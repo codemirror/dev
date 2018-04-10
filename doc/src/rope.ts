@@ -1,6 +1,12 @@
-const MAX_LEAF = 256
-const BASE_LEAF = 128
-const TARGET_BRANCH_SHIFT = 4
+/* These were settled on through benchmarking */
+
+// The max size of a leaf node
+const MAX_LEAF = 512
+// The base size of a leaf node
+const BASE_LEAF = MAX_LEAF >> 1
+// The desired amount of branches per node, as an exponent of 2 (so 3
+// means 8 branches)
+const TARGET_BRANCH_SHIFT = 3
 
 export abstract class Rope {
   abstract text: string;
