@@ -1,0 +1,33 @@
+{
+  "name": "codemirror",
+  "version": "6.0.0",
+  "description": "Text/code editor component",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha -r ts-node/register */test/test-*.ts"
+  },
+  "keywords": [
+    "editor",
+    "code",
+    "syntax",
+    "highlighting"
+  ],
+  "contributors": [
+    {
+      "name": "Adrian Heine",
+      "email": "mail@adrianheine.de"
+    },
+    {
+      "name": "Marijn Haverbeke",
+      "email": "marijnh@gmail.com"
+    }
+  ],
+  "author": "Marijn Haverbeke <marijnh@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "ist": "^1.0.1",
+    "mocha": "^5.0.5",
+    "ts-node": "^5.0.1",
+    "typescript": "^2.8.1"
+  }
+}
