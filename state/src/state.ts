@@ -106,10 +106,7 @@ export class Change {
     return this.from + (side < 0 ? 0 : this.text.length)
   }
 
-  // FIXME add a replace operation to Rope, rather than delete/insert
   apply(doc: Rope): Rope {
-    if (this.to > this.from) doc = doc.delete(this.from, this.to)
-    if (this.text) doc = doc.insert(this.text, this.from)
-    return doc
+    return doc.replace(this.from, this.to, this.text)
   }
 }

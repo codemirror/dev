@@ -12,12 +12,13 @@ export abstract class Rope {
   abstract text: string;
   abstract length: number;
   abstract slice(from: number, to: number): string;
-  abstract insert(text: string, at: number): Rope;
-  abstract insertInner(text: string, at: number): Rope[];
-  abstract delete(from: number, to: number): Rope;
+  abstract replace(from: number, to: number, text: string): Rope;
+
+  abstract decomposeStart(to: number, target: Rope[]): void;
+  abstract decomposeEnd(from: number, target: Rope[]): void;
 
   static create(text: string): Rope {
-    return text.length < MAX_LEAF ? new Leaf(text) : Node.from(text.length, Leaf.split(text))
+    return text.length < MAX_LEAF ? new Leaf(text) : Node.from(text.length, Leaf.split(text, []))
   }
 }
 
@@ -33,34 +34,33 @@ export class Leaf extends Rope {
     return this.text.length
   }
 
-  insert(text: string, at: number): Rope {
-    text = this.text.slice(0, at) + text + this.text.slice(at)
+  replace(from: number, to: number, text: string): Rope {
+    text = this.text.slice(0, from) + text + this.text.slice(to)
     if (text.length <= MAX_LEAF) return new Leaf(text)
-    return Node.from(text.length, Leaf.split(text))
+    return Node.from(text.length, Leaf.split(text, []))
   }
 
-  static split(text: string): Leaf[] {
-    let leaves: Leaf[] = []
-    for (let i = 0;; i += BASE_LEAF) {
-      if (i + MAX_LEAF > text.length) {
-        leaves.push(new Leaf(text.slice(i)))
-        break
-      }
-      leaves.push(new Leaf(text.slice(i, i + BASE_LEAF)))
-    }
-    return leaves
+  decomposeStart(to: number, target: Rope[]) {
+    target.push(new Leaf(this.text.slice(0, to)))
   }
 
-  insertInner(text: string, at: number): Rope[] {
-    return Leaf.split(this.text.slice(0, at) + text + this.text.slice(at))
-  }
-
-  delete(from: number, to: number = this.length): Leaf {
-    return new Leaf(this.text.slice(0, from) + this.text.slice(to))
+  decomposeEnd(from: number, target: Rope[]) {
+    target.push(new Leaf(this.text.slice(from)))
   }
 
   slice(from: number, to: number = this.text.length): string {
     return this.text.slice(from, to)
+  }
+
+  static split(text: string, target: Leaf[]): Leaf[] {
+    for (let i = 0;; i += BASE_LEAF) {
+      if (i + MAX_LEAF > text.length) {
+        target.push(new Leaf(text.slice(i)))
+        break
+      }
+      target.push(new Leaf(text.slice(i, i + BASE_LEAF)))
+    }
+    return target
   }
 }
 
@@ -74,53 +74,59 @@ export class Node extends Rope {
     this.children = children
   }
 
-  insert(text: string, at: number): Rope {
-    let child, childN
-    for (let i = 0, pos = 0;; i++) {
-      child = this.children[i]
-      let end = pos + child.length
-      if (at <= end) { childN = i; at -= pos; break }
-      pos = end
-    }
-    let totalLength = this.length + text.length, maxChunk = totalLength >> (TARGET_BRANCH_SHIFT - 1)
-    if (child.length + text.length < Math.max(MAX_LEAF, maxChunk)) { // Fast path — insert into single child
-      let children = this.children.slice()
-      children[childN] = child.insert(text, at)
-      return new Node(totalLength, children)
-    } else { // Build up a node list first, then balance into a tree
-      return Node.from(totalLength, this.children.slice(0, childN)
-                       .concat(child.insertInner(text, at))
-                       .concat(this.children.slice(childN + 1)))
-    }
-  }
+  replace(from: number, to: number, text: string): Rope {
+    let lengthDiff = text.length - (to - from), newLength = this.length + lengthDiff
+    if (newLength <= BASE_LEAF) return new Leaf(this.slice(0, from) + text + this.slice(to))
 
-  insertInner(text: string, at: number): Rope[] {
-    let child, childN
-    for (let i = 0, pos = 0;; i++) {
-      child = this.children[i]
-      let end = pos + child.length
-      if (at <= end) { childN = i; at -= pos; break }
-      pos = end
-    }
-    return this.children.slice(0, childN)
-      .concat(child.insertInner(text, at))
-      .concat(this.children.slice(childN + 1))
-  }
-
-  delete(from: number, to: number = this.length): Rope {
-    let newLength = this.length - (to - from)
-    if (newLength <= BASE_LEAF) return new Leaf(this.slice(0, from) + this.slice(to))
-
-    let children = [], cutAt = -1
+    let chunkLength = newLength >> TARGET_BRANCH_SHIFT
+    let children
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
-      if (from >= end || to <= pos)
-        children.push(child)
-      else if (pos < from || end > to)
-        children.push(child.delete(Math.max(0, from - pos), Math.min(child.length, to - pos)))
+      if (from >= pos && to <= end &&
+          (lengthDiff > 0
+           ? child.length + lengthDiff < Math.max(chunkLength << 1, MAX_LEAF)
+           : child.length + lengthDiff > chunkLength)) {
+        // Fast path: if the change only affects one child and the
+        // child's size remains in the acceptable range, only update
+        // that child
+        children = this.children.slice()
+        children[i] = child.replace(from - pos, to - pos, text)
+        return new Node(newLength, children)
+      } else if (end > from) {
+        // Otherwise, we must build up a new array of children
+        if (children == null) children = this.children.slice(0, i)
+        if (pos < from) {
+          child.decomposeStart(from - pos, children)
+          if (end >= to) Leaf.split(text, children)
+        }
+        if (pos >= to) children.push(child)
+        else if (end > to) child.decomposeEnd(to - pos, children)
+      }
       pos = end
     }
-    return new Node(newLength, children)
+    return children ? Node.from(newLength, children) : this
+  }
+
+  decomposeStart(to: number, target: Rope[]) {
+    for (let i = 0, pos = 0;; i++) {
+      let child = this.children[i], end = pos + child.length
+      if (end <= to) {
+        target.push(child)
+      } else {
+        if (pos < to) child.decomposeStart(to - pos, target)
+        break
+      }
+      pos = end
+    }
+  }
+
+  decomposeEnd(from: number, target: Rope[]) {
+    for (let i = 0, pos = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length
+      if (pos >= from) target.push(child)
+      else if (end > from && pos < from) child.decomposeEnd(from - pos, target)
+      pos = end
+    }
   }
 
   slice(from: number, to: number = this.length): string {
@@ -147,12 +153,17 @@ export class Node extends Rope {
     let chunkLength = length >> TARGET_BRANCH_SHIFT, maxLength = chunkLength << 1, minLength = chunkLength >> 1
     let chunked: Rope[] = [], currentLength = 0, currentChunk: Rope[] = []
     function add(child: Rope) {
-      let childLength = child.length
+      let childLength = child.length, last
       if (childLength > maxLength && child instanceof Node) {
         for (let i = 0; i < child.children.length; i++) add(child.children[i])
       } else if (childLength > minLength && (currentLength > minLength || currentLength == 0)) {
         flush()
         chunked.push(child)
+      } else if (child instanceof Leaf && currentLength > 0 &&
+                 (last = currentChunk[currentChunk.length - 1]) instanceof Leaf &&
+                 child.length + last.length <= BASE_LEAF) {
+        currentLength += childLength
+        currentChunk[currentChunk.length - 1] = new Leaf(last.text + child.text)
       } else {
         if (currentLength + childLength > chunkLength) flush()
         currentLength += childLength
