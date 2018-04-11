@@ -78,14 +78,13 @@ export class Node extends Rope {
     let lengthDiff = text.length - (to - from), newLength = this.length + lengthDiff
     if (newLength <= BASE_LEAF) return new Leaf(this.slice(0, from) + text + this.slice(to))
 
-    let chunkLength = newLength >> TARGET_BRANCH_SHIFT
     let children
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       if (from >= pos && to <= end &&
           (lengthDiff > 0
-           ? child.length + lengthDiff < Math.max(chunkLength << 1, MAX_LEAF)
-           : child.length + lengthDiff > chunkLength)) {
+           ? child.length + lengthDiff < Math.max(newLength >> (TARGET_BRANCH_SHIFT - 1), MAX_LEAF)
+           : child.length + lengthDiff > newLength >> TARGET_BRANCH_SHIFT)) {
         // Fast path: if the change only affects one child and the
         // child's size remains in the acceptable range, only update
         // that child
@@ -96,7 +95,8 @@ export class Node extends Rope {
         // Otherwise, we must build up a new array of children
         if (children == null) children = this.children.slice(0, i)
         if (pos < from) {
-          child.decomposeStart(from - pos, children)
+          if (end == from) children.push(child)
+          else child.decomposeStart(from - pos, children)
           if (end >= to) Leaf.split(text, children)
         }
         if (pos >= to) children.push(child)
