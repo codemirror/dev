@@ -1,10 +1,7 @@
 import {Rope} from "../../doc/src/rope"
 
 export class EditorState {
-  constructor(public doc: Rope, public selection: Selection = Selection.default) {
-    this.doc = doc
-    this.selection = selection
-  }
+  constructor(public readonly doc: Rope, public readonly selection: Selection = Selection.default) {}
 
   get transaction(): Transaction {
     return new Transaction(this)
@@ -12,7 +9,7 @@ export class EditorState {
 }
 
 export class Range {
-  constructor(public anchor: number, public head: number = anchor) {}
+  constructor(public readonly anchor: number, public readonly head: number = anchor) {}
 
   get from(): number { return Math.min(this.anchor, this.head) }
   get to(): number { return Math.max(this.anchor, this.head) }
@@ -27,7 +24,7 @@ export class Range {
 
 // FIXME remove/join on overlap, maybe sort, store primary index
 export class Selection {
-  constructor(public ranges: Range[]) {}
+  constructor(public readonly ranges: Range[]) {}
 
   map(change: Change): Selection {
     return new Selection(this.ranges.map(r => r.map(change)))
@@ -93,7 +90,7 @@ export class Transaction {
 }
 
 export class Change {
-  constructor(public from: number, public to: number, public text: string) {}
+  constructor(public readonly from: number, public readonly to: number, public readonly text: string) {}
 
   invert(doc: Rope) {
     return new Change(this.from, this.from + this.text.length, doc.slice(this.from, this.to))
