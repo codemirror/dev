@@ -11,8 +11,8 @@ const TARGET_BRANCH_SHIFT = 3
 export abstract class Rope {
   abstract readonly text: string;
   abstract readonly length: number;
-  abstract slice(from: number, to: number): string;
   abstract replace(from: number, to: number, text: string): Rope;
+  abstract slice(from: number, to: number): string;
 
   abstract decomposeStart(to: number, target: Rope[]): void;
   abstract decomposeEnd(from: number, target: Rope[]): void;
@@ -39,16 +39,16 @@ export class Leaf extends Rope {
     return Node.from(text.length, Leaf.split(text, []))
   }
 
+  slice(from: number, to: number = this.text.length): string {
+    return this.text.slice(from, to)
+  }
+
   decomposeStart(to: number, target: Rope[]) {
     target.push(new Leaf(this.text.slice(0, to)))
   }
 
   decomposeEnd(from: number, target: Rope[]) {
     target.push(new Leaf(this.text.slice(from)))
-  }
-
-  slice(from: number, to: number = this.text.length): string {
-    return this.text.slice(from, to)
   }
 
   static split(text: string, target: Leaf[]): Leaf[] {
@@ -66,6 +66,13 @@ export class Leaf extends Rope {
 export class Node extends Rope {
   constructor(readonly length: number, readonly children: Rope[]) {
     super()
+  }
+
+  get text(): string {
+    let result = ""
+    for (let i = 0; i < this.children.length; i++)
+      result += this.children[i].text
+    return result
   }
 
   replace(from: number, to: number, text: string): Rope {
@@ -101,6 +108,17 @@ export class Node extends Rope {
     return children ? Node.from(newLength, children) : this
   }
 
+  slice(from: number, to: number = this.length): string {
+    let result = ""
+    for (let i = 0, pos = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length
+      if (to > pos && from < end)
+        result += child.slice(Math.max(0, from - pos), Math.min(child.length, to - pos))
+      pos = end
+    }
+    return result
+  }
+
   decomposeStart(to: number, target: Rope[]) {
     for (let i = 0, pos = 0;; i++) {
       let child = this.children[i], end = pos + child.length
@@ -121,24 +139,6 @@ export class Node extends Rope {
       else if (end > from && pos < from) child.decomposeEnd(from - pos, target)
       pos = end
     }
-  }
-
-  slice(from: number, to: number = this.length): string {
-    let result = ""
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
-      if (to > pos && from < end)
-        result += child.slice(Math.max(0, from - pos), Math.min(child.length, to - pos))
-      pos = end
-    }
-    return result
-  }
-
-  get text(): string {
-    let result = ""
-    for (let i = 0; i < this.children.length; i++)
-      result += this.children[i].text
-    return result
   }
 
   static from(length: number, children: Rope[]): Rope {
