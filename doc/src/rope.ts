@@ -35,8 +35,7 @@ export class Leaf extends Rope {
 
   replace(from: number, to: number, text: string): Rope {
     text = this.text.slice(0, from) + text + this.text.slice(to)
-    if (text.length <= MAX_LEAF) return new Leaf(text)
-    return Node.from(text.length, Leaf.split(text, []))
+    return Rope.create(text)
   }
 
   slice(from: number, to: number = this.text.length): string {
