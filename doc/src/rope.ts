@@ -9,13 +9,15 @@ const BASE_LEAF = MAX_LEAF >> 1
 const TARGET_BRANCH_SHIFT = 3
 
 export abstract class Rope {
-  abstract text: string;
-  abstract length: number;
+  abstract readonly text: string;
+  abstract readonly length: number;
   abstract slice(from: number, to: number): string;
   abstract replace(from: number, to: number, text: string): Rope;
 
   abstract decomposeStart(to: number, target: Rope[]): void;
   abstract decomposeEnd(from: number, target: Rope[]): void;
+
+  protected constructor() {}
 
   static create(text: string): Rope {
     return text.length < MAX_LEAF ? new Leaf(text) : Node.from(text.length, Leaf.split(text, []))
@@ -23,11 +25,8 @@ export abstract class Rope {
 }
 
 export class Leaf extends Rope {
-  text: string;
-
-  constructor(text: string) {
+  constructor(readonly text: string) {
     super()
-    this.text = text
   }
 
   get length(): number {
@@ -65,13 +64,8 @@ export class Leaf extends Rope {
 }
 
 export class Node extends Rope {
-  length: number;
-  children: Rope[];
-
-  constructor(length: number, children: Rope[]) {
+  constructor(readonly length: number, readonly children: Rope[]) {
     super()
-    this.length = length
-    this.children = children
   }
 
   replace(from: number, to: number, text: string): Rope {
