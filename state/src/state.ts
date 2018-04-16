@@ -1,7 +1,7 @@
-import {Rope} from "../../doc/src/rope"
+import {Text} from "../../doc/src/text"
 
 export class EditorState {
-  constructor(public readonly doc: Rope, public readonly selection: Selection = Selection.default) {}
+  constructor(public readonly doc: Text, public readonly selection: Selection = Selection.default) {}
 
   get transaction(): Transaction {
     return new Transaction(this)
@@ -37,7 +37,7 @@ export class Selection {
 
 export class Transaction {
   changes: Change[];
-  docs: Rope[];
+  docs: Text[];
   private currentSelection: Selection;
   private currentSelectionAt: number;
 
@@ -48,7 +48,7 @@ export class Transaction {
     this.currentSelectionAt = 0
   }
 
-  get doc(): Rope {
+  get doc(): Text {
     let last = this.docs.length - 1
     return last < 0 ? this.startState.doc : this.docs[last]
   }
@@ -92,7 +92,7 @@ export class Transaction {
 export class Change {
   constructor(public readonly from: number, public readonly to: number, public readonly text: string) {}
 
-  invert(doc: Rope) {
+  invert(doc: Text) {
     return new Change(this.from, this.from + this.text.length, doc.slice(this.from, this.to))
   }
 
@@ -103,7 +103,7 @@ export class Change {
     return this.from + (side < 0 ? 0 : this.text.length)
   }
 
-  apply(doc: Rope): Rope {
+  apply(doc: Text): Text {
     return doc.replace(this.from, this.to, this.text)
   }
 }

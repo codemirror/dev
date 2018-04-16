@@ -8,23 +8,25 @@ const BASE_LEAF = MAX_LEAF >> 1
 // means 8 branches)
 const TARGET_BRANCH_SHIFT = 3
 
-export abstract class Rope {
+export abstract class Text {
   abstract readonly text: string;
   abstract readonly length: number;
-  abstract replace(from: number, to: number, text: string): Rope;
+  abstract replace(from: number, to: number, text: string): Text;
   abstract slice(from: number, to: number): string;
 
-  abstract decomposeStart(to: number, target: Rope[]): void;
-  abstract decomposeEnd(from: number, target: Rope[]): void;
+  // These are module-internal but TypeScript doesn't have a
+  // way to express that.
+  abstract decomposeStart(to: number, target: Text[]): void;
+  abstract decomposeEnd(from: number, target: Text[]): void;
 
-  protected constructor() {}
+  constructor() {}
 
-  static create(text: string): Rope {
-    return text.length < MAX_LEAF ? new Leaf(text) : Node.from(text.length, Leaf.split(text, []))
+  static create(text: string): Text {
+    return text.length < MAX_LEAF ? new TextLeaf(text) : TextNode.from(text.length, TextLeaf.split(text, []))
   }
 }
 
-export class Leaf extends Rope {
+export class TextLeaf extends Text {
   constructor(readonly text: string) {
     super()
   }
@@ -33,36 +35,36 @@ export class Leaf extends Rope {
     return this.text.length
   }
 
-  replace(from: number, to: number, text: string): Rope {
-    return Rope.create(this.text.slice(0, from) + text + this.text.slice(to))
+  replace(from: number, to: number, text: string): Text {
+    return Text.create(this.text.slice(0, from) + text + this.text.slice(to))
   }
 
   slice(from: number, to: number = this.text.length): string {
     return this.text.slice(from, to)
   }
 
-  decomposeStart(to: number, target: Rope[]) {
-    target.push(new Leaf(this.text.slice(0, to)))
+  decomposeStart(to: number, target: Text[]) {
+    target.push(new TextLeaf(this.text.slice(0, to)))
   }
 
-  decomposeEnd(from: number, target: Rope[]) {
-    target.push(new Leaf(this.text.slice(from)))
+  decomposeEnd(from: number, target: Text[]) {
+    target.push(new TextLeaf(this.text.slice(from)))
   }
 
-  static split(text: string, target: Leaf[]): Leaf[] {
+  static split(text: string, target: TextLeaf[]): TextLeaf[] {
     for (let i = 0;; i += BASE_LEAF) {
       if (i + MAX_LEAF > text.length) {
-        target.push(new Leaf(text.slice(i)))
+        target.push(new TextLeaf(text.slice(i)))
         break
       }
-      target.push(new Leaf(text.slice(i, i + BASE_LEAF)))
+      target.push(new TextLeaf(text.slice(i, i + BASE_LEAF)))
     }
     return target
   }
 }
 
-export class Node extends Rope {
-  constructor(readonly length: number, readonly children: Rope[]) {
+export class TextNode extends Text {
+  constructor(readonly length: number, readonly children: Text[]) {
     super()
   }
 
@@ -73,9 +75,9 @@ export class Node extends Rope {
     return result
   }
 
-  replace(from: number, to: number, text: string): Rope {
+  replace(from: number, to: number, text: string): Text {
     let lengthDiff = text.length - (to - from), newLength = this.length + lengthDiff
-    if (newLength <= BASE_LEAF) return new Leaf(this.slice(0, from) + text + this.slice(to))
+    if (newLength <= BASE_LEAF) return new TextLeaf(this.slice(0, from) + text + this.slice(to))
 
     let children
     for (let i = 0, pos = 0; i < this.children.length; i++) {
@@ -89,21 +91,21 @@ export class Node extends Rope {
         // that child
         children = this.children.slice()
         children[i] = child.replace(from - pos, to - pos, text)
-        return new Node(newLength, children)
+        return new TextNode(newLength, children)
       } else if (end > from) {
         // Otherwise, we must build up a new array of children
         if (children == null) children = this.children.slice(0, i)
         if (pos < from) {
           if (end == from) children.push(child)
           else child.decomposeStart(from - pos, children)
-          if (end >= to) Leaf.split(text, children)
+          if (end >= to) TextLeaf.split(text, children)
         }
         if (pos >= to) children.push(child)
         else if (end > to) child.decomposeEnd(to - pos, children)
       }
       pos = end
     }
-    return children ? Node.from(newLength, children) : this
+    return children ? TextNode.from(newLength, children) : this
   }
 
   slice(from: number, to: number = this.length): string {
@@ -117,7 +119,7 @@ export class Node extends Rope {
     return result
   }
 
-  decomposeStart(to: number, target: Rope[]) {
+  decomposeStart(to: number, target: Text[]) {
     for (let i = 0, pos = 0;; i++) {
       let child = this.children[i], end = pos + child.length
       if (end <= to) {
@@ -130,7 +132,7 @@ export class Node extends Rope {
     }
   }
 
-  decomposeEnd(from: number, target: Rope[]) {
+  decomposeEnd(from: number, target: Text[]) {
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       if (pos >= from) target.push(child)
@@ -139,23 +141,23 @@ export class Node extends Rope {
     }
   }
 
-  static from(length: number, children: Rope[]): Rope {
-    if (children.length == 0) return new Leaf("")
+  static from(length: number, children: Text[]): Text {
+    if (children.length == 0) return new TextLeaf("")
 
     let chunkLength = length >> TARGET_BRANCH_SHIFT, maxLength = chunkLength << 1, minLength = chunkLength >> 1
-    let chunked: Rope[] = [], currentLength = 0, currentChunk: Rope[] = []
-    function add(child: Rope) {
+    let chunked: Text[] = [], currentLength = 0, currentChunk: Text[] = []
+    function add(child: Text) {
       let childLength = child.length, last
-      if (childLength > maxLength && child instanceof Node) {
+      if (childLength > maxLength && child instanceof TextNode) {
         for (let i = 0; i < child.children.length; i++) add(child.children[i])
       } else if (childLength > minLength && (currentLength > minLength || currentLength == 0)) {
         flush()
         chunked.push(child)
-      } else if (child instanceof Leaf && currentLength > 0 &&
-                 (last = currentChunk[currentChunk.length - 1]) instanceof Leaf &&
+      } else if (child instanceof TextLeaf && currentLength > 0 &&
+                 (last = currentChunk[currentChunk.length - 1]) instanceof TextLeaf &&
                  child.length + last.length <= BASE_LEAF) {
         currentLength += childLength
-        currentChunk[currentChunk.length - 1] = new Leaf(last.text + child.text)
+        currentChunk[currentChunk.length - 1] = new TextLeaf(last.text + child.text)
       } else {
         if (currentLength + childLength > chunkLength) flush()
         currentLength += childLength
@@ -164,7 +166,7 @@ export class Node extends Rope {
     }
     function flush() {
       if (currentLength > 0) {
-        chunked.push(currentChunk.length == 1 ? currentChunk[0] : Node.from(currentLength, currentChunk))
+        chunked.push(currentChunk.length == 1 ? currentChunk[0] : TextNode.from(currentLength, currentChunk))
         currentLength = 0
         currentChunk.length = 0
       }
@@ -172,6 +174,6 @@ export class Node extends Rope {
 
     for (let i = 0; i < children.length; i++) add(children[i])
     flush()
-    return chunked.length == 1 ? chunked[0] : new Node(length, chunked)
+    return chunked.length == 1 ? chunked[0] : new TextNode(length, chunked)
   }
 }
