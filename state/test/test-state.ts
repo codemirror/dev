@@ -26,4 +26,10 @@ describe("EditorState", () => {
     ist(newState.doc.text, "QabcdQefghQ")
     ist(newState.selection.ranges.map(r => r.from).join("/"), "1/6/11")
   })
+
+  it("can store meta properties on transactions", () => {
+    let tr = new EditorState(Text.create("foo")).transaction
+    tr.setMeta("something", 55)
+    ist(tr.getMeta("something"), 55)
+  })
 })

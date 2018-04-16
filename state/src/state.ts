@@ -39,16 +39,27 @@ export class Transaction {
   changes: Change[];
   docs: Text[];
   selection: Selection;
+  meta: {[key: string]: any};
 
   constructor(public startState: EditorState) {
     this.changes = []
     this.docs = []
     this.selection = startState.selection
+    this.meta = Object.create(null)
   }
 
   get doc(): Text {
     let last = this.docs.length - 1
     return last < 0 ? this.startState.doc : this.docs[last]
+  }
+
+  setMeta(name: string, value: any) {
+    this.meta[name] = value
+    return this
+  }
+
+  getMeta(name: string): any {
+    return this.meta[name]
   }
 
   change(change: Change): Transaction {
