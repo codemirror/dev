@@ -38,14 +38,12 @@ export class Selection {
 export class Transaction {
   changes: Change[];
   docs: Text[];
-  private currentSelection: Selection;
-  private currentSelectionAt: number;
+  selection: Selection;
 
   constructor(public startState: EditorState) {
     this.changes = []
     this.docs = []
-    this.currentSelection = startState.selection
-    this.currentSelectionAt = 0
+    this.selection = startState.selection
   }
 
   get doc(): Text {
@@ -53,17 +51,11 @@ export class Transaction {
     return last < 0 ? this.startState.doc : this.docs[last]
   }
 
-  get selection(): Selection {
-    while (this.currentSelectionAt < this.changes.length) {
-      this.currentSelection = this.currentSelection.map(this.changes[this.currentSelectionAt])
-      this.currentSelectionAt++
-    }
-    return this.currentSelection
-  }
-
   change(change: Change): Transaction {
+    if (change.from == change.to && change.text == "") return this
     this.changes.push(change)
     this.docs.push(change.apply(this.doc))
+    this.selection = this.selection.map(change)
     return this
   }
 
