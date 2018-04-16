@@ -34,8 +34,7 @@ export class Leaf extends Rope {
   }
 
   replace(from: number, to: number, text: string): Rope {
-    text = this.text.slice(0, from) + text + this.text.slice(to)
-    return Rope.create(text)
+    return Rope.create(this.text.slice(0, from) + text + this.text.slice(to))
   }
 
   slice(from: number, to: number = this.text.length): string {
