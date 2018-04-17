@@ -24,7 +24,7 @@ export class Range {
 
 // FIXME remove/join on overlap, maybe sort, store primary index
 export class Selection {
-  constructor(public readonly ranges: Range[]) {}
+  constructor(public readonly ranges: ReadonlyArray<Range>) {}
 
   map(change: Change): Selection {
     return new Selection(this.ranges.map(r => r.map(change)))
@@ -47,8 +47,8 @@ Meta.prototype["__proto__"] = null
 
 export class Transaction {
   private constructor(public readonly startState: EditorState,
-                      public readonly changes: Change[],
-                      public readonly docs: Text[],
+                      public readonly changes: ReadonlyArray<Change>,
+                      public readonly docs: ReadonlyArray<Text>,
                       public readonly selection: Selection,
                       private readonly meta: Meta) {}
 
