@@ -28,8 +28,7 @@ describe("EditorState", () => {
   })
 
   it("can store meta properties on transactions", () => {
-    let tr = new EditorState(Text.create("foo")).transaction
-    tr.setMeta("something", 55)
+    let tr = new EditorState(Text.create("foo")).transaction.setMeta("something", 55)
     ist(tr.getMeta("something"), 55)
   })
 })

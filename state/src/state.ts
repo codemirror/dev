@@ -4,7 +4,7 @@ export class EditorState {
   constructor(public readonly doc: Text, public readonly selection: Selection = Selection.default) {}
 
   get transaction(): Transaction {
-    return new Transaction(this)
+    return Transaction.start(this)
   }
 }
 
@@ -35,17 +35,27 @@ export class Selection {
   static default: Selection = new Selection([new Range(0)]);
 }
 
-export class Transaction {
-  changes: Change[];
-  docs: Text[];
-  selection: Selection;
-  meta: {[key: string]: any};
+const empty: any[] = []
 
-  constructor(public startState: EditorState) {
-    this.changes = []
-    this.docs = []
-    this.selection = startState.selection
-    this.meta = Object.create(null)
+class Meta {
+  constructor(from: Meta | null = null) {
+    if (from) for (let prop in from) this[prop] = from[prop]
+  }
+  [key: string]: any;
+}
+Meta.prototype["__proto__"] = null
+
+export class Transaction {
+  private constructor(public readonly startState: EditorState,
+                      public readonly changes: Change[],
+                      public readonly docs: Text[],
+                      public readonly selection: Selection,
+                      private readonly meta: Meta) {}
+
+  static start(state: EditorState, time: number = Date.now()) {
+    let meta = new Meta
+    meta.time = time
+    return new Transaction(state, empty, empty, state.selection, meta)
   }
 
   get doc(): Text {
@@ -54,8 +64,9 @@ export class Transaction {
   }
 
   setMeta(name: string, value: any) {
-    this.meta[name] = value
-    return this
+    let meta = new Meta(this.meta)
+    meta[name] = value
+    return new Transaction(this.startState, this.changes, this.docs, this.selection, meta)
   }
 
   getMeta(name: string): any {
@@ -64,27 +75,28 @@ export class Transaction {
 
   change(change: Change): Transaction {
     if (change.from == change.to && change.text == "") return this
-    this.changes.push(change)
-    this.docs.push(change.apply(this.doc))
-    this.selection = this.selection.map(change)
-    return this
+    return new Transaction(this.startState,
+                           this.changes.concat(change),
+                           this.docs.concat(change.apply(this.doc)),
+                           this.selection.map(change), this.meta)
   }
 
   replaceSelection(text: string): Transaction {
-    this.forEachRange(r => {
-      this.change(new Change(r.from, r.to, text))
+    return this.reduceRanges((state, r) => {
+      return state.change(new Change(r.from, r.to, text))
     })
-    return this
   }
 
-  forEachRange(f: (range: Range) => void) {
-    let sel = this.selection, start = this.changes.length
+  reduceRanges(f: (transaction: Transaction, range: Range) => Transaction): Transaction {
+    let tr: Transaction = this
+    let sel = tr.selection, start = tr.changes.length
     for (let i = 0; i < sel.ranges.length; i++) {
       let range = sel.ranges[i]
-      for (let j = start; j < this.changes.length; j++)
-        range = range.map(this.changes[j])
-      f(range)
+      for (let j = start; j < tr.changes.length; j++)
+        range = range.map(tr.changes[j])
+      tr = f(tr, range)
     }
+    return tr
   }
 
   apply(): EditorState {
