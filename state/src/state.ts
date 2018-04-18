@@ -16,7 +16,7 @@ export class Range {
   get empty(): boolean { return this.anchor == this.head }
 
   map(change: Change): Range {
-    let anchor = change.map(this.anchor), head = change.map(this.head)
+    let anchor = change.mapPos(this.anchor), head = change.mapPos(this.head)
     if (anchor == this.anchor && head == this.head) return this
     else return new Range(anchor, head)
   }
@@ -111,7 +111,7 @@ export class Change {
     return new Change(this.from, this.from + this.text.length, doc.slice(this.from, this.to))
   }
 
-  map(pos: number, bias: number = 1) {
+  mapPos(pos: number, bias: number = 1) {
     if (pos < this.from || bias < 0 && pos == this.from) return pos
     if (pos > this.to) return pos + this.text.length - (this.to - this.from)
     let side = this.from == this.to ? bias : pos == this.from ? -1 : pos == this.to ? 1 : bias
