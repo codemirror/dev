@@ -8,11 +8,20 @@ const BASE_LEAF = MAX_LEAF >> 1
 // means 8 branches)
 const TARGET_BRANCH_SHIFT = 3
 
-export abstract class Text {
+const iterator: symbol = typeof Symbol == "undefined" ? "__iterator" as any as symbol : Symbol.iterator
+
+// @ts-ignore (Typescript doesn't believe we're implementing Iterator due to indirection)
+export abstract class Text implements Iterable<string> {
   abstract readonly text: string;
   abstract readonly length: number;
+  abstract readonly lineBreaks: number;
   abstract replace(from: number, to: number, text: string): Text;
   abstract slice(from: number, to: number): string;
+  abstract eq(other: Text): boolean;
+
+  get lines() { return this.lineBreaks + 1 }
+  iter() { return new TextIterator(this) }
+  [iterator]() { return new TextIterator(this) }
 
   // These are module-internal but TypeScript doesn't have a
   // way to express that.
@@ -27,8 +36,14 @@ export abstract class Text {
 }
 
 export class TextLeaf extends Text {
+  readonly lineBreaks: number;
+
   constructor(readonly text: string) {
     super()
+    let lineBreaks = 0
+    // FIXME use configured line ending? Fixed special char?
+    for (let pos = 0, next; (next = text.indexOf("\n", pos)) > -1; pos = next + 1) lineBreaks++
+    this.lineBreaks = lineBreaks
   }
 
   get length(): number {
@@ -41,6 +56,10 @@ export class TextLeaf extends Text {
 
   slice(from: number, to: number = this.text.length): string {
     return this.text.slice(from, to)
+  }
+
+  eq(other: Text): boolean {
+    return other == this || (other instanceof TextLeaf ? this.text == other.text : eqContent(this, other))
   }
 
   decomposeStart(to: number, target: Text[]) {
@@ -64,8 +83,13 @@ export class TextLeaf extends Text {
 }
 
 export class TextNode extends Text {
+  readonly lineBreaks: number;
+
   constructor(readonly length: number, readonly children: Text[]) {
     super()
+    let lineBreaks = 0
+    for (let i = 0; i < children.length; i++) lineBreaks += children[i].lineBreaks
+    this.lineBreaks = lineBreaks
   }
 
   get text(): string {
@@ -117,6 +141,10 @@ export class TextNode extends Text {
       pos = end
     }
     return result
+  }
+
+  eq(other: Text): boolean {
+    return this == other || eqContent(this, other)
   }
 
   decomposeStart(to: number, target: Text[]) {
@@ -175,5 +203,101 @@ export class TextNode extends Text {
     for (let i = 0; i < children.length; i++) add(children[i])
     flush()
     return chunked.length == 1 ? chunked[0] : new TextNode(length, chunked)
+  }
+}
+
+function eqContent(a: Text, b: Text): boolean {
+  if (a.length != b.length) return false
+  let iterA = a.iter(), iterB = b.iter()
+  for (let strA = iterA.next().value, strB = iterB.next().value;;) {
+    let lenA = strA.length, lenB = strB.length
+    if (lenA == lenB) {
+      if (strA != strB) return false
+      strA = iterA.next().value; strB = iterB.next().value
+      if (strA.length == 0) return true
+    } else if (lenA > lenB) {
+      if (strA.slice(0, lenB) != strB) return false
+      strA = strA.slice(lenB)
+      strB = iterB.next().value
+    } else {
+      if (strB.slice(0, lenA) != strA) return false
+      strB = strB.slice(lenA)
+      strA = iterA.next().value
+    }
+  }
+}
+
+
+export class TextIterator implements Iterator<string> {
+  private parents: TextNode[];
+  private indices: number[];
+  private nextValue: string;
+  private result: IteratorResult<string>;
+  public pos: number = 0;
+
+  constructor(text: Text) {
+    this.result = {value: "", done: false}
+    if (text instanceof TextNode) {
+      this.parents = [text]
+      this.indices = [0]
+      this.nextValue = ""
+      this.findNextLeaf()
+    } else {
+      this.parents = []
+      this.indices = []
+      this.nextValue = text.text
+    }
+  }
+
+  private findNextLeaf() {
+    for (;;) {
+      let last = this.parents.length - 1
+      if (last < 0) {
+        this.nextValue = ""
+        break
+      }
+      let top = this.parents[last]
+      let index = this.indices[last]
+      if (index == top.children.length) {
+        this.parents.pop()
+        this.indices.pop()
+      } else {
+        let next = top.children[index]
+        this.indices[last] = index + 1
+        if (next instanceof TextNode) {
+          this.parents.push(next)
+          this.indices.push(0)
+        } else {
+          this.nextValue = next.text
+          break
+        }
+      }
+    }
+  }
+
+  next(): IteratorResult<string> {
+    let value = this.result.value = this.nextValue
+    let done = this.result.done = value.length == 0
+    if (!done) {
+      this.pos += value.length
+      this.findNextLeaf()
+    }
+    return this.result
+  }
+
+  skip(n: number): boolean {
+    for (;;) {
+      if (this.nextValue == null) {
+        return false
+      } else if (this.nextValue.length > n) {
+        this.nextValue = this.nextValue.slice(n)
+        this.pos += n
+        return true
+      } else {
+        n -= this.nextValue.length
+        this.pos += this.nextValue.length
+        this.findNextLeaf()
+      }
+    }
   }
 }

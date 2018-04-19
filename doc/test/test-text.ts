@@ -5,7 +5,7 @@ function depth(node) {
   return node instanceof TextLeaf ? 0 : 1 + Math.max(...node.children.map(depth))
 }
 
-const line = "x".repeat(100)
+const line = "1234567890".repeat(10)
 const midDoc = new Array(200).fill(line).join("\n")
 
 describe("doc", () => {
@@ -28,7 +28,7 @@ describe("doc", () => {
     let doc = Text.create(midDoc).replace(10, midDoc.length - 10, "")
     ist(depth(doc), 0)
     ist(doc.length, 20)
-    ist(doc.text, "x".repeat(20))
+    ist(doc.text, line.slice(0, 20))
   })
 
   it("handles deleting at start", () => {
@@ -63,5 +63,29 @@ describe("doc", () => {
       let end = i == 399 ? doc.length : start + Math.floor(Math.random() * (doc.length - start))
       ist(doc.slice(start, end), str.slice(start, end))
     }
+  })
+
+  it("can be compared", () => {
+    let doc = Text.create(midDoc), doc2 = Text.create(midDoc)
+    ist(doc.eq(doc))
+    ist(doc.eq(doc2))
+    ist(doc2.eq(doc))
+    ist(!doc.eq(doc2.replace(5000, 5000, "y")))
+    ist(!doc.eq(doc2.replace(5000, 5001, "y")))
+  })
+
+  it("can be compared despite different tree shape", () => {
+    ist(Text.create(midDoc).eq(Text.create(midDoc.repeat(3)).replace(1000, (midDoc.length * 2) + 1000, "")))
+  })
+
+  it("can compare small documents", () => {
+    ist(Text.create("foo").eq(Text.create("foo")))
+    ist(!Text.create("foo").eq(Text.create("faa")))
+  })
+
+  it("is iterable", () => {
+    let found = "", doc = Text.create(midDoc.repeat(5))
+    for (let iter = doc.iter(), cur; !(cur = iter.next()).done;) found += cur.value
+    ist(found, doc.text)
   })
 })
