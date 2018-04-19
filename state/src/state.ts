@@ -107,11 +107,11 @@ export class Transaction {
 export class Change {
   constructor(public readonly from: number, public readonly to: number, public readonly text: string) {}
 
-  invert(doc: Text) {
+  invert(doc: Text): Change {
     return new Change(this.from, this.from + this.text.length, doc.slice(this.from, this.to))
   }
 
-  mapPos(pos: number, bias: number = 1) {
+  mapPos(pos: number, bias: number = 1): number {
     if (pos < this.from || bias < 0 && pos == this.from) return pos
     if (pos > this.to) return pos + this.text.length - (this.to - this.from)
     let side = this.from == this.to ? bias : pos == this.from ? -1 : pos == this.to ? 1 : bias
