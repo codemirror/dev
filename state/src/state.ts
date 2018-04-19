@@ -1,10 +1,39 @@
 import {Text} from "../../doc/src/text"
 
+export interface StateFieldSpec<T> {
+  readonly key: string;
+  init(): T;
+  apply(tr: Transaction, value: T): T;
+}
+
+export class Configuration {
+  constructor(public readonly fields: StateFieldSpec<any>[] = []) {
+  }
+
+  static get default(): Configuration {
+    return new Configuration()
+  }
+}
+
 export class EditorState {
-  constructor(public readonly doc: Text, public readonly selection: Selection = Selection.default) {}
+  constructor(public readonly config: Configuration,
+              public readonly doc: Text,
+              public readonly selection: Selection = Selection.default,
+              public readonly fields: {[key: string]: any} = Object.create(null)) {}
+
+  getField(key: string): any {
+    return this.fields[key]
+  }
 
   get transaction(): Transaction {
     return Transaction.start(this)
+  }
+
+  static fromConfig(config: Configuration, doc: Text, selection: Selection = Selection.default): EditorState {
+    return new EditorState(config, doc, selection, config.fields.reduce((map, field) => {
+      map[field.key] = field.init()
+      return map
+    }, Object.create(null)))
   }
 }
 
@@ -100,7 +129,13 @@ export class Transaction {
   }
 
   apply(): EditorState {
-    return new EditorState(this.doc, this.selection)
+    return new EditorState(this.startState.config,
+                           this.doc,
+                           this.selection,
+                           this.startState.config.fields.reduce((fields, fieldSpec) => {
+                             fields[fieldSpec.key] = fieldSpec.apply(this, fields[fieldSpec.key])
+                             return fields
+                           }, this.startState.fields))
   }
 }
 
