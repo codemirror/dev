@@ -49,20 +49,17 @@ export class DOMObserver {
   }
 
   flush() {
-    let records: MutationRecord[] | null = null
-    if (this.observer) {
-      records = this.observer.takeRecords()
-    }
-    if (this.charDataQueue.length) {
-      clearTimeout(this.charDataTimeout)
-      this.charDataTimeout = null
-      records = records ? records.concat(this.charDataQueue) : this.charDataQueue.slice()
-      this.charDataQueue.length = 0
-    }
-    if (records) this.registerMutations(records)
+    this.registerMutations(this.observer ? this.observer.takeRecords() : [])
   }
 
   registerMutations(records: MutationRecord[]) {
+    if (this.charDataQueue.length) {
+      clearTimeout(this.charDataTimeout)
+      this.charDataTimeout = null
+      records = records.concat(this.charDataQueue)
+      this.charDataQueue.length = 0
+    }
+
     let from = -1, to = -1
     for (let i = 0; i < records.length; i++) {
       let range = this.registerMutation(records[i])
@@ -74,6 +71,7 @@ export class DOMObserver {
         to = Math.max(range.to, to)
       }
     }
+
     if (from > -1) {
       this.view.docView.dirtyRanges.push({from, to})
       applyDOMChange(this.view, from, to)
