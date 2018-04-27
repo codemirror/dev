@@ -246,10 +246,10 @@ class LineViewDesc extends ViewDesc {
   }
 
   insertText(at: number, text: string) {
-    this.length += text.length
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       if (at >= pos && at < end) {
+        this.length += text.length
         child.insertText(at - pos, text)
         return
       }
