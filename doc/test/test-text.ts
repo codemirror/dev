@@ -88,4 +88,10 @@ describe("doc", () => {
     for (let iter = doc.iter(), cur; !(cur = iter.next()).done;) found += cur.value
     ist(found, doc.text)
   })
+
+  it("is partially iterable", () => {
+    let found = "", doc = Text.create(midDoc.repeat(5))
+    for (let iter = doc.iterRange(500, doc.length - 500), cur; !(cur = iter.next()).done;) found += cur.value
+    ist(found.slice(found.length - 100), doc.slice(500, doc.length - 500).slice(found.length - 100))
+  })
 })

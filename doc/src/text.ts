@@ -15,12 +15,14 @@ export abstract class Text implements Iterable<string> {
   abstract readonly text: string;
   abstract readonly length: number;
   abstract readonly lineBreaks: number;
+  abstract readonly children: ReadonlyArray<Text> | null;
   abstract replace(from: number, to: number, text: string): Text;
   abstract slice(from: number, to: number): string;
   abstract eq(other: Text): boolean;
 
   get lines() { return this.lineBreaks + 1 }
   iter() { return new TextIterator(this) }
+  iterRange(from: number, to: number | undefined) { return new TextIterator(this, from, to) }
   [iterator]() { return new TextIterator(this) }
 
   // These are module-internal but TypeScript doesn't have a
@@ -28,7 +30,7 @@ export abstract class Text implements Iterable<string> {
   abstract decomposeStart(to: number, target: Text[]): void;
   abstract decomposeEnd(from: number, target: Text[]): void;
 
-  constructor() {}
+  protected constructor() {}
 
   static create(text: string): Text {
     return text.length < MAX_LEAF ? new TextLeaf(text) : TextNode.from(text.length, TextLeaf.split(text, []))
@@ -50,6 +52,8 @@ export class TextLeaf extends Text {
     return this.text.length
   }
 
+  get children() { return null }
+
   replace(from: number, to: number, text: string): Text {
     return Text.create(this.text.slice(0, from) + text + this.text.slice(to))
   }
@@ -70,13 +74,20 @@ export class TextLeaf extends Text {
     target.push(new TextLeaf(this.text.slice(from)))
   }
 
-  static split(text: string, target: TextLeaf[]): TextLeaf[] {
-    for (let i = 0;; i += BASE_LEAF) {
+  static split(text: string, target: Text[]): Text[] {
+    // FIXME maybe introduce some random (or deterministic) jitter
+    // here to prevent getting too many equal-sized nodes in the tree
+    // (which are more expensive to compare)
+    for (let i = 0;;) {
       if (i + MAX_LEAF > text.length) {
         target.push(new TextLeaf(text.slice(i)))
         break
       }
-      target.push(new TextLeaf(text.slice(i, i + BASE_LEAF)))
+      // Don't cut in the middle of a surrogate pair
+      let end = i + BASE_LEAF, after = text.charCodeAt(end)
+      if (after >= 0xdc00 && after < 0xe000) end++
+      target.push(new TextLeaf(text.slice(i, end)))
+      i = end
     }
     return target
   }
@@ -85,7 +96,7 @@ export class TextLeaf extends Text {
 export class TextNode extends Text {
   readonly lineBreaks: number;
 
-  constructor(readonly length: number, readonly children: Text[]) {
+  constructor(readonly length: number, readonly children: ReadonlyArray<Text>) {
     super()
     let lineBreaks = 0
     for (let i = 0; i < children.length; i++) lineBreaks += children[i].lineBreaks
@@ -233,10 +244,12 @@ export class TextIterator implements Iterator<string> {
   private indices: number[];
   private nextValue: string;
   private result: IteratorResult<string>;
+  private clipped: number;
   public pos: number = 0;
 
-  constructor(text: Text) {
+  constructor(text: Text, from: number = 0, to: number = -1) {
     this.result = {value: "", done: false}
+    this.clipped = to
     if (text instanceof TextNode) {
       this.parents = [text]
       this.indices = [0]
@@ -247,6 +260,7 @@ export class TextIterator implements Iterator<string> {
       this.indices = []
       this.nextValue = text.text
     }
+    if (from > 0) this.skip(from)
   }
 
   private findNextLeaf() {
@@ -280,23 +294,48 @@ export class TextIterator implements Iterator<string> {
     let done = this.result.done = value.length == 0
     if (!done) {
       this.pos += value.length
-      this.findNextLeaf()
+      if (this.clipped > -1 && this.pos > this.clipped) {
+        this.result.value = this.result.value.slice(0, value.length - (this.pos - this.clipped))
+        this.pos = this.clipped
+        this.nextValue = ""
+      } else {
+        this.findNextLeaf()
+      }
     }
     return this.result
   }
 
-  skip(n: number): boolean {
+  private skip(n: number) {
+    if (this.nextValue.length > n) {
+      this.nextValue = this.nextValue.slice(n)
+      this.pos += n
+    } else {
+      n -= this.nextValue.length
+      this.pos += this.nextValue.length
+      this.nextValue = ""
+    }
     for (;;) {
-      if (this.nextValue == null) {
-        return false
-      } else if (this.nextValue.length > n) {
-        this.nextValue = this.nextValue.slice(n)
-        this.pos += n
-        return true
+      let last = this.parents.length - 1
+      if (last < 0) break
+      let parent = this.parents[last]
+      let index = this.indices[last]
+      if (index == parent.children.length) {
+        this.parents.pop()
+        this.indices.pop()
       } else {
-        n -= this.nextValue.length
-        this.pos += this.nextValue.length
-        this.findNextLeaf()
+        let next = parent.children[index], len = next.length
+        this.indices[last] = index + 1
+        if (len <= n) {
+          n -= len
+          this.pos += len
+        } else if (next instanceof TextNode) {
+          this.parents.push(next)
+          this.indices.push(0)
+        } else {
+          this.nextValue = next.text.slice(n)
+          this.pos += n
+          break
+        }
       }
     }
   }
