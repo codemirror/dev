@@ -91,6 +91,42 @@ export abstract class ViewDesc {
     }
     if (syncTop) this.syncDOM()
   }
+
+  localPosFromDOM(node: Node, offset: number): number {
+    let after: Node | null
+    if (node == this.dom) {
+      after = this.dom.childNodes[offset]
+    } else {
+      let bias = !node.firstChild ? 0 : offset == 0 ? -1 : 1
+      for (;;) {
+        let parent = node.parentNode!
+        if (parent == this.dom) break
+        if (bias == 0 && parent.firstChild != parent.lastChild) {
+          if (node == parent.firstChild) bias = -1
+          else bias = 1
+        }
+        node = parent
+      }
+      if (bias < 0) after = node
+      else after = node.nextSibling
+    }
+    if (!after) return this.length
+
+    for (let i = 0, pos = 0;; i++) {
+      let child = this.children[i]
+      if (child.dom == after) return pos
+      pos += child.length + this.childGap
+    }
+  }
+
+  domFromPos(pos: number): {node: Node, offset: number} {
+    for (let offset = 0, i = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = offset + child.length
+      if (pos <= end) return child.domFromPos(pos - offset)
+      offset = end + this.childGap
+    }
+    return {node: this.dom, offset: this.dom.childNodes.length}
+  }
 }
 
 // Remove a DOM node and return its next sibling.
@@ -226,6 +262,12 @@ export class DocViewDesc extends ViewDesc {
     }
     return null
   }
+
+  posFromDOM(node: Node, offset: number): number {
+    let desc = this.nearest(node)
+    if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
+    return desc.localPosFromDOM(node, offset) + desc.posAtStart
+  }
 }
 
 class LineViewDesc extends ViewDesc {
@@ -322,6 +364,14 @@ class TextViewDesc extends ViewDesc {
   }
 
   syncDOMFor(_ranges: Range[]) { this.syncDOM() }
+
+  localPosFromDOM(_node: Node, offset: number): number {
+    return offset
+  }
+
+  domFromPos(pos: number): {node: Node, offset: number} {
+    return {node: this.dom, offset: pos}
+  }
 }
 
 interface UpdateRange {
@@ -401,6 +451,10 @@ function addRange(ranges: Range[], from: number, to: number) {
     if (range.to < from) continue
     range.from = Math.min(from, range.from)
     range.to = Math.max(to, range.to)
+    while (i < ranges.length - 1 && range.to > ranges[i + 1].from) {
+      range.to = Math.max(ranges[i + 1].to, range.to)
+      ranges.splice(i + 1, 1)
+    }
     return
   }
   ranges.splice(i, 0, {from, to})

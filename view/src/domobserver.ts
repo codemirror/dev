@@ -34,9 +34,9 @@ export class DOMObserver {
 
   start() {
     if (this.observer)
-      this.observer.observe(this.view.dom, observeOptions)
+      this.observer.observe(this.view.contentDOM, observeOptions)
     if (useCharData)
-      this.view.dom.addEventListener("DOMCharacterDataModified", this.onCharData)
+      this.view.contentDOM.addEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
   stop() {
@@ -45,7 +45,7 @@ export class DOMObserver {
       this.observer.disconnect()
     }
     if (useCharData)
-      this.view.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
+      this.view.contentDOM.removeEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
   flush() {

@@ -18,7 +18,7 @@ function findDiff(a: string, b: string, preferredPos: number, preferredSide: str
   while (from < minLen && a.charCodeAt(from) == b.charCodeAt(from)) from++
   if (from == minLen && a.length == b.length) return null
   let toA = a.length, toB = b.length
-  while (toA > 0 && toB > 0 && a.charCodeAt(toA) == b.charCodeAt(toB)) { toA--; toB-- }
+  while (toA > 0 && toB > 0 && a.charCodeAt(toA - 1) == b.charCodeAt(toB - 1)) { toA--; toB-- }
 
   if (preferredSide == "end") {
     let adjust = Math.max(0, from - Math.min(toA, toB))

@@ -49,14 +49,26 @@ export class Range {
     if (anchor == this.anchor && head == this.head) return this
     else return new Range(anchor, head)
   }
+
+  eq(other: Range): boolean {
+    return this.anchor == other.anchor && this.head == other.head
+  }
 }
 
 // FIXME remove/join on overlap, maybe sort, store primary index
+// FIXME maybe rename to avoid name clash with DOM Selection type?
 export class Selection {
   constructor(public readonly ranges: ReadonlyArray<Range>) {}
 
   map(change: Change): Selection {
     return new Selection(this.ranges.map(r => r.map(change)))
+  }
+
+  eq(other: Selection): boolean {
+    if (this.ranges.length != other.ranges.length) return false
+    for (let i = 0; i < this.ranges.length; i++)
+      if (!this.ranges[i].eq(other.ranges[i])) return false
+    return true
   }
 
   get primary(): Range { return this.ranges[0] }
@@ -74,17 +86,20 @@ class Meta {
 }
 Meta.prototype["__proto__"] = null
 
+const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
+
 export class Transaction {
   private constructor(public readonly startState: EditorState,
                       public readonly changes: ReadonlyArray<Change>,
                       public readonly docs: ReadonlyArray<Text>,
                       public readonly selection: Selection,
-                      private readonly meta: Meta) {}
+                      private readonly meta: Meta,
+                      private readonly flags: number) {}
 
   static start(state: EditorState, time: number = Date.now()) {
     let meta = new Meta
     meta.time = time
-    return new Transaction(state, empty, empty, state.selection, meta)
+    return new Transaction(state, empty, empty, state.selection, meta, 0)
   }
 
   get doc(): Text {
@@ -95,7 +110,7 @@ export class Transaction {
   setMeta(name: string, value: any) {
     let meta = new Meta(this.meta)
     meta[name] = value
-    return new Transaction(this.startState, this.changes, this.docs, this.selection, meta)
+    return new Transaction(this.startState, this.changes, this.docs, this.selection, meta, this.flags)
   }
 
   getMeta(name: string): any {
@@ -107,7 +122,7 @@ export class Transaction {
     return new Transaction(this.startState,
                            this.changes.concat(change),
                            this.docs.concat(change.apply(this.doc)),
-                           this.selection.map(change), this.meta)
+                           this.selection.map(change), this.meta, this.flags)
   }
 
   replace(from: number, to: number, text: string): Transaction {
@@ -130,6 +145,22 @@ export class Transaction {
       tr = f(tr, range)
     }
     return tr
+  }
+
+  setSelection(selection: Selection): Transaction {
+    return new Transaction(this.startState, this.changes, this.docs, selection, this.meta, this.flags | FLAG_SELECTION_SET)
+  }
+
+  get selectionSet() {
+    return (this.flags & FLAG_SELECTION_SET) > 0
+  }
+
+  scrollIntoView() {
+    return new Transaction(this.startState, this.changes, this.docs, this.selection, this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
+  }    
+
+  get scrolledIntoView() {
+    return (this.flags & FLAG_SCROLL_INTO_VIEW) > 0
   }
 
   apply(): EditorState {
