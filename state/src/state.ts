@@ -110,6 +110,10 @@ export class Transaction {
                            this.selection.map(change), this.meta)
   }
 
+  replace(from: number, to: number, text: string): Transaction {
+    return this.change(new Change(from, to, text))
+  }
+
   replaceSelection(text: string): Transaction {
     return this.reduceRanges((state, r) => {
       return state.change(new Change(r.from, r.to, text))
