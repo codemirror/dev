@@ -235,7 +235,7 @@ export class DocViewDesc extends ViewDesc {
         let result = child.parseRange(from - pos, to - pos)
         return {from: result.from + pos, to: result.to + pos, text: result.text}
       }*/
-      if (pos <= from && fromI == -1) { fromI = i; fromStart = pos }
+      if (end >= from && fromI == -1) { fromI = i; fromStart = pos }
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
       pos = end + 1
     }
