@@ -16,13 +16,14 @@ declare global {
   interface Node { cmView: ViewDesc | undefined }
 }
 
-interface Range { from: number, to: number }
+const NOT_DIRTY = 0, CHILD_DIRTY = 1, NODE_DIRTY = 2
 
 export abstract class ViewDesc {
   constructor(public parent: ViewDesc | null, public dom: Node) {}
 
   abstract children: ViewDesc[];
   abstract length: number;
+  dirty: number = NOT_DIRTY;
 
   get childGap() { return 0 }
 
@@ -47,7 +48,7 @@ export abstract class ViewDesc {
     return this.posBefore(desc) + desc.length
   }
 
-  syncDOM() {
+  syncDOMChildren() {
     let dom = this.dom.firstChild
     for (let i = 0; i < this.children.length; i++) {
       let desc = this.children[i], childDOM = desc.dom
@@ -61,35 +62,12 @@ export abstract class ViewDesc {
     while (dom) dom = rm(dom)
   }
 
-  syncDOMFor(ranges: Range[]) {
-    if (ranges.length == 0) return
-    let syncTop = false, rangeI = 0, nextRange = ranges[0]
-    outer: for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length, childRanges: Range[] | null = null
-      while (nextRange.from < end) {
-        if (!childRanges) childRanges = []
-        childRanges.push({from: Math.max(0, nextRange.from - pos),
-                          to: Math.min(child.length, nextRange.to - pos)})
-        if (nextRange.to <= end) {
-          if (rangeI == ranges.length - 1) {
-            child.syncDOMFor(childRanges)
-            break outer
-          }
-          nextRange = ranges[++rangeI]
-        } else {
-          syncTop = true
-          break
-        }
-      }
-      if (childRanges) child.syncDOMFor(childRanges)
-      pos = end + this.childGap
-      if (nextRange.to == pos) {
-        syncTop = true
-        if (rangeI == ranges.length - 1) break
-        nextRange = ranges[++rangeI]
-      }
-    }
-    if (syncTop) this.syncDOM()
+  sync() {
+    if (this.dirty & NODE_DIRTY)
+      this.syncDOMChildren()
+    if (this.dirty & CHILD_DIRTY)
+      for (let i = 0; i < this.children.length; i++) this.children[i].sync()
+    this.dirty = NOT_DIRTY
   }
 
   localPosFromDOM(node: Node, offset: number): number {
@@ -127,6 +105,12 @@ export abstract class ViewDesc {
     }
     return {node: this.dom, offset: this.dom.childNodes.length}
   }
+
+  markDirty() {
+    this.dirty |= NODE_DIRTY
+    for (let parent = this.parent; parent; parent = parent.parent)
+      parent.dirty |= CHILD_DIRTY
+  }
 }
 
 // Remove a DOM node and return its next sibling.
@@ -138,7 +122,6 @@ function rm(dom: Node): Node {
 
 export class DocViewDesc extends ViewDesc {
   lines: LineViewDesc[];
-  dirtyRanges: Range[] = [];
 
   get children() { return this.lines }
   get length() { return this.text.length }
@@ -152,15 +135,15 @@ export class DocViewDesc extends ViewDesc {
     this.lines = [curLine]
     this.text = Text.create("")
     this.update(text)
+    this.sync()
   }
 
   update(text: Text) {
     let prevText = this.text
     let plan = buildUpdatePlan(prevText, text)
     this.text = text
-    if (plan.length == 0) return
 
-    for (let planI = plan.length - 1, range = plan[planI], lineI = this.lines.length - 1, pos = prevText.length;;) {
+    if (plan.length > 0) for (let planI = plan.length - 1, range = plan[planI], lineI = this.lines.length - 1, pos = prevText.length;;) {
       let line = this.lines[lineI], start = pos - line.length
       if (start > range.prevEnd) {
         // No change for this line
@@ -172,23 +155,22 @@ export class DocViewDesc extends ViewDesc {
         while (start > range.prevStart) start -= this.lines[--startI].length
         lineI = startI
         this.updateRange(startI, range.prevStart - start, lineI, endOffset, text, range.curStart, range.curEnd)
-        if (planI == 0) { this.lines[lineI].syncDOM(); break }
+        if (planI == 0) break
         pos = start + this.lines[startI].length
         range = plan[--planI]
       }
     }
-
-    this.syncDOMFor(finalDirtyRanges(this.dirtyRanges, plan))
-    this.dirtyRanges.length = 0
   }
 
   updateRange(fromI: number, fromOff: number, toI: number, toOff: number,
               text: Text, from: number, to: number) {
     let fromLine = this.lines[fromI], tail = null
+    this.dirty |= CHILD_DIRTY
 
     // First remove the deleted range
     // FIXME make line DOM changes a single step for within-line changes
     if (fromI != toI) { // Across lines
+      this.dirty |= NODE_DIRTY
       fromLine.removeRange(fromOff, fromLine.length)
       tail = this.lines[toI].detachTail(toOff)
       if (fromI + 1 < toI) this.lines.splice(fromI + 1, toI - fromI - 1)
@@ -209,14 +191,13 @@ export class DocViewDesc extends ViewDesc {
           }
           if (end == -1) break
           if (!tail) tail = curLine.detachTail(linePos)
-          if (curLine != fromLine) curLine.syncDOM()
           this.lines.splice(++lineI, 0, curLine = new LineViewDesc())
+          this.dirty |= NODE_DIRTY
           curLine.parent = this
           linePos = 0
           start = end + 1
         }
       }
-      if (curLine != fromLine) curLine.syncDOM()
     }
 
     if (tail) {
@@ -285,6 +266,7 @@ class LineViewDesc extends ViewDesc {
     this.children.push(child)
     child.parent = this
     this.length += child.length
+    this.dirty |= NODE_DIRTY
   }
 
   insertText(at: number, text: string) {
@@ -293,6 +275,7 @@ class LineViewDesc extends ViewDesc {
       if (at >= pos && at < end) {
         this.length += text.length
         child.insertText(at - pos, text)
+        this.dirty |= NODE_DIRTY
         return
       }
       pos = end
@@ -307,8 +290,10 @@ class LineViewDesc extends ViewDesc {
       if (end > from) {
         if (pos < from || end > to) {
           child.removeRange(Math.max(from - pos, 0), Math.min(to - pos, child.length))
+          this.dirty |= CHILD_DIRTY
         } else {
           this.children.splice(i--, 1)
+          this.dirty |= NODE_DIRTY
         }
       }
       pos = end
@@ -325,6 +310,7 @@ class LineViewDesc extends ViewDesc {
           endIndex = i + 1
           result.push(new TextViewDesc(child.text.slice(from - pos)))
           child.removeRange(from - pos, child.length)
+          this.dirty |= CHILD_DIRTY
         } else {
           if (endIndex < 0) endIndex = i
           result.push(child)
@@ -332,7 +318,10 @@ class LineViewDesc extends ViewDesc {
       }
       pos = end
     }
-    if (endIndex > -1) this.children.length = endIndex
+    if (endIndex > -1) {
+      this.children.length = endIndex
+      this.dirty |= NODE_DIRTY
+    }
     return result
   }
 }
@@ -350,20 +339,19 @@ class TextViewDesc extends ViewDesc {
 
   removeRange(from: number, to: number) {
     this.text = this.text.slice(0, from) + this.text.slice(to)
-    this.dom.nodeValue = this.text
+    this.dirty |= NODE_DIRTY
   }
 
   insertText(at: number, text: string) {
     this.text = this.text.slice(0, at) + text + this.text.slice(at)
-    this.dom.nodeValue = this.text
+    this.dirty |= NODE_DIRTY
   }
 
-  syncDOM() {
-    if (this.dom.nodeValue != this.text)
+  sync() {
+    if ((this.dirty & NODE_DIRTY) && this.dom.nodeValue != this.text)
       this.dom.nodeValue = this.text
+    this.dirty = NOT_DIRTY
   }
-
-  syncDOMFor(_ranges: Range[]) { this.syncDOM() }
 
   localPosFromDOM(_node: Node, offset: number): number {
     return offset
@@ -421,50 +409,13 @@ function buildUpdatePlan(prev: Text, current: Text): UpdateRange[] {
 function readDOM(node: Node): string {
   // FIXME add a way to ignore certain nodes based on their desc
   if (node.nodeType == 3) return node.nodeValue as string
-  else if (node.nodeType == 1) return readDOMContent(node)
-  else return ""
+//  if (node.nodeName == "BR") return "\n"
+  if (node.nodeType == 1) return readDOMContent(node)
+  return ""
 }
 
 function readDOMContent(node: Node) {
   let text = ""
   for (let child = node.firstChild; child; child = child.nextSibling) text += readDOM(child)
   return text
-}
-
-function mapThroughPlan(pos: number, plan: UpdateRange[]) {
-  let offset = 0
-  for (let i = 0; i < plan.length; i++) {
-    let range = plan[i]
-    if (range.prevStart >= pos) break
-    if (range.prevEnd > pos) return range.curStart
-    offset += (range.curEnd - range.curStart) - (range.prevEnd - range.prevStart)
-  }
-  return pos + offset
-}
-
-function addRange(ranges: Range[], from: number, to: number) {
-  if (from >= to) return
-  let i = 0;
-  for (; i < ranges.length; i++) {
-    let range = ranges[i]
-    if (range.from > to) break
-    if (range.to < from) continue
-    range.from = Math.min(from, range.from)
-    range.to = Math.max(to, range.to)
-    while (i < ranges.length - 1 && range.to > ranges[i + 1].from) {
-      range.to = Math.max(ranges[i + 1].to, range.to)
-      ranges.splice(i + 1, 1)
-    }
-    return
-  }
-  ranges.splice(i, 0, {from, to})
-}
-
-function finalDirtyRanges(dirtyRanges: Range[], plan: UpdateRange[]): Range[] {
-  let ranges = plan.map(r => ({from: r.curStart, to: r.curEnd}))
-  for (let i = 0; i < dirtyRanges.length; i++) {
-    let dRange = dirtyRanges[i]
-    addRange(ranges, mapThroughPlan(dRange.from, plan), mapThroughPlan(dRange.to, plan))
-  }
-  return ranges
 }

@@ -4,7 +4,9 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
   let {from, to, text} = view.docView.readDOMRange(start, end)
   let diff = findDiff(view.state.doc.slice(from, to), text, view.state.selection.primary.head, null)
   if (diff) {
-    // FIXME apply to other selection ranges, sometimes
+    // FIXME apply generic insertText functionality when appropriate
+    // (including mapping selection forward in case of replace), maybe
+    // detect enter, allow a textInput hook
     view.dispatch(view.state.transaction.replace(from + diff.from, from + diff.toA, text.slice(diff.from, diff.toB)))
   } else { // Force DOM update to clear damage
     view.setState(view.state)

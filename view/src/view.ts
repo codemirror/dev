@@ -48,13 +48,14 @@ export class EditorView {
   setState(state: EditorState) {
     let prev = this.state
     this._state = state
-    let updateDOM = state.doc != prev.doc || this.docView.dirtyRanges.length
+    let updateDOM = state.doc != prev.doc || this.docView.dirty
     let updateSel = updateDOM || !prev.selection.eq(state.selection)
     if (updateSel) {
       this.selectionReader.ignoreUpdates = true
       if (updateDOM) {
         this.domObserver.stop()
         this.docView.update(state.doc)
+        this.docView.sync()
         this.domObserver.start()
         this.selectionReader.clearDOMState()
       }

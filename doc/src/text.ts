@@ -30,6 +30,8 @@ export abstract class Text implements Iterable<string> {
   abstract decomposeStart(to: number, target: Text[]): void;
   abstract decomposeEnd(from: number, target: Text[]): void;
 
+  toString() { return this.text }
+
   protected constructor() {}
 
   static create(text: string): Text {

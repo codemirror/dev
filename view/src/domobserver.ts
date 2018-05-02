@@ -22,7 +22,7 @@ export class DOMObserver {
 
   constructor(public view: EditorView) {
     if (typeof "MutationObserver" != "undefined")
-      this.observer = new MutationObserver(mutations => this.registerMutations(mutations))
+      this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {
         this.charDataQueue.push({target: event.target,
@@ -49,20 +49,21 @@ export class DOMObserver {
   }
 
   flush() {
-    this.registerMutations(this.observer ? this.observer.takeRecords() : [])
+    this.applyMutations(this.observer ? this.observer.takeRecords() : [])
   }
 
-  registerMutations(records: MutationRecord[]) {
+  applyMutations(records: MutationRecord[]) {
     if (this.charDataQueue.length) {
       clearTimeout(this.charDataTimeout)
       this.charDataTimeout = null
       records = records.concat(this.charDataQueue)
       this.charDataQueue.length = 0
     }
+    if (records.length == 0) return
 
     let from = -1, to = -1
     for (let i = 0; i < records.length; i++) {
-      let range = this.registerMutation(records[i])
+      let range = this.readMutation(records[i])
       if (!range) continue
       if (from == -1) {
         ;({from, to} = range)
@@ -72,15 +73,14 @@ export class DOMObserver {
       }
     }
 
-    if (from > -1) {
-      this.view.docView.dirtyRanges.push({from, to})
-      applyDOMChange(this.view, from, to)
-    }
+    if (from > -1) applyDOMChange(this.view, from, to)
+    else if (this.view.docView.dirty) this.view.setState(this.view.state)
   }
 
-  registerMutation(rec: MutationRecord): {from: number, to: number} | null {
+  readMutation(rec: MutationRecord): {from: number, to: number} | null {
     let desc = this.view.docView.nearest(rec.target)
     if (!desc) return null // FIXME query domView for ignorable mutations
+    desc.markDirty()
 
     if (rec.type == "childList") {
       let childBefore = rec.previousSibling && findChild(desc, rec.previousSibling)
