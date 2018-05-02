@@ -2,7 +2,7 @@ import {EditorView} from "./view"
 
 export function applyDOMChange(view: EditorView, start: number, end: number) {
   let {from, to, text} = view.docView.readDOMRange(start, end)
-  let diff = findDiff(view.state.doc.slice(from, to), text, view.state.selection.primary.head, null)
+  let diff = findDiff(view.state.doc.slice(from, to), text, view.state.selection.primary.head - from, null)
   if (diff) {
     // FIXME apply generic insertText functionality when appropriate
     // (including mapping selection forward in case of replace), maybe
