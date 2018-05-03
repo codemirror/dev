@@ -121,9 +121,8 @@ function rm(dom: Node): Node {
 }
 
 export class DocViewDesc extends ViewDesc {
-  lines: LineViewDesc[];
+  children: LineViewDesc[];
 
-  get children() { return this.lines }
   get length() { return this.text.length }
   get childGap() { return 1 }
 
@@ -132,7 +131,7 @@ export class DocViewDesc extends ViewDesc {
     let curLine = new LineViewDesc()
     curLine.parent = this
     dom.cmView = this
-    this.lines = [curLine]
+    this.children = [curLine]
     this.text = Text.create("")
     this.update(text)
     this.sync()
@@ -143,8 +142,8 @@ export class DocViewDesc extends ViewDesc {
     let plan = buildUpdatePlan(prevText, text)
     this.text = text
 
-    if (plan.length > 0) for (let planI = plan.length - 1, range = plan[planI], lineI = this.lines.length - 1, pos = prevText.length;;) {
-      let line = this.lines[lineI], start = pos - line.length
+    if (plan.length > 0) for (let planI = plan.length - 1, range = plan[planI], lineI = this.children.length - 1, pos = prevText.length;;) {
+      let line = this.children[lineI], start = pos - line.length
       if (start > range.prevEnd) {
         // No change for this line
         if (lineI == 0) break
@@ -152,11 +151,11 @@ export class DocViewDesc extends ViewDesc {
         pos = start - 1
       } else {
         let startI = lineI, endOffset = range.prevEnd - start
-        while (start > range.prevStart) start -= this.lines[--startI].length
+        while (start > range.prevStart) start -= this.children[--startI].length
         lineI = startI
         this.updateRange(startI, range.prevStart - start, lineI, endOffset, text, range.curStart, range.curEnd)
         if (planI == 0) break
-        pos = start + this.lines[startI].length
+        pos = start + this.children[startI].length
         range = plan[--planI]
       }
     }
@@ -164,7 +163,7 @@ export class DocViewDesc extends ViewDesc {
 
   updateRange(fromI: number, fromOff: number, toI: number, toOff: number,
               text: Text, from: number, to: number) {
-    let fromLine = this.lines[fromI], tail = null
+    let fromLine = this.children[fromI], tail = null
     this.dirty |= CHILD_DIRTY
 
     // First remove the deleted range
@@ -172,8 +171,8 @@ export class DocViewDesc extends ViewDesc {
     if (fromI != toI) { // Across lines
       this.dirty |= NODE_DIRTY
       fromLine.removeRange(fromOff, fromLine.length)
-      tail = this.lines[toI].detachTail(toOff)
-      if (fromI + 1 < toI) this.lines.splice(fromI + 1, toI - fromI - 1)
+      tail = this.children[toI].detachTail(toOff)
+      if (fromI + 1 < toI) this.children.splice(fromI + 1, toI - fromI - 1)
     } else if (fromOff != toOff) {
       fromLine.removeRange(fromOff, toOff)
     }
@@ -191,7 +190,7 @@ export class DocViewDesc extends ViewDesc {
           }
           if (end == -1) break
           if (!tail) tail = curLine.detachTail(linePos)
-          this.lines.splice(++lineI, 0, curLine = new LineViewDesc())
+          this.children.splice(++lineI, 0, curLine = new LineViewDesc())
           this.dirty |= NODE_DIRTY
           curLine.parent = this
           linePos = 0
@@ -209,7 +208,7 @@ export class DocViewDesc extends ViewDesc {
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
     // FIXME partially parse lines when possible
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    if (this.lines.length == 0) return {from: 0, to: 0, text: readDOM(this.dom.firstChild, null)}
+    if (this.children.length == 0) return {from: 0, to: 0, text: readDOM(this.dom.firstChild, null)}
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       /*      if (pos < from && end > to) {
