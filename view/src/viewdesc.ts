@@ -209,7 +209,7 @@ export class DocViewDesc extends ViewDesc {
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
     // FIXME partially parse lines when possible
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    if (this.lines.length == 0) return {from: 0, to: 0, text: readDOMContent(this.dom)}
+    if (this.lines.length == 0) return {from: 0, to: 0, text: readDOM(this.dom.firstChild, null)}
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       /*      if (pos < from && end > to) {
@@ -220,16 +220,12 @@ export class DocViewDesc extends ViewDesc {
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
       pos = end + 1
     }
-    let text = "", fromDesc = this.children[fromI], toDesc = this.children[toI]
+    let fromDesc = this.children[fromI], toDesc = this.children[toI]
     let startDOM = fromDesc.dom.parentNode == this.dom ? fromDesc.dom
       : (fromI ? this.children[fromI - 1].dom.nextSibling : null) || this.dom.firstChild
     let endDOM = toDesc.dom.parentNode == this.dom ? toDesc.dom.nextSibling
       : toI < this.children.length - 1 ? this.children[toI + 1].dom : null
-    for (let cur = startDOM; cur != endDOM; cur = cur!.nextSibling) {
-      if (cur != startDOM) text += "\n"
-      text += readDOM(cur!)
-    }
-    return {from: fromStart, to: toEnd, text}
+    return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
   }
 
   nearest(dom: Node): ViewDesc | null {
@@ -406,16 +402,26 @@ function buildUpdatePlan(prev: Text, current: Text): UpdateRange[] {
   return plan
 }
 
-function readDOM(node: Node): string {
+function readDOM(start: Node | null, end: Node | null): string {
+  let text = "", cur = start
+  if (cur) for (;;) {
+    text += readDOMNode(cur!)
+    let next: Node | null = cur!.nextSibling
+    if (next == end) break
+    if (isBlockNode(cur!)) text += "\n"
+    cur = next
+  }
+  return text
+}
+
+function readDOMNode(node: Node): string {
   // FIXME add a way to ignore certain nodes based on their desc
   if (node.nodeType == 3) return node.nodeValue as string
-//  if (node.nodeName == "BR") return "\n"
-  if (node.nodeType == 1) return readDOMContent(node)
+  if (node.nodeName == "BR") return "\n"
+  if (node.nodeType == 1) return readDOM(node.firstChild, null)
   return ""
 }
 
-function readDOMContent(node: Node) {
-  let text = ""
-  for (let child = node.firstChild; child; child = child.nextSibling) text += readDOM(child)
-  return text
+function isBlockNode(node: Node): boolean {
+  return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
 }
