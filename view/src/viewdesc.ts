@@ -122,7 +122,7 @@ export class DocViewDesc extends ViewDesc {
     this.text = text
 
     let cur = new ChildCursor(this.children, prevText.length, 1)
-    for (let i = 0; i < plan.length; i++) {
+    for (let i = plan.length - 1; i >= 0; i--) {
       let {prevStart, prevEnd, curStart, curEnd} = plan[i]
       let {i: toI, off: toOff} = cur.findPos(prevEnd)
       let {i: fromI, off: fromOff} = cur.findPos(prevStart)
@@ -359,7 +359,7 @@ function buildUpdatePlan(prev: Text, current: Text): UpdateRange[] {
     }
     let minLen = Math.min(chPrev.length, chCur.length)
     let start = 0, skipOff = startOff, end  = 0
-    while (start < minLen && chPrev[start] != chCur[start]) { start++; skipOff += chPrev[start].length + 1 }
+    while (start < minLen && chPrev[start] == chCur[start]) { start++; skipOff += chPrev[start].length + 1 }
     while (end < minLen - start &&
            chPrev[chPrev.length - 1 - end] == chCur[chCur.length - 1 - end]) end++
     if (chPrev.length == chCur.length && start + end + 1 >= minLen) {
@@ -377,7 +377,7 @@ function buildUpdatePlan(prev: Text, current: Text): UpdateRange[] {
     let start = 0, end = 0, minLen = Math.min(prev.length, current.length)
     while (start < minLen && prev.charCodeAt(start) == current.charCodeAt(start)) start++
     if (start == minLen && prev.length == current.length) return
-    while (end < minLen- start &&
+    while (end < minLen - start &&
            prev.charCodeAt(prev.length - 1 - end) == current.charCodeAt(current.length - 1 - end)) end++
     plan.push({prevStart: startOff + start, curStart: startOff + start,
                prevEnd: startOff + prev.length - end, curEnd: startOff + current.length - end})
