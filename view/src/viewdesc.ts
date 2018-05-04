@@ -359,7 +359,7 @@ function buildUpdatePlan(prev: Text, current: Text): UpdateRange[] {
     }
     let minLen = Math.min(chPrev.length, chCur.length)
     let start = 0, skipOff = startOff, end  = 0
-    while (start < minLen && chPrev[start] == chCur[start]) { start++; skipOff += chPrev[start].length + 1 }
+    while (start < minLen && chPrev[start] == chCur[start]) { skipOff += chPrev[start].length; start++ }
     while (end < minLen - start &&
            chPrev[chPrev.length - 1 - end] == chCur[chCur.length - 1 - end]) end++
     if (chPrev.length == chCur.length && start + end + 1 >= minLen) {
