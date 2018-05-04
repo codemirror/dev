@@ -1,17 +1,5 @@
 import {Text} from "../../doc/src/text"
 
-/*
-
-DISCLAIMER
-
-The current content of this file is all wrong and not the right
-approach at all, but since I couldn't figure out how to do this
-properly yet I did this wrong stuff so that we can start getting
-something to work and as a way to gather some experience about what
-the right solution might look like.
-
-*/
-
 declare global {
   interface Node { cmView: ViewDesc | undefined }
 }
@@ -19,7 +7,9 @@ declare global {
 const NOT_DIRTY = 0, CHILD_DIRTY = 1, NODE_DIRTY = 2
 
 export abstract class ViewDesc {
-  constructor(public parent: ViewDesc | null, public dom: Node) {}
+  constructor(public parent: ViewDesc | null, public dom: Node) {
+    dom.cmView = this
+  }
 
   abstract children: ViewDesc[];
   abstract length: number;
@@ -128,10 +118,7 @@ export class DocViewDesc extends ViewDesc {
 
   constructor(public text: Text, dom: Element) {
     super(null, dom)
-    let curLine = new LineViewDesc()
-    curLine.parent = this
-    dom.cmView = this
-    this.children = [curLine]
+    this.children = [new LineViewDesc(this, [])]
     this.text = Text.create("")
     this.update(text)
     this.sync()
@@ -142,66 +129,32 @@ export class DocViewDesc extends ViewDesc {
     let plan = buildUpdatePlan(prevText, text)
     this.text = text
 
-    if (plan.length > 0) for (let planI = plan.length - 1, range = plan[planI], lineI = this.children.length - 1, pos = prevText.length;;) {
-      let line = this.children[lineI], start = pos - line.length
-      if (start > range.prevEnd) {
-        // No change for this line
-        if (lineI == 0) break
-        lineI--
-        pos = start - 1
-      } else {
-        let startI = lineI, endOffset = range.prevEnd - start
-        while (start > range.prevStart) start -= this.children[--startI].length
-        lineI = startI
-        this.updateRange(startI, range.prevStart - start, lineI, endOffset, text, range.curStart, range.curEnd)
-        if (planI == 0) break
-        pos = start + this.children[startI].length
-        range = plan[--planI]
-      }
-    }
-  }
+    let cur = new ChildCursor(this.children, prevText.length, 1)
+    for (let i = 0; i < plan.length; i++) {
+      let {prevStart, prevEnd, curStart, curEnd} = plan[i]
+      let {i: toI, off: toOff} = cur.findPos(prevEnd)
+      let {i: fromI, off: fromOff} = cur.findPos(prevStart)
+      let lines = linesBetween(text, curStart, curEnd)
 
-  updateRange(fromI: number, fromOff: number, toI: number, toOff: number,
-              text: Text, from: number, to: number) {
-    let fromLine = this.children[fromI], tail = null
-    this.dirty |= CHILD_DIRTY
-
-    // First remove the deleted range
-    // FIXME make line DOM changes a single step for within-line changes
-    if (fromI != toI) { // Across lines
-      this.dirty |= NODE_DIRTY
-      fromLine.removeRange(fromOff, fromLine.length)
-      tail = this.children[toI].detachTail(toOff)
-      if (fromI + 1 < toI) this.children.splice(fromI + 1, toI - fromI - 1)
-    } else if (fromOff != toOff) {
-      fromLine.removeRange(fromOff, toOff)
-    }
-
-    // Then insert the added range, if any
-    let curLine = fromLine, lineI = fromI
-    if (from < to) {
-      for (let iter = text.iterRange(from, to), next, linePos = fromOff; !(next = iter.next()).done;) {
-        for (let start = 0;;) {
-          let end = next.value.indexOf("\n", start)
-          let text = next.value.slice(start, end == -1 ? undefined : end)
-          if (text) {
-            curLine.insertText(linePos, text)
-            linePos += text.length
-          }
-          if (end == -1) break
-          if (!tail) tail = curLine.detachTail(linePos)
-          this.children.splice(++lineI, 0, curLine = new LineViewDesc())
-          this.dirty |= NODE_DIRTY
-          curLine.parent = this
-          linePos = 0
-          start = end + 1
+      if (lines.length == 1) {
+        if (fromI == toI) { // Change within single line
+          this.children[fromI].update(fromOff, toOff, lines[0])
+          this.dirty |= CHILD_DIRTY
+        } else { // Join lines
+          let tail = this.children[toI].detachTail(toOff)
+          this.children[fromI].update(fromOff, undefined, lines[0], tail)
+          this.children.splice(fromI + 1, toI - fromI)
+          this.dirty |= CHILD_DIRTY | NODE_DIRTY
         }
+      } else { // Across lines
+        let tail = this.children[toI].detachTail(toOff)
+        this.children[fromI].update(fromOff, undefined, lines[0])
+        let insert = []
+        for (let j = 1; j < lines.length; j++)
+          insert.push(new LineViewDesc(this, lines[j], j == lines.length - 1 ? tail : undefined))
+        this.children.splice(fromI + 1, toI - fromI, ...insert)
+        this.dirty |= CHILD_DIRTY | NODE_DIRTY
       }
-    }
-
-    if (tail) {
-      // Need to join lines
-      for (let i = 0; i < tail.length; i++) curLine.add(tail[i])
     }
   }
 
@@ -246,77 +199,106 @@ export class DocViewDesc extends ViewDesc {
   }
 }
 
+const MAX_JOIN_LEN = 256
+
 class LineViewDesc extends ViewDesc {
   children: TextViewDesc[];
   length: number;
 
-  constructor() {
-    super(null, document.createElement("div"))
-    this.dom.cmView = this
-    this.children = []
+  constructor(parent: DocViewDesc, content: string[], tail: TextViewDesc[] | null = null) {
+    super(parent, document.createElement("div"))
     this.length = 0
+    this.children = []
+    this.update(0, 0, content, tail)
   }
 
-  add(child: TextViewDesc) {
-    this.children.push(child)
-    child.parent = this
-    this.length += child.length
-    this.dirty |= NODE_DIRTY
+  finishUpdate() {
+/*    if (this.children.length == 0) {
+      this.children.push(new EmptyLineHack(this))
+      this.DIRTY |= CONTENT_DIRTY
+    } else if (this.children.length > 1 && this.children[this.children.length - 1] instanceof EmptyLineHack) {
+      this.children.pop()
+      this.DIRTY |= CONTENT_DIRTY
+    }*/
   }
 
-  insertText(at: number, text: string) {
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
-      if (at >= pos && at < end) {
-        this.length += text.length
-        child.insertText(at - pos, text)
-        this.dirty |= NODE_DIRTY
-        return
-      }
-      pos = end
-    }
-    this.add(new TextViewDesc(text))
-  }
+  update(from: number, to: number = this.length, content: string[], tail: TextViewDesc[] | null = null) {
+    let cur = new ChildCursor(this.children, this.length)
+    let totalLen = 0
+    for (let j = 0; j < content.length; j++) totalLen += content[j].length
+    let dLen = totalLen - (to - from)
 
-  removeRange(from: number, to: number) {
-    this.length -= to - from
-    for (let i = 0, pos = 0; i < this.children.length && pos < to; i++) {
-      let child = this.children[i], end = pos + child.length
-      if (end > from) {
-        if (pos < from || end > to) {
-          child.removeRange(Math.max(from - pos, 0), Math.min(to - pos, child.length))
+    let {i: toI, off: toOff} = cur.findPos(to)
+    let {i: fromI, off: fromOff} = cur.findPos(from)
+
+    if (fromI < this.children.length &&
+        (toI == fromI || toI == fromI + 1 && toOff == 0) && content.length < 2 &&
+        this.children[fromI].length + dLen <= MAX_JOIN_LEN) {
+      this.children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0] : "")
+      this.dirty |= CHILD_DIRTY
+    } else {
+      if (content.length > 0 && fromOff > 0 &&
+          fromOff + content[0].length <= MAX_JOIN_LEN) {
+        content[0] = this.children[fromI].text.slice(0, fromOff) + content[0]
+        fromOff = 0
+      } else if (content.length > 0 && fromOff == 0 && fromI > 0 &&
+                 this.children[fromI - 1].length + content[0].length <= MAX_JOIN_LEN) {
+        if (fromI == toI && toOff == 0) {
+          this.children[fromI - 1].update(this.children[fromI - 1].length, undefined, content[0])
           this.dirty |= CHILD_DIRTY
+          content.shift()
         } else {
-          this.children.splice(i--, 1)
-          this.dirty |= NODE_DIRTY
+          content[0] = this.children[fromI - 1].text + content[0]
+          fromI--
         }
+      } else if (fromOff > 0) {
+        this.children[fromI].update(fromOff)
+        this.dirty |= CHILD_DIRTY
+        fromI++
       }
-      pos = end
+      if (content.length && toI < this.children.length &&
+          this.children[toI].length - toOff + content[content.length - 1].length <= MAX_JOIN_LEN) {
+        content[content.length - 1] += this.children[toI].text.slice(toOff)
+        toI++
+      } else if (toOff > 0) {
+        this.children[toI].update(0, toOff)
+        this.dirty |= CHILD_DIRTY
+      }
+
+      if (toI > fromI || content.length) {
+        this.children.splice(fromI, toI - fromI, ...content.map(t => new TextViewDesc(this, t)))
+        this.dirty |= NODE_DIRTY | CHILD_DIRTY
+      }
     }
+    this.length += dLen
+
+    if (tail) {
+      this.dirty |= NODE_DIRTY | CHILD_DIRTY
+      for (let i = 0; i < tail.length; i++) {
+        let child = tail[i]
+        child.parent = this
+        this.children.push(child)
+        this.length += child.length
+      }
+    }
+    this.finishUpdate()
   }
 
   detachTail(from: number): TextViewDesc[] {
-    this.length = from
-    let endIndex = -1, result = []
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
-      if (end > from) {
-        if (pos < from) {
-          endIndex = i + 1
-          result.push(new TextViewDesc(child.text.slice(from - pos)))
-          child.removeRange(from - pos, child.length)
-          this.dirty |= CHILD_DIRTY
-        } else {
-          if (endIndex < 0) endIndex = i
-          result.push(child)
-        }
-      }
-      pos = end
+    let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
+    let result = []
+    if (off > 0) {
+      result.push(new TextViewDesc(this, this.children[i].text.slice(off)))
+      this.children[i].update(off)
+      this.dirty |= CHILD_DIRTY
+      i++
     }
-    if (endIndex > -1) {
-      this.children.length = endIndex
+    if (i < this.children.length) {
+      for (; i < this.children.length; i++) result.push(this.children[i])
+      this.children.length = i
       this.dirty |= NODE_DIRTY
     }
+    this.length = from
     return result
   }
 }
@@ -324,21 +306,16 @@ class LineViewDesc extends ViewDesc {
 const noChildren: ViewDesc[] = []
 
 class TextViewDesc extends ViewDesc {
-  constructor(public text: string) {
-    super(null, document.createTextNode(text))
-    this.dom.cmView = this
+  constructor(parent: LineViewDesc, public text: string) {
+    super(parent, document.createTextNode(text))
   }
 
   get children() { return noChildren }
   get length() { return this.text.length }
 
-  removeRange(from: number, to: number) {
-    this.text = this.text.slice(0, from) + this.text.slice(to)
-    this.dirty |= NODE_DIRTY
-  }
 
-  insertText(at: number, text: string) {
-    this.text = this.text.slice(0, at) + text + this.text.slice(at)
+  update(from: number, to: number = this.text.length, content: string = "") {
+    this.text = this.text.slice(0, from) + content + this.text.slice(to)
     this.dirty |= NODE_DIRTY
   }
 
@@ -423,4 +400,44 @@ function readDOMNode(node: Node): string {
 
 function isBlockNode(node: Node): boolean {
   return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
+}
+
+class ChildCursor {
+  i: number;
+  off: number = 0;
+
+  constructor(public children: ViewDesc[], public pos: number, public gap: number = 0) {
+    this.i = children.length
+    this.pos += gap
+  }
+
+  findPos(pos: number): this {
+    for (;;) {
+      if (pos >= this.pos) {
+        this.off = pos - this.pos
+        return this
+      }
+      this.pos -= this.children[--this.i].length + this.gap
+    }
+  }
+}
+
+function linesBetween(text: Text, start: number, end: number): string[][] {
+  let result: string[][] = [[]]
+  if (start == end) return result
+  for (let textCur = text.iterRange(start, end);;) {
+    let {value, done} = textCur.next()
+    if (done) return result
+    for (let pos = 0;;) {
+      let nextNewline = value.indexOf("\n", pos)
+      if (nextNewline == -1) {
+        if (pos < value.length) result[result.length - 1].push(value.slice(pos))
+        break
+      } else {
+        if (nextNewline > pos) result[result.length - 1].push(value.slice(pos, nextNewline))
+        result.push([])
+        pos = nextNewline + 1
+      }
+    }
+  }
 }
