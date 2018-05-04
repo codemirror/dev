@@ -47,4 +47,12 @@ describe("EditorView drawing", () => {
     ist(text2.parentElement, line2)
     ist(line2.parentElement, cm.contentDOM)
   })
+
+  it("draws BR nodes on empty lines", () => {
+    let cm = tempEditor("one\n\ntwo")
+    ist(cm.contentDOM.childNodes[1].childNodes.length, 1)
+    ist(cm.contentDOM.childNodes[1].firstChild.nodeName, "BR")
+    cm.dispatch(cm.state.transaction.replace(4, 4, "x"))
+    ist(!Array.from(cm.contentDOM.childNodes[1].childNodes).some(n => n.nodeName == "BR"))
+  })
 })

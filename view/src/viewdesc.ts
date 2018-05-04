@@ -111,6 +111,7 @@ export class DocViewDesc extends ViewDesc {
   constructor(public text: Text, dom: Element) {
     super(null, dom)
     this.children = [new LineViewDesc(this, [])]
+    this.dirty = NODE_DIRTY
     this.text = Text.create("")
     this.update(text)
     this.sync()
@@ -163,11 +164,8 @@ export class DocViewDesc extends ViewDesc {
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
       pos = end + 1
     }
-    let fromDesc = this.children[fromI], toDesc = this.children[toI]
-    let startDOM = fromDesc.dom.parentNode == this.dom ? fromDesc.dom
-      : (fromI ? this.children[fromI - 1].dom.nextSibling : null) || this.dom.firstChild
-    let endDOM = toDesc.dom.parentNode == this.dom ? toDesc.dom.nextSibling
-      : toI < this.children.length - 1 ? this.children[toI + 1].dom : null
+    let startDOM = (fromI ? this.children[fromI - 1].dom.nextSibling : null) || this.dom.firstChild
+    let endDOM = toI < this.children.length - 1 ? this.children[toI + 1].dom : null
     return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
   }
 
