@@ -11,8 +11,8 @@ export abstract class ViewDesc {
     dom.cmView = this
   }
 
-  abstract children: ViewDesc[];
   abstract length: number;
+  abstract children: ViewDesc[];
   dirty: number = NOT_DIRTY;
 
   get childGap() { return 0 }
@@ -202,7 +202,7 @@ export class DocViewDesc extends ViewDesc {
 const MAX_JOIN_LEN = 256
 
 class LineViewDesc extends ViewDesc {
-  children: TextViewDesc[];
+  children: ViewDesc[];
   length: number;
 
   constructor(parent: DocViewDesc, content: string[], tail: TextViewDesc[] | null = null) {
@@ -212,18 +212,14 @@ class LineViewDesc extends ViewDesc {
     this.update(0, 0, content, tail)
   }
 
-  finishUpdate() {
-/*    if (this.children.length == 0) {
-      this.children.push(new EmptyLineHack(this))
-      this.DIRTY |= CONTENT_DIRTY
-    } else if (this.children.length > 1 && this.children[this.children.length - 1] instanceof EmptyLineHack) {
-      this.children.pop()
-      this.DIRTY |= CONTENT_DIRTY
-    }*/
-  }
-
   update(from: number, to: number = this.length, content: string[], tail: TextViewDesc[] | null = null) {
-    let cur = new ChildCursor(this.children, this.length)
+    if (this.children.length == 1 && this.children[this.children.length - 1] instanceof EmptyLineHack) {
+      this.children.pop()
+      this.dirty |= NODE_DIRTY
+    }
+
+    let children = this.children as TextViewDesc[]
+    let cur = new ChildCursor(children, this.length)
     let totalLen = 0
     for (let j = 0; j < content.length; j++) totalLen += content[j].length
     let dLen = totalLen - (to - from)
@@ -231,70 +227,77 @@ class LineViewDesc extends ViewDesc {
     let {i: toI, off: toOff} = cur.findPos(to)
     let {i: fromI, off: fromOff} = cur.findPos(from)
 
-    if (fromI < this.children.length &&
+    if (fromI < children.length &&
         (toI == fromI || toI == fromI + 1 && toOff == 0) && content.length < 2 &&
-        this.children[fromI].length + dLen <= MAX_JOIN_LEN) {
-      this.children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0] : "")
+        children[fromI].length + dLen <= MAX_JOIN_LEN) {
+      children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0] : "")
       this.dirty |= CHILD_DIRTY
     } else {
       if (content.length > 0 && fromOff > 0 &&
           fromOff + content[0].length <= MAX_JOIN_LEN) {
-        content[0] = this.children[fromI].text.slice(0, fromOff) + content[0]
+        content[0] = children[fromI].text.slice(0, fromOff) + content[0]
         fromOff = 0
       } else if (content.length > 0 && fromOff == 0 && fromI > 0 &&
-                 this.children[fromI - 1].length + content[0].length <= MAX_JOIN_LEN) {
+                 children[fromI - 1].length + content[0].length <= MAX_JOIN_LEN) {
         if (fromI == toI && toOff == 0) {
-          this.children[fromI - 1].update(this.children[fromI - 1].length, undefined, content[0])
+          children[fromI - 1].update(children[fromI - 1].length, undefined, content[0])
           this.dirty |= CHILD_DIRTY
           content.shift()
         } else {
-          content[0] = this.children[fromI - 1].text + content[0]
+          content[0] = children[fromI - 1].text + content[0]
           fromI--
         }
       } else if (fromOff > 0) {
-        this.children[fromI].update(fromOff)
+        children[fromI].update(fromOff)
         this.dirty |= CHILD_DIRTY
         fromI++
       }
-      if (content.length && toI < this.children.length &&
-          this.children[toI].length - toOff + content[content.length - 1].length <= MAX_JOIN_LEN) {
-        content[content.length - 1] += this.children[toI].text.slice(toOff)
+      if (content.length && toI < children.length &&
+          children[toI].length - toOff + content[content.length - 1].length <= MAX_JOIN_LEN) {
+        content[content.length - 1] += children[toI].text.slice(toOff)
         toI++
       } else if (toOff > 0) {
-        this.children[toI].update(0, toOff)
+        children[toI].update(0, toOff)
         this.dirty |= CHILD_DIRTY
       }
 
       if (toI > fromI || content.length) {
-        this.children.splice(fromI, toI - fromI, ...content.map(t => new TextViewDesc(this, t)))
+        children.splice(fromI, toI - fromI, ...content.map(t => new TextViewDesc(this, t)))
         this.dirty |= NODE_DIRTY | CHILD_DIRTY
       }
     }
     this.length += dLen
 
-    if (tail) {
-      this.dirty |= NODE_DIRTY | CHILD_DIRTY
-      for (let i = 0; i < tail.length; i++) {
-        let child = tail[i]
-        child.parent = this
-        this.children.push(child)
-        this.length += child.length
-      }
+    if (tail) this.attachTail(tail)
+
+    if (this.length == 0) {
+      this.children.push(new EmptyLineHack(this))
+      this.dirty |= NODE_DIRTY
     }
-    this.finishUpdate()
+  }
+
+  attachTail(tail: TextViewDesc[]) {
+    for (let i = 0; i < tail.length; i++) {
+      let child = tail[i]
+      child.parent = this
+      this.children.push(child)
+      this.length += child.length
+    }
+    this.dirty |= NODE_DIRTY | CHILD_DIRTY
   }
 
   detachTail(from: number): TextViewDesc[] {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
-    let result = []
+    let result: TextViewDesc[] = []
     if (off > 0) {
-      result.push(new TextViewDesc(this, this.children[i].text.slice(off)))
-      this.children[i].update(off)
+      let child = this.children[i] as TextViewDesc
+      result.push(new TextViewDesc(this, child.text.slice(off)))
+      child.update(off)
       this.dirty |= CHILD_DIRTY
       i++
     }
     if (i < this.children.length) {
-      for (; i < this.children.length; i++) result.push(this.children[i])
+      for (; i < this.children.length; i++) result.push(this.children[i] as TextViewDesc)
       this.children.length = i
       this.dirty |= NODE_DIRTY
     }
@@ -313,7 +316,6 @@ class TextViewDesc extends ViewDesc {
   get children() { return noChildren }
   get length() { return this.text.length }
 
-
   update(from: number, to: number = this.text.length, content: string = "") {
     this.text = this.text.slice(0, from) + content + this.text.slice(to)
     this.dirty |= NODE_DIRTY
@@ -331,6 +333,14 @@ class TextViewDesc extends ViewDesc {
 
   domFromPos(pos: number): {node: Node, offset: number} {
     return {node: this.dom, offset: pos}
+  }
+}
+
+class EmptyLineHack extends ViewDesc {
+  get length() { return 0 }
+  get children() { return noChildren }
+  constructor(parent: ViewDesc) {
+    super(parent, document.createElement("br"))
   }
 }
 
