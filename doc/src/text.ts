@@ -247,7 +247,7 @@ export class TextIterator implements Iterator<string> {
   private nextValue: string;
   private result: IteratorResult<string>;
   private clipped: number;
-  public pos: number = 0;
+  public pos: number;
 
   constructor(text: Text, from: number = 0, to: number = -1) {
     this.result = {value: "", done: false}
@@ -256,16 +256,17 @@ export class TextIterator implements Iterator<string> {
       this.parents = [text]
       this.indices = [0]
       this.nextValue = ""
-      this.findNextLeaf()
+      this.pos = 0
+      this.findNextLeaf(from)
     } else {
       this.parents = []
       this.indices = []
-      this.nextValue = text.text
+      this.nextValue = text.text.slice(from)
+      this.pos = from
     }
-    if (from > 0) this.skip(from)
   }
 
-  private findNextLeaf() {
+  private findNextLeaf(skip: number = 0) {
     for (;;) {
       let last = this.parents.length - 1
       if (last < 0) {
@@ -278,13 +279,17 @@ export class TextIterator implements Iterator<string> {
         this.parents.pop()
         this.indices.pop()
       } else {
-        let next = top.children[index]
+        let next = top.children[index], len = next.length
         this.indices[last] = index + 1
-        if (next instanceof TextNode) {
+        if (skip > len) {
+          skip -= len
+          this.pos += len
+        } else if (next instanceof TextNode) {
           this.parents.push(next)
           this.indices.push(0)
         } else {
-          this.nextValue = next.text
+          this.nextValue = next.text.slice(skip)
+          this.pos += skip
           break
         }
       }
@@ -305,40 +310,5 @@ export class TextIterator implements Iterator<string> {
       }
     }
     return this.result
-  }
-
-  private skip(n: number) {
-    if (this.nextValue.length > n) {
-      this.nextValue = this.nextValue.slice(n)
-      this.pos += n
-    } else {
-      n -= this.nextValue.length
-      this.pos += this.nextValue.length
-      this.nextValue = ""
-    }
-    for (;;) {
-      let last = this.parents.length - 1
-      if (last < 0) break
-      let parent = this.parents[last]
-      let index = this.indices[last]
-      if (index == parent.children.length) {
-        this.parents.pop()
-        this.indices.pop()
-      } else {
-        let next = parent.children[index], len = next.length
-        this.indices[last] = index + 1
-        if (len <= n) {
-          n -= len
-          this.pos += len
-        } else if (next instanceof TextNode) {
-          this.parents.push(next)
-          this.indices.push(0)
-        } else {
-          this.nextValue = next.text.slice(n)
-          this.pos += n
-          break
-        }
-      }
-    }
   }
 }
