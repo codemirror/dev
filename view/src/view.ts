@@ -32,6 +32,7 @@ export class EditorView {
     this.contentDOM = document.createElement("pre")
     this.contentDOM.className = "CM-content"
     this.contentDOM.setAttribute("contenteditable", "true")
+    this.contentDOM.setAttribute("spellcheck", "false")
 
     this.dom = document.createElement("div")
     this.dom.className = "CM"
@@ -85,6 +86,11 @@ export class EditorView {
     selectionToDOM(this, true)
   }
 
+  destroy() {
+    this.domObserver.stop()
+    this.selectionReader.destroy()
+    this.dom.remove()
+  }
 }
 
 interface EditorProps {
