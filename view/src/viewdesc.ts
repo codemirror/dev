@@ -404,7 +404,7 @@ function readDOMNode(node: Node): string {
   let desc = node.cmView
   if (desc && desc.ignoreInDOM) return ""
   if (node.nodeType == 3) return node.nodeValue as string
-  if (node.nodeName == "BR") return "\n"
+  if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
   if (node.nodeType == 1) return readDOM(node.firstChild, null)
   return ""
 }
