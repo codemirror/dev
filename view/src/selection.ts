@@ -138,7 +138,7 @@ export function selectionToDOM(view: EditorView, takeFocus: boolean = false) {
   domSel.removeAllRanges()
   domSel.addRange(range)
   if (domSel.extend) domSel.extend(head.node, head.offset)
-  
+
   reader.storeDOMState(sel)
   reader.ignoreUpdates = false
 }

@@ -16,6 +16,7 @@ export abstract class ViewDesc {
   dirty: number = NOT_DIRTY;
 
   get childGap() { return 0 }
+  get ignoreInDOM() { return false }
 
   get posAtStart(): number {
     return this.parent ? this.parent.posBefore(this) : 0
@@ -87,15 +88,6 @@ export abstract class ViewDesc {
     }
   }
 
-  domFromPos(pos: number): {node: Node, offset: number} {
-    for (let offset = 0, i = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = offset + child.length
-      if (pos <= end) return child.domFromPos(pos - offset)
-      offset = end + this.childGap
-    }
-    return {node: this.dom, offset: this.dom.childNodes.length}
-  }
-
   markDirty() {
     this.dirty |= NODE_DIRTY
     for (let parent = this.parent; parent; parent = parent.parent)
@@ -161,7 +153,6 @@ export class DocViewDesc extends ViewDesc {
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
     // FIXME partially parse lines when possible
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    if (this.children.length == 0) return {from: 0, to: 0, text: readDOM(this.dom.firstChild, null)}
     for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       /*      if (pos < from && end > to) {
@@ -196,6 +187,11 @@ export class DocViewDesc extends ViewDesc {
     let desc = this.nearest(node)
     if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
     return desc.localPosFromDOM(node, offset) + desc.posAtStart
+  }
+
+  domFromPos(pos: number): {node: Node, offset: number} {
+    let {i, off} = new ChildCursor(this.children, this.text.length, 1).findPos(pos)
+    return this.children[i].domFromPos(off)
   }
 }
 
@@ -287,8 +283,9 @@ class LineViewDesc extends ViewDesc {
   }
 
   detachTail(from: number): TextViewDesc[] {
-    let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     let result: TextViewDesc[] = []
+    if (this.length == 0) return result
+    let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     if (off > 0) {
       let child = this.children[i] as TextViewDesc
       result.push(new TextViewDesc(this, child.text.slice(off)))
@@ -297,12 +294,17 @@ class LineViewDesc extends ViewDesc {
       i++
     }
     if (i < this.children.length) {
-      for (; i < this.children.length; i++) result.push(this.children[i] as TextViewDesc)
+      for (let j = i; j < this.children.length; j++) result.push(this.children[j] as TextViewDesc)
       this.children.length = i
       this.dirty |= NODE_DIRTY
     }
     this.length = from
     return result
+  }
+
+  domFromPos(pos: number): {node: Node, offset: number} {
+    let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
+    return off == 0 ? {node: this.dom, offset: i} : {node: this.children[i].dom, offset: off}
   }
 }
 
@@ -330,15 +332,12 @@ class TextViewDesc extends ViewDesc {
   localPosFromDOM(_node: Node, offset: number): number {
     return offset
   }
-
-  domFromPos(pos: number): {node: Node, offset: number} {
-    return {node: this.dom, offset: pos}
-  }
 }
 
 class EmptyLineHack extends ViewDesc {
   get length() { return 0 }
   get children() { return noChildren }
+  get ignoreInDOM() { return true }
   constructor(parent: ViewDesc) {
     super(parent, document.createElement("br"))
   }
@@ -402,6 +401,8 @@ function readDOM(start: Node | null, end: Node | null): string {
 
 function readDOMNode(node: Node): string {
   // FIXME add a way to ignore certain nodes based on their desc
+  let desc = node.cmView
+  if (desc && desc.ignoreInDOM) return ""
   if (node.nodeType == 3) return node.nodeValue as string
   if (node.nodeName == "BR") return "\n"
   if (node.nodeType == 1) return readDOM(node.firstChild, null)
