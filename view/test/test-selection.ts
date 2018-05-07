@@ -43,8 +43,8 @@ describe("EditorView selection", () => {
     let cm = tempEditor("abc\n\ndef")
     function test(pos, node, offset) {
       cm.dispatch(cm.state.transaction.setSelection(new Selection([new Range(pos)])))
-      ist(getSelection().focusNode, node)
-      ist(getSelection().focusOffset, offset)
+      ist(window.getSelection().focusNode, node)
+      ist(window.getSelection().focusOffset, offset)
     }
     let abc = cm.contentDOM.firstChild.firstChild
     let def = cm.contentDOM.lastChild.firstChild
