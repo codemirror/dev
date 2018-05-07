@@ -4,7 +4,7 @@
   "description": "Text/code editor component",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts"
+    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts"
   },
   "keywords": [
     "editor",
@@ -26,8 +26,10 @@
   "license": "MIT",
   "dependencies": {
     "@types/mocha": "^5.2.0",
+    "@types/prosemirror-transform": "^1.0.3",
     "ist": "^1.0.1",
     "mocha": "^5.1.1",
+    "prosemirror-transform": "^1.0.10",
     "rollup": "^0.58.2",
     "rollup-plugin-commonjs": "^9.1.3",
     "rollup-typescript": "^1.1.2",
