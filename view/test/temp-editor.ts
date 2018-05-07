@@ -1,6 +1,5 @@
 import {EditorView} from "../src/view"
-import {EditorState, Configuration} from "../../state/src/state"
-import {Text} from "../../doc/src/text"
+import {EditorState} from "../../state/src/state"
 
 const workspace = document.querySelector("#workspace")
 
@@ -12,7 +11,7 @@ export function tempEditor(doc = "", props = {}) {
     tempView = null
   }
 
-  let state = new EditorState(Configuration.default, typeof doc == "string" ? Text.create(doc) : doc)
+  let state = EditorState.create({doc})
   tempView = new EditorView(state, props)
   workspace.appendChild(tempView.dom)
   return tempView

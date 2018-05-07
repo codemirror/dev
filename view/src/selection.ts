@@ -69,7 +69,6 @@ export class SelectionReader {
     this.lastAnchorNode = this.lastSelection = null
   }
 
-  // FIXME turn off during updates, somehow
   read() {
     if (this.ignoreUpdates || !this.domChanged() || !this.view.hasFocus() || !hasSelection(this.view)) return
     this.view.domObserver.flush()

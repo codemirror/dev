@@ -6,7 +6,7 @@ export interface StateFieldSpec<T> {
   apply(tr: Transaction, value: T): T;
 }
 
-export class Configuration {
+class Configuration {
   constructor(public readonly fields: StateFieldSpec<any>[] = []) {
   }
 
@@ -15,11 +15,17 @@ export class Configuration {
   }
 }
 
+export interface EditorStateConfig {
+  doc?: string | Text;
+  selection?: Selection;
+}
+
 export class EditorState {
-  constructor(public readonly config: Configuration,
+  /** internal */
+  constructor(/** internal */ public readonly config: Configuration,
               public readonly doc: Text,
               public readonly selection: Selection = Selection.default,
-              public readonly fields: {[key: string]: any} = Object.create(null)) {}
+              public readonly fields: {readonly [key: string]: any} = Object.create(null)) {}
 
   getField(key: string): any {
     return this.fields[key]
@@ -29,11 +35,12 @@ export class EditorState {
     return Transaction.start(this)
   }
 
-  static fromConfig(config: Configuration, doc: Text, selection: Selection = Selection.default): EditorState {
-    return new EditorState(config, doc, selection, config.fields.reduce((map, field) => {
-      map[field.key] = field.init()
-      return map
-    }, Object.create(null)))
+  static create(config: EditorStateConfig = {}) {
+    let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
+    let $config = Configuration.default // FIXME derive from plugins
+    let fields = Object.create(null)
+    for (let i = 0; i < $config.fields.length; i++) fields[$config.fields[i].key] = $config.fields[i].init()
+    return new EditorState($config, doc, config.selection || Selection.default, fields)
   }
 }
 
@@ -164,13 +171,15 @@ export class Transaction {
   }
 
   apply(): EditorState {
-    return new EditorState(this.startState.config,
-                           this.doc,
-                           this.selection,
-                           this.startState.config.fields.reduce((fields, fieldSpec) => {
-                             fields[fieldSpec.key] = fieldSpec.apply(this, fields[fieldSpec.key])
-                             return fields
-                           }, this.startState.fields))
+    // FIXME this doesn't allow plugins to read fields defined by
+    // earlier plugins during `apply`, which does get used in
+    // ProseMirror
+    let fields = Object.create(null), $conf = this.startState.config
+    for (let i = 0; i < $conf.fields.length; i++) {
+      let field = $conf.fields[i]
+      fields[field.key] = field.apply(this, this.startState.fields[field.key])
+    }
+    return new EditorState($conf, this.doc, this.selection, fields)
   }
 }
 
