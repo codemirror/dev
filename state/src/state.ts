@@ -3,7 +3,7 @@ import {Text} from "../../doc/src/text"
 export interface StateFieldSpec<T> {
   readonly key: string;
   init(): T;
-  apply(tr: Transaction, value: T): T;
+  apply(tr: Transaction, value: T, newState: EditorState, oldState: EditorState): T;
 }
 
 class Configuration {
@@ -171,15 +171,13 @@ export class Transaction {
   }
 
   apply(): EditorState {
-    // FIXME this doesn't allow plugins to read fields defined by
-    // earlier plugins during `apply`, which does get used in
-    // ProseMirror
     let fields = Object.create(null), $conf = this.startState.config
+    let newState = new EditorState($conf, this.doc, this.selection, fields)
     for (let i = 0; i < $conf.fields.length; i++) {
       let field = $conf.fields[i]
-      fields[field.key] = field.apply(this, this.startState.fields[field.key])
+      fields[field.key] = field.apply(this, this.startState.fields[field.key], newState, this.startState)
     }
-    return new EditorState($conf, this.doc, this.selection, fields)
+    return newState
   }
 }
 
