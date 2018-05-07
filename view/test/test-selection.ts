@@ -13,7 +13,10 @@ function setDOMSel(node, offset) {
 
 describe("EditorView selection", () => {
   it("can read the DOM selection", () => {
-    if (!document.hasFocus()) return
+    if (!document.hasFocus()) {
+      console.warn("The document doesn't have focus, skipping some tests")
+      return
+    }
     let cm = tempEditor("one\n\nthree")
 
     function test(node, offset, expected) {
@@ -59,4 +62,3 @@ describe("EditorView selection", () => {
     test(8, def.parentNode, 1)
   })
 })
-

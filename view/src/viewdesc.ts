@@ -302,6 +302,7 @@ class LineViewDesc extends ViewDesc {
 
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
+    while (off == 0 && i > 0 && this.children[i - 1].length == 0) i--
     return off == 0 ? {node: this.dom, offset: i} : {node: this.children[i].dom, offset: off}
   }
 }
