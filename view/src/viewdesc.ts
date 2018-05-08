@@ -436,8 +436,8 @@ function linesBetween(text: Text, start: number, end: number): string[][] {
   let result: string[][] = [[]]
   if (start == end) return result
   for (let textCur = text.iterRange(start, end);;) {
-    let {value, done} = textCur.next()
-    if (done) return result
+    let value = textCur.next()
+    if (value.length == 0) return result
     for (let pos = 0;;) {
       let nextNewline = value.indexOf("\n", pos)
       if (nextNewline == -1) {

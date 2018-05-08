@@ -85,21 +85,33 @@ describe("doc", () => {
 
   it("is iterable", () => {
     let found = "", doc = Text.create(midDoc.repeat(5))
-    for (let iter = doc.iter(), cur; !(cur = iter.next()).done;) found += cur.value
+    for (let iter = doc.iter(), cur; (cur = iter.next()).length;) found += cur
+    ist(found, doc.text)
+  })
+
+  it("is iterable in reverse", () => {
+    let found = "", doc = Text.create(midDoc.repeat(5))
+    for (let iter = doc.iter(-1), cur; (cur = iter.next()).length;) found = cur + found
     ist(found, doc.text)
   })
 
   it("is partially iterable", () => {
     let found = "", doc = Text.create(midDoc.repeat(5))
-    for (let iter = doc.iterRange(500, doc.length - 500), cur; !(cur = iter.next()).done;) found += cur.value
-    ist(found.slice(found.length - 100), doc.slice(500, doc.length - 500).slice(found.length - 100))
+    for (let iter = doc.iterRange(500, doc.length - 500), cur; (cur = iter.next()).length;) found += cur
+    ist(found, doc.slice(500, doc.length - 500))
+  })
+
+  it("is partially iterable in reverse", () => {
+    let found = "", doc = Text.create(midDoc)
+    for (let iter = doc.iterRange(doc.length - 500, 500), cur; (cur = iter.next()).length;) found = cur + found
+    ist(found, doc.slice(500, doc.length - 500))
   })
 
   it("can partially iter over subsections at the start and end", () => {
     let doc = Text.create(midDoc)
-    ist(doc.iterRange(0, 1).next().value, "1")
-    ist(doc.iterRange(1, 2).next().value, "2")
-    ist(doc.iterRange(doc.length - 1, doc.length).next().value, "0")
-    ist(doc.iterRange(doc.length - 2, doc.length - 1).next().value, "9")
+    ist(doc.iterRange(0, 1).next(), "1")
+    ist(doc.iterRange(1, 2).next(), "2")
+    ist(doc.iterRange(doc.length - 1, doc.length).next(), "0")
+    ist(doc.iterRange(doc.length - 2, doc.length - 1).next(), "9")
   })
 })

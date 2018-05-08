@@ -21,9 +21,16 @@ export abstract class Text implements Iterable<string> {
   abstract eq(other: Text): boolean;
 
   get lines() { return this.lineBreaks + 1 }
-  iter() { return new TextIterator(this) }
-  iterRange(from: number, to: number | undefined) { return new TextIterator(this, from, to) }
-  [iterator]() { return new TextIterator(this) }
+  iter(dir: 1 | -1 = 1): {next(): string} { return new TextCursor(this, dir) }
+  iterRange(from: number, to: number = this.length): {next(): string} { return new PartialTextCursor(this, from, to) }
+  [iterator](): Iterator<string> {
+    let cursor = new TextCursor(this), result = {done: false, value: ""}
+    return {next() {
+      result.value = cursor.next()
+      result.done = result.value.length > 0
+      return result
+    }}
+  }
 
   // These are module-internal but TypeScript doesn't have a
   // way to express that.
@@ -222,93 +229,89 @@ export class TextNode extends Text {
 function eqContent(a: Text, b: Text): boolean {
   if (a.length != b.length) return false
   let iterA = a.iter(), iterB = b.iter()
-  for (let strA = iterA.next().value, strB = iterB.next().value;;) {
+  for (let strA = iterA.next(), strB = iterB.next();;) {
     let lenA = strA.length, lenB = strB.length
     if (lenA == lenB) {
       if (strA != strB) return false
-      strA = iterA.next().value; strB = iterB.next().value
+      strA = iterA.next(); strB = iterB.next()
       if (strA.length == 0) return true
     } else if (lenA > lenB) {
       if (strA.slice(0, lenB) != strB) return false
       strA = strA.slice(lenB)
-      strB = iterB.next().value
+      strB = iterB.next()
     } else {
       if (strB.slice(0, lenA) != strA) return false
       strB = strB.slice(lenA)
-      strA = iterA.next().value
+      strA = iterA.next()
     }
   }
 }
 
+class TextCursor {
+  nodes: Text[];
+  offsets: number[];
 
-export class TextIterator implements Iterator<string> {
-  private parents: TextNode[];
-  private indices: number[];
-  private nextValue: string;
-  private result: IteratorResult<string>;
-  private clipped: number;
-  public pos: number;
-
-  constructor(text: Text, from: number = 0, to: number = -1) {
-    this.result = {value: "", done: false}
-    this.clipped = to
-    if (text instanceof TextNode) {
-      this.parents = [text]
-      this.indices = [0]
-      this.nextValue = ""
-      this.pos = 0
-      this.findNextLeaf(from)
-    } else {
-      this.parents = []
-      this.indices = []
-      this.nextValue = text.text.slice(from)
-      this.pos = from
-    }
+  constructor(text: Text, public dir: 1 | -1 = 1) {
+    this.nodes = [text]
+    this.offsets = [dir > 0 ? 0 : text instanceof TextLeaf ? text.length : text.children!.length]
   }
 
-  private findNextLeaf(skip: number = 0) {
+  next(skip: number = 0): string {
     for (;;) {
-      let last = this.parents.length - 1
-      if (last < 0) {
-        this.nextValue = ""
-        break
-      }
-      let top = this.parents[last]
-      let index = this.indices[last]
-      if (index == top.children.length) {
-        this.parents.pop()
-        this.indices.pop()
+      let last = this.nodes.length - 1
+      if (last < 0) return ""
+      let top = this.nodes[last]
+      let offset = this.offsets[last]
+      if (top instanceof TextLeaf) {
+        this.nodes.pop()
+        this.offsets.pop()
+        if (this.dir > 0) {
+          let len = top.length - offset
+          if (len > skip) return top.text.slice(offset + skip)
+          else skip -= len
+        } else {
+          if (offset > skip) return top.text.slice(0, offset - skip)
+          else skip -= offset
+        }
+      } else if (offset == (this.dir > 0 ? top.children!.length : 0)) {
+        this.nodes.pop()
+        this.offsets.pop()
       } else {
-        let next = top.children[index], len = next.length
-        this.indices[last] = index + 1
+        let next = top.children![this.dir > 0 ? offset : offset - 1], len = next.length
+        this.offsets[last] = offset + this.dir
         if (skip > len) {
           skip -= len
-          this.pos += len
-        } else if (next instanceof TextNode) {
-          this.parents.push(next)
-          this.indices.push(0)
         } else {
-          this.nextValue = next.text.slice(skip)
-          this.pos += skip
-          break
+          this.nodes.push(next)
+          this.offsets.push(this.dir > 0 ? 0 : next instanceof TextLeaf ? next.length : next.children!.length)
         }
       }
     }
   }
+}
 
-  next(): IteratorResult<string> {
-    let value = this.result.value = this.nextValue
-    let done = this.result.done = value.length == 0
-    if (!done) {
-      this.pos += value.length
-      if (this.clipped > -1 && this.pos > this.clipped) {
-        this.result.value = this.result.value.slice(0, value.length - (this.pos - this.clipped))
-        this.pos = this.clipped
-        this.nextValue = ""
-      } else {
-        this.findNextLeaf()
-      }
+class PartialTextCursor {
+  cursor: TextCursor;
+  limit: number;
+  skip: number;
+
+  constructor(text: Text, start: number, end: number) {
+    this.cursor = new TextCursor(text, start > end ? -1 : 1)
+    if (start > end) {
+      this.skip = text.length - start
+      this.limit = start - end
+    } else {
+      this.skip = start
+      this.limit = end - start
     }
-    return this.result
+  }
+
+  next(): string {
+    let value = this.cursor.next(this.skip)
+    this.skip = 0
+    if (value.length > this.limit)
+      value = this.cursor.dir > 0 ? value.slice(0, this.limit) : value.slice(value.length - this.limit)
+    this.limit -= value.length
+    return value
   }
 }
