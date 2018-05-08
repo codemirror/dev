@@ -27,11 +27,11 @@
   "dependencies": {
     "@types/mocha": "^5.2.0",
     "ist": "^1.0.1",
-    "mocha": "^5.0.5",
+    "mocha": "^5.1.1",
     "rollup": "^0.58.2",
     "rollup-plugin-commonjs": "^9.1.3",
     "rollup-typescript": "^1.1.2",
     "ts-node": "^5.0.1",
-    "typescript": "^2.8.1"
+    "typescript": "^2.8.3"
   }
 }

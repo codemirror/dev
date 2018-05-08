@@ -1,4 +1,5 @@
 import {Text} from "../../doc/src/text"
+import {changedRanges} from "../../doc/src/diff"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined }
@@ -119,15 +120,15 @@ export class DocViewDesc extends ViewDesc {
 
   update(text: Text) {
     let prevText = this.text
-    let plan = buildUpdatePlan(prevText, text)
+    let plan = changedRanges(prevText, text)
     this.text = text
 
     let cur = new ChildCursor(this.children, prevText.length, 1)
     for (let i = plan.length - 1; i >= 0; i--) {
-      let {prevStart, prevEnd, curStart, curEnd} = plan[i]
-      let {i: toI, off: toOff} = cur.findPos(prevEnd)
-      let {i: fromI, off: fromOff} = cur.findPos(prevStart)
-      let lines = linesBetween(text, curStart, curEnd)
+      let {fromA, toA, fromB, toB} = plan[i]
+      let {i: toI, off: toOff} = cur.findPos(toA)
+      let {i: fromI, off: fromOff} = cur.findPos(fromA)
+      let lines = linesBetween(text, fromB, toB)
 
       if (lines.length == 1) {
         if (fromI == toI) { // Change within single line
@@ -344,46 +345,6 @@ class EmptyLineHack extends ViewDesc {
 
 interface UpdateRange {
   prevStart: number, curStart: number, prevEnd: number, curEnd: number
-}
-
-// FIXME more intelligent diffing
-function buildUpdatePlan(prev: Text, current: Text): UpdateRange[] {
-  let plan: UpdateRange[] = []
-
-  function scanChildren(startOff: number, prev: Text, current: Text) {
-    let chPrev = prev.children, chCur= current.children
-    if (chPrev == null || chCur == null) {
-      scanText(startOff, prev.text, current.text) // FIXME may concatenate a huge string (scanText should iterate nodes)
-      return
-    }
-    let minLen = Math.min(chPrev.length, chCur.length)
-    let start = 0, skipOff = startOff, end  = 0
-    while (start < minLen && chPrev[start] == chCur[start]) { skipOff += chPrev[start].length; start++ }
-    while (end < minLen - start &&
-           chPrev[chPrev.length - 1 - end] == chCur[chCur.length - 1 - end]) end++
-    if (chPrev.length == chCur.length && start + end + 1 >= minLen) {
-      if (start + end != minLen)
-        scanChildren(skipOff, chPrev[start], chCur[start])
-    } else {
-      let prevText = "", curText = ""
-      for (let i = start; i < chPrev.length - end; i++) prevText += chPrev[i].text
-      for (let i = start; i < chCur.length - end; i++) curText += chCur[i].text
-      scanText(skipOff, prevText, curText)
-    }
-  }
-
-  function scanText(startOff: number, prev: string, current: string) {
-    let start = 0, end = 0, minLen = Math.min(prev.length, current.length)
-    while (start < minLen && prev.charCodeAt(start) == current.charCodeAt(start)) start++
-    if (start == minLen && prev.length == current.length) return
-    while (end < minLen - start &&
-           prev.charCodeAt(prev.length - 1 - end) == current.charCodeAt(current.length - 1 - end)) end++
-    plan.push({prevStart: startOff + start, curStart: startOff + start,
-               prevEnd: startOff + prev.length - end, curEnd: startOff + current.length - end})
-  }
-
-  scanChildren(0, prev, current)
-  return plan
 }
 
 function readDOM(start: Node | null, end: Node | null): string {
