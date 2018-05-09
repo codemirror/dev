@@ -343,10 +343,6 @@ class EmptyLineHack extends ViewDesc {
   }
 }
 
-interface UpdateRange {
-  prevStart: number, curStart: number, prevEnd: number, curEnd: number
-}
-
 function readDOM(start: Node | null, end: Node | null): string {
   let text = "", cur = start
   if (cur) for (;;) {
