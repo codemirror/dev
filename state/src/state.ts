@@ -164,7 +164,7 @@ export class Transaction {
 
   scrollIntoView() {
     return new Transaction(this.startState, this.changes, this.docs, this.selection, this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
-  }    
+  }
 
   get scrolledIntoView() {
     return (this.flags & FLAG_SCROLL_INTO_VIEW) > 0
