@@ -7,17 +7,13 @@ export interface StateFieldSpec<T> {
 }
 
 class Configuration {
-  constructor(public readonly fields: StateFieldSpec<any>[] = []) {
-  }
-
-  static get default(): Configuration {
-    return new Configuration()
-  }
+  constructor(public readonly fields: ReadonlyArray<StateFieldSpec<any>>) {}
 }
 
 export interface EditorStateConfig {
   doc?: string | Text;
   selection?: Selection;
+  fields?: StateFieldSpec<any>[];
 }
 
 export class EditorState {
@@ -37,7 +33,7 @@ export class EditorState {
 
   static create(config: EditorStateConfig = {}) {
     let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
-    let $config = Configuration.default // FIXME derive from plugins
+    let $config = new Configuration(config.fields || [])
     let fields = Object.create(null)
     for (let i = 0; i < $config.fields.length; i++) fields[$config.fields[i].key] = $config.fields[i].init()
     return new EditorState($config, doc, config.selection || Selection.default, fields)
