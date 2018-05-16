@@ -49,6 +49,8 @@ const noChildren: ReadonlyArray<DecorationSet> = noDecorations as any as Readonl
 
 const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
+type DecorationFilter = (from: number, to: number, spec: DecorationSpec) => boolean
+
 export class DecorationSet {
   private constructor(
     // The text length covered by this set
@@ -63,16 +65,14 @@ export class DecorationSet {
     private children: ReadonlyArray<DecorationSet>
   ) {}
 
-  update(decorations: ReadonlyArray<Decoration> = noDecorations,
-         filter: ((decoration: Decoration) => boolean) | null = null): DecorationSet {
+  update(decorations: ReadonlyArray<Decoration> = noDecorations, filter: DecorationFilter | null = null): DecorationSet {
     return this.updateInner(decorations.length ? decorations.slice().sort(byPos) : decorations, filter, 0)
   }
 
-  private updateInner(decorations: ReadonlyArray<Decoration>,
-                      filter: ((decoration: Decoration) => boolean) | null, offset: number): DecorationSet {
+  private updateInner(decorations: ReadonlyArray<Decoration>, filter: DecorationFilter | null, offset: number): DecorationSet {
     // The new local decorations. May equal this.local at any point in
     // this method, in which case it has to be copied before mutation
-    let local: Decoration[] = filterDecorations(this.local, filter) as Decoration[]
+    let local: Decoration[] = filterDecorations(this.local, filter, offset) as Decoration[]
     // The new array of child sets. May equal this.children as long as
     // no changes are made
     let children: DecorationSet[] = this.children as DecorationSet[]
@@ -155,12 +155,12 @@ export class DecorationSet {
 
     // Rebalance the children if necessary
     if (children != this.children) {
-      for (let i = 0, off = 0; i < children.length; i++) {
+      for (let i = 0, off = 0; i < children.length;) {
         let child = children[i], next
-        if (child.size == 0 && (i > 0 || i == children.length - 1)) {
+        if (child.size == 0 && (i > 0 || children.length == 1)) {
           // Drop empty node
           children.splice(i--, 1)
-          if (i > 0) children[i - 1] = children[i - 1].grow(child.length)
+          if (i >= 0) children[i] = children[i].grow(child.length)
         } else if (child.size > (childSize << 1) && child.local.length < (child.length >> 1)) {
           // Unwrap an overly big node
           for (let j = 0; j < child.local.length; j++) {
@@ -174,7 +174,7 @@ export class DecorationSet {
           // Join two small leaf nodes
           children.splice(i, 2, new DecorationSet(child.length + next.length,
                                                   child.size + next.size,
-                                                  child.local.concat(next.local.map(d => d.move(child.size))),
+                                                  child.local.concat(next.local.map(d => d.move(child.length))),
                                                   noChildren))
           off += child.length + next.length
         } else {
@@ -247,12 +247,12 @@ function byPos(a: Decoration, b: Decoration): number {
   return (a.from - b.from) || (a.to - b.to) || (a.desc.startAssoc - b.desc.startAssoc)
 }
 
-function filterDecorations(decorations: ReadonlyArray<Decoration>, filter: ((decoration: Decoration) => boolean) | null): ReadonlyArray<Decoration> {
-  if (filter == null) return decorations
+function filterDecorations(decorations: ReadonlyArray<Decoration>, filter: DecorationFilter | null, offset: number): ReadonlyArray<Decoration> {
+  if (!filter) return decorations
   let copy: Decoration[] | null = null
   for (let i = 0; i < decorations.length; i++) {
     let deco = decorations[i]
-    if (filter(deco)) {
+    if (filter(deco.from + offset, deco.to + offset, deco.spec)) {
       if (copy != null) copy.push(deco)
     } else {
       if (copy == null) copy = decorations.slice(0, i)
