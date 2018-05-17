@@ -1,4 +1,5 @@
 import {Decoration, DecorationSet} from "../src/decoration"
+import {Change} from "../../state/src/state"
 const ist = require("ist")
 
 function depth(decoSet: DecorationSet): number {
@@ -116,6 +117,57 @@ describe("DecorationSet", () => {
 
     it("reuses unchanged nodes", () => {
       ist(set0.update([], () => true), set0)
+    })
+  })
+
+  describe("map", () => {
+    type Pos = number | [number, number, any?]
+
+    function asRange(pos: Pos): {from: number, to: number} {
+      return typeof pos == "number" ? {from: pos, to: pos} : {from: pos[0], to: pos[1]}
+    }
+
+    function test(positions: Pos[], changes: [number, number, number][], newPositions: Pos[]) {
+      let set = DecorationSet.create(positions.map(pos => {
+        let {from, to} = asRange(pos)
+        return Decoration.create(from, to, pos[2] || {})
+      }))
+      let mapped = set.map(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len))))
+      let out = []
+      mapped.collect(out, 0)
+      ist(JSON.stringify(out.map(d => d.from + "-" + d.to)),
+          JSON.stringify(newPositions.map(asRange).map(r => r.from + "-" + r.to)))
+    }
+
+    it("can map through changes", () =>
+       test([1, 4, 10], [[0, 0, 1], [2, 3, 0], [8, 8, 20]], [2, 4, 30]))
+
+    it("takes assoc into account", () =>
+       test([[1, 2, {startAssoc: -1, endAssoc: 1}]], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
+
+    it("defaults to exclusive on both sides", () =>
+       test([[1, 2]], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
+
+    it("makes sure decorations don't invert", () =>
+       test([[1, 2]], [[1, 2, 0], [1, 1, 1]], [2]))
+
+    it("adjusts the set tree shape", () => {
+      let child0Size = set0.children[0].length, child1Size = set0.children[1].length
+      let set = set0.map([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")])
+      ist(set.size, set0.size)
+      ist(set.children[0].length, child0Size + 2)
+      ist(set.children[1].length, child1Size - 2)
+      ist(set.children[2].length, set0.children[2].length)
+    })
+
+    it("allows decorations to escape their parent node", () => {
+      let deco = []
+      for (let i = 0; i < 100; i++)
+        deco.push(Decoration.create(i, i, {startAssoc: -1, endAssoc: 1}))
+      let set0 = DecorationSet.create(deco), nodeBoundary = set0.children[0].length
+      let set = set0.map([new Change(nodeBoundary, nodeBoundary, "hello")])
+      ist(set.size, set0.size)
+      checkSet(set)
     })
   })
 })

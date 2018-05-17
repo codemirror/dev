@@ -29,10 +29,11 @@ export class Decoration {
 
   get spec() { return this.desc.spec }
 
-  map(change: Change): Decoration {
-    let from = change.mapPos(this.from, this.desc.startAssoc)
-    let to = this.from == this.to ? from : change.mapPos(this.to, this.desc.endAssoc)
-    return new Decoration(from, to, this.desc)
+  // FIXME allow deletion
+  map(changes: Change[]): Decoration {
+    let from = mapPos(this.from, changes, this.desc.startAssoc)
+    let to = Math.max(from, mapPos(this.to, changes, this.desc.endAssoc))
+    return from == this.from && to == this.to ? this : new Decoration(from, to, this.desc)
   }
 
   move(offset: number): Decoration {
@@ -42,6 +43,12 @@ export class Decoration {
   static create(from: number, to: number, spec: DecorationSpec): Decoration {
     return new Decoration(from, to, new DecorationDesc(spec))
   }
+}
+
+// FIXME use a mapping abstraction defined in the state module
+function mapPos(pos: number, changes: Change[], assoc: number) {
+  for (let i = 0; i < changes.length; i++) pos = changes[i].mapPos(pos, assoc)
+  return pos
 }
 
 const noDecorations: ReadonlyArray<Decoration> = []
@@ -95,7 +102,7 @@ export class DecorationSet {
         decI++
         if (next.to > endPos) {
           if (local == this.local) local = local.slice()
-          local.push(next.move(-offset))
+          insertSorted(local, next.move(-offset))
           length = Math.max(length, next.to - offset)
         } else {
           if (localDeco == null) localDeco = []
@@ -134,7 +141,7 @@ export class DecorationSet {
       children = noChildren as DecorationSet[]
       while (decI < decorations.length) {
         if (local == this.local) local = local.slice()
-        local.push(decorations[decI++].move(-offset))
+        insertSorted(local, decorations[decI++].move(-offset))
       }
     }
 
@@ -149,7 +156,7 @@ export class DecorationSet {
         let deco = decorations[decI]
         if (deco.to > endPos) {
           if (local == this.local) local = local.slice()
-          local.push(deco.move(-offset))
+          insertSorted(local, deco.move(-offset))
         } else {
           add.push(deco)
         }
@@ -175,7 +182,7 @@ export class DecorationSet {
           // Unwrap an overly big node
           for (let j = 0; j < child.local.length; j++) {
             if (local == this.local) local = this.local.slice()
-            local.push(child.local[j].move(off))
+            insertSorted(local, child.local[j].move(off))
           }
           children.splice(i, 1, ...child.children)
         } else if (child.children.length == 0 && i < children.length - 1 &&
@@ -206,6 +213,7 @@ export class DecorationSet {
               if (deco.from >= off && deco.to <= off + length) {
                 if (local == this.local) local = this.local.slice()
                 local.splice(j--, 1)
+                if (local.length == 0) local = noDecorations
                 joinedLocals.push(deco.move(-off))
               }
             }
@@ -221,7 +229,8 @@ export class DecorationSet {
       }
     }
 
-    return new DecorationSet(length, size, local == this.local ? local : local.sort(byPos), children)
+    if (length == 0 && size == 0 && local.length == 0 && children.length == 0) return DecorationSet.empty
+    return new DecorationSet(length, size, local, children)
   }
 
   grow(length: number): DecorationSet {
@@ -240,6 +249,60 @@ export class DecorationSet {
     }
   }
 
+  map(changes: Change[]): DecorationSet {
+    if (changes.length == 0 || this == DecorationSet.empty) return this
+    return this.mapInner(changes, 0, 0, mapPos(this.length, changes, 1)).set
+  }
+
+  private mapInner(changes: Change[],
+                   oldStart: number, newStart: number,
+                   newEnd: number): {set: DecorationSet, escaped: Decoration[] | null} {
+    let newLocal: Decoration[] | null = null
+    let escaped: Decoration[] | null = null
+    let newLength = newEnd - newStart
+
+    for (let i = 0; i < this.local.length; i++) {
+      // FIXME support deletion through mapping
+      let deco = this.local[i], mapped = deco.map(changes)
+      let escape = mapped.from < 0 || mapped.to > newLength
+      if (newLocal == null && (deco != mapped || escaped)) newLocal = this.local.slice(0, i)
+      if (escape) (escaped || (escaped = [])).push(mapped)
+      else if (newLocal) newLocal.push(mapped)
+    }
+
+    let newChildren: DecorationSet[] | null = null
+    for (let i = 0, oldPos = oldStart, newPos = newStart; i < this.children.length; i++) {
+      let child = this.children[i], newChild = child
+      let oldChildEnd = oldPos + child.length
+      let newChildEnd = mapPos(oldPos + child.length, changes, 1)
+      if (touchesChange(oldPos, oldChildEnd, changes)) {
+        let inner = child.mapInner(changes, oldPos, newPos, newChildEnd)
+        newChild = inner.set
+        if (inner.escaped) for (let j = 0; j < inner.escaped.length; j++) {
+          let deco = inner.escaped[j].move(newPos - newStart)
+          if (deco.from < 0 || deco.to > newLength) {
+            (escaped || (escaped = [])).push(deco)
+          } else {
+            if (newLocal == null) newLocal = this.local.slice()
+            insertSorted(newLocal, deco)
+          }
+        }
+      } else if (newChildEnd - newPos != oldChildEnd - oldPos) {
+        newChild = new DecorationSet(newChildEnd - newPos, child.size, child.local, child.children)
+      }
+      if (newChild != child && newChildren == null) newChildren = this.children.slice(0, i)
+      if (newChildren) newChildren.push(newChild)
+      oldPos = oldChildEnd
+      newPos = newChildEnd
+    }
+
+    let set = newLength == this.length && newChildren == null && newLocal == null
+      ? this
+      : new DecorationSet(newLength, this.size - (escaped == null ? 0 : escaped.length),
+                          newLocal || this.local, newChildren || this.children)
+    return {set, escaped}
+  }
+
   static create(decorations: Decoration[]): DecorationSet {
     return DecorationSet.empty.update(decorations)
   }
@@ -249,6 +312,12 @@ export class DecorationSet {
 
 function byPos(a: Decoration, b: Decoration): number {
   return (a.from - b.from) || (a.to - b.to) || (a.desc.startAssoc - b.desc.startAssoc)
+}
+
+function insertSorted(target: Decoration[], deco: Decoration) {
+  let i = 0
+  while (i < target.length && byPos(target[i], deco) < 0) i++
+  target.splice(i, 0, deco)
 }
 
 function filterDecorations(decorations: ReadonlyArray<Decoration>,
@@ -266,4 +335,15 @@ function filterDecorations(decorations: ReadonlyArray<Decoration>,
     }
   }
   return copy || decorations
+}
+
+function touchesChange(from: number, to: number, changes: Change[]): boolean {
+  for (let i = 0; i < changes.length; i++) {
+    let change = changes[i]
+    if (change.to >= from && change.from <= to) return true
+    let diff = change.text.length - (change.to - change.from)
+    if (from > change.from) from += diff
+    if (to > change.to) to += diff
+  }
+  return false
 }
