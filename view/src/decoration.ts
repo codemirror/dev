@@ -29,11 +29,12 @@ export class Decoration {
 
   get spec() { return this.desc.spec }
 
-  // FIXME allow deletion
-  map(changes: Change[]): Decoration {
+  map(changes: Change[]): Decoration | null {
     let from = mapPos(this.from, changes, this.desc.startAssoc)
-    let to = Math.max(from, mapPos(this.to, changes, this.desc.endAssoc))
-    return from == this.from && to == this.to ? this : new Decoration(from, to, this.desc)
+    let to = mapPos(this.to, changes, this.desc.endAssoc)
+    if (isDead(this.desc, from, to)) return null
+    if (from == this.from && to == this.to) return this
+    return new Decoration(from, to, this.desc)
   }
 
   move(offset: number): Decoration {
@@ -41,7 +42,12 @@ export class Decoration {
   }
 
   static create(from: number, to: number, spec: DecorationSpec): Decoration {
-    return new Decoration(from, to, new DecorationDesc(spec))
+    let desc = new DecorationDesc(spec)
+    if (isDead(desc, from, to)) {
+      if (from == to) throw new RangeError("Zero-extent decorations must either have a negative startAssoc or a positive endAssoc")
+      else throw new RangeError("Creating a decoration whose end is before its start")
+    }
+    return new Decoration(from, to, desc)
   }
 }
 
@@ -138,6 +144,7 @@ export class DecorationSet {
         child.collect(local, -off)
         off += child.length
       }
+      local.sort(byPos)
       children = noChildren as DecorationSet[]
       while (decI < decorations.length) {
         if (local == this.local) local = local.slice()
@@ -259,15 +266,14 @@ export class DecorationSet {
                    newEnd: number): {set: DecorationSet, escaped: Decoration[] | null} {
     let newLocal: Decoration[] | null = null
     let escaped: Decoration[] | null = null
-    let newLength = newEnd - newStart
+    let newLength = newEnd - newStart, newSize = 0
 
     for (let i = 0; i < this.local.length; i++) {
-      // FIXME support deletion through mapping
       let deco = this.local[i], mapped = deco.map(changes)
-      let escape = mapped.from < 0 || mapped.to > newLength
+      let escape = mapped != null && (mapped.from < 0 || mapped.to > newLength)
       if (newLocal == null && (deco != mapped || escaped)) newLocal = this.local.slice(0, i)
-      if (escape) (escaped || (escaped = [])).push(mapped)
-      else if (newLocal) newLocal.push(mapped)
+      if (escape) (escaped || (escaped = [])).push(mapped!)
+      else if (newLocal && mapped) newLocal.push(mapped)
     }
 
     let newChildren: DecorationSet[] | null = null
@@ -281,7 +287,7 @@ export class DecorationSet {
         if (inner.escaped) for (let j = 0; j < inner.escaped.length; j++) {
           let deco = inner.escaped[j].move(newPos - newStart)
           if (deco.from < 0 || deco.to > newLength) {
-            (escaped || (escaped = [])).push(deco)
+            ;(escaped || (escaped = [])).push(deco)
           } else {
             if (newLocal == null) newLocal = this.local.slice()
             insertSorted(newLocal, deco)
@@ -290,15 +296,31 @@ export class DecorationSet {
       } else if (newChildEnd - newPos != oldChildEnd - oldPos) {
         newChild = new DecorationSet(newChildEnd - newPos, child.size, child.local, child.children)
       }
-      if (newChild != child && newChildren == null) newChildren = this.children.slice(0, i)
-      if (newChildren) newChildren.push(newChild)
+      if (newChild != child) {
+        if (newChildren == null) newChildren = this.children.slice(0, i)
+        // If the node's content was completely deleted by mapping,
+        // drop the node—which is complicated by the need to
+        // distribute its length to another child when it's not the
+        // last child
+        if (newChild.size == 0 && (newChild.length == 0 || i > 0 || i == this.children.length)) {
+          if (newChild.length > 0 && i > 0) {
+            let last = newChildren[i - 1]
+            newChildren[i - 1] = new DecorationSet(last.length + newChild.length, last.size, last.local, last.children)
+          }
+        } else {
+          newChildren.push(newChild)
+        }
+      } else if (newChildren) {
+        newChildren.push(newChild)
+      }
+      newSize += newChild.size
       oldPos = oldChildEnd
       newPos = newChildEnd
     }
 
     let set = newLength == this.length && newChildren == null && newLocal == null
       ? this
-      : new DecorationSet(newLength, this.size - (escaped == null ? 0 : escaped.length),
+      : new DecorationSet(newLength, newSize + (newLocal || this.local).length,
                           newLocal || this.local, newChildren || this.children)
     return {set, escaped}
   }
@@ -346,4 +368,10 @@ function touchesChange(from: number, to: number, changes: Change[]): boolean {
     if (to > change.to) to += diff
   }
   return false
+}
+
+function isDead(desc: DecorationDesc, from: number, to: number): boolean {
+  if (from < to) return false
+  if (from > to) return true
+  return desc.startAssoc >= 0 && desc.endAssoc < 0
 }

@@ -42,7 +42,7 @@ function checkSet(decoSet: DecorationSet, offset: number = 0) {
 
 let smallDecorations = []
 for (let i = 0; i < 5000; i++) {
-  smallDecorations.push(Decoration.create(i, i + (i % 4), {pos: i}))
+  smallDecorations.push(Decoration.create(i, i + 1 + (i % 4), {pos: i}))
 }
 let set0 = DecorationSet.create(smallDecorations)
 
@@ -63,7 +63,7 @@ describe("DecorationSet", () => {
   describe("update", () => {
     it("can add decorations to an existing set", () => {
       let set = set0.update([
-        Decoration.create(2000, 2000, {pos: 2000}),
+        Decoration.create(2000, 2000, {pos: 2000, assoc: 1}),
         Decoration.create(2008, 2200, {pos: 2008})
       ])
       ist(set.size, 5002)
@@ -74,10 +74,10 @@ describe("DecorationSet", () => {
 
     it("can add a large amount of decorations", () => {
       let set0 = DecorationSet.create([
-        Decoration.create(0, 0, {pos: 0}),
-        Decoration.create(100, 100, {pos: 100}),
+        Decoration.create(0, 0, {pos: 0, assoc: 1}),
+        Decoration.create(100, 100, {pos: 100, assoc: 1}),
         Decoration.create(2, 4000, {pos: 2}),
-        Decoration.create(10000, 10000, {pos: 10000})
+        Decoration.create(10000, 10000, {pos: 10000, assoc: 1})
       ])
       let set = set0.update(smallDecorations)
       ist(set.size, 5004)
@@ -130,7 +130,7 @@ describe("DecorationSet", () => {
     function test(positions: Pos[], changes: [number, number, number][], newPositions: Pos[]) {
       let set = DecorationSet.create(positions.map(pos => {
         let {from, to} = asRange(pos)
-        return Decoration.create(from, to, pos[2] || {})
+        return Decoration.create(from, to, pos[2] || (from == to ? {assoc: 1} : {}))
       }))
       let mapped = set.map(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len))))
       let out = []
@@ -148,8 +148,8 @@ describe("DecorationSet", () => {
     it("defaults to exclusive on both sides", () =>
        test([[1, 2]], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
 
-    it("makes sure decorations don't invert", () =>
-       test([[1, 2]], [[1, 2, 0], [1, 1, 1]], [2]))
+    it("drops collapsed decorations", () =>
+       test([[1, 2]], [[1, 2, 0], [1, 1, 1]], []))
 
     it("adjusts the set tree shape", () => {
       let child0Size = set0.children[0].length, child1Size = set0.children[1].length
@@ -168,6 +168,12 @@ describe("DecorationSet", () => {
       let set = set0.map([new Change(nodeBoundary, nodeBoundary, "hello")])
       ist(set.size, set0.size)
       checkSet(set)
+    })
+
+    it("removes collapsed tree nodes", () => {
+      let set = set0.map([new Change(0, 6000, "")])
+      ist(set.size, 0)
+      ist(depth(set), 1)
     })
   })
 })
