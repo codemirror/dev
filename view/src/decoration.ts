@@ -65,14 +65,20 @@ export class DecorationSet {
     private children: ReadonlyArray<DecorationSet>
   ) {}
 
-  update(decorations: ReadonlyArray<Decoration> = noDecorations, filter: DecorationFilter | null = null): DecorationSet {
-    return this.updateInner(decorations.length ? decorations.slice().sort(byPos) : decorations, filter, 0)
+  update(decorations: ReadonlyArray<Decoration> = noDecorations,
+         filter: DecorationFilter | null = null,
+         filterFrom: number = 0,
+         filterTo: number = this.length): DecorationSet {
+    return this.updateInner(decorations.length ? decorations.slice().sort(byPos) : decorations, filter, filterFrom, filterTo, 0)
   }
 
-  private updateInner(decorations: ReadonlyArray<Decoration>, filter: DecorationFilter | null, offset: number): DecorationSet {
+  private updateInner(decorations: ReadonlyArray<Decoration>,
+                      filter: DecorationFilter | null,
+                      filterFrom: number, filterTo: number,
+                      offset: number): DecorationSet {
     // The new local decorations. May equal this.local at any point in
     // this method, in which case it has to be copied before mutation
-    let local: Decoration[] = filterDecorations(this.local, filter, offset) as Decoration[]
+    let local: Decoration[] = filterDecorations(this.local, filter, filterFrom, filterTo, offset) as Decoration[]
     // The new array of child sets. May equal this.children as long as
     // no changes are made
     let children: DecorationSet[] = this.children as DecorationSet[]
@@ -96,7 +102,9 @@ export class DecorationSet {
           localDeco.push(next)
         }
       }
-      let newChild = filter || localDeco ? child.updateInner(localDeco || noDecorations, filter, pos) : child
+      let newChild = child
+      if (localDeco || filter && filterFrom <= endPos && filterTo >= pos)
+        newChild = newChild.updateInner(localDeco || noDecorations, filter, filterFrom, filterTo, pos)
       size += newChild.size
       let copied = children != this.children
       if (newChild != child) {
@@ -148,7 +156,9 @@ export class DecorationSet {
       }
       if (add.length) {
         if (children == this.children) children = this.children.slice()
-        children.push(DecorationSet.createChild(add, endPos - pos, pos))
+        let newChild = DecorationSet.empty.updateInner(add, null, 0, 0, pos)
+        newChild.length = endPos - pos
+        children.push(newChild)
         pos = endPos
       }
     }
@@ -230,12 +240,6 @@ export class DecorationSet {
     }
   }
 
-  static createChild(decorations: Decoration[], length: number, offset: number): DecorationSet {
-    let set = DecorationSet.empty.updateInner(decorations, null, offset)
-    set.length = length
-    return set
-  }
-
   static create(decorations: Decoration[]): DecorationSet {
     return DecorationSet.empty.update(decorations)
   }
@@ -247,12 +251,15 @@ function byPos(a: Decoration, b: Decoration): number {
   return (a.from - b.from) || (a.to - b.to) || (a.desc.startAssoc - b.desc.startAssoc)
 }
 
-function filterDecorations(decorations: ReadonlyArray<Decoration>, filter: DecorationFilter | null, offset: number): ReadonlyArray<Decoration> {
+function filterDecorations(decorations: ReadonlyArray<Decoration>,
+                           filter: DecorationFilter | null,
+                           filterFrom: number, filterTo: number,
+                           offset: number): ReadonlyArray<Decoration> {
   if (!filter) return decorations
   let copy: Decoration[] | null = null
   for (let i = 0; i < decorations.length; i++) {
-    let deco = decorations[i]
-    if (filter(deco.from + offset, deco.to + offset, deco.spec)) {
+    let deco = decorations[i], from = deco.from + offset, to = deco.to + offset
+    if (filterFrom > to || filterTo < from || filter(from, to, deco.spec)) {
       if (copy != null) copy.push(deco)
     } else {
       if (copy == null) copy = decorations.slice(0, i)
