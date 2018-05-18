@@ -116,7 +116,8 @@ class Branch {
   compress(upto: number = this.entries.length): Branch {
     const newEntries = []
     let eventCount = 0
-    for (let map = null, i = 0; i < upto; ++i) {
+    let map = null
+    for (let i = 0; i < upto; ++i) {
       const entry = this.entries[i]
       if (entry instanceof MappingEntry) {
         if (!map) map = new Mapping()
