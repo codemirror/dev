@@ -69,13 +69,13 @@ export class DecorationSet {
     // The text length covered by this set
     private length: number,
     // The number of decorations in the set
-    public size: number,
+    public readonly size: number,
     // The locally stored decorations—which are all of them for leaf
     // nodes, and the ones that don't fit in child sets for
     // non-leaves. Sorted via byPos
-    private local: ReadonlyArray<Decoration>,
+    private readonly local: ReadonlyArray<Decoration>,
     // The child sets, in position order
-    private children: ReadonlyArray<DecorationSet>
+    private readonly children: ReadonlyArray<DecorationSet>
   ) {}
 
   update(decorations: ReadonlyArray<Decoration> = noDecorations,
@@ -220,7 +220,7 @@ export class DecorationSet {
               if (deco.from >= off && deco.to <= off + length) {
                 if (local == this.local) local = this.local.slice()
                 local.splice(j--, 1)
-                if (local.length == 0) local = noDecorations
+                if (local.length == 0) local = noDecorations.slice()
                 joinedLocals.push(deco.move(-off))
               }
             }

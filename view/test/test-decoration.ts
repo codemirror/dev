@@ -121,7 +121,7 @@ describe("DecorationSet", () => {
   })
 
   describe("map", () => {
-    type Pos = number | [number, number, any?]
+    type Pos = number | [number, number] | [number, number, any]
 
     function asRange(pos: Pos): {from: number, to: number} {
       return typeof pos == "number" ? {from: pos, to: pos} : {from: pos[0], to: pos[1]}
