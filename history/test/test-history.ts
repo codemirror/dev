@@ -3,7 +3,7 @@ const ist = require("ist")
 import {Mapping, StepMap} from "prosemirror-transform"
 
 import {Change, EditorState, Range, Selection, Transaction, MetaSlot} from "../../state/src/state"
-import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
+import {closeHistory, history, mappingSlot, redo, redoDepth, undo, undoDepth} from "../src/history"
 
 const mkState = (config?) => EditorState.create({plugins: [history(config)]})
 
@@ -21,14 +21,6 @@ const compress = state => {
 }
 
 describe("history", () => {
-  it("historyStateField can be used in an EditorState", () => {
-    mkState()
-  })
-
-  it("historyStateField.init returns a HistoryState object", () => {
-    ist(history().stateField.init())
-  })
-
   it("allows to undo a change", () => {
     let state = mkState()
     state = type(state, "newtext")
@@ -276,13 +268,13 @@ describe("history", () => {
     ist(redo(state), false)
   })
 
-  it.skip("truncates history", () => {
-    let state = mkState({depth: 2})
-    for (let i = 1; i < 40; ++i) {
+  it("truncates history", () => {
+    let state = mkState({minDepth: 10})
+    for (let i = 0; i < 40; ++i) {
       state = type(state, "a")
       state = closeHistory(state.transaction).apply()
-      ist(undoDepth(state), (i - 2) % 21 + 2)
     }
+    ist(undoDepth(state) < 40)
   })
 
   it("supports transactions with multiple changes", () => {
@@ -304,8 +296,8 @@ describe("history", () => {
 
   it("supports rebasing", () => {
     // This test simulates a collab editing session where the local editor
-    // receives a change (`right`) that's on top of the parent change (`base`) of
-    // the last local change (`left`).
+    // receives a change (`left`) that's on top of the parent change (`base`) of
+    // the last local change (`right`).
 
     // Shared base change
     let state = mkState()
@@ -343,7 +335,7 @@ describe("history", () => {
     mapping.appendMap(getStepMap(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text)), 0)
 
     tr = tr.setMeta(MetaSlot.rebased, 1)
-    tr.mapping = mapping // FIXME remove when transactions have own mapping field
+    tr = tr.setMeta(mappingSlot, mapping) // FIXME remove when transactions have own mapping field
     state = tr.apply()
     ist(state.doc.text, "left base right")
     ist(undoDepth(state), 2)

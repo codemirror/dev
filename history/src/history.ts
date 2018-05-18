@@ -1,197 +1,58 @@
-import {Text} from "../../doc/src/text"
 import {Change, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
-import {Mappable, Mapping, StepMap} from "prosemirror-transform"
+import {Mapping, StepMap} from "prosemirror-transform"
+import {HistoryState, Mapping as HistoryMapping, PopTarget} from "./core"
 
-// Used to schedule history compression
-const max_empty_items = 500
+export const mappingSlot = new MetaSlot("mapping")
 
-const historyStateSlot = new MetaSlot<HistoryState>("historyState")
+class MyMapping /*implements HistoryMapping<Change, MyMapping>*/ {
+  private constructor(private readonly m: Mapping) {}
+
+  concat(otherM: MyMapping): MyMapping {
+    const newM = this.m.slice()
+    newM.appendMapping(otherM.m)
+    return new MyMapping(newM)
+  }
+  mapChange(change: Change): Change {
+    const from = this.m.map(change.from, 1)
+    return new Change(from, Math.max(from, this.m.map(change.to, -1)), change.text)
+  }
+  deletesChange(change: Change): boolean {
+    return this.m.mapResult(change.from, 1).deleted || this.m.mapResult(change.from + change.text.length, -1).deleted
+  }
+  static fromChanges(changes: ReadonlyArray<Change>): MyMapping {
+    return new MyMapping(new Mapping(changes.map(
+      change => new StepMap([change.from, change.to - change.from, change.text.length])
+    )))
+  }
+}
+
+const historyStateSlot = new MetaSlot<HistoryState<Change, MyMapping>>("historyState")
 export const closeHistorySlot = new MetaSlot<boolean>("historyClose")
 
-function getStepMap(change: Change) {
-  return new StepMap([change.from, change.to - change.from, change.text.length])
-}
-
-function mapChange(map: Mappable, change: Change): Change {
-  const from = map.map(change.from, 1)
-  return new Change(from, Math.max(from, map.map(change.to, -1)), change.text)
-}
-
-class ChangesEntry {
+class ChangeList {
+  readonly length: number
   constructor(readonly changes: ReadonlyArray<Change>,
-              readonly inverted: ReadonlyArray<Change>) {}
-}
-
-class MappingEntry {
-  constructor(readonly map: Mapping) {};
-
-  static fromChanges(changes: ReadonlyArray<Change>): MappingEntry {
-    return new MappingEntry(new Mapping(changes.map(getStepMap)))
-  }
-}
-
-type HistoryEntry = ChangesEntry | MappingEntry
-
-const enum PopTarget {
-  Done,
-  Undone
-}
-
-class Branch {
-  private constructor(public readonly entries: ReadonlyArray<HistoryEntry>,
-                      public readonly eventCount: number) {}
-
-  addChanges(changes: ReadonlyArray<Change>, docs: ReadonlyArray<Text>, tryMerge: boolean): Branch {
-    const inverted = changes.map((c, i) => c.invert(docs[i]))
-    const lastItem = this.entries[this.entries.length - 1]
-    if (lastItem instanceof ChangesEntry &&
-        tryMerge &&
-        isAdjacent(lastItem.changes[lastItem.changes.length - 1], changes[0])) {
-      const newEntries = this.entries.slice()
-      newEntries[newEntries.length - 1] = new ChangesEntry(lastItem.changes.concat(changes), lastItem.inverted.concat(inverted))
-      return new Branch(newEntries, this.eventCount)
-    } else {
-      return this.pushEntry(new ChangesEntry(changes, inverted))
-    }
+              readonly inverted: ReadonlyArray<Change>,
+              private readonly mirror: ReadonlyArray<number> = []) {
+    this.length = changes.length
   }
 
-  pushEntry(entry: HistoryEntry): Branch {
-    return new Branch(this.entries.concat(entry),
-                      this.eventCount + (entry instanceof ChangesEntry ? 1 : 0))
+  get(n: number): Change {
+    return this.changes[n]
   }
 
-  popChanges(): {changesEntry: ChangesEntry, newBranch: Branch, map: Mapping} | null {
-    let idx
-    for (idx = this.entries.length - 1; this.entries[idx] instanceof MappingEntry; --idx) {}
-    if (!this.entries[idx]) return null
-
-    const map = new Mapping()
-    for (let i = idx + 1; i < this.entries.length; ++i) {
-      const entry = this.entries[i] as MappingEntry
-      map.appendMapping(entry.map)
-    }
-
-    let init: ReadonlyArray<HistoryEntry> = this.entries.slice(0, idx)
-    // if there are no changes before map entries, we don't keep the map entries either
-    if (init.length) {
-      init = init.concat(new MappingEntry(map))
-    }
-    return {changesEntry: this.entries[idx] as ChangesEntry, newBranch: new Branch(init, this.eventCount - 1), map}
+  getInverted(n: number): Change {
+    return this.inverted[n]
   }
 
-  rebase(changes: ReadonlyArray<Change>, docs: ReadonlyArray<Text>, mapping: Mapping, rebasedCount: number): Branch {
-    if (!this.eventCount) return this
-
-    const rebasedItems = [], start = Math.max(0, this.entries.length - rebasedCount)
-    let newUntil = changes.length
-    let eventCount = this.eventCount
-
-    let iRebased = rebasedCount
-    for (let i = start; i < this.entries.length; ++i) {
-      const entry = this.entries[i]
-      const pos = mapping.getMirror(--iRebased)
-      if (pos == null) {
-        if (entry instanceof ChangesEntry) --eventCount
-        continue
-      }
-      newUntil = Math.min(newUntil, pos)
-      if (entry instanceof ChangesEntry) {
-        rebasedItems.push(new ChangesEntry([changes[pos]], [changes[pos].invert(docs[pos])]))
-      } else {
-        rebasedItems.push(entry)
-      }
-    }
-
-    const newMap = new Mapping
-    for (let i = rebasedCount; i < newUntil; i++) newMap.appendMap(mapping.maps[i])
-    const entries = this.entries.slice(0, start).concat([new MappingEntry(newMap)]).concat(rebasedItems)
-    let branch = new Branch(entries, eventCount)
-    if (entries.length - eventCount > max_empty_items)
-      branch = branch.compress(this.entries.length - rebasedItems.length)
-    return branch
+  getMirror(n: number): number | null {
+    for (let i = 0; i < this.mirror.length; i++)
+      if (this.mirror[i] == n) return this.mirror[i + (i % 2 ? -1 : 1)]
+    return null
   }
 
-  // FIXME: This only compresses consecutive `MappingEntry`s instead of mapping
-  // `ChangeEntry`s and discarding `MappingEntry`s.
-  compress(upto: number = this.entries.length): Branch {
-    const newEntries = []
-    let eventCount = 0
-    let map = null
-    for (let i = 0; i < upto; ++i) {
-      const entry = this.entries[i]
-      if (entry instanceof MappingEntry) {
-        if (!map) map = new Mapping()
-        map.appendMapping(entry.map)
-      } else {
-        if (map) {
-          newEntries.push(new MappingEntry(map))
-          map = null
-        }
-        newEntries.push(entry)
-        ++eventCount
-      }
-    }
-    if (map) {
-      newEntries.push(new MappingEntry(map))
-      map = null
-    }
-    return new Branch(newEntries.concat(this.entries.slice(upto)), eventCount)
-  }
-
-  static readonly empty: Branch = new Branch([], 0)
-}
-
-class HistoryState {
-  constructor(public readonly done: Branch,
-              public readonly undone: Branch,
-              private readonly prevTime: number | null = null) {}
-
-  addChanges(changes: ReadonlyArray<Change>, docs: ReadonlyArray<Text>, time: number, newGroupDelay: number): HistoryState {
-    if (changes.length == 0) return this
-    return new HistoryState(this.done.addChanges(changes, docs, this.prevTime !== null && time - this.prevTime < newGroupDelay),
-                            this.undone, time)
-  }
-
-  rebase(changes: ReadonlyArray<Change>, docs: ReadonlyArray<Text>, mapping: Mapping, rebasedCount: number): HistoryState {
-    return new HistoryState(this.done.rebase(changes, docs, mapping, rebasedCount),
-                            this.undone.rebase(changes, docs, mapping, rebasedCount),
-                            this.prevTime)
-  }
-
-  addMapping(entry: MappingEntry): HistoryState {
-    if (this.done.entries.length == 0) return this
-    return new HistoryState(this.done.pushEntry(entry), this.undone)
-  }
-
-  canPop(done: PopTarget): boolean {
-    return (done == PopTarget.Done ? this.done : this.undone).entries.length > 0
-  }
-
-  pop(done: PopTarget): {changes: ReadonlyArray<Change>, state: HistoryState, map: Mapping} {
-    const popResult = (done == PopTarget.Done ? this.done : this.undone).popChanges()
-    if (!popResult) {
-      if (this.canPop(done)) throw new Error("LogicError: canPop returns true but pop fails")
-      throw new Error("Shouldn't call pop if canPop returns false")
-    }
-    const {newBranch, changesEntry, map} = popResult
-    let changes = [], inverted = []
-    for (let i = 0; i < changesEntry.changes.length; ++i) {
-      const change = changesEntry.changes[i]
-      if (!map.mapResult(change.from, 1).deleted && !map.mapResult(change.from + change.text.length, -1).deleted) {
-        changes.unshift(mapChange(map, change))
-        inverted.unshift(mapChange(map, changesEntry.inverted[i]))
-      }
-    }
-    let otherSide = (done == PopTarget.Done ? this.undone : this.done)
-    if (changes.length > 0) {
-      otherSide = otherSide.pushEntry(new ChangesEntry(inverted, changes))
-    }
-    return {
-      changes: changesEntry.inverted,
-      state: new HistoryState(done == PopTarget.Done ? newBranch : otherSide,
-                              done == PopTarget.Done ? otherSide : newBranch),
-      map
-    }
+  getMapping(from: number, to: number): MyMapping {
+    return MyMapping.fromChanges(this.changes.slice(from, to))
   }
 }
 
@@ -201,46 +62,47 @@ function isAdjacent(prev: Change | null, cur: Change): boolean {
 }
 
 const historyField = new StateField({
-  init() {
-    return new HistoryState(Branch.empty, Branch.empty)
+  init(editorState: EditorState): HistoryState<Change, MyMapping> {
+    const {minDepth} = editorState.getPluginWithField(historyField).config
+    return HistoryState.empty(minDepth)
   },
 
-  apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
+  apply(tr: Transaction, state: HistoryState<Change, MyMapping>, editorState: EditorState): HistoryState<Change, MyMapping> {
     const fromMeta = tr.getMeta(historyStateSlot)
-    const {config} = editorState.getPluginWithField(historyField)!
     if (fromMeta) return fromMeta
-    if (tr.getMeta(closeHistorySlot)) state = new HistoryState(state.done, state.undone, null)
+    const {newGroupDelay} = editorState.getPluginWithField(historyField).config
+    if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
     let rebased
     if (rebased = tr.getMeta(MetaSlot.rebased)) {
-      return state.rebase(tr.changes, [tr.startState.doc].concat(tr.docs), tr.mapping, rebased)
+      const docs = [tr.startState.doc].concat(tr.docs)
+      const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
+      return state.rebase(new ChangeList(tr.changes, inverted, tr.getMeta(mappingSlot).mirror), rebased)
     } else if (tr.getMeta(MetaSlot.addToHistory) !== false) {
-      return state.addChanges(tr.changes, [tr.startState.doc].concat(tr.docs), tr.getMeta(MetaSlot.time)!, config.newGroupDelay)
+      const docs = [tr.startState.doc].concat(tr.docs)
+      const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
+      return state.addChanges(new ChangeList(tr.changes, inverted), isAdjacent, tr.getMeta(MetaSlot.time), newGroupDelay)
     } else {
-      return state.addMapping(MappingEntry.fromChanges(tr.changes))
+      return state.addMapping(MyMapping.fromChanges(tr.changes))
     }
   },
 
   debugName: "historyState"
 })
 
-export function history({newGroupDelay = 500}: {newGroupDelay?: number} = {}): Plugin {
+export function history({minDepth = 100, newGroupDelay = 500}: {minDepth?: number, newGroupDelay?: number} = {}): Plugin {
   return new Plugin({
     state: historyField,
-    config: {newGroupDelay}
+    config: {minDepth, newGroupDelay}
   })
 }
 
 function historyCmd(target: PopTarget, state: EditorState, dispatch?: (tr: Transaction) => void | null): boolean {
-  const historyState: HistoryState | undefined = state.getField(historyField)
+  const historyState: HistoryState<Change, MyMapping> | undefined = state.getField(historyField)
   if (!historyState || !historyState.canPop(target)) return false
   if (dispatch) {
-    const {changes, state: newState, map} = historyState.pop(target)
+    const {changes, state: newState} = historyState.pop(target)
     let tr = state.transaction.setMeta(historyStateSlot, newState)
-    let revChanges = changes.slice().reverse()
-    for (let change of revChanges) {
-      change = mapChange(map, change)
-      tr = tr.change(change)
-    }
+    for (const change of changes) tr = tr.change(change)
     dispatch(tr)
   }
   return true
