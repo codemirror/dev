@@ -4,7 +4,7 @@
   "description": "Text/code editor component",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts"
+    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts view/test/test-decoration.ts"
   },
   "keywords": [
     "editor",
