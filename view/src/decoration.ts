@@ -12,22 +12,29 @@ interface DecorationSpec {
 class DecorationDesc {
   startAssoc: number;
   endAssoc: number;
+  affectsSpans: boolean;
 
   constructor(public spec: DecorationSpec) {
     this.startAssoc = spec.startAssoc != null ? spec.startAssoc : spec.assoc != null ? spec.assoc : 1
     this.endAssoc = spec.endAssoc != null ? spec.endAssoc : spec.assoc != null ? spec.assoc : -1
+    this.affectsSpans = spec.tagName != null || spec.attributes != null
   }
 }
 
 export class Decoration {
-  private constructor(
+  /** @internal */
+  constructor(
     public readonly from: number,
     public readonly to: number,
-    /** internal */
+    /** @internal */
     public readonly desc: DecorationDesc
   ) {}
 
-  get spec() { return this.desc.spec }
+  get spec(): DecorationSpec { return this.desc.spec }
+
+  /** @internal Used to have a heap that contains both active
+   * decorations and LocalSet instances */
+  get endAssoc(): number { return this.desc.endAssoc }
 
   map(changes: Change[]): Decoration | null {
     let from = mapPos(this.from, changes, this.desc.startAssoc)
@@ -66,16 +73,16 @@ type DecorationFilter = (from: number, to: number, spec: DecorationSpec) => bool
 
 export class DecorationSet {
   private constructor(
-    // The text length covered by this set
-    private length: number,
-    // The number of decorations in the set
-    public readonly size: number,
-    // The locally stored decorations—which are all of them for leaf
-    // nodes, and the ones that don't fit in child sets for
-    // non-leaves. Sorted via byPos
-    private readonly local: ReadonlyArray<Decoration>,
-    // The child sets, in position order
-    private readonly children: ReadonlyArray<DecorationSet>
+    /** @internal The text length covered by this set */
+    public length: number,
+    /** The number of decorations in the set */
+    public size: number,
+    /** @internal The locally stored decorations—which are all of them
+     * for leaf nodes, and the ones that don't fit in child sets for
+     * non-leaves. Sorted by start position, then end position, then startAssoc. */
+    public local: ReadonlyArray<Decoration>,
+    /** @internal The child sets, in position order */
+    public children: ReadonlyArray<DecorationSet>
   ) {}
 
   update(decorations: ReadonlyArray<Decoration> = noDecorations,
@@ -144,7 +151,7 @@ export class DecorationSet {
         child.collect(local, -off)
         off += child.length
       }
-      local.sort(byPos)
+      local.sort(byPos) // FIXME is this necessary?
       children = noChildren as DecorationSet[]
       while (decI < decorations.length) {
         if (local == this.local) local = local.slice()
@@ -220,7 +227,7 @@ export class DecorationSet {
               if (deco.from >= off && deco.to <= off + length) {
                 if (local == this.local) local = this.local.slice()
                 local.splice(j--, 1)
-                if (local.length == 0) local = noDecorations.slice()
+                if (local.length == 0) local = noDecorations as Decoration[]
                 joinedLocals.push(deco.move(-off))
               }
             }
@@ -330,6 +337,167 @@ export class DecorationSet {
   }
 
   static empty = new DecorationSet(0, 0, noDecorations, noChildren);
+}
+
+// Cursor into a node-local set of decorations
+class LocalSet {
+  public index: number = 0;
+  constructor(public offset: number,
+              public decorations: ReadonlyArray<Decoration>,
+              public next: DecorationSetIterator | null) {}
+
+  // Used to make this conform to Heapable
+  get to(): number { return this.decorations[this.offset].from }
+  get endAssoc(): number { return this.decorations[this.offset].desc.startAssoc }
+}
+
+// Stack element for DecorationSetIterator
+class IteratedSet {
+  // Index == -1 means the set's locals have not been yielded yet.
+  // Otherwise this indicates an index in the set's child array.
+  public index: number = -1;
+  constructor(public offset: number,
+              public set: DecorationSet) {}
+}
+
+class DecorationSetIterator {
+  stack: IteratedSet[];
+
+  constructor(set: DecorationSet) {
+    this.stack = [new IteratedSet(0, set)]
+  }
+
+  next(skip: number): LocalSet | null {
+    for (;;) {
+      if (this.stack.length == 0) return null
+      let top = this.stack[this.stack.length - 1]
+      if (top.index < 0) {
+        top.index = 0
+        if (top.set.local.length > 0)
+          return new LocalSet(top.offset, top.set.local, top.set.children.length ? this : null)
+      }
+      if (top.index == top.set.children.length) {
+        this.stack.pop()
+      } else {
+        let next = top.set.children[top.index], start = top.offset
+        top.index++
+        top.offset += next.length
+        if (skip > next.length) skip -= next.length
+        else this.stack.push(new IteratedSet(start, next))
+      }
+    }
+  }
+}
+
+interface Heapable { to: number; endAssoc: number }
+
+class DecoratedRange {
+  constructor(readonly from: number,
+              readonly to: number,
+              readonly widget: Decoration | null,
+              readonly collapsed: boolean,
+              readonly tagName: string | null,
+              readonly attrs: {[key: string]: string} | null) {}
+
+  static build(from: number, to: number, decorations: Decoration[]): DecoratedRange {
+    let tagName = null, attrs: {[key: string]: string} | null = null
+    for (let i = 0; i < decorations.length; i++) {
+      let spec = decorations[i].spec
+      if (spec.tagName) tagName = spec.tagName
+      if (spec.attributes) for (let name in spec.attributes) {
+        let value = spec.attributes[name]
+        if (value == null) continue
+        if (!attrs) attrs = {}
+        // FIXME handle class/style specially
+        attrs[name] = value
+      }
+    }
+    return new DecoratedRange(from, to, null, false, tagName, attrs)
+  }
+}
+
+export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: number, to: number): DecoratedRange[] {
+  let heap: Heapable[] = []
+
+  function addIter(iter: DecorationSetIterator, skip: number) {
+    for (;;) {
+      let next = iter.next(skip)
+      if (next == null) break
+      addToHeap(heap, next)
+      if (next.next != null) break
+      skip = 0
+    }
+  }
+
+  for (let i = 0; i < sets.length; i++) {
+    let set = sets[i]
+    if (set.size > 0) addIter(new DecorationSetIterator(set), from)
+  }
+
+  let result: DecoratedRange[] = []
+  let active: Decoration[] = []
+  let pos = from
+
+  while (heap.length > 0) {
+    let next = takeFromHeap(heap)
+    if (next instanceof LocalSet) {
+      let deco = next.decorations[next.index]
+      if (++next.index < next.decorations.length) addToHeap(heap, next)
+      else if (next.next) addIter(next.next, 0)
+      if (deco.to < from || !deco.desc.affectsSpans) continue
+      if (deco.from > to) break
+      // FIXME handle widgets, collapsing
+      if (deco.from > pos) {
+        result.push(DecoratedRange.build(pos, deco.from, active))
+        pos = deco.from
+      }
+      active.push(deco)
+    } else { // It is a decoration that ends here
+      let deco = next as Decoration
+      if (deco.to > pos) {
+        result.push(DecoratedRange.build(pos, deco.to, active))
+        pos = deco.to
+      }
+      active.splice(active.indexOf(deco), 1)
+    }
+  }
+  if (pos < to) result.push(DecoratedRange.build(pos, to, active))
+  return result
+}
+
+function compareHeapable(a: Heapable, b: Heapable): number {
+  return (a.to - b.to) || (a.endAssoc || b.endAssoc)
+}
+
+function addToHeap(heap: Heapable[], elt: Heapable) {
+  let index = heap.push(elt) - 1
+  while (index > 0) {
+    let parentIndex = index >> 1, parent = heap[parentIndex]
+    if (compareHeapable(elt, parent) >= 0) break
+    heap[index] = parent
+    heap[parentIndex] = elt
+    index = parentIndex
+  }
+}
+
+function takeFromHeap(heap: Heapable[]): Heapable {
+  let elt = heap[0], replacement = heap.pop()!
+  if (heap.length == 0) return elt
+  heap[0] = replacement
+  for (let index = 0;;) {
+    let childIndex = (index << 1) + 1
+    if (childIndex >= heap.length) break
+    let child = heap[childIndex]
+    if (childIndex + 1 < heap.length && compareHeapable(child, heap[childIndex + 1]) < 0) {
+      child = heap[childIndex + 1]
+      childIndex++
+    }
+    if (compareHeapable(replacement, child) < 0) break
+    heap[childIndex] = replacement
+    heap[index] = child
+    index = childIndex
+  }
+  return elt
 }
 
 function byPos(a: Decoration, b: Decoration): number {

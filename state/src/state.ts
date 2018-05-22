@@ -17,8 +17,8 @@ export interface EditorStateConfig {
 }
 
 export class EditorState {
-  /** internal */
-  constructor(/** internal */ public readonly config: Configuration,
+  /** @internal */
+  constructor(/** @internal */ public readonly config: Configuration,
               public readonly doc: Text,
               public readonly selection: Selection = Selection.default,
               public readonly fields: {readonly [key: string]: any} = Object.create(null)) {}
