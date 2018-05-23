@@ -1,6 +1,11 @@
 import {Text} from "./text"
 
-export interface ChangedRange { fromA: number, fromB: number, toA: number, toB: number }
+export class ChangedRange {
+  constructor(readonly fromA: number,
+              readonly toA: number,
+              readonly fromB: number,
+              readonly toB: number) {}
+}
 
 class DiffState {
   ranges: ChangedRange[] = [];
@@ -27,8 +32,8 @@ export function changedRanges(a: Text, b: Text): ChangedRange[] {
         let diff = computeDiff(a.text, b.text)
         for (let i = 0; i < diff.length; i++) {
           let range = diff[i]
-          state.ranges.push({fromA: range.fromA + pos, toA: range.toA + pos,
-                             fromB: range.fromB + pos, toB: range.toB + pos})
+          state.ranges.push(new ChangedRange(range.fromA + pos, range.toA + pos,
+                                             range.fromB + pos, range.toB + pos))
         }
       }
       break
@@ -48,7 +53,7 @@ export function changedRanges(a: Text, b: Text): ChangedRange[] {
     } else {
       let leftA = a.length - skipOff, leftB = b.length - skipOff
       if (leftA == 0 || leftB == 0)
-        state.ranges.push({fromA: startPos, toA: startPos, fromB: startPos + leftA, toB: startPos + leftB})
+        state.ranges.push(new ChangedRange(startPos, startPos, startPos + leftA, startPos + leftB))
       else
         scanNodes(state, startPos, leftA, chA.slice(start, endA),
                   startPos, leftB, chB.slice(start, endB))
@@ -87,8 +92,8 @@ function scanText(state: DiffState, fromA: number, toA: number, fromB: number, t
     let diff = computeDiff(state.a.slice(fromA, toA), state.b.slice(fromB, toB))
     for (let i = 0; i < diff.length; i++) {
       let range = diff[i]
-      state.ranges.push({fromA: range.fromA + fromA, toA: range.toA + fromA,
-                         fromB: range.fromB + fromB, toB: range.toB + fromB})
+      state.ranges.push(new ChangedRange(range.fromA + fromA, range.toA + fromA,
+                                         range.fromB + fromB, range.toB + fromB))
     }
   } else {
     state.ranges.push({fromA, toA, fromB, toB})
@@ -159,7 +164,7 @@ function computeDiff<T>(a: Seq<T>, b: Seq<T>): ChangedRange[] {
   if (start == aEnd && start == bEnd) return []
   while (aEnd > start && bEnd > start && a[aEnd - 1] == b[bEnd - 1]) aEnd--, bEnd--
   if (start == aEnd || start == bEnd || (aEnd == bEnd && aEnd == start + 1))
-    return [{fromA: start, toA: aEnd, fromB: start, toB: bEnd}]
+    return [new ChangedRange(start, aEnd, start, bEnd)]
 
   // Longest common subsequence algorithm, based on
   // https://en.wikipedia.org/wiki/Longest_common_subsequence_problem#Code_for_the_dynamic_programming_solution
@@ -178,6 +183,8 @@ function computeDiff<T>(a: Seq<T>, b: Seq<T>): ChangedRange[] {
       index++
     }
   }
+
+  // FIXME simplify these by ignoring very short unchanged ranges?
   let result = []
   for (let x = aEnd, y = bEnd, cur = null, index = table.length - 1; x > start || y > start;) {
     let startX = x, startY = y
@@ -187,8 +194,8 @@ function computeDiff<T>(a: Seq<T>, b: Seq<T>): ChangedRange[] {
     else x--, y--, index -= aLen + 1
 
     if (flag == FLAG_SAME) cur = null
-    else if (cur) cur.fromA = x, cur.fromB = y
-    else result.push(cur = {fromA: x, toA: startX, fromB: y, toB: startY})
+    else if (cur) (cur as any).fromA = x, (cur as any).fromB = y
+    else result.push(cur = new ChangedRange(x, startX, y, startY))
   }
   return result.reverse()
 }
