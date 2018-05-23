@@ -34,7 +34,9 @@ export class Decoration {
 
   /** @internal Used to have a heap that contains both active
    * decorations and LocalSet instances */
-  get endAssoc(): number { return this.desc.endAssoc }
+  get heapAssoc(): number { return this.desc.endAssoc }
+  /** @internal */
+  get heapPos(): number { return this.to }
 
   map(changes: Change[]): Decoration | null {
     let from = mapPos(this.from, changes, this.desc.startAssoc)
@@ -347,8 +349,8 @@ class LocalSet {
               public next: DecorationSetIterator | null) {}
 
   // Used to make this conform to Heapable
-  get to(): number { return this.decorations[this.offset].from }
-  get endAssoc(): number { return this.decorations[this.offset].desc.startAssoc }
+  get heapPos(): number { return this.decorations[this.index].from + this.offset }
+  get heapAssoc(): number { return this.decorations[this.index].desc.startAssoc }
 }
 
 // Stack element for DecorationSetIterator
@@ -374,7 +376,7 @@ class DecorationSetIterator {
       if (top.index < 0) {
         top.index = 0
         if (top.set.local.length > 0)
-          return new LocalSet(top.offset, top.set.local, top.set.children.length ? this : null)
+          return new LocalSet(top.offset, top.set.local, top.set.children.length ? null : this)
       }
       if (top.index == top.set.children.length) {
         this.stack.pop()
@@ -389,7 +391,7 @@ class DecorationSetIterator {
   }
 }
 
-interface Heapable { to: number; endAssoc: number }
+interface Heapable { heapPos: number; heapAssoc: number }
 
 class DecoratedRange {
   constructor(readonly from: number,
@@ -408,7 +410,10 @@ class DecoratedRange {
         let value = spec.attributes[name]
         if (value == null) continue
         if (!attrs) attrs = {}
-        // FIXME handle class/style specially
+        if (name == "style" && attrs.style)
+          value = attrs.style + ";" + value
+        else if (name == "class" && attrs.class)
+          value = attrs.class + " " + value
         attrs[name] = value
       }
     }
@@ -425,7 +430,6 @@ export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: 
       if (next == null) break
       addToHeap(heap, next)
       if (next.next != null) break
-      skip = 0
     }
   }
 
@@ -444,16 +448,20 @@ export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: 
       let deco = next.decorations[next.index]
       if (++next.index < next.decorations.length) addToHeap(heap, next)
       else if (next.next) addIter(next.next, 0)
-      if (deco.to < from || !deco.desc.affectsSpans) continue
-      if (deco.from > to) break
+
+      if (deco.to + next.offset < from || !deco.desc.affectsSpans) continue
+      if (deco.from + next.offset > to) break
+      deco = deco.move(next.offset)
       // FIXME handle widgets, collapsing
       if (deco.from > pos) {
         result.push(DecoratedRange.build(pos, deco.from, active))
         pos = deco.from
       }
       active.push(deco)
+      addToHeap(heap, deco)
     } else { // It is a decoration that ends here
       let deco = next as Decoration
+      if (deco.to >= to) break
       if (deco.to > pos) {
         result.push(DecoratedRange.build(pos, deco.to, active))
         pos = deco.to
@@ -466,7 +474,7 @@ export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: 
 }
 
 function compareHeapable(a: Heapable, b: Heapable): number {
-  return (a.to - b.to) || (a.endAssoc || b.endAssoc)
+  return (a.heapPos - b.heapPos) || (a.heapAssoc - b.heapAssoc)
 }
 
 function addToHeap(heap: Heapable[], elt: Heapable) {
@@ -488,7 +496,7 @@ function takeFromHeap(heap: Heapable[]): Heapable {
     let childIndex = (index << 1) + 1
     if (childIndex >= heap.length) break
     let child = heap[childIndex]
-    if (childIndex + 1 < heap.length && compareHeapable(child, heap[childIndex + 1]) < 0) {
+    if (childIndex + 1 < heap.length && compareHeapable(child, heap[childIndex + 1]) >= 0) {
       child = heap[childIndex + 1]
       childIndex++
     }

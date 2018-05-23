@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet} from "../src/decoration"
+import {Decoration, DecorationSet, decoratedSpansInRange} from "../src/decoration"
 import {Change} from "../../state/src/state"
 const ist = require("ist")
 
@@ -174,6 +174,59 @@ describe("DecorationSet", () => {
       let set = set0.map([new Change(0, 6000, "")])
       ist(set.size, 0)
       ist(depth(set), 1)
+    })
+  })
+
+  describe("decoratedSpansInRange", () => {
+    function d(from, to, tag) {
+      return Decoration.create(from, to, {attributes: {[tag]: "y"}})
+    }
+    function id(span) {
+      return span.from + "-" + span.to + (span.attrs ? "=" + Object.keys(span.attrs).sort().join("&") : "")
+    }
+
+    it("separates the range in covering spans", () => {
+      let set = DecorationSet.create([d(3, 8, "one"), d(5, 8, "two"), d(10, 12, "three")])
+      let ranges = decoratedSpansInRange([set], 0, 15)
+      ist(ranges.map(id).join(","), "0-3,3-5=one,5-8=one&two,8-10,10-12=three,12-15")
+    })
+
+    it("can retrieve a limited range", () => {
+      let decos = [d(0, 200, "wide")]
+      for (let i = 0; i < 100; i++) decos.push(d(i * 2, i * 2 + 2, "span" + i))
+      let set = DecorationSet.create(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
+      let expected = ""
+      for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
+        expected += (expected ? "," : "") + pos + "-" + Math.min(end, pos + (pos % 2 ? 1 : 2)) + "=span" + Math.floor(pos / 2) + "&wide"
+      ist(decoratedSpansInRange([set], start, end).map(id).join(","), expected)
+    })
+
+    it("ignores decorations that don't affect spans", () => {
+      let decos = [d(0, 10, "yes"), Decoration.create(5, 6, {})]
+      ist(decoratedSpansInRange([DecorationSet.create(decos)], 2, 15).map(id).join(","), "2-10=yes,10-15")
+    })
+
+    it("combines classes", () => {
+      let decos = [Decoration.create(0, 10, {attributes: {class: "a"}}),
+                   Decoration.create(2, 4, {attributes: {class: "b"}})]
+      let ranges = decoratedSpansInRange([DecorationSet.create(decos)], 0, 10)
+      ist(ranges.map(id).join(","), "0-2=class,2-4=class,4-10=class")
+      ist(ranges.map(r => r.attrs.class).join(","), "a,a b,a")
+    })
+
+    it("combines styles", () => {
+      let decos = [Decoration.create(0, 6, {attributes: {style: "color: red"}}),
+                   Decoration.create(4, 10, {attributes: {style: "background: blue"}})]
+      let ranges = decoratedSpansInRange([DecorationSet.create(decos)], 0, 10)
+      ist(ranges.map(id).join(","), "0-4=style,4-6=style,6-10=style")
+      ist(ranges.map(r => r.attrs.style).join(","), "color: red,color: red;background: blue,background: blue")
+    })
+
+    it("reads from multiple sets at once", () => {
+      let one = DecorationSet.create([d(2, 3, "x"), d(5, 10, "y"), d(10, 12, "z")])
+      let two = DecorationSet.create([d(0, 6, "a"), d(10, 12, "b")])
+      ist(decoratedSpansInRange([one, two], 0, 12).map(id).join(","),
+          "0-2=a,2-3=a&x,3-5=a,5-6=a&y,6-10=y,10-12=b&z")
     })
   })
 })
