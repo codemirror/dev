@@ -44,11 +44,11 @@ let smallDecorations = []
 for (let i = 0; i < 5000; i++) {
   smallDecorations.push(Decoration.create(i, i + 1 + (i % 4), {pos: i}))
 }
-let set0 = DecorationSet.create(smallDecorations)
+let set0 = DecorationSet.of(smallDecorations)
 
 describe("DecorationSet", () => {
   it("creates a balanced decoration tree", () => {
-    let set = DecorationSet.create(smallDecorations.concat([
+    let set = DecorationSet.of(smallDecorations.concat([
       Decoration.create(1000, 4000, {pos: 1000}),
       Decoration.create(2000, 3000, {pos: 2000})
     ]))
@@ -73,7 +73,7 @@ describe("DecorationSet", () => {
     })
 
     it("can add a large amount of decorations", () => {
-      let set0 = DecorationSet.create([
+      let set0 = DecorationSet.of([
         Decoration.create(0, 0, {pos: 0, assoc: 1}),
         Decoration.create(100, 100, {pos: 100, assoc: 1}),
         Decoration.create(2, 4000, {pos: 2}),
@@ -128,7 +128,7 @@ describe("DecorationSet", () => {
     }
 
     function test(positions: Pos[], changes: [number, number, number][], newPositions: Pos[]) {
-      let set = DecorationSet.create(positions.map(pos => {
+      let set = DecorationSet.of(positions.map(pos => {
         let {from, to} = asRange(pos)
         return Decoration.create(from, to, pos[2] || (from == to ? {assoc: 1} : {}))
       }))
@@ -164,7 +164,7 @@ describe("DecorationSet", () => {
       let deco = []
       for (let i = 0; i < 100; i++)
         deco.push(Decoration.create(i, i, {startAssoc: -1, endAssoc: 1}))
-      let set0 = DecorationSet.create(deco), nodeBoundary = set0.children[0].length
+      let set0 = DecorationSet.of(deco), nodeBoundary = set0.children[0].length
       let set = set0.map([new Change(nodeBoundary, nodeBoundary, "hello")])
       ist(set.size, set0.size)
       checkSet(set)
@@ -186,7 +186,7 @@ describe("DecorationSet", () => {
     }
 
     it("separates the range in covering spans", () => {
-      let set = DecorationSet.create([d(3, 8, "one"), d(5, 8, "two"), d(10, 12, "three")])
+      let set = DecorationSet.of([d(3, 8, "one"), d(5, 8, "two"), d(10, 12, "three")])
       let ranges = decoratedSpansInRange([set], 0, 15)
       ist(ranges.map(id).join(","), "0-3,3-5=one,5-8=one&two,8-10,10-12=three,12-15")
     })
@@ -194,7 +194,7 @@ describe("DecorationSet", () => {
     it("can retrieve a limited range", () => {
       let decos = [d(0, 200, "wide")]
       for (let i = 0; i < 100; i++) decos.push(d(i * 2, i * 2 + 2, "span" + i))
-      let set = DecorationSet.create(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
+      let set = DecorationSet.of(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
         expected += (expected ? "," : "") + pos + "-" + Math.min(end, pos + (pos % 2 ? 1 : 2)) + "=span" + Math.floor(pos / 2) + "&wide"
@@ -203,13 +203,13 @@ describe("DecorationSet", () => {
 
     it("ignores decorations that don't affect spans", () => {
       let decos = [d(0, 10, "yes"), Decoration.create(5, 6, {})]
-      ist(decoratedSpansInRange([DecorationSet.create(decos)], 2, 15).map(id).join(","), "2-10=yes,10-15")
+      ist(decoratedSpansInRange([DecorationSet.of(decos)], 2, 15).map(id).join(","), "2-10=yes,10-15")
     })
 
     it("combines classes", () => {
       let decos = [Decoration.create(0, 10, {attributes: {class: "a"}}),
                    Decoration.create(2, 4, {attributes: {class: "b"}})]
-      let ranges = decoratedSpansInRange([DecorationSet.create(decos)], 0, 10)
+      let ranges = decoratedSpansInRange([DecorationSet.of(decos)], 0, 10)
       ist(ranges.map(id).join(","), "0-2=class,2-4=class,4-10=class")
       ist(ranges.map(r => r.attrs.class).join(","), "a,a b,a")
     })
@@ -217,14 +217,14 @@ describe("DecorationSet", () => {
     it("combines styles", () => {
       let decos = [Decoration.create(0, 6, {attributes: {style: "color: red"}}),
                    Decoration.create(4, 10, {attributes: {style: "background: blue"}})]
-      let ranges = decoratedSpansInRange([DecorationSet.create(decos)], 0, 10)
+      let ranges = decoratedSpansInRange([DecorationSet.of(decos)], 0, 10)
       ist(ranges.map(id).join(","), "0-4=style,4-6=style,6-10=style")
       ist(ranges.map(r => r.attrs.style).join(","), "color: red,color: red;background: blue,background: blue")
     })
 
     it("reads from multiple sets at once", () => {
-      let one = DecorationSet.create([d(2, 3, "x"), d(5, 10, "y"), d(10, 12, "z")])
-      let two = DecorationSet.create([d(0, 6, "a"), d(10, 12, "b")])
+      let one = DecorationSet.of([d(2, 3, "x"), d(5, 10, "y"), d(10, 12, "z")])
+      let two = DecorationSet.of([d(0, 6, "a"), d(10, 12, "b")])
       ist(decoratedSpansInRange([one, two], 0, 12).map(id).join(","),
           "0-2=a,2-3=a&x,3-5=a,5-6=a&y,6-10=y,10-12=b&z")
     })

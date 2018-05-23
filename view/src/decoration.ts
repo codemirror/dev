@@ -334,8 +334,11 @@ export class DecorationSet {
     return {set, escaped}
   }
 
-  static create(decorations: Decoration[]): DecorationSet {
-    return DecorationSet.empty.update(decorations)
+  static of(decorations: Decoration[] | Decoration): DecorationSet {
+    let set = DecorationSet.empty
+    if (decorations instanceof Decoration) set = set.update([decorations])
+    else if (decorations.length) set = set.update(decorations)
+    return set
   }
 
   static empty = new DecorationSet(0, 0, noDecorations, noChildren);
