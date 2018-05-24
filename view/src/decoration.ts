@@ -1,4 +1,5 @@
 import {Change} from "../../state/src/state"
+import {ChangedRange} from "../../doc/src/diff"
 
 interface DecorationSpec {
   startAssoc?: number;
@@ -334,6 +335,12 @@ export class DecorationSet {
     return {set, escaped}
   }
 
+  changedRanges(other: DecorationSet, textDiff: ChangedRange[]): number[] {
+    let result: number[] = []
+    changedRanges(this, 0, noDecorations, other, 0, noDecorations, textDiff, result)
+    return result
+  }
+
   static of(decorations: Decoration[] | Decoration): DecorationSet {
     let set = DecorationSet.empty
     if (decorations instanceof Decoration) set = set.update([decorations])
@@ -368,8 +375,8 @@ class IteratedSet {
 class DecorationSetIterator {
   stack: IteratedSet[];
 
-  constructor(set: DecorationSet) {
-    this.stack = [new IteratedSet(0, set)]
+  constructor(set: DecorationSet, offset: number = 0) {
+    this.stack = [new IteratedSet(offset, set)]
   }
 
   next(skip: number): LocalSet | null {
@@ -427,18 +434,9 @@ class DecoratedRange {
 export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: number, to: number): DecoratedRange[] {
   let heap: Heapable[] = []
 
-  function addIter(iter: DecorationSetIterator, skip: number) {
-    for (;;) {
-      let next = iter.next(skip)
-      if (next == null) break
-      addToHeap(heap, next)
-      if (next.next != null) break
-    }
-  }
-
   for (let i = 0; i < sets.length; i++) {
     let set = sets[i]
-    if (set.size > 0) addIter(new DecorationSetIterator(set), from)
+    if (set.size > 0) addIterToHeap(heap, new DecorationSetIterator(set), from)
   }
 
   let result: DecoratedRange[] = []
@@ -450,7 +448,7 @@ export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: 
     if (next instanceof LocalSet) {
       let deco = next.decorations[next.index]
       if (++next.index < next.decorations.length) addToHeap(heap, next)
-      else if (next.next) addIter(next.next, 0)
+      else if (next.next) addIterToHeap(heap, next.next)
 
       if (deco.to + next.offset < from || !deco.desc.affectsSpans) continue
       if (deco.from + next.offset > to) break
@@ -478,6 +476,15 @@ export function decoratedSpansInRange(sets: ReadonlyArray<DecorationSet>, from: 
 
 function compareHeapable(a: Heapable, b: Heapable): number {
   return (a.heapPos - b.heapPos) || (a.heapAssoc - b.heapAssoc)
+}
+
+function addIterToHeap(heap: Heapable[], iter: DecorationSetIterator, skip: number = 0) {
+  for (;;) {
+    let next = iter.next(skip)
+    if (next == null) break
+    addToHeap(heap, next)
+    if (next.next != null) break
+  }
 }
 
 function addToHeap(heap: Heapable[], elt: Heapable) {
@@ -516,8 +523,8 @@ function byPos(a: Decoration, b: Decoration): number {
 }
 
 function insertSorted(target: Decoration[], deco: Decoration) {
-  let i = 0
-  while (i < target.length && byPos(target[i], deco) < 0) i++
+  let i = target.length
+  while (i > 0 && byPos(target[i - 1], deco) >= 0) i--
   target.splice(i, 0, deco)
 }
 
@@ -550,7 +557,93 @@ function touchesChange(from: number, to: number, changes: Change[]): boolean {
 }
 
 function isDead(desc: DecorationDesc, from: number, to: number): boolean {
-  if (from < to) return false
-  if (from > to) return true
-  return desc.startAssoc >= 0 && desc.endAssoc < 0
+  return from > to || from == to && desc.startAssoc >= 0 && desc.endAssoc < 0
+}
+
+function mapThroughRanges(pos: number, ranges: ReadonlyArray<ChangedRange>): number {
+  for (let i = ranges.length - 1; i >= 0; i--) {
+    let range = ranges[i]
+    if (range.fromA <= pos)
+      return range.toB + (range.toA < pos ? pos - range.toA : 0)
+  }
+  return pos
+}
+
+function changedRanges(a: DecorationSet, aOffset: number, aExtra: ReadonlyArray<Decoration>,
+                       b: DecorationSet, bOffset: number, bExtra: ReadonlyArray<Decoration>,
+                       textDiff: ReadonlyArray<ChangedRange>, changes: number[]) {
+  if (a == b && aOffset == bOffset) return
+
+  // FIXME match locals
+
+  let iA = 0, iB = 0
+  let posA = aOffset, mappedPosA = mapThroughRanges(posA, textDiff), posB = bOffset
+  for (; iA < a.children.length || iB < b.children.length;) {
+    let startA = iA, startB = iB
+    let endA = posA, mappedEndA = mappedPosA, endB = posB
+    while (iA == startA || iB == startB || mappedEndA != endB) {
+      if (mappedEndA < endB) {
+        if (iA < a.children.length) {
+          endA += a.children[iA++].length
+          mappedEndA = mapThroughRanges(posA, textDiff)
+        } else {
+          iB = b.children.length
+          break
+        }
+      } else {
+        if (iB < b.children.length) {
+          endB += b.children[iB++].length
+        } else {
+          iA = a.children.length
+          break
+        }
+      }
+    }
+
+    if (iA == startA + 1 && iB == startB + 1 && mappedEndA == endB) {
+      changedRanges(a.children[startA], posA, noDecorations, // FIXME
+                    b.children[startB], posB, noDecorations,
+                    textDiff, changes)
+    } else {
+      changedRangesFlat(a.children, posA, startA, iA, noDecorations,
+                        b.children, posB, startB, iB, noDecorations,
+                        textDiff, changes)
+    }
+    posA = endA
+    mappedPosA = mappedEndA
+    posB = endB
+  }
+}
+
+function takeDecoration(heap: LocalSet[]): Decoration | null {
+  if (heap.length == 0) return null
+  let next = takeFromHeap(heap) as LocalSet
+  let deco = next.decorations[next.index++].move(next.offset)
+  if (next.index < next.decorations.length)
+    addToHeap(heap, next)
+  else if (next.next)
+    addIterToHeap(heap, next.next)
+  return deco
+}
+
+function changedRangesFlat(setsA: ReadonlyArray<DecorationSet>, aOffset: number, fromA: number, toA: number,
+                           aExtra: ReadonlyArray<Decoration>,
+                           setsB: ReadonlyArray<DecorationSet>, bOffset: number, fromB: number, toB: number,
+                           bExtra: ReadonlyArray<Decoration>,
+                           textDiff: ReadonlyArray<ChangedRange>, changes: number[]) {
+  let heapA: LocalSet[] = [], heapB: LocalSet[] = []
+  for (let i = fromA; i < toA; i++) addIterToHeap(heapA, new DecorationSetIterator(setsA[i], aOffset))
+  for (let i = fromB; i < toB; i++) addIterToHeap(heapB, new DecorationSetIterator(setsB[i], bOffset))
+
+  for (let nextA = takeDecoration(heapA), nextB = takeDecoration(heapB); nextA || nextB;) {
+    if (nextA == null) {
+      changes.push(nextB.from, nextB.to)
+      nextB = takeDecoration(heapB)
+    } else if (nextB == null) {
+      changes.push(mapThroughRanges(nextA.from, textDiff), mapThroughRanges(nextA.to, textDiff))
+      nextA = takeDecoration(heapA)
+    } else {
+      
+    }
+  }
 }
