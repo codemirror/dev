@@ -151,6 +151,9 @@ describe("DecorationSet", () => {
     it("drops collapsed decorations", () =>
        test([[1, 2]], [[1, 2, 0], [1, 1, 1]], []))
 
+    it("drops decorations in deleted regions", () =>
+       test([[1, 2, {assoc: 1}]], [[0, 4, 0]], []))
+
     it("adjusts the set tree shape", () => {
       let child0Size = set0.children[0].length, child1Size = set0.children[1].length
       let set = set0.map([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")])
