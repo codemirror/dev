@@ -42,15 +42,15 @@ function checkSet(decoSet: DecorationSet, offset: number = 0) {
 
 let smallDecorations = []
 for (let i = 0; i < 5000; i++) {
-  smallDecorations.push(Decoration.create(i, i + 1 + (i % 4), {pos: i}))
+  smallDecorations.push(Decoration.range(i, i + 1 + (i % 4), {pos: i}))
 }
 let set0 = DecorationSet.of(smallDecorations)
 
 describe("DecorationSet", () => {
   it("creates a balanced decoration tree", () => {
     let set = DecorationSet.of(smallDecorations.concat([
-      Decoration.create(1000, 4000, {pos: 1000}),
-      Decoration.create(2000, 3000, {pos: 2000})
+      Decoration.range(1000, 4000, {pos: 1000}),
+      Decoration.range(2000, 3000, {pos: 2000})
     ]))
     ist(set.size, 5002)
     ist(size(set), 5002)
@@ -63,8 +63,8 @@ describe("DecorationSet", () => {
   describe("update", () => {
     it("can add decorations to an existing set", () => {
       let set = set0.update([
-        Decoration.create(2000, 2000, {pos: 2000, assoc: 1}),
-        Decoration.create(2008, 2200, {pos: 2008})
+        Decoration.point(2000, {pos: 2000}),
+        Decoration.range(2008, 2200, {pos: 2008})
       ])
       ist(set.size, 5002)
       checkSet(set)
@@ -74,10 +74,10 @@ describe("DecorationSet", () => {
 
     it("can add a large amount of decorations", () => {
       let set0 = DecorationSet.of([
-        Decoration.create(0, 0, {pos: 0, assoc: 1}),
-        Decoration.create(100, 100, {pos: 100, assoc: 1}),
-        Decoration.create(2, 4000, {pos: 2}),
-        Decoration.create(10000, 10000, {pos: 10000, assoc: 1})
+        Decoration.point(0, {pos: 0}),
+        Decoration.point(100, {pos: 100}),
+        Decoration.range(2, 4000, {pos: 2}),
+        Decoration.point(10000, {pos: 10000})
       ])
       let set = set0.update(smallDecorations)
       ist(set.size, 5004)
@@ -98,7 +98,7 @@ describe("DecorationSet", () => {
     })
 
     it("can add and remove in one go", () => {
-      let set = set0.update([Decoration.create(25, 30, {pos: 25})], from => from % 1000 > 0)
+      let set = set0.update([Decoration.range(25, 30, {pos: 25})], from => from % 1000 > 0)
       ist(set.size, 4996)
       checkSet(set)
     })
@@ -130,7 +130,7 @@ describe("DecorationSet", () => {
     function test(positions: Pos[], changes: [number, number, number][], newPositions: Pos[]) {
       let set = DecorationSet.of(positions.map(pos => {
         let {from, to} = asRange(pos)
-        return Decoration.create(from, to, pos[2] || (from == to ? {assoc: 1} : {}))
+        return from == to ? Decoration.point(from, pos[2] || {}) : Decoration.range(from, to, pos[2] || {})
       }))
       let mapped = set.map(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len))))
       let out = []
@@ -142,8 +142,8 @@ describe("DecorationSet", () => {
     it("can map through changes", () =>
        test([1, 4, 10], [[0, 0, 1], [2, 3, 0], [8, 8, 20]], [2, 4, 30]))
 
-    it("takes assoc into account", () =>
-       test([[1, 2, {startAssoc: -1, endAssoc: 1}]], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
+    it("takes inclusivity into account", () =>
+       test([[1, 2, {inclusiveStart: true, inclusiveEnd: true}]], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
 
     it("defaults to exclusive on both sides", () =>
        test([[1, 2]], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
@@ -166,7 +166,7 @@ describe("DecorationSet", () => {
     it("allows decorations to escape their parent node", () => {
       let deco = []
       for (let i = 0; i < 100; i++)
-        deco.push(Decoration.create(i, i, {startAssoc: -1, endAssoc: 1}))
+        deco.push(Decoration.range(i, i + 1, {inclusiveStart: true, inclusiveEnd: true}))
       let set0 = DecorationSet.of(deco), nodeBoundary = set0.children[0].length
       let set = set0.map([new Change(nodeBoundary, nodeBoundary, "hello")])
       ist(set.size, set0.size)
@@ -182,7 +182,7 @@ describe("DecorationSet", () => {
 
   describe("decoratedSpansInRange", () => {
     function d(from, to, tag) {
-      return Decoration.create(from, to, {attributes: {[tag]: "y"}})
+      return Decoration.range(from, to, {attributes: {[tag]: "y"}})
     }
     function id(span) {
       return span.from + "-" + span.to + (span.attrs ? "=" + Object.keys(span.attrs).sort().join("&") : "")
@@ -205,21 +205,21 @@ describe("DecorationSet", () => {
     })
 
     it("ignores decorations that don't affect spans", () => {
-      let decos = [d(0, 10, "yes"), Decoration.create(5, 6, {})]
+      let decos = [d(0, 10, "yes"), Decoration.range(5, 6, {})]
       ist(decoratedSpansInRange([DecorationSet.of(decos)], 2, 15).map(id).join(","), "2-10=yes,10-15")
     })
 
     it("combines classes", () => {
-      let decos = [Decoration.create(0, 10, {attributes: {class: "a"}}),
-                   Decoration.create(2, 4, {attributes: {class: "b"}})]
+      let decos = [Decoration.range(0, 10, {attributes: {class: "a"}}),
+                   Decoration.range(2, 4, {attributes: {class: "b"}})]
       let ranges = decoratedSpansInRange([DecorationSet.of(decos)], 0, 10)
       ist(ranges.map(id).join(","), "0-2=class,2-4=class,4-10=class")
       ist(ranges.map(r => r.attrs.class).join(","), "a,a b,a")
     })
 
     it("combines styles", () => {
-      let decos = [Decoration.create(0, 6, {attributes: {style: "color: red"}}),
-                   Decoration.create(4, 10, {attributes: {style: "background: blue"}})]
+      let decos = [Decoration.range(0, 6, {attributes: {style: "color: red"}}),
+                   Decoration.range(4, 10, {attributes: {style: "background: blue"}})]
       let ranges = decoratedSpansInRange([DecorationSet.of(decos)], 0, 10)
       ist(ranges.map(id).join(","), "0-4=style,4-6=style,6-10=style")
       ist(ranges.map(r => r.attrs.style).join(","), "color: red,color: red;background: blue,background: blue")
