@@ -1,5 +1,5 @@
 import {Change} from "../../state/src/state"
-//import {ChangedRange} from "../../doc/src/diff"
+import {ChangedRange} from "../../doc/src/diff"
 
 export interface DecorationRangeSpec {
   inclusiveStart?: boolean;
@@ -273,13 +273,20 @@ export class DecorationSet {
     return {set, escaped}
   }
 
-  /*
   changedRanges(other: DecorationSet, textDiff: ChangedRange[]): number[] {
-    let result: number[] = []
-    changedRanges(this, 0, noDecorations, other, 0, noDecorations, textDiff, result)
-    return result
+    let ranges: number[] = []
+    let oldPos = 0, newPos = 0
+    for (let i = 0; i < textDiff.length; i++) {
+      let range = textDiff[i]
+      if (range.fromA > oldPos)
+        changedRanges(this, oldPos, other, newPos, range.fromA - oldPos, ranges)
+      oldPos = range.toA
+      newPos = range.toB
+    }
+    if (oldPos < this.length || newPos < other.length)
+      changedRanges(this, oldPos, other, newPos, Math.max(this.length - oldPos, other.length - newPos), ranges)
+    return ranges
   }
-  */
 
   static of(decorations: Decoration[] | Decoration): DecorationSet {
     let set = DecorationSet.empty
@@ -291,51 +298,43 @@ export class DecorationSet {
   static empty = new DecorationSet(0, 0, noDecorations, noChildren);
 }
 
+// Stack element for iterating over a decoration set
+class IteratedSet {
+  // Index == -1 means the set's locals have not been yielded yet.
+  // Otherwise this is an index in the set's child array.
+  index: number = 0;
+  constructor(public offset: number,
+              public set: DecorationSet) {}
+}
+
 // Cursor into a node-local set of decorations
 class LocalSet {
   public index: number = 0;
   constructor(public offset: number,
               public decorations: A<Decoration>,
-              public next: DecorationSetIterator | null) {}
+              public next: IteratedSet[] | null) {}
 
   // Used to make this conform to Heapable
   get heapPos(): number { return this.decorations[this.index].from + this.offset }
   get desc(): DecorationDesc { return this.decorations[this.index].desc }
 }
 
-// Stack element for DecorationSetIterator
-class IteratedSet {
-  // Index == -1 means the set's locals have not been yielded yet.
-  // Otherwise this is an index in the set's child array.
-  index: number = -1;
-  constructor(public offset: number,
-              public set: DecorationSet) {}
-}
-
-class DecorationSetIterator {
-  stack: IteratedSet[];
-
-  constructor(set: DecorationSet, offset: number = 0) {
-    this.stack = [new IteratedSet(offset, set)]
-  }
-
-  next(skip: number): LocalSet | null {
-    for (;;) {
-      if (this.stack.length == 0) return null
-      let top = this.stack[this.stack.length - 1]
-      if (top.index < 0) {
-        top.index = 0
-        if (top.set.local.length > 0)
-          return new LocalSet(top.offset, top.set.local, top.set.children.length ? null : this)
-      }
-      if (top.index == top.set.children.length) {
-        this.stack.pop()
+function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
+  for (;;) {
+    if (stack.length == 0) return -1
+    let top = stack[stack.length - 1]
+    if (top.index == top.set.children.length) {
+      stack.pop()
+    } else {
+      let next = top.set.children[top.index], start = top.offset
+      top.index++
+      top.offset += next.length
+      if (skip > next.length) {
+        skip -= next.length
       } else {
-        let next = top.set.children[top.index], start = top.offset
-        top.index++
-        top.offset += next.length
-        if (skip > next.length) skip -= next.length
-        else this.stack.push(new IteratedSet(start, next))
+        if (skip > 0 && !next.children.length) skip = 0
+        stack.push(new IteratedSet(start, next))
+        return skip
       }
     }
   }
@@ -375,7 +374,10 @@ export function decoratedSpansInRange(sets: A<DecorationSet>, from: number, to: 
 
   for (let i = 0; i < sets.length; i++) {
     let set = sets[i]
-    if (set.size > 0) addIterToHeap(heap, new DecorationSetIterator(set), from)
+    if (set.size > 0) {
+      addIterToHeap(heap, [new IteratedSet(0, set)], from)
+      if (set.local.length) addToHeap(heap, new LocalSet(0, set.local, null))
+    }
   }
 
   let result: DecoratedRange[] = []
@@ -420,12 +422,14 @@ function compareHeapable(a: Heapable, b: Heapable): number {
   return a.heapPos - b.heapPos || a.desc.bias - b.desc.bias
 }
 
-function addIterToHeap(heap: Heapable[], iter: DecorationSetIterator, skip: number = 0) {
+function addIterToHeap(heap: Heapable[], stack: IteratedSet[], skip: number = 0) {
   for (;;) {
-    let next = iter.next(skip)
-    if (next == null) break
-    addToHeap(heap, next)
-    if (next.next != null) break
+    skip = iterDecorationSet(stack, skip)
+    if (stack.length == 0) break
+    let next = stack[stack.length - 1], local = next.set.local
+    let leaf = next.set.children.length ? null : stack
+    if (local.length) addToHeap(heap, new LocalSet(next.offset, local, leaf))
+    if (leaf) break
   }
 }
 
@@ -588,62 +592,16 @@ function rebalanceChildren(local: Decoration[], children: DecorationSet[], child
   }
 }
 
+function changedRanges(a: DecorationSet, startA: number,
+                       b: DecorationSet, startB: number,
+                       length: number, ranges: number[]) {
+  let heapA = [], heapB = []
+  let stackA = [new IteratedSet(0, a)], stackB = [new IteratedSet(0, b)]
+  // FIXME
+}
+
+
 /*
-function mapThroughRanges(pos: number, ranges: A<ChangedRange>): number {
-  for (let i = ranges.length - 1; i >= 0; i--) {
-    let range = ranges[i]
-    if (range.fromA <= pos)
-      return range.toB + (range.toA < pos ? pos - range.toA : 0)
-  }
-  return pos
-}
-
-function changedRanges(a: DecorationSet, aOffset: number, aExtra: A<Decoration>,
-                       b: DecorationSet, bOffset: number, bExtra: A<Decoration>,
-                       textDiff: A<ChangedRange>, changes: number[]) {
-  if (a == b && aOffset == bOffset) return
-
-  // FIXME match locals
-
-  let iA = 0, iB = 0
-  let posA = aOffset, mappedPosA = mapThroughRanges(posA, textDiff), posB = bOffset
-  for (; iA < a.children.length || iB < b.children.length;) {
-    let startA = iA, startB = iB
-    let endA = posA, mappedEndA = mappedPosA, endB = posB
-    while (iA == startA || iB == startB || mappedEndA != endB) {
-      if (mappedEndA < endB) {
-        if (iA < a.children.length) {
-          endA += a.children[iA++].length
-          mappedEndA = mapThroughRanges(posA, textDiff)
-        } else {
-          iB = b.children.length
-          break
-        }
-      } else {
-        if (iB < b.children.length) {
-          endB += b.children[iB++].length
-        } else {
-          iA = a.children.length
-          break
-        }
-      }
-    }
-
-    if (iA == startA + 1 && iB == startB + 1 && mappedEndA == endB) {
-      changedRanges(a.children[startA], posA, noDecorations, // FIXME
-                    b.children[startB], posB, noDecorations,
-                    textDiff, changes)
-    } else {
-      changedRangesFlat(a.children, posA, startA, iA, noDecorations,
-                        b.children, posB, startB, iB, noDecorations,
-                        textDiff, changes)
-    }
-    posA = endA
-    mappedPosA = mappedEndA
-    posB = endB
-  }
-}
-
 function takeDecoration(heap: LocalSet[]): Decoration | null {
   if (heap.length == 0) return null
   let next = takeFromHeap(heap) as LocalSet
