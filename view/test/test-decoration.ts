@@ -265,8 +265,8 @@ describe("DecorationSet", () => {
 
     it("notices added decorations", () =>
        test([mk(2, 4, "a"), mk(8, 11, "a")], {
-         add: [mk(3, 9, "b"), mk(16, 17, "b")]
-       }, [3, 9, 16, 17]))
+         add: [mk(3, 9, "b"), mk(106, 107, "b")]
+       }, [3, 9, 106, 107]))
 
     it("notices deleted decorations", () =>
        test([mk(4, 6, "a"), mk(5, 7, "b"), mk(6, 8, "c"), mk(20, 30, "d")], {
@@ -274,16 +274,22 @@ describe("DecorationSet", () => {
        }, [5, 7, 20, 30]))
 
     it("recognizes identical decorations", () =>
-       test([mk(0, 10, "a")], {
-         add: [mk(5, 15, "a")],
+       test([mk(0, 50, "a")], {
+         add: [mk(10, 40, "a")],
          filter: () => false
-       }, [0, 5, 10, 15]))
+       }, [0, 10, 40, 50]))
 
     it("skips changes", () =>
        test([mk(0, 20, "a")], {
-         changes: [[5, 15, 5]],
+         changes: [[5, 15, 20]],
          filter: () => false
-       }, [0, 5, 10, 15]))
+       }, [0, 5, 25, 30]))
+
+    it("simplifies ranges close to each other", () =>
+       test([mk(1, 2, "a"), mk(4, 5, "b")], {
+         add: [mk(7, 8, "c"), mk(100, 101, "d")],
+         filter: () => false
+       }, [1, 8, 100, 101]))
 
     it("ignores identical sub-nodes", () => {
       let decos = []

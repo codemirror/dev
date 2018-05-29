@@ -633,13 +633,13 @@ function advanceCompare(pos: number, end: number, heap: Heapable[], active: Rang
   let next = takeFromHeap(heap)!
   if (next instanceof LocalSet) {
     let deco = next.decorations[next.index++]
-    if (deco.from + next.offset > end) {
-      heap.length = 0
-      return end
-    }
-    if (deco.to + next.offset >= pos) {
-      // FIXME handle widget, collapsed
-      if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans) {
+    // FIXME handle widget, collapsed
+    if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans) {
+      if (deco.from + next.offset >= end) {
+        heap.length = 0
+        return end
+      }
+      if (deco.to + next.offset > pos) {
         deco = deco.move(next.offset)
         if (deco.from > pos) {
           if (!compareActiveSets(active, otherActive))
@@ -654,7 +654,7 @@ function advanceCompare(pos: number, end: number, heap: Heapable[], active: Rang
     if (next.index < next.decorations.length) addToHeap(heap, next)
   } else {
     let deco = next as Decoration
-    if (deco.to > pos) {
+    if (deco.to > pos && pos < end) {
       if (!compareActiveSets(active, otherActive))
         addRange(pos, Math.min(end, deco.to), ranges)
       pos = deco.to
@@ -680,13 +680,6 @@ function remove<T>(array: T[], elt: T) {
   let found = array.indexOf(elt)
   let last = array.pop()!
   if (found != array.length) array[found] = last
-}
-
-function addRange(from: number, to: number, ranges: number[]) {
-  if (from < to) {
-    if (ranges[ranges.length - 1] >= from) ranges[ranges.length - 1] = to
-    else ranges.push(from, to)
-  }
 }
 
 function changedRanges(a: DecorationSet, startA: number,
@@ -719,4 +712,24 @@ function attrsEq(a: any, b: any): boolean {
     if (keysB.indexOf(key) == -1 || a[key] !== b[key]) return false
   }
   return true
+}
+
+const MIN_RANGE_GAP = 10
+
+function addRange(from: number, to: number, ranges: number[]) {
+  if (ranges[ranges.length - 1] + MIN_RANGE_GAP > from) ranges[ranges.length - 1] = to
+  else ranges.push(from, to)
+}
+
+export function joinRanges(a: number[], b: number[]): number[] {
+  let result: number[] = []
+  for (let iA = 0, iB = 0;;) {
+    if (iA < a.length && (iB == b.length || a[iA] < b[iB]))
+      addRange(a[iA++], a[iA++], result)
+    else if (iB < b.length)
+      addRange(b[iB++], b[iB++], result)
+    else
+      break
+  }
+  return result
 }
