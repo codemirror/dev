@@ -40,6 +40,12 @@ function checkSet(decoSet: DecorationSet, offset: number = 0) {
   }
 }
 
+function mk(from: number, to: any, spec: any): Decoration {
+  if (typeof to != "number") { spec = to; to = from }
+  if (typeof spec == "string") spec = {attributes: {[spec]: "y"}}
+  return from == to ? Decoration.point(from, spec) : Decoration.range(from, to, spec)
+}
+
 let smallDecorations = []
 for (let i = 0; i < 5000; i++) {
   smallDecorations.push(Decoration.range(i, i + 1 + (i % 4), {pos: i}))
@@ -118,6 +124,12 @@ describe("DecorationSet", () => {
     it("reuses unchanged nodes", () => {
       ist(set0.update([], () => true), set0)
     })
+
+    it("creates a sorted set", () => {
+      let set = DecorationSet.of([mk(2, 4, "a"), mk(8, 11, "a")])
+        .update([mk(3, 9, "b"), mk(16, 17, "b")])
+      ist(set.local.map(d => d.from).join(","), "2,3,8,16")
+    })
   })
 
   describe("map", () => {
@@ -181,22 +193,19 @@ describe("DecorationSet", () => {
   })
 
   describe("decoratedSpansInRange", () => {
-    function d(from, to, tag) {
-      return Decoration.range(from, to, {attributes: {[tag]: "y"}})
-    }
     function id(span) {
       return span.from + "-" + span.to + (span.attrs ? "=" + Object.keys(span.attrs).sort().join("&") : "")
     }
 
     it("separates the range in covering spans", () => {
-      let set = DecorationSet.of([d(3, 8, "one"), d(5, 8, "two"), d(10, 12, "three")])
+      let set = DecorationSet.of([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")])
       let ranges = decoratedSpansInRange([set], 0, 15)
       ist(ranges.map(id).join(","), "0-3,3-5=one,5-8=one&two,8-10,10-12=three,12-15")
     })
 
     it("can retrieve a limited range", () => {
-      let decos = [d(0, 200, "wide")]
-      for (let i = 0; i < 100; i++) decos.push(d(i * 2, i * 2 + 2, "span" + i))
+      let decos = [mk(0, 200, "wide")]
+      for (let i = 0; i < 100; i++) decos.push(mk(i * 2, i * 2 + 2, "span" + i))
       let set = DecorationSet.of(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
@@ -205,7 +214,7 @@ describe("DecorationSet", () => {
     })
 
     it("ignores decorations that don't affect spans", () => {
-      let decos = [d(0, 10, "yes"), Decoration.range(5, 6, {})]
+      let decos = [mk(0, 10, "yes"), Decoration.range(5, 6, {})]
       ist(decoratedSpansInRange([DecorationSet.of(decos)], 2, 15).map(id).join(","), "2-10=yes,10-15")
     })
 
@@ -226,10 +235,47 @@ describe("DecorationSet", () => {
     })
 
     it("reads from multiple sets at once", () => {
-      let one = DecorationSet.of([d(2, 3, "x"), d(5, 10, "y"), d(10, 12, "z")])
-      let two = DecorationSet.of([d(0, 6, "a"), d(10, 12, "b")])
+      let one = DecorationSet.of([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
+      let two = DecorationSet.of([mk(0, 6, "a"), mk(10, 12, "b")])
       ist(decoratedSpansInRange([one, two], 0, 12).map(id).join(","),
           "0-2=a,2-3=a&x,3-5=a,5-6=a&y,6-10=y,10-12=b&z")
     })
+  })
+
+  describe("changedRanges", () => {
+    function test(decos, update, ranges) {
+      let deco = DecorationSet.of(decos)
+      let newDeco = deco
+      let docRanges = []
+      if (update.changes) {
+        let changes = update.changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len)))
+        newDeco = deco.map(changes)
+        for (let i = 0, off = 0; i < changes.length; i++) {
+          let {from, to, text} = changes[i]
+          docRanges.push({fromA: from + off, toA: to + off, fromB: from, toB: from + text.length})
+          off += (to - from) - text.length
+        }
+      }
+      if (update.add || update.filter)
+        newDeco = newDeco.update(update.add || [], update.filter)
+      let found = deco.changedRanges(newDeco, docRanges)
+      ist(JSON.stringify(found), JSON.stringify(ranges))
+    }
+
+    it("notices added decorations", () =>
+       test([mk(2, 4, "a"), mk(8, 11, "a")], {
+         add: [mk(3, 9, "b"), mk(16, 17, "b")]
+       }, [3, 9, 16, 17]))
+
+    it("notices deleted decorations", () =>
+       test([mk(4, 6, "a"), mk(5, 7, "b"), mk(6, 8, "c"), mk(20, 30, "d")], {
+         filter: from => from != 5 && from != 20
+       }, [5, 7, 20, 30]))
+
+    it("skips changes", () =>
+       test([mk(0, 20, "a")], {
+         changes: [[5, 15, 5]],
+         filter: () => false
+       }, [0, 5, 10, 15]))
   })
 })
