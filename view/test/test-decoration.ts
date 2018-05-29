@@ -47,9 +47,8 @@ function mk(from: number, to: any, spec: any): Decoration {
 }
 
 let smallDecorations = []
-for (let i = 0; i < 5000; i++) {
+for (let i = 0; i < 5000; i++)
   smallDecorations.push(Decoration.range(i, i + 1 + (i % 4), {pos: i}))
-}
 let set0 = DecorationSet.of(smallDecorations)
 
 describe("DecorationSet", () => {
@@ -169,7 +168,8 @@ describe("DecorationSet", () => {
     it("adjusts the set tree shape", () => {
       let child0Size = set0.children[0].length, child1Size = set0.children[1].length
       let set = set0.map([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")])
-      ist(set.size, set0.size)
+      ist(set.size, set0.size, "<=")
+      ist(set.size, set0.size - 2, ">")
       ist(set.children[0].length, child0Size + 2)
       ist(set.children[1].length, child1Size - 2)
       ist(set.children[2].length, set0.children[2].length)
@@ -258,6 +258,7 @@ describe("DecorationSet", () => {
       }
       if (update.add || update.filter)
         newDeco = newDeco.update(update.add || [], update.filter)
+      if (update.prepare) update.prepare(newDeco)
       let found = deco.changedRanges(newDeco, docRanges)
       ist(JSON.stringify(found), JSON.stringify(ranges))
     }
@@ -272,10 +273,38 @@ describe("DecorationSet", () => {
          filter: from => from != 5 && from != 20
        }, [5, 7, 20, 30]))
 
+    it("recognizes identical decorations", () =>
+       test([mk(0, 10, "a")], {
+         add: [mk(5, 15, "a")],
+         filter: () => false
+       }, [0, 5, 10, 15]))
+
     it("skips changes", () =>
        test([mk(0, 20, "a")], {
          changes: [[5, 15, 5]],
          filter: () => false
        }, [0, 5, 10, 15]))
+
+    it("ignores identical sub-nodes", () => {
+      let decos = []
+      for (let i = 0; i < 1000; i += 2) decos.push(mk(i, i + 1, "a"))
+      test(decos, {
+        changes: [[900, 1000, 0]],
+        add: [mk(850, 860, "b")],
+        prepare: set => Object.defineProperty(set.children[0], "local", {get() { throw new Error("NO TOUCH") }})
+      }, [850, 860])
+    })
+
+    it("can handle multiple changes", () => {
+      let decos = []
+      for (let i = 0; i < 200; i += 2) {
+        let end = i + 1 + Math.ceil(i / 50)
+        decos.push(mk(i, end, `${i}-${end}`))
+      }
+      test(decos, {
+        changes: [[0, 0, 50], [100, 150, 0], [150, 200, 0]],
+        filter: from => from % 50 > 0
+      }, [50, 51, 100, 103, 150, 153])
+    })
   })
 })

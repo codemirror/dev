@@ -19,7 +19,7 @@ type DecorationSpec = DecorationRangeSpec | DecorationPointSpec
 
 abstract class DecorationDesc {
   constructor(readonly spec: DecorationSpec, readonly bias: number) {}
-  abstract map(deco: Decoration, changes: A<Change>): Decoration | null;
+  abstract map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null;
 }
 
 const BIG_BIAS = 2e9
@@ -36,13 +36,14 @@ class RangeDesc extends DecorationDesc {
     this.affectsSpans = !!(spec.attributes || spec.tagName || spec.collapsed)
   }
 
-  map(deco: Decoration, changes: A<Change>): Decoration | null {
-    let from = mapPos(deco.from, changes, this.bias), to = mapPos(deco.to, changes, this.endBias)
-    return from < to ? new Decoration(from, to, this) : null
+  map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
+    let from = mapPos(deco.from + oldOffset, changes, this.bias), to = mapPos(deco.to + oldOffset, changes, this.endBias)
+    return from < to ? new Decoration(from - newOffset, to - newOffset, this) : null
   }
 
   eq(other: RangeDesc) {
-    return this == other // FIXME
+    return this == other ||
+      (this.spec as any).tagName == (other.spec as any).tagName && attrsEq((this.spec as any).attributes, (other.spec as any).attributes)
   }
 }
 
@@ -51,9 +52,10 @@ class PointDesc extends DecorationDesc {
     super(spec, spec.side || 0)
   }
 
-  map(deco: Decoration, changes: A<Change>): Decoration | null {
-    let pos = mapPos(deco.from, changes, this.bias)
-    return new Decoration(pos, pos, this)
+  map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
+    let pos = mapPos(deco.from + oldOffset, changes, this.bias)
+    // FIXME drop if the character at spec.side was deleted
+    return new Decoration(pos - newOffset, pos - newOffset, this)
   }
 }
 
@@ -68,7 +70,9 @@ export class Decoration {
 
   get spec(): DecorationSpec { return this.desc.spec }
 
-  map(changes: Change[]): Decoration | null { return this.desc.map(this, changes) }
+  map(changes: Change[], oldOffset: number, newOffset: number): Decoration | null {
+    return this.desc.map(this, changes, oldOffset, newOffset)
+  }
 
   /** @internal */
   move(offset: number): Decoration {
@@ -213,6 +217,7 @@ export class DecorationSet {
     return this.mapInner(changes, 0, 0, mapPos(this.length, changes, 1)).set
   }
 
+  // FIXME this spills way too much to the outer node
   private mapInner(changes: Change[],
                    oldStart: number, newStart: number,
                    newEnd: number): {set: DecorationSet, escaped: Decoration[] | null} {
@@ -221,7 +226,7 @@ export class DecorationSet {
     let newLength = newEnd - newStart, newSize = 0
 
     for (let i = 0; i < this.local.length; i++) {
-      let deco = this.local[i], mapped = deco.map(changes)
+      let deco = this.local[i], mapped = deco.map(changes, oldStart, newStart)
       let escape = mapped != null && (mapped.from < 0 || mapped.to > newLength)
       if (newLocal == null && (deco != mapped || escaped)) newLocal = this.local.slice(0, i)
       if (escape) (escaped || (escaped = [])).push(mapped!)
@@ -254,10 +259,10 @@ export class DecorationSet {
         // drop the node—which is complicated by the need to
         // distribute its length to another child when it's not the
         // last child
-        if (newChild.size == 0 && (newChild.length == 0 || i > 0 || i == this.children.length)) {
+        if (newChild.size == 0 && (newChild.length == 0 || newChildren.length || i == this.children.length)) {
           if (newChild.length > 0 && i > 0) {
-            let last = newChildren[i - 1]
-            newChildren[i - 1] = new DecorationSet(last.length + newChild.length, last.size, last.local, last.children)
+            let last = newChildren.length - 1, lastChild = newChildren[last]
+            newChildren[last] = new DecorationSet(lastChild.length + newChild.length, lastChild.size, lastChild.local, lastChild.children)
           }
         } else {
           newChildren.push(newChild)
@@ -637,7 +642,8 @@ function advanceCompare(pos: number, end: number, heap: Heapable[], active: Rang
       if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans) {
         deco = deco.move(next.offset)
         if (deco.from > pos) {
-          if (!compareActiveSets(active, otherActive)) addRange(pos, Math.min(end, deco.from), ranges)
+          if (!compareActiveSets(active, otherActive))
+            addRange(pos, Math.min(end, deco.from), ranges)
           pos = deco.from
         }
         // FIXME as optimization, it should be possible to remove it from the other set, if present
@@ -649,7 +655,8 @@ function advanceCompare(pos: number, end: number, heap: Heapable[], active: Rang
   } else {
     let deco = next as Decoration
     if (deco.to > pos) {
-      if (!compareActiveSets(active, otherActive)) addRange(pos, Math.min(end, deco.to), ranges)
+      if (!compareActiveSets(active, otherActive))
+        addRange(pos, Math.min(end, deco.to), ranges)
       pos = deco.to
     }
     remove(active, deco.desc)
@@ -676,18 +683,22 @@ function remove<T>(array: T[], elt: T) {
 }
 
 function addRange(from: number, to: number, ranges: number[]) {
-  if (ranges[ranges.length - 1] >= from) ranges[ranges.length - 1] = to
-  else ranges.push(from, to)
+  if (from < to) {
+    if (ranges[ranges.length - 1] >= from) ranges[ranges.length - 1] = to
+    else ranges.push(from, to)
+  }
 }
 
-function compareDecorations(heapA: LocalSet[], heapB: LocalSet[],
-                            start: number, end: number,
-                            ranges: number[]) {
+function changedRanges(a: DecorationSet, startA: number,
+                       b: DecorationSet, startB: number,
+                       length: number, ranges: number[]) {
+  let {heapA, heapB} = gatherNonMatchingNodes(a, startA, b, startB, length)
+
   // Run over the gathered decorations of both sides, skipping
   // decorations that are identical and storing ranges for decorations
   // that differ.
   let activeA: RangeDesc[] = [], activeB: RangeDesc[] = []
-  for (let pos = start;;) {
+  for (let pos = startB, end = startB + length;;) {
     if (heapA.length && (!heapB.length || (heapA[0].heapPos - heapB[0].heapPos || heapA[0].desc.bias - heapB[0].desc.bias) < 0)) {
       pos = advanceCompare(pos, end, heapA, activeA, activeB, ranges)
     } else if (heapB.length) {
@@ -698,9 +709,14 @@ function compareDecorations(heapA: LocalSet[], heapB: LocalSet[],
   }
 }
 
-function changedRanges(a: DecorationSet, startA: number,
-                       b: DecorationSet, startB: number,
-                       length: number, ranges: number[]) {
-  let {heapA, heapB} = gatherNonMatchingNodes(a, startA, b, startB, length)
-  compareDecorations(heapA, heapB, startB, startB + length, ranges)
+function attrsEq(a: any, b: any): boolean {
+  if (a == b) return true
+  if (!a || !b) return false
+  let keysA = Object.keys(a), keysB = Object.keys(b)
+  if (keysA.length != keysB.length) return false
+  for (let i = 0; i < keysA.length; i++) {
+    let key = keysA[i]
+    if (keysB.indexOf(key) == -1 || a[key] !== b[key]) return false
+  }
+  return true
 }
