@@ -241,7 +241,7 @@ describe("history", () => {
   })
 
   it.skip("handles change overwriting in item-preserving mode", () => {
-    let state = mkState(undefined, {preserveItems: true})
+    let state = mkState({preserveItems: true})
     state = type(state, "a")
     state = type(state, "b")
     state = closeHistory(state.transaction).apply()
@@ -277,7 +277,7 @@ describe("history", () => {
   })
 
   it.skip("truncates history", () => {
-    let state = mkState(null, {depth: 2})
+    let state = mkState({depth: 2})
     for (let i = 1; i < 40; ++i) {
       state = type(state, "a")
       state = closeHistory(state.transaction).apply()
