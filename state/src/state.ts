@@ -48,8 +48,15 @@ class Configuration {
   readonly fields: ReadonlyArray<StateField<any>>;
 
   constructor(readonly plugins: ReadonlyArray<Plugin>) {
-    // (Cast because TypeScript doesn't understand the effect of filter(id))
-    this.fields = plugins.map(p => p.stateField).filter(f => f) as ReadonlyArray<StateField<any>>
+    let fields = []
+    for (let i = 0; i < plugins.length; i++) {
+      let field = plugins[i].stateField
+      if (!field) continue
+      if (fields.indexOf(field) > -1)
+        throw new Error(`A state field (${field.key}) can only be added to a state once`)
+      fields.push(field)
+    }
+    this.fields = fields
   }              
 }
 
