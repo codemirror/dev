@@ -8,8 +8,9 @@ export class EditorView {
   private _state: EditorState;
   get state(): EditorState { return this._state }
 
-  private _props: EditorProps;
-  get props(): EditorProps { return this._props }
+  // FIXME get rid of bare props entirely, and have people provide a
+  // plugin if they need props?
+  readonly props: EditorProps;
 
   private _root: Document | null = null;
 
@@ -26,7 +27,7 @@ export class EditorView {
 
   constructor(state: EditorState, props: EditorProps = {}, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
-    this._props = props
+    this.props = props
     this.dispatch = dispatch || (tr => this.setState(tr.apply()))
 
     this.contentDOM = document.createElement("pre")
@@ -63,6 +64,18 @@ export class EditorView {
       selectionToDOM(this)
       this.selectionReader.ignoreUpdates = false
     }
+  }
+
+  // FIXME this is very awkward to type. Change or embrace the any?
+  someProp(propName: string, f: ((value: any) => any) | undefined = undefined): any {
+    let prop = (this.props as any)[propName], value
+    if (prop != null && (value = f ? f(prop) : prop)) return value
+    let plugins = this.state.plugins
+    for (let i = 0; i < plugins.length; i++) {
+      let prop = plugins[i].props[propName]
+      if (prop != null && (value = f ? f(prop) : prop)) return value
+    }
+    return null
   }
 
   // FIXME can also return a DocumentFragment, but TypeScript doesn't

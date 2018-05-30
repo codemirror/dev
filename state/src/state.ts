@@ -76,6 +76,8 @@ export class EditorState {
     return (this as any)[field.key]
   }
 
+  get plugins(): ReadonlyArray<Plugin> { return this.config.plugins }
+
   getPluginWithField(field: StateField<any>): Plugin | null {
     for (let i = 0; i < this.config.plugins.length; i++) {
       let plugin = this.config.plugins[i]
