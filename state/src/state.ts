@@ -1,30 +1,80 @@
 import {Text} from "../../doc/src/text"
 
-export interface StateFieldSpec<T> {
+function unique(prefix: string, names: {[key: string]: string}): string {
+  for (let i = 0;; i++) {
+    let name = prefix + (i ? "_" + i : "")
+    if (!(name in names)) return names[name] = name
+  }
+}
+
+const fieldNames = Object.create(null)
+
+export class StateField<T> {
+  /** @internal */
   readonly key: string;
-  init(): T;
-  apply(tr: Transaction, value: T, newState: EditorState, oldState: EditorState): T;
+  readonly init: (state: EditorState) => T;
+  readonly apply: (tr: Transaction, value: T, newState: EditorState) => T;
+
+  constructor({init, apply, debugName = "field"}: {
+    init: (state: EditorState) => T,
+    apply: (tr: Transaction, value: T, newState: EditorState) => T,
+    debugName?: string
+  }) {
+    this.init = init
+    this.apply = apply
+    this.key = unique("$" + debugName, fieldNames)
+  }
+}
+
+export interface PluginSpec {
+  state?: StateField<any>;
+  config?: any;
+  props?: any;
+}
+
+export class Plugin {
+  readonly config: any;
+  readonly stateField: StateField<any> | null;
+  readonly props: any;
+
+  constructor(spec: PluginSpec) {
+    this.config = spec.config;
+    this.stateField = spec.state || null;
+    this.props = spec.props || {};
+  }
 }
 
 class Configuration {
-  constructor(public readonly fields: ReadonlyArray<StateFieldSpec<any>>) {}
+  readonly fields: ReadonlyArray<StateField<any>>;
+
+  constructor(readonly plugins: ReadonlyArray<Plugin>) {
+    // (Cast because TypeScript doesn't understand the effect of filter(id))
+    this.fields = plugins.map(p => p.stateField).filter(f => f) as ReadonlyArray<StateField<any>>
+  }              
 }
 
 export interface EditorStateConfig {
   doc?: string | Text;
   selection?: Selection;
-  fields?: StateFieldSpec<any>[];
+  plugins?: ReadonlyArray<Plugin>;
 }
 
 export class EditorState {
   /** @internal */
   constructor(/** @internal */ public readonly config: Configuration,
               public readonly doc: Text,
-              public readonly selection: Selection = Selection.default,
-              public readonly fields: {readonly [key: string]: any} = Object.create(null)) {}
+              public readonly selection: Selection = Selection.default) {}
 
-  getField(key: string): any {
-    return this.fields[key]
+  getField<T>(field: StateField<T>): T | undefined {
+    return (this as any)[field.key]
+  }
+
+  getPluginWithField(field: StateField<any>): Plugin | null {
+    for (let i = 0; i < this.config.plugins.length; i++) {
+      let plugin = this.config.plugins[i]
+      if (plugin.stateField == field) return plugin
+    }
+    return null
   }
 
   get transaction(): Transaction {
@@ -33,10 +83,11 @@ export class EditorState {
 
   static create(config: EditorStateConfig = {}) {
     let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
-    let $config = new Configuration(config.fields || [])
-    let fields = Object.create(null)
-    for (let i = 0; i < $config.fields.length; i++) fields[$config.fields[i].key] = $config.fields[i].init()
-    return new EditorState($config, doc, config.selection || Selection.default, fields)
+    let $config = new Configuration(config.plugins || [])
+    let state = new EditorState($config, doc, config.selection || Selection.default)
+    for (let i = 0; i < $config.fields.length; i++)
+      (state as any)[$config.fields[i].key] = $config.fields[i].init(state)
+    return state
   }
 }
 
@@ -89,19 +140,34 @@ class Meta {
 }
 Meta.prototype["__proto__"] = null
 
+const metaSlotNames = Object.create(null)
+
+export class MetaSlot<T> {
+  /** @internal */
+  name: string;
+
+  constructor(debugName: string = "meta") {
+    this.name = unique(debugName, metaSlotNames)
+  }
+
+  static time: MetaSlot<number> = new MetaSlot("time");
+  static addToHistory: MetaSlot<boolean> = new MetaSlot("addToHistory")
+  static rebased: MetaSlot<number> = new MetaSlot("rebased")
+}
+
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
 
 export class Transaction {
-  private constructor(public readonly startState: EditorState,
-                      public readonly changes: ReadonlyArray<Change>,
-                      public readonly docs: ReadonlyArray<Text>,
-                      public readonly selection: Selection,
+  private constructor(readonly startState: EditorState,
+                      readonly changes: ReadonlyArray<Change>,
+                      readonly docs: ReadonlyArray<Text>,
+                      readonly selection: Selection,
                       private readonly meta: Meta,
                       private readonly flags: number) {}
 
   static start(state: EditorState, time: number = Date.now()) {
     let meta = new Meta
-    meta.time = time
+    meta[MetaSlot.time.name] = time
     return new Transaction(state, empty, empty, state.selection, meta, 0)
   }
 
@@ -110,14 +176,14 @@ export class Transaction {
     return last < 0 ? this.startState.doc : this.docs[last]
   }
 
-  setMeta(name: string, value: any) {
+  setMeta<T>(slot: MetaSlot<T>, value: T) {
     let meta = new Meta(this.meta)
-    meta[name] = value
+    meta[slot.name] = value
     return new Transaction(this.startState, this.changes, this.docs, this.selection, meta, this.flags)
   }
 
-  getMeta(name: string): any {
-    return this.meta[name]
+  getMeta<T>(slot: MetaSlot<T>): T | undefined {
+    return this.meta[slot.name] as T
   }
 
   change(change: Change): Transaction {
@@ -167,11 +233,11 @@ export class Transaction {
   }
 
   apply(): EditorState {
-    let fields = Object.create(null), $conf = this.startState.config
-    let newState = new EditorState($conf, this.doc, this.selection, fields)
+    let $conf = this.startState.config
+    let newState = new EditorState($conf, this.doc, this.selection)
     for (let i = 0; i < $conf.fields.length; i++) {
       let field = $conf.fields[i]
-      fields[field.key] = field.apply(this, this.startState.fields[field.key], newState, this.startState)
+      ;(newState as any)[field.key] = field.apply(this, (this.startState as any)[field.key], newState)
     }
     return newState
   }

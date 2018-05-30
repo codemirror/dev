@@ -1,12 +1,12 @@
 import {Text} from "../../doc/src/text"
-import {Change, EditorState, StateFieldSpec, Transaction} from "../../state/src/state"
+import {Change, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
 import {Mappable, Mapping, StepMap} from "prosemirror-transform"
 
 // Used to schedule history compression
 const max_empty_items = 500
 
-const key = "history"
-const closeHistoryKey = "history_close"
+const historyStateSlot = new MetaSlot<HistoryState>("historyState")
+export const closeHistorySlot = new MetaSlot<boolean>("historyClose")
 
 function getStepMap(change: Change) {
   return new StepMap([change.from, change.to - change.from, change.text.length])
@@ -200,39 +200,42 @@ function isAdjacent(prev: Change | null, cur: Change): boolean {
   return cur.from <= prev.mapPos(prev.to) && cur.to >= prev.mapPos(prev.from, -1)
 }
 
-export function history(options: {newGroupDelay?: number} = {}): {stateField: StateFieldSpec<HistoryState>} {
-  const {newGroupDelay = 500} = options
-  return {
-    stateField: {
-      key,
+const historyField = new StateField({
+  init() {
+    return new HistoryState(Branch.empty, Branch.empty)
+  },
 
-      init(): HistoryState {
-        return new HistoryState(Branch.empty, Branch.empty)
-      },
-
-      apply(tr: Transaction, state: HistoryState): HistoryState {
-        const fromMeta = tr.getMeta(key)
-        if (fromMeta) return fromMeta
-        if (tr.getMeta(closeHistoryKey)) state = new HistoryState(state.done, state.undone, null)
-        let rebased
-        if (tr.getMeta("addToHistory") !== false) {
-          return state.addChanges(tr.changes, [tr.startState.doc].concat(tr.docs), tr.getMeta("time"), newGroupDelay)
-        } else if (rebased = tr.getMeta("rebased")) {
-          return state.rebase(tr.changes, [tr.startState.doc].concat(tr.docs), tr.getMeta("mapping"), rebased)
-        } else {
-          return state.addMapping(MappingEntry.fromChanges(tr.changes))
-        }
-      }
+  apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
+    const fromMeta = tr.getMeta(historyStateSlot)
+    const {config} = editorState.getPluginWithField(historyField)!
+    if (fromMeta) return fromMeta
+    if (tr.getMeta(closeHistorySlot)) state = new HistoryState(state.done, state.undone, null)
+    let rebased
+    if (rebased = tr.getMeta(MetaSlot.rebased)) {
+      return state.rebase(tr.changes, [tr.startState.doc].concat(tr.docs), tr.mapping, rebased)
+    } else if (tr.getMeta(MetaSlot.addToHistory) !== false) {
+      return state.addChanges(tr.changes, [tr.startState.doc].concat(tr.docs), tr.getMeta(MetaSlot.time)!, config.newGroupDelay)
+    } else {
+      return state.addMapping(MappingEntry.fromChanges(tr.changes))
     }
-  }
+  },
+
+  debugName: "historyState"
+})
+
+export function history({newGroupDelay = 500}: {newGroupDelay?: number} = {}): Plugin {
+  return new Plugin({
+    state: historyField,
+    config: {newGroupDelay}
+  })
 }
 
 function historyCmd(target: PopTarget, state: EditorState, dispatch?: (tr: Transaction) => void | null): boolean {
-  const historyState: HistoryState | null = state.getField(key)
+  const historyState: HistoryState | undefined = state.getField(historyField)
   if (!historyState || !historyState.canPop(target)) return false
   if (dispatch) {
     const {changes, state: newState, map} = historyState.pop(target)
-    let tr = state.transaction.setMeta(key, newState)
+    let tr = state.transaction.setMeta(historyStateSlot, newState)
     let revChanges = changes.slice().reverse()
     for (let change of revChanges) {
       change = mapChange(map, change)
@@ -255,17 +258,17 @@ export function redo(state: EditorState, dispatch?: (tr: Transaction) => void | 
 // from being appended to an existing history event (so that they
 // require a separate undo command to undo).
 export function closeHistory(tr: Transaction): Transaction {
-  return tr.setMeta(closeHistoryKey, true)
+  return tr.setMeta(closeHistorySlot, true)
 }
 
 // The amount of undoable events available in a given state.
 export function undoDepth(state: EditorState): number {
-  let hist = state.getField(key)
+  let hist = state.getField(historyField)
   return hist ? hist.done.eventCount : 0
 }
 
 // The amount of redoable events available in a given state.
 export function redoDepth(state: EditorState): number {
-  let hist = state.getField(key)
+  let hist = state.getField(historyField)
   return hist ? hist.undone.eventCount : 0
 }

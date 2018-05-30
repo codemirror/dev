@@ -2,21 +2,21 @@ const ist = require("ist")
 
 import {Mapping, StepMap} from "prosemirror-transform"
 
-import {Change, EditorState, Range, Selection, Transaction} from "../../state/src/state"
+import {Change, EditorState, Range, Selection, Transaction, MetaSlot} from "../../state/src/state"
 import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
-const mkState = (config?) => EditorState.create({fields: [history(config).stateField]})
+const mkState = (config?) => EditorState.create({plugins: [history(config)]})
 
 const type = (state, text, at = state.doc.length) => state.transaction.replace(at, at, text).apply()
 const timedType = (state, text, atTime) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
-const receive = (state, text, from, to = from) => state.transaction.replace(from, to, text).setMeta("addToHistory", false).apply()
+const receive = (state, text, from, to = from) => state.transaction.replace(from, to, text).setMeta(MetaSlot.addToHistory, false).apply()
 const command = (state, cmd) => {
   ist(cmd(state, tr => state = tr.apply()), true)
   return state
 }
 
 const compress = state => {
-  state.fields.history.done = state.fields.history.done.compress()
+  state.$historyState.done = state.$historyState.done.compress()
   return state
 }
 
@@ -162,7 +162,7 @@ describe("history", () => {
     state = type(state, "hi")
     state = closeHistory(state.transaction).apply()
     state = type(state, "hello")
-    state = state.transaction.replace(0, 7, "").setMeta("addToHistory", false).apply()
+    state = state.transaction.replace(0, 7, "").setMeta(MetaSlot.addToHistory, false).apply()
     ist(state.doc.text, "")
     state = command(state, undo)
     ist(state.doc.text, "")
@@ -341,10 +341,9 @@ describe("history", () => {
     mapping.appendMap(getStepMap(rightChange.invert(baseDoc)))
     mapping.appendMap(getStepMap(leftChange))
     mapping.appendMap(getStepMap(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text)), 0)
-    tr = tr.setMeta("mapping", mapping)
 
-    tr = tr.setMeta("addToHistory", false)
-    tr = tr.setMeta("rebased", 1)
+    tr = tr.setMeta(MetaSlot.rebased, 1)
+    tr.mapping = mapping // FIXME remove when transactions have own mapping field
     state = tr.apply()
     ist(state.doc.text, "left base right")
     ist(undoDepth(state), 2)
