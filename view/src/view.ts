@@ -1,8 +1,11 @@
 import {EditorState, Transaction} from "../../state/src/state"
-import {DocViewDesc} from "./viewdesc"
+import {DocViewDesc, PluginDeco} from "./viewdesc"
 import {DOMObserver} from "./domobserver"
 import {attachEventHandlers} from "./input"
 import {SelectionReader, selectionToDOM} from "./selection"
+import {Decoration, DecorationSet} from "./decoration"
+
+export {Decoration, DecorationSet}
 
 export class EditorView {
   private _state: EditorState;
@@ -43,20 +46,21 @@ export class EditorView {
     attachEventHandlers(this)
     this.selectionReader = new SelectionReader(this)
     
-    this.docView = new DocViewDesc(state.doc, this.contentDOM)
+    this.docView = new DocViewDesc(state.doc, this.getDecorations(), this.contentDOM)
     this.domObserver.start()
   }
 
   setState(state: EditorState) {
     let prev = this.state
     this._state = state
-    let updateDOM = state.doc != prev.doc || this.docView.dirty
+    let decorations = this.getDecorations()
+    let updateDOM = state.doc != prev.doc || this.docView.dirty || !sameDecorations(decorations, this.docView.decorations)
     let updateSel = updateDOM || !prev.selection.eq(state.selection)
     if (updateSel) {
       this.selectionReader.ignoreUpdates = true
       if (updateDOM) {
         this.domObserver.stop()
-        this.docView.update(state.doc)
+        this.docView.update(state.doc, decorations)
         this.docView.sync()
         this.domObserver.start()
         this.selectionReader.clearDOMState()
@@ -64,6 +68,21 @@ export class EditorView {
       selectionToDOM(this)
       this.selectionReader.ignoreUpdates = false
     }
+  }
+
+  private getDecorations(): PluginDeco[] {
+    let result: PluginDeco[] = [], plugins = this.state.plugins
+    if (this.props.decorations) {
+      let decorations = this.props.decorations(this.state)
+      if (decorations.size) result.push({plugin: null, decorations})
+    }
+    for (let i = 0; i < plugins.length; i++) {
+      let prop = plugins[i].props.decorations
+      if (!prop) continue
+      let decorations = prop(this.state)
+      if (decorations.size) result.push({plugin: plugins[i], decorations})
+    }
+    return result
   }
 
   // FIXME this is very awkward to type. Change or embrace the any?
@@ -108,4 +127,11 @@ export class EditorView {
 
 interface EditorProps {
   readonly handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
+  readonly decorations?: (state: EditorState) => DecorationSet;
+}
+
+function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
+  if (a.length != b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
+  return true
 }

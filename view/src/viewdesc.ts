@@ -1,5 +1,7 @@
 import {Text} from "../../doc/src/text"
-import {changedRanges} from "../../doc/src/diff"
+import {changedRanges, ChangedRange} from "../../doc/src/diff"
+import {Plugin} from "../../state/src/state"
+import {DecorationSet, DecoratedSpan, joinRanges, attrsEq} from "./decoration"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined }
@@ -103,32 +105,37 @@ function rm(dom: Node): Node {
   return next!
 }
 
+export type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
+
 export class DocViewDesc extends ViewDesc {
   children: LineViewDesc[];
+  decorations: PluginDeco[] = [];
 
   get length() { return this.text.length }
   get childGap() { return 1 }
 
-  constructor(public text: Text, dom: Element) {
+  constructor(public text: Text, decorations: PluginDeco[], dom: Element) {
     super(null, dom)
     this.children = [new LineViewDesc(this, [])]
     this.dirty = NODE_DIRTY
     this.text = Text.create("")
-    this.update(text)
+    this.update(text, decorations)
     this.sync()
   }
 
-  update(text: Text) {
+  update(text: Text, decorations: PluginDeco[]) {
     let prevText = this.text
-    let plan = changedRanges(prevText, text)
+    let plan = extendForChangedDecorations(changedRanges(prevText, text), decorations, this.decorations)
     this.text = text
+    this.decorations = decorations
 
     let cur = new ChildCursor(this.children, prevText.length, 1)
     for (let i = plan.length - 1; i >= 0; i--) {
       let {fromA, toA, fromB, toB} = plan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
-      let lines = linesBetween(text, fromB, toB)
+      let lines = DecoratedSpan.build(decorations.map(d => d.decorations), fromB, toB,
+                                      linesBetween(text, fromB, toB))
 
       if (lines.length == 1) {
         if (fromI == toI) { // Change within single line
@@ -200,14 +207,14 @@ class LineViewDesc extends ViewDesc {
   children: ViewDesc[];
   length: number;
 
-  constructor(parent: DocViewDesc, content: string[], tail: TextViewDesc[] | null = null) {
+  constructor(parent: DocViewDesc, content: DecoratedSpan[], tail: TextViewDesc[] | null = null) {
     super(parent, document.createElement("div"))
     this.length = 0
     this.children = []
     this.update(0, 0, content, tail)
   }
 
-  update(from: number, to: number = this.length, content: string[], tail: TextViewDesc[] | null = null) {
+  update(from: number, to: number = this.length, content: DecoratedSpan[], tail: TextViewDesc[] | null = null) {
     if (this.children.length == 1 && this.children[this.children.length - 1] instanceof EmptyLineHack) {
       this.children.pop()
       this.dirty |= NODE_DIRTY
@@ -216,30 +223,33 @@ class LineViewDesc extends ViewDesc {
     let children = this.children as TextViewDesc[]
     let cur = new ChildCursor(children, this.length)
     let totalLen = 0
-    for (let j = 0; j < content.length; j++) totalLen += content[j].length
+    for (let j = 0; j < content.length; j++) totalLen += content[j].string.length
     let dLen = totalLen - (to - from)
 
     let {i: toI, off: toOff} = cur.findPos(to)
     let {i: fromI, off: fromOff} = cur.findPos(from)
 
     if (fromI < children.length &&
-        (toI == fromI || toI == fromI + 1 && toOff == 0) && content.length < 2 &&
-        children[fromI].length + dLen <= MAX_JOIN_LEN) {
-      children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0] : "")
+        (toI == fromI || toI == fromI + 1 && toOff == 0) &&
+        children[fromI].length + dLen <= MAX_JOIN_LEN &&
+        (content.length == 0 || content.length == 1 && children[fromI].matchesMarkup(content[0]))) {
+      children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0].string : "")
       this.dirty |= CHILD_DIRTY
     } else {
       if (content.length > 0 && fromOff > 0 &&
-          fromOff + content[0].length <= MAX_JOIN_LEN) {
-        content[0] = children[fromI].text.slice(0, fromOff) + content[0]
+          fromOff + content[0].string.length <= MAX_JOIN_LEN &&
+          children[fromI].matchesMarkup(content[0])) {
+        content[0] = new DecoratedSpan(children[fromI].text.slice(0, fromOff) + content[0].string, content[0].tagName, content[0].attrs)
         fromOff = 0
       } else if (content.length > 0 && fromOff == 0 && fromI > 0 &&
-                 children[fromI - 1].length + content[0].length <= MAX_JOIN_LEN) {
+                 children[fromI - 1].length + content[0].string.length <= MAX_JOIN_LEN &&
+                 children[fromI - 1].matchesMarkup(content[0])) {
         if (fromI == toI && toOff == 0) {
-          children[fromI - 1].update(children[fromI - 1].length, undefined, content[0])
+          children[fromI - 1].update(children[fromI - 1].length, undefined, content[0].string)
           this.dirty |= CHILD_DIRTY
           content.shift()
         } else {
-          content[0] = children[fromI - 1].text + content[0]
+          content[0] = new DecoratedSpan(children[fromI - 1].text + content[0], content[0].tagName, content[0].attrs)
           fromI--
         }
       } else if (fromOff > 0) {
@@ -248,8 +258,10 @@ class LineViewDesc extends ViewDesc {
         fromI++
       }
       if (content.length && toI < children.length &&
-          children[toI].length - toOff + content[content.length - 1].length <= MAX_JOIN_LEN) {
-        content[content.length - 1] += children[toI].text.slice(toOff)
+          children[toI].length - toOff + content[content.length - 1].string.length <= MAX_JOIN_LEN &&
+          children[toI].matchesMarkup(content[content.length - 1])) {
+        let last = content[content.length - 1]
+        content[content.length - 1] = new DecoratedSpan(last.string + children[toI].text.slice(toOff), last.tagName, last.attrs)
         toI++
       } else if (toOff > 0) {
         children[toI].update(0, toOff)
@@ -257,7 +269,7 @@ class LineViewDesc extends ViewDesc {
       }
 
       if (toI > fromI || content.length) {
-        children.splice(fromI, toI - fromI, ...content.map(t => new TextViewDesc(this, t)))
+        children.splice(fromI, toI - fromI, ...content.map(s => new TextViewDesc(this, s.string, s.tagName, s.attrs)))
         this.dirty |= NODE_DIRTY | CHILD_DIRTY
       }
     }
@@ -287,7 +299,7 @@ class LineViewDesc extends ViewDesc {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     if (off > 0) {
       let child = this.children[i] as TextViewDesc
-      result.push(new TextViewDesc(this, child.text.slice(off)))
+      result.push(new TextViewDesc(this, child.text.slice(off), child.tagName, child.attrs))
       child.update(off)
       this.dirty |= CHILD_DIRTY
       i++
@@ -304,15 +316,29 @@ class LineViewDesc extends ViewDesc {
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
     while (off == 0 && i > 0 && this.children[i - 1].length == 0) i--
-    return off == 0 ? {node: this.dom, offset: i} : {node: this.children[i].dom, offset: off}
+    return off == 0 ? {node: this.dom, offset: i} : {node: this.children[i].textDOM, offset: off}
   }
 }
 
 const noChildren: ViewDesc[] = []
 
+function buildDOM(text: string, tagName: string | null, attrs: {[key: string]: string} | null): Node {
+  if (attrs && !tagName) tagName = "span"
+  let textNode = document.createTextNode(text)
+  if (!tagName) return textNode
+  let node = document.createElement(tagName)
+  node.appendChild(textNode)
+  if (attrs) for (let name in attrs) node.setAttribute(name, attrs[name])
+  return node
+}
+
 class TextViewDesc extends ViewDesc {
-  constructor(parent: LineViewDesc, public text: string) {
-    super(parent, document.createTextNode(text))
+  textDOM: Node;
+
+  constructor(parent: LineViewDesc, public text: string,
+              public tagName: string | null, public attrs: {[key: string]: string} | null) {
+    super(parent, buildDOM(text, tagName, attrs))
+    this.textDOM = tagName || attrs ? this.dom.firstChild! : this.dom
   }
 
   get children() { return noChildren }
@@ -324,13 +350,22 @@ class TextViewDesc extends ViewDesc {
   }
 
   sync() {
-    if ((this.dirty & NODE_DIRTY) && this.dom.nodeValue != this.text)
-      this.dom.nodeValue = this.text
+    if (this.dirty & NODE_DIRTY) {
+      if (this.textDOM.nodeValue != this.text) this.textDOM.nodeValue = this.text
+      if (this.textDOM != this.dom && (this.dom.firstChild != this.textDOM || this.dom.lastChild != this.textDOM)) {
+        while (this.dom.firstChild) this.dom.removeChild(this.dom.firstChild)
+        this.dom.appendChild(this.textDOM)
+      }
+    }
     this.dirty = NOT_DIRTY
   }
 
-  localPosFromDOM(_node: Node, offset: number): number {
-    return offset
+  localPosFromDOM(node: Node, offset: number): number {
+    return node == this.textDOM ? offset : offset ? this.text.length : 0
+  }
+
+  matchesMarkup(span: DecoratedSpan): boolean {
+    return this.tagName == span.tagName && attrsEq(this.attrs, span.attrs)
   }
 }
 
@@ -406,5 +441,55 @@ function linesBetween(text: Text, start: number, end: number): string[][] {
         pos = nextNewline + 1
       }
     }
+  }
+}
+
+function findPluginDeco(decorations: ReadonlyArray<PluginDeco>, plugin: Plugin | null): DecorationSet | null {
+  for (let i = 0; i < decorations.length; i++)
+    if (decorations[i].plugin == plugin) return decorations[i].decorations
+  return null
+}
+
+function extendForChangedDecorations(diff: ReadonlyArray<ChangedRange>,
+                                     decorations: ReadonlyArray<PluginDeco>,
+                                     oldDecorations: ReadonlyArray<PluginDeco>): ReadonlyArray<ChangedRange> {
+  let ranges: number[] = []
+  for (let i = 0; i < decorations.length; i++) {
+    let deco = decorations[i]
+    let newRanges = (findPluginDeco(oldDecorations, deco.plugin) || DecorationSet.empty)
+      .changedRanges(deco.decorations, diff)
+    ranges = joinRanges(ranges, newRanges)
+  }
+  for (let i = 0; i < oldDecorations.length; i++) {
+    let old = oldDecorations[i]
+    if (!findPluginDeco(decorations, old.plugin))
+      ranges = joinRanges(ranges, old.decorations.changedRanges(DecorationSet.empty, diff))
+  }
+  return extendWithRanges(diff, ranges)
+}
+
+function addChangedRange(ranges: ChangedRange[], fromA: number, toA: number, fromB: number, toB: number) {
+  if (ranges.length) {
+    let last = ranges[ranges.length - 1]
+    if (last.toA == fromA && last.toB == fromB) {
+      ranges[ranges.length - 1] = new ChangedRange(last.fromA, toA, last.fromB, toB)
+      return
+    }
+  }
+  ranges.push(new ChangedRange(fromA, toA, fromB, toB))
+}
+
+function extendWithRanges(diff: ReadonlyArray<ChangedRange>, ranges: number[]): ReadonlyArray<ChangedRange> {
+  let result: ChangedRange[] = []
+  for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
+    let next = dI == diff.length ? null : diff[dI], off = posA - posB
+    let end = next ? next.fromB : 2e9
+    while (rI < ranges.length && ranges[rI] < end) {
+      let from = ranges[rI++], to = ranges[rI++]
+      addChangedRange(result, from + off, to + off, from, to)
+    }
+    if (!next) return result
+    addChangedRange(result, next.fromA, next.toA, next.fromB, next.toB)
+    posA = next.toA; posB = next.toB
   }
 }

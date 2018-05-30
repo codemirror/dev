@@ -282,7 +282,7 @@ export class DecorationSet {
     return {set, escaped}
   }
 
-  changedRanges(other: DecorationSet, textDiff: ChangedRange[]): number[] {
+  changedRanges(other: DecorationSet, textDiff: A<ChangedRange>): number[] {
     let ranges: number[] = []
     let oldPos = 0, newPos = 0
     for (let i = 0; i < textDiff.length; i++) {
@@ -351,13 +351,25 @@ function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
 
 interface Heapable { heapPos: number; desc: DecorationDesc }
 
-class DecoratedRange {
-  constructor(readonly from: number,
-              readonly to: number,
+export class DecoratedSpan {
+  constructor(readonly string: string,
               readonly tagName: string | null,
               readonly attrs: {[key: string]: string} | null) {}
 
-  static build(from: number, to: number, ranges: Decoration[]): DecoratedRange {
+  static build(sets: A<DecorationSet>, from: number, to: number, lines: string[][]): DecoratedSpan[][] {
+    return decoratedRangesFor(sets, from, to, lines)
+  }
+}
+
+class RangeBuilder {
+  lineI: number = 0;
+  stringI: number = 0;
+  stringOff: number = 0;
+  ranges: DecoratedSpan[][] = [[]];
+
+  constructor(readonly lines: string[][], public pos: number) {}
+
+  buildRange(to: number, ranges: Decoration[]) {
     let tagName = null
     let attrs: {[key: string]: string} | null = null
     for (let i = 0; i < ranges.length; i++) {
@@ -374,11 +386,40 @@ class DecoratedRange {
         attrs[name] = value
       }
     }
-    return new DecoratedRange(from, to, tagName, attrs)
+
+    for (let len = to - this.pos;;) {
+      let line = this.lines[this.lineI]
+      if (this.stringI == line.length) {
+        // End of line, add a line break placeholder
+        // FIXME maybe gather line decorations here
+        this.ranges.push([])
+        this.lineI++
+        this.stringI = this.stringOff = 0
+        if (--len == 0) break
+        continue
+      }
+
+      let string = line[this.stringI]
+      let cut = Math.min(len, string.length - this.stringOff)
+      if (cut > 0) {
+        this.ranges[this.ranges.length - 1].push(
+          new DecoratedSpan(string.slice(this.stringOff, this.stringOff + cut), tagName, attrs))
+        this.stringOff += cut
+        len -= cut
+        if (len == 0) break
+      }
+
+      // Moving past the end of the current string
+      // FIXME join small compatible ranges together
+      this.stringOff = 0
+      this.stringI++
+    }
+
+    this.pos = to
   }
 }
 
-export function decoratedSpansInRange(sets: A<DecorationSet>, from: number, to: number): DecoratedRange[] {
+function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, lines: string[][]): DecoratedSpan[][] {
   let heap: Heapable[] = []
 
   for (let i = 0; i < sets.length; i++) {
@@ -389,9 +430,8 @@ export function decoratedSpansInRange(sets: A<DecorationSet>, from: number, to: 
     }
   }
 
-  let result: DecoratedRange[] = []
+  let builder = new RangeBuilder(lines, from)
   let active: Decoration[] = []
-  let pos = from
 
   while (heap.length > 0) {
     let next = takeFromHeap(heap)
@@ -406,25 +446,19 @@ export function decoratedSpansInRange(sets: A<DecorationSet>, from: number, to: 
       if (deco.desc instanceof RangeDesc) {
         if (!deco.desc.affectsSpans) continue
         deco = deco.move(next.offset)
-        if (deco.from > pos) {
-          result.push(DecoratedRange.build(pos, deco.from, active))
-          pos = deco.from
-        }
+        if (deco.from > builder.pos) builder.buildRange(deco.from, active)
         active.push(deco)
         addToHeap(heap, deco)
       }
     } else { // It is a decoration that ends here
       let deco = next as Decoration
       if (deco.to >= to) break
-      if (deco.to > pos) {
-        result.push(DecoratedRange.build(pos, deco.to, active))
-        pos = deco.to
-      }
+      if (deco.to > builder.pos) builder.buildRange(deco.to, active)
       active.splice(active.indexOf(deco), 1)
     }
   }
-  if (pos < to) result.push(DecoratedRange.build(pos, to, active))
-  return result
+  if (builder.pos < to) builder.buildRange(to, active)
+  return builder.ranges
 }
 
 function compareHeapable(a: Heapable, b: Heapable): number {
@@ -702,7 +736,7 @@ function changedRanges(a: DecorationSet, startA: number,
   }
 }
 
-function attrsEq(a: any, b: any): boolean {
+export function attrsEq(a: any, b: any): boolean {
   if (a == b) return true
   if (!a || !b) return false
   let keysA = Object.keys(a), keysB = Object.keys(b)
