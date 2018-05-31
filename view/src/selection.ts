@@ -1,6 +1,8 @@
 import {EditorView} from "./view"
-import {Selection as EditorSelection, Range} from "../../state/src/state"
+import {Selection as EditorSelection, MetaSlot, Range} from "../../state/src/state"
 import browser from "./browser"
+
+const originSlot = new MetaSlot("origin")
 
 export class SelectionReader {
   lastAnchorNode: Node | null = null;
@@ -81,7 +83,7 @@ export class SelectionReader {
     this.storeDOMState(selection)
     if (!this.view.state.selection.eq(selection)) {
       let tr = this.view.state.transaction.setSelection(selection)
-      if (this.originTime > Date.now() - 50) tr = tr.setMeta("origin", this.origin)
+      if (this.originTime > Date.now() - 50) tr = tr.setMeta(originSlot, this.origin)
       this.view.dispatch(tr)
     }
     this.origin = null

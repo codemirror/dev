@@ -57,7 +57,7 @@ class Configuration {
       fields.push(field)
     }
     this.fields = fields
-  }              
+  }
 }
 
 export interface EditorStateConfig {
@@ -90,7 +90,7 @@ export class EditorState {
     return Transaction.start(this)
   }
 
-  static create(config: EditorStateConfig = {}) {
+  static create(config: EditorStateConfig = {}): EditorState {
     let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
     let $config = new Configuration(config.plugins || [])
     let state = new EditorState($config, doc, config.selection || Selection.default)
@@ -185,7 +185,7 @@ export class Transaction {
     return last < 0 ? this.startState.doc : this.docs[last]
   }
 
-  setMeta<T>(slot: MetaSlot<T>, value: T) {
+  setMeta<T>(slot: MetaSlot<T>, value: T): Transaction {
     let meta = new Meta(this.meta)
     meta[slot.name] = value
     return new Transaction(this.startState, this.changes, this.docs, this.selection, meta, this.flags)

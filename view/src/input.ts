@@ -1,6 +1,8 @@
+import {MetaSlot} from "../../state/src/state"
 import {EditorView} from "./view"
 import browser from "./browser"
 
+const uiEvent = new MetaSlot("uiEvent")
 const handlers = Object.create(null)
 
 export function attachEventHandlers(view: EditorView) {
@@ -31,7 +33,7 @@ function capturePaste(view: EditorView) {
 
 function doPaste(view: EditorView, text: string) {
   // FIXME normalize input text (newlines)?
-  view.dispatch(view.state.transaction.replaceSelection(text).setMeta("uiEvent", "paste"))
+  view.dispatch(view.state.transaction.replaceSelection(text).setMeta(uiEvent, "paste"))
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
@@ -75,6 +77,6 @@ handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut") {
-    view.dispatch(view.state.transaction.replaceSelection("").scrollIntoView().setMeta("uiEvent", "cut"))
+    view.dispatch(view.state.transaction.replaceSelection("").scrollIntoView().setMeta(uiEvent, "cut"))
   }
 }
