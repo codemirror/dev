@@ -90,7 +90,7 @@ export abstract class ViewDesc {
       pos += child.length + this.childGap
     }
   }
- 
+
   markDirty() {
     this.dirty |= NODE_DIRTY
     for (let parent = this.parent; parent; parent = parent.parent)

@@ -87,7 +87,7 @@ export class Decoration {
   static point(pos: number, spec: DecorationPointSpec): Decoration {
     return new Decoration(pos, pos, new PointDesc(spec))
   }
-  
+
   /** @internal Here so that we can put active decorations on a heap
    * and take then off at their end */
   get heapPos() { return this.to }

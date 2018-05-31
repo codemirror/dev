@@ -45,7 +45,7 @@ export class EditorView {
     this.domObserver = new DOMObserver(this)
     attachEventHandlers(this)
     this.selectionReader = new SelectionReader(this)
-    
+
     this.docView = new DocViewDesc(state.doc, this.getDecorations(), this.contentDOM)
     this.domObserver.start()
   }
