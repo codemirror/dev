@@ -160,6 +160,8 @@ export class MetaSlot<T> {
   }
 
   static time: MetaSlot<number> = new MetaSlot("time");
+  static origin: MetaSlot<string> = new MetaSlot("origin")
+  static userEvent: MetaSlot<string> = new MetaSlot("userEvent")
   static addToHistory: MetaSlot<boolean> = new MetaSlot("addToHistory")
   static rebased: MetaSlot<number> = new MetaSlot("rebased")
 }
