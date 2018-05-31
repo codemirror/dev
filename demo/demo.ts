@@ -1,5 +1,5 @@
 import {EditorState, Plugin, StateField} from "../state/src/state"
-import {EditorView, Decoration, DecorationSet} from "../view/src/view"
+import {EditorView, Decoration, DecorationSet} from "../view/src/"
 
 let field = new StateField<DecorationSet>({
   init() {return DecorationSet.of([

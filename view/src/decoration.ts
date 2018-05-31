@@ -15,7 +15,7 @@ export interface DecorationPointSpec {
   lineAttributes?: {[key: string]: string};
 }
 
-type DecorationSpec = DecorationRangeSpec | DecorationPointSpec
+export type DecorationSpec = DecorationRangeSpec | DecorationPointSpec
 
 abstract class DecorationDesc {
   constructor(readonly spec: DecorationSpec, readonly bias: number) {}

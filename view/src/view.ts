@@ -3,9 +3,7 @@ import {DocViewDesc, PluginDeco} from "./viewdesc"
 import {DOMObserver} from "./domobserver"
 import {attachEventHandlers} from "./input"
 import {SelectionReader, selectionToDOM} from "./selection"
-import {Decoration, DecorationSet} from "./decoration"
-
-export {Decoration, DecorationSet}
+import {DecorationSet} from "./decoration"
 
 export class EditorView {
   private _state: EditorState;
