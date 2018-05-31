@@ -231,7 +231,10 @@ class LineViewDesc extends ViewDesc {
     let {i: toI, off: toOff} = cur.findPos(to)
     let {i: fromI, off: fromOff} = cur.findPos(from)
 
-    if (fromI < children.length &&
+    if (from == 0 && to == this.length && content.length == 0) {
+      this.children.length = 0
+      this.dirty |= NODE_DIRTY
+    } else if (fromI < children.length &&
         (toI == fromI || toI == fromI + 1 && toOff == 0) &&
         (content.length == 0 || content.length == 1 && children[fromI].canJoinWithSpan(content[0], to - from))) {
       children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0].text : "")
