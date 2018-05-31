@@ -70,7 +70,7 @@ export class Decoration {
 
   get spec(): DecorationSpec { return this.desc.spec }
 
-  map(changes: Change[], oldOffset: number, newOffset: number): Decoration | null {
+  map(changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
     return this.desc.map(this, changes, oldOffset, newOffset)
   }
 
@@ -212,13 +212,12 @@ export class DecorationSet {
     }
   }
 
-  map(changes: Change[]): DecorationSet {
+  map(changes: A<Change>): DecorationSet {
     if (changes.length == 0 || this == DecorationSet.empty) return this
     return this.mapInner(changes, 0, 0, mapPos(this.length, changes, 1)).set
   }
 
-  // FIXME this spills way too much to the outer node
-  private mapInner(changes: Change[],
+  private mapInner(changes: A<Change>,
                    oldStart: number, newStart: number,
                    newEnd: number): {set: DecorationSet, escaped: Decoration[] | null} {
     let newLocal: Decoration[] | null = null
@@ -536,7 +535,7 @@ function filterDecorations(decorations: A<Decoration>,
   return copy
 }
 
-function touchesChange(from: number, to: number, changes: Change[]): boolean {
+function touchesChange(from: number, to: number, changes: A<Change>): boolean {
   for (let i = 0; i < changes.length; i++) {
     let change = changes[i]
     if (change.to >= from && change.from <= to) return true
