@@ -53,6 +53,6 @@ describe("EditorView drawing", () => {
     ist(cm.contentDOM.childNodes[1].childNodes.length, 1)
     ist(cm.contentDOM.childNodes[1].firstChild.nodeName, "BR")
     cm.dispatch(cm.state.transaction.replace(4, 4, "x"))
-    ist(!Array.from(cm.contentDOM.childNodes[1].childNodes).some(n => n.nodeName == "BR"))
+    ist(!Array.from(cm.contentDOM.childNodes[1].childNodes).some(n => (n as any).nodeName == "BR"))
   })
 })

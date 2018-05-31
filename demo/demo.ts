@@ -17,5 +17,5 @@ let decos = new Plugin({
 })
 
 let state = EditorState.create({doc: "one\ntwo\nthree", plugins: [decos]})
-let view = window.view = new EditorView(state) 
+let view = (window as any).view = new EditorView(state) 
 document.body.appendChild(view.dom)
