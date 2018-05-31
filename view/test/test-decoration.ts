@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet, decoratedSpansInRange} from "../src/decoration"
+import {Decoration, DecorationSet, DecoratedSpan} from "../src/decoration"
 import {Change} from "../../state/src/state"
 const ist = require("ist")
 
@@ -192,15 +192,18 @@ describe("DecorationSet", () => {
     })
   })
 
-  describe("decoratedSpansInRange", () => {
+  describe("DecoratedSpan.build", () => {
+    function flatten(ranges) {
+      return ranges.map(range => range.map(id).join(",")).join("/")
+    }
     function id(span) {
-      return span.from + "-" + span.to + (span.attrs ? "=" + Object.keys(span.attrs).sort().join("&") : "")
+      return span.text + (span.attrs ? "=" + Object.keys(span.attrs).sort().join("&") : "")
     }
 
     it("separates the range in covering spans", () => {
       let set = DecorationSet.of([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")])
-      let ranges = decoratedSpansInRange([set], 0, 15)
-      ist(ranges.map(id).join(","), "0-3,3-5=one,5-8=one&two,8-10,10-12=three,12-15")
+      let ranges = DecoratedSpan.build([set], 0, 15, [["012345678901234"]])
+      ist(flatten(ranges), "012,34=one,567=one&two,89,01=three,234")
     })
 
     it("can retrieve a limited range", () => {
@@ -209,36 +212,36 @@ describe("DecorationSet", () => {
       let set = DecorationSet.of(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
-        expected += (expected ? "," : "") + pos + "-" + Math.min(end, pos + (pos % 2 ? 1 : 2)) + "=span" + Math.floor(pos / 2) + "&wide"
-      ist(decoratedSpansInRange([set], start, end).map(id).join(","), expected)
+        expected += (expected ? "," : "") + "x".repeat(Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "&wide"
+      ist(flatten(DecoratedSpan.build([set], start, end, [["x".repeat(end - start)]])), expected)
     })
 
     it("ignores decorations that don't affect spans", () => {
       let decos = [mk(0, 10, "yes"), Decoration.range(5, 6, {})]
-      ist(decoratedSpansInRange([DecorationSet.of(decos)], 2, 15).map(id).join(","), "2-10=yes,10-15")
+      ist(flatten(DecoratedSpan.build([DecorationSet.of(decos)], 2, 15, [["x".repeat(13)]])), "xxxxxxxx=yes,xxxxx")
     })
 
     it("combines classes", () => {
       let decos = [Decoration.range(0, 10, {attributes: {class: "a"}}),
                    Decoration.range(2, 4, {attributes: {class: "b"}})]
-      let ranges = decoratedSpansInRange([DecorationSet.of(decos)], 0, 10)
-      ist(ranges.map(id).join(","), "0-2=class,2-4=class,4-10=class")
-      ist(ranges.map(r => r.attrs.class).join(","), "a,a b,a")
+      let ranges = DecoratedSpan.build([DecorationSet.of(decos)], 0, 10, [["x".repeat(10)]])
+      ist(flatten(ranges), "xx=class,xx=class,xxxxxx=class")
+      ist(ranges[0].map(r => r.attrs.class).join(","), "a,a b,a")
     })
 
     it("combines styles", () => {
       let decos = [Decoration.range(0, 6, {attributes: {style: "color: red"}}),
                    Decoration.range(4, 10, {attributes: {style: "background: blue"}})]
-      let ranges = decoratedSpansInRange([DecorationSet.of(decos)], 0, 10)
-      ist(ranges.map(id).join(","), "0-4=style,4-6=style,6-10=style")
-      ist(ranges.map(r => r.attrs.style).join(","), "color: red,color: red;background: blue,background: blue")
+      let ranges = DecoratedSpan.build([DecorationSet.of(decos)], 0, 10, [["x".repeat(10)]])
+      ist(flatten(ranges), "xxxx=style,xx=style,xxxx=style")
+      ist(ranges[0].map(r => r.attrs.style).join(","), "color: red,color: red;background: blue,background: blue")
     })
 
     it("reads from multiple sets at once", () => {
       let one = DecorationSet.of([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
       let two = DecorationSet.of([mk(0, 6, "a"), mk(10, 12, "b")])
-      ist(decoratedSpansInRange([one, two], 0, 12).map(id).join(","),
-          "0-2=a,2-3=a&x,3-5=a,5-6=a&y,6-10=y,10-12=b&z")
+      ist(flatten(DecoratedSpan.build([one, two], 0, 12, [["x".repeat(12)]])),
+          "xx=a,x=a&x,xx=a,x=a&y,xxxx=y,xx=b&z")
     })
   })
 
