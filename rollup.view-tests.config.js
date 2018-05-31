@@ -1,3 +1,6 @@
+import typescript from "rollup-plugin-typescript2";
+import commonjs from "rollup-plugin-commonjs"
+
 export default {
   input: "./view/test/test.ts",
   output: {
@@ -5,5 +8,13 @@ export default {
     file: "./view/test/test_built.js",
     sourcemap: true
   },
-  plugins: [require("rollup-typescript")(), require("rollup-plugin-commonjs")()]
+  plugins: [
+    typescript({
+      tsconfigOverride: {
+        compilerOptions: {lib: ["ES6", "dom"], sourceMap: true, target: "es5", strict: false},
+        include: null
+      }
+    }),
+    commonjs()
+  ]
 }

@@ -33,8 +33,8 @@
     "prosemirror-transform": "^1.0.10",
     "rollup": "^0.58.2",
     "rollup-plugin-commonjs": "^9.1.3",
-    "rollup-typescript": "^1.1.2",
+    "rollup-plugin-typescript2": "^0.14.0",
     "ts-node": "^5.0.1",
-    "typescript": "^2.8.3"
+    "typescript": "^2.8.4"
   }
 }
