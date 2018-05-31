@@ -90,12 +90,14 @@ export abstract class ViewDesc {
       pos += child.length + this.childGap
     }
   }
-
+ 
   markDirty() {
     this.dirty |= NODE_DIRTY
     for (let parent = this.parent; parent; parent = parent.parent)
       parent.dirty |= CHILD_DIRTY
   }
+
+  canJoinWithSpan(span: DecoratedSpan, overlap: number): boolean { return false }
 }
 
 // Remove a DOM node and return its next sibling.
@@ -223,7 +225,7 @@ class LineViewDesc extends ViewDesc {
     let children = this.children as TextViewDesc[]
     let cur = new ChildCursor(children, this.length)
     let totalLen = 0
-    for (let j = 0; j < content.length; j++) totalLen += content[j].string.length
+    for (let j = 0; j < content.length; j++) totalLen += content[j].text.length
     let dLen = totalLen - (to - from)
 
     let {i: toI, off: toOff} = cur.findPos(to)
@@ -231,25 +233,23 @@ class LineViewDesc extends ViewDesc {
 
     if (fromI < children.length &&
         (toI == fromI || toI == fromI + 1 && toOff == 0) &&
-        children[fromI].length + dLen <= MAX_JOIN_LEN &&
-        (content.length == 0 || content.length == 1 && children[fromI].matchesMarkup(content[0]))) {
-      children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0].string : "")
+        (content.length == 0 || content.length == 1 && children[fromI].canJoinWithSpan(content[0], to - from))) {
+      children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0].text : "")
       this.dirty |= CHILD_DIRTY
     } else {
       if (content.length > 0 && fromOff > 0 &&
-          fromOff + content[0].string.length <= MAX_JOIN_LEN &&
-          children[fromI].matchesMarkup(content[0])) {
-        content[0] = new DecoratedSpan(children[fromI].text.slice(0, fromOff) + content[0].string, content[0].tagName, content[0].attrs)
+          children[fromI].canJoinWithSpan(content[0], children[fromI].text.length - fromOff)) {
+        content[0] = new DecoratedSpan(children[fromI].text.slice(0, fromOff) + content[0].text,
+                                       content[0].tagName, content[0].attrs)
         fromOff = 0
       } else if (content.length > 0 && fromOff == 0 && fromI > 0 &&
-                 children[fromI - 1].length + content[0].string.length <= MAX_JOIN_LEN &&
-                 children[fromI - 1].matchesMarkup(content[0])) {
+                 children[fromI - 1].canJoinWithSpan(content[0], 0)) {
         if (fromI == toI && toOff == 0) {
-          children[fromI - 1].update(children[fromI - 1].length, undefined, content[0].string)
+          children[fromI - 1].update(children[fromI - 1].length, undefined, content[0].text)
           this.dirty |= CHILD_DIRTY
           content.shift()
         } else {
-          content[0] = new DecoratedSpan(children[fromI - 1].text + content[0], content[0].tagName, content[0].attrs)
+          content[0] = new DecoratedSpan(children[fromI - 1].text + content[0].text, content[0].tagName, content[0].attrs)
           fromI--
         }
       } else if (fromOff > 0) {
@@ -258,10 +258,9 @@ class LineViewDesc extends ViewDesc {
         fromI++
       }
       if (content.length && toI < children.length &&
-          children[toI].length - toOff + content[content.length - 1].string.length <= MAX_JOIN_LEN &&
-          children[toI].matchesMarkup(content[content.length - 1])) {
+          children[toI].canJoinWithSpan(content[content.length - 1], toOff)) {
         let last = content[content.length - 1]
-        content[content.length - 1] = new DecoratedSpan(last.string + children[toI].text.slice(toOff), last.tagName, last.attrs)
+        content[content.length - 1] = new DecoratedSpan(last.text + children[toI].text.slice(toOff), last.tagName, last.attrs)
         toI++
       } else if (toOff > 0) {
         children[toI].update(0, toOff)
@@ -269,7 +268,7 @@ class LineViewDesc extends ViewDesc {
       }
 
       if (toI > fromI || content.length) {
-        children.splice(fromI, toI - fromI, ...content.map(s => new TextViewDesc(this, s.string, s.tagName, s.attrs)))
+        children.splice(fromI, toI - fromI, ...content.map(s => new TextViewDesc(this, s.text, s.tagName, s.attrs)))
         this.dirty |= NODE_DIRTY | CHILD_DIRTY
       }
     }
@@ -316,16 +315,19 @@ class LineViewDesc extends ViewDesc {
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
     while (off == 0 && i > 0 && this.children[i - 1].length == 0) i--
-    return off == 0 ? {node: this.dom, offset: i} : {node: this.children[i].textDOM, offset: off}
+    if (off == 0) return {node: this.dom, offset: i}
+    let child = this.children[i]
+    if (child instanceof TextViewDesc) return {node: child.textDOM, offset: off}
+    else return {node: this.dom, offset: i}
   }
 }
 
 const noChildren: ViewDesc[] = []
 
 function buildDOM(text: string, tagName: string | null, attrs: {[key: string]: string} | null): Node {
-  if (attrs && !tagName) tagName = "span"
   let textNode = document.createTextNode(text)
-  if (!tagName) return textNode
+  if (attrs && !tagName) tagName = "span"
+  else if (!tagName) return textNode
   let node = document.createElement(tagName)
   node.appendChild(textNode)
   if (attrs) for (let name in attrs) node.setAttribute(name, attrs[name])
@@ -364,8 +366,9 @@ class TextViewDesc extends ViewDesc {
     return node == this.textDOM ? offset : offset ? this.text.length : 0
   }
 
-  matchesMarkup(span: DecoratedSpan): boolean {
-    return this.tagName == span.tagName && attrsEq(this.attrs, span.attrs)
+  canJoinWithSpan(span: DecoratedSpan, overlap: number): boolean {
+    return span.text.length + this.text.length - overlap <= MAX_JOIN_LEN &&
+      this.tagName == span.tagName && attrsEq(this.attrs, span.attrs)
   }
 }
 

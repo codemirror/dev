@@ -352,9 +352,11 @@ function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
 interface Heapable { heapPos: number; desc: DecorationDesc }
 
 export class DecoratedSpan {
-  constructor(readonly string: string,
+  constructor(readonly text: string,
               readonly tagName: string | null,
               readonly attrs: {[key: string]: string} | null) {}
+
+  toString() { throw new Error("EH") }
 
   static build(sets: A<DecorationSet>, from: number, to: number, lines: string[][]): DecoratedSpan[][] {
     return decoratedRangesFor(sets, from, to, lines)
