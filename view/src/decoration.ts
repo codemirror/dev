@@ -15,10 +15,9 @@ export interface DecorationPointSpec {
   lineAttributes?: {[key: string]: string};
 }
 
-export type DecorationSpec = DecorationRangeSpec | DecorationPointSpec
-
 abstract class DecorationDesc {
-  constructor(readonly spec: DecorationSpec, readonly bias: number) {}
+  constructor(readonly bias: number) {}
+  spec: any;
   abstract map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null;
 }
 
@@ -27,11 +26,11 @@ const BIG_BIAS = 2e9
 type A<T> = ReadonlyArray<T>
 
 class RangeDesc extends DecorationDesc {
-  endBias: number;
-  affectsSpans: boolean;
+  readonly endBias: number;
+  readonly affectsSpans: boolean;
 
-  constructor(spec: DecorationRangeSpec) {
-    super(spec, spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS)
+  constructor(readonly spec: DecorationRangeSpec) {
+    super(spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS)
     this.endBias = spec.inclusiveEnd == true ? BIG_BIAS : -BIG_BIAS
     this.affectsSpans = !!(spec.attributes || spec.tagName || spec.collapsed)
   }
@@ -43,13 +42,13 @@ class RangeDesc extends DecorationDesc {
 
   eq(other: RangeDesc) {
     return this == other ||
-      (this.spec as any).tagName == (other.spec as any).tagName && attrsEq((this.spec as any).attributes, (other.spec as any).attributes)
+      this.spec.tagName == other.spec.tagName && attrsEq(this.spec.attributes, other.spec.attributes)
   }
 }
 
 class PointDesc extends DecorationDesc {
-  constructor(spec: DecorationPointSpec) {
-    super(spec, spec.side || 0)
+  constructor(readonly spec: DecorationPointSpec) {
+    super(spec.side || 0)
   }
 
   map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
@@ -68,7 +67,7 @@ export class Decoration {
     public readonly desc: DecorationDesc
   ) {}
 
-  get spec(): DecorationSpec { return this.desc.spec }
+  get spec(): any { return this.desc.spec }
 
   map(changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
     return this.desc.map(this, changes, oldOffset, newOffset)
@@ -104,7 +103,7 @@ const noChildren: A<DecorationSet> = []
 
 const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
-type DecorationFilter = (from: number, to: number, spec: DecorationSpec) => boolean
+type DecorationFilter = (from: number, to: number, spec: any) => boolean
 
 export class DecorationSet {
   /** @internal */

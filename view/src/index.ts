@@ -1,2 +1,2 @@
 export {EditorView} from "./view"
-export {Decoration, DecorationSet, DecorationSpec, DecorationRangeSpec, DecorationPointSpec} from "./decoration"
+export {Decoration, DecorationSet, DecorationRangeSpec, DecorationPointSpec} from "./decoration"
