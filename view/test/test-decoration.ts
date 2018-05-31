@@ -243,6 +243,12 @@ describe("DecorationSet", () => {
       ist(flatten(DecoratedSpan.build([one, two], 0, 12, [["x".repeat(12)]])),
           "xx=a,x=a&x,xx=a,x=a&y,xxxx=y,xx=b&z")
     })
+
+    it("splits on line boundaries", () => {
+      let ranges = DecoratedSpan.build([DecorationSet.of([mk(0, 3, "x"), mk(2, 8, "y")])],
+                                       0, 9, [[], ["one"], [], ["two"]])
+      ist(flatten(ranges), "/o=x,n=x&y,e=y//tw=y,o")
+    })
   })
 
   describe("changedRanges", () => {
