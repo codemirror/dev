@@ -621,6 +621,19 @@ function gatherNonMatchingNodes(a: DecorationSet, startA: number,
   return {heapA, heapB}
 }
 
+function advanceComparePos(pos: number, newPos: number,
+                           active: RangeDesc[], otherActive: RangeDesc[],
+                           widgets: PointDesc[], otherWidgets: PointDesc[],
+                           ranges: number[]): number {
+  if (!compareWidgetSets(widgets,otherWidgets)) {
+    addRange(pos, pos, ranges)
+    widgets.length = otherWidgets.length = 0
+  }
+  if (!compareActiveSets(active, otherActive))
+    addRange(pos, newPos, ranges)
+  return newPos
+}
+
 function advanceCompare(pos: number, end: number, heap: Heapable[],
                         active: RangeDesc[], otherActive: RangeDesc[],
                         widgets: PointDesc[], otherWidgets: PointDesc[],
@@ -628,7 +641,7 @@ function advanceCompare(pos: number, end: number, heap: Heapable[],
   let next = takeFromHeap(heap)!
   if (next instanceof LocalSet) {
     let deco = next.decorations[next.index++]
-    if (deco.from + next.offset >= end) {
+    if (deco.from + next.offset > end) {
       heap.length = 0
       return end
     }
@@ -638,30 +651,23 @@ function advanceCompare(pos: number, end: number, heap: Heapable[],
       if (!deco.desc.affectsSpans) return pos
       if (deco.to + next.offset > pos) {
         deco = deco.move(next.offset)
-        if (deco.from > pos) {
-          if (!compareWidgetSets(widgets,otherWidgets)) {
-            addRange(pos, pos, ranges)
-            widgets.length = otherWidgets.length = 0
-          }
-          if (!compareActiveSets(active, otherActive))
-            addRange(pos, Math.min(end, deco.from), ranges)
-          pos = deco.from
-        }
+        if (deco.from > pos)
+          pos = advanceComparePos(pos, Math.min(end, deco.from), active, otherActive,
+                                  widgets, otherWidgets, ranges)
         // FIXME as optimization, it should be possible to remove it from the other set, if present
         active.push(deco.desc as RangeDesc)
         addToHeap(heap, deco)
       }
     } else {
       let desc = deco.desc as PointDesc
+      if (deco.from > pos)
+        pos = advanceComparePos(pos, deco.from, active, otherActive, widgets, otherWidgets, ranges)
       if (desc.widget) widgets.push(desc)
     }
   } else {
     let deco = next as Decoration
-    if (deco.to > pos && pos < end) {
-      if (!compareActiveSets(active, otherActive))
-        addRange(pos, Math.min(end, deco.to), ranges)
-      pos = deco.to
-    }
+    if (deco.to > pos && pos < end)
+      pos = advanceComparePos(pos, Math.min(end, deco.to), active, otherActive, widgets, otherWidgets, ranges)
     remove(active, deco.desc)
   }
   return pos
@@ -711,7 +717,7 @@ function changedRanges(a: DecorationSet, startA: number,
     if (heapA.length && (!heapB.length || (heapA[0].heapPos - heapB[0].heapPos || heapA[0].desc.bias - heapB[0].desc.bias) < 0)) {
       pos = advanceCompare(pos, end, heapA, activeA, activeB, widgetsA, widgetsB, ranges)
     } else if (heapB.length) {
-      pos = advanceCompare(pos, end, heapB, activeB, activeA, widgetsA, widgetsB, ranges)
+      pos = advanceCompare(pos, end, heapB, activeB, activeA, widgetsB, widgetsA, ranges)
     } else {
       if (!compareWidgetSets(widgetsA, widgetsB)) addRange(pos, pos, ranges)
       break
