@@ -10,8 +10,8 @@ declare global {
 const NOT_DIRTY = 0, CHILD_DIRTY = 1, NODE_DIRTY = 2
 
 export abstract class ViewDesc {
-  constructor(public parent: ViewDesc | null, public dom: Node) {
-    dom.cmView = this
+  constructor(public parent: ViewDesc | null, public dom: Node | null) {
+    if (dom) dom.cmView = this
   }
 
   abstract length: number;
@@ -43,9 +43,11 @@ export abstract class ViewDesc {
   }
 
   syncDOMChildren() {
+    if (!this.dom) return
     let dom = this.dom.firstChild
     for (let i = 0; i < this.children.length; i++) {
       let desc = this.children[i], childDOM = desc.dom
+      if (!childDOM) continue
       if (childDOM.parentNode == this.dom) {
         while (childDOM != dom) dom = rm(dom!)
         dom = dom.nextSibling
@@ -174,7 +176,7 @@ export class DocViewDesc extends ViewDesc {
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
       pos = end + 1
     }
-    let startDOM = (fromI ? this.children[fromI - 1].dom.nextSibling : null) || this.dom.firstChild
+    let startDOM = (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom!.firstChild
     let endDOM = toI < this.children.length - 1 ? this.children[toI + 1].dom : null
     return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
   }
@@ -318,10 +320,10 @@ class LineViewDesc extends ViewDesc {
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
     while (off == 0 && i > 0 && this.children[i - 1].length == 0) i--
-    if (off == 0) return {node: this.dom, offset: i}
+    if (off == 0) return {node: this.dom!, offset: i}
     let child = this.children[i]
     if (child instanceof TextViewDesc) return {node: child.textDOM, offset: off}
-    else return {node: this.dom, offset: i}
+    else return {node: this.dom!, offset: i}
   }
 }
 
@@ -343,7 +345,7 @@ class TextViewDesc extends ViewDesc {
   constructor(parent: LineViewDesc, public text: string,
               public tagName: string | null, public attrs: {[key: string]: string} | null) {
     super(parent, buildDOM(text, tagName, attrs))
-    this.textDOM = tagName || attrs ? this.dom.firstChild! : this.dom
+    this.textDOM = (tagName || attrs ? this.dom!.firstChild : this.dom)!
   }
 
   get children() { return noChildren }
@@ -357,9 +359,10 @@ class TextViewDesc extends ViewDesc {
   sync() {
     if (this.dirty & NODE_DIRTY) {
       if (this.textDOM.nodeValue != this.text) this.textDOM.nodeValue = this.text
-      if (this.textDOM != this.dom && (this.dom.firstChild != this.textDOM || this.dom.lastChild != this.textDOM)) {
-        while (this.dom.firstChild) this.dom.removeChild(this.dom.firstChild)
-        this.dom.appendChild(this.textDOM)
+      let dom = this.dom!
+      if (this.textDOM != dom && (this.dom!.firstChild != this.textDOM || dom.lastChild != this.textDOM)) {
+        while (dom.firstChild) dom.removeChild(dom.firstChild)
+        dom.appendChild(this.textDOM)
       }
     }
     this.dirty = NOT_DIRTY
