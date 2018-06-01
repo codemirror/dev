@@ -139,9 +139,7 @@ export class DocViewDesc extends ViewDesc {
       let {fromA, toA, fromB, toB} = plan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
-      let builder = new LineElementBuilder(linesBetween(text, fromB, toB), fromB)
-      buildLineElements(decorations.map(d => d.decorations), fromB, toB, builder)
-      let lines = builder.elements
+      let lines = LineElementBuilder.build(text, fromB, toB, decorations.map(d => d.decorations))
 
       if (lines.length == 1) {
         if (fromI == toI) { // Change within single line
@@ -412,7 +410,7 @@ class WidgetViewDesc extends LineElementViewDesc {
   }
 }
 
-class LineElementBuilder {
+export class LineElementBuilder {
   lineI: number = 0;
   stringI: number = 0;
   stringOff: number = 0;
@@ -474,6 +472,12 @@ class LineElementBuilder {
 
   addWidget(widget: Widget<any>, side: number) {
     this.elements[this.elements.length - 1].push(new WidgetViewDesc(widget, side))
+  }
+
+  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineElementViewDesc[][] {
+    let builder = new LineElementBuilder(linesBetween(text, from, to), from)
+    buildLineElements(decorations, from, to, builder)
+    return builder.elements
   }
 }
 

@@ -198,65 +198,6 @@ describe("DecorationSet", () => {
     })
   })
 
-  describe("DecoratedSpan.build", () => {
-    function flatten(ranges) {
-      return ranges.map(range => range.map(id).join(",")).join("/")
-    }
-    function id(span) {
-      return span.text + (span.attrs ? "=" + Object.keys(span.attrs).sort().join("&") : "")
-    }
-
-    it("separates the range in covering spans", () => {
-      let set = DecorationSet.of([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")])
-      let ranges = DecoratedSpan.build([set], 0, 15, [["012345678901234"]])
-      ist(flatten(ranges), "012,34=one,567=one&two,89,01=three,234")
-    })
-
-    it("can retrieve a limited range", () => {
-      let decos = [mk(0, 200, "wide")]
-      for (let i = 0; i < 100; i++) decos.push(mk(i * 2, i * 2 + 2, "span" + i))
-      let set = DecorationSet.of(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
-      let expected = ""
-      for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
-        expected += (expected ? "," : "") + "x".repeat(Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "&wide"
-      ist(flatten(DecoratedSpan.build([set], start, end, [["x".repeat(end - start)]])), expected)
-    })
-
-    it("ignores decorations that don't affect spans", () => {
-      let decos = [mk(0, 10, "yes"), Decoration.range(5, 6, {})]
-      ist(flatten(DecoratedSpan.build([DecorationSet.of(decos)], 2, 15, [["x".repeat(13)]])), "xxxxxxxx=yes,xxxxx")
-    })
-
-    it("combines classes", () => {
-      let decos = [Decoration.range(0, 10, {attributes: {class: "a"}}),
-                   Decoration.range(2, 4, {attributes: {class: "b"}})]
-      let ranges = DecoratedSpan.build([DecorationSet.of(decos)], 0, 10, [["x".repeat(10)]])
-      ist(flatten(ranges), "xx=class,xx=class,xxxxxx=class")
-      ist(ranges[0].map(r => r.attrs.class).join(","), "a,a b,a")
-    })
-
-    it("combines styles", () => {
-      let decos = [Decoration.range(0, 6, {attributes: {style: "color: red"}}),
-                   Decoration.range(4, 10, {attributes: {style: "background: blue"}})]
-      let ranges = DecoratedSpan.build([DecorationSet.of(decos)], 0, 10, [["x".repeat(10)]])
-      ist(flatten(ranges), "xxxx=style,xx=style,xxxx=style")
-      ist(ranges[0].map(r => r.attrs.style).join(","), "color: red,color: red;background: blue,background: blue")
-    })
-
-    it("reads from multiple sets at once", () => {
-      let one = DecorationSet.of([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
-      let two = DecorationSet.of([mk(0, 6, "a"), mk(10, 12, "b")])
-      ist(flatten(DecoratedSpan.build([one, two], 0, 12, [["x".repeat(12)]])),
-          "xx=a,x=a&x,xx=a,x=a&y,xxxx=y,xx=b&z")
-    })
-
-    it("splits on line boundaries", () => {
-      let ranges = DecoratedSpan.build([DecorationSet.of([mk(0, 3, "x"), mk(2, 8, "y")])],
-                                       0, 9, [[], ["one"], [], ["two"]])
-      ist(flatten(ranges), "/o=x,n=x&y,e=y//tw=y,o")
-    })
-  })
-
   describe("changedRanges", () => {
     function test(decos, update, ranges) {
       let deco = DecorationSet.of(decos)
