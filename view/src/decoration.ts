@@ -369,14 +369,17 @@ class RangeBuilder {
   stringI: number = 0;
   stringOff: number = 0;
   ranges: DecoratedSpan[][] = [[]];
+  active: RangeDesc[] = [];
 
   constructor(readonly lines: string[][], public pos: number) {}
 
-  buildRange(to: number, ranges: Decoration[]) {
+  advance(pos: number) {
+    if (pos <= this.pos) return
+
     let tagName = null
     let attrs: {[key: string]: string} | null = null
-    for (let i = 0; i < ranges.length; i++) {
-      let spec = ranges[i].spec as DecorationRangeSpec
+    for (let i = 0; i < this.active.length; i++) {
+      let spec = this.active[i].spec
       if (spec.tagName) tagName = spec.tagName
       if (spec.attributes) for (let name in spec.attributes) {
         let value = spec.attributes[name]
@@ -390,7 +393,7 @@ class RangeBuilder {
       }
     }
 
-    for (let len = to - this.pos;;) {
+    for (let len = pos - this.pos;;) {
       let line = this.lines[this.lineI]
       if (this.stringI == line.length) {
         // End of line, add a line break placeholder
@@ -418,7 +421,7 @@ class RangeBuilder {
       this.stringI++
     }
 
-    this.pos = to
+    this.pos = pos
   }
 }
 
@@ -434,7 +437,6 @@ function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, li
   }
 
   let builder = new RangeBuilder(lines, from)
-  let active: Decoration[] = []
 
   while (heap.length > 0) {
     let next = takeFromHeap(heap)
@@ -445,22 +447,27 @@ function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, li
 
       if (deco.to + next.offset < from) continue
       if (deco.from + next.offset > to) break
-      // FIXME handle widgets, collapsing
       if (deco.desc instanceof RangeDesc) {
+        // FIXME handle collapsing
         if (!deco.desc.affectsSpans) continue
         deco = deco.move(next.offset)
-        if (deco.from > builder.pos) builder.buildRange(deco.from, active)
-        active.push(deco)
+        builder.advance(deco.from)
+        builder.active.push(deco.desc as RangeDesc)
         addToHeap(heap, deco)
+      } else if (false) {
+        let desc = deco.desc as PointDesc
+        if (!desc.widget) continue
+        builder.advance(deco.from)
+//        builder.addWidget
       }
     } else { // It is a decoration that ends here
       let deco = next as Decoration
       if (deco.to >= to) break
-      if (deco.to > builder.pos) builder.buildRange(deco.to, active)
-      active.splice(active.indexOf(deco), 1)
+      builder.advance(deco.to)
+      builder.active.splice(builder.active.indexOf(deco.desc as RangeDesc), 1)
     }
   }
-  if (builder.pos < to) builder.buildRange(to, active)
+  builder.advance(to)
   return builder.ranges
 }
 
