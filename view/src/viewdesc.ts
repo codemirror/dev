@@ -1,10 +1,10 @@
 import {Text} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
-import {DecorationSet, DecoratedSpan, joinRanges, attrsEq} from "./decoration"
+import {DecorationSet, joinRanges, attrsEq, Widget, RangeDesc, buildLineElements} from "./decoration"
 
 declare global {
-  interface Node { cmView: ViewDesc | undefined }
+  interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
 }
 
 const NOT_DIRTY = 0, CHILD_DIRTY = 1, NODE_DIRTY = 2
@@ -19,7 +19,7 @@ export abstract class ViewDesc {
   dirty: number = NOT_DIRTY;
 
   get childGap() { return 0 }
-  get ignoreInDOM() { return false }
+  get ignoreDOMText() { return false }
 
   get posAtStart(): number {
     return this.parent ? this.parent.posBefore(this) : 0
@@ -94,12 +94,13 @@ export abstract class ViewDesc {
   }
 
   markDirty() {
+    if (this.dirty & NODE_DIRTY) return
     this.dirty |= NODE_DIRTY
-    for (let parent = this.parent; parent; parent = parent.parent)
+    for (let parent = this.parent; parent; parent = parent.parent) {
+      if (parent.dirty & CHILD_DIRTY) return
       parent.dirty |= CHILD_DIRTY
+    }
   }
-
-  canJoinWithSpan(span: DecoratedSpan, overlap: number): boolean { return false }
 }
 
 // Remove a DOM node and return its next sibling.
@@ -138,27 +139,27 @@ export class DocViewDesc extends ViewDesc {
       let {fromA, toA, fromB, toB} = plan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
-      let lines = DecoratedSpan.build(decorations.map(d => d.decorations), fromB, toB,
-                                      linesBetween(text, fromB, toB))
+      let builder = new LineElementBuilder(linesBetween(text, fromB, toB), fromB)
+      buildLineElements(decorations.map(d => d.decorations), fromB, toB, builder)
+      let lines = builder.elements
 
       if (lines.length == 1) {
         if (fromI == toI) { // Change within single line
           this.children[fromI].update(fromOff, toOff, lines[0])
-          this.dirty |= CHILD_DIRTY
         } else { // Join lines
           let tail = this.children[toI].detachTail(toOff)
-          this.children[fromI].update(fromOff, undefined, lines[0], tail)
+          this.children[fromI].update(fromOff, undefined, appendLineElements(lines[0], tail))
           this.children.splice(fromI + 1, toI - fromI)
-          this.dirty |= CHILD_DIRTY | NODE_DIRTY
+          this.markDirty()
         }
       } else { // Across lines
         let tail = this.children[toI].detachTail(toOff)
         this.children[fromI].update(fromOff, undefined, lines[0])
         let insert = []
         for (let j = 1; j < lines.length; j++)
-          insert.push(new LineViewDesc(this, lines[j], j == lines.length - 1 ? tail : undefined))
+          insert.push(new LineViewDesc(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
         this.children.splice(fromI + 1, toI - fromI, ...insert)
-        this.dirty |= CHILD_DIRTY | NODE_DIRTY
+        this.markDirty()
       }
     }
   }
@@ -208,93 +209,75 @@ export class DocViewDesc extends ViewDesc {
 const MAX_JOIN_LEN = 256
 
 class LineViewDesc extends ViewDesc {
-  children: ViewDesc[];
+  children: LineElementViewDesc[];
   length: number;
 
-  constructor(parent: DocViewDesc, content: DecoratedSpan[], tail: TextViewDesc[] | null = null) {
+  constructor(parent: DocViewDesc, content: LineElementViewDesc[]) {
     super(parent, document.createElement("div"))
     this.length = 0
     this.children = []
-    this.update(0, 0, content, tail)
+    if (content.length) this.update(0, 0, content)
   }
 
-  update(from: number, to: number = this.length, content: DecoratedSpan[], tail: TextViewDesc[] | null = null) {
-    if (this.children.length == 1 && this.children[this.children.length - 1] instanceof EmptyLineHack) {
-      this.children.pop()
-      this.dirty |= NODE_DIRTY
-    }
-
-    let children = this.children as TextViewDesc[]
-    let cur = new ChildCursor(children, this.length)
-    let totalLen = 0
-    for (let j = 0; j < content.length; j++) totalLen += content[j].text.length
-    let dLen = totalLen - (to - from)
-
-    let {i: toI, off: toOff} = cur.findPos(to)
-    let {i: fromI, off: fromOff} = cur.findPos(from)
-
-    if (from == 0 && to == this.length && content.length == 0) {
-      this.children.length = 0
-      this.dirty |= NODE_DIRTY
-    } else if (fromI < children.length &&
-        (toI == fromI || toI == fromI + 1 && toOff == 0) &&
-        (content.length == 0 || content.length == 1 && children[fromI].canJoinWithSpan(content[0], to - from))) {
-      children[fromI].update(fromOff, toI == fromI ? toOff : undefined, content.length ? content[0].text : "")
-      this.dirty |= CHILD_DIRTY
-    } else {
-      if (content.length > 0 && fromOff > 0 &&
-          children[fromI].canJoinWithSpan(content[0], children[fromI].text.length - fromOff)) {
-        content[0] = new DecoratedSpan(children[fromI].text.slice(0, fromOff) + content[0].text,
-                                       content[0].tagName, content[0].attrs)
-        fromOff = 0
-      } else if (content.length > 0 && fromOff == 0 && fromI > 0 &&
-                 children[fromI - 1].canJoinWithSpan(content[0], 0)) {
-        if (fromI == toI && toOff == 0) {
-          children[fromI - 1].update(children[fromI - 1].length, undefined, content[0].text)
-          this.dirty |= CHILD_DIRTY
-          content.shift()
-        } else {
-          content[0] = new DecoratedSpan(children[fromI - 1].text + content[0].text, content[0].tagName, content[0].attrs)
-          fromI--
-        }
-      } else if (fromOff > 0) {
-        children[fromI].update(fromOff)
-        this.dirty |= CHILD_DIRTY
-        fromI++
-      }
-      if (content.length && toI < children.length &&
-          children[toI].canJoinWithSpan(content[content.length - 1], toOff)) {
-        let last = content[content.length - 1]
-        content[content.length - 1] = new DecoratedSpan(last.text + children[toI].text.slice(toOff), last.tagName, last.attrs)
-        toI++
-      } else if (toOff > 0) {
-        children[toI].update(0, toOff)
-        this.dirty |= CHILD_DIRTY
-      }
-
-      if (toI > fromI || content.length) {
-        children.splice(fromI, toI - fromI, ...content.map(s => new TextViewDesc(this, s.text, s.tagName, s.attrs)))
-        this.dirty |= NODE_DIRTY | CHILD_DIRTY
-      }
-    }
+  update(from: number, to: number = this.length, content: LineElementViewDesc[]) {
+    this.markDirty()
+    let cur = new ChildCursor(this.children, this.length)
+    let {i: toI, off: toOff} = cur.findPos(to, 1)
+    let {i: fromI, off: fromOff} = cur.findPos(from, -1)
+    let dLen = from - to
+    for (let i = 0; i < content.length; i++) dLen += content[i].length
     this.length += dLen
 
-    if (tail) this.attachTail(tail)
-
-    if (this.length == 0) {
-      this.children.push(new EmptyLineHack(this))
-      this.dirty |= NODE_DIRTY
+    // Both from and to point into the same text view
+    if (fromI == toI && fromOff) {
+      let start = this.children[fromI] as TextViewDesc
+      // Maybe just update that view and be done
+      if (content.length == 1 && start.merge(content[0], fromOff, toOff)) return
+      if (content.length == 0) return start.cut(fromOff, toOff)
+      // Otherwise split it, so that we don't have to worry about aliasting front/end afterwards
+      appendLineElements(content, [new TextViewDesc(start.text.slice(toOff), start.tagName, start.attrs)])
+      toI++
+      toOff = 0
     }
-  }
 
-  attachTail(tail: TextViewDesc[]) {
-    for (let i = 0; i < tail.length; i++) {
-      let child = tail[i]
-      child.parent = this
-      this.children.push(child)
-      this.length += child.length
+    // Make sure start and end positions fall on node boundaries
+    // (fromOff/toOff are no longer used after this), and that if the
+    // start or end of the content can be merged with adjacent nodes,
+    // this is done
+    if (toOff) {
+      let end = this.children[toI] as TextViewDesc
+      if (content.length && end.merge(content[content.length - 1], 0, toOff)) content.pop()
+      else end.cut(0, toOff)
+    } else if (toI < this.children.length && content.length &&
+               this.children[toI].merge(content[content.length - 1], 0, 0)) {
+      content.pop()
     }
-    this.dirty |= NODE_DIRTY | CHILD_DIRTY
+    if (fromOff) {
+      let start = this.children[fromI] as TextViewDesc
+      if (content.length && start.merge(content[0], fromOff)) content.shift()
+      else start.cut(fromOff)
+      fromI++
+    } else if (fromI && content.length && this.children[fromI - 1].merge(content[0], this.children[fromI - 1].length)) {
+      content.shift()
+    }
+
+    // Then try to merge any mergeable nodes at the start and end of
+    // the changed range
+    while (fromI < toI && content.length && this.children[toI - 1].merge(content[content.length - 1])) {
+      this.children.pop()
+      toI--
+    }
+    while (fromI < toI && content.length && this.children[fromI].merge(content[0])) {
+      this.children.shift()
+      fromI++
+    }
+
+    // And if anything remains, splice the child array to insert the new content
+    if (content.length || fromI != toI) {
+      for (let i = 0; i < content.length; i++) content[i].finish(this)
+      this.children.splice(fromI, toI - fromI, ...content)
+      this.markDirty()
+    }
   }
 
   detachTail(from: number): TextViewDesc[] {
@@ -303,15 +286,14 @@ class LineViewDesc extends ViewDesc {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     if (off > 0) {
       let child = this.children[i] as TextViewDesc
-      result.push(new TextViewDesc(this, child.text.slice(off), child.tagName, child.attrs))
-      child.update(off)
-      this.dirty |= CHILD_DIRTY
+      result.push(new TextViewDesc(child.text.slice(off), child.tagName, child.attrs))
+      child.cut(off)
       i++
     }
     if (i < this.children.length) {
       for (let j = i; j < this.children.length; j++) result.push(this.children[j] as TextViewDesc)
       this.children.length = i
-      this.dirty |= NODE_DIRTY
+      this.markDirty()
     }
     this.length = from
     return result
@@ -322,68 +304,176 @@ class LineViewDesc extends ViewDesc {
     while (off == 0 && i > 0 && this.children[i - 1].length == 0) i--
     if (off == 0) return {node: this.dom!, offset: i}
     let child = this.children[i]
-    if (child instanceof TextViewDesc) return {node: child.textDOM, offset: off}
+    if (child instanceof TextViewDesc) return {node: child.textDOM!, offset: off}
     else return {node: this.dom!, offset: i}
+  }
+
+  sync() {
+    super.sync()
+    let last = this.dom!.lastChild
+    if (!last || last.nodeName == "BR") {
+      let hack = document.createElement("BR")
+      hack.cmIgnore = true
+      this.dom.appendChild(hack)
+    }
   }
 }
 
 const noChildren: ViewDesc[] = []
 
-function buildDOM(text: string, tagName: string | null, attrs: {[key: string]: string} | null): Node {
-  let textNode = document.createTextNode(text)
-  if (attrs && !tagName) tagName = "span"
-  else if (!tagName) return textNode
-  let node = document.createElement(tagName)
-  node.appendChild(textNode)
-  if (attrs) for (let name in attrs) node.setAttribute(name, attrs[name])
-  return node
+abstract class LineElementViewDesc extends ViewDesc {
+  merge(other: LineElementViewDesc, from: number = 0, to: number = 0): boolean { return false }
+  get children() { return noChildren }
+  finish(parent: ViewDesc) {}
 }
 
-class TextViewDesc extends ViewDesc {
-  textDOM: Node;
+function appendLineElements(a: LineElementViewDesc[], b: LineElementViewDesc[]): LineElementViewDesc[] {
+  let i = 0
+  if (b.length && a.length && a[a.length - 1].merge(b[0])) i++
+  for (; i < b.length; i++) a.push(b[i])
+  return a
+}
 
-  constructor(parent: LineViewDesc, public text: string,
-              public tagName: string | null, public attrs: {[key: string]: string} | null) {
-    super(parent, buildDOM(text, tagName, attrs))
-    this.textDOM = (tagName || attrs ? this.dom!.firstChild : this.dom)!
+class TextViewDesc extends LineElementViewDesc {
+  textDOM: Node | null = null;
+
+  constructor(public text: string, public tagName: string | null, public attrs: {[key: string]: string} | null) {
+    super(null, null)
   }
 
-  get children() { return noChildren }
+  finish(parent: ViewDesc) {
+    this.parent = parent
+    if (this.dom) return
+    this.textDOM = document.createTextNode(this.text)
+    let tagName = this.tagName || (this.attrs ? "span" : null)
+    if (tagName) {
+      this.dom = document.createElement(tagName)
+      this.dom.appendChild(this.textDOM)
+      if (this.attrs) for (let name in this.attrs) (this.dom as Element).setAttribute(name, this.attrs[name])
+    } else {
+      this.dom = this.textDOM
+    }
+    this.dom.cmView = this
+  }
+
   get length() { return this.text.length }
-
-  update(from: number, to: number = this.text.length, content: string = "") {
-    this.text = this.text.slice(0, from) + content + this.text.slice(to)
-    this.dirty |= NODE_DIRTY
-  }
 
   sync() {
     if (this.dirty & NODE_DIRTY) {
-      if (this.textDOM.nodeValue != this.text) this.textDOM.nodeValue = this.text
+      if (this.textDOM!.nodeValue != this.text) this.textDOM!.nodeValue = this.text
       let dom = this.dom!
       if (this.textDOM != dom && (this.dom!.firstChild != this.textDOM || dom.lastChild != this.textDOM)) {
         while (dom.firstChild) dom.removeChild(dom.firstChild)
-        dom.appendChild(this.textDOM)
+        dom.appendChild(this.textDOM!)
       }
     }
     this.dirty = NOT_DIRTY
   }
 
+  merge(other: LineElementViewDesc, from: number = 0, to: number = this.length): boolean {
+    if (!(other instanceof TextViewDesc) || other.tagName != this.tagName ||
+        !attrsEq(other.attrs, this.attrs) || this.length - (to - from) + other.length > MAX_JOIN_LEN)
+      return false
+    this.text = this.text.slice(0, from) + other.text + this.text.slice(to)
+    this.markDirty()
+    return true
+  }
+
+  cut(from: number, to: number = this.length) {
+    this.text = this.text.slice(0, from) + this.text.slice(to)
+    this.markDirty()
+  }
+
   localPosFromDOM(node: Node, offset: number): number {
     return node == this.textDOM ? offset : offset ? this.text.length : 0
   }
+}
 
-  canJoinWithSpan(span: DecoratedSpan, overlap: number): boolean {
-    return span.text.length + this.text.length - overlap <= MAX_JOIN_LEN &&
-      this.tagName == span.tagName && attrsEq(this.attrs, span.attrs)
+class WidgetViewDesc extends LineElementViewDesc {
+  constructor(readonly widget: Widget<any>, readonly side: number) {
+    super(null, null)
+  }
+
+  finish(parent: ViewDesc) {
+    this.parent = parent
+    if (!this.dom) {
+      this.dom = this.widget.toDOM()
+      this.dom.cmView = this
+    }
+  }  
+
+  get length() { return 0 }
+  get ignoreDOMText() { return true }
+
+  merge(other: LineElementViewDesc): boolean {
+    return other instanceof WidgetViewDesc &&
+      (other.widget == this.widget || other.widget.constructor == this.widget.constructor && other.widget.eq(this.widget)) &&
+      other.side == this.side
   }
 }
 
-class EmptyLineHack extends ViewDesc {
-  get length() { return 0 }
-  get children() { return noChildren }
-  get ignoreInDOM() { return true }
-  constructor(parent: ViewDesc) {
-    super(parent, document.createElement("br"))
+class LineElementBuilder {
+  lineI: number = 0;
+  stringI: number = 0;
+  stringOff: number = 0;
+  elements: LineElementViewDesc[][] = [[]];
+  active: RangeDesc[] = [];
+
+  constructor(readonly lines: string[][], public pos: number) {}
+
+  advance(pos: number) {
+    if (pos <= this.pos) return
+
+    let tagName = null
+    let attrs: {[key: string]: string} | null = null
+    for (let i = 0; i < this.active.length; i++) {
+      let spec = this.active[i].spec
+      if (spec.tagName) tagName = spec.tagName
+      if (spec.attributes) for (let name in spec.attributes) {
+        let value = spec.attributes[name]
+        if (value == null) continue
+        if (!attrs) attrs = {}
+        if (name == "style" && attrs.style)
+          value = attrs.style + ";" + value
+        else if (name == "class" && attrs.class)
+          value = attrs.class + " " + value
+        attrs[name] = value
+      }
+    }
+
+    for (let len = pos - this.pos;;) {
+      let line = this.lines[this.lineI]
+      if (this.stringI == line.length) {
+        // End of line, add a line break placeholder
+        // FIXME maybe gather line decorations here
+        this.elements.push([])
+        this.lineI++
+        this.stringI = this.stringOff = 0
+        if (--len == 0) break
+        continue
+      }
+
+      let string = line[this.stringI]
+      let cut = Math.min(len, string.length - this.stringOff)
+      if (cut > 0) {
+        this.elements[this.elements.length - 1].push(
+          new TextViewDesc(string.slice(this.stringOff, this.stringOff + cut), tagName, attrs))
+        this.stringOff += cut
+        len -= cut
+        if (len == 0) break
+      }
+
+      // Moving past the end of the current string
+      // FIXME join small compatible ranges together
+      this.stringOff = 0
+      this.stringI++
+    }
+
+    this.pos = pos
+  }
+
+  addWidget(widget: Widget<any>, side: number) {
+    this.elements[this.elements.length - 1].push(new WidgetViewDesc(widget, side))
   }
 }
 
@@ -401,8 +491,9 @@ function readDOM(start: Node | null, end: Node | null): string {
 
 function readDOMNode(node: Node): string {
   // FIXME add a way to ignore certain nodes based on their desc
+  if (node.cmIgnore) return ""
   let desc = node.cmView
-  if (desc && desc.ignoreInDOM) return ""
+  if (desc && desc.ignoreDOMText) return ""
   if (node.nodeType == 3) return node.nodeValue as string
   if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
   if (node.nodeType == 1) return readDOM(node.firstChild, null)
@@ -422,9 +513,9 @@ class ChildCursor {
     this.pos += gap
   }
 
-  findPos(pos: number): this {
+  findPos(pos: number, bias: number = 1): this {
     for (;;) {
-      if (pos >= this.pos) {
+      if (pos > this.pos || pos == this.pos && (bias > 0 || this.i == 0)) {
         this.off = pos - this.pos
         return this
       }

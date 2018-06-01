@@ -6,12 +6,12 @@ export default {
   output: {
     format: "umd",
     file: "./view/test/test_built.js",
-    sourcemap: true
+    sourcemap: false
   },
   plugins: [
     typescript({
       tsconfigOverride: {
-        compilerOptions: {lib: ["ES6", "dom"], sourceMap: true, target: "es5", strict: false},
+        compilerOptions: {lib: ["ES6", "dom"], sourceMap: false, target: "es5", strict: false},
         include: null
       }
     }),

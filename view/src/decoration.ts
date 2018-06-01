@@ -13,6 +13,13 @@ export interface DecorationRangeSpec {
 export interface DecorationPointSpec {
   side?: number;
   lineAttributes?: {[key: string]: string};
+  widget?: Widget<any>;
+}
+
+export abstract class Widget<T> {
+  constructor(readonly spec: T) {}
+  abstract toDOM(): Node;
+  eq(spec: T): boolean { return this.spec === spec }
 }
 
 abstract class DecorationDesc {
@@ -25,7 +32,7 @@ const BIG_BIAS = 2e9
 
 type A<T> = ReadonlyArray<T>
 
-class RangeDesc extends DecorationDesc {
+export class RangeDesc extends DecorationDesc {
   readonly endBias: number;
   readonly affectsSpans: boolean;
 
@@ -47,8 +54,10 @@ class RangeDesc extends DecorationDesc {
 }
 
 class PointDesc extends DecorationDesc {
+  widget: Widget<any> | null;
   constructor(readonly spec: DecorationPointSpec) {
     super(spec.side || 0)
+    this.widget = spec.widget || null
   }
 
   map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
@@ -350,82 +359,11 @@ function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
   }
 }
 
-interface Heapable { heapPos: number; desc: DecorationDesc }
-
-export class DecoratedSpan {
-  constructor(readonly text: string,
-              readonly tagName: string | null,
-              readonly attrs: {[key: string]: string} | null) {}
-
-  toString() { throw new Error("EH") }
-
-  static build(sets: A<DecorationSet>, from: number, to: number, lines: string[][]): DecoratedSpan[][] {
-    return decoratedRangesFor(sets, from, to, lines)
-  }
-}
-
-class RangeBuilder {
-  lineI: number = 0;
-  stringI: number = 0;
-  stringOff: number = 0;
-  ranges: DecoratedSpan[][] = [[]];
-  active: RangeDesc[] = [];
-
-  constructor(readonly lines: string[][], public pos: number) {}
-
-  advance(pos: number) {
-    if (pos <= this.pos) return
-
-    let tagName = null
-    let attrs: {[key: string]: string} | null = null
-    for (let i = 0; i < this.active.length; i++) {
-      let spec = this.active[i].spec
-      if (spec.tagName) tagName = spec.tagName
-      if (spec.attributes) for (let name in spec.attributes) {
-        let value = spec.attributes[name]
-        if (value == null) continue
-        if (!attrs) attrs = {}
-        if (name == "style" && attrs.style)
-          value = attrs.style + ";" + value
-        else if (name == "class" && attrs.class)
-          value = attrs.class + " " + value
-        attrs[name] = value
-      }
-    }
-
-    for (let len = pos - this.pos;;) {
-      let line = this.lines[this.lineI]
-      if (this.stringI == line.length) {
-        // End of line, add a line break placeholder
-        // FIXME maybe gather line decorations here
-        this.ranges.push([])
-        this.lineI++
-        this.stringI = this.stringOff = 0
-        if (--len == 0) break
-        continue
-      }
-
-      let string = line[this.stringI]
-      let cut = Math.min(len, string.length - this.stringOff)
-      if (cut > 0) {
-        this.ranges[this.ranges.length - 1].push(
-          new DecoratedSpan(string.slice(this.stringOff, this.stringOff + cut), tagName, attrs))
-        this.stringOff += cut
-        len -= cut
-        if (len == 0) break
-      }
-
-      // Moving past the end of the current string
-      // FIXME join small compatible ranges together
-      this.stringOff = 0
-      this.stringI++
-    }
-
-    this.pos = pos
-  }
-}
-
-function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, lines: string[][]): DecoratedSpan[][] {
+export function buildLineElements(sets: A<DecorationSet>, from: number, to: number, builder: {
+  advance(pos: number): void;
+  addWidget(widget: Widget<any>, side: number): void;
+  active: RangeDesc[];
+}) {
   let heap: Heapable[] = []
 
   for (let i = 0; i < sets.length; i++) {
@@ -435,8 +373,6 @@ function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, li
       if (set.local.length) addToHeap(heap, new LocalSet(0, set.local))
     }
   }
-
-  let builder = new RangeBuilder(lines, from)
 
   while (heap.length > 0) {
     let next = takeFromHeap(heap)
@@ -454,11 +390,11 @@ function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, li
         builder.advance(deco.from)
         builder.active.push(deco.desc as RangeDesc)
         addToHeap(heap, deco)
-      } else if (false) {
+      } else {
         let desc = deco.desc as PointDesc
         if (!desc.widget) continue
         builder.advance(deco.from)
-//        builder.addWidget
+        builder.addWidget(desc.widget, desc.bias)
       }
     } else { // It is a decoration that ends here
       let deco = next as Decoration
@@ -468,7 +404,6 @@ function decoratedRangesFor(sets: A<DecorationSet>, from: number, to: number, li
     }
   }
   builder.advance(to)
-  return builder.ranges
 }
 
 function compareHeapable(a: Heapable, b: Heapable): number {
@@ -485,6 +420,8 @@ function addIterToHeap(heap: Heapable[], stack: IteratedSet[], skip: number = 0)
     if (leaf) break
   }
 }
+
+interface Heapable { heapPos: number; desc: DecorationDesc }
 
 function addToHeap(heap: Heapable[], elt: Heapable) {
   let index = heap.push(elt) - 1
