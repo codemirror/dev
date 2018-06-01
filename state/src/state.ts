@@ -136,6 +136,10 @@ export class Selection {
 
   get primary(): Range { return this.ranges[0] }
 
+  static single(anchor: number, head: number = anchor) {
+    return new Selection([new Range(anchor, head)])
+  }
+
   static default: Selection = new Selection([new Range(0)]);
 }
 

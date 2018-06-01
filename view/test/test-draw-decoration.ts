@@ -1,7 +1,7 @@
 import {Decoration, DecorationSet, Widget} from "../src/"
 import {LineElementBuilder} from "../src/viewdesc"
 import {tempEditor} from "./temp-editor"
-import {StateField, MetaSlot, Plugin} from "../../state/src/state"
+import {StateField, MetaSlot, Plugin, Selection} from "../../state/src/state"
 import {Text} from "../../doc/src/text"
 import ist from "ist"
 
@@ -136,7 +136,12 @@ describe("EditorView decoration", () => {
     })
 
     it("places the cursor based on side", () => {
-
+      let cm = decoEditor("abc", [d(2, {widget: new WordWidget("A"), side: -1}),
+                                  d(2, {widget: new WordWidget("B"), side: 1})])
+      cm.dispatch(cm.state.setSelection(Selection.single(2)))
+      let domSel = document.getSelection()
+      ist(domSel.focusNode.childNodes[domSel.focusOffset - 1].textContent, "A")
+      ist(domSel.focusNode.childNodes[domSel.focusOffset].textContent, "B")
     })
   })
 })

@@ -299,7 +299,7 @@ class LineViewDesc extends ViewDesc {
 
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
-    while (off == 0 && i > 0 && this.children[i - 1].length == 0) i--
+    while (off == 0 && i > 0 && this.children[i - 1].side > 0) i--
     if (off == 0) return {node: this.dom!, offset: i}
     let child = this.children[i]
     if (child instanceof TextViewDesc) return {node: child.textDOM!, offset: off}
@@ -312,7 +312,7 @@ class LineViewDesc extends ViewDesc {
     if (!last || last.nodeName == "BR") {
       let hack = document.createElement("BR")
       hack.cmIgnore = true
-      this.dom.appendChild(hack)
+      this.dom!.appendChild(hack)
     }
   }
 }
@@ -323,6 +323,7 @@ abstract class LineElementViewDesc extends ViewDesc {
   merge(other: LineElementViewDesc, from: number = 0, to: number = 0): boolean { return false }
   get children() { return noChildren }
   finish(parent: ViewDesc) {}
+  get side() { return 0 }
 }
 
 function appendLineElements(a: LineElementViewDesc[], b: LineElementViewDesc[]): LineElementViewDesc[] {
