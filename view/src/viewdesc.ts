@@ -262,11 +262,11 @@ class LineViewDesc extends ViewDesc {
     // Then try to merge any mergeable nodes at the start and end of
     // the changed range
     while (fromI < toI && content.length && this.children[toI - 1].merge(content[content.length - 1])) {
-      this.children.pop()
+      content.pop()
       toI--
     }
     while (fromI < toI && content.length && this.children[fromI].merge(content[0])) {
-      this.children.shift()
+      content.shift()
       fromI++
     }
 
@@ -396,6 +396,7 @@ class WidgetViewDesc extends LineElementViewDesc {
     this.parent = parent
     if (!this.dom) {
       this.dom = this.widget.toDOM()
+      ;(this.dom as HTMLElement).contentEditable = "true"
       this.dom.cmView = this
     }
   }  
@@ -404,9 +405,7 @@ class WidgetViewDesc extends LineElementViewDesc {
   get ignoreDOMText() { return true }
 
   merge(other: LineElementViewDesc): boolean {
-    return other instanceof WidgetViewDesc &&
-      (other.widget == this.widget || other.widget.constructor == this.widget.constructor && other.widget.eq(this.widget)) &&
-      other.side == this.side
+    return other instanceof WidgetViewDesc && other.widget.compare(this.widget) && other.side == this.side
   }
 }
 

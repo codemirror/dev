@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet} from "../src/"
+import {Decoration, DecorationSet, Widget} from "../src/"
 import {LineElementBuilder} from "../src/viewdesc"
 import {tempEditor} from "./temp-editor"
 import {StateField, MetaSlot, Plugin} from "../../state/src/state"
@@ -26,7 +26,7 @@ function decos(startState: DecorationSet = DecorationSet.empty) {
   })
 }
 
-function d(from, to, spec) {
+function d(from, to, spec = null) {
   if (typeof to != "number") { spec = to; to = from }
   if (typeof spec == "string") spec = {attributes: {[spec]: "y"}}
   return from == to ? Decoration.point(from, spec) : Decoration.range(from, to, spec)
@@ -76,6 +76,69 @@ describe("EditorView decoration", () => {
     ist(cm.contentDOM.lastChild, secondLine)
     ist(secondLine.firstChild, secondLineText)
   })
+
+  describe("widget", () => {
+    class WordWidget extends Widget<string> {
+      eq(otherSpec) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
+      toDOM() {
+        let dom = document.createElement("strong")
+        dom.textContent = this.spec
+        return dom
+      }
+    }
+    class OtherWidget extends Widget<string> {
+      toDOM() { return document.createElement("img") }
+    }
+
+    it("draws widgets", () => {
+      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
+      let w = cm.contentDOM.querySelector("strong")
+      ist(w)
+      ist(w.textContent, "hi")
+      ist(w.previousSibling.textContent, "hell")
+      ist(w.nextSibling.textContent, "o")
+      ist(w.contentEditable, "true")
+    })
+
+    it("supports editing around widgets", () => {
+      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
+      cm.dispatch(cm.state.transaction.replace(3, 4, "").replace(3, 5, ""))
+      ist(cm.contentDOM.querySelector("strong"))
+    })
+
+    it("compares widgets with their eq method", () => {
+      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
+      let w = cm.contentDOM.querySelector("strong")
+      cm.dispatch(cm.state.transaction
+                  .setMeta(addSlot, [d(4, {widget: new WordWidget("HI")})])
+                  .setMeta(filterSlot, () => false))
+      ist(w, cm.contentDOM.querySelector("strong"))
+    })
+
+    it("doesn't consider different widgets types equivalent", () => {
+      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
+      let w = cm.contentDOM.querySelector("strong")
+      cm.dispatch(cm.state.transaction
+                  .setMeta(addSlot, [d(4, {widget: new OtherWidget("hi")})])
+                  .setMeta(filterSlot, () => false))
+      ist(w, cm.contentDOM.querySelector("strong"), "!=")
+    })
+
+    it("orders widgets by side", () => {
+      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("C"), side: 10}),
+                                    d(4, {widget: new WordWidget("B")}),
+                                    d(4, {widget: new WordWidget("A"), side: -1})])
+      let widgets = cm.contentDOM.querySelectorAll("strong")
+      ist(widgets.length, 3)
+      ist(widgets[0].textContent, "A")
+      ist(widgets[1].textContent, "B")
+      ist(widgets[2].textContent, "C")
+    })
+
+    it("places the cursor based on side", () => {
+
+    })
+  })
 })
 
 describe("LineElementBuilder.build", () => {
@@ -112,7 +175,7 @@ describe("LineElementBuilder.build", () => {
                  Decoration.range(2, 4, {attributes: {class: "b"}})]
     let ranges = LineElementBuilder.build(Text.create("x".repeat(10)), 0, 10, [DecorationSet.of(decos)])
     ist(flatten(ranges), "xx=class,xx=class,xxxxxx=class")
-    ist(ranges[0].map(r => (r as any).attrs.class).join(","), "a,a b,a")
+    ist(ranges[0].map(r => r.attrs.class).join(","), "a,a b,a")
   })
 
   it("combines styles", () => {

@@ -10,6 +10,7 @@ export default {
   },
   plugins: [
     typescript({
+      check: false,
       tsconfigOverride: {
         compilerOptions: {lib: ["ES6", "dom"], sourceMap: false, target: "es5", strict: false},
         include: null
