@@ -163,7 +163,13 @@ describe("DecorationSet", () => {
        test([[1, 2]], [[1, 2, 0], [1, 1, 1]], []))
 
     it("drops decorations in deleted regions", () =>
-       test([[1, 2, {assoc: 1}]], [[0, 4, 0]], []))
+       test([[1, 2], 3], [[0, 4, 0]], []))
+
+    it("shrinks range decorations", () =>
+       test([[2, 4], [2, 8], [6, 8]], [[3, 7, 0]], [[2, 3], [2, 4], [3, 4]]))
+
+    it("leaves point decorations on change boundaries", () =>
+       test([2, 4], [[2, 4, 6]], [2, 8]))
 
     it("adjusts the set tree shape", () => {
       let child0Size = set0.children[0].length, child1Size = set0.children[1].length

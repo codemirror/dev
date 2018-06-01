@@ -52,9 +52,8 @@ class PointDesc extends DecorationDesc {
   }
 
   map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
-    let pos = mapPos(deco.from + oldOffset, changes, this.bias)
-    // FIXME drop if the character at spec.side was deleted
-    return new Decoration(pos - newOffset, pos - newOffset, this)
+    let pos = mapPos(deco.from + oldOffset, changes, this.bias, true)
+    return pos == -1 ? null : new Decoration(pos - newOffset, pos - newOffset, this)
   }
 }
 
@@ -93,8 +92,12 @@ export class Decoration {
 }
 
 // FIXME use a mapping abstraction defined in the state module
-function mapPos(pos: number, changes: A<Change>, assoc: number) {
-  for (let i = 0; i < changes.length; i++) pos = changes[i].mapPos(pos, assoc)
+function mapPos(pos: number, changes: A<Change>, assoc: number, track: boolean = false) {
+  for (let i = 0; i < changes.length; i++) {
+    let change = changes[i]
+    if (track && change.from < pos && change.to > pos) return -1
+    pos = change.mapPos(pos, assoc)
+  }
   return pos
 }
 
