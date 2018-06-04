@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet, Widget} from "../src/"
+import {Decoration, DecorationSet, WidgetType} from "../src/"
 import {LineElementBuilder} from "../src/viewdesc"
 import {tempEditor} from "./temp-editor"
 import {StateField, MetaSlot, Plugin, Selection} from "../../state/src/state"
@@ -77,16 +77,17 @@ describe("EditorView decoration", () => {
     ist(secondLine.firstChild, secondLineText)
   })
 
-  describe("widget", () => {
-    class WordWidget extends Widget<string> {
-      eq(otherSpec) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
-      toDOM() {
-        let dom = document.createElement("strong")
-        dom.textContent = this.spec
-        return dom
-      }
+  class WordWidget extends WidgetType<string> {
+    eq(otherSpec) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
+    toDOM() {
+      let dom = document.createElement("strong")
+      dom.textContent = this.spec
+      return dom
     }
-    class OtherWidget extends Widget<string> {
+  }
+
+  describe("widget", () => {
+    class OtherWidget extends WidgetType<string> {
       toDOM() { return document.createElement("img") }
     }
 
@@ -151,6 +152,23 @@ describe("EditorView decoration", () => {
     it("omits collapsed content", () => {
       let cm = decoEditor("foobar", [d(1, 4, {collapsed: true})])
       ist(cm.contentDOM.textContent, "far")
+    })
+
+    it("can collapse across lines", () => {
+      let cm = decoEditor("foo\nbar\nbaz\nbug", [d(1, 14, {collapsed: true})])
+      ist(cm.contentDOM.childNodes.length, 1)
+      ist(cm.contentDOM.firstChild.textContent, "fg")
+    })
+
+    it("draws replacement widgets", () => {
+      let cm = decoEditor("foo\nbar\nbaz", [d(6, 9, {collapsed: new WordWidget("X")})])
+      ist(cm.contentDOM.textContent, "foobaXaz")
+    })
+
+    it("can handle multiple overlapping collapsed ranges", () => {
+      let cm = decoEditor("foo\nbar\nbaz\nbug", [d(1, 6, {collapsed: true}), d(6, 9, {collapsed: true}), d(8, 14, {collapsed: true})])
+      ist(cm.contentDOM.childNodes.length, 1)
+      ist(cm.contentDOM.firstChild.textContent, "fg")
     })
   })
 })

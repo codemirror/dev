@@ -1,7 +1,7 @@
 import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
-import {DecorationSet, joinRanges, attrsEq, Widget, RangeDesc, buildLineElements} from "./decoration"
+import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
@@ -389,7 +389,7 @@ class TextViewDesc extends LineElementViewDesc {
 }
 
 class WidgetViewDesc extends LineElementViewDesc {
-  constructor(readonly widget: Widget<any>, readonly side: number) {
+  constructor(readonly widget: WidgetType<any>, readonly side: number) {
     super(null, null)
   }
 
@@ -504,7 +504,7 @@ export class LineElementBuilder {
     }
   }
 
-  addWidget(widget: Widget<any>, side: number) {
+  addWidget(widget: WidgetType<any>, side: number) {
     this.elements[this.elements.length - 1].push(new WidgetViewDesc(widget, side))
   }
 

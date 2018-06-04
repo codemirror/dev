@@ -8,23 +8,22 @@ export interface DecorationRangeSpec {
   attributes?: {[key: string]: string};
   lineAttributes?: {[key: string]: string};
   tagName?: string;
-  // FIXME boolean | WidgetType
-  collapsed?: boolean;
+  collapsed?: boolean | WidgetType<any>;
 }
 
 export interface DecorationPointSpec {
   side?: number;
   lineAttributes?: {[key: string]: string};
-  widget?: Widget<any>;
+  widget?: WidgetType<any>;
 }
 
-export abstract class Widget<T> {
+export abstract class WidgetType<T> {
   constructor(readonly spec: T) {}
   abstract toDOM(): HTMLElement;
   eq(spec: T): boolean { return this.spec === spec }
 
   /** @internal */
-  compare(other: Widget<any>): boolean {
+  compare(other: WidgetType<any>): boolean {
     return this == other || this.constructor == other.constructor && this.eq(other.spec)
   }
 }
@@ -61,7 +60,7 @@ export class RangeDesc extends DecorationDesc {
 }
 
 class PointDesc extends DecorationDesc {
-  widget: Widget<any> | null;
+  widget: WidgetType<any> | null;
   constructor(readonly spec: DecorationPointSpec) {
     super(spec.side || 0)
     this.widget = spec.widget || null
@@ -372,7 +371,7 @@ function iterDecorationSet(stack: IteratedSet[], skipTo: number = 0) {
 export function buildLineElements(sets: A<DecorationSet>, from: number, to: number, builder: {
   advance(pos: number): void;
   advanceCollapsed(pos: number): void;
-  addWidget(widget: Widget<any>, side: number): void;
+  addWidget(widget: WidgetType<any>, side: number): void;
   active: RangeDesc[];
 }) {
   let heap: Heapable[] = []
@@ -395,7 +394,9 @@ export function buildLineElements(sets: A<DecorationSet>, from: number, to: numb
         if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans) {
           deco = deco.move(next.offset)
           builder.advance(deco.from)
-          if (deco.desc.spec.collapsed) {
+          let collapsed = deco.desc.spec.collapsed
+          if (collapsed) {
+            if (collapsed instanceof WidgetType) builder.addWidget(collapsed, 0)
             from = deco.to
             builder.advanceCollapsed(Math.min(from, to))
           } else {
@@ -606,8 +607,8 @@ class DecorationSetComparison {
   stackB: IteratedSet[];
   activeA: RangeDesc[] = [];
   activeB: RangeDesc[] = [];
-  widgetsA: PointDesc[] = [];
-  widgetsB: PointDesc[] = [];
+  widgetsA: WidgetType<any>[] = [];
+  widgetsB: WidgetType<any>[] = [];
   tipA: LocalSet | null = null;
   tipB: LocalSet | null = null;
   start: number;
@@ -692,18 +693,20 @@ class DecorationSetComparison {
       }
       // FIXME handle line decoration
       if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans && deco.to + next.offset > pos) {
-        if (deco.desc.spec.collapsed) {
+        if (deco.from + next.offset > pos) pos = this.advancePos(pos, Math.min(this.end, deco.from + next.offset))
+        let collapsed = deco.desc.spec.collapsed
+        if (collapsed) {
+          ;(isA ? this.widgetsA : this.widgetsB).push(collapsed)
           pos = this.start = deco.to + next.offset
         } else {
           deco = deco.move(next.offset)
-          if (deco.from > pos) pos = this.advancePos(pos, Math.min(this.end, deco.from))
           // FIXME as optimization, it should be possible to remove it from the other set, if present
           ;(isA ? this.activeA : this.activeB).push(deco.desc as RangeDesc)
           addToHeap(heap, deco)
         }
       } else if (deco.desc instanceof PointDesc && deco.desc.widget) {
         if (deco.from > pos) pos = this.advancePos(pos, deco.from)
-        ;(isA ? this.widgetsA : this.widgetsB).push(deco.desc)
+        ;(isA ? this.widgetsA : this.widgetsB).push(deco.desc.widget)
       }
       if (next.index < next.decorations.length) addToHeap(heap, next)
       else if (next == this.tipA) this.forwardIter(SIDE_A)
@@ -729,13 +732,13 @@ function compareActiveSets(active: RangeDesc[], otherActive: RangeDesc[]): boole
   return true
 }
 
-function compareWidgetSets(widgets: PointDesc[], otherWidgets: PointDesc[]): boolean {
+function compareWidgetSets(widgets: WidgetType<any>[], otherWidgets: WidgetType<any>[]): boolean {
   if (widgets.length != otherWidgets.length) return false
   outer: for (let i = 0; i < widgets.length; i++) {
-    let desc = widgets[i]
-    if (otherWidgets.indexOf(desc) > -1) continue
+    let widget = widgets[i]
+    if (otherWidgets.indexOf(widget) > -1) continue
     for (let j = 0; j < otherWidgets.length; j++)
-      if (desc.eq(otherWidgets[i])) continue outer
+      if (widget.compare(otherWidgets[i])) continue outer
     return false
   }
   return true
