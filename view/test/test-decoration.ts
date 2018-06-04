@@ -156,6 +156,9 @@ describe("DecorationSet", () => {
     it("takes inclusivity into account", () =>
        test([[1, 2, {inclusiveStart: true, inclusiveEnd: true}]], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
 
+    it("uses side to determine mapping of points", () =>
+       test([[1, 1, {side: 1}], [1, 1, {side: -1}]], [[1, 1, 2]], [1, 3]))
+
     it("defaults to exclusive on both sides", () =>
        test([[1, 2]], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
 
