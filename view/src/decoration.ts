@@ -4,8 +4,9 @@ import {ChangedRange} from "../../doc/src/diff"
 export interface DecorationRangeSpec {
   inclusiveStart?: boolean;
   inclusiveEnd?: boolean;
-  // FIXME class as shorthand
   attributes?: {[key: string]: string};
+  // Shorthand for {attributes: {class: value}}
+  class?: string;
   lineAttributes?: {[key: string]: string};
   tagName?: string;
   collapsed?: boolean | WidgetType<any>;
@@ -45,7 +46,7 @@ export class RangeDesc extends DecorationDesc {
   constructor(readonly spec: DecorationRangeSpec) {
     super(spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS)
     this.endBias = spec.inclusiveEnd == true ? BIG_BIAS : -BIG_BIAS
-    this.affectsSpans = !!(spec.attributes || spec.tagName || spec.collapsed)
+    this.affectsSpans = !!(spec.attributes || spec.tagName || spec.class || spec.collapsed)
   }
 
   map(deco: Decoration, changes: A<Change>, oldOffset: number, newOffset: number): Decoration | null {
@@ -55,7 +56,9 @@ export class RangeDesc extends DecorationDesc {
 
   eq(other: RangeDesc) {
     return this == other ||
-      this.spec.tagName == other.spec.tagName && attrsEq(this.spec.attributes, other.spec.attributes)
+      this.spec.tagName == other.spec.tagName &&
+      this.spec.class == other.spec.class &&
+      attrsEq(this.spec.attributes, other.spec.attributes)
   }
 }
 
@@ -696,7 +699,7 @@ class DecorationSetComparison {
         if (deco.from + next.offset > pos) pos = this.advancePos(pos, Math.min(this.end, deco.from + next.offset))
         let collapsed = deco.desc.spec.collapsed
         if (collapsed) {
-          ;(isA ? this.widgetsA : this.widgetsB).push(collapsed)
+          if (collapsed instanceof WidgetType) (isA ? this.widgetsA : this.widgetsB).push(collapsed)
           pos = this.start = deco.to + next.offset
         } else {
           deco = deco.move(next.offset)

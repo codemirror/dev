@@ -52,7 +52,7 @@ describe("EditorView decoration", () => {
 
   it("updates for added decorations", () => {
     let cm = decoEditor("hello\ngoodbye")
-    cm.dispatch(cm.state.transaction.setMeta(addSlot, [d(2, 8, {attributes: {class: "c"}})]))
+    cm.dispatch(cm.state.transaction.setMeta(addSlot, [d(2, 8, {class: "c"})]))
     let spans = cm.contentDOM.querySelectorAll(".c")
     ist(spans.length, 2)
     ist(spans[0].textContent, "llo")
@@ -62,7 +62,7 @@ describe("EditorView decoration", () => {
   })
 
   it("updates for removed decorations", () => {
-    let cm = decoEditor("one\ntwo\nthree", [d(1, 12, {attributes: {class: "x"}}),
+    let cm = decoEditor("one\ntwo\nthree", [d(1, 12, {class: "x"}),
                                             d(4, 7, {tagName: "strong"})])
     cm.dispatch(cm.state.transaction.setMeta(filterSlot, from => from == 4))
     ist(cm.contentDOM.querySelectorAll(".x").length, 0)
@@ -206,8 +206,8 @@ describe("LineElementBuilder.build", () => {
     let decos = [Decoration.range(0, 10, {attributes: {class: "a"}}),
                  Decoration.range(2, 4, {attributes: {class: "b"}})]
     let ranges = LineElementBuilder.build(Text.create("x".repeat(10)), 0, 10, [DecorationSet.of(decos)])
-    ist(flatten(ranges), "xx=class,xx=class,xxxxxx=class")
-    ist(ranges[0].map(r => r.attrs.class).join(","), "a,a b,a")
+    ist(flatten(ranges), "xx,xx,xxxxxx")
+    ist(ranges[0].map(r => r.class).join(","), "a,a b,a")
   })
 
   it("combines styles", () => {

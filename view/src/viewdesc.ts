@@ -233,7 +233,7 @@ class LineViewDesc extends ViewDesc {
       if (content.length == 1 && start.merge(content[0], fromOff, toOff)) return
       if (content.length == 0) return start.cut(fromOff, toOff)
       // Otherwise split it, so that we don't have to worry about aliasting front/end afterwards
-      appendLineElements(content, [new TextViewDesc(start.text.slice(toOff), start.tagName, start.attrs)])
+      appendLineElements(content, [new TextViewDesc(start.text.slice(toOff), start.tagName, start.class, start.attrs)])
       toI++
       toOff = 0
     }
@@ -284,7 +284,7 @@ class LineViewDesc extends ViewDesc {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     if (off > 0) {
       let child = this.children[i] as TextViewDesc
-      result.push(new TextViewDesc(child.text.slice(off), child.tagName, child.attrs))
+      result.push(new TextViewDesc(child.text.slice(off), child.tagName, child.class, child.attrs))
       child.cut(off)
       i++
     }
@@ -335,20 +335,26 @@ function appendLineElements(a: LineElementViewDesc[], b: LineElementViewDesc[]):
 
 class TextViewDesc extends LineElementViewDesc {
   textDOM: Node | null = null;
+  class: string | null;
 
-  constructor(public text: string, public tagName: string | null, public attrs: {[key: string]: string} | null) {
+  constructor(public text: string,
+              public tagName: string | null,
+              public clss: string | null,
+              public attrs: {[key: string]: string} | null) {
     super(null, null)
+    this.class = clss
   }
 
   finish(parent: ViewDesc) {
     this.parent = parent
     if (this.dom) return
     this.textDOM = document.createTextNode(this.text)
-    let tagName = this.tagName || (this.attrs ? "span" : null)
+    let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
     if (tagName) {
       this.dom = document.createElement(tagName)
       this.dom.appendChild(this.textDOM)
-      if (this.attrs) for (let name in this.attrs) (this.dom as Element).setAttribute(name, this.attrs[name])
+      if (this.class) (this.dom as HTMLElement).className = this.class
+      if (this.attrs) for (let name in this.attrs) (this.dom as HTMLElement).setAttribute(name, this.attrs[name])
     } else {
       this.dom = this.textDOM
     }
@@ -370,7 +376,8 @@ class TextViewDesc extends LineElementViewDesc {
   }
 
   merge(other: LineElementViewDesc, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof TextViewDesc) || other.tagName != this.tagName ||
+    if (!(other instanceof TextViewDesc) ||
+        other.tagName != this.tagName || other.class != this.class ||
         !attrsEq(other.attrs, this.attrs) || this.length - (to - from) + other.length > MAX_JOIN_LEN)
       return false
     this.text = this.text.slice(0, from) + other.text + this.text.slice(to)
@@ -435,7 +442,7 @@ export class LineElementBuilder {
     this.text = this.cursor.next(pos)
   }
 
-  buildText(length: number, tagName: string | null, attrs: {[key: string]: string} | null) {
+  buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null) {
     while (length > 0) {
       if (this.textOff == this.text.length) {
         this.text = this.cursor.next()
@@ -448,7 +455,7 @@ export class LineElementBuilder {
       }
       if (end > this.textOff) {
         this.elements[this.elements.length - 1].push(
-          new TextViewDesc(this.text.slice(this.textOff, end), tagName, attrs))
+          new TextViewDesc(this.text.slice(this.textOff, end), tagName, clss, attrs))
         length -= end - this.textOff
         this.textOff = end
       }
@@ -463,23 +470,25 @@ export class LineElementBuilder {
   advance(pos: number) {
     if (pos <= this.pos) return
 
-    let tagName = null
+    let tagName = null, clss = null
     let attrs: {[key: string]: string} | null = null
     for (let i = 0; i < this.active.length; i++) {
       let spec = this.active[i].spec
       if (spec.tagName) tagName = spec.tagName
+      if (spec.class) clss = clss ? clss + " " + spec.class : spec.class
       if (spec.attributes) for (let name in spec.attributes) {
         let value = spec.attributes[name]
         if (value == null) continue
-        if (!attrs) attrs = {}
-        if (name == "style" && attrs.style)
-          value = attrs.style + ";" + value
-        else if (name == "class" && attrs.class)
-          value = attrs.class + " " + value
-        attrs[name] = value
+        if (name == "class") {
+          clss = clss ? clss + " " + value : value
+        } else {
+          if (!attrs) attrs = {}
+          if (name == "style" && attrs.style) value = attrs.style + ";" + value
+          attrs[name] = value
+        }
       }
     }
-    this.buildText(pos - this.pos, tagName, attrs)
+    this.buildText(pos - this.pos, tagName, clss, attrs)
     this.pos = pos
   }
 
