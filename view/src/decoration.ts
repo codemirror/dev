@@ -4,9 +4,11 @@ import {ChangedRange} from "../../doc/src/diff"
 export interface DecorationRangeSpec {
   inclusiveStart?: boolean;
   inclusiveEnd?: boolean;
+  // FIXME class as shorthand
   attributes?: {[key: string]: string};
   lineAttributes?: {[key: string]: string};
   tagName?: string;
+  // FIXME boolean | WidgetType
   collapsed?: boolean;
 }
 
@@ -308,13 +310,13 @@ export class DecorationSet {
     let oldPos = 0, newPos = 0
     for (let i = 0; i < textDiff.length; i++) {
       let range = textDiff[i]
-      if (range.fromA > oldPos)
-        changedRanges(this, oldPos, other, newPos, range.fromA - oldPos, ranges)
+      if (range.fromB > newPos && (this != other || oldPos != newPos))
+        new DecorationSetComparison(this, oldPos, other, newPos, range.fromB, ranges).run()
       oldPos = range.toA
       newPos = range.toB
     }
     if (oldPos < this.length || newPos < other.length)
-      changedRanges(this, oldPos, other, newPos, Math.max(this.length - oldPos, other.length - newPos), ranges)
+      new DecorationSetComparison(this, oldPos, other, newPos, Math.max(this.length - oldPos + newPos, other.length), ranges).run()
     return ranges
   }
 
@@ -595,84 +597,124 @@ function rebalanceChildren(local: Decoration[], children: DecorationSet[], child
   }
 }
 
-function gatherNonMatchingNodes(a: DecorationSet, startA: number,
-                                b: DecorationSet, startB: number,
-                                length: number): {heapA: LocalSet[], heapB: LocalSet[]} {
-  let heapA: LocalSet[] = [], heapB: LocalSet[] = []
-  let stackA = [new IteratedSet(startB - startA, a)], stackB = [new IteratedSet(0, b)]
+const SIDE_A = 1, SIDE_B = 2
 
-  // Walk both threes in sync, skipping nodes that are the same in
-  // both, collecting local sets of nodes that only appear on one side.
-  let skipToA = startB /* really, since it's been moved into B's coordinate space */, skipToB = startB
-  for (;;) {
-    let nextA = stackA.length ? stackA[stackA.length - 1] : null
-    let nextB = stackB.length ? stackB[stackB.length - 1] : null
-    if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
-      iterDecorationSet(stackA, skipToA)
-      iterDecorationSet(stackB, skipToB)
-    } else if (nextA && (!nextB || (nextA.offset < nextB.offset || nextA.offset == nextB.offset && nextA.set.length > nextB.set.length))) {
-      if (nextA.set.local.length) addToHeap(heapA, new LocalSet(nextA.offset, nextA.set.local))
-      iterDecorationSet(stackA, skipToA)
-    } else if (nextB) {
-      if (nextB.set.local.length) addToHeap(heapB, new LocalSet(nextB.offset, nextB.set.local))
-      iterDecorationSet(stackB, skipToB)
-    } else {
-      break
-    }
+class DecorationSetComparison {
+  heapA: LocalSet[] = [];
+  heapB: LocalSet[] = [];
+  stackA: IteratedSet[];
+  stackB: IteratedSet[];
+  activeA: RangeDesc[] = [];
+  activeB: RangeDesc[] = [];
+  widgetsA: PointDesc[] = [];
+  widgetsB: PointDesc[] = [];
+  tipA: LocalSet | null = null;
+  tipB: LocalSet | null = null;
+  start: number;
+  end: number;
+
+  constructor(a: DecorationSet, startA: number,
+              b: DecorationSet, startB: number, endB: number,
+              readonly ranges: number[]) {
+    this.stackA = [new IteratedSet(startB - startA, a)]
+    this.stackB = [new IteratedSet(0, b)]
+    this.start = startB
+    this.end = endB
+    this.forwardIter(SIDE_A | SIDE_B)
   }
-  return {heapA, heapB}
-}
 
-function advanceComparePos(pos: number, newPos: number,
-                           active: RangeDesc[], otherActive: RangeDesc[],
-                           widgets: PointDesc[], otherWidgets: PointDesc[],
-                           ranges: number[]): number {
-  if (!compareWidgetSets(widgets,otherWidgets)) {
-    addRange(pos, pos, ranges)
-    widgets.length = otherWidgets.length = 0
-  }
-  if (!compareActiveSets(active, otherActive))
-    addRange(pos, newPos, ranges)
-  return newPos
-}
-
-function advanceCompare(pos: number, end: number, heap: Heapable[],
-                        active: RangeDesc[], otherActive: RangeDesc[],
-                        widgets: PointDesc[], otherWidgets: PointDesc[],
-                        ranges: number[]): number {
-  let next = takeFromHeap(heap)!
-  if (next instanceof LocalSet) {
-    let deco = next.decorations[next.index++]
-    if (deco.from + next.offset > end) {
-      heap.length = 0
-      return end
-    }
-    if (next.index < next.decorations.length) addToHeap(heap, next)
-    // FIXME handle collapsed spans, line decoration
-    if (deco.desc instanceof RangeDesc) {
-      if (!deco.desc.affectsSpans) return pos
-      if (deco.to + next.offset > pos) {
-        deco = deco.move(next.offset)
-        if (deco.from > pos)
-          pos = advanceComparePos(pos, Math.min(end, deco.from), active, otherActive,
-                                  widgets, otherWidgets, ranges)
-        // FIXME as optimization, it should be possible to remove it from the other set, if present
-        active.push(deco.desc as RangeDesc)
-        addToHeap(heap, deco)
+  forwardIter(side: number) {
+    for (; side > 0;) {
+      let nextA = this.stackA.length ? this.stackA[this.stackA.length - 1] : null
+      let nextB = this.stackB.length ? this.stackB[this.stackB.length - 1] : null
+      if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
+        iterDecorationSet(this.stackA, this.start)
+        iterDecorationSet(this.stackB, this.start)
+      } else if (nextA && (!nextB || (nextA.offset < nextB.offset || nextA.offset == nextB.offset && (this.stackA.length == 1 || nextA.set.length >= nextB.set.length)))) {
+        if (nextA.set.local.length) {
+          let local = new LocalSet(nextA.offset, nextA.set.local)
+          addToHeap(this.heapA, local)
+          if (!nextA.set.children.length) {
+            this.tipA = local
+            side = side & ~SIDE_A
+          }
+        }
+        iterDecorationSet(this.stackA, this.start)
+      } else if (nextB) {
+        if (nextB.set.local.length) {
+          let local = new LocalSet(nextB.offset, nextB.set.local)
+          addToHeap(this.heapB, local)
+          if (!nextB.set.children.length) {
+            this.tipB = local
+            side = side & ~SIDE_B
+          }
+        }
+        iterDecorationSet(this.stackB, this.start)
+      } else {
+        break
       }
-    } else {
-      let desc = deco.desc as PointDesc
-      if (deco.from > pos)
-        pos = advanceComparePos(pos, deco.from, active, otherActive, widgets, otherWidgets, ranges)
-      if (desc.widget) widgets.push(desc)
     }
-  } else {
-    let deco = next as Decoration
-    if (deco.to > pos && pos < end)
-      pos = advanceComparePos(pos, Math.min(end, deco.to), active, otherActive, widgets, otherWidgets, ranges)
-    remove(active, deco.desc)
   }
-  return pos
+
+  run() {
+    let {heapA, heapB} = this
+
+    for (let pos = this.start;;) {
+      if (heapA.length && (!heapB.length || (heapA[0].heapPos - heapB[0].heapPos || heapA[0].desc.bias - heapB[0].desc.bias) < 0)) {
+        pos = this.advance(pos, true)
+      } else if (heapB.length) {
+        pos = this.advance(pos, false)
+      } else {
+        if (!compareWidgetSets(this.widgetsA, this.widgetsB)) addRange(pos, pos, this.ranges)
+        break
+      }
+    }
+  }
+
+  advancePos(pos: number, newPos: number): number {
+    if (this.widgetsA.length || this.widgetsB.length) {
+      if (!compareWidgetSets(this.widgetsA, this.widgetsB)) addRange(pos, pos, this.ranges)
+      this.widgetsA.length = this.widgetsB.length = 0
+    }
+    if (!compareActiveSets(this.activeA, this.activeB))
+      addRange(pos, newPos, this.ranges)
+    return newPos
+  }
+
+  advance(pos: number, isA: boolean): number {
+    let heap = isA ? this.heapA : this.heapB
+    let next = takeFromHeap(heap)!
+    if (next instanceof LocalSet) {
+      let deco = next.decorations[next.index++]
+      if (deco.from + next.offset > this.end) {
+        heap.length = 0
+        return this.end
+      }
+      // FIXME handle line decoration
+      if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans && deco.to + next.offset > pos) {
+        if (deco.desc.spec.collapsed) {
+          pos = this.start = deco.to + next.offset
+        } else {
+          deco = deco.move(next.offset)
+          if (deco.from > pos) pos = this.advancePos(pos, Math.min(this.end, deco.from))
+          // FIXME as optimization, it should be possible to remove it from the other set, if present
+          ;(isA ? this.activeA : this.activeB).push(deco.desc as RangeDesc)
+          addToHeap(heap, deco)
+        }
+      } else if (deco.desc instanceof PointDesc && deco.desc.widget) {
+        if (deco.from > pos) pos = this.advancePos(pos, deco.from)
+        ;(isA ? this.widgetsA : this.widgetsB).push(deco.desc)
+      }
+      if (next.index < next.decorations.length) addToHeap(heap, next)
+      else if (next == this.tipA) this.forwardIter(SIDE_A)
+      else if (next == this.tipB) this.forwardIter(SIDE_B)
+    } else {
+      let deco = next as Decoration
+      if (deco.to > pos && pos < this.end) pos = this.advancePos(pos, Math.min(this.end, deco.to))
+      remove(isA ? this.activeA : this.activeB, deco.desc)
+    }
+    return pos
+  }
 }
 
 function compareActiveSets(active: RangeDesc[], otherActive: RangeDesc[]): boolean {
@@ -703,28 +745,6 @@ function remove<T>(array: T[], elt: T) {
   let found = array.indexOf(elt)
   let last = array.pop()!
   if (found != array.length) array[found] = last
-}
-
-function changedRanges(a: DecorationSet, startA: number,
-                       b: DecorationSet, startB: number,
-                       length: number, ranges: number[]) {
-  let {heapA, heapB} = gatherNonMatchingNodes(a, startA, b, startB, length)
-
-  // Run over the gathered decorations of both sides, skipping
-  // decorations that are identical and storing ranges for decorations
-  // that differ.
-  let activeA: RangeDesc[] = [], activeB: RangeDesc[] = []
-  let widgetsA: PointDesc[] = [], widgetsB: PointDesc[] = []
-  for (let pos = startB, end = startB + length;;) {
-    if (heapA.length && (!heapB.length || (heapA[0].heapPos - heapB[0].heapPos || heapA[0].desc.bias - heapB[0].desc.bias) < 0)) {
-      pos = advanceCompare(pos, end, heapA, activeA, activeB, widgetsA, widgetsB, ranges)
-    } else if (heapB.length) {
-      pos = advanceCompare(pos, end, heapB, activeB, activeA, widgetsB, widgetsA, ranges)
-    } else {
-      if (!compareWidgetSets(widgetsA, widgetsB)) addRange(pos, pos, ranges)
-      break
-    }
-  }
 }
 
 export function attrsEq(a: any, b: any): boolean {

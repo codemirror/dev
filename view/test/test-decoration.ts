@@ -203,7 +203,7 @@ describe("DecorationSet", () => {
 
   describe("changedRanges", () => {
     function test(decos, update, ranges) {
-      let deco = DecorationSet.of(decos)
+      let deco = Array.isArray(decos) ? DecorationSet.of(decos) : decos
       let newDeco = deco
       let docRanges = []
       if (update.changes) {
@@ -258,6 +258,25 @@ describe("DecorationSet", () => {
         add: [mk(850, 860, "b")],
         prepare: set => Object.defineProperty(set.children[0], "local", {get() { throw new Error("NO TOUCH") }})
       }, [850, 860])
+    })
+
+    it("ignores collapsed sub-nodes", () => {
+      let decos = [mk(3, 997, {collapsed: true})]
+      for (let i = 0; i < 1000; i += 2) decos.push(mk(i, i + 1, "a"))
+      let set = DecorationSet.of(decos)
+      test(set, {
+        add: [mk(set.children[0].length + 1, set.children[0].length + 2, "b")],
+        prepare: set => Object.defineProperty(set.children[2], "local", {get() { throw new Error("NO TOUCH") }})
+      }, [])
+    })
+
+    it("ignores changes in collapsed decorations", () => {
+      let decos = [mk(3, 997, {collapsed: true})]
+      for (let i = 0; i < 1000; i += 2) decos.push(mk(i, i + 1, "a"))
+      let set = DecorationSet.of(decos)
+      test(set, {
+        changs: [[300, 500, 100]]
+      }, [])
     })
 
     it("can handle multiple changes", () => {
