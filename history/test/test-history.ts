@@ -1,7 +1,5 @@
 const ist = require("ist")
 
-import {Mapping, StepMap} from "prosemirror-transform"
-
 import {Change, EditorState, Range, Selection, Transaction, MetaSlot} from "../../state/src/state"
 import {closeHistory, history, mappingSlot, redo, redoDepth, undo, undoDepth} from "../src/history"
 
@@ -326,16 +324,8 @@ describe("history", () => {
     tr = tr.change(leftChange)
     tr = tr.change(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text))
 
-    function getStepMap(change: Change) {
-      return new StepMap([change.from, change.to - change.from, change.text.length])
-    }
-    const mapping = new Mapping()
-    mapping.appendMap(getStepMap(rightChange.invert(baseDoc)))
-    mapping.appendMap(getStepMap(leftChange))
-    mapping.appendMap(getStepMap(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text)), 0)
-
     tr = tr.setMeta(MetaSlot.rebased, 1)
-    tr = tr.setMeta(mappingSlot, mapping) // FIXME remove when transactions have own mapping field
+    tr = tr.setMeta(mappingSlot, [0, 2]) // FIXME remove when transactions have own mapping field
     state = tr.apply()
     ist(state.doc.text, "left base right")
     ist(undoDepth(state), 2)

@@ -1,28 +1,41 @@
 import {Change, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
-import {Mapping, StepMap} from "prosemirror-transform"
-import {HistoryState, Mapping as HistoryMapping, PopTarget} from "./core"
+import {HistoryState, PopTarget} from "./core"
 
 export const mappingSlot = new MetaSlot("mapping")
 
-class MyMapping /*implements HistoryMapping<Change, MyMapping>*/ {
-  private constructor(private readonly m: Mapping) {}
+class MyMapping /*implements Mapping<Change, MyMapping>*/ {
+  private constructor(private readonly changes: ReadonlyArray<Change>) {}
 
   concat(otherM: MyMapping): MyMapping {
-    const newM = this.m.slice()
-    newM.appendMapping(otherM.m)
-    return new MyMapping(newM)
+    return new MyMapping(this.changes.concat(otherM.changes))
   }
+
   mapChange(change: Change): Change {
-    const from = this.m.map(change.from, 1)
-    return new Change(from, Math.max(from, this.m.map(change.to, -1)), change.text)
+    const from = this._map(change.from, 1) as number
+    return new Change(from, Math.max(from, this._map(change.to, -1) as number), change.text)
   }
+
   deletesChange(change: Change): boolean {
-    return this.m.mapResult(change.from, 1).deleted || this.m.mapResult(change.from + change.text.length, -1).deleted
+    return this._map(change.from, 1, true) as boolean ||
+           this._map(change.from + change.text.length, -1, true) as boolean
   }
+
+  _map(pos: number, assoc: -1 | 1, deleted: boolean = false): number | boolean {
+    for (const change of this.changes) {
+      const start = change.from
+      if (start > pos) continue
+      const oldSize = change.to - change.from, newSize = change.text.length, end = start + oldSize
+      if (pos <= end) {
+        const side = !oldSize ? assoc : pos == start ? -1 : pos == end ? 1 : assoc
+        if (deleted && (assoc < 0 ? pos != start : pos != end)) return true
+        pos = start + (side < 0 ? 0 : newSize)
+      } else pos += newSize - oldSize
+    }
+    return deleted ? false : pos
+  }
+
   static fromChanges(changes: ReadonlyArray<Change>): MyMapping {
-    return new MyMapping(new Mapping(changes.map(
-      change => new StepMap([change.from, change.to - change.from, change.text.length])
-    )))
+    return new MyMapping(changes)
   }
 }
 
@@ -76,7 +89,7 @@ const historyField = new StateField({
     if (rebased = tr.getMeta(MetaSlot.rebased)) {
       const docs = [tr.startState.doc].concat(tr.docs)
       const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
-      return state.rebase(new ChangeList(tr.changes, inverted, tr.getMeta(mappingSlot).mirror), rebased)
+      return state.rebase(new ChangeList(tr.changes, inverted, tr.getMeta(mappingSlot)), rebased)
     } else if (tr.getMeta(MetaSlot.addToHistory) !== false) {
       const docs = [tr.startState.doc].concat(tr.docs)
       const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
