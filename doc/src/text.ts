@@ -21,10 +21,14 @@ export abstract class Text implements Iterable<string> {
   abstract eq(other: Text): boolean;
 
   get lines() { return this.lineBreaks + 1 }
-  iter(dir: 1 | -1 = 1): {next(): string} { return new TextCursor(this, dir) }
-  iterRange(from: number, to: number = this.length): {next(): string} { return new PartialTextCursor(this, from, to) }
+  iter(dir: 1 | -1 = 1): TextCursor {
+    return new RawTextCursor(this, dir)
+  }
+  iterRange(from: number, to: number = this.length): TextCursor {
+    return new PartialTextCursor(this, from, to)
+  }
   [iterator](): Iterator<string> {
-    let cursor = new TextCursor(this), result = {done: false, value: ""}
+    let cursor = new RawTextCursor(this), result = {done: false, value: ""}
     return {next() {
       result.value = cursor.next()
       result.done = result.value.length > 0
@@ -44,6 +48,10 @@ export abstract class Text implements Iterable<string> {
   static create(text: string): Text {
     return text.length < MAX_LEAF ? new TextLeaf(text) : TextNode.from(text.length, TextLeaf.split(text, []))
   }
+}
+
+export interface TextCursor {
+  next(skip?: number): string
 }
 
 export class TextLeaf extends Text {
@@ -247,10 +255,11 @@ function eqContent(a: Text, b: Text): boolean {
   }
 }
 
-class TextCursor {
-  nodes: Text[];
-  offsets: number[];
+class RawTextCursor implements TextCursor {
+  private nodes: Text[];
+  private offsets: number[];
 
+  /** @internal */
   constructor(text: Text, public dir: 1 | -1 = 1) {
     this.nodes = [text]
     this.offsets = [dir > 0 ? 0 : text instanceof TextLeaf ? text.length : text.children!.length]
@@ -290,13 +299,13 @@ class TextCursor {
   }
 }
 
-class PartialTextCursor {
-  cursor: TextCursor;
+class PartialTextCursor implements TextCursor {
+  cursor: RawTextCursor;
   limit: number;
   skip: number;
 
   constructor(text: Text, start: number, end: number) {
-    this.cursor = new TextCursor(text, start > end ? -1 : 1)
+    this.cursor = new RawTextCursor(text, start > end ? -1 : 1)
     if (start > end) {
       this.skip = text.length - start
       this.limit = start - end

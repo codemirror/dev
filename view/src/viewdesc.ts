@@ -1,4 +1,4 @@
-import {Text} from "../../doc/src/text"
+import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, Widget, RangeDesc, buildLineElements} from "./decoration"
@@ -411,14 +411,54 @@ class WidgetViewDesc extends LineElementViewDesc {
   }
 }
 
+class CollapsedViewDesc extends LineElementViewDesc {
+  constructor(public length: number) {
+    super(null, null)
+  }
+  finish(parent: ViewDesc) { this.parent = parent }
+  merge(other: LineElementViewDesc, from: number = 0, to: number = this.length): boolean {
+    if (!(other instanceof CollapsedViewDesc)) return false
+    this.length = from + other.length + (this.length - to)
+    return true
+  }
+}
+
 export class LineElementBuilder {
-  lineI: number = 0;
-  stringI: number = 0;
-  stringOff: number = 0;
   elements: LineElementViewDesc[][] = [[]];
   active: RangeDesc[] = [];
+  cursor: TextCursor;
+  text: string;
+  textOff: number = 0;
 
-  constructor(readonly lines: string[][], public pos: number) {}
+  constructor(text: Text, public pos: number) {
+    this.cursor = text.iter()
+    this.text = this.cursor.next(pos)
+  }
+
+  buildText(length: number, tagName: string | null, attrs: {[key: string]: string} | null) {
+    while (length > 0) {
+      if (this.textOff == this.text.length) {
+        this.text = this.cursor.next()
+        this.textOff = 0
+      }
+
+      let end = Math.min(this.textOff + length, this.text.length)
+      for (let i = this.textOff; i < end; i++) {
+        if (this.text.charCodeAt(i) == 10) { end = i; break }
+      }
+      if (end > this.textOff) {
+        this.elements[this.elements.length - 1].push(
+          new TextViewDesc(this.text.slice(this.textOff, end), tagName, attrs))
+        length -= end - this.textOff
+        this.textOff = end
+      }
+      if (end < this.text.length && length) {
+        this.elements.push([])
+        length--
+        this.textOff++
+      }
+    }
+  }
 
   advance(pos: number) {
     if (pos <= this.pos) return
@@ -439,36 +479,29 @@ export class LineElementBuilder {
         attrs[name] = value
       }
     }
-
-    for (let len = pos - this.pos;;) {
-      let line = this.lines[this.lineI]
-      if (this.stringI == line.length) {
-        // End of line, add a line break placeholder
-        // FIXME maybe gather line decorations here
-        this.elements.push([])
-        this.lineI++
-        this.stringI = this.stringOff = 0
-        if (--len == 0) break
-        continue
-      }
-
-      let string = line[this.stringI]
-      let cut = Math.min(len, string.length - this.stringOff)
-      if (cut > 0) {
-        this.elements[this.elements.length - 1].push(
-          new TextViewDesc(string.slice(this.stringOff, this.stringOff + cut), tagName, attrs))
-        this.stringOff += cut
-        len -= cut
-        if (len == 0) break
-      }
-
-      // Moving past the end of the current string
-      // FIXME join small compatible ranges together
-      this.stringOff = 0
-      this.stringI++
-    }
-
+    this.buildText(pos - this.pos, tagName, attrs)
     this.pos = pos
+  }
+
+  advanceCollapsed(pos: number) {
+    if (pos > this.pos) {
+      let line = this.elements[this.elements.length - 1]
+      if (line.length && (line[line.length - 1] instanceof CollapsedViewDesc))
+        line[line.length - 1].length += (pos - this.pos)
+      else
+        line.push(new CollapsedViewDesc(pos - this.pos))
+
+      // Advance the iterator past the collapsed content
+      let length = pos - this.pos
+      if (this.textOff + length <= this.text.length) {
+        this.textOff += length
+      } else {
+        this.text = this.cursor.next(length - (this.text.length - this.textOff))
+        this.textOff = 0
+      }
+      
+      this.pos = pos
+    }
   }
 
   addWidget(widget: Widget<any>, side: number) {
@@ -476,7 +509,7 @@ export class LineElementBuilder {
   }
 
   static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineElementViewDesc[][] {
-    let builder = new LineElementBuilder(linesBetween(text, from, to), from)
+    let builder = new LineElementBuilder(text, from)
     buildLineElements(decorations, from, to, builder)
     return builder.elements
   }
@@ -525,26 +558,6 @@ class ChildCursor {
         return this
       }
       this.pos -= this.children[--this.i].length + this.gap
-    }
-  }
-}
-
-function linesBetween(text: Text, start: number, end: number): string[][] {
-  let result: string[][] = [[]]
-  if (start == end) return result
-  for (let textCur = text.iterRange(start, end);;) {
-    let value = textCur.next()
-    if (value.length == 0) return result
-    for (let pos = 0;;) {
-      let nextNewline = value.indexOf("\n", pos)
-      if (nextNewline == -1) {
-        if (pos < value.length) result[result.length - 1].push(value.slice(pos))
-        break
-      } else {
-        if (nextNewline > pos) result[result.length - 1].push(value.slice(pos, nextNewline))
-        result.push([])
-        pos = nextNewline + 1
-      }
     }
   }
 }

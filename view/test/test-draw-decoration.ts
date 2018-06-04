@@ -146,6 +146,13 @@ describe("EditorView decoration", () => {
       ist(domSel.focusNode.childNodes[domSel.focusOffset].textContent, "B")
     })
   })
+
+  describe("collapsed", () => {
+    it("omits collapsed content", () => {
+      let cm = decoEditor("foobar", [d(1, 4, {collapsed: true})])
+      ist(cm.contentDOM.textContent, "far")
+    })
+  })
 })
 
 describe("LineElementBuilder.build", () => {

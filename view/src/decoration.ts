@@ -258,6 +258,7 @@ export class DecorationSet {
       let child = this.children[i], newChild = child
       let oldChildEnd = oldPos + child.length
       let newChildEnd = mapPos(oldPos + child.length, changes, 1)
+      // FIXME immediately collapse children entirely covered by a change
       if (touchesChange(oldPos, oldChildEnd, changes)) {
         let inner = child.mapInner(changes, oldPos, newPos, newChildEnd)
         newChild = inner.set
@@ -348,9 +349,9 @@ class LocalSet {
   get desc(): DecorationDesc { return this.decorations[this.index].desc }
 }
 
-function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
+function iterDecorationSet(stack: IteratedSet[], skipTo: number = 0) {
   for (;;) {
-    if (stack.length == 0) return -1
+    if (stack.length == 0) break
     let top = stack[stack.length - 1]
     if (top.index == top.set.children.length) {
       stack.pop()
@@ -358,12 +359,9 @@ function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
       let next = top.set.children[top.index], start = top.offset
       top.index++
       top.offset += next.length
-      if (skip > next.length) {
-        skip -= next.length
-      } else {
-        if (skip > 0 && !next.children.length) skip = 0
+      if (top.offset >= skipTo) {
         stack.push(new IteratedSet(start, next))
-        return skip
+        break
       }
     }
   }
@@ -371,6 +369,7 @@ function iterDecorationSet(stack: IteratedSet[], skip: number = 0): number {
 
 export function buildLineElements(sets: A<DecorationSet>, from: number, to: number, builder: {
   advance(pos: number): void;
+  advanceCollapsed(pos: number): void;
   addWidget(widget: Widget<any>, side: number): void;
   active: RangeDesc[];
 }) {
@@ -388,24 +387,27 @@ export function buildLineElements(sets: A<DecorationSet>, from: number, to: numb
     let next = takeFromHeap(heap)
     if (next instanceof LocalSet) {
       let deco = next.decorations[next.index]
-      if (++next.index < next.decorations.length) addToHeap(heap, next)
-      else if (next.next) addIterToHeap(heap, next.next)
-
-      if (deco.to + next.offset < from) continue
       if (deco.from + next.offset > to) break
-      if (deco.desc instanceof RangeDesc) {
-        // FIXME handle collapsing
-        if (!deco.desc.affectsSpans) continue
-        deco = deco.move(next.offset)
-        builder.advance(deco.from)
-        builder.active.push(deco.desc as RangeDesc)
-        addToHeap(heap, deco)
-      } else {
-        let desc = deco.desc as PointDesc
-        if (!desc.widget) continue
-        builder.advance(deco.from)
-        builder.addWidget(desc.widget, desc.bias)
+
+      if (deco.to + next.offset >= from) {
+        if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans) {
+          deco = deco.move(next.offset)
+          builder.advance(deco.from)
+          if (deco.desc.spec.collapsed) {
+            from = deco.to
+            builder.advanceCollapsed(Math.min(from, to))
+          } else {
+            builder.active.push(deco.desc as RangeDesc)
+            addToHeap(heap, deco)
+          }
+        } else if (deco.desc instanceof PointDesc && deco.desc.widget) {
+          builder.advance(deco.from)
+          builder.addWidget(deco.desc.widget, deco.desc.bias)
+        }
       }
+      // Put the rest of the set back onto the heap
+      if (++next.index < next.decorations.length) addToHeap(heap, next)
+      else if (next.next) addIterToHeap(heap, next.next, from)
     } else { // It is a decoration that ends here
       let deco = next as Decoration
       if (deco.to >= to) break
@@ -420,9 +422,9 @@ function compareHeapable(a: Heapable, b: Heapable): number {
   return a.heapPos - b.heapPos || a.desc.bias - b.desc.bias
 }
 
-function addIterToHeap(heap: Heapable[], stack: IteratedSet[], skip: number = 0) {
+function addIterToHeap(heap: Heapable[], stack: IteratedSet[], skipTo: number = 0) {
   for (;;) {
-    skip = iterDecorationSet(stack, skip)
+    iterDecorationSet(stack, skipTo)
     if (stack.length == 0) break
     let next = stack[stack.length - 1], local = next.set.local
     let leaf = next.set.children.length ? null : stack
@@ -601,19 +603,19 @@ function gatherNonMatchingNodes(a: DecorationSet, startA: number,
 
   // Walk both threes in sync, skipping nodes that are the same in
   // both, collecting local sets of nodes that only appear on one side.
-  let skipA = startA, skipB = startB
+  let skipToA = startB /* really, since it's been moved into B's coordinate space */, skipToB = startB
   for (;;) {
     let nextA = stackA.length ? stackA[stackA.length - 1] : null
     let nextB = stackB.length ? stackB[stackB.length - 1] : null
     if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
-      skipA = iterDecorationSet(stackA, skipA)
-      skipB = iterDecorationSet(stackB, skipB)
+      iterDecorationSet(stackA, skipToA)
+      iterDecorationSet(stackB, skipToB)
     } else if (nextA && (!nextB || (nextA.offset < nextB.offset || nextA.offset == nextB.offset && nextA.set.length > nextB.set.length))) {
       if (nextA.set.local.length) addToHeap(heapA, new LocalSet(nextA.offset, nextA.set.local))
-      skipA = iterDecorationSet(stackA, skipA)
+      iterDecorationSet(stackA, skipToA)
     } else if (nextB) {
       if (nextB.set.local.length) addToHeap(heapB, new LocalSet(nextB.offset, nextB.set.local))
-      skipB = iterDecorationSet(stackB, skipB)
+      iterDecorationSet(stackB, skipToB)
     } else {
       break
     }
