@@ -143,7 +143,7 @@ export class Selection {
   static default: Selection = new Selection([new Range(0)]);
 }
 
-const empty: any[] = []
+const empty: ReadonlyArray<any> = []
 
 class Meta {
   constructor(from: Meta | null = null) {
@@ -170,9 +170,16 @@ export class MetaSlot<T> {
   static rebased: MetaSlot<number> = new MetaSlot("rebased")
 }
 
-export class ChangePipeline {
-  constructor(readonly changes: ReadonlyArray<Change>,
-              readonly mirror: ReadonlyArray<number> = []) {}
+export class DocChanges {
+  constructor(private readonly startDoc: Text,
+              readonly changes: ReadonlyArray<Change>,
+              readonly docs: ReadonlyArray<Text>,
+              readonly mirror: ReadonlyArray<number> = empty) {}
+
+  get doc(): Text {
+    let last = this.docs.length - 1
+    return last < 0 ? this.startDoc : this.docs[last]
+  }
 
   get length(): number {
     return this.changes.length
@@ -184,43 +191,50 @@ export class ChangePipeline {
     return null
   }
 
-  append(change: Change, mirror?: number): ChangePipeline {
+  append(change: Change, mirror?: number): DocChanges {
     const newMirror = mirror != null ? this.mirror.concat([this.changes.length, mirror]) : this.mirror
-    return new ChangePipeline(this.changes.concat(change), newMirror)
+    return new DocChanges(this.startDoc,
+                          this.changes.concat(change),
+                          this.docs.concat(change.apply(this.doc)),
+                          newMirror)
   }
 
-  static empty = new ChangePipeline([])
+  static empty(startDoc: Text): DocChanges {
+    return new DocChanges(startDoc, empty, empty)
+  }
 }
 
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
 
 export class Transaction {
   private constructor(readonly startState: EditorState,
-                      readonly pipeline: ChangePipeline,
-                      readonly docs: ReadonlyArray<Text>,
+                      readonly docchanges: DocChanges,
                       readonly selection: Selection,
                       private readonly meta: Meta,
                       private readonly flags: number) {}
 
-  get changes(): ReadonlyArray<Change> {
-    return this.pipeline.changes
-  }
-
   static start(state: EditorState, time: number = Date.now()) {
     let meta = new Meta
     meta[MetaSlot.time.name] = time
-    return new Transaction(state, ChangePipeline.empty, empty, state.selection, meta, 0)
+    return new Transaction(state, DocChanges.empty(state.doc), state.selection, meta, 0)
+  }
+
+  get changes(): ReadonlyArray<Change> {
+    return this.docchanges.changes
   }
 
   get doc(): Text {
-    let last = this.docs.length - 1
-    return last < 0 ? this.startState.doc : this.docs[last]
+    return this.docchanges.doc
+  }
+
+  get docs(): ReadonlyArray<Text> {
+    return this.docchanges.docs
   }
 
   setMeta<T>(slot: MetaSlot<T>, value: T): Transaction {
     let meta = new Meta(this.meta)
     meta[slot.name] = value
-    return new Transaction(this.startState, this.pipeline, this.docs, this.selection, meta, this.flags)
+    return new Transaction(this.startState, this.docchanges, this.selection, meta, this.flags)
   }
 
   getMeta<T>(slot: MetaSlot<T>): T | undefined {
@@ -230,8 +244,7 @@ export class Transaction {
   change(change: Change, mirror?: number): Transaction {
     if (change.from == change.to && change.text == "") return this
     return new Transaction(this.startState,
-                           this.pipeline.append(change, mirror),
-                           this.docs.concat(change.apply(this.doc)),
+                           this.docchanges.append(change, mirror),
                            this.selection.map(change), this.meta, this.flags)
   }
 
@@ -258,7 +271,7 @@ export class Transaction {
   }
 
   setSelection(selection: Selection): Transaction {
-    return new Transaction(this.startState, this.pipeline, this.docs, selection, this.meta, this.flags | FLAG_SELECTION_SET)
+    return new Transaction(this.startState, this.docchanges, selection, this.meta, this.flags | FLAG_SELECTION_SET)
   }
 
   get selectionSet() {
@@ -266,7 +279,7 @@ export class Transaction {
   }
 
   scrollIntoView() {
-    return new Transaction(this.startState, this.pipeline, this.docs, this.selection, this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
+    return new Transaction(this.startState, this.docchanges, this.selection, this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
   }
 
   get scrolledIntoView() {

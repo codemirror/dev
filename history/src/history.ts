@@ -87,7 +87,7 @@ const historyField = new StateField({
     if (rebased = tr.getMeta(MetaSlot.rebased)) {
       const docs = [tr.startState.doc].concat(tr.docs)
       const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
-      return state.rebase(new ChangeList(tr.changes, inverted, tr.pipeline.mirror), rebased)
+      return state.rebase(new ChangeList(tr.changes, inverted, tr.docchanges.mirror), rebased)
     } else if (tr.getMeta(MetaSlot.addToHistory) !== false) {
       const docs = [tr.startState.doc].concat(tr.docs)
       const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
