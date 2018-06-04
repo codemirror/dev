@@ -170,20 +170,46 @@ export class MetaSlot<T> {
   static rebased: MetaSlot<number> = new MetaSlot("rebased")
 }
 
+export class ChangePipeline {
+  constructor(readonly changes: ReadonlyArray<Change>,
+              readonly mirror: ReadonlyArray<number> = []) {}
+
+  get length(): number {
+    return this.changes.length
+  }
+
+  getMirror(n: number): number | null {
+    for (let i = 0; i < this.mirror.length; i++)
+      if (this.mirror[i] == n) return this.mirror[i + (i % 2 ? -1 : 1)]
+    return null
+  }
+
+  append(change: Change, mirror?: number): ChangePipeline {
+    const newMirror = mirror != null ? this.mirror.concat([this.changes.length, mirror]) : this.mirror
+    return new ChangePipeline(this.changes.concat(change), newMirror)
+  }
+
+  static empty = new ChangePipeline([])
+}
+
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
 
 export class Transaction {
   private constructor(readonly startState: EditorState,
-                      readonly changes: ReadonlyArray<Change>,
+                      readonly pipeline: ChangePipeline,
                       readonly docs: ReadonlyArray<Text>,
                       readonly selection: Selection,
                       private readonly meta: Meta,
                       private readonly flags: number) {}
 
+  get changes(): ReadonlyArray<Change> {
+    return this.pipeline.changes
+  }
+
   static start(state: EditorState, time: number = Date.now()) {
     let meta = new Meta
     meta[MetaSlot.time.name] = time
-    return new Transaction(state, empty, empty, state.selection, meta, 0)
+    return new Transaction(state, ChangePipeline.empty, empty, state.selection, meta, 0)
   }
 
   get doc(): Text {
@@ -194,17 +220,17 @@ export class Transaction {
   setMeta<T>(slot: MetaSlot<T>, value: T): Transaction {
     let meta = new Meta(this.meta)
     meta[slot.name] = value
-    return new Transaction(this.startState, this.changes, this.docs, this.selection, meta, this.flags)
+    return new Transaction(this.startState, this.pipeline, this.docs, this.selection, meta, this.flags)
   }
 
   getMeta<T>(slot: MetaSlot<T>): T | undefined {
     return this.meta[slot.name] as T
   }
 
-  change(change: Change): Transaction {
+  change(change: Change, mirror?: number): Transaction {
     if (change.from == change.to && change.text == "") return this
     return new Transaction(this.startState,
-                           this.changes.concat(change),
+                           this.pipeline.append(change, mirror),
                            this.docs.concat(change.apply(this.doc)),
                            this.selection.map(change), this.meta, this.flags)
   }
@@ -232,7 +258,7 @@ export class Transaction {
   }
 
   setSelection(selection: Selection): Transaction {
-    return new Transaction(this.startState, this.changes, this.docs, selection, this.meta, this.flags | FLAG_SELECTION_SET)
+    return new Transaction(this.startState, this.pipeline, this.docs, selection, this.meta, this.flags | FLAG_SELECTION_SET)
   }
 
   get selectionSet() {
@@ -240,7 +266,7 @@ export class Transaction {
   }
 
   scrollIntoView() {
-    return new Transaction(this.startState, this.changes, this.docs, this.selection, this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
+    return new Transaction(this.startState, this.pipeline, this.docs, this.selection, this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
   }
 
   get scrolledIntoView() {

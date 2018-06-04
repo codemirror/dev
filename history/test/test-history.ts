@@ -1,7 +1,7 @@
 const ist = require("ist")
 
 import {Change, EditorState, Range, Selection, Transaction, MetaSlot} from "../../state/src/state"
-import {closeHistory, history, mappingSlot, redo, redoDepth, undo, undoDepth} from "../src/history"
+import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
 const mkState = (config?) => EditorState.create({plugins: [history(config)]})
 
@@ -322,10 +322,9 @@ describe("history", () => {
     let tr = state.transaction
     tr = tr.change(rightChange.invert(baseDoc))
     tr = tr.change(leftChange)
-    tr = tr.change(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text))
+    tr = tr.change(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text), 0)
 
     tr = tr.setMeta(MetaSlot.rebased, 1)
-    tr = tr.setMeta(mappingSlot, [0, 2]) // FIXME remove when transactions have own mapping field
     state = tr.apply()
     ist(state.doc.text, "left base right")
     ist(undoDepth(state), 2)

@@ -1,8 +1,6 @@
 import {Change, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
 import {HistoryState, PopTarget} from "./core"
 
-export const mappingSlot = new MetaSlot("mapping")
-
 class MyMapping /*implements Mapping<Change, MyMapping>*/ {
   private constructor(private readonly changes: ReadonlyArray<Change>) {}
 
@@ -89,11 +87,11 @@ const historyField = new StateField({
     if (rebased = tr.getMeta(MetaSlot.rebased)) {
       const docs = [tr.startState.doc].concat(tr.docs)
       const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
-      return state.rebase(new ChangeList(tr.changes, inverted, tr.getMeta(mappingSlot)), rebased)
+      return state.rebase(new ChangeList(tr.changes, inverted, tr.pipeline.mirror), rebased)
     } else if (tr.getMeta(MetaSlot.addToHistory) !== false) {
       const docs = [tr.startState.doc].concat(tr.docs)
       const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
-      return state.addChanges(new ChangeList(tr.changes, inverted), isAdjacent, tr.getMeta(MetaSlot.time), newGroupDelay)
+      return state.addChanges(new ChangeList(tr.changes, inverted), isAdjacent, tr.getMeta(MetaSlot.time)!, newGroupDelay)
     } else {
       return state.addMapping(MyMapping.fromChanges(tr.changes))
     }
