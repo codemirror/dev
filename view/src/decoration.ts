@@ -603,25 +603,40 @@ function rebalanceChildren(local: Decoration[], children: DecorationSet[], child
 
 const SIDE_A = 1, SIDE_B = 2
 
+class ComparisonSide {
+  heap: LocalSet[] = [];
+  active: RangeDesc[] = [];
+  widgets: WidgetType<any>[] = [];
+  tip: LocalSet | null = null;
+
+  constructor(readonly stack: IteratedSet[]) {}
+
+  forward(start: number, next: IteratedSet): boolean {
+    let newTip = false
+    if (next.set.local.length) {
+      let local = new LocalSet(next.offset, next.set.local)
+      addToHeap(this.heap, local)
+      if (!next.set.children.length) {
+        this.tip = local
+        newTip = true
+      }
+    }
+    iterDecorationSet(this.stack, start)
+    return newTip
+  }
+}
+
 class DecorationSetComparison {
-  heapA: LocalSet[] = [];
-  heapB: LocalSet[] = [];
-  stackA: IteratedSet[];
-  stackB: IteratedSet[];
-  activeA: RangeDesc[] = [];
-  activeB: RangeDesc[] = [];
-  widgetsA: WidgetType<any>[] = [];
-  widgetsB: WidgetType<any>[] = [];
-  tipA: LocalSet | null = null;
-  tipB: LocalSet | null = null;
+  a: ComparisonSide;
+  b: ComparisonSide;
   start: number;
   end: number;
 
   constructor(a: DecorationSet, startA: number,
               b: DecorationSet, startB: number, endB: number,
               readonly ranges: number[]) {
-    this.stackA = [new IteratedSet(startB - startA, a)]
-    this.stackB = [new IteratedSet(0, b)]
+    this.a = new ComparisonSide([new IteratedSet(startB - startA, a)])
+    this.b = new ComparisonSide([new IteratedSet(0, b)])
     this.start = startB
     this.end = endB
     this.forwardIter(SIDE_A | SIDE_B)
@@ -629,31 +644,17 @@ class DecorationSetComparison {
 
   forwardIter(side: number) {
     for (; side > 0;) {
-      let nextA = this.stackA.length ? this.stackA[this.stackA.length - 1] : null
-      let nextB = this.stackB.length ? this.stackB[this.stackB.length - 1] : null
+      let nextA = this.a.stack.length ? this.a.stack[this.a.stack.length - 1] : null
+      let nextB = this.b.stack.length ? this.b.stack[this.b.stack.length - 1] : null
       if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
-        iterDecorationSet(this.stackA, this.start)
-        iterDecorationSet(this.stackB, this.start)
-      } else if (nextA && (!nextB || (nextA.offset < nextB.offset || nextA.offset == nextB.offset && (this.stackA.length == 1 || nextA.set.length >= nextB.set.length)))) {
-        if (nextA.set.local.length) {
-          let local = new LocalSet(nextA.offset, nextA.set.local)
-          addToHeap(this.heapA, local)
-          if (!nextA.set.children.length) {
-            this.tipA = local
-            side = side & ~SIDE_A
-          }
-        }
-        iterDecorationSet(this.stackA, this.start)
+        iterDecorationSet(this.a.stack, this.start)
+        iterDecorationSet(this.b.stack, this.start)
+      } else if (nextA && (!nextB || (nextA.offset < nextB.offset ||
+                                      nextA.offset == nextB.offset && (this.a.stack.length == 1 ||
+                                                                       nextA.set.length >= nextB.set.length)))) {
+        if (this.a.forward(this.start, nextA)) side = side & ~SIDE_A
       } else if (nextB) {
-        if (nextB.set.local.length) {
-          let local = new LocalSet(nextB.offset, nextB.set.local)
-          addToHeap(this.heapB, local)
-          if (!nextB.set.children.length) {
-            this.tipB = local
-            side = side & ~SIDE_B
-          }
-        }
-        iterDecorationSet(this.stackB, this.start)
+        if (this.b.forward(this.start, nextB)) side = side & ~SIDE_B
       } else {
         break
       }
@@ -661,37 +662,36 @@ class DecorationSetComparison {
   }
 
   run() {
-    let {heapA, heapB} = this
+    let heapA = this.a.heap, heapB = this.b.heap
 
     for (let pos = this.start;;) {
       if (heapA.length && (!heapB.length || (heapA[0].heapPos - heapB[0].heapPos || heapA[0].desc.bias - heapB[0].desc.bias) < 0)) {
-        pos = this.advance(pos, true)
+        pos = this.advance(pos, this.a)
       } else if (heapB.length) {
-        pos = this.advance(pos, false)
+        pos = this.advance(pos, this.b)
       } else {
-        if (!compareWidgetSets(this.widgetsA, this.widgetsB)) addRange(pos, pos, this.ranges)
+        if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(pos, pos, this.ranges)
         break
       }
     }
   }
 
   advancePos(pos: number, newPos: number): number {
-    if (this.widgetsA.length || this.widgetsB.length) {
-      if (!compareWidgetSets(this.widgetsA, this.widgetsB)) addRange(pos, pos, this.ranges)
-      this.widgetsA.length = this.widgetsB.length = 0
+    if (this.a.widgets.length || this.b.widgets.length) {
+      if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(pos, pos, this.ranges)
+      this.a.widgets.length = this.b.widgets.length = 0
     }
-    if (!compareActiveSets(this.activeA, this.activeB))
+    if (!compareActiveSets(this.a.active, this.b.active))
       addRange(pos, newPos, this.ranges)
     return newPos
   }
 
-  advance(pos: number, isA: boolean): number {
-    let heap = isA ? this.heapA : this.heapB
-    let next = takeFromHeap(heap)!
+  advance(pos: number, side: ComparisonSide): number {
+    let next = takeFromHeap(side.heap)!
     if (next instanceof LocalSet) {
       let deco = next.decorations[next.index++]
       if (deco.from + next.offset > this.end) {
-        heap.length = 0
+        side.heap.length = 0
         return this.end
       }
       // FIXME handle line decoration
@@ -699,25 +699,25 @@ class DecorationSetComparison {
         if (deco.from + next.offset > pos) pos = this.advancePos(pos, Math.min(this.end, deco.from + next.offset))
         let collapsed = deco.desc.spec.collapsed
         if (collapsed) {
-          if (collapsed instanceof WidgetType) (isA ? this.widgetsA : this.widgetsB).push(collapsed)
+          if (collapsed instanceof WidgetType) side.widgets.push(collapsed)
           pos = this.start = deco.to + next.offset
         } else {
           deco = deco.move(next.offset)
           // FIXME as optimization, it should be possible to remove it from the other set, if present
-          ;(isA ? this.activeA : this.activeB).push(deco.desc as RangeDesc)
-          addToHeap(heap, deco)
+          side.active.push(deco.desc as RangeDesc)
+          addToHeap(side.heap, deco)
         }
       } else if (deco.desc instanceof PointDesc && deco.desc.widget) {
         if (deco.from > pos) pos = this.advancePos(pos, deco.from)
-        ;(isA ? this.widgetsA : this.widgetsB).push(deco.desc.widget)
+        side.widgets.push(deco.desc.widget)
       }
-      if (next.index < next.decorations.length) addToHeap(heap, next)
-      else if (next == this.tipA) this.forwardIter(SIDE_A)
-      else if (next == this.tipB) this.forwardIter(SIDE_B)
+      if (next.index < next.decorations.length) addToHeap(side.heap, next)
+      else if (next == this.a.tip) this.forwardIter(SIDE_A)
+      else if (next == this.b.tip) this.forwardIter(SIDE_B)
     } else {
       let deco = next as Decoration
       if (deco.to > pos && pos < this.end) pos = this.advancePos(pos, Math.min(this.end, deco.to))
-      remove(isA ? this.activeA : this.activeB, deco.desc)
+      remove(side.active, deco.desc)
     }
     return pos
   }
