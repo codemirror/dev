@@ -275,8 +275,20 @@ describe("DecorationSet", () => {
       for (let i = 0; i < 1000; i += 2) decos.push(mk(i, i + 1, "a"))
       let set = DecorationSet.of(decos)
       test(set, {
-        changs: [[300, 500, 100]]
+        changes: [[300, 500, 100]]
       }, [])
+    })
+
+    it("notices adding a collapsed range", () => {
+      test([mk(3, 50, {collapsed: true})], {
+        add: [mk(40, 80, {collapsed: true})]
+      }, [50, 80])
+    })
+
+    it("notices removing a collapsed range", () => {
+      test([mk(3, 50, {collapsed: true})], {
+        filter: () => false
+      }, [3, 50])
     })
 
     it("can handle multiple changes", () => {

@@ -55,9 +55,11 @@ export class RangeDesc extends DecorationDesc {
   }
 
   eq(other: RangeDesc) {
+    let collA = this.spec.collapsed, collB = other.spec.collapsed
     return this == other ||
       this.spec.tagName == other.spec.tagName &&
       this.spec.class == other.spec.class &&
+      (collA === collB || (collA instanceof WidgetType && collB instanceof WidgetType && collA.compare(collB))) &&
       attrsEq(this.spec.attributes, other.spec.attributes)
   }
 }
@@ -205,6 +207,9 @@ export class DecorationSet {
       return collapseSet(children || this.children, local || this.local.slice(),
                          decorations, decI, offset, length)
 
+
+    // FIXME going from leaf to non-leaf is currently a mess—will
+    // leave all the locals alongside a newly created child
 
     let childSize = Math.max(BASE_NODE_SIZE, size >> BASE_NODE_SIZE_SHIFT)
     if (decI < decorations.length) {
@@ -608,6 +613,7 @@ class ComparisonSide {
   active: RangeDesc[] = [];
   widgets: WidgetType<any>[] = [];
   tip: LocalSet | null = null;
+  collapsedTo: number = -1;
 
   constructor(readonly stack: IteratedSet[]) {}
 
@@ -629,7 +635,7 @@ class ComparisonSide {
 class DecorationSetComparison {
   a: ComparisonSide;
   b: ComparisonSide;
-  start: number;
+  pos: number;
   end: number;
 
   constructor(a: DecorationSet, startA: number,
@@ -637,7 +643,7 @@ class DecorationSetComparison {
               readonly ranges: number[]) {
     this.a = new ComparisonSide([new IteratedSet(startB - startA, a)])
     this.b = new ComparisonSide([new IteratedSet(0, b)])
-    this.start = startB
+    this.pos = startB
     this.end = endB
     this.forwardIter(SIDE_A | SIDE_B)
   }
@@ -647,14 +653,14 @@ class DecorationSetComparison {
       let nextA = this.a.stack.length ? this.a.stack[this.a.stack.length - 1] : null
       let nextB = this.b.stack.length ? this.b.stack[this.b.stack.length - 1] : null
       if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
-        iterDecorationSet(this.a.stack, this.start)
-        iterDecorationSet(this.b.stack, this.start)
+        iterDecorationSet(this.a.stack, this.pos)
+        iterDecorationSet(this.b.stack, this.pos)
       } else if (nextA && (!nextB || (nextA.offset < nextB.offset ||
                                       nextA.offset == nextB.offset && (this.a.stack.length == 1 ||
                                                                        nextA.set.length >= nextB.set.length)))) {
-        if (this.a.forward(this.start, nextA)) side = side & ~SIDE_A
+        if (this.a.forward(this.pos, nextA)) side = side & ~SIDE_A
       } else if (nextB) {
-        if (this.b.forward(this.start, nextB)) side = side & ~SIDE_B
+        if (this.b.forward(this.pos, nextB)) side = side & ~SIDE_B
       } else {
         break
       }
@@ -664,51 +670,56 @@ class DecorationSetComparison {
   run() {
     let heapA = this.a.heap, heapB = this.b.heap
 
-    for (let pos = this.start;;) {
+    for (;;) {
       if (heapA.length && (!heapB.length || (heapA[0].heapPos - heapB[0].heapPos || heapA[0].desc.bias - heapB[0].desc.bias) < 0)) {
-        pos = this.advance(pos, this.a)
+        this.advance(this.a)
       } else if (heapB.length) {
-        pos = this.advance(pos, this.b)
+        this.advance(this.b)
       } else {
-        if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(pos, pos, this.ranges)
+        if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(this.pos, this.pos, this.ranges)
         break
       }
     }
   }
 
-  advancePos(pos: number, newPos: number): number {
+  advancePos(pos: number) {
+    if (pos > this.end) pos = this.end
+    if (pos <= this.pos) return
     if (this.a.widgets.length || this.b.widgets.length) {
       if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(pos, pos, this.ranges)
       this.a.widgets.length = this.b.widgets.length = 0
     }
     if (!compareActiveSets(this.a.active, this.b.active))
-      addRange(pos, newPos, this.ranges)
-    return newPos
+      addRange(this.pos, pos, this.ranges)
+    this.pos = pos
   }
 
-  advance(pos: number, side: ComparisonSide): number {
+  advance(side: ComparisonSide) {
     let next = takeFromHeap(side.heap)!
     if (next instanceof LocalSet) {
       let deco = next.decorations[next.index++]
       if (deco.from + next.offset > this.end) {
         side.heap.length = 0
-        return this.end
+        this.pos = this.end
+        return
       }
       // FIXME handle line decoration
-      if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans && deco.to + next.offset > pos) {
-        if (deco.from + next.offset > pos) pos = this.advancePos(pos, Math.min(this.end, deco.from + next.offset))
+      if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans && deco.to + next.offset > this.pos) {
+        this.advancePos(deco.from + next.offset)
+        deco = deco.move(next.offset)
         let collapsed = deco.desc.spec.collapsed
         if (collapsed) {
           if (collapsed instanceof WidgetType) side.widgets.push(collapsed)
-          pos = this.start = deco.to + next.offset
-        } else {
-          deco = deco.move(next.offset)
-          // FIXME as optimization, it should be possible to remove it from the other set, if present
-          side.active.push(deco.desc as RangeDesc)
-          addToHeap(side.heap, deco)
+          side.collapsedTo = Math.max(side.collapsedTo, deco.to)
+          // Skip regions that are collapsed on both sides
+          let collapsedTo = Math.min(this.a.collapsedTo, this.b.collapsedTo)
+          if (collapsedTo > this.pos) this.pos = collapsedTo
         }
+        // FIXME as optimization, it should be possible to remove it from the other set, if present
+        side.active.push(deco.desc as RangeDesc)
+        addToHeap(side.heap, deco)
       } else if (deco.desc instanceof PointDesc && deco.desc.widget) {
-        if (deco.from > pos) pos = this.advancePos(pos, deco.from)
+        this.advancePos(deco.from)
         side.widgets.push(deco.desc.widget)
       }
       if (next.index < next.decorations.length) addToHeap(side.heap, next)
@@ -716,10 +727,9 @@ class DecorationSetComparison {
       else if (next == this.b.tip) this.forwardIter(SIDE_B)
     } else {
       let deco = next as Decoration
-      if (deco.to > pos && pos < this.end) pos = this.advancePos(pos, Math.min(this.end, deco.to))
+      this.advancePos(deco.to)
       remove(side.active, deco.desc)
     }
-    return pos
   }
 }
 
