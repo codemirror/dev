@@ -1,5 +1,3 @@
-import {TruncatingStack} from "./stack"
-
 // Used to schedule history compression
 const max_empty_items = 500
 
@@ -32,52 +30,58 @@ type HistoryEntry<Change, M extends Mapping<Change, M>> = ChangesEntry<Change> |
 
 class Branch<Change, M extends Mapping<Change, M>> {
   static empty<Change, M extends Mapping<Change, M>>(maxLen: number): Branch<Change, M> {
-    return new Branch(TruncatingStack.empty(maxLen))
+    return new Branch(maxLen, [])
   }
-  private constructor(private readonly stack: TruncatingStack<HistoryEntry<Change, M>>) {}
+  private constructor(private readonly maxLen: number,
+                      private readonly items: ReadonlyArray<HistoryEntry<Change, M>>) {}
 
   get eventCount(): number {
-    let count = 0, len = this.stack.length
+    let count = 0, len = this.items.length
     for (let i = 0; i < len; ++i) {
-      if (this.stack.get(i) instanceof ChangesEntry) ++count
+      if (this.items[i] instanceof ChangesEntry) ++count
     }
     return count
   }
 
   isEmpty(): boolean {
-    return this.stack.lastItem == null
+    return this.items.length === 0
+  }
+
+  _checkLen(v: ReadonlyArray<HistoryEntry<Change, M>>) {
+    if (v.length > this.maxLen + 20) v = v.slice(v.length - this.maxLen - 1)
+    return v
   }
 
   addChanges(changes: ChangeList<Change, M>, isAdjacent: (prevChange: Change | null, curChange: Change) => boolean, tryMerge: boolean): Branch<Change, M> {
-    const lastItem = this.stack.lastItem
+    const lastItem = this.items[this.items.length - 1]
     if (lastItem instanceof ChangesEntry &&
         tryMerge &&
         isAdjacent(lastItem.changes[lastItem.changes.length - 1], changes.get(0))) {
-      return new Branch(this.stack.replaceFrom(this.stack.length - 1, [new ChangesEntry(lastItem.changes.concat(changes.changes), lastItem.inverted.concat(changes.inverted))]))
+      return new Branch(this.maxLen, this._checkLen(this.items.slice(0, -1).concat([new ChangesEntry(lastItem.changes.concat(changes.changes), lastItem.inverted.concat(changes.inverted))])))
     }
     return this.pushEntry(new ChangesEntry(changes.changes, changes.inverted))
   }
 
   pushEntry(entry: HistoryEntry<Change, M>): Branch<Change, M> {
-    return new Branch(this.stack.push(entry))
+    return new Branch(this.maxLen, this._checkLen(this.items.concat([entry])))
   }
 
   popChanges(): {changesEntry: ChangesEntry<Change>, newBranch: Branch<Change, M>, map: M | null} | null {
     let idx
-    for (idx = this.stack.length - 1; this.stack.get(idx) instanceof MappingEntry; --idx) {}
-    const changesEntry = this.stack.get(idx) as ChangesEntry<Change>
+    for (idx = this.items.length - 1; this.items[idx] instanceof MappingEntry; --idx) {}
+    const changesEntry = this.items[idx] as ChangesEntry<Change>
     let map = null
-    if (idx < this.stack.length - 1) {
-      map = (this.stack.get(idx + 1) as MappingEntry<Change, M>).map
-      for (let i = idx + 2; i < this.stack.length; ++i) {
-        const entry = this.stack.get(i) as MappingEntry<Change, M>
+    if (idx < this.items.length - 1) {
+      map = (this.items[idx + 1] as MappingEntry<Change, M>).map
+      for (let i = idx + 2; i < this.items.length; ++i) {
+        const entry = this.items[i] as MappingEntry<Change, M>
         map = map.concat(entry.map)
       }
     }
     // if there are no changes before map entries, we don't keep the map entries either
     const replaceWith = map && idx > 0 ? [new MappingEntry(map)] : []
-    const stack = this.stack.replaceFrom(idx, replaceWith)
-    return {changesEntry, newBranch: new Branch(stack), map}
+    const items = this._checkLen(this.items.slice(0, idx).concat(replaceWith))
+    return {changesEntry, newBranch: new Branch(this.maxLen, items), map}
   }
 
   // Record the fact that `rebasedCount` local changes were rebased as represented in `changes`.
@@ -89,13 +93,13 @@ class Branch<Change, M extends Mapping<Change, M>> {
   rebase(changes: ChangeList<Change, M>, rebasedCount: number): Branch<Change, M> {
     if (this.isEmpty()) return this
 
-    const itemCount = this.stack.length
+    const itemCount = this.items.length
     const rebasedItems = [], start = Math.max(0, itemCount - rebasedCount)
     let newUntil = changes.length
     let eventCount = this.eventCount
 
     for (let i = start, iRebased = rebasedCount; i < itemCount; ++i) {
-      const entry = this.stack.get(i) as HistoryEntry<Change, M>
+      const entry = this.items[i] as HistoryEntry<Change, M>
       const pos = changes.getMirror(--iRebased)
       if (pos == null) {
         // This entry is not shared nor was it rebased, so we drop it
@@ -111,20 +115,20 @@ class Branch<Change, M extends Mapping<Change, M>> {
     }
 
     const newMap = changes.getMapping(rebasedCount, newUntil)
-    const stack = this.stack.replaceFrom(start, [new MappingEntry<Change, M>(newMap)].concat(rebasedItems))
-    let branch = new Branch(stack)
-    if (stack.length - eventCount > max_empty_items)
+    const items = this._checkLen(this.items.slice(0, start).concat([new MappingEntry<Change, M>(newMap)]).concat(rebasedItems))
+    let branch = new Branch(this.maxLen, items)
+    if (items.length - eventCount > max_empty_items)
       branch = branch.compress(itemCount - rebasedItems.length)
     return branch
   }
 
   // FIXME: This only compresses consecutive `MappingEntry`s instead of mapping
   // `ChangeEntry`s and discarding `MappingEntry`s.
-  compress(upto: number = this.stack.length): Branch<Change, M> {
+  compress(upto: number = this.items.length): Branch<Change, M> {
     const newEntries: HistoryEntry<Change, M>[] = []
     let map = null
     for (let i = 0; i < upto; ++i) {
-      const entry = this.stack.get(i) as HistoryEntry<Change, M>
+      const entry = this.items[i] as HistoryEntry<Change, M>
       if (entry instanceof MappingEntry) {
         if (!map) map = entry.map
         else map = map.concat(entry.map)
@@ -140,7 +144,7 @@ class Branch<Change, M extends Mapping<Change, M>> {
       newEntries.push(new MappingEntry<Change, M>(map))
       map = null
     }
-    return new Branch(this.stack.replaceBefore(upto, newEntries))
+    return new Branch(this.maxLen, this.items.slice(0, upto).concat(newEntries))
   }
 }
 
