@@ -1,7 +1,7 @@
 import {EditorState, Transaction} from "../../state/src/state"
 import {DocViewDesc, PluginDeco} from "./viewdesc"
 import {DOMObserver} from "./domobserver"
-import {attachEventHandlers} from "./input"
+import {InputState, attachEventHandlers} from "./input"
 import {SelectionReader, selectionToDOM} from "./selection"
 import {DecorationSet} from "./decoration"
 
@@ -20,6 +20,7 @@ export class EditorView {
   public dom: Element;
   public contentDOM: Element;
 
+  public inputState: InputState = new InputState;
   // (Many of these things should be module-private)
 
   public docView: DocViewDesc;

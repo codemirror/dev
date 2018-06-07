@@ -2,6 +2,12 @@ import {MetaSlot} from "../../state/src/state"
 import {EditorView} from "./view"
 import browser from "./browser"
 
+// This will also be where dragging info and such goes
+export class InputState {
+  lastKeyCode: number = 0;
+  lastKeyTime: number = 0;
+}
+
 const handlers = Object.create(null)
 
 export function attachEventHandlers(view: EditorView) {
@@ -33,6 +39,11 @@ function capturePaste(view: EditorView) {
 function doPaste(view: EditorView, text: string) {
   // FIXME normalize input text (newlines)?
   view.dispatch(view.state.transaction.replaceSelection(text).setMeta(MetaSlot.userEvent, "paste"))
+}
+
+handlers.keydown = (view: EditorView, event: KeyboardEvent) => {
+  view.inputState.lastKeyCode = event.keyCode
+  view.inputState.lastKeyTime = Date.now()
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {

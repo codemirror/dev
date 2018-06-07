@@ -45,7 +45,7 @@ describe("EditorView selection", () => {
 
     let cm = tempEditor("abc\n\ndef")
     function test(pos, node, offset) {
-      cm.dispatch(cm.state.transaction.setSelection(new Selection([new Range(pos)])))
+      cm.dispatch(cm.state.transaction.setSelection(Selection.single(pos)))
       ist(window.getSelection().focusNode, node)
       ist(window.getSelection().focusOffset, offset)
     }

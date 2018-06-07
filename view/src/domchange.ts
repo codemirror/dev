@@ -3,7 +3,15 @@ import {EditorView} from "./view"
 export function applyDOMChange(view: EditorView, start: number, end: number) {
   let {from, to, text} = view.docView.readDOMRange(start, end)
 
-  let diff = findDiff(view.state.doc.slice(from, to), text, view.state.selection.primary.head - from, null)
+  let preferredPos = view.state.selection.primary.from, preferredSide = null
+  // Prefer anchoring to end when Backspace is pressed
+  if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100) {
+    preferredPos = view.state.selection.primary.to
+    preferredSide = "end"
+  }
+  view.inputState.lastKeyCode = 0
+
+  let diff = findDiff(view.state.doc.slice(from, to), text, preferredPos, preferredSide)
   if (diff) {
     // FIXME apply generic insertText functionality when appropriate
     // (including mapping selection forward in case of replace), maybe

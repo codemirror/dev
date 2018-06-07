@@ -1,4 +1,5 @@
 import {tempEditor} from "./temp-editor"
+import {Selection} from "../../state/src/state"
 import ist from "ist"
 
 describe("DOM changes", () => {
@@ -31,5 +32,15 @@ describe("DOM changes", () => {
     for (let i = 0; i < 100; i++) cm.contentDOM.appendChild(node.cloneNode(true))
     cm.domObserver.flush()
     ist(cm.state.doc.text, "okay" + "\nayayayayayay".repeat(100))
+  })
+
+  it("properly handles selection for ambiguous backspace", () => {
+    let cm = tempEditor("foo")
+    cm.dispatch(cm.state.transaction.setSelection(Selection.single(2)))
+    cm.contentDOM.firstChild.firstChild.nodeValue = "fo"
+    cm.inputState.lastKeyCode = 8
+    cm.inputState.lastKeyTime = Date.now()
+    cm.domObserver.flush()
+    ist(cm.state.selection.primary.anchor, 1)
   })
 })
