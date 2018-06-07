@@ -84,6 +84,7 @@ export abstract class ViewDesc {
       if (bias < 0) after = node
       else after = node.nextSibling
     }
+    while (after && !after.cmView) after = after.nextSibling
     if (!after) return this.length
 
     for (let i = 0, pos = 0;; i++) {
