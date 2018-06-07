@@ -116,14 +116,13 @@ export class TextNode extends Text {
   constructor(readonly length: number, readonly children: ReadonlyArray<Text>) {
     super()
     let lineBreaks = 0
-    for (let i = 0; i < children.length; i++) lineBreaks += children[i].lineBreaks
+    for (let child of children) lineBreaks += child.lineBreaks
     this.lineBreaks = lineBreaks
   }
 
   get text(): string {
     let result = ""
-    for (let i = 0; i < this.children.length; i++)
-      result += this.children[i].text
+    for (let child of this.children) result += child.text
     return result
   }
 
@@ -161,9 +160,9 @@ export class TextNode extends Text {
   }
 
   slice(from: number, to: number = this.length): string {
-    let result = ""
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
+    let result = "", pos = 0
+    for (let child of this.children) {
+      let end = pos + child.length
       if (to > pos && from < end)
         result += child.slice(Math.max(0, from - pos), Math.min(child.length, to - pos))
       pos = end
@@ -189,8 +188,9 @@ export class TextNode extends Text {
   }
 
   decomposeEnd(from: number, target: Text[]) {
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
+    let pos = 0
+    for (let child of this.children) {
+      let end = pos + child.length
       if (pos >= from) target.push(child)
       else if (end > from && pos < from) child.decomposeEnd(from - pos, target)
       pos = end
@@ -205,7 +205,7 @@ export class TextNode extends Text {
     function add(child: Text) {
       let childLength = child.length, last
       if (childLength > maxLength && child instanceof TextNode) {
-        for (let i = 0; i < child.children.length; i++) add(child.children[i])
+        for (let node of child.children) add(node)
       } else if (childLength > minLength && (currentLength > minLength || currentLength == 0)) {
         flush()
         chunked.push(child)
@@ -228,7 +228,7 @@ export class TextNode extends Text {
       }
     }
 
-    for (let i = 0; i < children.length; i++) add(children[i])
+    for (let child of children) add(child)
     flush()
     return chunked.length == 1 ? chunked[0] : new TextNode(length, chunked)
   }

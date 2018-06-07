@@ -49,8 +49,8 @@ class Configuration {
 
   constructor(readonly plugins: ReadonlyArray<Plugin>) {
     let fields = []
-    for (let i = 0; i < plugins.length; i++) {
-      let field = plugins[i].stateField
+    for (let plugin of plugins) {
+      let field = plugin.stateField
       if (!field) continue
       if (fields.indexOf(field) > -1)
         throw new Error(`A state field (${field.key}) can only be added to a state once`)
@@ -93,8 +93,7 @@ export class EditorState {
     let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
     let $config = new Configuration(config.plugins || [])
     let state = new EditorState($config, doc, config.selection || Selection.default)
-    for (let i = 0; i < $config.fields.length; i++)
-      (state as any)[$config.fields[i].key] = $config.fields[i].init(state)
+    for (let field of $config.fields) (state as any)[field.key] = field.init(state)
     return state
   }
 }
@@ -260,8 +259,7 @@ export class Transaction {
   reduceRanges(f: (transaction: Transaction, range: Range) => Transaction): Transaction {
     let tr: Transaction = this
     let sel = tr.selection, start = tr.changes.length
-    for (let i = 0; i < sel.ranges.length; i++) {
-      let range = sel.ranges[i]
+    for (let range of sel.ranges) {
       for (let j = start; j < tr.changes.length; j++)
         range = range.map(tr.changes[j])
       tr = f(tr, range)
@@ -288,10 +286,8 @@ export class Transaction {
   apply(): EditorState {
     let $conf = this.startState.config
     let newState = new EditorState($conf, this.doc, this.selection)
-    for (let i = 0; i < $conf.fields.length; i++) {
-      let field = $conf.fields[i]
-      ;(newState as any)[field.key] = field.apply(this, (this.startState as any)[field.key], newState)
-    }
+    for (let field of $conf.fields)
+      (newState as any)[field.key] = field.apply(this, (this.startState as any)[field.key], newState)
     return newState
   }
 }

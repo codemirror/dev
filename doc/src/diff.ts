@@ -30,11 +30,9 @@ export function changedRanges(a: Text, b: Text): ChangedRange[] {
         scanText(state, pos, pos + a.length, pos, pos + b.length)
       } else { // Both are text nodes, directly compare content
         let diff = computeDiff(a.text, b.text)
-        for (let i = 0; i < diff.length; i++) {
-          let range = diff[i]
+        for (let range of diff)
           state.ranges.push(new ChangedRange(range.fromA + pos, range.toA + pos,
                                              range.fromB + pos, range.toB + pos))
-        }
       }
       break
     }
@@ -90,11 +88,9 @@ function scanText(state: DiffState, fromA: number, toA: number, fromB: number, t
   if (Math.max(toA - fromA, toB - fromB) <= MAX_FULL_TEXT_DIFF_SIZE &&
       toA > fromA + 2 && toB > fromB + 2) {
     let diff = computeDiff(state.a.slice(fromA, toA), state.b.slice(fromB, toB))
-    for (let i = 0; i < diff.length; i++) {
-      let range = diff[i]
+    for (let range of diff)
       state.ranges.push(new ChangedRange(range.fromA + fromA, range.toA + fromA,
                                          range.fromB + fromB, range.toB + fromB))
-    }
   } else {
     state.ranges.push({fromA, toA, fromB, toB})
   }
@@ -115,8 +111,8 @@ function scanNodes(state: DiffState,
   let nodesA = nodesUpTo(a, maxSize), nodesB = nodesUpTo(b, maxSize)
   let diff = computeDiff(nodesA, nodesB)
   let nextSize = maxSize >> 1
-  for (let i = 0, posA = fromA, posB = fromB, iA = 0, iB = 0; i < diff.length; i++) {
-    let range = diff[i]
+  let posA = fromA, posB = fromB, iA = 0, iB = 0
+  for (let range of diff) {
     while (iA < range.fromA) posA += nodesA[iA++].length
     while (iB < range.fromB) posB += nodesA[iB++].length
     let startIA = iA, startPosA = posA, startIB = iB, startPosB = posB
@@ -134,13 +130,13 @@ function scanNodes(state: DiffState,
 
 function smallestNodeSize(nodes: Text[]): number {
   let size = 1e10
-  for (let i = 0; i < nodes.length; i++) size = Math.min(nodes[i].length, size)
+  for (let node of nodes) size = Math.min(node.length, size)
   return size
 }
 
 function nodesUpTo(nodes: ReadonlyArray<Text>, maxSize: number, result: Text[] = []): Text[] {
-  for (let i = 0; i < nodes.length; i++) {
-    let node = nodes[i], children = node.children
+  for (let node of nodes) {
+    let children = node.children
     if (!children || node.length <= maxSize) result.push(node)
     else nodesUpTo(children, maxSize, result)
   }
