@@ -78,12 +78,11 @@ export class EditorState {
 
   get plugins(): ReadonlyArray<Plugin> { return this.config.plugins }
 
-  getPluginWithField(field: StateField<any>): Plugin | null {
-    for (let i = 0; i < this.config.plugins.length; i++) {
-      let plugin = this.config.plugins[i]
+  getPluginWithField(field: StateField<any>): Plugin {
+    for (const plugin of this.config.plugins) {
       if (plugin.stateField == field) return plugin
     }
-    return null
+    throw new Error("Plugin for field not configured")
   }
 
   get transaction(): Transaction {
