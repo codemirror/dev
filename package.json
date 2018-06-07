@@ -4,7 +4,7 @@
   "description": "Text/code editor component",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts view/test/test-decoration.ts",
+    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts view/test/test-decoration.ts keymap/test/test-*.ts",
     "watch-demo": "rollup -w -c rollup.demo.config.js"
   },
   "keywords": [
@@ -35,6 +35,7 @@
     "rollup-plugin-commonjs": "^9.1.3",
     "rollup-plugin-typescript2": "^0.14.0",
     "ts-node": "^5.0.1",
-    "typescript": "^2.8.4"
+    "typescript": "^2.8.4",
+    "w3c-keyname": "^1.1.8"
   }
 }

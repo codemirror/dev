@@ -45,6 +45,19 @@ export class EditorView {
     attachEventHandlers(this)
     this.selectionReader = new SelectionReader(this)
 
+    const registeredEvents = []
+    const handleDOMEvents = this.someProp("handleDOMEvents")
+    for (const key in handleDOMEvents) {
+      if (Object.prototype.hasOwnProperty.call(handleDOMEvents, key) && registeredEvents.indexOf(key) == -1) {
+        this.contentDOM.addEventListener(key, event => {
+          const res = handleDOMEvents[event.type](this, event)
+          if (res) event.preventDefault()
+          return res
+        })
+        registeredEvents.push(key)
+      }
+    }
+
     this.docView = new DocViewDesc(state.doc, this.getDecorations(), this.contentDOM)
     this.domObserver.start()
   }

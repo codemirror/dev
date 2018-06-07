@@ -1,5 +1,7 @@
 import {EditorState, Plugin, StateField} from "../state/src/state"
 import {EditorView, Decoration, DecorationSet} from "../view/src/"
+import {keymap} from "../keymap/src/keymap"
+import {history, redo, undo} from "../history/src/history"
 
 let field = new StateField<DecorationSet>({
   init() {return DecorationSet.of([
@@ -16,6 +18,9 @@ let decos = new Plugin({
   }
 })
 
-let state = EditorState.create({doc: "one\ntwo\nthree", plugins: [decos]})
-let view = (window as any).view = new EditorView(state) 
+let state = EditorState.create({doc: "one\ntwo\nthree", plugins: [history(), decos, keymap({
+  "ctrl-z": undo,
+  "ctrl-shift-z": redo
+})]})
+let view = (window as any).view = new EditorView(state)
 document.body.appendChild(view.dom)
