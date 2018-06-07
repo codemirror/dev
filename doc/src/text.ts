@@ -144,7 +144,7 @@ export class TextNode extends Text {
         children = this.children.slice()
         children[i] = child.replace(from - pos, to - pos, text)
         return new TextNode(newLength, children)
-      } else if (end > from) {
+      } else if (end >= from) {
         // Otherwise, we must build up a new array of children
         if (children == null) children = this.children.slice(0, i)
         if (pos < from) {

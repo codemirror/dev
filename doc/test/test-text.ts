@@ -39,6 +39,20 @@ describe("doc", () => {
     ist(Text.create("?" + midDoc).replace(9500, midDoc.length + 1, "").text, "?" + midDoc.slice(0, 9499))
   })
 
+  it("can insert on node boundaries", () => {
+    let doc = Text.create(midDoc), pos = doc.children[0].length
+    ist(doc.replace(pos, pos, "abc").slice(pos, pos + 3), "abc")
+  })
+
+  it("can build up a doc by repeated appending", () => {
+    let len = 0, doc = Text.create("")
+    for (let i = 1; i < 1000; ++i) {
+      doc = doc.replace(doc.length, doc.length, "newtext" + i + " ")
+      len += 8 + i.toString().length
+    }
+    ist(doc.length, len)
+  })
+
   it("properly maintains content during editing", () => {
     let str = midDoc, doc = Text.create(str)
     for (let i = 0; i < 200; i++) {
