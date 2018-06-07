@@ -139,7 +139,7 @@ export class Selection {
     return new Selection([new Range(anchor, head)])
   }
 
-  static default: Selection = new Selection([new Range(0)]);
+  static default: Selection = Selection.single(0);
 }
 
 const empty: ReadonlyArray<any> = []
