@@ -34,6 +34,6 @@
     "rollup-plugin-typescript2": "^0.14.0",
     "ts-node": "^5.0.1",
     "typescript": "^2.8.4",
-    "w3c-keyname": "^1.1.8"
+    "w3c-keyname": "^2.0.0"
   }
 }

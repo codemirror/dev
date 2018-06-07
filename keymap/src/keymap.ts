@@ -1,4 +1,4 @@
-const keyName = require("w3c-keyname")
+import {base, keyName} from "w3c-keyname"
 
 import {EditorState, Transaction, Plugin} from "../../state/src/state"
 import {EditorView} from "../../view/src/view"
@@ -96,7 +96,7 @@ export function keydownHandler(bindings: {[key: string]: Command}): (view: Edito
     let baseName
     if (direct && direct(view.state, view.dispatch, view)) return true
     if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
-        (baseName = keyName.base[event.keyCode]) && baseName != name) {
+        (baseName = base[event.keyCode]) && baseName != name) {
       const fromCode = map[modifiers(baseName, event, true)]
       if (fromCode && fromCode(view.state, view.dispatch, view)) return true
     }
