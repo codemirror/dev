@@ -115,16 +115,16 @@ export type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
 
 export class DocViewDesc extends ViewDesc {
   children: LineViewDesc[];
+  text: Text = Text.create("");
   decorations: PluginDeco[] = [];
 
   get length() { return this.text.length }
   get childGap() { return 1 }
 
-  constructor(public text: Text, decorations: PluginDeco[], dom: Element) {
+  constructor(text: Text, decorations: PluginDeco[], dom: Element) {
     super(null, dom)
     this.children = [new LineViewDesc(this, [])]
     this.dirty = NODE_DIRTY
-    this.text = Text.create("")
     this.update(text, decorations)
     this.sync()
   }

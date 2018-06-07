@@ -29,6 +29,9 @@ export abstract class WidgetType<T> {
   }
 }
 
+// FIXME try dropping specs entirely from the data structure, and
+// providing a user data field in decoration descs
+
 abstract class DecorationDesc {
   constructor(readonly bias: number) {}
   spec: any;
@@ -131,6 +134,9 @@ const noChildren: A<DecorationSet> = []
 const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
 type DecorationFilter = (from: number, to: number, spec: any) => boolean
+
+// FIXME look into generalizing this to a generic mappable
+// position-data container
 
 export class DecorationSet {
   /** @internal */
