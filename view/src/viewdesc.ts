@@ -30,8 +30,8 @@ export abstract class ViewDesc {
   }
 
   posBefore(desc: ViewDesc): number {
-    for (let i = 0, pos = this.posAtStart; i < this.children.length; i++) {
-      let child = this.children[i]
+    let pos = this.posAtStart
+    for (let child of this.children) {
       if (child == desc) return pos
       pos += child.length + this.childGap
     }
@@ -45,8 +45,8 @@ export abstract class ViewDesc {
   syncDOMChildren() {
     if (!this.dom) return
     let dom = this.dom.firstChild
-    for (let i = 0; i < this.children.length; i++) {
-      let desc = this.children[i], childDOM = desc.dom
+    for (let desc of this.children) {
+      let childDOM = desc.dom
       if (!childDOM) continue
       if (childDOM.parentNode == this.dom) {
         while (childDOM != dom) dom = rm(dom!)
@@ -62,7 +62,7 @@ export abstract class ViewDesc {
     if (this.dirty & NODE_DIRTY)
       this.syncDOMChildren()
     if (this.dirty & CHILD_DIRTY)
-      for (let i = 0; i < this.children.length; i++) this.children[i].sync()
+      for (let child of this.children) child.sync()
     this.dirty = NOT_DIRTY
   }
 
@@ -224,7 +224,7 @@ class LineViewDesc extends ViewDesc {
     let {i: toI, off: toOff} = cur.findPos(to, 1)
     let {i: fromI, off: fromOff} = cur.findPos(from, -1)
     let dLen = from - to
-    for (let i = 0; i < content.length; i++) dLen += content[i].length
+    for (let desc of content) dLen += desc.length
     this.length += dLen
 
     // Both from and to point into the same text view
@@ -273,7 +273,7 @@ class LineViewDesc extends ViewDesc {
 
     // And if anything remains, splice the child array to insert the new content
     if (content.length || fromI != toI) {
-      for (let i = 0; i < content.length; i++) content[i].finish(this)
+      for (let desc of content) desc.finish(this)
       this.children.splice(fromI, toI - fromI, ...content)
       this.markDirty()
     }
@@ -473,8 +473,8 @@ export class LineElementBuilder {
 
     let tagName = null, clss = null
     let attrs: {[key: string]: string} | null = null
-    for (let i = 0; i < this.active.length; i++) {
-      let spec = this.active[i].spec
+    for (let desc of this.active) {
+      let spec = desc.spec
       if (spec.tagName) tagName = spec.tagName
       if (spec.class) clss = clss ? clss + " " + spec.class : spec.class
       if (spec.attributes) for (let name in spec.attributes) {
@@ -573,8 +573,8 @@ class ChildCursor {
 }
 
 function findPluginDeco(decorations: ReadonlyArray<PluginDeco>, plugin: Plugin | null): DecorationSet | null {
-  for (let i = 0; i < decorations.length; i++)
-    if (decorations[i].plugin == plugin) return decorations[i].decorations
+  for (let deco of decorations)
+    if (deco.plugin == plugin) return deco.decorations
   return null
 }
 
@@ -582,14 +582,12 @@ function extendForChangedDecorations(diff: ReadonlyArray<ChangedRange>,
                                      decorations: ReadonlyArray<PluginDeco>,
                                      oldDecorations: ReadonlyArray<PluginDeco>): ReadonlyArray<ChangedRange> {
   let ranges: number[] = []
-  for (let i = 0; i < decorations.length; i++) {
-    let deco = decorations[i]
+  for (let deco of decorations) {
     let newRanges = (findPluginDeco(oldDecorations, deco.plugin) || DecorationSet.empty)
       .changedRanges(deco.decorations, diff)
     ranges = joinRanges(ranges, newRanges)
   }
-  for (let i = 0; i < oldDecorations.length; i++) {
-    let old = oldDecorations[i]
+  for (let old of oldDecorations) {
     if (!findPluginDeco(decorations, old.plugin))
       ranges = joinRanges(ranges, old.decorations.changedRanges(DecorationSet.empty, diff))
   }

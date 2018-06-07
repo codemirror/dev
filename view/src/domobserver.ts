@@ -62,8 +62,8 @@ export class DOMObserver {
     if (records.length == 0) return
 
     let from = -1, to = -1
-    for (let i = 0; i < records.length; i++) {
-      let range = this.readMutation(records[i])
+    for (let record of records) {
+      let range = this.readMutation(record)
       if (!range) continue
       if (from == -1) {
         ;({from, to} = range)

@@ -88,11 +88,11 @@ export class EditorView {
       let decorations = this.props.decorations(this.state)
       if (decorations.size) result.push({plugin: null, decorations})
     }
-    for (let i = 0; i < plugins.length; i++) {
-      let prop = plugins[i].props.decorations
+    for (let plugin of plugins) {
+      let prop = plugin.props.decorations
       if (!prop) continue
       let decorations = prop(this.state)
-      if (decorations.size) result.push({plugin: plugins[i], decorations})
+      if (decorations.size) result.push({plugin, decorations})
     }
     return result
   }
@@ -102,8 +102,8 @@ export class EditorView {
     let prop = (this.props as any)[propName], value
     if (prop != null && (value = f ? f(prop) : prop)) return value
     let plugins = this.state.plugins
-    for (let i = 0; i < plugins.length; i++) {
-      let prop = plugins[i].props[propName]
+    for (let plugin of plugins) {
+      let prop = plugin.props[propName]
       if (prop != null && (value = f ? f(prop) : prop)) return value
     }
     return null

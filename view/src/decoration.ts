@@ -118,8 +118,7 @@ export class Decoration {
 
 // FIXME use a mapping abstraction defined in the state module
 function mapPos(pos: number, changes: A<Change>, assoc: number, track: boolean = false) {
-  for (let i = 0; i < changes.length; i++) {
-    let change = changes[i]
+  for (let change of changes) {
     if (track && change.from < pos && change.to > pos) return -1
     pos = change.mapPos(pos, assoc)
   }
@@ -172,7 +171,8 @@ export class DecorationSet {
     // Iterate over the child sets, applying filters and pushing added
     // decorations into them
     for (let i = 0; i < this.children.length; i++) {
-      let child = this.children[i], endPos = pos + child.length, localDeco: Decoration[] | null = null
+      let child = this.children[i]
+      let endPos = pos + child.length, localDeco: Decoration[] | null = null
       while (decI < decorations.length) {
         let next = decorations[decI]
         if (next.from >= endPos) break
@@ -233,10 +233,8 @@ export class DecorationSet {
   // Collect all decorations in this set into the target array,
   // offsetting them by `offset`
   collect(target: Decoration[], offset: number) {
-    for (let i = 0; i < this.local.length; i++)
-      target.push(this.local[i].move(offset))
-    for (let i = 0; i < this.children.length; i++) {
-      let child = this.children[i]
+    for (let deco of this.local) target.push(deco.move(offset))
+    for (let child of this.children) {
       child.collect(target, offset)
       offset += child.length
     }
@@ -262,7 +260,7 @@ export class DecorationSet {
       else if (newLocal && mapped) newLocal.push(mapped)
     }
 
-    let newChildren: DecorationSet[] | null = null
+    let newChildren: DecorationSet[] | null = null 
     for (let i = 0, oldPos = oldStart, newPos = newStart; i < this.children.length; i++) {
       let child = this.children[i], newChild = child
       let oldChildEnd = oldPos + child.length
@@ -271,8 +269,8 @@ export class DecorationSet {
       if (touchesChange(oldPos, oldChildEnd, changes)) {
         let inner = child.mapInner(changes, oldPos, newPos, newChildEnd)
         newChild = inner.set
-        if (inner.escaped) for (let j = 0; j < inner.escaped.length; j++) {
-          let deco = inner.escaped[j].move(newPos - newStart)
+        if (inner.escaped) for (let deco of inner.escaped) {
+          deco = deco.move(newPos - newStart)
           if (deco.from < 0 || deco.to > newLength) {
             ;(escaped || (escaped = [])).push(deco)
           } else {
@@ -315,8 +313,7 @@ export class DecorationSet {
   changedRanges(other: DecorationSet, textDiff: A<ChangedRange>): number[] {
     let ranges: number[] = []
     let oldPos = 0, newPos = 0
-    for (let i = 0; i < textDiff.length; i++) {
-      let range = textDiff[i]
+    for (let range of textDiff) {
       if (range.fromB > newPos && (this != other || oldPos != newPos))
         new DecorationSetComparison(this, oldPos, other, newPos, range.fromB, ranges).run()
       oldPos = range.toA
@@ -384,12 +381,9 @@ export function buildLineElements(sets: A<DecorationSet>, from: number, to: numb
 }) {
   let heap: Heapable[] = []
 
-  for (let i = 0; i < sets.length; i++) {
-    let set = sets[i]
-    if (set.size > 0) {
-      addIterToHeap(heap, [new IteratedSet(0, set)], from)
-      if (set.local.length) addToHeap(heap, new LocalSet(0, set.local))
-    }
+  for (let set of sets) if (set.size > 0) {
+    addIterToHeap(heap, [new IteratedSet(0, set)], from)
+    if (set.local.length) addToHeap(heap, new LocalSet(0, set.local))
   }
 
   while (heap.length > 0) {
@@ -505,8 +499,7 @@ function filterDecorations(decorations: A<Decoration>,
 }
 
 function touchesChange(from: number, to: number, changes: A<Change>): boolean {
-  for (let i = 0; i < changes.length; i++) {
-    let change = changes[i]
+  for (let change of changes) {
     if (change.to >= from && change.from <= to) return true
     let diff = change.text.length - (change.to - change.from)
     if (from > change.from) from += diff
@@ -517,14 +510,13 @@ function touchesChange(from: number, to: number, changes: A<Change>): boolean {
 
 function collapseSet(children: A<DecorationSet>, local: Decoration[],
                      add: A<Decoration>, start: number, offset: number, length: number): DecorationSet {
-  let wasEmpty = local.length == 0
-  for (let i = 0, off = 0; i < children.length; i++) {
-    let child = children[i]
+  let mustSort = local.length > 0 && add.length > 0, off = 0
+  for (let child of children) {
     child.collect(local, -off)
     off += child.length
   }
-  for (let i = start; i < add.length; i++) local.push(add[i].move(-offset))
-  if (!wasEmpty) local.sort(byPos)
+  for (let added of add) local.push(added.move(-offset))
+  if (mustSort) local.sort(byPos)
 
   return new DecorationSet(length, local.length, local, noChildren)
 }
@@ -561,7 +553,7 @@ function rebalanceChildren(local: Decoration[], children: DecorationSet[], child
       if (i >= 0) children[i] = children[i].grow(child.length)
     } else if (child.size > (childSize << 1) && child.local.length < (child.length >> 1)) {
       // Unwrap an overly big node
-      for (let j = 0; j < child.local.length; j++) insertSorted(local, child.local[j].move(off))
+      for (let deco of child.local) insertSorted(local, deco.move(off))
       children.splice(i, 1, ...child.children)
     } else if (child.children.length == 0 && i < children.length - 1 &&
                (next = children[i + 1]).size + child.size <= BASE_NODE_SIZE &&
@@ -735,11 +727,9 @@ class DecorationSetComparison {
 
 function compareActiveSets(active: RangeDesc[], otherActive: RangeDesc[]): boolean {
   if (active.length != otherActive.length) return false
-  outer: for (let i = 0; i < active.length; i++) {
-    let desc = active[i]
+  outer: for (let desc of active) {
     if (otherActive.indexOf(desc) > -1) continue
-    for (let j = 0; j < otherActive.length; j++)
-      if (desc.eq(otherActive[i])) continue outer
+    for (let other of otherActive) if (desc.eq(other)) continue outer
     return false
   }
   return true
@@ -747,11 +737,9 @@ function compareActiveSets(active: RangeDesc[], otherActive: RangeDesc[]): boole
 
 function compareWidgetSets(widgets: WidgetType<any>[], otherWidgets: WidgetType<any>[]): boolean {
   if (widgets.length != otherWidgets.length) return false
-  outer: for (let i = 0; i < widgets.length; i++) {
-    let widget = widgets[i]
+  outer: for (let widget of widgets) {
     if (otherWidgets.indexOf(widget) > -1) continue
-    for (let j = 0; j < otherWidgets.length; j++)
-      if (widget.compare(otherWidgets[i])) continue outer
+    for (let other of otherWidgets) if (widget.compare(other)) continue outer
     return false
   }
   return true
@@ -768,8 +756,7 @@ export function attrsEq(a: any, b: any): boolean {
   if (!a || !b) return false
   let keysA = Object.keys(a), keysB = Object.keys(b)
   if (keysA.length != keysB.length) return false
-  for (let i = 0; i < keysA.length; i++) {
-    let key = keysA[i]
+  for (let key of keysA) {
     if (keysB.indexOf(key) == -1 || a[key] !== b[key]) return false
   }
   return true
