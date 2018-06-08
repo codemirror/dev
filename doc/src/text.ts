@@ -39,13 +39,14 @@ export abstract class Text implements Iterable<string> {
     }}
   }
 
-  // These are module-internal but TypeScript doesn't have a
-  // way to express that.
+  /** @internal */
   abstract decomposeStart(to: number, target: Text[]): void;
+  /** @internal */
   abstract decomposeEnd(from: number, target: Text[]): void;
 
   toString() { return this.text }
 
+  /** @internal */
   protected constructor() {}
 
   static create(text: string): Text {
