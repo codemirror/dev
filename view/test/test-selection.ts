@@ -1,5 +1,5 @@
 import {tempEditor} from "./temp-editor"
-import {Selection, Range} from "../../state/src/state"
+import {Selection} from "../../state/src/state"
 import ist from "ist"
 
 function setDOMSel(node, offset) {

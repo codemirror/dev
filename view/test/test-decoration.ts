@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet, DecoratedSpan} from "../src/decoration"
+import {Decoration, DecorationSet} from "../src/decoration"
 import {Change} from "../../state/src/state"
 const ist = require("ist")
 
