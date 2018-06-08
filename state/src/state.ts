@@ -38,9 +38,9 @@ export class Plugin {
   readonly props: any;
 
   constructor(spec: PluginSpec) {
-    this.config = spec.config;
-    this.stateField = spec.state || null;
-    this.props = spec.props || {};
+    this.config = spec.config
+    this.stateField = spec.state || null
+    this.props = spec.props || {}
   }
 }
 

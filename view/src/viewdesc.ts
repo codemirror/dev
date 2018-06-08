@@ -408,7 +408,7 @@ class WidgetViewDesc extends LineElementViewDesc {
       ;(this.dom as HTMLElement).contentEditable = "true"
       this.dom.cmView = this
     }
-  }  
+  }
 
   get length() { return 0 }
   getSide() { return this.side }
@@ -509,7 +509,7 @@ export class LineElementBuilder {
         this.text = this.cursor.next(length - (this.text.length - this.textOff))
         this.textOff = 0
       }
-      
+
       this.pos = pos
     }
   }

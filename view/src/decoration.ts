@@ -266,7 +266,7 @@ export class DecorationSet {
       else if (newLocal && mapped) newLocal.push(mapped)
     }
 
-    let newChildren: DecorationSet[] | null = null 
+    let newChildren: DecorationSet[] | null = null
     for (let i = 0, oldPos = oldStart, newPos = newStart; i < this.children.length; i++) {
       let child = this.children[i], newChild = child
       let oldChildEnd = oldPos + child.length
