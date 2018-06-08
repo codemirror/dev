@@ -6,7 +6,8 @@ function depth(node) {
 }
 
 const line = "1234567890".repeat(10)
-const midDoc = new Array(200).fill(line).join("\n")
+const lines = new Array(200).fill(line).join("\n")
+const doc0 = Text.create(lines)
 
 describe("doc", () => {
   it("Creates a balanced tree when loading a document", () => {
@@ -16,31 +17,31 @@ describe("doc", () => {
   })
 
   it("rebalances on insert", () => {
-    let doc = Text.create(midDoc)
+    let doc = doc0
     let insert = "abc".repeat(200)
     for (let i = 0; i < 10; i++)
       doc = doc.replace(doc.length / 2, doc.length / 2, insert)
     ist(depth(doc), 3, "<=")
-    ist(doc.text, midDoc.slice(0, midDoc.length / 2) + "abc".repeat(2000) + midDoc.slice(midDoc.length / 2))
+    ist(doc.text, lines.slice(0, lines.length / 2) + "abc".repeat(2000) + lines.slice(lines.length / 2))
   })
 
   it("collapses on delete", () => {
-    let doc = Text.create(midDoc).replace(10, midDoc.length - 10, "")
+    let doc = doc0.replace(10, lines.length - 10, "")
     ist(depth(doc), 0)
     ist(doc.length, 20)
     ist(doc.text, line.slice(0, 20))
   })
 
   it("handles deleting at start", () => {
-    ist(Text.create(midDoc + "!").replace(0, 9500, "").text, midDoc.slice(9500) + "!")
+    ist(Text.create(lines + "!").replace(0, 9500, "").text, lines.slice(9500) + "!")
   })
 
   it("handles deleting at end", () => {
-    ist(Text.create("?" + midDoc).replace(9500, midDoc.length + 1, "").text, "?" + midDoc.slice(0, 9499))
+    ist(Text.create("?" + lines).replace(9500, lines.length + 1, "").text, "?" + lines.slice(0, 9499))
   })
 
   it("can insert on node boundaries", () => {
-    let doc = Text.create(midDoc), pos = doc.children[0].length
+    let doc = doc0, pos = doc.children[0].length
     ist(doc.replace(pos, pos, "abc").slice(pos, pos + 3), "abc")
   })
 
@@ -54,7 +55,7 @@ describe("doc", () => {
   })
 
   it("properly maintains content during editing", () => {
-    let str = midDoc, doc = Text.create(str)
+    let str = lines, doc = Text.create(str)
     for (let i = 0; i < 200; i++) {
       let insPos = Math.floor(Math.random() * doc.length)
       let insChar = String.fromCharCode("A".charCodeAt(0) + Math.floor(Math.random() * 26))
@@ -80,7 +81,7 @@ describe("doc", () => {
   })
 
   it("can be compared", () => {
-    let doc = Text.create(midDoc), doc2 = Text.create(midDoc)
+    let doc = doc0, doc2 = Text.create(lines)
     ist(doc.eq(doc))
     ist(doc.eq(doc2))
     ist(doc2.eq(doc))
@@ -89,7 +90,7 @@ describe("doc", () => {
   })
 
   it("can be compared despite different tree shape", () => {
-    ist(Text.create(midDoc).eq(Text.create(midDoc.repeat(3)).replace(1000, (midDoc.length * 2) + 1000, "")))
+    ist(doc0.eq(Text.create(lines.repeat(3)).replace(1000, (lines.length * 2) + 1000, "")))
   })
 
   it("can compare small documents", () => {
@@ -98,34 +99,47 @@ describe("doc", () => {
   })
 
   it("is iterable", () => {
-    let found = "", doc = Text.create(midDoc.repeat(5))
+    let found = "", doc = Text.create(lines.repeat(5))
     for (let iter = doc.iter(), cur; (cur = iter.next()).length;) found += cur
     ist(found, doc.text)
   })
 
   it("is iterable in reverse", () => {
-    let found = "", doc = Text.create(midDoc.repeat(5))
+    let found = "", doc = Text.create(lines.repeat(5))
     for (let iter = doc.iter(-1), cur; (cur = iter.next()).length;) found = cur + found
     ist(found, doc.text)
   })
 
   it("is partially iterable", () => {
-    let found = "", doc = Text.create(midDoc.repeat(5))
+    let found = "", doc = Text.create(lines.repeat(5))
     for (let iter = doc.iterRange(500, doc.length - 500), cur; (cur = iter.next()).length;) found += cur
     ist(found, doc.slice(500, doc.length - 500))
   })
 
   it("is partially iterable in reverse", () => {
-    let found = "", doc = Text.create(midDoc)
-    for (let iter = doc.iterRange(doc.length - 500, 500), cur; (cur = iter.next()).length;) found = cur + found
-    ist(found, doc.slice(500, doc.length - 500))
+    let found = ""
+    for (let iter = doc0.iterRange(doc0.length - 500, 500), cur; (cur = iter.next()).length;) found = cur + found
+    ist(found, doc0.slice(500, doc0.length - 500))
   })
 
   it("can partially iter over subsections at the start and end", () => {
-    let doc = Text.create(midDoc)
-    ist(doc.iterRange(0, 1).next(), "1")
-    ist(doc.iterRange(1, 2).next(), "2")
-    ist(doc.iterRange(doc.length - 1, doc.length).next(), "0")
-    ist(doc.iterRange(doc.length - 2, doc.length - 1).next(), "9")
+    ist(doc0.iterRange(0, 1).next(), "1")
+    ist(doc0.iterRange(1, 2).next(), "2")
+    ist(doc0.iterRange(doc0.length - 1, doc0.length).next(), "0")
+    ist(doc0.iterRange(doc0.length - 2, doc0.length - 1).next(), "9")
+  })
+
+  it("finds line starts", () => {
+    for (let i = 1; i <= 200; i++) ist(doc0.lineStart(i), (i - 1) * 101)
+    ist.throws(() => doc0.lineStart(201), /No line/)
+    ist.throws(() => doc0.lineStart(0), /No line/)
+  })
+
+  it("can retrieve line content", () => {
+    for (let i = 1; i <= 200; i++) ist(doc0.getLine(i), line)
+    ist.throws(() => doc0.getLine(201), /No line/)
+    ist.throws(() => doc0.getLine(0), /No line/)
+    let doc = doc0.replace(doc0.length - 99, doc0.length, "?")
+    ist(doc.getLine(200), "1?")
   })
 })

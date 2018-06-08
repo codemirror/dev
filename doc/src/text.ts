@@ -18,6 +18,9 @@ export abstract class Text implements Iterable<string> {
   abstract readonly children: ReadonlyArray<Text> | null;
   abstract replace(from: number, to: number, text: string): Text;
   abstract slice(from: number, to: number): string;
+  // Note line numbers are 1-based
+  abstract lineStart(n: number): number;
+  abstract getLine(n: number): string;
   abstract eq(other: Text): boolean;
 
   get lines() { return this.lineBreaks + 1 }
@@ -54,14 +57,22 @@ export interface TextCursor {
   next(skip?: number): string
 }
 
+// FIXME use configured line ending? Fixed special char?
+const NEW_LINE_CHAR = 10
+
+function findNewline(string: string, start: number = 0) {
+  for (let i = start; i < string.length; i++)
+    if (string.charCodeAt(i) == NEW_LINE_CHAR) return i
+  return -1
+}
+
 export class TextLeaf extends Text {
   readonly lineBreaks: number;
 
   constructor(readonly text: string) {
     super()
     let lineBreaks = 0
-    // FIXME use configured line ending? Fixed special char?
-    for (let pos = 0, next; (next = text.indexOf("\n", pos)) > -1; pos = next + 1) lineBreaks++
+    for (let pos = 0, next; (next = findNewline(text, pos)) > -1; pos = next + 1) lineBreaks++
     this.lineBreaks = lineBreaks
   }
 
@@ -77,6 +88,21 @@ export class TextLeaf extends Text {
 
   slice(from: number, to: number = this.text.length): string {
     return this.text.slice(from, to)
+  }
+
+  lineStart(n: number): number {
+    for (let line = 1, pos = 0;; line++) {
+      if (line == n) return pos
+      let next = findNewline(this.text, pos)
+      if (next < 0) throw new RangeError(`No line ${n} in document`)
+      pos = next + 1
+    }
+  }
+
+  getLine(n: number): string {
+    let start = this.lineStart(n)
+    let end = findNewline(this.text, start)
+    return this.text.slice(start, end < 0 ? this.text.length : end)
   }
 
   eq(other: Text): boolean {
@@ -168,6 +194,27 @@ export class TextNode extends Text {
       pos = end
     }
     return result
+  }
+
+  lineStart(n: number): number {
+    for (let i = 0, breaks = 0, pos = 0; i < this.children.length; i++) {
+      let child = this.children[i], endBreaks = breaks + child.lineBreaks
+      if (n <= endBreaks + 1) return child.lineStart(n - breaks) + pos
+      pos += child.length
+      breaks = endBreaks
+    }
+    throw new RangeError(`No line ${n} in document`)
+  }
+
+  // Not written directly on top of getLine and slice to avoid three
+  // trips down the tree for a single call
+  getLine(n: number): string {
+    for (let i = 0, line = 1; i < this.children.length; i++) {
+      let child = this.children[i], end = line + child.lineBreaks
+      if (n > line && n < end) return child.getLine(n - line + 1)
+      line = end
+    }
+    return this.slice(this.lineStart(n), n == this.lineBreaks + 1 ? this.length : this.lineStart(n + 1) - 1)
   }
 
   eq(other: Text): boolean {
