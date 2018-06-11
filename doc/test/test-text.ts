@@ -1,4 +1,4 @@
-import {Text, TextLeaf} from "../src/text"
+import {Text, TextLeaf, LinePos} from "../src/text"
 const ist = require("ist")
 
 function depth(node) {
@@ -141,5 +141,12 @@ describe("doc", () => {
     ist.throws(() => doc0.getLine(0), /No line/)
     let doc = doc0.replace(doc0.length - 99, doc0.length, "?")
     ist(doc.getLine(200), "1?")
+  })
+
+  function eqPos(a, b) { return a.line == b.line && a.col == b.col }
+
+  it("finds line positions", () => {
+    for (let i = 0; i < doc0.length; i += 5)
+      ist(doc0.linePos(i), new LinePos(Math.floor(i / 101) + 1, i % 101), eqPos)
   })
 })

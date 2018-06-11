@@ -10,6 +10,11 @@ const TARGET_BRANCH_SHIFT = 3
 
 const iterator: symbol = typeof Symbol == "undefined" ? "__iterator" as any as symbol : Symbol.iterator
 
+export class LinePos {
+  constructor(readonly line: number, readonly col: number) {}
+  toString() { return `${this.line}:${this.col}` }
+}
+
 // @ts-ignore (Typescript doesn't believe we're implementing Iterator due to indirection)
 export abstract class Text implements Iterable<string> {
   abstract readonly text: string;
@@ -20,8 +25,10 @@ export abstract class Text implements Iterable<string> {
   abstract slice(from: number, to: number): string;
   // Note line numbers are 1-based
   abstract lineStart(n: number): number;
+  abstract linePos(pos: number): LinePos;
   abstract getLine(n: number): string;
   abstract eq(other: Text): boolean;
+
 
   get lines() { return this.lineBreaks + 1 }
   iter(dir: 1 | -1 = 1): TextCursor {
@@ -43,6 +50,8 @@ export abstract class Text implements Iterable<string> {
   abstract decomposeStart(to: number, target: Text[]): void;
   /** @internal */
   abstract decomposeEnd(from: number, target: Text[]): void;
+  /** @internal */
+  abstract lastLineLength(): number;
 
   toString() { return this.text }
 
@@ -63,6 +72,12 @@ const NEW_LINE_CHAR = 10
 
 function findNewline(string: string, start: number = 0) {
   for (let i = start; i < string.length; i++)
+    if (string.charCodeAt(i) == NEW_LINE_CHAR) return i
+  return -1
+}
+
+function findLastNewline(string: string) {
+  for (let i = string.length - 1; i >= 0; i--)
     if (string.charCodeAt(i) == NEW_LINE_CHAR) return i
   return -1
 }
@@ -100,6 +115,15 @@ export class TextLeaf extends Text {
     }
   }
 
+  linePos(pos: number): LinePos {
+    if (pos > this.length) throw new RangeError(`Position ${pos} outside of document`)
+    for (let line = 1, curPos = 0;; line++) {
+      let end = findNewline(this.text, curPos)
+      if (end == -1 || end >= pos) return new LinePos(line, pos - curPos)
+      curPos = end + 1
+    }
+  }
+
   getLine(n: number): string {
     let start = this.lineStart(n)
     let end = findNewline(this.text, start)
@@ -116,6 +140,10 @@ export class TextLeaf extends Text {
 
   decomposeEnd(from: number, target: Text[]) {
     target.push(new TextLeaf(this.text.slice(from)))
+  }
+
+  lastLineLength(): number {
+    return this.length - (this.lineBreaks ? findLastNewline(this.text) + 1 : 0)
   }
 
   static split(text: string, target: Text[]): Text[] {
@@ -207,6 +235,22 @@ export class TextNode extends Text {
     throw new RangeError(`No line ${n} in document`)
   }
 
+  linePos(pos: number): LinePos {
+    if (pos > this.length) throw new RangeError(`Position ${pos} outside of document`)
+    for (let i = 0, breaks = 0, curPos = 0;; i++) {
+      let child = this.children[i], end = curPos + child.length
+      if (end >= pos) {
+        let result = child.linePos(pos - curPos)
+        // Crude patching of officially-readonly LinePos (which was created by the recursive call)
+        if (result.line == 1) (result as any).col += this.lineLengthTo(i)
+        ;(result as any).line += breaks
+        return result
+      }
+      curPos = end
+      breaks += child.lineBreaks
+    }
+  }
+
   // Not written directly on top of getLine and slice to avoid three
   // trips down the tree for a single call
   getLine(n: number): string {
@@ -243,6 +287,20 @@ export class TextNode extends Text {
       else if (end > from && pos < from) child.decomposeEnd(from - pos, target)
       pos = end
     }
+  }
+
+  private lineLengthTo(to: number): number {
+    let length = 0
+    for (let i = to - 1; i >= 0; i--) {
+      let child = this.children[i]
+      if (child.lineBreaks) return length + child.lastLineLength()
+      length += child.length
+    }
+    return length
+  }
+
+  lastLineLength(): number {
+    return this.lineLengthTo(this.children.length)
   }
 
   static from(length: number, children: Text[]): Text {
