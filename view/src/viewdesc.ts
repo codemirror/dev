@@ -3,6 +3,7 @@ import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
 import {Viewport, ViewportState} from "./viewport"
+import {EditorState} from "../../state/src/state"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
@@ -112,33 +113,38 @@ function rm(dom: Node): Node {
   return next!
 }
 
-export type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
-
 export class DocViewDesc extends ViewDesc {
   children: DocPartViewDesc[];
   viewportState: ViewportState;
   text: Text = Text.create("");
   decorations: PluginDeco[] = [];
+  visiblePart: PartViewDesc;
+  selAnchorPart: PartViewDesc | null = null;
+  selHeadPart: PartViewDesc | null = null;
 
   get length() { return this.text.length }
   
   constructor(dom: HTMLElement) {
     super(null, dom)
-    this.children = [new PartViewDesc(this)]
+    this.visiblePart = new PartViewDesc(this)
+    this.children = [this.visiblePart]
     this.viewportState = new ViewportState
     this.dirty = dirty.node
   }
 
-  update(text: Text, decorations: PluginDeco[]): boolean {
+  update(state: EditorState): boolean {
+    let visibleViewport = this.viewportState.getViewport(state.doc)
+    let decorations = getDecorations(state)
     // FIXME short-circuit in a viewport-safe way
-    if (this.dirty == dirty.not && this.text.eq(text) && sameDecorations(decorations, this.decorations)) return false
-    let plan = extendForChangedDecorations(changedRanges(this.text, text), decorations, this.decorations)
+    if (this.dirty == dirty.not && this.text.eq(state.doc) &&
+        sameDecorations(decorations, this.decorations) && visibleViewport.eq(this.visiblePart.viewport)) return false
+    let plan = extendForChangedDecorations(changedRanges(this.text, state.doc), decorations, this.decorations)
     let decoSets = decorations.map(d => d.decorations)
-    this.text = text
+    this.text = state.doc
     this.decorations = decorations
     // FIXME update viewports and gaps somewhere here
     for (let child of this.children)
-      child.update(new Viewport(0, text.length), text, decoSets, plan)
+      child.update(new Viewport(0, state.doc.length), state.doc, decoSets, plan)
     this.sync()
     return true
   }
@@ -170,8 +176,17 @@ export class DocViewDesc extends ViewDesc {
   }
 
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
-    // FIXME
-    return this.children[0].readDOMRange(from, to)
+    let pos = 0, text = ""
+    for (let child of this.children) {
+      let end = pos + child.length
+      if (pos < to && end > from) {
+        let inner = child.readDOMRange(Math.max(from, pos), Math.min(to, end))
+        if (pos < from) from = inner.from
+        if (end > to) to = inner.to
+        text += inner.text
+      }
+    }
+    return {from, to, text}
   }
 
   posFromDOM(node: Node, offset: number): number {
@@ -733,8 +748,21 @@ function clipPlan(plan: ReadonlyArray<ChangedRange>, viewportA: Viewport, viewpo
   return result
 }
 
+type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
+
 function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
   return true
+}
+
+function getDecorations(state: EditorState): PluginDeco[] {
+  let result: PluginDeco[] = [], plugins = state.plugins
+  for (let plugin of plugins) {
+    let prop = plugin.props.decorations
+    if (!prop) continue
+    let decorations = prop(state)
+    if (decorations.size) result.push({plugin, decorations})
+  }
+  return result
 }

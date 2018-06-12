@@ -1,5 +1,5 @@
 import {EditorState, Transaction} from "../../state/src/state"
-import {DocViewDesc, PluginDeco} from "./viewdesc"
+import {DocViewDesc} from "./viewdesc"
 import {DOMObserver} from "./domobserver"
 import {InputState, attachEventHandlers} from "./input"
 import {SelectionReader, selectionToDOM} from "./selection"
@@ -64,7 +64,7 @@ export class EditorView {
     }
 
     this.docView = new DocViewDesc(this.contentDOM)
-    this.docView.update(state.doc, this.getDecorations())
+    this.docView.update(state)
 
     this.domObserver.start()
   }
@@ -77,7 +77,7 @@ export class EditorView {
     this.selectionReader.ignoreUpdates = true
     // FIXME this might trigger a DOM change and a recursive call to setState. Need some strategy for dealing with that
     this.domObserver.stop()
-    let updated = this.docView.update(state.doc, this.getDecorations())
+    let updated = this.docView.update(state)
     if (updated) {
       this.selectionReader.clearDOMState()
       this.scheduleLayoutCheck()
@@ -90,21 +90,6 @@ export class EditorView {
   private scheduleLayoutCheck() {
     if (this.layoutCheckScheduled != null) return
     this.layoutCheckScheduled = requestAnimationFrame(() => this.docView.checkLayout())
-  }
-
-  private getDecorations(): PluginDeco[] {
-    let result: PluginDeco[] = [], plugins = this.state.plugins
-    if (this.props.decorations) {
-      let decorations = this.props.decorations(this.state)
-      if (decorations.size) result.push({plugin: null, decorations})
-    }
-    for (let plugin of plugins) {
-      let prop = plugin.props.decorations
-      if (!prop) continue
-      let decorations = prop(this.state)
-      if (decorations.size) result.push({plugin, decorations})
-    }
-    return result
   }
 
   // FIXME this is very awkward to type. Change or embrace the any?
