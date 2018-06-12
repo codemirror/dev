@@ -3,13 +3,6 @@ import {Selection as EditorSelection, MetaSlot, Range} from "../../state/src/sta
 import browser from "./browser"
 
 export class SelectionReader {
-  lastAnchorNode: Node | null = null;
-  lastHeadNode: Node | null = null;
-  lastAnchorOffset: number = -1;
-  lastHeadOffset: number = -1;
-
-  lastSelection: EditorSelection | null = null;
-
   listening: boolean = false;
   origin: string | null = null;
   originTime: number = 0;
@@ -49,28 +42,8 @@ export class SelectionReader {
     this.originTime = Date.now()
   }
 
-  // : () → bool
-  // Whether the DOM selection has changed from the last known state.
-  domChanged() {
-    let sel = this.view.root.getSelection()
-    return sel.anchorNode != this.lastAnchorNode || sel.anchorOffset != this.lastAnchorOffset ||
-      sel.focusNode != this.lastHeadNode || sel.focusOffset != this.lastHeadOffset
-  }
-
-  // Store the current state of the DOM selection.
-  storeDOMState(selection: EditorSelection) {
-    let sel = this.view.root.getSelection()
-    this.lastAnchorNode = sel.anchorNode; this.lastAnchorOffset = sel.anchorOffset
-    this.lastHeadNode = sel.focusNode; this.lastHeadOffset = sel.focusOffset
-    this.lastSelection = selection
-  }
-
-  clearDOMState() {
-    this.lastAnchorNode = this.lastSelection = null
-  }
-
   read() {
-    if (this.ignoreUpdates || !this.domChanged() || !this.view.hasFocus() || !hasSelection(this.view)) return
+    if (this.ignoreUpdates || !this.view.hasFocus() || !hasSelection(this.view)) return
     this.view.domObserver.flush()
 
     let domSel = this.view.root.getSelection()
@@ -78,7 +51,6 @@ export class SelectionReader {
     let anchor = selectionCollapsed(domSel) ? head : this.view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
 
     let selection = new EditorSelection([new Range(anchor, head)])
-    this.storeDOMState(selection)
     if (!this.view.state.selection.eq(selection)) {
       let tr = this.view.state.transaction.setSelection(selection)
       if (this.originTime > Date.now() - 50) tr = tr.setMeta(MetaSlot.origin, this.origin)
@@ -116,11 +88,11 @@ export function selectionToDOM(view: EditorView, takeFocus: boolean = false) {
   if (!view.hasFocus() && !takeFocus) return
 
   let reader = view.selectionReader
-  if (reader.lastSelection && reader.lastSelection.eq(sel) && !reader.domChanged()) return
 
   reader.ignoreUpdates = true
   let anchor = view.docView.domFromPos(sel.primary.anchor)!
   let head = view.docView.domFromPos(sel.primary.head)!
+  // FIXME check for equivalent positions, don't update if both are equiv
 
   let domSel = view.root.getSelection(), range = document.createRange()
   // Selection.extend can be used to create an 'inverted' selection
@@ -138,6 +110,5 @@ export function selectionToDOM(view: EditorView, takeFocus: boolean = false) {
   domSel.addRange(range)
   if (domSel.extend) domSel.extend(head.node, head.offset)
 
-  reader.storeDOMState(sel)
   reader.ignoreUpdates = false
 }

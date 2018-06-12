@@ -78,10 +78,7 @@ export class EditorView {
     // FIXME this might trigger a DOM change and a recursive call to setState. Need some strategy for dealing with that
     this.domObserver.stop()
     let updated = this.docView.update(state)
-    if (updated) {
-      this.selectionReader.clearDOMState()
-      this.scheduleLayoutCheck()
-    }
+    if (updated) this.scheduleLayoutCheck()
     this.domObserver.start()
     if (updated || !prev.selection.eq(state.selection)) selectionToDOM(this)
     this.selectionReader.ignoreUpdates = false
