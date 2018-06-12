@@ -2,7 +2,7 @@ import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
-import {Viewport, ViewportState} from "./viewport"
+import {Viewport, ViewportState, LINE_HEIGHT} from "./viewport"
 import {EditorState} from "../../state/src/state"
 
 declare global {
@@ -113,6 +113,8 @@ function rm(dom: Node): Node {
   return next!
 }
 
+const selPartMargin = 2
+
 export class DocViewDesc extends ViewDesc {
   children: DocPartViewDesc[];
   viewportState: ViewportState;
@@ -135,32 +137,73 @@ export class DocViewDesc extends ViewDesc {
   update(state: EditorState): boolean {
     let visibleViewport = this.viewportState.getViewport(state.doc)
     let decorations = getDecorations(state)
-    // FIXME short-circuit in a viewport-safe way
+
     if (this.dirty == dirty.not && this.text.eq(state.doc) &&
         sameDecorations(decorations, this.decorations) && visibleViewport.eq(this.visiblePart.viewport)) return false
+
+    if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to && visibleViewport.to >= this.selHeadPart.viewport.from) {
+      this.visiblePart = this.selHeadPart
+      this.selHeadPart = null
+    }
+
     let plan = extendForChangedDecorations(changedRanges(this.text, state.doc), decorations, this.decorations)
     let decoSets = decorations.map(d => d.decorations)
     this.text = state.doc
     this.decorations = decorations
-    // FIXME update viewports and gaps somewhere here
-    for (let child of this.children)
-      child.update(new Viewport(0, state.doc.length), state.doc, decoSets, plan)
+
+    this.visiblePart.update(visibleViewport, state.doc, decoSets, plan)
+    // FIXME be lazy about viewport changes, when possible
+    let {head, anchor} = state.selection.primary, parts = [this.visiblePart]
+    if (head < visibleViewport.from || head > visibleViewport.to) {
+      let headViewport = new Viewport(Math.max(0, head - selPartMargin), Math.min(state.doc.length, head + selPartMargin))
+      if (!this.selHeadPart) this.selHeadPart = new PartViewDesc(this)
+      this.selHeadPart.update(headViewport, state.doc, decoSets, plan)
+      parts.push(this.selHeadPart)
+    } else {
+      this.selHeadPart = null
+    }
+    if ((anchor < visibleViewport.from || anchor > visibleViewport.to) &&
+        (!this.selHeadPart || anchor < this.selHeadPart.viewport.from || anchor > this.selHeadPart.viewport.to)) {
+      let anchorViewport = new Viewport(Math.max(0, anchor - selPartMargin), Math.min(state.doc.length, anchor + selPartMargin))
+      if (!this.selAnchorPart) this.selAnchorPart = new PartViewDesc(this)
+      this.selAnchorPart.update(anchorViewport, state.doc, decoSets, plan)
+      parts.push(this.selAnchorPart)
+    } else {
+      this.selAnchorPart = null
+    }
+
+    // Sync the child array and make sure appropriate gaps are
+    // inserted between the children
+    let children = []
+    parts.sort((a, b) => a.viewport.from - b.viewport.from)
+    for (let i = 0, pos = 0, j = 0;; i++) {
+      let part = i < parts.length ? parts[i] : null
+      let start = part ? part.viewport.from : state.doc.length
+      if (start > pos) {
+        // FIXME use actual approximation mechanism
+        let space = (state.doc.linePos(start).line - state.doc.linePos(pos).line) * LINE_HEIGHT
+        while (j < this.children.length && !(this.children[j] instanceof GapViewDesc)) j++
+        let gap = j < this.children.length ? this.children[j++] as GapViewDesc : new GapViewDesc(this)
+        gap.update(start - pos, space)
+        children.push(gap)
+      }
+      if (!part) break
+      children.push(part)
+      pos = part.viewport.to
+    }
+    this.children = children
+
     this.sync()
     return true
   }
 
   checkLayout() {
-      /* FIXME
-    this.layoutCheckScheduled = null
-    this.viewportState.updateFromDOM(this.contentDOM)
+    this.viewportState.updateFromDOM(this.dom as HTMLElement)
     // FIXME check for coverage, loop until covered
-    if (!this.viewportState.coveredBy(this.state.doc, this.docView.viewport)) {
-      // FIXME reset selection, factor this stuff into a method
-      this.domObserver.stop()
-      this.docView.update(this.viewportState.getViewport(this.state.doc), this.state.doc, this.docView.decorations)
-      this.docView.sync()
-      this.domObserver.start()
-    }*/
+    if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
+      // FIXME turn off DOM observation!
+//      this.update(XXX)
+    }
   }
 
   nearest(dom: Node): ViewDesc | null {
@@ -185,6 +228,7 @@ export class DocViewDesc extends ViewDesc {
         if (end > to) to = inner.to
         text += inner.text
       }
+      pos += child.length
     }
     return {from, to, text}
   }
@@ -196,13 +240,12 @@ export class DocViewDesc extends ViewDesc {
   }
 
   domFromPos(pos: number): {node: Node, offset: number} | null {
-    let {i} = new ChildCursor(this.children, this.length).findPos(pos)
+    let {i} = new ChildCursor(this.children, this.length).findPos(pos, -1)
     return this.children[i].domFromPos(pos)
   }
 }
 
 abstract class DocPartViewDesc extends ViewDesc {
-  abstract update(viewport: Viewport, text: Text, decoSets: ReadonlyArray<DecorationSet>, plan: ReadonlyArray<ChangedRange>): void;
   abstract domFromPos(pos: number): {node: Node, offset: number} | null;
   abstract readDOMRange(from: number, to: number): {from: number, to: number, text: string};
 }
@@ -282,14 +325,21 @@ class PartViewDesc extends DocPartViewDesc {
   }
 }
 
-/*class GapViewDesc extends DocPartViewDesc {
-  // FIXME
-
+class GapViewDesc extends DocPartViewDesc {
+  length: number = 0;
+  constructor(parent: ViewDesc) {
+    super(parent, document.createElement("div"))
+  }
+  get children() { return noChildren }
+  update(length: number, height: number) {
+    this.length = length
+    ;(this.dom as HTMLElement).style.height = height + "px"
+  }
   domFromPos(pos: number): {node: Node, offset: number} | null { return null }
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
-    return {from, to, text: (this.parent as DocViewDesc).text.slice(from, to)}
+    return {from, to, text: this.parent ? (this.parent as DocViewDesc).text.slice(from, to) : ""}
   }
-}*/
+}
 
 const MAX_JOIN_LEN = 256
 

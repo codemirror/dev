@@ -88,8 +88,11 @@ export class EditorView {
   }
 
   private scheduleLayoutCheck() {
-    if (this.layoutCheckScheduled != null) return
-    this.layoutCheckScheduled = requestAnimationFrame(() => this.docView.checkLayout())
+    if (this.layoutCheckScheduled == null)
+      this.layoutCheckScheduled = requestAnimationFrame(() => {
+        this.layoutCheckScheduled = null
+        this.docView.checkLayout()
+      })
   }
 
   // FIXME this is very awkward to type. Change or embrace the any?
@@ -126,6 +129,7 @@ export class EditorView {
   }
 
   destroy() {
+    cancelAnimationFrame(this.layoutCheckScheduled!)
     this.domObserver.stop()
     this.selectionReader.destroy()
     this.dom.remove()

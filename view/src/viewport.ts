@@ -22,7 +22,7 @@ function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
 
 // This is all a crude approximation to get started on this, I'm sure
 // I'll figure out something a little more accurate later on
-const LINE_HEIGHT = 14
+export const LINE_HEIGHT = 14
 
 // FIXME make these actually reliable. Take collapsed decorations into account
 

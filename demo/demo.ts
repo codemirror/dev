@@ -18,7 +18,7 @@ let decos = new Plugin({
   }
 })
 
-let state = EditorState.create({doc: "one\ntwo\nthree", plugins: [history(), decos, keymap({
+let state = EditorState.create({doc: "one\ntwo\nthree\n".repeat(200), plugins: [history(), decos, keymap({
   "ctrl-z": undo,
   "ctrl-shift-z": redo
 })]})
