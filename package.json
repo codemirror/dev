@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts view/test/test-decoration.ts keymap/test/test-*.ts",
-    "watch-demo": "rollup -w -c rollup.demo.config.js"
+    "watch-demo": "rollup -w -c rollup.demo.config.js",
+    "watch-view-tests": "rollup -w -c rollup.view-tests.config.js"
   },
   "keywords": [
     "editor",

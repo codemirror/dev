@@ -2,12 +2,13 @@ import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
+import {Viewport} from "./viewport"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
 }
 
-const NOT_DIRTY = 0, CHILD_DIRTY = 1, NODE_DIRTY = 2
+const enum dirty { not = 0, child = 1, node = 2 }
 
 export abstract class ViewDesc {
   constructor(public parent: ViewDesc | null, public dom: Node | null) {
@@ -16,7 +17,7 @@ export abstract class ViewDesc {
 
   abstract length: number;
   abstract children: ViewDesc[];
-  dirty: number = NOT_DIRTY;
+  dirty: number = dirty.not;
 
   get childGap() { return 0 }
   get ignoreDOMText() { return false }
@@ -59,11 +60,11 @@ export abstract class ViewDesc {
   }
 
   sync() {
-    if (this.dirty & NODE_DIRTY)
+    if (this.dirty & dirty.node)
       this.syncDOMChildren()
-    if (this.dirty & CHILD_DIRTY)
+    if (this.dirty & dirty.child)
       for (let child of this.children) child.sync()
-    this.dirty = NOT_DIRTY
+    this.dirty = dirty.not
   }
 
   localPosFromDOM(node: Node, offset: number): number {
@@ -95,11 +96,11 @@ export abstract class ViewDesc {
   }
 
   markDirty() {
-    if (this.dirty & NODE_DIRTY) return
-    this.dirty |= NODE_DIRTY
+    if (this.dirty & dirty.node) return
+    this.dirty |= dirty.node
     for (let parent = this.parent; parent; parent = parent.parent) {
-      if (parent.dirty & CHILD_DIRTY) return
-      parent.dirty |= CHILD_DIRTY
+      if (parent.dirty & dirty.child) return
+      parent.dirty |= dirty.child
     }
   }
 }
@@ -117,49 +118,55 @@ export class DocViewDesc extends ViewDesc {
   children: LineViewDesc[];
   text: Text = Text.create("");
   decorations: PluginDeco[] = [];
+  viewport: Viewport = new Viewport(0, 0);
 
   get length() { return this.text.length }
   get childGap() { return 1 }
 
-  constructor(text: Text, decorations: PluginDeco[], dom: Element) {
+  constructor(viewport: Viewport, text: Text, decorations: PluginDeco[], dom: Element) {
     super(null, dom)
     this.children = [new LineViewDesc(this, [])]
-    this.dirty = NODE_DIRTY
-    this.update(text, decorations)
+    this.dirty = dirty.node
+    this.update(viewport, text, decorations)
     this.sync()
   }
 
-  update(text: Text, decorations: PluginDeco[]) {
+  update(viewport: Viewport, text: Text, decorations: PluginDeco[]) {
     let prevText = this.text
     let plan = extendForChangedDecorations(changedRanges(prevText, text), decorations, this.decorations)
+    let clippedPlan = clipPlan(plan, this.viewport, viewport)
     this.text = text
     this.decorations = decorations
+    this.viewport = viewport
 
     let cur = new ChildCursor(this.children, prevText.length, 1)
-    for (let i = plan.length - 1; i >= 0; i--) {
-      let {fromA, toA, fromB, toB} = plan[i]
+    for (let i = clippedPlan.length - 1; i >= 0; i--) {
+      let {fromA, toA, fromB, toB} = clippedPlan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
-      let lines = LineElementBuilder.build(text, fromB, toB, decorations.map(d => d.decorations))
+      this.updateRange(fromI, fromOff, toI, toOff,
+                       LineElementBuilder.build(text, fromB, toB, decorations.map(d => d.decorations)))
+    }
+  }
 
-      if (lines.length == 1) {
-        if (fromI == toI) { // Change within single line
-          this.children[fromI].update(fromOff, toOff, lines[0])
-        } else { // Join lines
-          let tail = this.children[toI].detachTail(toOff)
-          this.children[fromI].update(fromOff, undefined, appendLineElements(lines[0], tail))
-          this.children.splice(fromI + 1, toI - fromI)
-          this.markDirty()
-        }
-      } else { // Across lines
+  updateRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: LineElementViewDesc[][]) {
+    if (lines.length == 1) {
+      if (fromI == toI) { // Change within single line
+        this.children[fromI].update(fromOff, toOff, lines[0])
+      } else { // Join lines
         let tail = this.children[toI].detachTail(toOff)
-        this.children[fromI].update(fromOff, undefined, lines[0])
-        let insert = []
-        for (let j = 1; j < lines.length; j++)
-          insert.push(new LineViewDesc(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
-        this.children.splice(fromI + 1, toI - fromI, ...insert)
+        this.children[fromI].update(fromOff, undefined, appendLineElements(lines[0], tail))
+        this.children.splice(fromI + 1, toI - fromI)
         this.markDirty()
       }
+    } else { // Across lines
+      let tail = this.children[toI].detachTail(toOff)
+      this.children[fromI].update(fromOff, undefined, lines[0])
+      let insert = []
+      for (let j = 1; j < lines.length; j++)
+        insert.push(new LineViewDesc(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
+      this.children.splice(fromI + 1, toI - fromI, ...insert)
+      this.markDirty()
     }
   }
 
@@ -365,7 +372,7 @@ class TextViewDesc extends LineElementViewDesc {
   get length() { return this.text.length }
 
   sync() {
-    if (this.dirty & NODE_DIRTY) {
+    if (this.dirty & dirty.node) {
       if (this.textDOM!.nodeValue != this.text) this.textDOM!.nodeValue = this.text
       let dom = this.dom!
       if (this.textDOM != dom && (this.dom!.firstChild != this.textDOM || dom.lastChild != this.textDOM)) {
@@ -373,7 +380,7 @@ class TextViewDesc extends LineElementViewDesc {
         dom.appendChild(this.textDOM!)
       }
     }
-    this.dirty = NOT_DIRTY
+    this.dirty = dirty.not
   }
 
   merge(other: LineElementViewDesc, from: number = 0, to: number = this.length): boolean {
@@ -618,4 +625,46 @@ function extendWithRanges(diff: ReadonlyArray<ChangedRange>, ranges: number[]): 
     addChangedRange(result, next.fromA, next.toA, next.fromB, next.toB)
     posA = next.toA; posB = next.toB
   }
+}
+
+function boundAfter(viewport: Viewport, pos: number): number {
+  return pos < viewport.from ? viewport.from : pos < viewport.to ? viewport.to : 2e9
+}
+
+// Transforms a plan to take viewports into account. Discards changes
+// (or part of changes) that are outside of the viewport, and adds
+// ranges for text that was in one viewport but not the other (so that
+// old text is cleared out and newly visible text is drawn).
+function clipPlan(plan: ReadonlyArray<ChangedRange>, viewportA: Viewport, viewportB: Viewport): ReadonlyArray<ChangedRange> {
+  let result: ChangedRange[] = []
+  let posA = 0, posB = 0
+  for (let i = 0;; i++) {
+    let range = i < plan.length ? plan[i] : null
+    // Look at the unchanged range before the next range (or the end
+    // if there is no next range), divide it by viewport boundaries,
+    // and for each piece, if it is only in one viewport, add a
+    // changed range.
+    let nextA = range ? range.fromA : 2e9, nextB = range ? range.fromB : 2e9
+    while (posA < nextA) {
+      let boundA = boundAfter(viewportA, posA), boundB = boundAfter(viewportB, posB)
+      if (boundA >= nextA && boundB >= nextB) break
+      if ((posA >= viewportA.from && boundA <= viewportA.to) != (posB >= viewportB.from && boundB <= viewportB.to))
+        addChangedRange(result, Math.max(posA, viewportA.from), Math.min(boundA, viewportA.to),
+                        Math.max(posB, viewportB.from), Math.min(boundB, viewportB.to))
+      let advance = Math.min(boundA - posA, boundB - posB)
+      posA += advance; posB += advance
+    }
+
+    if (!range || (range.fromA > viewportA.to && range.fromB > viewportB.to)) break
+
+    // Clip existing ranges to the viewports
+    if ((range.toA >= viewportA.from && range.fromA <= viewportA.to) ||
+        (range.toB >= viewportB.from && range.fromB <= viewportB.to))
+      addChangedRange(result, Math.max(range.fromA, viewportA.from), Math.min(range.toA, viewportA.to),
+                      Math.max(range.fromB, viewportB.from), Math.min(range.toB, viewportB.to))
+
+    posA = range.toA; posB = range.toB
+  }
+
+  return result
 }

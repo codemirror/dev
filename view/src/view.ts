@@ -4,6 +4,7 @@ import {DOMObserver} from "./domobserver"
 import {InputState, attachEventHandlers} from "./input"
 import {SelectionReader, selectionToDOM} from "./selection"
 import {DecorationSet} from "./decoration"
+import {ViewportState} from "./viewport"
 
 export class EditorView {
   private _state: EditorState;
@@ -17,15 +18,22 @@ export class EditorView {
 
   public dispatch: (tr: Transaction) => void;
 
-  public dom: Element;
-  public contentDOM: Element;
+  public dom: HTMLElement;
+  public contentDOM: HTMLElement;
 
+  /** @internal */
   public inputState: InputState = new InputState;
-  // (Many of these things should be module-private)
+  /** @internal */
+  public viewportState: ViewportState = new ViewportState;
 
+  /** @internal */
   public docView: DocViewDesc;
+  /** @internal */
   public domObserver: DOMObserver;
+  /** @internal */
   public selectionReader: SelectionReader;
+
+  private layoutCheckScheduled: number | null = null;
 
   constructor(state: EditorState, props: EditorProps = {}, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
@@ -58,7 +66,7 @@ export class EditorView {
       }
     }
 
-    this.docView = new DocViewDesc(state.doc, this.getDecorations(), this.contentDOM)
+    this.docView = new DocViewDesc(this.viewportState.getViewport(state.doc), state.doc, this.getDecorations(), this.contentDOM)
     this.domObserver.start()
   }
 
@@ -66,19 +74,40 @@ export class EditorView {
     let prev = this.state
     this._state = state
     let decorations = this.getDecorations()
-    let updateDOM = state.doc != prev.doc || this.docView.dirty || !sameDecorations(decorations, this.docView.decorations)
+    let viewport = this.viewportState.getViewport(state.doc)
+    let updateDOM = state.doc != prev.doc || this.docView.dirty ||
+      !sameDecorations(decorations, this.docView.decorations) || !viewport.eq(this.docView.viewport)
     let updateSel = updateDOM || !prev.selection.eq(state.selection)
     if (updateSel) {
       this.selectionReader.ignoreUpdates = true
       if (updateDOM) {
         this.domObserver.stop()
-        this.docView.update(state.doc, decorations)
+        this.docView.update(viewport, state.doc, decorations)
         this.docView.sync()
         this.domObserver.start()
         this.selectionReader.clearDOMState()
+        this.scheduleLayoutCheck()
       }
       selectionToDOM(this)
       this.selectionReader.ignoreUpdates = false
+    }
+  }
+
+  private scheduleLayoutCheck() {
+    if (this.layoutCheckScheduled != null) return
+    this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
+  }
+
+  private checkLayout() {
+    this.layoutCheckScheduled = null
+    this.viewportState.updateFromDOM(this.contentDOM)
+    // FIXME check for coverage, loop until covered
+    if (!this.viewportState.coveredBy(this.state.doc, this.docView.viewport)) {
+      // FIXME reset selection, factor this stuff into a method
+      this.domObserver.stop()
+      this.docView.update(this.viewportState.getViewport(this.state.doc), this.state.doc, this.docView.decorations)
+      this.docView.sync()
+      this.domObserver.start()
     }
   }
 
