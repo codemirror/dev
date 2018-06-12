@@ -1,7 +1,6 @@
 import browser from "./browser"
-import {applyDOMChange} from "./domchange"
-import {EditorView} from "./view"
-import {ViewDesc} from "./viewdesc"
+import {DocViewDesc, ViewDesc} from "./viewdesc"
+import {hasSelection, getRoot} from "./dom"
 
 const observeOptions = {
   childList: true,
@@ -19,9 +18,14 @@ export class DOMObserver {
   onCharData: any;
   charDataQueue: MutationRecord[] = [];
   charDataTimeout: any = null;
+  active: boolean = false;
+  dom: HTMLElement;
 
-  constructor(public view: EditorView) {
-    if (typeof "MutationObserver" != "undefined")
+  constructor(private docView: DocViewDesc,
+              private onDOMChange: (from: number, to: number) => void,
+              private onSelectionChange: () => void) {
+    this.dom = docView.dom as HTMLElement
+    if (typeof MutationObserver != "undefined")
       this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {
@@ -30,36 +34,67 @@ export class DOMObserver {
                                  oldValue: event.prevValue} as MutationRecord)
         if (this.charDataTimeout == null) this.charDataTimeout = setTimeout(() => this.flush(), 20)
       }
+    this.readSelection = this.readSelection.bind(this)
+    this.listenForSelectionChanges()
+    this.start()
+  }
+
+  listenForSelectionChanges() {
+    let listening = false
+    this.dom.addEventListener("focus", () => {
+      if (listening) return
+      this.dom.ownerDocument.addEventListener("selectionchange", this.readSelection)
+      listening = true
+      if (hasSelection(this.dom)) this.readSelection()
+    })
+    this.dom.addEventListener("blur", () => {
+      if (!listening) return
+      this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
+      listening = false
+    })
+  }
+
+  withoutListening(f: () => void) {
+    try {
+      this.stop()
+      f()
+    } finally {
+      this.start()
+    }
   }
 
   start() {
+    if (this.active) return
     if (this.observer)
-      this.observer.observe(this.view.contentDOM, observeOptions)
+      this.observer.observe(this.dom, observeOptions)
     if (useCharData)
-      this.view.contentDOM.addEventListener("DOMCharacterDataModified", this.onCharData)
+      this.dom.addEventListener("DOMCharacterDataModified", this.onCharData)
+    this.active = true
   }
 
   stop() {
+    if (!this.active) return
+    this.active = false
     if (this.observer) {
       this.flush()
       this.observer.disconnect()
     }
     if (useCharData)
-      this.view.contentDOM.removeEventListener("DOMCharacterDataModified", this.onCharData)
+      this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
-  flush() {
-    this.applyMutations(this.observer ? this.observer.takeRecords() : [])
+  flush(): boolean {
+    return this.applyMutations(this.observer ? this.observer.takeRecords() : [])
   }
 
-  applyMutations(records: MutationRecord[]) {
+  applyMutations(records: MutationRecord[]): boolean {
     if (this.charDataQueue.length) {
       clearTimeout(this.charDataTimeout)
       this.charDataTimeout = null
       records = records.concat(this.charDataQueue)
       this.charDataQueue.length = 0
     }
-    if (records.length == 0) return
+    if (records.length == 0) return false
 
     let from = -1, to = -1
     for (let record of records) {
@@ -73,12 +108,14 @@ export class DOMObserver {
       }
     }
 
-    if (from > -1) applyDOMChange(this.view, from, to)
-    else if (this.view.docView.dirty) this.view.setState(this.view.state)
+    let apply = from > -1 && this.active
+    if (apply) this.onDOMChange(from, to)
+    if (this.docView.dirty) this.docView.sync()
+    return apply
   }
 
   readMutation(rec: MutationRecord): {from: number, to: number} | null {
-    let desc = this.view.docView.nearest(rec.target)
+    let desc = this.docView.nearest(rec.target)
     if (!desc) return null // FIXME query domView for ignorable mutations
     desc.markDirty()
 
@@ -91,6 +128,17 @@ export class DOMObserver {
       // FIXME insert ProseMirror's typeOver hack
       return {from: desc.posAtStart, to: desc.posAtEnd}
     }
+  }
+
+  readSelection() {
+    let root = getRoot(this.dom)
+    if (!this.active || root.activeElement != this.dom || !hasSelection(this.dom)) return
+    if (!this.flush()) this.onSelectionChange()
+  }
+
+  destroy() {
+    this.stop()
+    this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
   }
 }
 

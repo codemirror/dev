@@ -1,9 +1,9 @@
-import {EditorState, Transaction} from "../../state/src/state"
+import {EditorState, Transaction, Selection, MetaSlot} from "../../state/src/state"
 import {DocViewDesc} from "./viewdesc"
-import {DOMObserver} from "./domobserver"
 import {InputState, attachEventHandlers} from "./input"
-import {SelectionReader, selectionToDOM} from "./selection"
+import {getRoot, selectionCollapsed} from "./dom"
 import {DecorationSet} from "./decoration"
+import {applyDOMChange} from "./domchange"
 
 export class EditorView {
   private _state: EditorState;
@@ -12,8 +12,6 @@ export class EditorView {
   // FIXME get rid of bare props entirely, and have people provide a
   // plugin if they need props?
   readonly props: EditorProps;
-
-  private _root: Document | null = null;
 
   public dispatch: (tr: Transaction) => void;
 
@@ -25,10 +23,6 @@ export class EditorView {
 
   /** @internal */
   public docView: DocViewDesc;
-  /** @internal */
-  public domObserver: DOMObserver;
-  /** @internal */
-  public selectionReader: SelectionReader;
 
   private layoutCheckScheduled: number | null = null;
 
@@ -46,9 +40,7 @@ export class EditorView {
     this.dom.className = "CM"
     this.dom.appendChild(this.contentDOM)
 
-    this.domObserver = new DOMObserver(this)
     attachEventHandlers(this)
-    this.selectionReader = new SelectionReader(this)
 
     const registeredEvents = []
     const handleDOMEvents = this.someProp("handleDOMEvents")
@@ -63,27 +55,20 @@ export class EditorView {
       }
     }
 
-    this.docView = new DocViewDesc(this.contentDOM)
+    this.docView = new DocViewDesc(this.contentDOM, (start, end) => applyDOMChange(this, start, end),
+                                   () => applySelectionChange(this))
     this.docView.update(state)
-
-    this.domObserver.start()
   }
 
   setState(state: EditorState) {
-    let prev = this.state
     this._state = state
 
-    // FIXME somehow do this lazily?
-    this.selectionReader.ignoreUpdates = true
     // FIXME this might trigger a DOM change and a recursive call to setState. Need some strategy for dealing with that
-    this.domObserver.stop()
     let updated = this.docView.update(state)
     if (updated) this.scheduleLayoutCheck()
-    this.domObserver.start()
-    if (updated || !prev.selection.eq(state.selection)) selectionToDOM(this)
-    this.selectionReader.ignoreUpdates = false
   }
 
+  // FIXME move to docviewdesc?
   private scheduleLayoutCheck() {
     if (this.layoutCheckScheduled == null)
       this.layoutCheckScheduled = requestAnimationFrame(() => {
@@ -104,36 +89,39 @@ export class EditorView {
     return null
   }
 
-  // FIXME can also return a DocumentFragment, but TypeScript doesn't
-  // believe that has getSelection etc methods
-  get root(): Document {
-    let cached = this._root
-    if (cached == null) {
-      for (let search: any = this.dom.parentNode; search; search = search.parentNode) {
-        if (search.nodeType == 9 || (search.nodeType == 11 && search.host))
-          return this._root = search
-      }
-    }
-    return document
-  }
-
   hasFocus(): boolean {
-    return this.root.activeElement == this.contentDOM
+    return getRoot(this.dom).activeElement == this.contentDOM
   }
 
   focus() {
-    selectionToDOM(this, true)
+    this.docView.updateSelection(this.state.selection, true)
   }
 
   destroy() {
     cancelAnimationFrame(this.layoutCheckScheduled!)
-    this.domObserver.stop()
-    this.selectionReader.destroy()
     this.dom.remove()
+    this.docView.destroy()
   }
 }
 
 interface EditorProps {
   readonly handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
   readonly decorations?: (state: EditorState) => DecorationSet;
+}
+
+function selectionFromDOM(view: EditorView) {
+  let domSel = getRoot(view.contentDOM).getSelection()
+  let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
+  let anchor = selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
+  return Selection.single(anchor, head)
+}
+
+function applySelectionChange(view: EditorView) {
+  let selection = selectionFromDOM(view)
+  if (!view.state.selection.eq(selection)) {
+    let tr = view.state.transaction.setSelection(selection)
+    if (view.inputState.lastSelectionTime > Date.now() - 50) tr = tr.setMeta(MetaSlot.origin, view.inputState.lastSelectionOrigin)
+    view.dispatch(tr)
+  }
+  view.inputState.lastSelectionTime = 0
 }

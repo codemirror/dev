@@ -6,6 +6,13 @@ import browser from "./browser"
 export class InputState {
   lastKeyCode: number = 0;
   lastKeyTime: number = 0;
+  lastSelectionOrigin: string | null = null;
+  lastSelectionTime: number = 0;
+
+  setSelectionOrigin(origin: string) {
+    this.lastSelectionOrigin = origin
+    this.lastSelectionTime = Date.now()
+  }
 }
 
 const handlers = Object.create(null)

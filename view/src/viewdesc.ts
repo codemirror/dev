@@ -1,9 +1,10 @@
 import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
-import {Plugin} from "../../state/src/state"
+import {EditorState, Plugin, Selection} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
 import {Viewport, ViewportState, LINE_HEIGHT} from "./viewport"
-import {EditorState} from "../../state/src/state"
+import {DOMObserver} from "./domobserver"
+import {getRoot} from "./dom"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
@@ -120,18 +121,23 @@ export class DocViewDesc extends ViewDesc {
   viewportState: ViewportState;
   text: Text = Text.create("");
   decorations: PluginDeco[] = [];
+  selection: Selection = Selection.default;
   visiblePart: PartViewDesc;
   selAnchorPart: PartViewDesc | null = null;
   selHeadPart: PartViewDesc | null = null;
+  observer: DOMObserver;
 
   get length() { return this.text.length }
   
-  constructor(dom: HTMLElement) {
+  constructor(dom: HTMLElement,
+              onDOMChange: (from: number, to: number) => void,
+              onSelectionChange: () => void) {
     super(null, dom)
     this.visiblePart = new PartViewDesc(this)
     this.children = [this.visiblePart]
     this.viewportState = new ViewportState
     this.dirty = dirty.node
+    this.observer = new DOMObserver(this, onDOMChange, onSelectionChange)
   }
 
   update(state: EditorState): boolean {
@@ -139,7 +145,10 @@ export class DocViewDesc extends ViewDesc {
     let decorations = getDecorations(state)
 
     if (this.dirty == dirty.not && this.text.eq(state.doc) &&
-        sameDecorations(decorations, this.decorations) && visibleViewport.eq(this.visiblePart.viewport)) return false
+        sameDecorations(decorations, this.decorations) && visibleViewport.eq(this.visiblePart.viewport)) {
+      if (!state.selection.eq(this.selection)) this.updateSelection(state.selection)
+      return false
+    }
 
     if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to && visibleViewport.to >= this.selHeadPart.viewport.from) {
       this.visiblePart = this.selHeadPart
@@ -147,26 +156,60 @@ export class DocViewDesc extends ViewDesc {
     }
 
     let plan = extendForChangedDecorations(changedRanges(this.text, state.doc), decorations, this.decorations)
-    let decoSets = decorations.map(d => d.decorations)
     this.text = state.doc
     this.decorations = decorations
 
-    this.visiblePart.update(visibleViewport, state.doc, decoSets, plan)
+    this.updateInner(visibleViewport, plan)
+    this.updateSelection(state.selection)
+    return true
+  }
+
+  updateSelection(selection: Selection, takeFocus: boolean = false) {
+    this.selection = selection
+    let root = getRoot(this.dom as HTMLElement)
+    if (!takeFocus && root.activeElement != this.dom) return
+
+    let anchor = this.domFromPos(selection.primary.anchor)!
+    let head = this.domFromPos(selection.primary.head)!
+    // FIXME check for equivalent positions, don't update if both are equiv
+
+    let domSel = root.getSelection(), range = document.createRange()
+    // Selection.extend can be used to create an 'inverted' selection
+    // (one where the focus is before the anchor), but not all
+    // browsers support it yet.
+    if (domSel.extend) {
+      range.setEnd(anchor.node, anchor.offset)
+      range.collapse(false)
+    } else {
+      if (anchor > head) [anchor, head] = [head, anchor]
+      range.setEnd(head.node, head.offset)
+      range.setStart(anchor.node, anchor.offset)
+    }
+    this.observer.withoutListening(() => {
+      domSel.removeAllRanges()
+      domSel.addRange(range)
+      if (domSel.extend) domSel.extend(head.node, head.offset)
+    })
+  }
+
+  private updateInner(visibleViewport: Viewport, plan: ReadonlyArray<ChangedRange> = []) {
+    let decoSets = this.decorations.map(d => d.decorations)
+    this.visiblePart.update(visibleViewport, this.text, decoSets, plan)
     // FIXME be lazy about viewport changes, when possible
-    let {head, anchor} = state.selection.primary, parts = [this.visiblePart]
+    let {head, anchor} = this.selection.primary, parts = [this.visiblePart]
     if (head < visibleViewport.from || head > visibleViewport.to) {
-      let headViewport = new Viewport(Math.max(0, head - selPartMargin), Math.min(state.doc.length, head + selPartMargin))
+      let headViewport = new Viewport(Math.max(0, head - selPartMargin), Math.min(this.text.length, head + selPartMargin))
       if (!this.selHeadPart) this.selHeadPart = new PartViewDesc(this)
-      this.selHeadPart.update(headViewport, state.doc, decoSets, plan)
+      this.selHeadPart.update(headViewport, this.text, decoSets, plan)
       parts.push(this.selHeadPart)
     } else {
       this.selHeadPart = null
     }
     if ((anchor < visibleViewport.from || anchor > visibleViewport.to) &&
         (!this.selHeadPart || anchor < this.selHeadPart.viewport.from || anchor > this.selHeadPart.viewport.to)) {
-      let anchorViewport = new Viewport(Math.max(0, anchor - selPartMargin), Math.min(state.doc.length, anchor + selPartMargin))
+      let anchorViewport = new Viewport(Math.max(0, anchor - selPartMargin), Math.min(this.text.length, anchor + selPartMargin))
       if (!this.selAnchorPart) this.selAnchorPart = new PartViewDesc(this)
-      this.selAnchorPart.update(anchorViewport, state.doc, decoSets, plan)
+      this.selAnchorPart.update(anchorViewport, this.text, decoSets, plan)
       parts.push(this.selAnchorPart)
     } else {
       this.selAnchorPart = null
@@ -178,10 +221,10 @@ export class DocViewDesc extends ViewDesc {
     parts.sort((a, b) => a.viewport.from - b.viewport.from)
     for (let i = 0, pos = 0, j = 0;; i++) {
       let part = i < parts.length ? parts[i] : null
-      let start = part ? part.viewport.from : state.doc.length
+      let start = part ? part.viewport.from : this.text.length
       if (start > pos) {
         // FIXME use actual approximation mechanism
-        let space = (state.doc.linePos(start).line - state.doc.linePos(pos).line) * LINE_HEIGHT
+        let space = (this.text.linePos(start).line - this.text.linePos(pos).line) * LINE_HEIGHT
         while (j < this.children.length && !(this.children[j] instanceof GapViewDesc)) j++
         let gap = j < this.children.length ? this.children[j++] as GapViewDesc : new GapViewDesc(this)
         gap.update(start - pos, space)
@@ -193,7 +236,7 @@ export class DocViewDesc extends ViewDesc {
     }
     this.children = children
 
-    this.sync()
+    this.observer.withoutListening(() => this.sync())
     return true
   }
 
@@ -201,8 +244,7 @@ export class DocViewDesc extends ViewDesc {
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
     // FIXME check for coverage, loop until covered
     if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
-      // FIXME turn off DOM observation!
-//      this.update(XXX)
+      this.updateInner(this.viewportState.getViewport(this.text))
     }
   }
 
@@ -242,6 +284,10 @@ export class DocViewDesc extends ViewDesc {
   domFromPos(pos: number): {node: Node, offset: number} | null {
     let {i} = new ChildCursor(this.children, this.length).findPos(pos, -1)
     return this.children[i].domFromPos(pos)
+  }
+
+  destroy() {
+    this.observer.destroy()
   }
 }
 
