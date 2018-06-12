@@ -4,7 +4,6 @@ import {DOMObserver} from "./domobserver"
 import {InputState, attachEventHandlers} from "./input"
 import {SelectionReader, selectionToDOM} from "./selection"
 import {DecorationSet} from "./decoration"
-import {ViewportState} from "./viewport"
 
 export class EditorView {
   private _state: EditorState;
@@ -23,8 +22,6 @@ export class EditorView {
 
   /** @internal */
   public inputState: InputState = new InputState;
-  /** @internal */
-  public viewportState: ViewportState = new ViewportState;
 
   /** @internal */
   public docView: DocViewDesc;
@@ -66,49 +63,33 @@ export class EditorView {
       }
     }
 
-    this.docView = new DocViewDesc(this.viewportState.getViewport(state.doc), state.doc, this.getDecorations(), this.contentDOM)
+    this.docView = new DocViewDesc(this.contentDOM)
+    this.docView.update(state.doc, this.getDecorations())
+
     this.domObserver.start()
   }
 
   setState(state: EditorState) {
     let prev = this.state
     this._state = state
-    let decorations = this.getDecorations()
-    let viewport = this.viewportState.getViewport(state.doc)
-    let updateDOM = state.doc != prev.doc || this.docView.dirty ||
-      !sameDecorations(decorations, this.docView.decorations) || !viewport.eq(this.docView.viewport)
-    let updateSel = updateDOM || !prev.selection.eq(state.selection)
-    if (updateSel) {
-      this.selectionReader.ignoreUpdates = true
-      if (updateDOM) {
-        this.domObserver.stop()
-        this.docView.update(viewport, state.doc, decorations)
-        this.docView.sync()
-        this.domObserver.start()
-        this.selectionReader.clearDOMState()
-        this.scheduleLayoutCheck()
-      }
-      selectionToDOM(this)
-      this.selectionReader.ignoreUpdates = false
+
+    // FIXME somehow do this lazily?
+    this.selectionReader.ignoreUpdates = true
+    // FIXME this might trigger a DOM change and a recursive call to setState. Need some strategy for dealing with that
+    this.domObserver.stop()
+    let updated = this.docView.update(state.doc, this.getDecorations())
+    if (updated) {
+      this.selectionReader.clearDOMState()
+      this.scheduleLayoutCheck()
     }
+    this.domObserver.start()
+    if (updated || !prev.selection.eq(state.selection)) selectionToDOM(this)
+    this.selectionReader.ignoreUpdates = false
   }
 
   private scheduleLayoutCheck() {
     if (this.layoutCheckScheduled != null) return
-    this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
-  }
-
-  private checkLayout() {
-    this.layoutCheckScheduled = null
-    this.viewportState.updateFromDOM(this.contentDOM)
-    // FIXME check for coverage, loop until covered
-    if (!this.viewportState.coveredBy(this.state.doc, this.docView.viewport)) {
-      // FIXME reset selection, factor this stuff into a method
-      this.domObserver.stop()
-      this.docView.update(this.viewportState.getViewport(this.state.doc), this.state.doc, this.docView.decorations)
-      this.docView.sync()
-      this.domObserver.start()
-    }
+    this.layoutCheckScheduled = requestAnimationFrame(() => this.docView.checkLayout())
   }
 
   private getDecorations(): PluginDeco[] {
@@ -169,10 +150,4 @@ export class EditorView {
 interface EditorProps {
   readonly handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
   readonly decorations?: (state: EditorState) => DecorationSet;
-}
-
-function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
-  if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
-  return true
 }

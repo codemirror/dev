@@ -2,7 +2,7 @@ import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {Plugin} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
-import {Viewport} from "./viewport"
+import {Viewport, ViewportState} from "./viewport"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
@@ -115,37 +115,110 @@ function rm(dom: Node): Node {
 export type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
 
 export class DocViewDesc extends ViewDesc {
-  children: LineViewDesc[];
+  children: DocPartViewDesc[];
+  viewportState: ViewportState;
   text: Text = Text.create("");
   decorations: PluginDeco[] = [];
-  viewport: Viewport = new Viewport(0, 0);
 
   get length() { return this.text.length }
-  get childGap() { return 1 }
-
-  constructor(viewport: Viewport, text: Text, decorations: PluginDeco[], dom: Element) {
+  
+  constructor(dom: HTMLElement) {
     super(null, dom)
-    this.children = [new LineViewDesc(this, [])]
+    this.children = [new PartViewDesc(this)]
+    this.viewportState = new ViewportState
     this.dirty = dirty.node
-    this.update(viewport, text, decorations)
-    this.sync()
   }
 
-  update(viewport: Viewport, text: Text, decorations: PluginDeco[]) {
-    let prevText = this.text
-    let plan = extendForChangedDecorations(changedRanges(prevText, text), decorations, this.decorations)
-    let clippedPlan = clipPlan(plan, this.viewport, viewport)
+  update(text: Text, decorations: PluginDeco[]): boolean {
+    // FIXME short-circuit in a viewport-safe way
+    if (this.dirty == dirty.not && this.text.eq(text) && sameDecorations(decorations, this.decorations)) return false
+    let plan = extendForChangedDecorations(changedRanges(this.text, text), decorations, this.decorations)
+    let decoSets = decorations.map(d => d.decorations)
     this.text = text
     this.decorations = decorations
+    // FIXME update viewports and gaps somewhere here
+    for (let child of this.children)
+      child.update(new Viewport(0, text.length), text, decoSets, plan)
+    this.sync()
+    return true
+  }
+
+  checkLayout() {
+      /* FIXME
+    this.layoutCheckScheduled = null
+    this.viewportState.updateFromDOM(this.contentDOM)
+    // FIXME check for coverage, loop until covered
+    if (!this.viewportState.coveredBy(this.state.doc, this.docView.viewport)) {
+      // FIXME reset selection, factor this stuff into a method
+      this.domObserver.stop()
+      this.docView.update(this.viewportState.getViewport(this.state.doc), this.state.doc, this.docView.decorations)
+      this.docView.sync()
+      this.domObserver.start()
+    }*/
+  }
+
+  nearest(dom: Node): ViewDesc | null {
+    for (let cur: Node | null = dom; cur;) {
+      let domView = cur.cmView
+      if (domView) {
+        for (let v: ViewDesc | null = domView; v; v = v.parent)
+          if (v == this) return domView
+      }
+      cur = cur.parentNode
+    }
+    return null
+  }
+
+  readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
+    // FIXME
+    return this.children[0].readDOMRange(from, to)
+  }
+
+  posFromDOM(node: Node, offset: number): number {
+    let desc = this.nearest(node)
+    if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
+    return desc.localPosFromDOM(node, offset) + desc.posAtStart
+  }
+
+  domFromPos(pos: number): {node: Node, offset: number} | null {
+    let {i} = new ChildCursor(this.children, this.length).findPos(pos)
+    return this.children[i].domFromPos(pos)
+  }
+}
+
+abstract class DocPartViewDesc extends ViewDesc {
+  abstract update(viewport: Viewport, text: Text, decoSets: ReadonlyArray<DecorationSet>, plan: ReadonlyArray<ChangedRange>): void;
+  abstract domFromPos(pos: number): {node: Node, offset: number} | null;
+  abstract readDOMRange(from: number, to: number): {from: number, to: number, text: string};
+}
+
+class PartViewDesc extends DocPartViewDesc {
+  children: LineViewDesc[];
+  viewport: Viewport = new Viewport(0, 0);
+
+  get length() { return this.viewport.to - this.viewport.from }
+  get posAtStart(): number { return this.viewport.from }
+  get posAtEnd(): number { return this.viewport.to }
+
+  get childGap() { return 1 }
+
+  constructor(parent: ViewDesc) {
+    super(parent, document.createElement("div"))
+    this.children = [new LineViewDesc(this, [])]
+    this.dirty = dirty.node
+  }
+
+  update(viewport: Viewport, text: Text, decoSets: ReadonlyArray<DecorationSet>, plan: ReadonlyArray<ChangedRange>) {
+    let clippedPlan = clipPlan(plan, this.viewport, viewport)
+    let cur = new ChildCursor(this.children, this.viewport.to, 1)
     this.viewport = viewport
 
-    let cur = new ChildCursor(this.children, prevText.length, 1)
     for (let i = clippedPlan.length - 1; i >= 0; i--) {
       let {fromA, toA, fromB, toB} = clippedPlan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
       this.updateRange(fromI, fromOff, toI, toOff,
-                       LineElementBuilder.build(text, fromB, toB, decorations.map(d => d.decorations)))
+                       LineElementBuilder.build(text, fromB, toB, decoSets))
     }
   }
 
@@ -173,7 +246,7 @@ export class DocViewDesc extends ViewDesc {
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
     // FIXME partially parse lines when possible
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
+    for (let i = 0, pos = this.viewport.from; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       /*      if (pos < from && end > to) {
         let result = child.parseRange(from - pos, to - pos)
@@ -188,29 +261,20 @@ export class DocViewDesc extends ViewDesc {
     return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
   }
 
-  nearest(dom: Node): ViewDesc | null {
-    for (let cur: Node | null = dom; cur;) {
-      let domView = cur.cmView
-      if (domView) {
-        for (let v: ViewDesc | null = domView; v; v = v.parent)
-          if (v == this) return domView
-      }
-      cur = cur.parentNode
-    }
-    return null
-  }
-
-  posFromDOM(node: Node, offset: number): number {
-    let desc = this.nearest(node)
-    if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
-    return desc.localPosFromDOM(node, offset) + desc.posAtStart
-  }
-
-  domFromPos(pos: number): {node: Node, offset: number} {
-    let {i, off} = new ChildCursor(this.children, this.text.length, 1).findPos(pos)
+  domFromPos(pos: number): {node: Node, offset: number} | null {
+    let {i, off} = new ChildCursor(this.children, this.viewport.to, 1).findPos(pos)
     return this.children[i].domFromPos(off)
   }
 }
+
+/*class GapViewDesc extends DocPartViewDesc {
+  // FIXME
+
+  domFromPos(pos: number): {node: Node, offset: number} | null { return null }
+  readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
+    return {from, to, text: (this.parent as DocViewDesc).text.slice(from, to)}
+  }
+}*/
 
 const MAX_JOIN_LEN = 256
 
@@ -218,7 +282,7 @@ class LineViewDesc extends ViewDesc {
   children: LineElementViewDesc[];
   length: number;
 
-  constructor(parent: DocViewDesc, content: LineElementViewDesc[]) {
+  constructor(parent: PartViewDesc, content: LineElementViewDesc[]) {
     super(parent, document.createElement("div"))
     this.length = 0
     this.children = []
@@ -667,4 +731,10 @@ function clipPlan(plan: ReadonlyArray<ChangedRange>, viewportA: Viewport, viewpo
   }
 
   return result
+}
+
+function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
+  if (a.length != b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
+  return true
 }

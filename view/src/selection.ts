@@ -119,8 +119,8 @@ export function selectionToDOM(view: EditorView, takeFocus: boolean = false) {
   if (reader.lastSelection && reader.lastSelection.eq(sel) && !reader.domChanged()) return
 
   reader.ignoreUpdates = true
-  let anchor = view.docView.domFromPos(sel.primary.anchor)
-  let head = view.docView.domFromPos(sel.primary.head)
+  let anchor = view.docView.domFromPos(sel.primary.anchor)!
+  let head = view.docView.domFromPos(sel.primary.head)!
 
   let domSel = view.root.getSelection(), range = document.createRange()
   // Selection.extend can be used to create an 'inverted' selection
