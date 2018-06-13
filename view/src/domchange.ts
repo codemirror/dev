@@ -11,7 +11,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
   }
   view.inputState.lastKeyCode = 0
 
-  let diff = findDiff(view.state.doc.slice(from, to), text, preferredPos, preferredSide)
+  let diff = findDiff(view.state.doc.slice(from, to), text, preferredPos - from, preferredSide)
   if (diff) {
     // FIXME apply generic insertText functionality when appropriate
     // (including mapping selection forward in case of replace), maybe

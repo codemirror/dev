@@ -11,6 +11,7 @@ export default {
   plugins: [
     commonjs(),
     typescript({
+      check: false,
       tsconfigOverride: {
         compilerOptions: {lib: ["ES6", "dom"], sourceMap: true, target: "es5", strict: false},
         include: null

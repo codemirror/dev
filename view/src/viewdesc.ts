@@ -65,7 +65,7 @@ export abstract class ViewDesc {
     if (this.dirty & dirty.node)
       this.syncDOMChildren()
     if (this.dirty & dirty.child)
-      for (let child of this.children) child.sync()
+      for (let child of this.children) if (child.dirty) child.sync()
     this.dirty = dirty.not
   }
 
@@ -97,6 +97,7 @@ export abstract class ViewDesc {
     }
   }
 
+  // FIXME track precise dirty ranges, to avoid full DOM sync on every touched node?
   markDirty() {
     if (this.dirty & dirty.node) return
     this.dirty |= dirty.node
