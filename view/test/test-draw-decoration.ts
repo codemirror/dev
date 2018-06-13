@@ -33,13 +33,13 @@ function d(from, to, spec = null) {
 }
 
 function decoEditor(doc, decorations: any = []) {
-  return tempEditor(doc, {plugins: [decos(DecorationSet.of(decorations))]})
+  return tempEditor(doc, [decos(DecorationSet.of(decorations))])
 }
 
 describe("EditorView decoration", () => {
   it("renders tag names", () => {
     let cm = decoEditor("one\ntwo", d(2, 5, {tagName: "em"}))
-    ist(cm.contentDOM.innerHTML, "<div>on<em>e</em></div><div><em>t</em>wo</div>")
+    ist(cm.contentDOM.innerHTML, "<div><div>on<em>e</em></div><div><em>t</em>wo</div></div>")
   })
 
   it("renders attributes", () => {

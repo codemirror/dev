@@ -9,10 +9,6 @@ export class EditorView {
   private _state: EditorState;
   get state(): EditorState { return this._state }
 
-  // FIXME get rid of bare props entirely, and have people provide a
-  // plugin if they need props?
-  readonly props: EditorProps;
-
   public dispatch: (tr: Transaction) => void;
 
   public dom: HTMLElement;
@@ -26,9 +22,8 @@ export class EditorView {
 
   private layoutCheckScheduled: number | null = null;
 
-  constructor(state: EditorState, props: EditorProps = {}, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
+  constructor(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
-    this.props = props
     this.dispatch = dispatch || (tr => this.setState(tr.apply()))
 
     this.contentDOM = document.createElement("pre")
@@ -79,9 +74,7 @@ export class EditorView {
 
   // FIXME this is very awkward to type. Change or embrace the any?
   someProp(propName: string, f: ((value: any) => any) | undefined = undefined): any {
-    let prop = (this.props as any)[propName], value
-    if (prop != null && (value = f ? f(prop) : prop)) return value
-    let plugins = this.state.plugins
+    let plugins = this.state.plugins, value
     for (let plugin of plugins) {
       let prop = plugin.props[propName]
       if (prop != null && (value = f ? f(prop) : prop)) return value

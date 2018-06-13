@@ -1,18 +1,17 @@
 import {EditorView} from "../src/view"
-import {EditorState} from "../../state/src/state"
+import {EditorState, Plugin} from "../../state/src/state"
 
 const workspace = document.querySelector("#workspace")
 
 let tempView = null
 
-export function tempEditor(doc = "", props: any = {}) {
+export function tempEditor(doc = "", plugins: Plugin[] = []) {
   if (tempView) {
     tempView.destroy()
     tempView = null
   }
 
-  let state = EditorState.create({doc, plugins: props.plugins})
-  tempView = new EditorView(state, props)
+  tempView = new EditorView(EditorState.create({doc, plugins}))
   workspace.appendChild(tempView.dom)
   return tempView
 }
