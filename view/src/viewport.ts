@@ -54,9 +54,12 @@ export class ViewportState {
   coveredBy(doc: Text, viewport: Viewport) {
     let topLine = doc.linePos(viewport.from).line, bottomLine = doc.linePos(viewport.to).line
     let top = (topLine - 1) * LINE_HEIGHT, bottom = bottomLine * LINE_HEIGHT
-    return top <= this.top && bottom >= this.bottom
+    return (top <= this.top - COVER_MARGIN || topLine == 1) &&
+      (bottom >= this.bottom + COVER_MARGIN || bottomLine == doc.lines)
   }
 }
+
+const COVER_MARGIN = 10
 
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}

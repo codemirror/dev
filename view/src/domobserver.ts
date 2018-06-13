@@ -40,6 +40,11 @@ export class DOMObserver {
     this.listenForSelectionChanges()
     this.intersection = new IntersectionObserver(entries => {
       for (let entry of entries) if (entry.intersectionRatio > 0) return this.onIntersect()
+    }, {
+      // Multiple thresholds to make sure the observer keeps firing
+      // if, for some reason, the editor fails to appropriately handle
+      // the first event (FIXME try to remove when height estimates are reliable)
+      threshold: [0, 0.05, 0.1, 0.15, 0.2, 0.25]
     })
     this.start()
   }

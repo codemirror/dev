@@ -255,8 +255,10 @@ export class DocViewDesc extends ViewDesc {
   checkLayout() {
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
     // FIXME check for coverage, loop until covered
-    if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport))
+    if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
       this.updateInner(this.viewportState.getViewport(this.text))
+      this.updateSelection(this.selection)
+    }
   }
 
   nearest(dom: Node): ViewDesc | null {
@@ -293,8 +295,16 @@ export class DocViewDesc extends ViewDesc {
   }
 
   domFromPos(pos: number): {node: Node, offset: number} | null {
-    let {i} = new ChildCursor(this.children, this.length).findPos(pos, -1)
-    return this.children[i].domFromPos(pos)
+    let cur = 0
+    for (let child of this.children) {
+      let end = cur + child.length
+      if (pos >= cur && pos <= end) {
+        let dom = child.domFromPos(pos)
+        if (dom) return dom
+      }
+      cur = end
+    }
+    return null
   }
 
   destroy() {
