@@ -137,7 +137,7 @@ export class DocViewDesc extends ViewDesc {
     this.children = [this.visiblePart]
     this.viewportState = new ViewportState
     this.dirty = dirty.node
-    this.observer = new DOMObserver(this, onDOMChange, onSelectionChange)
+    this.observer = new DOMObserver(this, onDOMChange, onSelectionChange, () => this.checkLayout())
   }
 
   update(state: EditorState): boolean {
@@ -218,16 +218,16 @@ export class DocViewDesc extends ViewDesc {
 
     // Sync the child array and make sure appropriate gaps are
     // inserted between the children
-    let children = []
+    let children = [], gaps = this.children.filter(ch => ch instanceof GapViewDesc) as GapViewDesc[], j = 0
     parts.sort((a, b) => a.viewport.from - b.viewport.from)
-    for (let i = 0, pos = 0, j = 0;; i++) {
+    for (let i = 0, pos = 0;; i++) {
       let part = i < parts.length ? parts[i] : null
       let start = part ? part.viewport.from : this.text.length
       if (start > pos) {
         // FIXME use actual approximation mechanism
         let space = (this.text.linePos(start).line - this.text.linePos(pos).line) * LINE_HEIGHT
-        while (j < this.children.length && !(this.children[j] instanceof GapViewDesc)) j++
-        let gap = j < this.children.length ? this.children[j++] as GapViewDesc : new GapViewDesc(this)
+        let gap = j < gaps.length ? gaps[j] : new GapViewDesc(this)
+        j++
         gap.update(start - pos, space)
         children.push(gap)
       }
@@ -235,18 +235,27 @@ export class DocViewDesc extends ViewDesc {
       children.push(part)
       pos = part.viewport.to
     }
-    this.children = children
+    if (!sameArray(this.children, children)) {
+      this.children = children
+      this.markDirty()
+    }
+    if (j != gaps.length) this.registerIntersection()
 
     this.observer.withoutListening(() => this.sync())
     return true
   }
 
+  registerIntersection() {
+    let gapDOM: HTMLElement[] = []
+    for (let child of this.children) if (child instanceof GapViewDesc) gapDOM.push(child.dom as HTMLElement)
+    this.observer.observeIntersection(gapDOM)
+  }
+
   checkLayout() {
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
     // FIXME check for coverage, loop until covered
-    if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
+    if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport))
       this.updateInner(this.viewportState.getViewport(this.text))
-    }
   }
 
   nearest(dom: Node): ViewDesc | null {
@@ -825,11 +834,11 @@ function clipPlan(plan: ReadonlyArray<ChangedRange>, viewportA: Viewport, viewpo
     while (posA < nextA) {
       let boundA = boundAfter(viewportA, posA), boundB = boundAfter(viewportB, posB)
       if (boundA >= nextA && boundB >= nextB) break
-      if ((posA >= viewportA.from && boundA <= viewportA.to) != (posB >= viewportB.from && boundB <= viewportB.to))
-        addChangedRange(result, Math.max(posA, viewportA.from), Math.min(boundA, viewportA.to),
-                        Math.max(posB, viewportB.from), Math.min(boundB, viewportB.to))
-      let advance = Math.min(boundA - posA, boundB - posB)
-      posA += advance; posB += advance
+      let advance = Math.min(Math.min(boundA, nextA) - posA, Math.min(boundB, nextB) - posB)
+      let endA = posA + advance, endB = posB + advance
+      if ((posA >= viewportA.to || endA <= viewportA.from) != (posB >= viewportB.to || endB <= viewportB.from))
+        addChangedRange(result, viewportA.clip(posA), viewportA.clip(endA), viewportB.clip(posB), viewportB.clip(endB))
+      posA = endA; posB = endB
     }
 
     if (!range || (range.fromA > viewportA.to && range.fromB > viewportB.to)) break
@@ -851,6 +860,12 @@ type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
 function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
+  return true
+}
+
+function sameArray<T>(a: T[], b: T[]): boolean {
+  if (a.length != b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
 }
 

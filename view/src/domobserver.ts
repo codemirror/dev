@@ -20,10 +20,12 @@ export class DOMObserver {
   charDataTimeout: any = null;
   active: boolean = false;
   dom: HTMLElement;
+  intersection: IntersectionObserver;
 
   constructor(private docView: DocViewDesc,
               private onDOMChange: (from: number, to: number) => void,
-              private onSelectionChange: () => void) {
+              private onSelectionChange: () => void,
+              private onIntersect: () => void) {
     this.dom = docView.dom as HTMLElement
     if (typeof MutationObserver != "undefined")
       this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
@@ -36,6 +38,9 @@ export class DOMObserver {
       }
     this.readSelection = this.readSelection.bind(this)
     this.listenForSelectionChanges()
+    this.intersection = new IntersectionObserver(entries => {
+      for (let entry of entries) if (entry.intersectionRatio > 0) return this.onIntersect()
+    })
     this.start()
   }
 
@@ -69,6 +74,7 @@ export class DOMObserver {
       this.observer.observe(this.dom, observeOptions)
     if (useCharData)
       this.dom.addEventListener("DOMCharacterDataModified", this.onCharData)
+    this.intersection.takeRecords() // Dump any existing records
     this.active = true
   }
 
@@ -76,6 +82,9 @@ export class DOMObserver {
     if (!this.active) return
     this.active = false
     if (this.observer) {
+      // FIXME we're throwing away DOM events when flushing like this,
+      // to avoid recursively calling `setState` when setting a new
+      // state, but that could in some circumstances drop information
       this.flush()
       this.observer.disconnect()
     }
@@ -134,6 +143,11 @@ export class DOMObserver {
     let root = getRoot(this.dom)
     if (!this.active || root.activeElement != this.dom || !hasSelection(this.dom)) return
     if (!this.flush()) this.onSelectionChange()
+  }
+
+  observeIntersection(dom: HTMLElement[]) {
+    this.intersection.disconnect()
+    for (let elt of dom) this.intersection.observe(elt)
   }
 
   destroy() {
