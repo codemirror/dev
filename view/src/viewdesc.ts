@@ -134,10 +134,10 @@ export class DocViewDesc extends ViewDesc {
               onDOMChange: (from: number, to: number) => void,
               onSelectionChange: () => void) {
     super(null, dom)
+    this.dirty = dirty.node
     this.visiblePart = new PartViewDesc(this)
     this.children = [this.visiblePart]
     this.viewportState = new ViewportState
-    this.dirty = dirty.node
     this.observer = new DOMObserver(this, onDOMChange, onSelectionChange, () => this.checkLayout())
   }
 
@@ -329,11 +329,12 @@ class PartViewDesc extends DocPartViewDesc {
 
   constructor(parent: ViewDesc) {
     super(parent, document.createElement("div"))
-    this.children = [new LineViewDesc(this, [])]
     this.dirty = dirty.node
+    this.children = [new LineViewDesc(this, [])]
   }
 
   update(viewport: Viewport, text: Text, decoSets: ReadonlyArray<DecorationSet>, plan: ReadonlyArray<ChangedRange>) {
+    this.markDirty()
     let clippedPlan = clipPlan(plan, this.viewport, viewport)
     let cur = new ChildCursor(this.children, this.viewport.to, 1)
     this.viewport = viewport
@@ -420,6 +421,7 @@ class LineViewDesc extends ViewDesc {
     this.length = 0
     this.children = []
     if (content.length) this.update(0, 0, content)
+    this.markDirty()
   }
 
   update(from: number, to: number = this.length, content: LineElementViewDesc[]) {
@@ -479,7 +481,6 @@ class LineViewDesc extends ViewDesc {
     if (content.length || fromI != toI) {
       for (let desc of content) desc.finish(this)
       this.children.splice(fromI, toI - fromI, ...content)
-      this.markDirty()
     }
   }
 
@@ -563,6 +564,7 @@ class TextViewDesc extends LineElementViewDesc {
     } else {
       this.dom = this.textDOM
     }
+    this.markDirty()
     this.dom.cmView = this
   }
 
@@ -609,10 +611,13 @@ class WidgetViewDesc extends LineElementViewDesc {
     this.parent = parent
     if (!this.dom) {
       this.dom = this.widget.toDOM()
-      ;(this.dom as HTMLElement).contentEditable = "true"
+      ;(this.dom as HTMLElement).contentEditable = "false"
       this.dom.cmView = this
     }
+    this.markDirty()
   }
+
+  sync() { this.dirty = dirty.not }
 
   get length() { return 0 }
   getSide() { return this.side }

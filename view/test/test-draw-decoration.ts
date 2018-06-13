@@ -98,7 +98,7 @@ describe("EditorView decoration", () => {
       ist(w.textContent, "hi")
       ist(w.previousSibling.textContent, "hell")
       ist(w.nextSibling.textContent, "o")
-      ist(w.contentEditable, "true")
+      ist(w.contentEditable, "false")
     })
 
     it("supports editing around widgets", () => {

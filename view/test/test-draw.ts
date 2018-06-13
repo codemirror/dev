@@ -57,6 +57,12 @@ describe("EditorView drawing", () => {
     ist(cm.contentDOM.contains(line2))
   })
 
+  it("notices the doc needs to be redrawn when only inserting empty lines", () => {
+    let cm = tempEditor("")
+    cm.dispatch(cm.state.transaction.replace(0, 0, "\n\n\n"))
+    ist(domText(cm), "\n\n\n")
+  })
+
   it("draws BR nodes on empty lines", () => {
     let cm = tempEditor("one\n\ntwo")
     let emptyLine = cm.domAtPos(4).node
