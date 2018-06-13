@@ -159,6 +159,7 @@ export class DocViewDesc extends ViewDesc {
     this.text = state.doc
     this.decorations = decorations
 
+    this.selection = state.selection
     this.updateInner(visibleViewport, plan)
     this.updateSelection(state.selection)
     return true
@@ -375,6 +376,7 @@ class GapViewDesc extends DocPartViewDesc {
   length: number = 0;
   constructor(parent: ViewDesc) {
     super(parent, document.createElement("div"))
+    ;(this.dom as HTMLElement).contentEditable = "false"
   }
   get children() { return noChildren }
   update(length: number, height: number) {

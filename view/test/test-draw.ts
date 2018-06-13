@@ -2,9 +2,18 @@ import {tempEditor} from "./temp-editor"
 import ist from "ist"
 
 function domText(view) {
-  let text = ""
-  for (let dom = view.contentDOM.firstChild; dom; dom = dom.nextSibling)
-    text += dom.textContent + (dom.nextSibling ? "\n" : "")
+  let text = "", eol = false
+  function scan(node) {
+    if (node.nodeType == 1) {
+      if (node.nodeName == "BR") return
+      if (eol) { text += "\n"; eol = false }
+      for (let ch = node.firstChild; ch; ch = ch.nextSibling) scan(ch)
+      eol = true
+    } else if (node.nodeType == 3) {
+      text += node.nodeValue
+    }
+  }
+  scan(view.contentDOM)
   return text
 }
 
@@ -20,39 +29,40 @@ describe("EditorView drawing", () => {
     ist(domText(cm), "oo")
   })
 
-  it("works in big documents", () => {
-    let doc = "abcdefghijklmnopqrstuvwxyz\n".repeat(300)
+  it("works in multiple lines", () => {
+    let doc = "abcdefghijklmnopqrstuvwxyz\n".repeat(10)
     let cm = tempEditor("")
     cm.dispatch(cm.state.transaction.replace(0, 0, doc))
     ist(domText(cm), doc)
     cm.dispatch(cm.state.transaction.replace(0, 0, "/"))
     doc = "/" + doc
     ist(domText(cm), doc)
-    cm.dispatch(cm.state.transaction.replace(2000, 2004, "$"))
-    doc = doc.slice(0, 2000) + "$" + doc.slice(2004)
+    cm.dispatch(cm.state.transaction.replace(100, 104, "$"))
+    doc = doc.slice(0, 100) + "$" + doc.slice(104)
     ist(domText(cm), doc)
-    cm.dispatch(cm.state.transaction.replace(8000, 8100, ""))
-    doc = doc.slice(0, 8000)
+    cm.dispatch(cm.state.transaction.replace(500, 510, ""))
+    doc = doc.slice(0, 500)
     ist(domText(cm), doc)
   })
 
   it("redraws lazily", () => {
     let cm = tempEditor("one\ntwo\nthree")
-    let line0 = cm.contentDOM.firstChild, line1 = line0.nextSibling, line2 = line1.nextSibling
+    let line0 = cm.domAtPos(0).node, line1 = line0.nextSibling, line2 = line1.nextSibling
     let text0 = line0.firstChild, text2 = line2.firstChild
     cm.dispatch(cm.state.transaction.replace(5, 5, "x"))
     ist(text0.parentElement, line0)
-    ist(line0.parentElement, cm.contentDOM)
-    ist(line1.parentElement, cm.contentDOM)
+    ist(cm.contentDOM.contains(line0))
+    ist(cm.contentDOM.contains(line1))
     ist(text2.parentElement, line2)
-    ist(line2.parentElement, cm.contentDOM)
+    ist(cm.contentDOM.contains(line2))
   })
 
   it("draws BR nodes on empty lines", () => {
     let cm = tempEditor("one\n\ntwo")
-    ist(cm.contentDOM.childNodes[1].childNodes.length, 1)
-    ist(cm.contentDOM.childNodes[1].firstChild.nodeName, "BR")
+    let emptyLine = cm.domAtPos(4).node
+    ist(emptyLine.childNodes.length, 1)
+    ist(emptyLine.firstChild.nodeName, "BR")
     cm.dispatch(cm.state.transaction.replace(4, 4, "x"))
-    ist(!Array.from(cm.contentDOM.childNodes[1].childNodes).some(n => (n as any).nodeName == "BR"))
+    ist(!Array.from(cm.domAtPos(4).node.childNodes).some(n => (n as any).nodeName == "BR"))
   })
 })

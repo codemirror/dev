@@ -207,7 +207,7 @@ describe("LineElementBuilder.build", () => {
                  Decoration.range(2, 4, {attributes: {class: "b"}})]
     let ranges = LineElementBuilder.build(Text.create("x".repeat(10)), 0, 10, [DecorationSet.of(decos)])
     ist(flatten(ranges), "xx,xx,xxxxxx")
-    ist(ranges[0].map(r => r.class).join(","), "a,a b,a")
+    ist(ranges[0].map(r => (r as any).class).join(","), "a,a b,a")
   })
 
   it("combines styles", () => {

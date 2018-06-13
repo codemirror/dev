@@ -82,6 +82,10 @@ export class EditorView {
     return null
   }
 
+  domAtPos(pos: number): {node: Node, offset: number} | null {
+    return this.docView.domFromPos(pos)
+  }
+
   hasFocus(): boolean {
     return getRoot(this.dom).activeElement == this.contentDOM
   }
@@ -97,7 +101,7 @@ export class EditorView {
   }
 }
 
-interface EditorProps {
+export interface EditorProps {
   readonly handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
   readonly decorations?: (state: EditorState) => DecorationSet;
 }
