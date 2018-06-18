@@ -47,4 +47,13 @@ describe("DOM changes", () => {
     flush(cm)
     ist(cm.state.selection.primary.anchor, 1)
   })
+
+  it("notices text changes at the end of a long document", () => {
+    let cm = tempEditor("foo\nbar\n".repeat(15))
+    cm.domAtPos(8*15).node.textContent = "a"
+    console.log(cm.dom.innerText)
+    flush(cm)
+    ist(cm.state.doc.text, "foo\nbar\n".repeat(15) + "a")
+  })
+
 })

@@ -129,7 +129,7 @@ export class DocViewDesc extends ViewDesc {
   observer: DOMObserver;
 
   get length() { return this.text.length }
-  
+
   constructor(dom: HTMLElement,
               onDOMChange: (from: number, to: number) => void,
               onSelectionChange: () => void) {
@@ -277,7 +277,7 @@ export class DocViewDesc extends ViewDesc {
     let pos = 0, text = ""
     for (let child of this.children) {
       let end = pos + child.length
-      if (pos < to && end > from) {
+      if (pos < to && end >= from) {
         let inner = child.readDOMRange(Math.max(from, pos), Math.min(to, end))
         if (pos < from) from = inner.from
         if (end > to) to = inner.to
