@@ -259,6 +259,9 @@ export class DocViewDesc extends ViewDesc {
 
   checkLayout() {
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
+    this.heightMap = this.heightMap.setMeasuredHeights(
+      this.visiblePart.viewport.from, this.visiblePart.viewport.to,
+      this.visiblePart.measureLineHeights(), this.heightOracle, 0)
     // FIXME check for coverage, loop until covered
     if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
       this.updateInner(this.viewportState.getViewport(this.text))
@@ -395,6 +398,15 @@ class PartViewDesc extends DocPartViewDesc {
   domFromPos(pos: number): {node: Node, offset: number} | null {
     let {i, off} = new ChildCursor(this.children, this.viewport.to, 1).findPos(pos)
     return this.children[i].domFromPos(off)
+  }
+
+  measureLineHeights() {
+    let result = []
+    for (let line of this.children) {
+      let rect = (line.dom as HTMLElement).getBoundingClientRect()
+      result.push(line.length, rect.bottom - rect.top)
+    }
+    return result
   }
 }
 

@@ -4,12 +4,20 @@ import {DecorationSet, buildLineElements, RangeDesc, WidgetType} from "./decorat
 
 export class HeightOracle {
   doc: Text = Text.create("")
-  heightForRange(from: number, to: number): number { return 14 }
+
+  heightForRange(from: number, to: number): number {
+    console.log("range is", from, to)
+    let lines = this.doc.linePos(to).line - this.doc.linePos(from).line + 1
+    return 14 * lines
+  }
+
   heightForLine(length: number): number { return 14 }
+
   setDoc(doc: Text): this { this.doc = doc; return this }
 }
 
 class ReplaceSide {
+  // FIXME could compute these lazily, since they are often not needed
   constructor(readonly breakInside: number, readonly nextBreak: number) {}
   static start(doc: Text, start: number, length: number): ReplaceSide {
     let atEnd = doc.linePos(start + length)
@@ -26,16 +34,17 @@ class ReplaceSide {
 
 export abstract class HeightMapNode {
   height: number = -1 // Height of this part of the document, or -1 when uninitialized
+  abstract size: number
   constructor(
     public length: number // The number of characters covered
   ) {}
-  get size(): number { return 1 }
 
   abstract heightAt(pos: number): number
   abstract posAt(height: number): number
   abstract replace(from: number, to: number, nodes: HeightMapNode[],
                    start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode
   abstract computeHeight(oracle: HeightOracle, offset: number): number
+  abstract setMeasuredHeights(from: number, to: number, lines: number[], oracle: HeightOracle, offset: number): HeightMapNode
 
   applyChanges(doc: Text, decorations: ReadonlyArray<DecorationSet>, changes: ReadonlyArray<ChangedRange>): HeightMapNode {
     let me: HeightMapNode = this
@@ -55,6 +64,8 @@ const noDeco: number[] = []
 
 class HeightMapLine extends HeightMapNode {
   constructor(length: number, public deco: number[] = noDeco) { super(length) }
+
+  get size(): number { return 1 }
 
   // FIXME try to estimate wrapping? Or are height queries always per-line?
   heightAt(pos: number): number { return 0 }
@@ -130,9 +141,16 @@ class HeightMapLine extends HeightMapNode {
     }
     return this.height = Math.max(oracle.heightForLine(len), minH)
   }
+
+  setMeasuredHeights(from: number, to: number, lines: number[], oracle: HeightOracle, offset: number): HeightMapNode {
+    this.height = lines[1]
+    return this
+  }
 }
 
 class HeightMapRange extends HeightMapNode {
+  get size(): number { return 1 }
+
   heightAt(pos: number) {
     return this.height * (pos / this.length)
   }
@@ -182,6 +200,24 @@ class HeightMapRange extends HeightMapNode {
 
   computeHeight(oracle: HeightOracle, offset: number): number {
     return this.height > -1 ? this.height : this.height = oracle.heightForRange(offset, offset + this.length)
+  }
+
+  setMeasuredHeights(from: number, to: number, lines: number[], oracle: HeightOracle, offset: number): HeightMapNode {
+    let nodes = []
+    if (from > 0) {
+      nodes.push(new HeightMapRange(from - 1))
+      nodes[0].computeHeight(oracle, offset)
+    }
+    for (let i = 0; i < lines.length; i += 2) {
+      let line = new HeightMapLine(lines[i])
+      line.height = lines[i + 1]
+      nodes.push(line)
+    }
+    if (to < this.length) {
+      nodes.push(new HeightMapRange(this.length - to - 1))
+      nodes[nodes.length - 1].computeHeight(oracle, to)
+    }
+    return HeightMapBranch.from(nodes)
   }
 }
 
@@ -249,15 +285,18 @@ class HeightMapBranch extends HeightMapNode {
   }
 
   update(left: HeightMapNode, right: HeightMapNode): this {
-    while (left.size >= 2 * right.size) {
-      let {left: newLeft, right: mid} = left as HeightMapBranch
-      right = (left as HeightMapBranch).update(mid, right)
-      left = newLeft
-    }
-    while (right.size >= 2 * left.size) {
-      let {left: mid, right: newRight} = right as HeightMapBranch
-      left = (right as HeightMapBranch).update(left, mid)
-      right = newRight
+    for (;;) {
+      if (left.size >= (right.size << 1)) {
+        let {left: newLeft, right: mid} = left as HeightMapBranch
+        right = (left as HeightMapBranch).update(mid, right)
+        left = newLeft
+      } else if (right.size >= (left.size << 1)) {
+        let {left: mid, right: newRight} = right as HeightMapBranch
+        left = (right as HeightMapBranch).update(left, mid)
+        right = newRight
+      } else {
+        break
+      }
     }
     this.left = left; this.right = right
     this.height = left.height > -1 && right.height > -1 ? left.height + right.height : -1
@@ -270,6 +309,22 @@ class HeightMapBranch extends HeightMapNode {
     if (this.height > -1) return this.height
     return this.height = this.left.computeHeight(oracle, offset) + 1 +
       this.right.computeHeight(oracle, offset + this.left.length + 1)
+  }
+
+  setMeasuredHeights(from: number, to: number, lines: number[], oracle: HeightOracle, offset: number): HeightMapNode {
+    let {left, right} = this, rightStart = left.length + 1 + offset
+    if (to < rightStart) {
+      left = left.setMeasuredHeights(from, to, lines, oracle, offset)
+    } else if (from >= rightStart) {
+      right = right.setMeasuredHeights(from, to, lines, oracle, rightStart)
+    } else {
+      let i = 0, pos = from - 1
+      while (i < lines.length && pos < rightStart - 2) { pos += lines[i] + 1; i += 2 }
+      right = right.setMeasuredHeights(rightStart, to, lines.slice(i), oracle, rightStart)
+      lines.length = i
+      left = left.setMeasuredHeights(from, rightStart - 1, lines, oracle, offset)
+    }
+    return this.update(left, right)
   }
 
   static from(nodes: HeightMapNode[]): HeightMapNode {
