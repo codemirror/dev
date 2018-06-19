@@ -5,6 +5,7 @@ import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElem
 import {Viewport, ViewportState, LINE_HEIGHT} from "./viewport"
 import {DOMObserver} from "./domobserver"
 import {getRoot} from "./dom"
+import {HeightMapNode, HeightOracle} from "./heightmap"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
@@ -118,15 +119,17 @@ function rm(dom: Node): Node {
 const selPartMargin = 2
 
 export class DocViewDesc extends ViewDesc {
-  children: DocPartViewDesc[];
-  viewportState: ViewportState;
-  text: Text = Text.create("");
-  decorations: PluginDeco[] = [];
-  selection: Selection = Selection.default;
-  visiblePart: PartViewDesc;
-  selAnchorPart: PartViewDesc | null = null;
-  selHeadPart: PartViewDesc | null = null;
-  observer: DOMObserver;
+  children: DocPartViewDesc[]
+  viewportState: ViewportState
+  text: Text = Text.create("")
+  decorations: PluginDeco[] = []
+  selection: Selection = Selection.default
+  visiblePart: PartViewDesc
+  selAnchorPart: PartViewDesc | null = null
+  selHeadPart: PartViewDesc | null = null
+  observer: DOMObserver
+  heightMap: HeightMapNode = HeightMapNode.empty()
+  heightOracle: HeightOracle = new HeightOracle
 
   get length() { return this.text.length }
 
@@ -156,12 +159,14 @@ export class DocViewDesc extends ViewDesc {
       this.selHeadPart = null
     }
 
-    let plan = extendForChangedDecorations(changedRanges(this.text, state.doc), decorations, this.decorations)
+    let plan = fullChangedRanges(changedRanges(this.text, state.doc), decorations, this.decorations)
     this.text = state.doc
     this.decorations = decorations
+    this.heightMap = this.heightMap.applyChanges(state.doc, decorations.map(d => d.decorations), plan.height)
+    this.heightMap.computeHeight(this.heightOracle.setDoc(state.doc), 0)
 
     this.selection = state.selection
-    this.updateInner(visibleViewport, plan)
+    this.updateInner(visibleViewport, plan.content)
     this.updateSelection(state.selection)
     return true
   }
@@ -787,20 +792,26 @@ function findPluginDeco(decorations: ReadonlyArray<PluginDeco>, plugin: Plugin |
   return null
 }
 
-function extendForChangedDecorations(diff: ReadonlyArray<ChangedRange>,
-                                     decorations: ReadonlyArray<PluginDeco>,
-                                     oldDecorations: ReadonlyArray<PluginDeco>): ReadonlyArray<ChangedRange> {
-  let ranges: number[] = []
+function fullChangedRanges(diff: ReadonlyArray<ChangedRange>,
+                           decorations: ReadonlyArray<PluginDeco>,
+                           oldDecorations: ReadonlyArray<PluginDeco>
+                          ): {content: ReadonlyArray<ChangedRange>, height: ReadonlyArray<ChangedRange>} {
+  let contentRanges: number[] = [], heightRanges: number[] = []
   for (let deco of decorations) {
     let newRanges = (findPluginDeco(oldDecorations, deco.plugin) || DecorationSet.empty)
       .changedRanges(deco.decorations, diff)
-    ranges = joinRanges(ranges, newRanges)
+    contentRanges = joinRanges(contentRanges, newRanges.content)
+    heightRanges = joinRanges(heightRanges, newRanges.height)
   }
   for (let old of oldDecorations) {
-    if (!findPluginDeco(decorations, old.plugin))
-      ranges = joinRanges(ranges, old.decorations.changedRanges(DecorationSet.empty, diff))
+    if (!findPluginDeco(decorations, old.plugin)) {
+      let newRanges = old.decorations.changedRanges(DecorationSet.empty, diff)
+      contentRanges = joinRanges(contentRanges, newRanges.content)
+      heightRanges = joinRanges(heightRanges, newRanges.height)
+    }
   }
-  return extendWithRanges(diff, ranges)
+  return {content: extendWithRanges(diff, contentRanges),
+          height: extendWithRanges(diff, heightRanges)}
 }
 
 function addChangedRange(ranges: ChangedRange[], fromA: number, toA: number, fromB: number, toB: number) {

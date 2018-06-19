@@ -27,6 +27,8 @@ export abstract class WidgetType<T> {
   compare(other: WidgetType<any>): boolean {
     return this == other || this.constructor == other.constructor && this.eq(other.spec)
   }
+
+  get estimatedHeight(): number { return -1 }
 }
 
 // FIXME try dropping specs entirely from the data structure, and
@@ -316,18 +318,18 @@ export class DecorationSet {
     return {set, escaped}
   }
 
-  changedRanges(other: DecorationSet, textDiff: A<ChangedRange>): number[] {
-    let ranges: number[] = []
+  changedRanges(other: DecorationSet, textDiff: A<ChangedRange>): Changes {
+    let changes = new Changes
     let oldPos = 0, newPos = 0
     for (let range of textDiff) {
       if (range.fromB > newPos && (this != other || oldPos != newPos))
-        new DecorationSetComparison(this, oldPos, other, newPos, range.fromB, ranges).run()
+        new DecorationSetComparison(this, oldPos, other, newPos, range.fromB, changes).run()
       oldPos = range.toA
       newPos = range.toB
     }
     if (oldPos < this.length || newPos < other.length)
-      new DecorationSetComparison(this, oldPos, other, newPos, Math.max(this.length - oldPos + newPos, other.length), ranges).run()
-    return ranges
+      new DecorationSetComparison(this, oldPos, other, newPos, Math.max(this.length - oldPos + newPos, other.length), changes).run()
+    return changes
   }
 
   static of(decorations: Decoration[] | Decoration): DecorationSet {
@@ -338,6 +340,11 @@ export class DecorationSet {
   }
 
   static empty = new DecorationSet(0, 0, noDecorations, noChildren);
+}
+
+class Changes {
+  content: number[] = []
+  height: number[] = []
 }
 
 // Stack element for iterating over a decoration set
@@ -384,7 +391,7 @@ export function buildLineElements(sets: A<DecorationSet>, from: number, to: numb
   advanceCollapsed(pos: number): void;
   addWidget(widget: WidgetType<any>, side: number): void;
   active: RangeDesc[];
-}) {
+}, heightOnly: boolean = false /* FIXME silly boolean param */) {
   let heap: Heapable[] = []
 
   for (let set of sets) if (set.size > 0) {
@@ -399,7 +406,7 @@ export function buildLineElements(sets: A<DecorationSet>, from: number, to: numb
       if (deco.from + next.offset > to) break
 
       if (deco.to + next.offset >= from) {
-        if (deco.desc instanceof RangeDesc && deco.desc.affectsSpans) {
+        if (deco.desc instanceof RangeDesc && (heightOnly ? deco.desc.spec.collapsed : deco.desc.affectsSpans)) {
           deco = deco.move(next.offset)
           builder.advance(deco.from)
           let collapsed = deco.desc.spec.collapsed
@@ -411,7 +418,8 @@ export function buildLineElements(sets: A<DecorationSet>, from: number, to: numb
             builder.active.push(deco.desc as RangeDesc)
             addToHeap(heap, deco)
           }
-        } else if (deco.desc instanceof PointDesc && deco.desc.widget) {
+        } else if (deco.desc instanceof PointDesc && deco.desc.widget &&
+                   (heightOnly ? deco.desc.widget.estimatedHeight > -1 : true)) {
           builder.advance(deco.from)
           builder.addWidget(deco.desc.widget, deco.desc.bias)
         }
@@ -638,7 +646,7 @@ class DecorationSetComparison {
 
   constructor(a: DecorationSet, startA: number,
               b: DecorationSet, startB: number, endB: number,
-              readonly ranges: number[]) {
+              readonly changes: Changes) {
     this.a = new ComparisonSide([new IteratedSet(startB - startA, a)])
     this.b = new ComparisonSide([new IteratedSet(0, b)])
     this.pos = startB
@@ -674,7 +682,10 @@ class DecorationSetComparison {
       } else if (heapB.length) {
         this.advance(this.b)
       } else {
-        if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(this.pos, this.pos, this.ranges)
+        if (!compareWidgetSets(this.a.widgets, this.b.widgets)) {
+          addRange(this.pos, this.pos, this.changes.content)
+          addRange(this.pos, this.pos, this.changes.height)
+        }
         break
       }
     }
@@ -684,11 +695,16 @@ class DecorationSetComparison {
     if (pos > this.end) pos = this.end
     if (pos <= this.pos) return
     if (this.a.widgets.length || this.b.widgets.length) {
-      if (!compareWidgetSets(this.a.widgets, this.b.widgets)) addRange(pos, pos, this.ranges)
+      if (!compareWidgetSets(this.a.widgets, this.b.widgets)) {
+        addRange(pos, pos, this.changes.content)
+        addRange(pos, pos, this.changes.height)
+      }
       this.a.widgets.length = this.b.widgets.length = 0
     }
-    if (!compareActiveSets(this.a.active, this.b.active))
-      addRange(this.pos, pos, this.ranges)
+    if (!compareActiveSets(this.a.active, this.b.active)) {
+      addRange(this.pos, pos, this.changes.content)
+      if ((this.a.collapsedTo > this.pos) != (this.b.collapsedTo > this.pos)) addRange(this.pos, pos, this.changes.height)
+    }
     this.pos = pos
   }
 
@@ -776,6 +792,8 @@ function addRange(from: number, to: number, ranges: number[]) {
 }
 
 export function joinRanges(a: number[], b: number[]): number[] {
+  if (a.length == 0) return b
+  if (b.length == 0) return a
   let result: number[] = []
   for (let iA = 0, iB = 0;;) {
     if (iA < a.length && (iB == b.length || a[iA] < b[iB]))

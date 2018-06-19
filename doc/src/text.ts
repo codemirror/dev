@@ -25,10 +25,10 @@ export abstract class Text implements Iterable<string> {
   abstract slice(from: number, to: number): string;
   // Note line numbers are 1-based
   abstract lineStart(n: number): number;
+  lineEnd(n: number): number { return n == this.lineBreaks + 1 ? this.length : this.lineStart(n + 1) - 1 }
   abstract linePos(pos: number): LinePos;
   abstract getLine(n: number): string;
   abstract eq(other: Text): boolean;
-
 
   get lines() { return this.lineBreaks + 1 }
   iter(dir: 1 | -1 = 1): TextCursor {
