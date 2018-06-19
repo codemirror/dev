@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src/text"
-import {HeightMapNode} from "./heightmap"
+import {HeightMap} from "./heightmap"
 
 function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
   let rect = dom.getBoundingClientRect()
@@ -32,13 +32,14 @@ export class ViewportState {
     ;({top: this.top, bottom: this.bottom} = visiblePixelRange(dom))
   }
 
-  getViewport(doc: Text, heightMap: HeightMapNode): Viewport {
+  getViewport(doc: Text, heightMap: HeightMap): Viewport {
     return new Viewport(heightMap.startAtHeight(this.top - VIEWPORT_MARGIN, doc),
                         heightMap.endAtHeight(this.bottom + VIEWPORT_MARGIN, doc))
   }
 
-  coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMapNode) {
+  coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap) {
     let top = heightMap.heightAt(viewport.from, -1), bottom = heightMap.heightAt(viewport.to, 1)
+    console.log("cmputed", top, bottom, "vs", this.top, this.bottom)
     return (top <= this.top - COVER_MARGIN || viewport.from == 0) &&
       (bottom >= this.bottom + COVER_MARGIN || viewport.to == doc.length)
   }

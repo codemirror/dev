@@ -5,7 +5,7 @@ import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElem
 import {Viewport, ViewportState} from "./viewport"
 import {DOMObserver} from "./domobserver"
 import {getRoot, clientRectsFor} from "./dom"
-import {HeightMapNode, HeightOracle} from "./heightmap"
+import {HeightMap, HeightOracle} from "./heightmap"
 
 declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
@@ -128,7 +128,7 @@ export class DocViewDesc extends ViewDesc {
   selAnchorPart: PartViewDesc | null = null
   selHeadPart: PartViewDesc | null = null
   observer: DOMObserver
-  heightMap: HeightMapNode = HeightMapNode.empty()
+  heightMap: HeightMap = HeightMap.empty()
   heightOracle: HeightOracle = new HeightOracle
 
   get length() { return this.text.length }
@@ -144,9 +144,10 @@ export class DocViewDesc extends ViewDesc {
     this.observer = new DOMObserver(this, onDOMChange, onSelectionChange, () => this.checkLayout())
   }
 
-  update(state: EditorState): boolean {
-    // FIXME don't try to get a viewport if the height map is out of date
-    let visibleViewport = this.viewportState.getViewport(state.doc, this.heightMap)
+  // FIXME need some way to stabilize viewport—if a change causes the
+  // top of the visible viewport to move, scroll position should be
+  // adjusted to keep the content in place
+  update(state: EditorState) {
     let decorations = getDecorations(state)
 
     if (this.dirty == dirty.not && this.text.eq(state.doc) &&
@@ -232,7 +233,7 @@ export class DocViewDesc extends ViewDesc {
       let part = i < parts.length ? parts[i] : null
       let start = part ? part.viewport.from : this.text.length
       if (start > pos) {
-        let space = this.heightMap.heightAt(pos, 1) - this.heightMap.heightAt(start, -1)
+        let space = this.heightMap.heightAt(start - 1, 1) - this.heightMap.heightAt(pos, -1)
         let gap = j < gaps.length ? gaps[j] : new GapViewDesc(this)
         j++
         gap.update(start - pos, space)
@@ -240,7 +241,7 @@ export class DocViewDesc extends ViewDesc {
       }
       if (!part) break
       children.push(part)
-      pos = part.viewport.to
+      pos = part.viewport.to + 1
     }
     if (!sameArray(this.children, children)) {
       this.children = children
@@ -268,6 +269,7 @@ export class DocViewDesc extends ViewDesc {
                                           lineHeight, (this.visiblePart.dom as HTMLElement).clientWidth / charWidth)
     }
 
+    // FIXME should maybe also check gap sizes?
     for (let i = 0;; i++) {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.viewport.from, this.visiblePart.viewport.to,
@@ -277,6 +279,7 @@ export class DocViewDesc extends ViewDesc {
       this.updateInner(this.viewportState.getViewport(this.text, this.heightMap))
       lineHeights = null
       refresh = false
+      this.viewportState.updateFromDOM(this.dom as HTMLElement)
     }
   }
 
@@ -436,7 +439,7 @@ class PartViewDesc extends DocPartViewDesc {
 }
 
 class GapViewDesc extends DocPartViewDesc {
-  length: number = 0;
+  length: number = 0
   constructor(parent: ViewDesc) {
     super(parent, document.createElement("div"))
     ;(this.dom as HTMLElement).contentEditable = "false"

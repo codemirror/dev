@@ -26,6 +26,8 @@ export abstract class Text implements Iterable<string> {
   // Note line numbers are 1-based
   abstract lineStart(n: number): number;
   lineEnd(n: number): number { return n == this.lineBreaks + 1 ? this.length : this.lineStart(n + 1) - 1 }
+  abstract lineStartAt(pos: number): number;
+  abstract lineEndAt(pos: number): number;
   abstract linePos(pos: number): LinePos;
   abstract getLine(n: number): string;
   abstract eq(other: Text): boolean;
@@ -52,6 +54,8 @@ export abstract class Text implements Iterable<string> {
   abstract decomposeEnd(from: number, target: Text[]): void;
   /** @internal */
   abstract lastLineLength(): number;
+  /** @internal */
+  abstract firstLineLength(): number;
 
   toString() { return this.text }
 
@@ -115,6 +119,23 @@ export class TextLeaf extends Text {
     }
   }
 
+  lineStartAt(pos: number): number {
+    for (let start = 0;;) {
+      let next = findNewline(this.text, start)
+      if (next < 0 || next >= pos) return start
+      start = next + 1
+    }
+  }
+
+  lineEndAt(pos: number): number {
+    for (let start = 0;;) {
+      let next = findNewline(this.text, start)
+      if (next < 0) return this.length
+      if (next >= pos) return next
+      start = next + 1
+    }
+  }
+
   linePos(pos: number): LinePos {
     if (pos > this.length) throw new RangeError(`Position ${pos} outside of document`)
     for (let line = 1, curPos = 0;; line++) {
@@ -144,6 +165,10 @@ export class TextLeaf extends Text {
 
   lastLineLength(): number {
     return this.length - (this.lineBreaks ? findLastNewline(this.text) + 1 : 0)
+  }
+
+  firstLineLength(): number {
+    return this.lineBreaks ? findNewline(this.text) : this.length
   }
 
   static split(text: string, target: Text[]): Text[] {
@@ -235,6 +260,30 @@ export class TextNode extends Text {
     throw new RangeError(`No line ${n} in document`)
   }
 
+  lineStartAt(pos: number): number {
+    for (let i = 0, cur = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = cur + child.length
+      if (end >= pos) {
+        let inner = child.lineStartAt(pos - cur)
+        return inner == 0 ? inner + this.lineLengthTo(i) : inner
+      }
+      cur = end
+    }
+    throw new RangeError(`Position ${pos} outside of document`)
+  }
+
+  lineEndAt(pos: number): number {
+    for (let i = this.children.length - 1, cur = this.length; i >= 0; i--) {
+      let child = this.children[i], start = cur - child.length
+      if (start <= pos) {
+        let inner = child.lineEndAt(pos - start)
+        return inner == child.length ? inner + this.lineLengthFrom(i) : inner
+      }
+      cur = start
+    }
+    throw new RangeError(`Position ${pos} outside of document`)
+  }
+
   linePos(pos: number): LinePos {
     if (pos > this.length) throw new RangeError(`Position ${pos} outside of document`)
     for (let i = 0, breaks = 0, curPos = 0;; i++) {
@@ -299,9 +348,19 @@ export class TextNode extends Text {
     return length
   }
 
-  lastLineLength(): number {
-    return this.lineLengthTo(this.children.length)
+  lastLineLength(): number { return this.lineLengthTo(this.children.length) }
+
+  private lineLengthFrom(from: number): number {
+    let length = 0
+    for (let i = from; i < this.children.length; i++) {
+      let child = this.children[i]
+      if (child.lineBreaks) return length + child.firstLineLength()
+      length += child.length
+    }
+    return length
   }
+
+  firstLineLength(): number { return this.lineLengthFrom(0) }
 
   static from(length: number, children: Text[]): Text {
     if (children.length == 0) return new TextLeaf("")

@@ -1,4 +1,4 @@
-import {Text, TextCursor} from "../../doc/src/text"
+import {Text} from "../../doc/src/text"
 import {ChangedRange} from "../../doc/src/diff"
 import {DecorationSet, buildLineElements, RangeDesc, WidgetType} from "./decoration"
 
@@ -20,7 +20,7 @@ export class HeightOracle {
 
   heightForLine(length: number): number {
     if (!this.lineWrapping) return this.lineHeight
-    let lines = 1 + Math.ceil((length - this.lineLength) / (this.lineLength - 5))
+    let lines = 1 + Math.max(0, Math.ceil((length - this.lineLength) / (this.lineLength - 5)))
     return lines * this.lineHeight
   }
 
@@ -53,19 +53,16 @@ class ReplaceSide {
   // FIXME could compute these lazily, since they are often not needed
   constructor(readonly breakInside: number, readonly nextBreak: number) {}
   static start(doc: Text, start: number, length: number): ReplaceSide {
-    let atEnd = doc.linePos(start + length)
-    if (atEnd.col >= length) return new ReplaceSide(-1, atEnd.col - length)
-    return new ReplaceSide(atEnd.col, doc.linePos(start).col)
+    let inside = doc.lineEndAt(start) - start
+    return new ReplaceSide(inside >= length ? -1 : inside, start - doc.lineStartAt(start))
   }
   static end(doc: Text, end: number, length: number): ReplaceSide {
-    let atEnd = doc.linePos(end), next = doc.lineEnd(atEnd.line) - atEnd.col
-    if (atEnd.col >= length) return new ReplaceSide(-1, next)
-    let atStart = doc.linePos(end - length)
-    return new ReplaceSide(doc.lineEnd(atStart.line) - atStart.col, next)
+    let inside = end - doc.lineStartAt(end)
+    return new ReplaceSide(inside >= length ? -1 : inside, doc.lineEndAt(end) - end)
   }
 }
 
-export abstract class HeightMapNode {
+export abstract class HeightMap {
   height: number = -1 // Height of this part of the document, or -1 when uninitialized
   abstract size: number
   constructor(
@@ -73,15 +70,24 @@ export abstract class HeightMapNode {
   ) {}
 
   abstract heightAt(pos: number, bias?: 1 | -1): number
-  abstract startAtHeight(height: number, doc: Text): number
-  abstract endAtHeight(height: number, doc: Text): number
-  abstract replace(from: number, to: number, nodes: HeightMapNode[],
-                   start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode
+  abstract startAtHeight(height: number, doc: Text, offset?: number): number
+  abstract endAtHeight(height: number, doc: Text, offset?: number): number
+  abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide): void
+  abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide): void
   abstract updateHeight(oracle: HeightOracle, offset: number, force: boolean,
-                        from?: number, to?: number, lines?: number[]): HeightMapNode
+                        from?: number, to?: number, lines?: number[]): HeightMap
+  abstract toString(): void
 
-  applyChanges(doc: Text, decorations: ReadonlyArray<DecorationSet>, changes: ReadonlyArray<ChangedRange>): HeightMapNode {
-    let me: HeightMapNode = this
+  replace(from: number, to: number, nodes: HeightMap[], start: ReplaceSide, end: ReplaceSide): HeightMap {
+    let result: HeightMap[] = []
+    this.decomposeLeft(from, result, nodes[0], start)
+    let last = decomposeNew(result, nodes)
+    this.decomposeRight(to, result, last, end)
+    return HeightMap.of(result)
+  }
+
+  applyChanges(doc: Text, decorations: ReadonlyArray<DecorationSet>, changes: ReadonlyArray<ChangedRange>): HeightMap {
+    let me: HeightMap = this
     for (let i = changes.length - 1; i >= 0; i--) {
       let range = changes[i]
       let nodes = buildChangedNodes(doc, decorations, range.fromB, range.toB)
@@ -92,11 +98,37 @@ export abstract class HeightMapNode {
   }
 
   static empty() { return new HeightMapRange(0) }
+
+  static of(nodes: HeightMap[]): HeightMap {
+    if (nodes.length == 1) return nodes[0]
+
+    let i = 0, j = nodes.length, before = 0, after = 0
+    while (i < j) {
+      if (before < after) before += nodes[i++].size
+      else after += nodes[--j].size
+    }
+    for (;;) {
+      if (before > after * 2) {
+        let {left, right} = nodes[i - 1] as HeightMapBranch
+        nodes.splice(i - 1, 1, left, right)
+        before -= right.size
+        after += right.size
+      } else if (after > before * 2) {
+        let {left, right} = nodes[i] as HeightMapBranch
+        nodes.splice(i++, 1, left, right)
+        after -= left.size
+        before += left.size
+      } else {
+        break
+      }
+    }
+    return new HeightMapBranch(HeightMap.of(nodes.slice(0, i)), HeightMap.of(nodes.slice(i)))
+  }
 }
 
 const noDeco: number[] = []
 
-class HeightMapLine extends HeightMapNode {
+export class HeightMapLine extends HeightMap {
   constructor(length: number, public deco: number[] = noDeco) { super(length) }
 
   get size(): number { return 1 }
@@ -104,42 +136,45 @@ class HeightMapLine extends HeightMapNode {
   // FIXME try to estimate wrapping? Or are height queries always per-line?
   heightAt(pos: number, bias: 1 | -1 = -1): number { return bias < 0 ? 0 : this.height }
 
-  startAtHeight(height: number, doc: Text): number { return 0 }
-  endAtHeight(height: number, doc: Text): number { return this.length }
+  posAt(height: number, doc: Text, bias: 1 | -1 = -1, offset: number = 0) {
+    return offset + (bias < 0 ? 0 : this.length)
+  }
 
   copy() { return new HeightMapLine(this.length, this.deco) }
 
-  replace(from: number, to: number, nodes: HeightMapNode[], start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode {
-    if (end) {
-      let last = (nodes.length == 1 ? this : this.copy()).replaceStart(to, nodes[nodes.length - 1], end)
-      if (last instanceof HeightMapBranch) nodes.splice(nodes.length - 1, 1, last.left, last.right)
-      else nodes[nodes.length - 1] = last
+  decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
+    if (to == 0) {
+      target.push(node)
+    } else if (node instanceof HeightMapLine) {
+      target.push(this.copy().joinLine(to, this.length, node))
+    } else {
+      let self = this.copy()
+      self.offsetDeco(to, self.length, 0)
+      let addLen = start.breakInside == -1 ? node.length : start.breakInside
+      self.length = to + addLen
+      target.push(self)
+      if (start.breakInside >= 0)
+        target.push(new HeightMapRange(node.length - start.breakInside - 1))
     }
-    if (start) nodes[0] = this.replaceEnd(from, nodes[0], start)
-    return HeightMapBranch.from(nodes)
   }
 
-  replaceEnd(from: number, node: HeightMapNode, start: ReplaceSide): HeightMapNode {
-    this.height = -1
-    if (node instanceof HeightMapLine) return this.joinLine(from, this.length, node)
-    this.offsetDeco(from, this.length, 0)
-    let addLen = start.breakInside == -1 ? node.length : start.breakInside
-    this.length = from + addLen
-    if (start.breakInside < 0) return this
-    return new HeightMapBranch(this, new HeightMapRange(node.length - start.breakInside - 1))
+  decomposeRight(from: number, target: HeightMap[], node: HeightMap, end: ReplaceSide) {
+    if (from == this.length) {
+      target.push(node)
+    } else if (node instanceof HeightMapLine) {
+      target.push(this.copy().joinLine(0, from, node))
+    } else {
+      let addLen = end.breakInside == -1 ? node.length : end.breakInside
+      let self = this.copy()
+      self.offsetDeco(0, from, addLen)
+      self.length += addLen - from
+      if (end.breakInside >= 0)
+        target.push(new HeightMapRange(node.length - end.breakInside - 1))
+      target.push(self)
+    }
   }
 
-  replaceStart(to: number, node: HeightMapNode, end: ReplaceSide): HeightMapNode {
-    this.height = -1
-    if (node instanceof HeightMapLine) return this.joinLine(0, to, node)
-    let addLen = end.breakInside == -1 ? node.length : end.breakInside
-    this.offsetDeco(0, to, addLen)
-    this.length += addLen - to
-    if (end.breakInside < 0) return this
-    return new HeightMapBranch(new HeightMapRange(node.length - end.breakInside - 1), this)
-  }
-
-  joinLine(from: number, to: number, node: HeightMapLine): HeightMapNode {
+  joinLine(from: number, to: number, node: HeightMapLine): HeightMap {
     this.offsetDeco(from, to, node.length)
     for (let i = 0; i < node.deco.length; i += 2) this.addDeco(node.deco[i] + from, node.deco[i + 1])
     this.length += node.length - (to - from)
@@ -152,7 +187,7 @@ class HeightMapLine extends HeightMapNode {
       let pos = this.deco[i]
       if (pos < from) continue
       if (pos <= to) {
-        this.deco.splice(i, 2, 0)
+        this.deco.splice(i, 2)
         i -= 2
       } else {
         this.deco[i] += off
@@ -168,8 +203,9 @@ class HeightMapLine extends HeightMapNode {
   }
 
   updateHeight(oracle: HeightOracle, offset: number, force: boolean,
-               from?: number, to?: number, lines?: number[]): HeightMapNode {
+               from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
+      if (lines.length != 2) throw new Error("Mismatch between height map and line data")
       this.height = lines[1]
     } else if (force || this.height < 0) {
       let len = this.length, minH = 0
@@ -182,72 +218,51 @@ class HeightMapLine extends HeightMapNode {
     }
     return this
   }
+
+  toString() { return `line(${this.length}${this.deco.length ? ":" + this.deco.join(",") : ""})` }
 }
 
-class HeightMapRange extends HeightMapNode {
+export class HeightMapRange extends HeightMap {
   get size(): number { return 1 }
 
   heightAt(pos: number) {
     return this.height * (pos / this.length)
   }
 
-  startAtHeight(height: number, doc: Text): number {
-    if (height < 0) return 0
-    let {line} = doc.linePos(Math.floor(this.length * Math.min(1, height / this.height)))
-    return doc.lineStart(line)
+  posAt(height: number, doc: Text, bias: 1 | -1 = -1, offset: number = 0): number {
+    let pos = offset + Math.floor(this.length * Math.max(0, Math.min(1, height / this.height)))
+    return bias < 0 ? doc.lineStartAt(pos) : doc.lineEndAt(pos)
   }
 
-  endAtHeight(height: number, doc: Text): number {
-    if (height > this.height) return this.length
-    let {line} = doc.linePos(Math.floor(this.length * Math.max(0, height / this.height)))
-    return doc.lineEnd(line)
-  }
-
-  replace(from: number, to: number, nodes: HeightMapNode[], start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode {
-    if (end) {
-      let last = (nodes.length == 1 ? this : new HeightMapRange(this.length)).replaceStart(to, nodes[nodes.length - 1], end)
-      if (last instanceof HeightMapBranch) nodes.splice(nodes.length - 1, 1, last.left, last.right)
-      else nodes[nodes.length - 1] = last
-    }
-    if (start) nodes[0] = this.replaceEnd(from, nodes[0], start)
-    return HeightMapBranch.from(nodes)
-  }
-
-  replaceEnd(from: number, node: HeightMapNode, start: ReplaceSide): HeightMapNode {
-    this.height = -1
+  decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
     if (node instanceof HeightMapRange) {
-      this.length = from + node.length
-      return this
-    }
-    if (start.nextBreak > 0) {
+      target.push(new HeightMapRange(to + node.length))
+    } else {
       ;(node as HeightMapLine).offsetDeco(0, 0, start.nextBreak)
       node.length += start.nextBreak
-      if (start.nextBreak == this.length) return node
+      let length = to - start.nextBreak - 1
+      if (length > 0) target.push(new HeightMapRange(length))
+      target.push(node)
     }
-    this.length -= start.nextBreak
-    return new HeightMapBranch(this, node)
   }
 
-  replaceStart(to: number, node: HeightMapNode, end: ReplaceSide): HeightMapNode {
-    this.height = -1
+  decomposeRight(from: number, target: HeightMap[], node: HeightMap, end: ReplaceSide) {
     if (node instanceof HeightMapRange) {
-      this.length = this.length - to + node.length
-      return this
-    }
-    if (end.nextBreak > 0) {
+      target.push(new HeightMapRange(this.length - from + node.length))
+    } else {
       node.length += end.nextBreak
-      if (end.nextBreak == this.length) return node
+      target.push(node)
+      let length = this.length - (end.nextBreak + 1)
+      if (length > 0) target.push(new HeightMapRange(length))
     }
-    this.length -= end.nextBreak
-    return new HeightMapBranch(node, this)
   }
 
   updateHeight(oracle: HeightOracle, offset: number, force: boolean,
-               from?: number, to?: number, lines?: number[]): HeightMapNode {
+               from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
       let nodes = []
-      if (from! > 0) {
-        nodes.push(new HeightMapRange(from! - 1))
+      if (from! > offset) {
+        nodes.push(new HeightMapRange(from! - offset - 1))
         nodes[0].updateHeight(oracle, offset, true)
       }
       for (let i = 0; i < lines.length; i += 2) {
@@ -255,22 +270,24 @@ class HeightMapRange extends HeightMapNode {
         line.height = lines[i + 1]
         nodes.push(line)
       }
-      if (to! < this.length) {
-        nodes.push(new HeightMapRange(this.length - to! - 1))
+      if (to! < offset + this.length) {
+        nodes.push(new HeightMapRange(offset + this.length - to! - 1))
         nodes[nodes.length - 1].updateHeight(oracle, to!, true)
       }
-      return HeightMapBranch.from(nodes)
+      return HeightMap.of(nodes)
     } else if (force || this.height < 0) {
       this.height = oracle.heightForRange(offset, offset + this.length)
     }
     return this
   }
+
+  toString() { return `range(${this.length})` }
 }
 
-class HeightMapBranch extends HeightMapNode {
+export class HeightMapBranch extends HeightMap {
   size: number
 
-  constructor(public left: HeightMapNode, public right: HeightMapNode) {
+  constructor(public left: HeightMap, public right: HeightMap) {
     super(left.length + 1 + right.length)
     this.size = left.size + right.size
     if (left.height > -1 && right.height > -1) this.height = left.height + right.height
@@ -281,83 +298,54 @@ class HeightMapBranch extends HeightMapNode {
     return pos <= leftLen ? this.left.heightAt(pos, bias) : this.right.heightAt(pos - leftLen - 1, bias)
   }
 
-  startAtHeight(height: number, doc: Text): number {
+  startAtHeight(height: number, doc: Text, offset: number = 0): number {
     let right = height - this.left.height
-    return right < 0 ? this.left.startAtHeight(height, doc) : this.right.startAtHeight(right, doc)
+    return right < 0 ? this.left.startAtHeight(height, doc, offset)
+      : this.right.startAtHeight(right, doc, offset + this.left.length + 1)
   }
-  endAtHeight(height: number, doc: Text): number {
+  endAtHeight(height: number, doc: Text, offset: number = 0): number {
     let right = height - this.left.height
-    return right < 0 ? this.left.endAtHeight(height, doc) : this.right.endAtHeight(right, doc)
+    return right < 0 ? this.left.posAt(height, doc, bias, offset)
+      : this.right.posAt(right, doc, bias, offset + this.left.length + 1)
   }
 
-  replace(from: number, to: number, nodes: HeightMapNode[], start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode {
+  replace(from: number, to: number, nodes: HeightMap[], start: ReplaceSide, end: ReplaceSide): HeightMap {
     let rightStart = this.left.length + 1
     if (to < rightStart) {
-      return this.update(this.left.replace(from, to, nodes, start, end), this.right)
+      return this.balanced(this.left.replace(from, to, nodes, start, end), this.right)
     } else if (from >= rightStart) {
-      return this.update(this.left, this.right.replace(from - rightStart, to - rightStart, nodes, start, end))
-    } else if (nodes.length == 1 && start && end) {
-      return this.merge(this.left, from, this.right, to - rightStart, nodes, start, end)
+      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes, start, end))
     } else {
-      let dSize = this.left.size - this.right.size
-      let cut = Math.max(1, Math.min(nodes.length - 1, (nodes.length >> 1) + dSize))
-      let right = this.right.replace(0, to - rightStart, nodes.slice(cut), null, end)
-      nodes.length = cut
-      return this.update(this.left.replace(from, this.left.length, nodes, start, null), right)
+      let decomposed: HeightMap[] = []
+      this.left.decomposeLeft(from, decomposed, nodes[0], start)
+      let last = decomposeNew(decomposed, nodes)
+      this.right.decomposeRight(to - rightStart, decomposed, last, end)
+      return HeightMap.of(decomposed)
     }
   }
 
-  merge(left: HeightMapNode, from: number, right: HeightMapNode, to: number,
-        nodes: HeightMapNode[], start: ReplaceSide, end: ReplaceSide): HeightMapNode {
-    if (left instanceof HeightMapBranch) {
-      if (right instanceof HeightMapBranch) {
-        let before = left.left, after = right.right
-        let merged = left.merge(left.right, from - before.length - 1,
-                                right.left, to - left.length - 1, nodes, start, end)
-        return before.size > after.size
-          ? this.update(before, right.update(merged, after))
-          : this.update(right.update(before, merged), after)
-      } else {
-        let before = left.left
-        return this.update(before, left.merge(left.right, from - before.length - 1,
-                                              right, to, nodes, start, end))
-      }
-    } else if (right instanceof HeightMapBranch) {
-      let after = right.right
-      return this.update(right.merge(left, from, right.left, to, nodes, start, end), after)
+  decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
+    let rightStart = this.left.length + 1
+    if (to < rightStart) {
+      this.left.decomposeLeft(to, target, node, start)
     } else {
-      let result = left.replace(from, left.length, nodes, start, null)
-      let flat = result instanceof HeightMapBranch ? [result.left, result.right] : [result]
-      return right.replace(to, right.length, flat, null, end)
+      target.push(this.left)
+      this.right.decomposeLeft(to - rightStart, target, node, start)
     }
   }
 
-  update(left: HeightMapNode, right: HeightMapNode): this {
-    for (;;) {
-      if (left.size > (right.size << 1)) {
-        let {left: newLeft, right: mid} = left as HeightMapBranch
-        if (mid.size > newLeft.size) {
-          let {left: midLeft, right: midRight} = mid as HeightMapBranch
-          left = (left as HeightMapBranch).update(newLeft, midLeft)
-          right = (mid as HeightMapBranch).update(midRight, right)
-        } else {
-          right = (left as HeightMapBranch).update(mid, right)
-          left = newLeft
-        }
-      } else if (right.size > (left.size << 1)) {
-        let {left: mid, right: newRight} = right as HeightMapBranch
-        if (mid.size > newRight.size) {
-          let {left: midLeft, right: midRight} = mid as HeightMapBranch
-          right = (right as HeightMapBranch).update(midRight, newRight)
-          left = (mid as HeightMapBranch).update(left, midLeft)
-        } else {
-          left = (right as HeightMapBranch).update(left, mid)
-          right = newRight
-        }
-      } else {
-        break
-      }
+  decomposeRight(from: number, target: HeightMap[], node: HeightMap, end: ReplaceSide) {
+    let rightStart = this.left.length + 1
+    if (from < rightStart) {
+      this.left.decomposeRight(from, target, node, end)
+      target.push(this.right)
+    } else {
+      this.right.decomposeRight(from - rightStart, target, node, end)
     }
+  }
+
+  balanced(left: HeightMap, right: HeightMap): HeightMap {
+    if (left.size > 2 * right.size || right.size > 2 * left.size) return HeightMap.of([left, right])
     this.left = left; this.right = right
     this.height = left.height > -1 && right.height > -1 ? left.height + right.height : -1
     this.size = left.size + right.size
@@ -366,9 +354,9 @@ class HeightMapBranch extends HeightMapNode {
   }
 
   updateHeight(oracle: HeightOracle, offset: number, force: boolean,
-               from?: number, to?: number, lines?: number[]): HeightMapNode {
+               from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
-      let {left, right} = this, rightOffset = left.length + 1 + offset
+      let {left, right} = this, rightOffset = offset + left.length + 1
       if (to! < rightOffset) {
         left = left.updateHeight(oracle, offset, force, from, to, lines)
         if (force) right.updateHeight(oracle, rightOffset, true)
@@ -377,79 +365,69 @@ class HeightMapBranch extends HeightMapNode {
         if (force) left.updateHeight(oracle, offset, true)
       } else {
         let i = 0, pos = from! - 1
-        while (i < lines.length && pos < rightOffset - 2) { pos += lines[i] + 1; i += 2 }
+        while (i < lines.length && pos <= rightOffset - 2) { pos += lines[i] + 1; i += 2 }
         right = right.updateHeight(oracle, rightOffset, force, rightOffset, to, lines.slice(i))
         lines.length = i
         left = left.updateHeight(oracle, offset, force, from, rightOffset - 1, lines)
       }
-      return this.update(left, right)
+      return this.balanced(left, right)
     } else if (force || this.height < 0) {
       this.left.updateHeight(oracle, offset, force)
       this.right.updateHeight(oracle, offset + this.left.length + 1, force)
-      this.height = this.left.height + 1 + this.right.height
+      this.height = this.left.height + this.right.height
     }
     return this
   }
 
-  static from(nodes: HeightMapNode[]): HeightMapNode {
-    if (nodes.length == 1) return nodes[0]
-    let mid = nodes.length >> 1, right = HeightMapBranch.from(nodes.slice(mid))
-    nodes.length = mid
-    return new HeightMapBranch(HeightMapBranch.from(nodes), right)
-  }
+  toString() { return this.left + " " + this.right }
 }
 
 const noRange: RangeDesc[] = []
-const SKIP_DISTANCE = 1024
 
+// FIXME This could probably be optimized. Measure how often it's
+// actually running during regular use. (Current theory is that,
+// becuase most of the document will simply be an unparsed range, and
+// collapsed regions/widgets are relatively rare, and the viewport is
+// filled in through updateHeight, it's not going to be calling
+// `lineEndAt`/`lineStartAt` a significant amount of times except in
+// pathological circumstances.)
 class NodeBuilder {
   active: RangeDesc[] = noRange
-  nodes: HeightMapNode[] = []
-  cursor: TextCursor
+  nodes: HeightMap[] = []
   writtenTo: number
-  curLineStart: number = -1
+  lineStart: number = -1
+  lineEnd: number = -1
   curLine: HeightMapLine | null = null
-  text: string
-  textPos: number = 0
 
   constructor(public pos: number, public doc: Text) {
-    this.cursor = doc.iter()
-    this.text = this.cursor.next(this.pos)
     this.writtenTo = pos
   }
 
   advance(pos: number) {
-    while (this.pos < pos) {
-      if (this.textPos == this.text.length) {
-        if (!this.curLine && pos > this.pos + SKIP_DISTANCE) {
-          this.pos = pos
-          this.curLineStart = this.doc.lineStart(pos)
-        }
-        this.text = this.cursor.next(this.pos)
-        this.textPos = 0
+    if (this.curLine) {
+      if (this.lineEnd < 0) this.lineEnd = this.doc.lineEndAt(this.pos)
+      if (pos > this.lineEnd) {
+        this.curLine.length += (this.lineEnd - this.pos)
+        this.curLine = null
+        this.writtenTo = this.lineEnd + 1
+        this.lineEnd = -1
       } else {
-        let end = Math.min(this.textPos + (pos - this.pos), this.text.length)
-        for (let i = this.textPos; i < end; i++)
-          if (this.text.charCodeAt(i) == 10) { end = i; break }
-        let len = end - this.textPos
-        if (len > 0) {
-          this.pos += len
-          if (this.curLine) {
-            this.curLine.length += len
-            this.writtenTo += len
-          }
-        }
-        if (end < this.text.length && this.pos < pos) {
-          if (this.curLine) this.curLine = null
-          this.pos++
-          this.curLineStart = this.pos
-        }
+        this.curLine.length += (pos - this.pos)
+        this.writtenTo = pos
       }
+    } else if (this.lineEnd > -1 && pos > this.lineEnd) {
+      this.lineEnd = -1
     }
+    this.pos = pos
   }
 
   advanceCollapsed(pos: number) {
     this.addDeco(this.pos - pos)
+    if (this.curLine) {
+      this.curLine.length += pos - this.pos
+      this.writtenTo = pos
+      if (this.lineEnd < pos) this.lineEnd = -1
+    }
     this.pos = pos
   }
 
@@ -466,19 +444,28 @@ class NodeBuilder {
 
   addDeco(val: number) {
     if (!this.curLine) {
-      this.flushTo(this.curLineStart)
-      this.curLine = new HeightMapLine(this.pos - this.curLineStart)
-      this.nodes.push(this.curLine)
+      this.lineStart = Math.max(this.writtenTo, this.doc.lineStartAt(this.pos))
+      this.flushTo(this.lineStart - 1)
+      this.nodes.push(this.curLine = new HeightMapLine(this.pos - this.lineStart))
       this.writtenTo = this.pos
     }
-    this.curLine.addDeco(this.pos - this.curLineStart, val)
+    this.curLine.addDeco(this.pos - this.lineStart, val)
   }
 }
 
-function buildChangedNodes(doc: Text, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMapNode[] {
+function buildChangedNodes(doc: Text, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMap[] {
   let builder = new NodeBuilder(from, doc)
   buildLineElements(decorations, from, to, builder, true)
   builder.flushTo(builder.pos)
   if (builder.nodes.length == 0) builder.nodes.push(new HeightMapRange(0))
   return builder.nodes
+}
+
+function decomposeNew(target: HeightMap[], nodes: HeightMap[]): HeightMap {
+  if (nodes.length == 1) {
+    return target.pop()!
+  } else {
+    for (let i = 1; i < nodes.length - 1; i++) target.push(nodes[i])
+    return nodes[nodes.length - 1]
+  }
 }
