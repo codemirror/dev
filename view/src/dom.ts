@@ -25,3 +25,16 @@ export function hasSelection(dom: HTMLElement): boolean {
     return false
   }
 }
+
+export function clientRectsFor(dom: Node): DOMRectList {
+  if (dom.nodeType == 3) {
+    let range = document.createRange()
+    range.setEnd(dom, dom.nodeValue!.length)
+    range.setStart(dom, 0)
+    return range.getClientRects() as DOMRectList
+  } else if (dom.nodeType == 3) {
+    return (dom as HTMLElement).getClientRects() as DOMRectList
+  } else {
+    return [] as any as DOMRectList
+  }
+}

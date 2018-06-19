@@ -218,7 +218,7 @@ describe("DecorationSet", () => {
       if (update.add || update.filter)
         newDeco = newDeco.update(update.add || [], update.filter)
       if (update.prepare) update.prepare(newDeco)
-      let found = deco.changedRanges(newDeco, docRanges)
+      let found = deco.changedRanges(newDeco, docRanges).content
       ist(JSON.stringify(found), JSON.stringify(ranges))
     }
 

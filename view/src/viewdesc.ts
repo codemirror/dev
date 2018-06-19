@@ -4,7 +4,7 @@ import {EditorState, Plugin, Selection} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
 import {Viewport, ViewportState, LINE_HEIGHT} from "./viewport"
 import {DOMObserver} from "./domobserver"
-import {getRoot} from "./dom"
+import {getRoot, clientRectsFor} from "./dom"
 import {HeightMapNode, HeightOracle} from "./heightmap"
 
 declare global {
@@ -163,7 +163,7 @@ export class DocViewDesc extends ViewDesc {
     this.text = state.doc
     this.decorations = decorations
     this.heightMap = this.heightMap.applyChanges(state.doc, decorations.map(d => d.decorations), plan.height)
-    this.heightMap.computeHeight(this.heightOracle.setDoc(state.doc), 0)
+    this.heightOracle.setDoc(state.doc)
 
     this.selection = state.selection
     this.updateInner(visibleViewport, plan.content)
@@ -259,9 +259,16 @@ export class DocViewDesc extends ViewDesc {
 
   checkLayout() {
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
-    this.heightMap = this.heightMap.setMeasuredHeights(
-      this.visiblePart.viewport.from, this.visiblePart.viewport.to,
-      this.visiblePart.measureLineHeights(), this.heightOracle, 0)
+    if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
+    let lineHeights = this.visiblePart.measureLineHeights(), refresh = false
+    if (this.heightOracle.maybeRefresh(lineHeights)) {
+      let {lineHeight, charWidth} = this.visiblePart.measureTextSize()
+      refresh = this.heightOracle.refresh(getComputedStyle(this.dom as HTMLElement).whiteSpace!,
+                                          lineHeight, (this.visiblePart.dom as HTMLElement).clientWidth / charWidth)
+    }
+    this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
+                                                 this.visiblePart.viewport.from, this.visiblePart.viewport.to, lineHeights)
+
     // FIXME check for coverage, loop until covered
     if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
       this.updateInner(this.viewportState.getViewport(this.text))
@@ -402,10 +409,24 @@ class PartViewDesc extends DocPartViewDesc {
 
   measureLineHeights() {
     let result = []
+    for (let line of this.children)
+      result.push(line.length, (line.dom as HTMLElement).getBoundingClientRect().height)
+    return result
+  }
+
+  measureTextSize(): {lineHeight: number, charWidth: number} {
     for (let line of this.children) {
-      let rect = (line.dom as HTMLElement).getBoundingClientRect()
-      result.push(line.length, rect.bottom - rect.top)
+      let measure = line.measureTextSize()
+      if (measure) return measure
     }
+    // If no workable line exists, force a layout of a measurable element
+    let dummy = document.createElement("div")
+    dummy.textContent = "abc def ghi jkl mno pqr stu"
+    this.dom!.appendChild(dummy)
+    let rect = clientRectsFor(dummy.firstChild!)[0]
+    let result = {lineHeight: dummy.getBoundingClientRect().height,
+                  charWidth: rect ? rect.width / 27 : 7}
+    dummy.remove()
     return result
   }
 }
@@ -537,6 +558,19 @@ class LineViewDesc extends ViewDesc {
       hack.cmIgnore = true
       this.dom!.appendChild(hack)
     }
+  }
+
+  measureTextSize(): {lineHeight: number, charWidth: number} | null {
+    if (this.children.length == 0 || this.length > 20) return null
+    let totalWidth = 0
+    for (let child of this.children) {
+      if (!(child instanceof TextViewDesc)) return null
+      let rects = clientRectsFor(child.dom!)
+      if (rects.length != 1) return null
+      totalWidth += rects[0].width
+    }
+    return {lineHeight: (this.dom as HTMLElement).getBoundingClientRect().height,
+            charWidth: totalWidth / this.length}
   }
 }
 
