@@ -1,4 +1,5 @@
 import {Text} from "../../doc/src/text"
+import {HeightMapNode} from "./heightmap"
 
 function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
   let rect = dom.getBoundingClientRect()
@@ -20,22 +21,8 @@ function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
   return {top: top - rect.top, bottom: bottom - rect.top}
 }
 
-// This is all a crude approximation to get started on this, I'm sure
-// I'll figure out something a little more accurate later on
-export const LINE_HEIGHT = 14
-
-// FIXME make these actually reliable. Take collapsed decorations into account
-
-function visibleStart(doc: Text, top: number): number {
-  return doc.lineStart(Math.max(1, Math.min(doc.lines, Math.floor(top / LINE_HEIGHT) + 1)))
-}
-
-function visibleEnd(doc: Text, bottom: number): number {
-  let line = Math.max(1, Math.min(doc.lines, Math.floor(bottom / LINE_HEIGHT) + 1))
-  return line == doc.lines ? doc.length : doc.lineStart(line + 1) - 1
-}
-
 const VIEWPORT_MARGIN = 500 // FIXME look into appropriate value of this through benchmarking etc
+const COVER_MARGIN = 10 // coveredBy requires at least this many extra pixels to be covered
 
 export class ViewportState {
   top: number = 0;
@@ -45,21 +32,17 @@ export class ViewportState {
     ;({top: this.top, bottom: this.bottom} = visiblePixelRange(dom))
   }
 
-  getViewport(doc: Text): Viewport {
-    let start = visibleStart(doc, this.top - VIEWPORT_MARGIN)
-    let end = visibleEnd(doc, this.bottom + VIEWPORT_MARGIN)
-    return new Viewport(start, end)
+  getViewport(doc: Text, heightMap: HeightMapNode): Viewport {
+    return new Viewport(heightMap.startAtHeight(this.top - VIEWPORT_MARGIN, doc),
+                        heightMap.endAtHeight(this.bottom + VIEWPORT_MARGIN, doc))
   }
 
-  coveredBy(doc: Text, viewport: Viewport) {
-    let topLine = doc.linePos(viewport.from).line, bottomLine = doc.linePos(viewport.to).line
-    let top = (topLine - 1) * LINE_HEIGHT, bottom = bottomLine * LINE_HEIGHT
-    return (top <= this.top - COVER_MARGIN || topLine == 1) &&
-      (bottom >= this.bottom + COVER_MARGIN || bottomLine == doc.lines)
+  coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMapNode) {
+    let top = heightMap.heightAt(viewport.from, -1), bottom = heightMap.heightAt(viewport.to, 1)
+    return (top <= this.top - COVER_MARGIN || viewport.from == 0) &&
+      (bottom >= this.bottom + COVER_MARGIN || viewport.to == doc.length)
   }
 }
-
-const COVER_MARGIN = 10
 
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}

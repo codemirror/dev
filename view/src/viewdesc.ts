@@ -2,7 +2,7 @@ import {Text, TextCursor} from "../../doc/src/text"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {EditorState, Plugin, Selection} from "../../state/src/state"
 import {DecorationSet, joinRanges, attrsEq, WidgetType, RangeDesc, buildLineElements} from "./decoration"
-import {Viewport, ViewportState, LINE_HEIGHT} from "./viewport"
+import {Viewport, ViewportState} from "./viewport"
 import {DOMObserver} from "./domobserver"
 import {getRoot, clientRectsFor} from "./dom"
 import {HeightMapNode, HeightOracle} from "./heightmap"
@@ -132,7 +132,7 @@ export class DocViewDesc extends ViewDesc {
   heightOracle: HeightOracle = new HeightOracle
 
   get length() { return this.text.length }
-
+  
   constructor(dom: HTMLElement,
               onDOMChange: (from: number, to: number) => void,
               onSelectionChange: () => void) {
@@ -145,7 +145,8 @@ export class DocViewDesc extends ViewDesc {
   }
 
   update(state: EditorState): boolean {
-    let visibleViewport = this.viewportState.getViewport(state.doc)
+    // FIXME don't try to get a viewport if the height map is out of date
+    let visibleViewport = this.viewportState.getViewport(state.doc, this.heightMap)
     let decorations = getDecorations(state)
 
     if (this.dirty == dirty.not && this.text.eq(state.doc) &&
@@ -154,7 +155,8 @@ export class DocViewDesc extends ViewDesc {
       return false
     }
 
-    if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to && visibleViewport.to >= this.selHeadPart.viewport.from) {
+    if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to &&
+        visibleViewport.to >= this.selHeadPart.viewport.from) {
       this.visiblePart = this.selHeadPart
       this.selHeadPart = null
     }
@@ -230,8 +232,7 @@ export class DocViewDesc extends ViewDesc {
       let part = i < parts.length ? parts[i] : null
       let start = part ? part.viewport.from : this.text.length
       if (start > pos) {
-        // FIXME use actual approximation mechanism
-        let space = (this.text.linePos(start).line - this.text.linePos(pos).line) * LINE_HEIGHT
+        let space = this.heightMap.heightAt(pos, 1) - this.heightMap.heightAt(start, -1)
         let gap = j < gaps.length ? gaps[j] : new GapViewDesc(this)
         j++
         gap.update(start - pos, space)
@@ -260,19 +261,22 @@ export class DocViewDesc extends ViewDesc {
   checkLayout() {
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
     if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
-    let lineHeights = this.visiblePart.measureLineHeights(), refresh = false
+    let lineHeights: number[] | null = this.visiblePart.measureLineHeights(), refresh = false
     if (this.heightOracle.maybeRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.visiblePart.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom as HTMLElement).whiteSpace!,
                                           lineHeight, (this.visiblePart.dom as HTMLElement).clientWidth / charWidth)
     }
-    this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
-                                                 this.visiblePart.viewport.from, this.visiblePart.viewport.to, lineHeights)
 
-    // FIXME check for coverage, loop until covered
-    if (!this.viewportState.coveredBy(this.text, this.visiblePart.viewport)) {
-      this.updateInner(this.viewportState.getViewport(this.text))
-      this.updateSelection(this.selection)
+    for (let i = 0;; i++) {
+      this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
+                                                   this.visiblePart.viewport.from, this.visiblePart.viewport.to,
+                                                   lineHeights || this.visiblePart.measureLineHeights())
+      if (this.viewportState.coveredBy(this.text, this.visiblePart.viewport, this.heightMap)) break
+      if (i > 10) throw new Error("Layout failed to converge")
+      this.updateInner(this.viewportState.getViewport(this.text, this.heightMap))
+      lineHeights = null
+      refresh = false
     }
   }
 
@@ -292,7 +296,7 @@ export class DocViewDesc extends ViewDesc {
     let pos = 0, text = ""
     for (let child of this.children) {
       let end = pos + child.length
-      if (pos < to && end >= from) {
+      if (pos < to && end > from) {
         let inner = child.readDOMRange(Math.max(from, pos), Math.min(to, end))
         if (pos < from) from = inner.from
         if (end > to) to = inner.to

@@ -72,8 +72,9 @@ export abstract class HeightMapNode {
     public length: number // The number of characters covered
   ) {}
 
-  abstract heightAt(pos: number): number
-  abstract posAt(height: number): number
+  abstract heightAt(pos: number, bias?: 1 | -1): number
+  abstract startAtHeight(height: number, doc: Text): number
+  abstract endAtHeight(height: number, doc: Text): number
   abstract replace(from: number, to: number, nodes: HeightMapNode[],
                    start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode
   abstract updateHeight(oracle: HeightOracle, offset: number, force: boolean,
@@ -101,8 +102,10 @@ class HeightMapLine extends HeightMapNode {
   get size(): number { return 1 }
 
   // FIXME try to estimate wrapping? Or are height queries always per-line?
-  heightAt(pos: number): number { return 0 }
-  posAt(height: number): number { return 0 }
+  heightAt(pos: number, bias: 1 | -1 = -1): number { return bias < 0 ? 0 : this.height }
+
+  startAtHeight(height: number, doc: Text): number { return 0 }
+  endAtHeight(height: number, doc: Text): number { return this.length }
 
   copy() { return new HeightMapLine(this.length, this.deco) }
 
@@ -188,8 +191,16 @@ class HeightMapRange extends HeightMapNode {
     return this.height * (pos / this.length)
   }
 
-  posAt(height: number) { // FIXME is this even meaningful?
-    return Math.floor(this.length * (height / this.height))
+  startAtHeight(height: number, doc: Text): number {
+    if (height < 0) return 0
+    let {line} = doc.linePos(Math.floor(this.length * Math.min(1, height / this.height)))
+    return doc.lineStart(line)
+  }
+
+  endAtHeight(height: number, doc: Text): number {
+    if (height > this.height) return this.length
+    let {line} = doc.linePos(Math.floor(this.length * Math.max(0, height / this.height)))
+    return doc.lineEnd(line)
   }
 
   replace(from: number, to: number, nodes: HeightMapNode[], start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode {
@@ -265,16 +276,18 @@ class HeightMapBranch extends HeightMapNode {
     if (left.height > -1 && right.height > -1) this.height = left.height + right.height
   }
 
-  heightAt(pos: number): number {
+  heightAt(pos: number, bias: 1 | -1 = -1): number {
     let leftLen = this.left.length
-    return pos <= leftLen ? this.left.heightAt(pos) : this.right.heightAt(pos - leftLen - 1)
+    return pos <= leftLen ? this.left.heightAt(pos, bias) : this.right.heightAt(pos - leftLen - 1, bias)
   }
 
-  posAt(height: number): number {
-    if (height <= 0) return 0
-    if (height >= this.height) return this.length
-    let pastLeft = height - this.left.height
-    return pastLeft > 0 ? this.right.posAt(pastLeft) : this.left.posAt(height)
+  startAtHeight(height: number, doc: Text): number {
+    let right = height - this.left.height
+    return right < 0 ? this.left.startAtHeight(height, doc) : this.right.startAtHeight(right, doc)
+  }
+  endAtHeight(height: number, doc: Text): number {
+    let right = height - this.left.height
+    return right < 0 ? this.left.endAtHeight(height, doc) : this.right.endAtHeight(right, doc)
   }
 
   replace(from: number, to: number, nodes: HeightMapNode[], start: ReplaceSide | null, end: ReplaceSide | null): HeightMapNode {
@@ -324,8 +337,9 @@ class HeightMapBranch extends HeightMapNode {
       if (left.size > (right.size << 1)) {
         let {left: newLeft, right: mid} = left as HeightMapBranch
         if (mid.size > newLeft.size) {
-          left = (left as HeightMapBranch).update(newLeft, mid.left)
-          right = (mid as HeightMapBranch).update(mid.right, right)
+          let {left: midLeft, right: midRight} = mid as HeightMapBranch
+          left = (left as HeightMapBranch).update(newLeft, midLeft)
+          right = (mid as HeightMapBranch).update(midRight, right)
         } else {
           right = (left as HeightMapBranch).update(mid, right)
           left = newLeft
@@ -333,8 +347,9 @@ class HeightMapBranch extends HeightMapNode {
       } else if (right.size > (left.size << 1)) {
         let {left: mid, right: newRight} = right as HeightMapBranch
         if (mid.size > newRight.size) {
-          right = (right as HeightMapBranch).update(mid.right, newRight)
-          left = (mid as HeightMapBranch).update(left, mid.left)
+          let {left: midLeft, right: midRight} = mid as HeightMapBranch
+          right = (right as HeightMapBranch).update(midRight, newRight)
+          left = (mid as HeightMapBranch).update(left, midLeft)
         } else {
           left = (right as HeightMapBranch).update(left, mid)
           right = newRight
