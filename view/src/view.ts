@@ -20,8 +20,6 @@ export class EditorView {
   /** @internal */
   public docView: DocViewDesc;
 
-  private layoutCheckScheduled: number | null = null;
-
   constructor(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
     this.dispatch = dispatch || (tr => this.setState(tr.apply()))
@@ -57,19 +55,7 @@ export class EditorView {
 
   setState(state: EditorState) {
     this._state = state
-
-    // FIXME this might trigger a DOM change and a recursive call to setState. Need some strategy for dealing with that
-    let updated = this.docView.update(state)
-    if (updated) this.scheduleLayoutCheck()
-  }
-
-  // FIXME move to docviewdesc?
-  private scheduleLayoutCheck() {
-    if (this.layoutCheckScheduled == null)
-      this.layoutCheckScheduled = requestAnimationFrame(() => {
-        this.layoutCheckScheduled = null
-        this.docView.checkLayout()
-      })
+    this.docView.update(state)
   }
 
   // FIXME this is very awkward to type. Change or embrace the any?
@@ -95,7 +81,6 @@ export class EditorView {
   }
 
   destroy() {
-    cancelAnimationFrame(this.layoutCheckScheduled!)
     this.dom.remove()
     this.docView.destroy()
   }

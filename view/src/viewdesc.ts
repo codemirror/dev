@@ -130,6 +130,7 @@ export class DocViewDesc extends ViewDesc {
   observer: DOMObserver
   heightMap: HeightMap = HeightMap.empty()
   heightOracle: HeightOracle = new HeightOracle
+  layoutCheckScheduled: number = -1
 
   get length() { return this.text.length }
   
@@ -153,7 +154,7 @@ export class DocViewDesc extends ViewDesc {
     if (this.dirty == dirty.not && this.text.eq(state.doc) &&
         sameDecorations(decorations, this.decorations) && visibleViewport.eq(this.visiblePart.viewport)) {
       if (!state.selection.eq(this.selection)) this.updateSelection(state.selection)
-      return false
+      return
     }
 
     if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to &&
@@ -171,7 +172,12 @@ export class DocViewDesc extends ViewDesc {
     this.selection = state.selection
     this.updateInner(visibleViewport, plan.content)
     this.updateSelection(state.selection)
-    return true
+
+    if (this.layoutCheckScheduled < 0)
+      this.layoutCheckScheduled = requestAnimationFrame(() => {
+        this.layoutCheckScheduled = -1
+        this.checkLayout()
+      })
   }
 
   updateSelection(selection: Selection, takeFocus: boolean = false) {
@@ -330,6 +336,7 @@ export class DocViewDesc extends ViewDesc {
   }
 
   destroy() {
+    cancelAnimationFrame(this.layoutCheckScheduled!)
     this.observer.destroy()
   }
 }
