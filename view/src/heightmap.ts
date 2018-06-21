@@ -70,11 +70,10 @@ export abstract class HeightMap {
   ) {}
 
   abstract heightAt(pos: number, bias?: 1 | -1): number
-  abstract startAtHeight(height: number, doc: Text, offset?: number): number
-  abstract endAtHeight(height: number, doc: Text, offset?: number): number
+  abstract posAt(height: number, doc: Text, bias?: 1 | -1, offset?: number): number
   abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide): void
   abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide): void
-  abstract updateHeight(oracle: HeightOracle, offset: number, force: boolean,
+  abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean,
                         from?: number, to?: number, lines?: number[]): HeightMap
   abstract toString(): void
 
@@ -202,7 +201,7 @@ export class HeightMapLine extends HeightMap {
     this.deco.splice(i, 0, pos, value)
   }
 
-  updateHeight(oracle: HeightOracle, offset: number, force: boolean,
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false,
                from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
       if (lines.length != 2) throw new Error("Mismatch between height map and line data")
@@ -257,7 +256,7 @@ export class HeightMapRange extends HeightMap {
     }
   }
 
-  updateHeight(oracle: HeightOracle, offset: number, force: boolean,
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false,
                from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
       let nodes = []
@@ -295,15 +294,10 @@ export class HeightMapBranch extends HeightMap {
 
   heightAt(pos: number, bias: 1 | -1 = -1): number {
     let leftLen = this.left.length
-    return pos <= leftLen ? this.left.heightAt(pos, bias) : this.right.heightAt(pos - leftLen - 1, bias)
+    return pos <= leftLen ? this.left.heightAt(pos, bias) : this.left.height + this.right.heightAt(pos - leftLen - 1, bias)
   }
 
-  startAtHeight(height: number, doc: Text, offset: number = 0): number {
-    let right = height - this.left.height
-    return right < 0 ? this.left.startAtHeight(height, doc, offset)
-      : this.right.startAtHeight(right, doc, offset + this.left.length + 1)
-  }
-  endAtHeight(height: number, doc: Text, offset: number = 0): number {
+  posAt(height: number, doc: Text, bias: -1 | 1 = -1, offset: number = 0): number {
     let right = height - this.left.height
     return right < 0 ? this.left.posAt(height, doc, bias, offset)
       : this.right.posAt(right, doc, bias, offset + this.left.length + 1)
@@ -353,7 +347,7 @@ export class HeightMapBranch extends HeightMap {
     return this
   }
 
-  updateHeight(oracle: HeightOracle, offset: number, force: boolean,
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false,
                from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
       let {left, right} = this, rightOffset = offset + left.length + 1

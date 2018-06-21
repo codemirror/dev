@@ -265,7 +265,7 @@ export class TextNode extends Text {
       let child = this.children[i], end = cur + child.length
       if (end >= pos) {
         let inner = child.lineStartAt(pos - cur)
-        return inner == 0 ? inner + this.lineLengthTo(i) : inner
+        return inner + cur - (inner == 0 ? inner + this.lineLengthTo(i) : 0)
       }
       cur = end
     }
@@ -277,7 +277,7 @@ export class TextNode extends Text {
       let child = this.children[i], start = cur - child.length
       if (start <= pos) {
         let inner = child.lineEndAt(pos - start)
-        return inner == child.length ? inner + this.lineLengthFrom(i) : inner
+        return start + inner + (inner == child.length ? this.lineLengthFrom(i + 1) : 0)
       }
       cur = start
     }

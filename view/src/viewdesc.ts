@@ -151,64 +151,37 @@ export class DocViewDesc extends ViewDesc {
   update(state: EditorState) {
     let decorations = getDecorations(state)
 
-    if (this.dirty == dirty.not && this.text.eq(state.doc) &&
-        sameDecorations(decorations, this.decorations) && visibleViewport.eq(this.visiblePart.viewport)) {
+    if (this.dirty == dirty.not && this.text.eq(state.doc) && sameDecorations(decorations, this.decorations)) {
       if (!state.selection.eq(this.selection)) this.updateSelection(state.selection)
       return
-    }
-
-    if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to &&
-        visibleViewport.to >= this.selHeadPart.viewport.from) {
-      this.visiblePart = this.selHeadPart
-      this.selHeadPart = null
     }
 
     let plan = fullChangedRanges(changedRanges(this.text, state.doc), decorations, this.decorations)
     this.text = state.doc
     this.decorations = decorations
-    this.heightMap = this.heightMap.applyChanges(state.doc, decorations.map(d => d.decorations), plan.height)
-    this.heightOracle.setDoc(state.doc)
+    this.heightMap = this.heightMap
+      .applyChanges(state.doc, decorations.map(d => d.decorations), plan.height)
+      .updateHeight(this.heightOracle.setDoc(state.doc))
+
+    let visibleViewport = this.viewportState.getViewport(state.doc, this.heightMap)
 
     this.selection = state.selection
     this.updateInner(visibleViewport, plan.content)
     this.updateSelection(state.selection)
 
     if (this.layoutCheckScheduled < 0)
-      this.layoutCheckScheduled = requestAnimationFrame(() => {
-        this.layoutCheckScheduled = -1
-        this.checkLayout()
-      })
-  }
-
-  updateSelection(selection: Selection, takeFocus: boolean = false) {
-    this.selection = selection
-    let root = getRoot(this.dom as HTMLElement)
-    if (!takeFocus && root.activeElement != this.dom) return
-
-    let anchor = this.domFromPos(selection.primary.anchor)!
-    let head = this.domFromPos(selection.primary.head)!
-    // FIXME check for equivalent positions, don't update if both are equiv
-
-    let domSel = root.getSelection(), range = document.createRange()
-    // Selection.extend can be used to create an 'inverted' selection
-    // (one where the focus is before the anchor), but not all
-    // browsers support it yet.
-    if (domSel.extend) {
-      range.setEnd(anchor.node, anchor.offset)
-      range.collapse(false)
-    } else {
-      if (anchor > head) [anchor, head] = [head, anchor]
-      range.setEnd(head.node, head.offset)
-      range.setStart(anchor.node, anchor.offset)
-    }
-    this.observer.withoutListening(() => {
-      domSel.removeAllRanges()
-      domSel.addRange(range)
-      if (domSel.extend) domSel.extend(head.node, head.offset)
-    })
+      this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
   private updateInner(visibleViewport: Viewport, plan: ReadonlyArray<ChangedRange> = []) {
+    // Make sure that if an out-of-view selection part head came into
+    // view, we make it the main part
+    if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to &&
+        visibleViewport.to >= this.selHeadPart.viewport.from) {
+      this.visiblePart = this.selHeadPart
+      this.selHeadPart = null
+    }
+
     let decoSets = this.decorations.map(d => d.decorations)
     this.visiblePart.update(visibleViewport, this.text, decoSets, plan)
     // FIXME be lazy about viewport changes, when possible
@@ -259,6 +232,34 @@ export class DocViewDesc extends ViewDesc {
     return true
   }
 
+  updateSelection(selection: Selection, takeFocus: boolean = false) {
+    this.selection = selection
+    let root = getRoot(this.dom as HTMLElement)
+    if (!takeFocus && root.activeElement != this.dom) return
+
+    let anchor = this.domFromPos(selection.primary.anchor)!
+    let head = this.domFromPos(selection.primary.head)!
+    // FIXME check for equivalent positions, don't update if both are equiv
+
+    let domSel = root.getSelection(), range = document.createRange()
+    // Selection.extend can be used to create an 'inverted' selection
+    // (one where the focus is before the anchor), but not all
+    // browsers support it yet.
+    if (domSel.extend) {
+      range.setEnd(anchor.node, anchor.offset)
+      range.collapse(false)
+    } else {
+      if (anchor > head) [anchor, head] = [head, anchor]
+      range.setEnd(head.node, head.offset)
+      range.setStart(anchor.node, anchor.offset)
+    }
+    this.observer.withoutListening(() => {
+      domSel.removeAllRanges()
+      domSel.addRange(range)
+      if (domSel.extend) domSel.extend(head.node, head.offset)
+    })
+  }
+
   registerIntersection() {
     let gapDOM: HTMLElement[] = []
     for (let child of this.children) if (child instanceof GapViewDesc) gapDOM.push(child.dom as HTMLElement)
@@ -266,6 +267,9 @@ export class DocViewDesc extends ViewDesc {
   }
 
   checkLayout() {
+    cancelAnimationFrame(this.layoutCheckScheduled)
+    this.layoutCheckScheduled = -1
+
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
     if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
     let lineHeights: number[] | null = this.visiblePart.measureLineHeights(), refresh = false
@@ -336,7 +340,7 @@ export class DocViewDesc extends ViewDesc {
   }
 
   destroy() {
-    cancelAnimationFrame(this.layoutCheckScheduled!)
+    cancelAnimationFrame(this.layoutCheckScheduled)
     this.observer.destroy()
   }
 }

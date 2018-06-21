@@ -33,13 +33,12 @@ export class ViewportState {
   }
 
   getViewport(doc: Text, heightMap: HeightMap): Viewport {
-    return new Viewport(heightMap.startAtHeight(this.top - VIEWPORT_MARGIN, doc),
-                        heightMap.endAtHeight(this.bottom + VIEWPORT_MARGIN, doc))
+    return new Viewport(heightMap.posAt(this.top - VIEWPORT_MARGIN, doc, -1),
+                        heightMap.posAt(this.bottom + VIEWPORT_MARGIN, doc, 1))
   }
 
   coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap) {
     let top = heightMap.heightAt(viewport.from, -1), bottom = heightMap.heightAt(viewport.to, 1)
-    console.log("cmputed", top, bottom, "vs", this.top, this.bottom)
     return (top <= this.top - COVER_MARGIN || viewport.from == 0) &&
       (bottom >= this.bottom + COVER_MARGIN || viewport.to == doc.length)
   }
@@ -47,6 +46,5 @@ export class ViewportState {
 
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}
-  eq(other: Viewport): boolean { return this.from == other.from && this.to == other.to }
   clip(pos: number): number { return Math.max(this.from, Math.min(this.to, pos)) }
 }

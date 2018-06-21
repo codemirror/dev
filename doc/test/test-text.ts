@@ -149,4 +149,11 @@ describe("doc", () => {
     for (let i = 0; i < doc0.length; i += 5)
       ist(doc0.linePos(i), new LinePos(Math.floor(i / 101) + 1, i % 101), eqPos)
   })
+
+  it("can find line starts and ends", () => {
+    for (let i = 0; i < doc0.length; i += 5) {
+      ist(doc0.lineStartAt(i), i - (i % 101))
+      ist(doc0.lineEndAt(i), i - (i % 101) + 100)
+    }
+  })
 })
