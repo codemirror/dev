@@ -152,8 +152,12 @@ export class DocViewDesc extends ViewDesc {
     let decorations = getDecorations(state)
 
     if (this.dirty == dirty.not && this.text.eq(state.doc) && sameDecorations(decorations, this.decorations)) {
-      if (!state.selection.eq(this.selection)) this.updateSelection(state.selection)
-      return
+      if (state.selection.eq(this.selection)) return
+      if (state.selection.primary.from >= this.visiblePart.viewport.from &&
+          state.selection.primary.to <= this.visiblePart.viewport.to) {
+        this.updateSelection(state.selection)
+        return
+      }
     }
 
     let plan = fullChangedRanges(changedRanges(this.text, state.doc), decorations, this.decorations)
