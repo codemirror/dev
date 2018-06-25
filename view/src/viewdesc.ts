@@ -155,7 +155,8 @@ export class DocViewDesc extends ViewDesc {
       if (state.selection.eq(this.selection)) return
       if (state.selection.primary.from >= this.visiblePart.viewport.from &&
           state.selection.primary.to <= this.visiblePart.viewport.to) {
-        this.updateSelection(state.selection)
+        this.selection = state.selection
+        this.updateSelection()
         return
       }
     }
@@ -171,7 +172,6 @@ export class DocViewDesc extends ViewDesc {
 
     this.selection = state.selection
     this.updateInner(visibleViewport, plan.content)
-    this.updateSelection(state.selection)
 
     if (this.layoutCheckScheduled < 0)
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
@@ -232,17 +232,18 @@ export class DocViewDesc extends ViewDesc {
     }
     if (j != gaps.length) this.registerIntersection()
 
-    this.observer.withoutListening(() => this.sync())
-    return true
+    this.observer.withoutListening(() => {
+      this.sync()
+      this.updateSelection()
+    })
   }
 
-  updateSelection(selection: Selection, takeFocus: boolean = false) {
-    this.selection = selection
+  updateSelection(takeFocus: boolean = false) {
     let root = getRoot(this.dom as HTMLElement)
     if (!takeFocus && root.activeElement != this.dom) return
 
-    let anchor = this.domFromPos(selection.primary.anchor)!
-    let head = this.domFromPos(selection.primary.head)!
+    let anchor = this.domFromPos(this.selection.primary.anchor)!
+    let head = this.domFromPos(this.selection.primary.head)!
     // FIXME check for equivalent positions, don't update if both are equiv
 
     let domSel = root.getSelection(), range = document.createRange()
@@ -257,11 +258,10 @@ export class DocViewDesc extends ViewDesc {
       range.setEnd(head.node, head.offset)
       range.setStart(anchor.node, anchor.offset)
     }
-    this.observer.withoutListening(() => {
-      domSel.removeAllRanges()
-      domSel.addRange(range)
-      if (domSel.extend) domSel.extend(head.node, head.offset)
-    })
+
+    domSel.removeAllRanges()
+    domSel.addRange(range)
+    if (domSel.extend) domSel.extend(head.node, head.offset)
   }
 
   registerIntersection() {
@@ -283,13 +283,16 @@ export class DocViewDesc extends ViewDesc {
                                           lineHeight, (this.visiblePart.dom as HTMLElement).clientWidth / charWidth)
     }
 
-    // FIXME should maybe also check gap sizes?
+    // FIXME should maybe also check gap sizes? i.e. if new
+    // measurements mean a gap that's currently 200px should now be
+    // 300px that should be noticed
     for (let i = 0;; i++) {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.viewport.from, this.visiblePart.viewport.to,
                                                    lineHeights || this.visiblePart.measureLineHeights())
       if (this.viewportState.coveredBy(this.text, this.visiblePart.viewport, this.heightMap)) break
       if (i > 10) throw new Error("Layout failed to converge")
+      // FIXME swap visible and selection parts when appropriate?
       this.updateInner(this.viewportState.getViewport(this.text, this.heightMap))
       lineHeights = null
       refresh = false
@@ -572,6 +575,9 @@ class LineViewDesc extends ViewDesc {
     else return {node: this.dom!, offset: i}
   }
 
+  // FIXME might need another hack to work around Firefox's behavior
+  // of not actually displaying the cursor even though it's there in
+  // the DOM
   sync() {
     super.sync()
     let last = this.dom!.lastChild
