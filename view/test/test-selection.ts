@@ -22,7 +22,7 @@ describe("EditorView selection", () => {
     function test(node, offset, expected) {
       setDOMSel(node, offset)
       cm.contentDOM.focus()
-      cm.selectionReader.read()
+      cm.docView.observer.readSelection()
       ist(cm.state.selection.primary.head, expected)
     }
     let one = cm.contentDOM.firstChild.firstChild

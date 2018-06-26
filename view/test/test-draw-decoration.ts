@@ -39,7 +39,7 @@ function decoEditor(doc, decorations: any = []) {
 describe("EditorView decoration", () => {
   it("renders tag names", () => {
     let cm = decoEditor("one\ntwo", d(2, 5, {tagName: "em"}))
-    ist(cm.contentDOM.innerHTML, "<div><div>on<em>e</em></div><div><em>t</em>wo</div></div>")
+    ist(cm.contentDOM.innerHTML, "<div>on<em>e</em></div><div><em>t</em>wo</div>")
   })
 
   it("renders attributes", () => {

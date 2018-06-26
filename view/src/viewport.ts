@@ -47,4 +47,5 @@ export class ViewportState {
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}
   clip(pos: number): number { return Math.max(this.from, Math.min(this.to, pos)) }
+  static empty = new Viewport(0, 0)
 }

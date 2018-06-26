@@ -5,6 +5,9 @@ export class ChangedRange {
               readonly toA: number,
               readonly fromB: number,
               readonly toB: number) {}
+  extend(toA: number, toB: number): ChangedRange {
+    return new ChangedRange(this.fromA, toA, this.fromB, toB)
+  }
 }
 
 class DiffState {
@@ -74,7 +77,7 @@ function scanText(state: DiffState, fromA: number, toA: number, fromB: number, t
     fromA++; fromB++; offA++; offB++
   }
   if (fromA == toA || fromB == toB) {
-    if (fromA < toA || fromB < toB) state.ranges.push({fromA, toA, fromB, toB})
+    if (fromA < toA || fromB < toB) state.ranges.push(new ChangedRange(fromA, toA, fromB, toB))
     return
   }
   for (let iA = state.a.iterRange(toA, fromA), iB = state.b.iterRange(toB, fromB),
@@ -92,7 +95,7 @@ function scanText(state: DiffState, fromA: number, toA: number, fromB: number, t
       state.ranges.push(new ChangedRange(range.fromA + fromA, range.toA + fromA,
                                          range.fromB + fromB, range.toB + fromB))
   } else {
-    state.ranges.push({fromA, toA, fromB, toB})
+    state.ranges.push(new ChangedRange(fromA, toA, fromB, toB))
   }
 }
 

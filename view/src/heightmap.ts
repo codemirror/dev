@@ -1,6 +1,7 @@
 import {Text} from "../../doc/src/text"
 import {ChangedRange} from "../../doc/src/diff"
 import {DecorationSet, buildLineElements, RangeDesc, WidgetType} from "./decoration"
+import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
@@ -71,6 +72,7 @@ export abstract class HeightMap {
 
   abstract heightAt(pos: number, bias?: 1 | -1): number
   abstract posAt(height: number, doc: Text, bias?: 1 | -1, offset?: number): number
+  abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
   abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide): void
   abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide): void
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean,
@@ -137,6 +139,10 @@ export class HeightMapLine extends HeightMap {
 
   posAt(height: number, doc: Text, bias: 1 | -1 = -1, offset: number = 0) {
     return offset + (bias < 0 ? 0 : this.length)
+  }
+
+  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
+    return new Viewport(offset, offset + this.length)
   }
 
   copy() { return new HeightMapLine(this.length, this.deco) }
@@ -233,6 +239,10 @@ export class HeightMapRange extends HeightMap {
     return bias < 0 ? doc.lineStartAt(pos) : doc.lineEndAt(pos)
   }
 
+  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
+    return new Viewport(doc.lineStartAt(pos + offset), doc.lineEndAt(pos + offset))
+  }
+
   decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
     if (node instanceof HeightMapRange) {
       target.push(new HeightMapRange(to + node.length))
@@ -301,6 +311,12 @@ export class HeightMapBranch extends HeightMap {
     let right = height - this.left.height
     return right < 0 ? this.left.posAt(height, doc, bias, offset)
       : this.right.posAt(right, doc, bias, offset + this.left.length + 1)
+  }
+
+  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
+    let rightStart = this.left.length + 1
+    return pos < rightStart ? this.left.lineViewport(pos, doc, offset)
+      : this.right.lineViewport(pos - rightStart, doc, offset + rightStart)
   }
 
   replace(from: number, to: number, nodes: HeightMap[], start: ReplaceSide, end: ReplaceSide): HeightMap {

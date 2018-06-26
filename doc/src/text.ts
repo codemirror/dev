@@ -269,7 +269,7 @@ export class TextNode extends Text {
       }
       cur = end
     }
-    throw new RangeError(`Position ${pos} outside of document`)
+    throw new RangeError(`Position outside of document`)
   }
 
   lineEndAt(pos: number): number {
@@ -281,7 +281,7 @@ export class TextNode extends Text {
       }
       cur = start
     }
-    throw new RangeError(`Position ${pos} outside of document`)
+    throw new RangeError(`Position outside of document`)
   }
 
   linePos(pos: number): LinePos {

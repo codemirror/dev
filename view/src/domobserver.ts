@@ -129,8 +129,8 @@ export class DOMObserver {
     desc.markDirty()
 
     if (rec.type == "childList") {
-      let childBefore = rec.previousSibling && findChild(desc, rec.previousSibling)
-      let childAfter = rec.nextSibling && findChild(desc, rec.nextSibling)
+      let childBefore = findChild(desc, rec.previousSibling || rec.target.previousSibling, -1)
+      let childAfter = findChild(desc, rec.nextSibling || rec.target.nextSibling, 1)
       return {from: childBefore ? desc.posAfter(childBefore) : desc.posAtStart,
               to: childAfter ? desc.posBefore(childAfter) : desc.posAtEnd}
     } else { // "characterData"
@@ -156,10 +156,12 @@ export class DOMObserver {
   }
 }
 
-function findChild(desc: ViewDesc, dom: Node | null): ViewDesc | null {
-  for (; dom; dom = dom.parentNode) {
+function findChild(desc: ViewDesc, dom: Node | null, dir: number): ViewDesc | null {
+  while (dom) {
     let curDesc = dom.cmView
     if (curDesc && curDesc.parent == desc) return curDesc
+    let parent = dom.parentNode
+    dom = parent != desc.dom ? parent : dir > 0 ? dom.nextSibling : dom.previousSibling
   }
   return null
 }

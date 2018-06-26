@@ -11,6 +11,8 @@ declare global {
   interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
 }
 
+type A<T> = ReadonlyArray<T>
+
 const enum dirty { not = 0, child = 1, node = 2 }
 
 export abstract class ViewDesc {
@@ -23,7 +25,7 @@ export abstract class ViewDesc {
   dirty: number = dirty.not;
 
   get childGap() { return 0 }
-  get ignoreDOMText() { return false }
+  get overrideDOMText(): string | null { return null }
 
   get posAtStart(): number {
     return this.parent ? this.parent.posBefore(this) : 0
@@ -69,6 +71,8 @@ export abstract class ViewDesc {
       for (let child of this.children) if (child.dirty) child.sync()
     this.dirty = dirty.not
   }
+
+  domFromPos(pos: number): {node: Node, offset: number} | null { return null }
 
   localPosFromDOM(node: Node, offset: number): number {
     let after: Node | null
@@ -116,31 +120,32 @@ function rm(dom: Node): Node {
   return next!
 }
 
-const selPartMargin = 2
-
 export class DocViewDesc extends ViewDesc {
-  children: DocPartViewDesc[]
-  viewportState: ViewportState
+  children: ViewDesc[] = []
+  visiblePart: Viewport = Viewport.empty
+  viewports: Viewport[] = []
+
   text: Text = Text.create("")
   decorations: PluginDeco[] = []
   selection: Selection = Selection.default
-  visiblePart: PartViewDesc
-  selAnchorPart: PartViewDesc | null = null
-  selHeadPart: PartViewDesc | null = null
+
   observer: DOMObserver
+
+  viewportState: ViewportState
   heightMap: HeightMap = HeightMap.empty()
   heightOracle: HeightOracle = new HeightOracle
   layoutCheckScheduled: number = -1
 
   get length() { return this.text.length }
   
+  get childGap() { return 1 }
+
   constructor(dom: HTMLElement,
               onDOMChange: (from: number, to: number) => void,
               onSelectionChange: () => void) {
     super(null, dom)
     this.dirty = dirty.node
-    this.visiblePart = new PartViewDesc(this)
-    this.children = [this.visiblePart]
+
     this.viewportState = new ViewportState
     this.observer = new DOMObserver(this, onDOMChange, onSelectionChange, () => this.checkLayout())
   }
@@ -153,89 +158,121 @@ export class DocViewDesc extends ViewDesc {
 
     if (this.dirty == dirty.not && this.text.eq(state.doc) && sameDecorations(decorations, this.decorations)) {
       if (state.selection.eq(this.selection)) return
-      if (state.selection.primary.from >= this.visiblePart.viewport.from &&
-          state.selection.primary.to <= this.visiblePart.viewport.to) {
+      if (state.selection.primary.from >= this.visiblePart.from &&
+          state.selection.primary.to <= this.visiblePart.to) {
         this.selection = state.selection
-        this.updateSelection()
+        this.observer.withoutListening(() => this.updateSelection()) // FIXME suppressing selection events doesn't work yet
         return
       }
     }
 
-    let plan = fullChangedRanges(changedRanges(this.text, state.doc), decorations, this.decorations)
+    let changes = fullChangedRanges(changedRanges(this.text, state.doc), decorations, this.decorations)
+    let oldLength = this.text.length
     this.text = state.doc
     this.decorations = decorations
+    this.selection = state.selection
     this.heightMap = this.heightMap
-      .applyChanges(state.doc, decorations.map(d => d.decorations), plan.height)
+      .applyChanges(state.doc, decorations.map(d => d.decorations), changes.height)
       .updateHeight(this.heightOracle.setDoc(state.doc))
 
-    let visibleViewport = this.viewportState.getViewport(state.doc, this.heightMap)
-
-    this.selection = state.selection
-    this.updateInner(visibleViewport, plan.content)
+    this.updateInner(changes.content, oldLength)
 
     if (this.layoutCheckScheduled < 0)
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
-  private updateInner(visibleViewport: Viewport, plan: ReadonlyArray<ChangedRange> = []) {
-    // Make sure that if an out-of-view selection part head came into
-    // view, we make it the main part
-    if (this.selHeadPart && visibleViewport.from <= this.selHeadPart.viewport.to &&
-        visibleViewport.to >= this.selHeadPart.viewport.from) {
-      this.visiblePart = this.selHeadPart
-      this.selHeadPart = null
-    }
+  private updateInner(changes: A<ChangedRange> = [], oldLength: number = this.text.length) {
+    let visible = this.visiblePart = this.viewportState.getViewport(this.text, this.heightMap)
+    let viewports: Viewport[] = [visible]
+    let {head, anchor} = this.selection.primary
+    if (head < visible.from || head > visible.to)
+      viewports.push(this.heightMap.lineViewport(head, this.text))
+    if (!viewports.some(({from, to}) => anchor >= from && anchor <= to))
+      viewports.push(this.heightMap.lineViewport(anchor, this.text))
+    viewports.sort((a, b) => a.from - b.from)
+    let matchingRanges = findMatchingRanges(viewports, this.viewports, changes)
 
     let decoSets = this.decorations.map(d => d.decorations)
-    this.visiblePart.update(visibleViewport, this.text, decoSets, plan)
-    // FIXME be lazy about viewport changes, when possible
-    let {head, anchor} = this.selection.primary, parts = [this.visiblePart]
-    if (head < visibleViewport.from || head > visibleViewport.to) {
-      let headViewport = new Viewport(Math.max(0, head - selPartMargin), Math.min(this.text.length, head + selPartMargin))
-      if (!this.selHeadPart) this.selHeadPart = new PartViewDesc(this)
-      this.selHeadPart.update(headViewport, this.text, decoSets, plan)
-      parts.push(this.selHeadPart)
-    } else {
-      this.selHeadPart = null
-    }
-    if ((anchor < visibleViewport.from || anchor > visibleViewport.to) &&
-        (!this.selHeadPart || anchor < this.selHeadPart.viewport.from || anchor > this.selHeadPart.viewport.to)) {
-      let anchorViewport = new Viewport(Math.max(0, anchor - selPartMargin), Math.min(this.text.length, anchor + selPartMargin))
-      if (!this.selAnchorPart) this.selAnchorPart = new PartViewDesc(this)
-      this.selAnchorPart.update(anchorViewport, this.text, decoSets, plan)
-      parts.push(this.selAnchorPart)
-    } else {
-      this.selAnchorPart = null
-    }
+    let gaps: HTMLElement[] = [], newGaps = false
 
-    // Sync the child array and make sure appropriate gaps are
-    // inserted between the children
-    let children = [], gaps = this.children.filter(ch => ch instanceof GapViewDesc) as GapViewDesc[], j = 0
-    parts.sort((a, b) => a.viewport.from - b.viewport.from)
-    for (let i = 0, pos = 0;; i++) {
-      let part = i < parts.length ? parts[i] : null
-      let start = part ? part.viewport.from : this.text.length
-      if (start > pos) {
-        let space = this.heightMap.heightAt(start - 1, 1) - this.heightMap.heightAt(pos, -1)
-        let gap = j < gaps.length ? gaps[j] : new GapViewDesc(this)
-        j++
-        gap.update(start - pos, space)
-        children.push(gap)
+    let childI = this.children.length
+    let posA = oldLength, posB = this.text.length
+    for (let i = viewports.length - 1;; i--) {
+      let nextA = i < 0 ? 0 : matchingRanges[i].to + 1
+      let nextB = i < 0 ? 0 : viewports[i].to + 1
+      let gap: GapViewDesc | null = null, endI = childI
+      while (posA >= nextA && childI > 0) {
+        let nextChild = this.children[--childI]
+        posA -= nextChild.length + 1
+        if (nextChild instanceof GapViewDesc) gap = nextChild
       }
-      if (!part) break
-      children.push(part)
-      pos = part.viewport.to + 1
-    }
-    if (!sameArray(this.children, children)) {
-      this.children = children
-      this.markDirty()
-    }
-    if (j != gaps.length) this.registerIntersection()
+      if (posB > nextB) {
+        if (!gap || endI - childI != 1) {
+          if (!gap) { gap = new GapViewDesc(this); newGaps = true }
+          this.children.splice(childI, endI - childI, gap)
+          this.markDirty()
+        }
+        gap.update(posB - nextB, this.heightMap.heightAt(posB, 1) - this.heightMap.heightAt(nextB, -1))
+        gaps.push(gap.dom! as HTMLElement)
+      } else if (endI != childI) {
+        this.children.splice(childI, endI - childI)
+        this.markDirty()
+      }
 
+      if (i < 0) break
+
+      let viewport = viewports[i], matching = matchingRanges[i]
+      endI = childI
+      while (posA >= matching.from && childI > 0) posA -= this.children[--childI].length + 1
+      if (matching.from == matching.to) {
+        this.children.splice(childI, endI - childI, new LineViewDesc(this, []))
+        endI = childI + 1
+      }
+      this.updatePart(childI, endI, matching, viewport, changes, decoSets)
+      posB = viewport.from - 1
+    }
+
+    if (newGaps) this.observer.observeIntersection(gaps)
+    this.viewports = viewports
     this.observer.withoutListening(() => {
       this.sync()
       this.updateSelection()
     })
+  }
+
+  private updatePart(startI: number, endI: number, oldPort: Viewport, newPort: Viewport,
+                     changes: A<ChangedRange>, decoSets: A<DecorationSet>) {
+    let plan = clipPlan(changes, oldPort, newPort)
+    let cur = new ChildCursor(this.children, oldPort.to, 1, endI)
+    for (let i = plan.length - 1; i >= 0; i--) {
+      let {fromA, toA, fromB, toB} = plan[i]
+      let {i: toI, off: toOff} = cur.findPos(toA)
+      let {i: fromI, off: fromOff} = cur.findPos(fromA)
+      this.updatePartRange(fromI, fromOff, toI, toOff, LineElementBuilder.build(this.text, fromB, toB, decoSets))
+    }
+  }
+
+  private updatePartRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: LineElementViewDesc[][]) {
+    // All children in the touched range should be line views
+    let children = this.children as LineViewDesc[]
+    if (lines.length == 1) {
+      if (fromI == toI) { // Change within single line
+        children[fromI].update(fromOff, toOff, lines[0])
+      } else { // Join lines
+        let tail = children[toI].detachTail(toOff)
+        children[fromI].update(fromOff, undefined, appendLineElements(lines[0], tail))
+        children.splice(fromI + 1, toI - fromI)
+        this.markDirty()
+      }
+    } else { // Across lines
+      let tail = children[toI].detachTail(toOff)
+      children[fromI].update(fromOff, undefined, lines[0])
+      let insert = []
+      for (let j = 1; j < lines.length; j++)
+        insert.push(new LineViewDesc(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
+      children.splice(fromI + 1, toI - fromI, ...insert)
+      this.markDirty()
+    }
   }
 
   updateSelection(takeFocus: boolean = false) {
@@ -276,11 +313,11 @@ export class DocViewDesc extends ViewDesc {
 
     this.viewportState.updateFromDOM(this.dom as HTMLElement)
     if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
-    let lineHeights: number[] | null = this.visiblePart.measureLineHeights(), refresh = false
+    let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
     if (this.heightOracle.maybeRefresh(lineHeights)) {
-      let {lineHeight, charWidth} = this.visiblePart.measureTextSize()
+      let {lineHeight, charWidth} = this.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom as HTMLElement).whiteSpace!,
-                                          lineHeight, (this.visiblePart.dom as HTMLElement).clientWidth / charWidth)
+                                          lineHeight, (this.dom as HTMLElement).clientWidth / charWidth)
     }
 
     // FIXME should maybe also check gap sizes? i.e. if new
@@ -288,12 +325,11 @@ export class DocViewDesc extends ViewDesc {
     // 300px that should be noticed
     for (let i = 0;; i++) {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
-                                                   this.visiblePart.viewport.from, this.visiblePart.viewport.to,
-                                                   lineHeights || this.visiblePart.measureLineHeights())
-      if (this.viewportState.coveredBy(this.text, this.visiblePart.viewport, this.heightMap)) break
+                                                   this.visiblePart.from, this.visiblePart.to,
+                                                   lineHeights || this.measureVisibleLineHeights())
+      if (this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap)) break
       if (i > 10) throw new Error("Layout failed to converge")
-      // FIXME swap visible and selection parts when appropriate?
-      this.updateInner(this.viewportState.getViewport(this.text, this.heightMap))
+      this.updateInner()
       lineHeights = null
       refresh = false
       this.viewportState.updateFromDOM(this.dom as HTMLElement)
@@ -313,106 +349,9 @@ export class DocViewDesc extends ViewDesc {
   }
 
   readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
-    let pos = 0, text = ""
-    for (let child of this.children) {
-      let end = pos + child.length
-      if (pos < to && end > from) {
-        let inner = child.readDOMRange(Math.max(from, pos), Math.min(to, end))
-        if (pos < from) from = inner.from
-        if (end > to) to = inner.to
-        text += inner.text
-      }
-      pos += child.length
-    }
-    return {from, to, text}
-  }
-
-  posFromDOM(node: Node, offset: number): number {
-    let desc = this.nearest(node)
-    if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
-    return desc.localPosFromDOM(node, offset) + desc.posAtStart
-  }
-
-  domFromPos(pos: number): {node: Node, offset: number} | null {
-    let cur = 0
-    for (let child of this.children) {
-      let end = cur + child.length
-      if (pos >= cur && pos <= end) {
-        let dom = child.domFromPos(pos)
-        if (dom) return dom
-      }
-      cur = end
-    }
-    return null
-  }
-
-  destroy() {
-    cancelAnimationFrame(this.layoutCheckScheduled)
-    this.observer.destroy()
-  }
-}
-
-abstract class DocPartViewDesc extends ViewDesc {
-  abstract domFromPos(pos: number): {node: Node, offset: number} | null;
-  abstract readDOMRange(from: number, to: number): {from: number, to: number, text: string};
-}
-
-class PartViewDesc extends DocPartViewDesc {
-  children: LineViewDesc[];
-  viewport: Viewport = new Viewport(0, 0);
-
-  get length() { return this.viewport.to - this.viewport.from }
-  get posAtStart(): number { return this.viewport.from }
-  get posAtEnd(): number { return this.viewport.to }
-
-  get childGap() { return 1 }
-
-  constructor(parent: ViewDesc) {
-    super(parent, document.createElement("div"))
-    this.dirty = dirty.node
-    this.children = [new LineViewDesc(this, [])]
-  }
-
-  update(viewport: Viewport, text: Text, decoSets: ReadonlyArray<DecorationSet>, plan: ReadonlyArray<ChangedRange>) {
-    this.markDirty()
-    let clippedPlan = clipPlan(plan, this.viewport, viewport)
-    let cur = new ChildCursor(this.children, this.viewport.to, 1)
-    this.viewport = viewport
-
-    for (let i = clippedPlan.length - 1; i >= 0; i--) {
-      let {fromA, toA, fromB, toB} = clippedPlan[i]
-      let {i: toI, off: toOff} = cur.findPos(toA)
-      let {i: fromI, off: fromOff} = cur.findPos(fromA)
-      this.updateRange(fromI, fromOff, toI, toOff,
-                       LineElementBuilder.build(text, fromB, toB, decoSets))
-    }
-  }
-
-  updateRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: LineElementViewDesc[][]) {
-    if (lines.length == 1) {
-      if (fromI == toI) { // Change within single line
-        this.children[fromI].update(fromOff, toOff, lines[0])
-      } else { // Join lines
-        let tail = this.children[toI].detachTail(toOff)
-        this.children[fromI].update(fromOff, undefined, appendLineElements(lines[0], tail))
-        this.children.splice(fromI + 1, toI - fromI)
-        this.markDirty()
-      }
-    } else { // Across lines
-      let tail = this.children[toI].detachTail(toOff)
-      this.children[fromI].update(fromOff, undefined, lines[0])
-      let insert = []
-      for (let j = 1; j < lines.length; j++)
-        insert.push(new LineViewDesc(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
-      this.children.splice(fromI + 1, toI - fromI, ...insert)
-      this.markDirty()
-    }
-  }
-
-  readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
     // FIXME partially parse lines when possible
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    for (let i = 0, pos = this.viewport.from; i < this.children.length; i++) {
+    for (let i = 0, pos = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       /*      if (pos < from && end > to) {
         let result = child.parseRange(from - pos, to - pos)
@@ -427,22 +366,34 @@ class PartViewDesc extends DocPartViewDesc {
     return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
   }
 
+  posFromDOM(node: Node, offset: number): number {
+    let desc = this.nearest(node)
+    if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
+    return desc.localPosFromDOM(node, offset) + desc.posAtStart
+  }
+
   domFromPos(pos: number): {node: Node, offset: number} | null {
-    let {i, off} = new ChildCursor(this.children, this.viewport.to, 1).findPos(pos)
+    let {i, off} = new ChildCursor(this.children, this.text.length, 1).findPos(pos)
     return this.children[i].domFromPos(off)
   }
 
-  measureLineHeights() {
-    let result = []
-    for (let line of this.children)
-      result.push(line.length, (line.dom as HTMLElement).getBoundingClientRect().height)
+  measureVisibleLineHeights() {
+    let result = [], {from, to} = this.visiblePart
+    for (let pos = 0, i = 0; pos <= to; i++) {
+      let child = this.children[i]
+      if (pos >= from)
+        result.push(child.length, (child.dom as HTMLElement).getBoundingClientRect().height)
+      pos += child.length + 1
+    }
     return result
   }
 
   measureTextSize(): {lineHeight: number, charWidth: number} {
-    for (let line of this.children) {
-      let measure = line.measureTextSize()
-      if (measure) return measure
+    for (let child of this.children) {
+      if (child instanceof LineViewDesc) {
+        let measure = child.measureTextSize()
+        if (measure) return measure
+      }
     }
     // If no workable line exists, force a layout of a measurable element
     let dummy = document.createElement("div")
@@ -454,22 +405,30 @@ class PartViewDesc extends DocPartViewDesc {
     dummy.remove()
     return result
   }
+
+  destroy() {
+    cancelAnimationFrame(this.layoutCheckScheduled)
+    this.observer.destroy()
+  }
 }
 
-class GapViewDesc extends DocPartViewDesc {
+class GapViewDesc extends ViewDesc {
   length: number = 0
+
   constructor(parent: ViewDesc) {
     super(parent, document.createElement("div"))
     ;(this.dom as HTMLElement).contentEditable = "false"
   }
+
   get children() { return noChildren }
+
   update(length: number, height: number) {
     this.length = length
     ;(this.dom as HTMLElement).style.height = height + "px"
   }
-  domFromPos(pos: number): {node: Node, offset: number} | null { return null }
-  readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
-    return {from, to, text: this.parent ? (this.parent as DocViewDesc).text.slice(from, to) : ""}
+
+  get overrideDOMText() {
+    return this.parent ? (this.parent as DocViewDesc).text.slice(this.posAtStart, this.posAtEnd) : ""
   }
 }
 
@@ -479,7 +438,7 @@ class LineViewDesc extends ViewDesc {
   children: LineElementViewDesc[];
   length: number;
 
-  constructor(parent: PartViewDesc, content: LineElementViewDesc[]) {
+  constructor(parent: DocViewDesc, content: LineElementViewDesc[]) {
     super(parent, document.createElement("div"))
     this.length = 0
     this.children = []
@@ -613,7 +572,10 @@ abstract class LineElementViewDesc extends ViewDesc {
 
 function appendLineElements(a: LineElementViewDesc[], b: LineElementViewDesc[]): LineElementViewDesc[] {
   let i = 0
-  if (b.length && a.length && a[a.length - 1].merge(b[0])) i++
+  if (b.length && a.length) {
+    let last = a[a.length - 1]
+    if (last.merge(b[0], last.length)) i++
+  }
   for (; i < b.length; i++) a.push(b[i])
   return a
 }
@@ -679,6 +641,8 @@ class TextViewDesc extends LineElementViewDesc {
   localPosFromDOM(node: Node, offset: number): number {
     return node == this.textDOM ? offset : offset ? this.text.length : 0
   }
+
+  domFromPos(pos: number) { return {node: this.textDOM!, offset: pos} }
 }
 
 class WidgetViewDesc extends LineElementViewDesc {
@@ -700,7 +664,7 @@ class WidgetViewDesc extends LineElementViewDesc {
 
   get length() { return 0 }
   getSide() { return this.side }
-  get ignoreDOMText() { return true }
+  get overrideDOMText() { return "" }
 
   merge(other: LineElementViewDesc): boolean {
     return other instanceof WidgetViewDesc && other.widget.compare(this.widget) && other.side == this.side
@@ -806,7 +770,7 @@ export class LineElementBuilder {
     this.elements[this.elements.length - 1].push(new WidgetViewDesc(widget, side))
   }
 
-  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineElementViewDesc[][] {
+  static build(text: Text, from: number, to: number, decorations: A<DecorationSet>): LineElementViewDesc[][] {
     let builder = new LineElementBuilder(text, from)
     buildLineElements(decorations, from, to, builder)
     return builder.elements
@@ -829,7 +793,8 @@ function readDOMNode(node: Node): string {
   // FIXME add a way to ignore certain nodes based on their desc
   if (node.cmIgnore) return ""
   let desc = node.cmView
-  if (desc && desc.ignoreDOMText) return ""
+  let fromDesc = desc && desc.overrideDOMText
+  if (fromDesc != null) return fromDesc
   if (node.nodeType == 3) return node.nodeValue as string
   if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
   if (node.nodeType == 1) return readDOM(node.firstChild, null)
@@ -841,11 +806,10 @@ function isBlockNode(node: Node): boolean {
 }
 
 class ChildCursor {
-  i: number;
-  off: number = 0;
+  off: number = 0
 
-  constructor(public children: ViewDesc[], public pos: number, public gap: number = 0) {
-    this.i = children.length
+  constructor(public children: ViewDesc[], public pos: number,
+              public gap: number = 0, public i: number = children.length) {
     this.pos += gap
   }
 
@@ -860,16 +824,16 @@ class ChildCursor {
   }
 }
 
-function findPluginDeco(decorations: ReadonlyArray<PluginDeco>, plugin: Plugin | null): DecorationSet | null {
+function findPluginDeco(decorations: A<PluginDeco>, plugin: Plugin | null): DecorationSet | null {
   for (let deco of decorations)
     if (deco.plugin == plugin) return deco.decorations
   return null
 }
 
-function fullChangedRanges(diff: ReadonlyArray<ChangedRange>,
-                           decorations: ReadonlyArray<PluginDeco>,
-                           oldDecorations: ReadonlyArray<PluginDeco>
-                          ): {content: ReadonlyArray<ChangedRange>, height: ReadonlyArray<ChangedRange>} {
+function fullChangedRanges(diff: A<ChangedRange>,
+                           decorations: A<PluginDeco>,
+                           oldDecorations: A<PluginDeco>
+                          ): {content: A<ChangedRange>, height: A<ChangedRange>} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let deco of decorations) {
     let newRanges = (findPluginDeco(oldDecorations, deco.plugin) || DecorationSet.empty)
@@ -899,7 +863,7 @@ function addChangedRange(ranges: ChangedRange[], fromA: number, toA: number, fro
   ranges.push(new ChangedRange(fromA, toA, fromB, toB))
 }
 
-function extendWithRanges(diff: ReadonlyArray<ChangedRange>, ranges: number[]): ReadonlyArray<ChangedRange> {
+function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRange> {
   let result: ChangedRange[] = []
   for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
     let next = dI == diff.length ? null : diff[dI], off = posA - posB
@@ -914,18 +878,37 @@ function extendWithRanges(diff: ReadonlyArray<ChangedRange>, ranges: number[]): 
   }
 }
 
+type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
+
+function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
+  if (a.length != b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
+  return true
+}
+
+function getDecorations(state: EditorState): PluginDeco[] {
+  let result: PluginDeco[] = [], plugins = state.plugins
+  for (let plugin of plugins) {
+    let prop = plugin.props.decorations
+    if (!prop) continue
+    let decorations = prop(state)
+    if (decorations.size) result.push({plugin, decorations})
+  }
+  return result
+}
+
 function boundAfter(viewport: Viewport, pos: number): number {
   return pos < viewport.from ? viewport.from : pos < viewport.to ? viewport.to : 2e9
 }
-
+ 
 // Transforms a plan to take viewports into account. Discards changes
 // (or part of changes) that are outside of the viewport, and adds
 // ranges for text that was in one viewport but not the other (so that
 // old text is cleared out and newly visible text is drawn).
-function clipPlan(plan: ReadonlyArray<ChangedRange>, viewportA: Viewport, viewportB: Viewport): ReadonlyArray<ChangedRange> {
+function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewport): A<ChangedRange> {
   let result: ChangedRange[] = []
-  let posA = 0, posB = 0
-  for (let i = 0;; i++) {
+   let posA = 0, posB = 0
+   for (let i = 0;; i++) {
     let range = i < plan.length ? plan[i] : null
     // Look at the unchanged range before the next range (or the end
     // if there is no next range), divide it by viewport boundaries,
@@ -956,27 +939,30 @@ function clipPlan(plan: ReadonlyArray<ChangedRange>, viewportA: Viewport, viewpo
   return result
 }
 
-type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
-
-function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
-  if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
-  return true
+function mapThroughChanges(pos: number, bias: number, changes: A<ChangedRange>): number {
+  let off = 0
+  for (let range of changes) {
+    if (pos < range.fromA) return pos + off
+    if (pos <= range.toA) return bias < 0 ? range.fromA : range.toA
+    off = range.toB - range.toA
+  }
+  return pos + off
 }
 
-function sameArray<T>(a: T[], b: T[]): boolean {
-  if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
-  return true
-}
-
-function getDecorations(state: EditorState): PluginDeco[] {
-  let result: PluginDeco[] = [], plugins = state.plugins
-  for (let plugin of plugins) {
-    let prop = plugin.props.decorations
-    if (!prop) continue
-    let decorations = prop(state)
-    if (decorations.size) result.push({plugin, decorations})
+function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>, changes: A<ChangedRange>): Viewport[] {
+  let prevI = 0, result: Viewport[] = []
+  outer: for (let viewport of viewports) {
+    for (let j = prevI; j < prevViewports.length; j++) {
+      let prev = prevViewports[j]
+      if (mapThroughChanges(prev.from, 1, changes) < viewport.to &&
+          mapThroughChanges(prev.to, -1, changes) > viewport.from) {
+        result.push(prev)
+        prevI = j + 1
+        continue outer
+      }
+    }
+    let at = result.length ? result[result.length - 1].to : 0
+    result.push(new Viewport(at, at))
   }
   return result
 }
