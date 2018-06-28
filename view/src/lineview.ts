@@ -6,8 +6,9 @@ import {DecorationSet, WidgetType, RangeDesc, buildLineElements} from "./decorat
 import {Text, TextCursor} from "../../doc/src/text"
 
 export class LineView extends ContentView {
-  children: InlineView[];
-  length: number;
+  children: InlineView[]
+  length: number
+  dom!: HTMLElement
 
   constructor(parent: DocView, content: InlineView[]) {
     super(parent, document.createElement("div"))
@@ -99,10 +100,10 @@ export class LineView extends ContentView {
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
     while (off == 0 && i > 0 && this.children[i - 1].getSide() > 0) i--
-    if (off == 0) return {node: this.dom!, offset: i}
+    if (off == 0) return {node: this.dom, offset: i}
     let child = this.children[i]
     if (child instanceof TextView) return {node: child.textDOM!, offset: off}
-    else return {node: this.dom!, offset: i}
+    else return {node: this.dom, offset: i}
   }
 
   // FIXME might need another hack to work around Firefox's behavior
@@ -110,11 +111,11 @@ export class LineView extends ContentView {
   // the DOM
   sync() {
     super.sync()
-    let last = this.dom!.lastChild
+    let last = this.dom.lastChild
     if (!last || last.nodeName == "BR") {
       let hack = document.createElement("BR")
       hack.cmIgnore = true
-      this.dom!.appendChild(hack)
+      this.dom.appendChild(hack)
     }
   }
 
@@ -127,7 +128,7 @@ export class LineView extends ContentView {
       if (rects.length != 1) return null
       totalWidth += rects[0].width
     }
-    return {lineHeight: (this.dom as HTMLElement).getBoundingClientRect().height,
+    return {lineHeight: this.dom.getBoundingClientRect().height,
             charWidth: totalWidth / this.length}
   }
 }

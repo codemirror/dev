@@ -29,6 +29,8 @@ export class DocView extends ContentView {
   heightOracle: HeightOracle = new HeightOracle
   layoutCheckScheduled: number = -1
 
+  dom!: HTMLElement
+
   get length() { return this.text.length }
   
   get childGap() { return 1 }
@@ -102,7 +104,7 @@ export class DocView extends ContentView {
           this.markDirty()
         }
         gap.update(posB - nextB, this.heightMap.heightAt(posB, 1) - this.heightMap.heightAt(nextB, -1))
-        gaps.push(gap.dom! as HTMLElement)
+        gaps.push(gap.dom)
       } else if (endI != cursor.i) {
         this.children.splice(cursor.i, endI - cursor.i)
         this.markDirty()
@@ -166,7 +168,7 @@ export class DocView extends ContentView {
   }
 
   updateSelection(takeFocus: boolean = false) {
-    let root = getRoot(this.dom as HTMLElement)
+    let root = getRoot(this.dom)
     if (!takeFocus && root.activeElement != this.dom) return
 
     let anchor = this.domFromPos(this.selection.primary.anchor)!
@@ -205,13 +207,13 @@ export class DocView extends ContentView {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1
 
-    this.viewportState.updateFromDOM(this.dom as HTMLElement)
+    this.viewportState.updateFromDOM(this.dom)
     if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
     if (this.heightOracle.maybeRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.measureTextSize()
-      refresh = this.heightOracle.refresh(getComputedStyle(this.dom as HTMLElement).whiteSpace!,
-                                          lineHeight, (this.dom as HTMLElement).clientWidth / charWidth)
+      refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
+                                          lineHeight, (this.dom).clientWidth / charWidth)
     }
 
     // FIXME should maybe also check gap sizes? i.e. if new
@@ -226,7 +228,7 @@ export class DocView extends ContentView {
       this.updateInner()
       lineHeights = null
       refresh = false
-      this.viewportState.updateFromDOM(this.dom as HTMLElement)
+      this.viewportState.updateFromDOM(this.dom)
     }
   }
 
@@ -255,7 +257,7 @@ export class DocView extends ContentView {
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
       pos = end + 1
     }
-    let startDOM = (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom!.firstChild
+    let startDOM = (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom.firstChild
     let endDOM = toI < this.children.length - 1 ? this.children[toI + 1].dom : null
     return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
   }
@@ -292,7 +294,7 @@ export class DocView extends ContentView {
     // If no workable line exists, force a layout of a measurable element
     let dummy = document.createElement("div")
     dummy.textContent = "abc def ghi jkl mno pqr stu"
-    this.dom!.appendChild(dummy)
+    this.dom.appendChild(dummy)
     let rect = clientRectsFor(dummy.firstChild!)[0]
     let result = {lineHeight: dummy.getBoundingClientRect().height,
                   charWidth: rect ? rect.width / 27 : 7}
@@ -311,10 +313,11 @@ const noChildren: ContentView[] = []
 class GapView extends ContentView {
   length: number = 0
   height: number = 0
+  dom!: HTMLElement
 
   constructor(parent: ContentView) {
     super(parent, document.createElement("div"))
-    ;(this.dom as HTMLElement).contentEditable = "false"
+    this.dom.contentEditable = "false"
   }
 
   get children() { return noChildren }
@@ -323,7 +326,7 @@ class GapView extends ContentView {
     this.length = length
     if (height != this.height) {
       this.height = height
-      ;(this.dom as HTMLElement).style.height = height + "px"
+      this.dom.style.height = height + "px"
     }
   }
 

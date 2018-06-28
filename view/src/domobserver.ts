@@ -30,7 +30,7 @@ export class DOMObserver {
               private onDOMChange: (from: number, to: number) => void,
               private onSelectionChange: () => void,
               private onIntersect: () => void) {
-    this.dom = docView.dom as HTMLElement
+    this.dom = docView.dom
     this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {

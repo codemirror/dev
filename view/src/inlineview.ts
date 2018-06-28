@@ -88,6 +88,8 @@ export class TextView extends InlineView {
 }
 
 export class WidgetView extends InlineView {
+  dom!: HTMLElement | null
+
   constructor(readonly widget: WidgetType<any>, readonly side: number) {
     super(null, null)
   }
@@ -96,7 +98,7 @@ export class WidgetView extends InlineView {
     this.parent = parent
     if (!this.dom) {
       this.dom = this.widget.toDOM()
-      ;(this.dom as HTMLElement).contentEditable = "false"
+      this.dom.contentEditable = "false"
       this.dom.cmView = this
     }
     this.markDirty()
