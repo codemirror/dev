@@ -310,6 +310,7 @@ const noChildren: ContentView[] = []
 
 class GapView extends ContentView {
   length: number = 0
+  height: number = 0
 
   constructor(parent: ContentView) {
     super(parent, document.createElement("div"))
@@ -320,7 +321,10 @@ class GapView extends ContentView {
 
   update(length: number, height: number) {
     this.length = length
-    ;(this.dom as HTMLElement).style.height = height + "px"
+    if (height != this.height) {
+      this.height = height
+      ;(this.dom as HTMLElement).style.height = height + "px"
+    }
   }
 
   get overrideDOMText() {
