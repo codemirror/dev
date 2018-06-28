@@ -28,8 +28,7 @@ export class DOMObserver {
               private onSelectionChange: () => void,
               private onIntersect: () => void) {
     this.dom = docView.dom as HTMLElement
-    if (typeof MutationObserver != "undefined")
-      this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
+    this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {
         this.charDataQueue.push({target: event.target,
@@ -71,8 +70,7 @@ export class DOMObserver {
 
   start() {
     if (this.active) return
-    if (this.observer)
-      this.observer.observe(this.dom, observeOptions)
+    this.observer.observe(this.dom, observeOptions)
     if (useCharData)
       this.dom.addEventListener("DOMCharacterDataModified", this.onCharData)
     this.intersection.takeRecords() // Dump any existing records
@@ -82,19 +80,17 @@ export class DOMObserver {
   stop() {
     if (!this.active) return
     this.active = false
-    if (this.observer) {
-      // FIXME we're throwing away DOM events when flushing like this,
-      // to avoid recursively calling `setState` when setting a new
-      // state, but that could in some circumstances drop information
-      this.flush()
-      this.observer.disconnect()
-    }
+    // FIXME we're throwing away DOM events when flushing like this,
+    // to avoid recursively calling `setState` when setting a new
+    // state, but that could in some circumstances drop information
+    this.flush()
+    this.observer.disconnect()
     if (useCharData)
       this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
   flush(): boolean {
-    return this.applyMutations(this.observer ? this.observer.takeRecords() : [])
+    return this.applyMutations(this.observer.takeRecords())
   }
 
   applyMutations(records: MutationRecord[]): boolean {
@@ -140,6 +136,7 @@ export class DOMObserver {
     }
   }
 
+  // FIXME this is called more often than I'd expect—look into that
   readSelection() {
     let root = getRoot(this.dom)
     if (!this.active || root.activeElement != this.dom || !hasSelection(this.dom)) return
