@@ -1,14 +1,15 @@
 import {ContentView, ChildCursor, dirty} from "./contentview"
-import {LineView, LineElementBuilder} from "./lineview"
-import {InlineView} from "./inlineview"
+import {LineView} from "./lineview"
+import {InlineView, InlineBuilder} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
 import {EditorState, Plugin, Selection} from "../../state/src/state"
 import {HeightMap, HeightOracle} from "./heightmap"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
-import {DecorationSet, joinRanges} from "./decoration"
+import {DecorationSet, joinRanges, findChangedRanges} from "./decoration"
 import {getRoot, clientRectsFor} from "./dom"
+import {RangeSet} from "../../rangeset/src/rangeset"
 
 type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
 type A<T> = ReadonlyArray<T>
@@ -140,7 +141,7 @@ export class DocView extends ContentView {
       let {fromA, toA, fromB, toB} = plan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
-      this.updatePartRange(fromI, fromOff, toI, toOff, LineElementBuilder.build(this.text, fromB, toB, decoSets))
+      this.updatePartRange(fromI, fromOff, toI, toOff, InlineBuilder.build(this.text, fromB, toB, decoSets))
     }
   }
 
@@ -347,14 +348,14 @@ function fullChangedRanges(diff: A<ChangedRange>,
                           ): {content: A<ChangedRange>, height: A<ChangedRange>} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let deco of decorations) {
-    let newRanges = (findPluginDeco(oldDecorations, deco.plugin) || DecorationSet.empty)
-      .changedRanges(deco.decorations, diff)
+    let newRanges = findChangedRanges(findPluginDeco(oldDecorations, deco.plugin) || RangeSet.empty,
+                                      deco.decorations, diff)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
   }
   for (let old of oldDecorations) {
     if (!findPluginDeco(decorations, old.plugin)) {
-      let newRanges = old.decorations.changedRanges(DecorationSet.empty, diff)
+      let newRanges = findChangedRanges(old.decorations, RangeSet.empty, diff)
       contentRanges = joinRanges(contentRanges, newRanges.content)
       heightRanges = joinRanges(heightRanges, newRanges.height)
     }

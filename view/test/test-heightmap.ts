@@ -12,7 +12,7 @@ describe("HeightMap", () => {
   })
 
   function mk(text, deco = []) {
-    return HeightMap.empty().applyChanges(text, [DecorationSet.of(deco)],
+    return HeightMap.empty().applyChanges(text, [Decoration.set(deco)],
                                           [new ChangedRange(0, 0, 0, text.length)])
   }
   function doc(... lineLen) {
@@ -69,8 +69,8 @@ describe("HeightMap", () => {
                         Decoration.point(24, {widget: new MyWidget(20)})])
     ist(map.toString(), "line(10:2,-3) range(10) line(10:2,20)")
     map = map.applyChanges(text.replace(10, 22, ""), [
-      DecorationSet.of([Decoration.range(2, 5, {collapsed: true}),
-                        Decoration.point(12, {widget: new MyWidget(20)})])
+      Decoration.set([Decoration.range(2, 5, {collapsed: true}),
+                      Decoration.point(12, {widget: new MyWidget(20)})])
     ], [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20:2,-3,12,20)")
   })

@@ -1,9 +1,7 @@
 import {ContentView, ChildCursor} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView, WidgetView, CollapsedView} from "./inlineview"
+import {InlineView, TextView} from "./inlineview"
 import {clientRectsFor} from "./dom"
-import {DecorationSet, WidgetType, RangeDesc, buildLineElements} from "./decoration"
-import {Text, TextCursor} from "../../doc/src/text"
 
 export class LineView extends ContentView {
   children: InlineView[]
@@ -130,99 +128,5 @@ export class LineView extends ContentView {
     }
     return {lineHeight: this.dom.getBoundingClientRect().height,
             charWidth: totalWidth / this.length}
-  }
-}
-
-export class LineElementBuilder {
-  elements: InlineView[][] = [[]];
-  active: RangeDesc[] = [];
-  cursor: TextCursor;
-  text: string;
-  textOff: number = 0;
-
-  constructor(text: Text, public pos: number) {
-    this.cursor = text.iter()
-    this.text = this.cursor.next(pos)
-  }
-
-  buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null) {
-    while (length > 0) {
-      if (this.textOff == this.text.length) {
-        this.text = this.cursor.next()
-        this.textOff = 0
-      }
-
-      let end = Math.min(this.textOff + length, this.text.length)
-      for (let i = this.textOff; i < end; i++) {
-        if (this.text.charCodeAt(i) == 10) { end = i; break }
-      }
-      if (end > this.textOff) {
-        this.elements[this.elements.length - 1].push(
-          new TextView(this.text.slice(this.textOff, end), tagName, clss, attrs))
-        length -= end - this.textOff
-        this.textOff = end
-      }
-      if (end < this.text.length && length) {
-        this.elements.push([])
-        length--
-        this.textOff++
-      }
-    }
-  }
-
-  advance(pos: number) {
-    if (pos <= this.pos) return
-
-    let tagName = null, clss = null
-    let attrs: {[key: string]: string} | null = null
-    for (let desc of this.active) {
-      let spec = desc.spec
-      if (spec.tagName) tagName = spec.tagName
-      if (spec.class) clss = clss ? clss + " " + spec.class : spec.class
-      if (spec.attributes) for (let name in spec.attributes) {
-        let value = spec.attributes[name]
-        if (value == null) continue
-        if (name == "class") {
-          clss = clss ? clss + " " + value : value
-        } else {
-          if (!attrs) attrs = {}
-          if (name == "style" && attrs.style) value = attrs.style + ";" + value
-          attrs[name] = value
-        }
-      }
-    }
-    this.buildText(pos - this.pos, tagName, clss, attrs)
-    this.pos = pos
-  }
-
-  advanceCollapsed(pos: number) {
-    if (pos > this.pos) {
-      let line = this.elements[this.elements.length - 1]
-      if (line.length && (line[line.length - 1] instanceof CollapsedView))
-        line[line.length - 1].length += (pos - this.pos)
-      else
-        line.push(new CollapsedView(pos - this.pos))
-
-      // Advance the iterator past the collapsed content
-      let length = pos - this.pos
-      if (this.textOff + length <= this.text.length) {
-        this.textOff += length
-      } else {
-        this.text = this.cursor.next(length - (this.text.length - this.textOff))
-        this.textOff = 0
-      }
-
-      this.pos = pos
-    }
-  }
-
-  addWidget(widget: WidgetType<any>, side: number) {
-    this.elements[this.elements.length - 1].push(new WidgetView(widget, side))
-  }
-
-  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): InlineView[][] {
-    let builder = new LineElementBuilder(text, from)
-    buildLineElements(decorations, from, to, builder)
-    return builder.elements
   }
 }

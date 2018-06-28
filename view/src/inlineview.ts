@@ -1,5 +1,7 @@
 import {ContentView, dirty} from "./contentview"
-import {WidgetType, attrsEq} from "./decoration"
+import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, PointDecoration} from "./decoration"
+import {Text, TextCursor} from "../../doc/src/text"
+import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 
 const noChildren: ContentView[] = []
 
@@ -127,3 +129,97 @@ export class CollapsedView extends InlineView {
   }
 }
 
+export class InlineBuilder implements RangeIterator<Decoration> {
+  elements: InlineView[][] = [[]];
+  cursor: TextCursor;
+  text: string;
+  textOff: number = 0;
+
+  constructor(text: Text, public pos: number) {
+    this.cursor = text.iter()
+    this.text = this.cursor.next(pos)
+  }
+
+  buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null) {
+    while (length > 0) {
+      if (this.textOff == this.text.length) {
+        this.text = this.cursor.next()
+        this.textOff = 0
+      }
+
+      let end = Math.min(this.textOff + length, this.text.length)
+      for (let i = this.textOff; i < end; i++) {
+        if (this.text.charCodeAt(i) == 10) { end = i; break }
+      }
+      if (end > this.textOff) {
+        this.elements[this.elements.length - 1].push(
+          new TextView(this.text.slice(this.textOff, end), tagName, clss, attrs))
+        length -= end - this.textOff
+        this.textOff = end
+      }
+      if (end < this.text.length && length) {
+        this.elements.push([])
+        length--
+        this.textOff++
+      }
+    }
+  }
+
+  advance(pos: number, active: Decoration[]) {
+    if (pos <= this.pos) return
+
+    let tagName = null, clss = null
+    let attrs: {[key: string]: string} | null = null
+    for (let deco of active as RangeDecoration[]) {
+      if (deco.tagName) tagName = deco.tagName
+      if (deco.class) clss = clss ? clss + " " + deco.class : deco.class
+      if (deco.attributes) for (let name in deco.attributes) {
+        let value = deco.attributes[name]
+        if (value == null) continue
+        if (name == "class") {
+          clss = clss ? clss + " " + value : value
+        } else {
+          if (!attrs) attrs = {}
+          if (name == "style" && attrs.style) value = attrs.style + ";" + value
+          attrs[name] = value
+        }
+      }
+    }
+    this.buildText(pos - this.pos, tagName, clss, attrs)
+    this.pos = pos
+  }
+
+  advanceCollapsed(pos: number) {
+    if (pos <= this.pos) return
+
+    let line = this.elements[this.elements.length - 1]
+    if (line.length && (line[line.length - 1] instanceof CollapsedView))
+      line[line.length - 1].length += (pos - this.pos)
+    else
+      line.push(new CollapsedView(pos - this.pos))
+
+    // Advance the iterator past the collapsed content
+    let length = pos - this.pos
+    if (this.textOff + length <= this.text.length) {
+      this.textOff += length
+    } else {
+      this.text = this.cursor.next(length - (this.text.length - this.textOff))
+      this.textOff = 0
+    }
+
+    this.pos = pos
+  }
+
+  point(deco: Decoration) {
+    this.elements[this.elements.length - 1].push(new WidgetView(deco.widget!, deco instanceof PointDecoration ? deco.bias : 0))
+  }
+
+  ignoreRange(deco: Decoration): boolean { return !(deco as RangeDecoration).affectsSpans }
+  ignorePoint(deco: Decoration): boolean { return !deco.widget }
+
+  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): InlineView[][] {
+    let builder = new InlineBuilder(text, from)
+    RangeSet.iterateSpans(decorations, from, to, builder)
+    return builder.elements
+  }
+}

@@ -1,6 +1,7 @@
 import {Text} from "../../doc/src/text"
 import {ChangedRange} from "../../doc/src/diff"
-import {DecorationSet, buildLineElements, RangeDesc, WidgetType} from "./decoration"
+import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
+import {DecorationSet, RangeDecoration, Decoration} from "./decoration"
 import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
@@ -392,8 +393,6 @@ export class HeightMapBranch extends HeightMap {
   toString() { return this.left + " " + this.right }
 }
 
-const noRange: RangeDesc[] = []
-
 // FIXME This could probably be optimized. Measure how often it's
 // actually running during regular use. (Current theory is that,
 // becuase most of the document will simply be an unparsed range, and
@@ -401,8 +400,7 @@ const noRange: RangeDesc[] = []
 // filled in through updateHeight, it's not going to be calling
 // `lineEndAt`/`lineStartAt` a significant amount of times except in
 // pathological circumstances.)
-class NodeBuilder {
-  active: RangeDesc[] = noRange
+class NodeBuilder implements RangeIterator<Decoration> {
   nodes: HeightMap[] = []
   writtenTo: number
   lineStart: number = -1
@@ -414,6 +412,7 @@ class NodeBuilder {
   }
 
   advance(pos: number) {
+    if (pos <= this.pos) return
     if (this.curLine) {
       if (this.lineEnd < 0) this.lineEnd = this.doc.lineEndAt(this.pos)
       if (pos > this.lineEnd) {
@@ -432,6 +431,7 @@ class NodeBuilder {
   }
 
   advanceCollapsed(pos: number) {
+    if (pos <= this.pos) return
     this.addDeco(this.pos - pos)
     if (this.curLine) {
       this.curLine.length += pos - this.pos
@@ -441,8 +441,8 @@ class NodeBuilder {
     this.pos = pos
   }
 
-  addWidget(widget: WidgetType<any>) {
-    this.addDeco(widget.estimatedHeight)
+  point(deco: Decoration) {
+    this.addDeco(deco.widget!.estimatedHeight)
   }
 
   flushTo(pos: number) {
@@ -461,11 +461,14 @@ class NodeBuilder {
     }
     this.curLine.addDeco(this.pos - this.lineStart, val)
   }
+
+  ignoreRange(value: Decoration) { return !(value as RangeDecoration).collapsed }
+  ignorePoint(value: Decoration) { return !value.widget }
 }
 
 function buildChangedNodes(doc: Text, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMap[] {
   let builder = new NodeBuilder(from, doc)
-  buildLineElements(decorations, from, to, builder, true)
+  RangeSet.iterateSpans(decorations, from, to, builder)
   builder.flushTo(builder.pos)
   if (builder.nodes.length == 0) builder.nodes.push(new HeightMapRange(0))
   return builder.nodes
