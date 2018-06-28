@@ -1,4 +1,5 @@
 import {tempEditor} from "./temp-editor"
+import {Selection} from "../../state/src/state"
 import ist from "ist"
 
 function domText(view) {
@@ -84,5 +85,19 @@ describe("EditorView drawing", () => {
     cm.dom.scrollTop = cm.dom.scrollHeight / 2
     cm.docView.checkLayout()
     ist(cm.contentDOM.textContent.match(/b/))
+  })
+
+  it("keeps a drawn area around selection ends", () => {
+    let cm = tempEditor("\nsecond\n" + "x\n".repeat(500) + "last")
+    cm.dom.style.height = "300px"
+    cm.dom.style.overflow = "auto"
+    cm.dom.scrollTop = 3000
+    cm.dispatch(cm.state.transaction.setSelection(Selection.single(1, cm.state.doc.length)))
+    cm.docView.checkLayout()
+    cm.focus()
+    let text = cm.contentDOM.textContent
+    ist(text.length, 500, "<")
+    ist(/second/.test(text))
+    ist(/last/.test(text))
   })
 })

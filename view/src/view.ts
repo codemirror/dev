@@ -77,7 +77,7 @@ export class EditorView {
   }
 
   focus() {
-    this.docView.updateSelection(true)
+    this.docView.focus()
   }
 
   destroy() {

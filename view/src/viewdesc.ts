@@ -195,41 +195,37 @@ export class DocViewDesc extends ViewDesc {
     let decoSets = this.decorations.map(d => d.decorations)
     let gaps: HTMLElement[] = [], newGaps = false
 
-    let childI = this.children.length
-    let posA = oldLength, posB = this.text.length
+    let cursor = new ChildCursor(this.children, oldLength, 1)
+    let posB = this.text.length
     for (let i = viewports.length - 1;; i--) {
-      let nextA = i < 0 ? -1 : matchingRanges[i].to
+      let endI = cursor.i
+      cursor.findPos(i < 0 ? 0 : matchingRanges[i].to + 1)
+      let gap = cursor.i < endI && this.children[cursor.i] instanceof GapViewDesc ? this.children[cursor.i] as GapViewDesc : null
       let nextB = i < 0 ? 0 : viewports[i].to + 1
-      let gap: GapViewDesc | null = null, endI = childI
-      while (posA > nextA) {
-        let nextChild = this.children[--childI]
-        posA -= nextChild.length + 1
-        if (nextChild instanceof GapViewDesc) gap = nextChild
-      }
-      if (posB > nextB) {
-        if (!gap || endI - childI != 1) {
+      if (posB >= nextB) {
+        if (!gap || endI - cursor.i != 1) {
           if (!gap) { gap = new GapViewDesc(this); newGaps = true }
-          this.children.splice(childI, endI - childI, gap)
+          this.children.splice(cursor.i, endI - cursor.i, gap)
           this.markDirty()
         }
         gap.update(posB - nextB, this.heightMap.heightAt(posB, 1) - this.heightMap.heightAt(nextB, -1))
         gaps.push(gap.dom! as HTMLElement)
-      } else if (endI != childI) {
-        this.children.splice(childI, endI - childI)
+      } else if (endI != cursor.i) {
+        this.children.splice(cursor.i, endI - cursor.i)
         this.markDirty()
       }
 
       if (i < 0) break
 
       let viewport = viewports[i], matching = matchingRanges[i]
-      endI = childI
+      endI = cursor.i
       if (matching.from == matching.to) {
-        this.children.splice(childI, endI - childI, new LineViewDesc(this, []))
-        endI = childI + 1
+        this.children.splice(cursor.i, endI - cursor.i, new LineViewDesc(this, []))
+        endI = cursor.i + 1
       } else {
-        while (posA >= matching.from) posA -= this.children[--childI].length + 1
+        cursor.findPos(matching.from)
       }
-      this.updatePart(childI, endI, matching, viewport, changes, decoSets)
+      this.updatePart(cursor.i, endI, matching, viewport, changes, decoSets)
       posB = viewport.from - 1
     }
 
@@ -300,6 +296,10 @@ export class DocViewDesc extends ViewDesc {
     domSel.removeAllRanges()
     domSel.addRange(range)
     if (domSel.extend) domSel.extend(head.node, head.offset)
+  }
+
+  focus() {
+    this.observer.withoutListening(() => this.updateSelection(true))
   }
 
   registerIntersection() {
