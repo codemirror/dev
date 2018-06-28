@@ -1,4 +1,4 @@
-import {EditorView} from "../src/view"
+import {EditorView} from "../src"
 import {EditorState, Plugin} from "../../state/src/state"
 
 const workspace = document.querySelector("#workspace")

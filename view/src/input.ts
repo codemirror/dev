@@ -1,5 +1,5 @@
 import {MetaSlot} from "../../state/src/state"
-import {EditorView} from "./view"
+import {EditorView} from "./editorview"
 import browser from "./browser"
 
 // This will also be where dragging info and such goes

@@ -8,20 +8,20 @@ import {getRoot, clientRectsFor} from "./dom"
 import {HeightMap, HeightOracle} from "./heightmap"
 
 declare global {
-  interface Node { cmView: ViewDesc | undefined; cmIgnore: boolean | undefined }
+  interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
 }
 
 type A<T> = ReadonlyArray<T>
 
 const enum dirty { not = 0, child = 1, node = 2 }
 
-export abstract class ViewDesc {
-  constructor(public parent: ViewDesc | null, public dom: Node | null) {
+export abstract class ContentView {
+  constructor(public parent: ContentView | null, public dom: Node | null) {
     if (dom) dom.cmView = this
   }
 
   abstract length: number;
-  abstract children: ViewDesc[];
+  abstract children: ContentView[];
   dirty: number = dirty.not;
 
   get childGap() { return 0 }
@@ -35,24 +35,24 @@ export abstract class ViewDesc {
     return this.posAtStart + this.length
   }
 
-  posBefore(desc: ViewDesc): number {
+  posBefore(view: ContentView): number {
     let pos = this.posAtStart
     for (let child of this.children) {
-      if (child == desc) return pos
+      if (child == view) return pos
       pos += child.length + this.childGap
     }
     throw new RangeError("Invalid child in posBefore")
   }
 
-  posAfter(desc: ViewDesc): number {
-    return this.posBefore(desc) + desc.length
+  posAfter(view: ContentView): number {
+    return this.posBefore(view) + view.length
   }
 
   syncDOMChildren() {
     if (!this.dom) return
     let dom = this.dom.firstChild
-    for (let desc of this.children) {
-      let childDOM = desc.dom
+    for (let view of this.children) {
+      let childDOM = view.dom
       if (!childDOM) continue
       if (childDOM.parentNode == this.dom) {
         while (childDOM != dom) dom = rm(dom!)
@@ -120,8 +120,8 @@ function rm(dom: Node): Node {
   return next!
 }
 
-export class DocViewDesc extends ViewDesc {
-  children: ViewDesc[] = [new LineViewDesc(this, [])]
+export class DocView extends ContentView {
+  children: ContentView[] = [new LineView(this, [])]
   visiblePart: Viewport = Viewport.empty
   viewports: Viewport[] = []
 
@@ -200,11 +200,11 @@ export class DocViewDesc extends ViewDesc {
     for (let i = viewports.length - 1;; i--) {
       let endI = cursor.i
       cursor.findPos(i < 0 ? 0 : matchingRanges[i].to + 1)
-      let gap = cursor.i < endI && this.children[cursor.i] instanceof GapViewDesc ? this.children[cursor.i] as GapViewDesc : null
+      let gap = cursor.i < endI && this.children[cursor.i] instanceof GapView ? this.children[cursor.i] as GapView : null
       let nextB = i < 0 ? 0 : viewports[i].to + 1
       if (posB >= nextB) {
         if (!gap || endI - cursor.i != 1) {
-          if (!gap) { gap = new GapViewDesc(this); newGaps = true }
+          if (!gap) { gap = new GapView(this); newGaps = true }
           this.children.splice(cursor.i, endI - cursor.i, gap)
           this.markDirty()
         }
@@ -220,7 +220,7 @@ export class DocViewDesc extends ViewDesc {
       let viewport = viewports[i], matching = matchingRanges[i]
       endI = cursor.i
       if (matching.from == matching.to) {
-        this.children.splice(cursor.i, endI - cursor.i, new LineViewDesc(this, []))
+        this.children.splice(cursor.i, endI - cursor.i, new LineView(this, []))
         endI = cursor.i + 1
       } else {
         cursor.findPos(matching.from)
@@ -249,9 +249,9 @@ export class DocViewDesc extends ViewDesc {
     }
   }
 
-  private updatePartRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: LineElementViewDesc[][]) {
+  private updatePartRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: LineElementView[][]) {
     // All children in the touched range should be line views
-    let children = this.children as LineViewDesc[]
+    let children = this.children as LineView[]
     if (lines.length == 1) {
       if (fromI == toI) { // Change within single line
         children[fromI].update(fromOff, toOff, lines[0])
@@ -266,7 +266,7 @@ export class DocViewDesc extends ViewDesc {
       children[fromI].update(fromOff, undefined, lines[0])
       let insert = []
       for (let j = 1; j < lines.length; j++)
-        insert.push(new LineViewDesc(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
+        insert.push(new LineView(this, j < lines.length - 1 ? lines[j] : appendLineElements(lines[j], tail)))
       children.splice(fromI + 1, toI - fromI, ...insert)
       this.markDirty()
     }
@@ -304,7 +304,7 @@ export class DocViewDesc extends ViewDesc {
 
   registerIntersection() {
     let gapDOM: HTMLElement[] = []
-    for (let child of this.children) if (child instanceof GapViewDesc) gapDOM.push(child.dom as HTMLElement)
+    for (let child of this.children) if (child instanceof GapView) gapDOM.push(child.dom as HTMLElement)
     this.observer.observeIntersection(gapDOM)
   }
 
@@ -337,11 +337,11 @@ export class DocViewDesc extends ViewDesc {
     }
   }
 
-  nearest(dom: Node): ViewDesc | null {
+  nearest(dom: Node): ContentView | null {
     for (let cur: Node | null = dom; cur;) {
       let domView = cur.cmView
       if (domView) {
-        for (let v: ViewDesc | null = domView; v; v = v.parent)
+        for (let v: ContentView | null = domView; v; v = v.parent)
           if (v == this) return domView
       }
       cur = cur.parentNode
@@ -368,9 +368,9 @@ export class DocViewDesc extends ViewDesc {
   }
 
   posFromDOM(node: Node, offset: number): number {
-    let desc = this.nearest(node)
-    if (!desc) throw new RangeError("Trying to find position for a DOM position outside of the document")
-    return desc.localPosFromDOM(node, offset) + desc.posAtStart
+    let view = this.nearest(node)
+    if (!view) throw new RangeError("Trying to find position for a DOM position outside of the document")
+    return view.localPosFromDOM(node, offset) + view.posAtStart
   }
 
   domFromPos(pos: number): {node: Node, offset: number} | null {
@@ -391,7 +391,7 @@ export class DocViewDesc extends ViewDesc {
 
   measureTextSize(): {lineHeight: number, charWidth: number} {
     for (let child of this.children) {
-      if (child instanceof LineViewDesc) {
+      if (child instanceof LineView) {
         let measure = child.measureTextSize()
         if (measure) return measure
       }
@@ -413,10 +413,10 @@ export class DocViewDesc extends ViewDesc {
   }
 }
 
-class GapViewDesc extends ViewDesc {
+class GapView extends ContentView {
   length: number = 0
 
-  constructor(parent: ViewDesc) {
+  constructor(parent: ContentView) {
     super(parent, document.createElement("div"))
     ;(this.dom as HTMLElement).contentEditable = "false"
   }
@@ -429,17 +429,17 @@ class GapViewDesc extends ViewDesc {
   }
 
   get overrideDOMText() {
-    return this.parent ? (this.parent as DocViewDesc).text.slice(this.posAtStart, this.posAtEnd) : ""
+    return this.parent ? (this.parent as DocView).text.slice(this.posAtStart, this.posAtEnd) : ""
   }
 }
 
 const MAX_JOIN_LEN = 256
 
-class LineViewDesc extends ViewDesc {
-  children: LineElementViewDesc[];
+class LineView extends ContentView {
+  children: LineElementView[];
   length: number;
 
-  constructor(parent: DocViewDesc, content: LineElementViewDesc[]) {
+  constructor(parent: DocView, content: LineElementView[]) {
     super(parent, document.createElement("div"))
     this.length = 0
     this.children = []
@@ -447,23 +447,23 @@ class LineViewDesc extends ViewDesc {
     this.markDirty()
   }
 
-  update(from: number, to: number = this.length, content: LineElementViewDesc[]) {
+  update(from: number, to: number = this.length, content: LineElementView[]) {
     this.markDirty()
     let cur = new ChildCursor(this.children, this.length)
     let {i: toI, off: toOff} = cur.findPos(to, 1)
     let {i: fromI, off: fromOff} = cur.findPos(from, -1)
     let dLen = from - to
-    for (let desc of content) dLen += desc.length
+    for (let view of content) dLen += view.length
     this.length += dLen
 
     // Both from and to point into the same text view
     if (fromI == toI && fromOff) {
-      let start = this.children[fromI] as TextViewDesc
+      let start = this.children[fromI] as TextView
       // Maybe just update that view and be done
       if (content.length == 1 && start.merge(content[0], fromOff, toOff)) return
       if (content.length == 0) return start.cut(fromOff, toOff)
       // Otherwise split it, so that we don't have to worry about aliasting front/end afterwards
-      appendLineElements(content, [new TextViewDesc(start.text.slice(toOff), start.tagName, start.class, start.attrs)])
+      appendLineElements(content, [new TextView(start.text.slice(toOff), start.tagName, start.class, start.attrs)])
       toI++
       toOff = 0
     }
@@ -473,7 +473,7 @@ class LineViewDesc extends ViewDesc {
     // start or end of the content can be merged with adjacent nodes,
     // this is done
     if (toOff) {
-      let end = this.children[toI] as TextViewDesc
+      let end = this.children[toI] as TextView
       if (content.length && end.merge(content[content.length - 1], 0, toOff)) content.pop()
       else end.cut(0, toOff)
     } else if (toI < this.children.length && content.length &&
@@ -481,7 +481,7 @@ class LineViewDesc extends ViewDesc {
       content.pop()
     }
     if (fromOff) {
-      let start = this.children[fromI] as TextViewDesc
+      let start = this.children[fromI] as TextView
       if (content.length && start.merge(content[0], fromOff)) content.shift()
       else start.cut(fromOff)
       fromI++
@@ -502,23 +502,23 @@ class LineViewDesc extends ViewDesc {
 
     // And if anything remains, splice the child array to insert the new content
     if (content.length || fromI != toI) {
-      for (let desc of content) desc.finish(this)
+      for (let view of content) view.finish(this)
       this.children.splice(fromI, toI - fromI, ...content)
     }
   }
 
-  detachTail(from: number): TextViewDesc[] {
-    let result: TextViewDesc[] = []
+  detachTail(from: number): TextView[] {
+    let result: TextView[] = []
     if (this.length == 0) return result
     let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     if (off > 0) {
-      let child = this.children[i] as TextViewDesc
-      result.push(new TextViewDesc(child.text.slice(off), child.tagName, child.class, child.attrs))
+      let child = this.children[i] as TextView
+      result.push(new TextView(child.text.slice(off), child.tagName, child.class, child.attrs))
       child.cut(off)
       i++
     }
     if (i < this.children.length) {
-      for (let j = i; j < this.children.length; j++) result.push(this.children[j] as TextViewDesc)
+      for (let j = i; j < this.children.length; j++) result.push(this.children[j] as TextView)
       this.children.length = i
       this.markDirty()
     }
@@ -531,7 +531,7 @@ class LineViewDesc extends ViewDesc {
     while (off == 0 && i > 0 && this.children[i - 1].getSide() > 0) i--
     if (off == 0) return {node: this.dom!, offset: i}
     let child = this.children[i]
-    if (child instanceof TextViewDesc) return {node: child.textDOM!, offset: off}
+    if (child instanceof TextView) return {node: child.textDOM!, offset: off}
     else return {node: this.dom!, offset: i}
   }
 
@@ -552,7 +552,7 @@ class LineViewDesc extends ViewDesc {
     if (this.children.length == 0 || this.length > 20) return null
     let totalWidth = 0
     for (let child of this.children) {
-      if (!(child instanceof TextViewDesc)) return null
+      if (!(child instanceof TextView)) return null
       let rects = clientRectsFor(child.dom!)
       if (rects.length != 1) return null
       totalWidth += rects[0].width
@@ -562,16 +562,16 @@ class LineViewDesc extends ViewDesc {
   }
 }
 
-const noChildren: ViewDesc[] = []
+const noChildren: ContentView[] = []
 
-abstract class LineElementViewDesc extends ViewDesc {
-  merge(other: LineElementViewDesc, from: number = 0, to: number = 0): boolean { return false }
+abstract class LineElementView extends ContentView {
+  merge(other: LineElementView, from: number = 0, to: number = 0): boolean { return false }
   get children() { return noChildren }
-  finish(parent: ViewDesc) {}
+  finish(parent: ContentView) {}
   getSide() { return 0 }
 }
 
-function appendLineElements(a: LineElementViewDesc[], b: LineElementViewDesc[]): LineElementViewDesc[] {
+function appendLineElements(a: LineElementView[], b: LineElementView[]): LineElementView[] {
   let i = 0
   if (b.length && a.length) {
     let last = a[a.length - 1]
@@ -581,7 +581,7 @@ function appendLineElements(a: LineElementViewDesc[], b: LineElementViewDesc[]):
   return a
 }
 
-class TextViewDesc extends LineElementViewDesc {
+class TextView extends LineElementView {
   textDOM: Node | null = null;
   class: string | null;
 
@@ -593,7 +593,7 @@ class TextViewDesc extends LineElementViewDesc {
     this.class = clss
   }
 
-  finish(parent: ViewDesc) {
+  finish(parent: ContentView) {
     this.parent = parent
     if (this.dom) return
     this.textDOM = document.createTextNode(this.text)
@@ -624,8 +624,8 @@ class TextViewDesc extends LineElementViewDesc {
     this.dirty = dirty.not
   }
 
-  merge(other: LineElementViewDesc, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof TextViewDesc) ||
+  merge(other: LineElementView, from: number = 0, to: number = this.length): boolean {
+    if (!(other instanceof TextView) ||
         other.tagName != this.tagName || other.class != this.class ||
         !attrsEq(other.attrs, this.attrs) || this.length - (to - from) + other.length > MAX_JOIN_LEN)
       return false
@@ -646,12 +646,12 @@ class TextViewDesc extends LineElementViewDesc {
   domFromPos(pos: number) { return {node: this.textDOM!, offset: pos} }
 }
 
-class WidgetViewDesc extends LineElementViewDesc {
+class WidgetView extends LineElementView {
   constructor(readonly widget: WidgetType<any>, readonly side: number) {
     super(null, null)
   }
 
-  finish(parent: ViewDesc) {
+  finish(parent: ContentView) {
     this.parent = parent
     if (!this.dom) {
       this.dom = this.widget.toDOM()
@@ -667,25 +667,25 @@ class WidgetViewDesc extends LineElementViewDesc {
   getSide() { return this.side }
   get overrideDOMText() { return "" }
 
-  merge(other: LineElementViewDesc): boolean {
-    return other instanceof WidgetViewDesc && other.widget.compare(this.widget) && other.side == this.side
+  merge(other: LineElementView): boolean {
+    return other instanceof WidgetView && other.widget.compare(this.widget) && other.side == this.side
   }
 }
 
-class CollapsedViewDesc extends LineElementViewDesc {
+class CollapsedView extends LineElementView {
   constructor(public length: number) {
     super(null, null)
   }
-  finish(parent: ViewDesc) { this.parent = parent }
-  merge(other: LineElementViewDesc, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof CollapsedViewDesc)) return false
+  finish(parent: ContentView) { this.parent = parent }
+  merge(other: LineElementView, from: number = 0, to: number = this.length): boolean {
+    if (!(other instanceof CollapsedView)) return false
     this.length = from + other.length + (this.length - to)
     return true
   }
 }
 
 export class LineElementBuilder {
-  elements: LineElementViewDesc[][] = [[]];
+  elements: LineElementView[][] = [[]];
   active: RangeDesc[] = [];
   cursor: TextCursor;
   text: string;
@@ -709,7 +709,7 @@ export class LineElementBuilder {
       }
       if (end > this.textOff) {
         this.elements[this.elements.length - 1].push(
-          new TextViewDesc(this.text.slice(this.textOff, end), tagName, clss, attrs))
+          new TextView(this.text.slice(this.textOff, end), tagName, clss, attrs))
         length -= end - this.textOff
         this.textOff = end
       }
@@ -749,10 +749,10 @@ export class LineElementBuilder {
   advanceCollapsed(pos: number) {
     if (pos > this.pos) {
       let line = this.elements[this.elements.length - 1]
-      if (line.length && (line[line.length - 1] instanceof CollapsedViewDesc))
+      if (line.length && (line[line.length - 1] instanceof CollapsedView))
         line[line.length - 1].length += (pos - this.pos)
       else
-        line.push(new CollapsedViewDesc(pos - this.pos))
+        line.push(new CollapsedView(pos - this.pos))
 
       // Advance the iterator past the collapsed content
       let length = pos - this.pos
@@ -768,10 +768,10 @@ export class LineElementBuilder {
   }
 
   addWidget(widget: WidgetType<any>, side: number) {
-    this.elements[this.elements.length - 1].push(new WidgetViewDesc(widget, side))
+    this.elements[this.elements.length - 1].push(new WidgetView(widget, side))
   }
 
-  static build(text: Text, from: number, to: number, decorations: A<DecorationSet>): LineElementViewDesc[][] {
+  static build(text: Text, from: number, to: number, decorations: A<DecorationSet>): LineElementView[][] {
     let builder = new LineElementBuilder(text, from)
     buildLineElements(decorations, from, to, builder)
     return builder.elements
@@ -791,11 +791,10 @@ function readDOM(start: Node | null, end: Node | null): string {
 }
 
 function readDOMNode(node: Node): string {
-  // FIXME add a way to ignore certain nodes based on their desc
   if (node.cmIgnore) return ""
-  let desc = node.cmView
-  let fromDesc = desc && desc.overrideDOMText
-  if (fromDesc != null) return fromDesc
+  let view = node.cmView
+  let fromView = view && view.overrideDOMText
+  if (fromView != null) return fromView
   if (node.nodeType == 3) return node.nodeValue as string
   if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
   if (node.nodeType == 1) return readDOM(node.firstChild, null)
@@ -809,7 +808,7 @@ function isBlockNode(node: Node): boolean {
 class ChildCursor {
   off: number = 0
 
-  constructor(public children: ViewDesc[], public pos: number,
+  constructor(public children: ContentView[], public pos: number,
               public gap: number = 0, public i: number = children.length) {
     this.pos += gap
   }

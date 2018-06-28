@@ -1,4 +1,4 @@
-import {EditorView} from "./view"
+import {EditorView} from "./editorview"
 
 export function applyDOMChange(view: EditorView, start: number, end: number) {
   let {from, to, text} = view.docView.readDOMRange(start, end)

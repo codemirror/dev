@@ -1,5 +1,5 @@
 import browser from "./browser"
-import {DocViewDesc, ViewDesc} from "./viewdesc"
+import {DocView, ContentView} from "./contentview"
 import {hasSelection, getRoot} from "./dom"
 
 const observeOptions = {
@@ -22,7 +22,7 @@ export class DOMObserver {
   dom: HTMLElement;
   intersection: IntersectionObserver;
 
-  constructor(private docView: DocViewDesc,
+  constructor(private docView: DocView,
               private onDOMChange: (from: number, to: number) => void,
               private onSelectionChange: () => void,
               private onIntersect: () => void) {
@@ -124,18 +124,18 @@ export class DOMObserver {
   }
 
   readMutation(rec: MutationRecord): {from: number, to: number} | null {
-    let desc = this.docView.nearest(rec.target)
-    if (!desc) return null // FIXME query domView for ignorable mutations
-    desc.markDirty()
+    let cView = this.docView.nearest(rec.target)
+    if (!cView) return null // FIXME query domView for ignorable mutations
+    cView.markDirty()
 
     if (rec.type == "childList") {
-      let childBefore = findChild(desc, rec.previousSibling || rec.target.previousSibling, -1)
-      let childAfter = findChild(desc, rec.nextSibling || rec.target.nextSibling, 1)
-      return {from: childBefore ? desc.posAfter(childBefore) : desc.posAtStart,
-              to: childAfter ? desc.posBefore(childAfter) : desc.posAtEnd}
+      let childBefore = findChild(cView, rec.previousSibling || rec.target.previousSibling, -1)
+      let childAfter = findChild(cView, rec.nextSibling || rec.target.nextSibling, 1)
+      return {from: childBefore ? cView.posAfter(childBefore) : cView.posAtStart,
+              to: childAfter ? cView.posBefore(childAfter) : cView.posAtEnd}
     } else { // "characterData"
       // FIXME insert ProseMirror's typeOver hack
-      return {from: desc.posAtStart, to: desc.posAtEnd}
+      return {from: cView.posAtStart, to: cView.posAtEnd}
     }
   }
 
@@ -156,12 +156,12 @@ export class DOMObserver {
   }
 }
 
-function findChild(desc: ViewDesc, dom: Node | null, dir: number): ViewDesc | null {
+function findChild(cView: ContentView, dom: Node | null, dir: number): ContentView | null {
   while (dom) {
-    let curDesc = dom.cmView
-    if (curDesc && curDesc.parent == desc) return curDesc
+    let curView = dom.cmView
+    if (curView && curView.parent == cView) return curView
     let parent = dom.parentNode
-    dom = parent != desc.dom ? parent : dir > 0 ? dom.nextSibling : dom.previousSibling
+    dom = parent != cView.dom ? parent : dir > 0 ? dom.nextSibling : dom.previousSibling
   }
   return null
 }

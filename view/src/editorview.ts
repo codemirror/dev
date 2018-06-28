@@ -1,5 +1,5 @@
 import {EditorState, Transaction, Selection, MetaSlot} from "../../state/src/state"
-import {DocViewDesc} from "./viewdesc"
+import {DocView} from "./contentview"
 import {InputState, attachEventHandlers} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {DecorationSet} from "./decoration"
@@ -18,7 +18,7 @@ export class EditorView {
   public inputState: InputState = new InputState;
 
   /** @internal */
-  public docView: DocViewDesc;
+  public docView: DocView;
 
   constructor(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
@@ -48,8 +48,8 @@ export class EditorView {
       }
     }
 
-    this.docView = new DocViewDesc(this.contentDOM, (start, end) => applyDOMChange(this, start, end),
-                                   () => applySelectionChange(this))
+    this.docView = new DocView(this.contentDOM, (start, end) => applyDOMChange(this, start, end),
+                               () => applySelectionChange(this))
     this.docView.update(state)
   }
 
