@@ -6,7 +6,7 @@ export default {
   output: {
     format: "umd",
     file: "./view/test/test_built.js",
-    sourcemap: false
+    sourcemap: true
   },
   plugins: [
     typescript({

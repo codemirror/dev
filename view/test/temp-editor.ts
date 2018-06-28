@@ -15,3 +15,8 @@ export function tempEditor(doc = "", plugins: Plugin[] = []) {
   workspace.appendChild(tempView.dom)
   return tempView
 }
+
+export function requireFocus() {
+  if (!document.hasFocus())
+    throw new Error("The document doesn't have focus, which is needed for this test (in Firefox, you may have to close the dev tools to get the stupid browser to leave focus on the document)")
+}

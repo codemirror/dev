@@ -1,4 +1,4 @@
-import {tempEditor} from "./temp-editor"
+import {tempEditor, requireFocus} from "./temp-editor"
 import {Selection} from "../../state/src/state"
 import ist from "ist"
 
@@ -13,10 +13,7 @@ function setDOMSel(node, offset) {
 
 describe("EditorView selection", () => {
   it("can read the DOM selection", () => {
-    if (!document.hasFocus()) {
-      console.warn("The document doesn't have focus, skipping some tests")
-      return
-    }
+    requireFocus()
     let cm = tempEditor("one\n\nthree")
 
     function test(node, offset, expected) {
@@ -40,8 +37,7 @@ describe("EditorView selection", () => {
   })
 
   it("syncs the DOM selection with the editor selection", () => {
-    // disabled when the document doesn't have focus, since that causes this to fail
-    if (!document.hasFocus()) return
+    requireFocus()
 
     let cm = tempEditor("abc\n\ndef")
     function test(pos, node, offset) {

@@ -121,7 +121,7 @@ function rm(dom: Node): Node {
 }
 
 export class DocViewDesc extends ViewDesc {
-  children: ViewDesc[] = []
+  children: ViewDesc[] = [new LineViewDesc(this, [])]
   visiblePart: Viewport = Viewport.empty
   viewports: Viewport[] = []
 
@@ -198,10 +198,10 @@ export class DocViewDesc extends ViewDesc {
     let childI = this.children.length
     let posA = oldLength, posB = this.text.length
     for (let i = viewports.length - 1;; i--) {
-      let nextA = i < 0 ? 0 : matchingRanges[i].to + 1
+      let nextA = i < 0 ? -1 : matchingRanges[i].to
       let nextB = i < 0 ? 0 : viewports[i].to + 1
       let gap: GapViewDesc | null = null, endI = childI
-      while (posA >= nextA && childI > 0) {
+      while (posA > nextA) {
         let nextChild = this.children[--childI]
         posA -= nextChild.length + 1
         if (nextChild instanceof GapViewDesc) gap = nextChild
@@ -223,10 +223,11 @@ export class DocViewDesc extends ViewDesc {
 
       let viewport = viewports[i], matching = matchingRanges[i]
       endI = childI
-      while (posA >= matching.from && childI > 0) posA -= this.children[--childI].length + 1
       if (matching.from == matching.to) {
         this.children.splice(childI, endI - childI, new LineViewDesc(this, []))
         endI = childI + 1
+      } else {
+        while (posA >= matching.from) posA -= this.children[--childI].length + 1
       }
       this.updatePart(childI, endI, matching, viewport, changes, decoSets)
       posB = viewport.from - 1

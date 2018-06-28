@@ -71,4 +71,18 @@ describe("EditorView drawing", () => {
     cm.dispatch(cm.state.transaction.replace(4, 4, "x"))
     ist(!Array.from(cm.domAtPos(4).node.childNodes).some(n => (n as any).nodeName == "BR"))
   })
+
+  it("only draws visible content", () => {
+    let cm = tempEditor("a\n".repeat(500) + "b\n".repeat(500))
+    cm.dom.style.height = "300px"
+    cm.dom.style.overflow = "auto"
+    cm.dom.scrollTop = 0
+    cm.docView.checkLayout()
+    ist(cm.contentDOM.childNodes.length, 500, "<")
+    ist(cm.contentDOM.clientHeight, 10000, ">")
+    ist(!cm.contentDOM.textContent.match(/b/))
+    cm.dom.scrollTop = cm.dom.scrollHeight / 2
+    cm.docView.checkLayout()
+    ist(cm.contentDOM.textContent.match(/b/))
+  })
 })

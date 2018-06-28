@@ -1,6 +1,6 @@
 import {Decoration, DecorationSet, WidgetType} from "../src/"
 import {LineElementBuilder} from "../src/viewdesc"
-import {tempEditor} from "./temp-editor"
+import {tempEditor, requireFocus} from "./temp-editor"
 import {StateField, MetaSlot, Plugin, Selection} from "../../state/src/state"
 import {Text} from "../../doc/src/text"
 import ist from "ist"
@@ -137,7 +137,7 @@ describe("EditorView decoration", () => {
     })
 
     it("places the cursor based on side", () => {
-      if (!document.hasFocus()) return
+      requireFocus()
       let cm = decoEditor("abc", [d(2, {widget: new WordWidget("A"), side: -1}),
                                   d(2, {widget: new WordWidget("B"), side: 1})])
       cm.dispatch(cm.state.transaction.setSelection(Selection.single(2)))
