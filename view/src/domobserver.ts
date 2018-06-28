@@ -1,5 +1,6 @@
 import browser from "./browser"
-import {DocView, ContentView} from "./contentview"
+import {ContentView} from "./contentview"
+import {DocView} from "./docview"
 import {hasSelection, getRoot} from "./dom"
 
 const observeOptions = {

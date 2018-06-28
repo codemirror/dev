@@ -1,5 +1,5 @@
 import {Decoration, DecorationSet, WidgetType} from "../src/"
-import {LineElementBuilder} from "../src/contentview"
+import {LineElementBuilder} from "../src/lineview"
 import {tempEditor, requireFocus} from "./temp-editor"
 import {StateField, MetaSlot, Plugin, Selection} from "../../state/src/state"
 import {Text} from "../../doc/src/text"

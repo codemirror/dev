@@ -1,5 +1,5 @@
 import {EditorState, Transaction, Selection, MetaSlot} from "../../state/src/state"
-import {DocView} from "./contentview"
+import {DocView} from "./docview"
 import {InputState, attachEventHandlers} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {DecorationSet} from "./decoration"
