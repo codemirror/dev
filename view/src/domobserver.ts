@@ -14,6 +14,9 @@ const observeOptions = {
 // DOMCharacterDataModified there
 const useCharData = browser.ie && browser.ie_version <= 11
 
+const thresholds: number[] = []
+for (let i = 0; i <= 100; i += 2) thresholds.push(i / 100)
+
 export class DOMObserver {
   observer: MutationObserver | null = null;
   onCharData: any;
@@ -39,8 +42,17 @@ export class DOMObserver {
     this.readSelection = this.readSelection.bind(this)
     this.listenForSelectionChanges()
     this.intersection = new IntersectionObserver(entries => {
-      for (let entry of entries) if (entry.intersectionRatio > 0) return this.onIntersect()
-    }, {})
+      let intersects = false, full = false
+      for (let {intersectionRatio} of entries) if (intersectionRatio > 0) {
+        intersects = true
+        if (intersectionRatio == 1) full = true
+      }
+      if (intersects) this.onIntersect()
+      // Sometimes, during quick scrolling, it seems even though a
+      // redraw happens, intersection stays at 1 and no new entries
+      // are fired—this makes sure an extra check happens in that case
+      if (full) setTimeout(() => this.onIntersect(), 100)
+    }, {threshold: thresholds})
     this.start()
   }
 
