@@ -18,13 +18,13 @@ const thresholds: number[] = []
 for (let i = 0; i <= 100; i += 2) thresholds.push(i / 100)
 
 export class DOMObserver {
-  observer: MutationObserver | null = null;
-  onCharData: any;
-  charDataQueue: MutationRecord[] = [];
-  charDataTimeout: any = null;
-  active: boolean = false;
-  dom: HTMLElement;
-  intersection: IntersectionObserver;
+  observer: MutationObserver
+  onCharData: any
+  charDataQueue: MutationRecord[] = []
+  charDataTimeout: any = null
+  active: boolean = false
+  dom: HTMLElement
+  intersection: IntersectionObserver
 
   constructor(private docView: DocView,
               private onDOMChange: (from: number, to: number) => void,
@@ -149,7 +149,6 @@ export class DOMObserver {
     }
   }
 
-  // FIXME this is called more often than I'd expect—look into that
   readSelection() {
     let root = getRoot(this.dom)
     if (!this.active || root.activeElement != this.dom || !hasSelection(this.dom)) return

@@ -128,8 +128,14 @@ export class DocView extends ContentView {
     if (newGaps) this.observer.observeIntersection(gaps)
     this.viewports = viewports
     this.observer.withoutListening(() => {
+      // Lock the height during redrawing, since Chrome sometimes
+      // messes with the scroll position during DOM mutation (though
+      // no relayout is triggered and I cannot imagine how it can
+      // recompute the scroll position without a layout)
+      this.dom.style.height = this.heightMap.height + "px"
       this.sync()
       this.updateSelection()
+      this.dom.style.height = ""
     })
   }
 
@@ -222,9 +228,6 @@ export class DocView extends ContentView {
                                           lineHeight, (this.dom).clientWidth / charWidth)
     }
 
-    // FIXME should maybe also check gap sizes? i.e. if new
-    // measurements mean a gap that's currently 200px should now be
-    // 300px that should be noticed
     for (let i = 0;; i++) {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.from, this.visiblePart.to,
@@ -332,7 +335,14 @@ class GapView extends ContentView {
     this.length = length
     if (height != this.height) {
       this.height = height
-      this.dom.style.height = height + "px"
+      this.markDirty()
+    }
+  }
+
+  sync() {
+    if (this.dirty) {
+      this.dom.style.height = this.height + "px"
+      this.dirty = dirty.not
     }
   }
 
