@@ -36,7 +36,7 @@ export class EditorView {
     attachEventHandlers(this)
 
     const registeredEvents = []
-    const handleDOMEvents = this.someProp("handleDOMEvents")
+    const handleDOMEvents = this.getProp("handleDOMEvents")!
     for (const key in handleDOMEvents) {
       if (Object.prototype.hasOwnProperty.call(handleDOMEvents, key) && registeredEvents.indexOf(key) == -1) {
         this.contentDOM.addEventListener(key, event => {
@@ -58,14 +58,21 @@ export class EditorView {
     this.docView.update(state)
   }
 
-  // FIXME this is very awkward to type. Change or embrace the any?
-  someProp(propName: string, f: ((value: any) => any) | undefined = undefined): any {
-    let plugins = this.state.plugins, value
-    for (let plugin of plugins) {
+  someProp<N extends keyof EditorProps, R>(propName: N, f: (value: EditorProps[N]) => R | undefined): R | undefined {
+    let value: R | undefined = undefined
+    for (let plugin of this.state.plugins) {
       let prop = plugin.props[propName]
-      if (prop != null && (value = f ? f(prop) : prop)) return value
+      if (prop != null && (value = f(prop)) != null) break
     }
-    return null
+    return value
+  }
+
+  getProp<N extends keyof EditorProps>(propName: N): EditorProps[N] {
+    for (let plugin of this.state.plugins) {
+      let prop = plugin.props[propName]
+      if (prop != null) return prop
+    }
+    return undefined
   }
 
   domAtPos(pos: number): {node: Node, offset: number} | null {
