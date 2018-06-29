@@ -8,7 +8,7 @@ import {EditorState, Plugin, Selection} from "../../state/src/state"
 import {HeightMap, HeightOracle} from "./heightmap"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {DecorationSet, joinRanges, findChangedRanges} from "./decoration"
-import {getRoot, clientRectsFor} from "./dom"
+import {getRoot, clientRectsFor, isEquivalentPosition} from "./dom"
 import {RangeSet} from "../../rangeset/src/rangeset"
 
 type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
@@ -57,7 +57,7 @@ export class DocView extends ContentView {
       if (state.selection.primary.from >= this.visiblePart.from &&
           state.selection.primary.to <= this.visiblePart.to) {
         this.selection = state.selection
-        this.observer.withoutListening(() => this.updateSelection()) // FIXME suppressing selection events doesn't work yet
+        this.observer.withoutListening(() => this.updateSelection())
         return
       }
     }
@@ -174,9 +174,14 @@ export class DocView extends ContentView {
 
     let anchor = this.domFromPos(this.selection.primary.anchor)!
     let head = this.domFromPos(this.selection.primary.head)!
-    // FIXME check for equivalent positions, don't update if both are equiv
 
-    let domSel = root.getSelection(), range = document.createRange()
+    let domSel = root.getSelection()
+    // If the selection is already here, or in an equivalent position, don't touch it
+    if (isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
+        isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset))
+      return
+
+    let range = document.createRange()
     // Selection.extend can be used to create an 'inverted' selection
     // (one where the focus is before the anchor), but not all
     // browsers support it yet.
