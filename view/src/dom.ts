@@ -47,7 +47,7 @@ export function isEquivalentPosition(node: Node, off: number, targetNode: Node |
                        scanFor(node, off, targetNode, targetOff, 1)) : false
 }
 
-function domIndex(node: Node): number {
+export function domIndex(node: Node): number {
   for (var index = 0;; index++) {
     node = node.previousSibling!
     if (!node) return index
@@ -57,20 +57,20 @@ function domIndex(node: Node): number {
 function scanFor(node: Node, off: number, targetNode: Node, targetOff: number, dir: -1 | 1): boolean {
   for (;;) {
     if (node == targetNode && off == targetOff) return true
-    if (off == (dir < 0 ? 0 : nodeSize(node))) {
+    if (off == (dir < 0 ? 0 : maxOffset(node))) {
       let parent = node.parentNode
       if (!parent || parent.nodeType != 1 || parent.nodeName == "DIV") return false
       off = domIndex(node) + (dir < 0 ? 0 : 1)
       node = parent
     } else if (node.nodeType == 1) {
       node = node.childNodes[off + (dir < 0 ? -1 : 0)]
-      off = dir < 0 ? nodeSize(node) : 0
+      off = dir < 0 ? maxOffset(node) : 0
     } else {
       return false
     }
   }
 }
 
-function nodeSize(node: Node): number {
+export function maxOffset(node: Node): number {
   return node.nodeType == 3 ? node.nodeValue!.length : node.childNodes.length
 }

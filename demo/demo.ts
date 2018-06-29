@@ -1,5 +1,5 @@
 import {EditorState, Plugin, StateField} from "../state/src/state"
-import {EditorView, Decoration, DecorationSet} from "../view/src/"
+import {EditorView, Decoration, DecorationSet, WidgetType} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, undo} from "../history/src/history"
 

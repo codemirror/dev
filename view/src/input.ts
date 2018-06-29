@@ -1,6 +1,7 @@
 import {MetaSlot} from "../../state/src/state"
 import {EditorView} from "./editorview"
 import browser from "./browser"
+import {beforeKeyDown} from "./capturekeys"
 
 // This will also be where dragging info and such goes
 export class InputState {
@@ -26,6 +27,11 @@ export class InputState {
       })
       this.registeredEvents.push(type)
     }
+    // Must always run, even if a custom handler handled the event
+    view.contentDOM.addEventListener("keydown", event => {
+      view.inputState.lastKeyCode = event.keyCode
+      view.inputState.lastKeyTime = Date.now()
+    })
     this.updateCustomHandlers(view)
   }
 
@@ -93,8 +99,7 @@ function doPaste(view: EditorView, text: string) {
 }
 
 handlers.keydown = (view: EditorView, event: KeyboardEvent) => {
-  view.inputState.lastKeyCode = event.keyCode
-  view.inputState.lastKeyTime = Date.now()
+  if (beforeKeyDown(view, event)) event.preventDefault()
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
