@@ -1,6 +1,6 @@
 const ist = require("ist")
 
-import {Change, EditorState, Selection, Transaction, MetaSlot} from "../../state/src/state"
+import {Change, ChangeSet, EditorState, Selection, Transaction, MetaSlot} from "../../state/src/state"
 import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
 const mkState = (config?) => EditorState.create({plugins: [history(config)]})
@@ -322,7 +322,8 @@ describe("history", () => {
     let tr = state.transaction
     tr = tr.change(rightChange.invert(baseDoc))
     tr = tr.change(leftChange)
-    tr = tr.change(new Change(leftChange.mapPos(rightChange.from, 1), leftChange.mapPos(rightChange.to, -1), rightChange.text), 0)
+    let leftMap = new ChangeSet([leftChange])
+    tr = tr.change(new Change(leftMap.mapPos(rightChange.from, 1), leftMap.mapPos(rightChange.to, -1), rightChange.text), 0)
 
     tr = tr.setMeta(MetaSlot.rebased, 1)
     state = tr.apply()

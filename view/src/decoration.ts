@@ -1,5 +1,5 @@
-import {Change} from "../../state/src/state"
-import {RangeValue, Range, RangeSet, mapPos, RangeComparator} from "../../rangeset/src/rangeset"
+import {Mapping} from "../../state/src/state"
+import {RangeValue, Range, RangeSet, RangeComparator} from "../../rangeset/src/rangeset"
 import {ChangedRange} from "../../doc/src/diff"
 
 export interface RangeDecorationSpec {
@@ -39,7 +39,7 @@ export type DecoratedRange = Range<Decoration>
 
 export abstract class Decoration implements RangeValue {
   constructor(readonly bias: number, readonly widget: WidgetType<any> | null, readonly data: any) {}
-  abstract map(changes: ReadonlyArray<Change>, from: number, to: number): DecoratedRange | null;
+  abstract map(mapping: Mapping, from: number, to: number): DecoratedRange | null;
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
     if (from >= to) throw new RangeError("Range decorations may not be empty")
@@ -79,8 +79,8 @@ export class RangeDecoration extends Decoration {
     this.affectsSpans = !!(this.attributes || this.tagName || this.class || this.collapsed)
   }
 
-  map(changes: ReadonlyArray<Change>, from: number, to: number): DecoratedRange | null {
-    let newFrom = mapPos(from, changes, this.bias), newTo = mapPos(to, changes, this.endBias)
+  map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
+    let newFrom = mapping.mapPos(from, this.bias), newTo = mapping.mapPos(to, this.endBias)
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
@@ -99,8 +99,8 @@ export class PointDecoration extends Decoration {
     super(spec.side || 0, spec.widget || null, spec.data)
   }
 
-  map(changes: ReadonlyArray<Change>, from: number, to: number): DecoratedRange | null {
-    let pos = mapPos(from, changes, this.bias, true)
+  map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
+    let pos = mapping.mapPos(from, this.bias, true)
     return pos == -1 ? null : new Range(pos, pos, this)
   }
 

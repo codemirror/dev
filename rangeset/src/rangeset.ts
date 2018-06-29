@@ -1,10 +1,10 @@
-import {Change} from "../../state/src/state"
+import {Mapping, ChangeSet, Change} from "../../state/src/state"
 import {ChangedRange} from "../../doc/src/diff"
 
 type A<T> = ReadonlyArray<T>
 
 export interface RangeValue {
-  map(changes: A<Change>, from: number, to: number): Range<any> | null
+  map(mapping: Mapping, from: number, to: number): Range<any> | null
   bias: number
   collapsed?: boolean
 }
@@ -34,7 +34,7 @@ export class Range<T extends RangeValue> {
   ) {}
 
   /** @internal */
-  map(changes: A<Change>, oldOffset: number, newOffset: number): Range<T> | null {
+  map(changes: ChangeSet, oldOffset: number, newOffset: number): Range<T> | null {
     let mapped = this.value.map(changes, this.from + oldOffset, this.to + oldOffset)
     if (mapped) {
       ;(mapped as any).from -= newOffset
@@ -171,12 +171,12 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
-  map(changes: A<Change>): RangeSet<T> {
+  map(changes: ChangeSet): RangeSet<T> {
     if (changes.length == 0 || this == RangeSet.empty) return this
-    return this.mapInner(changes, 0, 0, mapPos(this.length, changes, 1)).set
+    return this.mapInner(changes, 0, 0, changes.mapPos(this.length, 1)).set
   }
 
-  private mapInner(changes: A<Change>,
+  private mapInner(changes: ChangeSet,
                    oldStart: number, newStart: number,
                    newEnd: number): {set: RangeSet<T>, escaped: Range<T>[] | null} {
     let newLocal: Range<T>[] | null = null
@@ -195,9 +195,9 @@ export class RangeSet<T extends RangeValue> {
     for (let i = 0, oldPos = oldStart, newPos = newStart; i < this.children.length; i++) {
       let child = this.children[i], newChild = child
       let oldChildEnd = oldPos + child.length
-      let newChildEnd = mapPos(oldPos + child.length, changes, 1)
+      let newChildEnd = changes.mapPos(oldPos + child.length, 1)
       // FIXME immediately collapse children entirely covered by a change
-      if (touchesChange(oldPos, oldChildEnd, changes)) {
+      if (touchesChanges(oldPos, oldChildEnd, changes.changes)) {
         let inner = child.mapInner(changes, oldPos, newPos, newChildEnd)
         newChild = inner.set
         if (inner.escaped) for (let range of inner.escaped) {
@@ -422,16 +422,6 @@ function filterRanges<T extends RangeValue>(ranges: A<Range<T>>,
   return copy
 }
 
-function touchesChange(from: number, to: number, changes: A<Change>): boolean {
-  for (let change of changes) {
-    if (change.to >= from && change.from <= to) return true
-    let diff = change.text.length - (change.to - change.from)
-    if (from > change.from) from += diff
-    if (to > change.to) to += diff
-  }
-  return false
-}
-
 function collapseSet<T extends RangeValue>(
   children: A<RangeSet<T>>, local: Range<T>[],
   add: A<Range<T>>, start: number, offset: number, length: number
@@ -654,11 +644,12 @@ function remove<T>(array: T[], elt: T) {
   if (found != array.length) array[found] = last
 }
 
-// FIXME use a mapping abstraction defined in the state module
-export function mapPos(pos: number, changes: A<Change>, assoc: number, track: boolean = false) {
+function touchesChanges(from: number, to: number, changes: A<Change>): boolean {
   for (let change of changes) {
-    if (track && change.from < pos && change.to > pos) return -1
-    pos = change.mapPos(pos, assoc)
+    if (change.to >= from && change.from <= to) return true
+    let diff = change.text.length - (change.to - change.from)
+    if (from > change.from) from += diff
+    if (to > change.to) to += diff
   }
-  return pos
+  return false
 }

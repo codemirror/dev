@@ -1,5 +1,5 @@
-import {Range, RangeSet, RangeValue, mapPos, RangeComparator, RangeIterator} from "../src/rangeset"
-import {Change} from "../../state/src/state"
+import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from "../src/rangeset"
+import {Change, ChangeSet, Mapping} from "../../state/src/state"
 const ist = require("ist")
 
 class Value implements RangeValue {
@@ -15,12 +15,12 @@ class Value implements RangeValue {
     this.name = spec.name || null
     this.pos = spec.pos == null ? null : spec.pos
   }
-  map(changes: ReadonlyArray<Change>, from: number, to: number) {
+  map(mapping: Mapping, from: number, to: number) {
     if (from == to) {
-      let pos = mapPos(from, changes, this.bias, true)
+      let pos = mapping.mapPos(from, this.bias, true)
       return pos < 0 ? null : new Range(pos, pos, this)
     } else {
-      let newFrom = mapPos(from, changes, this.bias), newTo = mapPos(to, changes, this.biasEnd)
+      let newFrom = mapping.mapPos(from, this.bias), newTo = mapping.mapPos(to, this.biasEnd)
       return newFrom >= newTo ? null : new Range(newFrom, newTo, this)
     }
   }
@@ -162,7 +162,7 @@ describe("RangeSet", () => {
         let {from, to} = asRange(pos)
         return mk(from, to, pos[2])
       }))
-      let mapped = set.map(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len))))
+      let mapped = set.map(new ChangeSet(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len)))))
       let out = []
       mapped.collect(out, 0)
       ist(JSON.stringify(out.map(d => d.from + "-" + d.to)),
@@ -195,7 +195,7 @@ describe("RangeSet", () => {
 
     it("adjusts the set tree shape", () => {
       let child0Size = set0.children[0].length, child1Size = set0.children[1].length
-      let set = set0.map([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")])
+      let set = set0.map(new ChangeSet([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")]))
       ist(set.size, set0.size, "<=")
       ist(set.size, set0.size - 2, ">")
       ist(set.children[0].length, child0Size + 2)
@@ -208,13 +208,13 @@ describe("RangeSet", () => {
       for (let i = 0; i < 100; i++)
         ranges.push(mk(i, i + 1, {bias: -1, biasEnd: 1}))
       let set0 = mkSet(ranges), nodeBoundary = set0.children[0].length
-      let set = set0.map([new Change(nodeBoundary, nodeBoundary, "hello")])
+      let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, "hello")]))
       ist(set.size, set0.size)
       checkSet(set)
     })
 
     it("removes collapsed tree nodes", () => {
-      let set = set0.map([new Change(0, 6000, "")])
+      let set = set0.map(new ChangeSet([new Change(0, 6000, "")]))
       ist(set.size, 0)
       ist(depth(set), 1)
     })
@@ -242,10 +242,10 @@ describe("RangeSet", () => {
       let newSet = set
       let docRanges = []
       if (update.changes) {
-        let changes = update.changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len)))
+        let changes = new ChangeSet(update.changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len))))
         newSet = newSet.map(changes)
         for (let i = 0, off = 0; i < changes.length; i++) {
-          let {from, to, text} = changes[i]
+          let {from, to, text} = changes.changes[i]
           docRanges.push({fromA: from + off, toA: to + off, fromB: from, toB: from + text.length})
           off += (to - from) - text.length
         }

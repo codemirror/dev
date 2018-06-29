@@ -10,7 +10,7 @@ function decos(startState: DecorationSet = Decoration.none) {
   let field = new StateField<DecorationSet>({
     init() { return startState },
     apply(tr, value) {
-      if (tr.changes.length) value = value.map(tr.changes)
+      if (tr.docChanged) value = value.map(tr.changes)
       let add = tr.getMeta(addSlot), filter = tr.getMeta(filterSlot)
       if (add || filter) value = value.update(add, filter)
       return value

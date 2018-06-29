@@ -1,4 +1,4 @@
-import {Change, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
+import {Change, ChangeSet, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
 import {HistoryState, PopTarget} from "./core"
 
 class MyMapping /*implements Mapping<Change, MyMapping>*/ {
@@ -69,7 +69,9 @@ class ChangeList {
 
 function isAdjacent(prev: Change | null, cur: Change): boolean {
   if (!prev) return true
-  return cur.from <= prev.mapPos(prev.to) && cur.to >= prev.mapPos(prev.from, -1)
+  // FIXME not great, maybe bring back Change.mapPos
+  let mapping = new ChangeSet([prev])
+  return cur.from <= mapping.mapPos(prev.to) && cur.to >= mapping.mapPos(prev.from, -1)
 }
 
 const historyField = new StateField({
@@ -85,15 +87,16 @@ const historyField = new StateField({
     if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
     let rebased
     if (rebased = tr.getMeta(MetaSlot.rebased)) {
+      // FIXME make this easy on top of Transaction
       const docs = [tr.startState.doc].concat(tr.docs)
-      const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
-      return state.rebase(new ChangeList(tr.changes, inverted, tr.docchanges.mirror), rebased)
+      const inverted = tr.changes.changes.map((c, i) => c.invert(docs[i]))
+      return state.rebase(new ChangeList(tr.changes.changes, inverted, tr.changes.mirror), rebased)
     } else if (tr.getMeta(MetaSlot.addToHistory) !== false) {
       const docs = [tr.startState.doc].concat(tr.docs)
-      const inverted = tr.changes.map((c, i) => c.invert(docs[i]))
-      return state.addChanges(new ChangeList(tr.changes, inverted), isAdjacent, tr.getMeta(MetaSlot.time)!, newGroupDelay)
+      const inverted = tr.changes.changes.map((c, i) => c.invert(docs[i]))
+      return state.addChanges(new ChangeList(tr.changes.changes, inverted), isAdjacent, tr.getMeta(MetaSlot.time)!, newGroupDelay)
     } else {
-      return state.addMapping(MyMapping.fromChanges(tr.changes))
+      return state.addMapping(MyMapping.fromChanges(tr.changes.changes))
     }
   },
 
