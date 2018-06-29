@@ -17,13 +17,12 @@ export class InputState {
     this.lastSelectionTime = Date.now()
   }
 
-  // FIXME check whether event belongs to actual editor
-
   constructor(view: EditorView) {
     for (let type in handlers) {
       let handler = handlers[type]
       view.contentDOM.addEventListener(type, event => {
-        this.runCustomHandlers(type, view, event) || handler(view, event)
+        if (eventBelongsToEditor(view, event) && !this.runCustomHandlers(type, view, event))
+          handler(view, event)
       })
       this.registeredEvents.push(type)
     }
@@ -35,7 +34,9 @@ export class InputState {
     for (let type in this.customHandlers) {
       if (this.registeredEvents.indexOf(type) < 0) {
         this.registeredEvents.push(type)
-        view.contentDOM.addEventListener(type, event => this.runCustomHandlers(type, view, event))
+        view.contentDOM.addEventListener(type, event => {
+          if (eventBelongsToEditor(view, event)) this.runCustomHandlers(type, view, event)
+        })
       }
     }
   }
@@ -48,7 +49,14 @@ export class InputState {
   }
 }
 
-const handlers = Object.create(null)
+function eventBelongsToEditor(view: EditorView, event: Event): boolean {
+  if (!event.bubbles) return true
+  if (event.defaultPrevented) return false
+  for (let node: Node | null = event.target as Node; node != view.contentDOM; node = node.parentNode)
+    if (!node || node.nodeType == 11 || (node.cmView && node.cmView.ignoreEvent(event)))
+      return false
+  return true
+}
 
 function customHandlers(view: EditorView) {
   let result = Object.create(null)
@@ -58,6 +66,8 @@ function customHandlers(view: EditorView) {
   })
   return result
 }
+
+const handlers = Object.create(null)
 
 // This is very crude, but unfortunately both these browsers _pretend_
 // that they have a clipboard API—all the objects and methods are

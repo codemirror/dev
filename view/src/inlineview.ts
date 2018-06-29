@@ -117,6 +117,7 @@ export class WidgetView extends InlineView {
   }
 
   ignoreMutation(): boolean { return true }
+  ignoreEvent(): boolean { return true }
 }
 
 export class CollapsedView extends InlineView {

@@ -102,6 +102,7 @@ export abstract class ContentView {
   }
 
   ignoreMutation(rec: MutationRecord): boolean { return false }
+  ignoreEvent(event: Event): boolean { return false }
 }
 
 // Remove a DOM node and return its next sibling.
