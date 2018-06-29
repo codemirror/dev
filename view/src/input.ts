@@ -4,24 +4,59 @@ import browser from "./browser"
 
 // This will also be where dragging info and such goes
 export class InputState {
-  lastKeyCode: number = 0;
-  lastKeyTime: number = 0;
-  lastSelectionOrigin: string | null = null;
-  lastSelectionTime: number = 0;
+  lastKeyCode: number = 0
+  lastKeyTime: number = 0
+  lastSelectionOrigin: string | null = null
+  lastSelectionTime: number = 0
+
+  registeredEvents: string[] = []
+  customHandlers!: {[key: string]: ((view: EditorView, event: Event) => boolean)[]}
 
   setSelectionOrigin(origin: string) {
     this.lastSelectionOrigin = origin
     this.lastSelectionTime = Date.now()
   }
+
+  // FIXME check whether event belongs to actual editor
+
+  constructor(view: EditorView) {
+    for (let type in handlers) {
+      let handler = handlers[type]
+      view.contentDOM.addEventListener(type, event => {
+        this.runCustomHandlers(type, view, event) || handler(view, event)
+      })
+      this.registeredEvents.push(type)
+    }
+    this.updateCustomHandlers(view)
+  }
+
+  updateCustomHandlers(view: EditorView) {
+    this.customHandlers = customHandlers(view)
+    for (let type in this.customHandlers) {
+      if (this.registeredEvents.indexOf(type) < 0) {
+        this.registeredEvents.push(type)
+        view.contentDOM.addEventListener(type, event => this.runCustomHandlers(type, view, event))
+      }
+    }
+  }
+
+  runCustomHandlers(type: string, view: EditorView, event: Event): boolean {
+    let handlers = this.customHandlers[type]
+    if (handlers) for (let handler of handlers)
+      if (handler(view, event) || event.defaultPrevented) return true
+    return false
+  }
 }
 
 const handlers = Object.create(null)
 
-export function attachEventHandlers(view: EditorView) {
-  for (let event in handlers) {
-    let handler = handlers[event]
-    view.contentDOM.addEventListener(event, event => handler(view, event))
-  }
+function customHandlers(view: EditorView) {
+  let result = Object.create(null)
+  view.someProp("handleDOMEvents", handlers => {
+    for (let eventType in handlers)
+      (result[eventType] || (result[eventType] = [])).push(handlers[eventType])
+  })
+  return result
 }
 
 // This is very crude, but unfortunately both these browsers _pretend_

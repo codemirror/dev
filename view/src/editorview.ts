@@ -1,21 +1,21 @@
 import {EditorState, Transaction, Selection, MetaSlot} from "../../state/src/state"
 import {DocView} from "./docview"
-import {InputState, attachEventHandlers} from "./input"
+import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 
 export class EditorView {
-  private _state: EditorState;
+  private _state: EditorState
   get state(): EditorState { return this._state }
 
-  public dispatch: (tr: Transaction) => void;
+  public dispatch: (tr: Transaction) => void
 
-  public dom: HTMLElement;
-  public contentDOM: HTMLElement;
+  public dom: HTMLElement
+  public contentDOM: HTMLElement
 
   /** @internal */
-  public inputState: InputState = new InputState;
+  public inputState: InputState
 
   /** @internal */
   public docView: DocView;
@@ -33,20 +33,7 @@ export class EditorView {
     this.dom.className = "CM"
     this.dom.appendChild(this.contentDOM)
 
-    attachEventHandlers(this)
-
-    const registeredEvents = []
-    const handleDOMEvents = this.getProp("handleDOMEvents")!
-    for (const key in handleDOMEvents) {
-      if (Object.prototype.hasOwnProperty.call(handleDOMEvents, key) && registeredEvents.indexOf(key) == -1) {
-        this.contentDOM.addEventListener(key, event => {
-          const res = handleDOMEvents[event.type](this, event)
-          if (res) event.preventDefault()
-          return res
-        })
-        registeredEvents.push(key)
-      }
-    }
+    this.inputState = new InputState(this)
 
     this.docView = new DocView(this.contentDOM, (start, end) => applyDOMChange(this, start, end),
                                () => applySelectionChange(this))
@@ -54,11 +41,13 @@ export class EditorView {
   }
 
   setState(state: EditorState) {
+    let configChanged = this._state.config != state.config
     this._state = state
     this.docView.update(state)
+    if (configChanged) this.inputState.updateCustomHandlers(this)
   }
 
-  someProp<N extends keyof EditorProps, R>(propName: N, f: (value: EditorProps[N]) => R | undefined): R | undefined {
+  someProp<N extends keyof EditorProps, R>(propName: N, f: (value: NonNullable<EditorProps[N]>) => R | undefined): R | undefined {
     let value: R | undefined = undefined
     for (let plugin of this.state.plugins) {
       let prop = plugin.props[propName]
