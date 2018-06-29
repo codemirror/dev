@@ -100,6 +100,8 @@ export abstract class ContentView {
       parent.dirty |= dirty.child
     }
   }
+
+  ignoreMutation(rec: MutationRecord): boolean { return false }
 }
 
 // Remove a DOM node and return its next sibling.

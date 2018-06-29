@@ -41,6 +41,7 @@ export class DOMObserver {
       }
     this.readSelection = this.readSelection.bind(this)
     this.listenForSelectionChanges()
+    // FIXME need a fallback for IE11
     this.intersection = new IntersectionObserver(entries => {
       let intersects = false, full = false
       for (let {intersectionRatio} of entries) if (intersectionRatio > 0) {
@@ -134,7 +135,7 @@ export class DOMObserver {
 
   readMutation(rec: MutationRecord): {from: number, to: number} | null {
     let cView = this.docView.nearest(rec.target)
-    if (!cView) return null // FIXME query domView for ignorable mutations
+    if (!cView || cView.ignoreMutation(rec)) return null
     cView.markDirty()
 
     if (rec.type == "childList") {

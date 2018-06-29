@@ -115,6 +115,8 @@ export class WidgetView extends InlineView {
   merge(other: InlineView): boolean {
     return other instanceof WidgetView && other.widget.compare(this.widget) && other.side == this.side
   }
+
+  ignoreMutation(): boolean { return true }
 }
 
 export class CollapsedView extends InlineView {
