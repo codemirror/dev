@@ -200,10 +200,17 @@ export class ChangeSet implements Mapping {
 
   /** @internal */
   mapInner(pos: number, bias: number = 1, trackDel: boolean, fromI: number, toI: number): number {
+    let dir = toI < fromI ? -1 : 1
     let recoverables: {[key: number]: number} | null = null
     let hasMirrors = this.mirror.length > 0, rec, mirror
-    for (let i = fromI; i < toI; i++) {
+    for (let i = fromI - (dir < 0 ? 1 : 0), endI = toI - (dir < 0 ? 1 : 0); i != endI; i += dir) {
       let {from, to, text: {length}} = this.changes[i]
+      if (dir < 0) {
+        let len = to - from
+        to = from + length
+        length = len
+      }
+
       if (pos < from) continue
       if (pos > to) {
         pos += length - (to - from)
@@ -214,7 +221,8 @@ export class ChangeSet implements Mapping {
         pos = from + rec
         continue
       }
-      if (hasMirrors && (mirror = this.getMirror(i)) != null && mirror > i && mirror < toI) { // A mirror exists
+      if (hasMirrors && (mirror = this.getMirror(i)) != null &&
+          (dir > 0 ? mirror > i && mirror < toI : mirror < i && mirror >= toI)) { // A mirror exists
         if (pos > from && pos < to) { // If this change deletes the position, skip forward to the mirror
           i = mirror
           pos = this.changes[i].from + (pos - from)
@@ -233,11 +241,6 @@ export class ChangeSet implements Mapping {
     return pos
   }
 
-  /** @internal */
-  mapInnerInverted(pos: number, bias: number = 1, trackDel: boolean, from: number, to: number): number {
-    return -1 // FIXME
-  }
-
   partialMapping(from: number, to: number = this.length): Mapping {
     if (from == 0 && to == this.length) return this
     return new PartialMapping(this, from, to)
@@ -247,13 +250,11 @@ export class ChangeSet implements Mapping {
 class PartialMapping implements Mapping {
   constructor(readonly changes: ChangeSet, readonly from: number, readonly to: number) {}
   mapPos(pos: number, bias: number = 1, trackDel: boolean = false): number {
-    if (this.from > this.to) return this.changes.mapInnerInverted(pos, bias, trackDel, this.from, this.to)
-    else return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
+    return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
   }
   get length() { return Math.abs(this.to - this.from) }
 }
     
-
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
 
 export class Transaction {
