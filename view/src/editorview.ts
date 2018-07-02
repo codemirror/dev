@@ -41,7 +41,7 @@ export class EditorView {
   }
 
   setState(state: EditorState) {
-    let configChanged = this._state.config != state.config
+    let configChanged = !this._state.sameConfig(state)
     this._state = state
     this.docView.update(state)
     if (configChanged) this.inputState.updateCustomHandlers(this)
