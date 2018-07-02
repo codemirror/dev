@@ -1,4 +1,4 @@
-import {Change, ChangeSet, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src/state"
+import {Change, ChangeSet, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src"
 import {HistoryState, PopTarget} from "./core"
 
 class MyMapping /*implements Mapping<Change, MyMapping>*/ {

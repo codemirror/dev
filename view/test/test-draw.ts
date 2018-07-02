@@ -1,5 +1,5 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state/src/state"
+import {EditorSelection} from "../../state/src"
 import ist from "ist"
 
 function domText(view) {

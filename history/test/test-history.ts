@@ -1,6 +1,6 @@
 const ist = require("ist")
 
-import {Change, ChangeSet, EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src/state"
+import {Change, ChangeSet, EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
 import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
 const mkState = (config?) => EditorState.create({plugins: [history(config)]})

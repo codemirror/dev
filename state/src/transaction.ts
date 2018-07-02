@@ -1,0 +1,118 @@
+import {Text} from "../../doc/src/text"
+import {EditorState} from "./state"
+import {EditorSelection, SelectionRange} from "./selection"
+import {unique} from "./plugin"
+import {Change, ChangeSet} from "./change"
+
+const empty: ReadonlyArray<any> = []
+
+class Meta {
+  constructor(from: Meta | null = null) {
+    if (from) for (let prop in from) this[prop] = from[prop]
+  }
+  [key: string]: any;
+}
+Meta.prototype["__proto__"] = null
+
+const metaSlotNames = Object.create(null)
+
+export class MetaSlot<T> {
+  /** @internal */
+  name: string;
+
+  constructor(debugName: string = "meta") {
+    this.name = unique(debugName, metaSlotNames)
+  }
+
+  static time: MetaSlot<number> = new MetaSlot("time");
+  static origin: MetaSlot<string> = new MetaSlot("origin")
+  static userEvent: MetaSlot<string> = new MetaSlot("userEvent")
+  static addToHistory: MetaSlot<boolean> = new MetaSlot("addToHistory")
+  static rebased: MetaSlot<number> = new MetaSlot("rebased")
+}
+
+const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
+
+export class Transaction {
+  private constructor(readonly startState: EditorState,
+                      readonly changes: ChangeSet,
+                      readonly docs: ReadonlyArray<Text>,
+                      readonly selection: EditorSelection,
+                      private readonly meta: Meta,
+                      private readonly flags: number) {}
+
+  static start(state: EditorState, time: number = Date.now()) {
+    let meta = new Meta
+    meta[MetaSlot.time.name] = time
+    return new Transaction(state, ChangeSet.empty, empty, state.selection, meta, 0)
+  }
+
+  get doc(): Text {
+    let last = this.docs.length - 1
+    return last < 0 ? this.startState.doc : this.docs[last]
+  }
+
+  setMeta<T>(slot: MetaSlot<T>, value: T): Transaction {
+    let meta = new Meta(this.meta)
+    meta[slot.name] = value
+    return new Transaction(this.startState, this.changes, this.docs, this.selection, meta, this.flags)
+  }
+
+  getMeta<T>(slot: MetaSlot<T>): T | undefined {
+    return this.meta[slot.name] as T
+  }
+
+  change(change: Change, mirror?: number): Transaction {
+    if (change.from == change.to && change.text == "") return this
+    let changes = this.changes.append(change, mirror)
+    return new Transaction(this.startState, changes, this.docs.concat(change.apply(this.doc)),
+                           this.selection.map(changes.partialMapping(changes.length - 1)),
+                           this.meta, this.flags)
+  }
+
+  replace(from: number, to: number, text: string): Transaction {
+    return this.change(new Change(from, to, text))
+  }
+
+  replaceSelection(text: string): Transaction {
+    return this.reduceRanges((state, r) => {
+      return state.change(new Change(r.from, r.to, text))
+    })
+  }
+
+  reduceRanges(f: (transaction: Transaction, range: SelectionRange) => Transaction): Transaction {
+    let tr: Transaction = this
+    let sel = tr.selection, start = tr.changes.length
+    for (let range of sel.ranges) {
+      range = range.map(tr.changes.partialMapping(start))
+      tr = f(tr, range)
+    }
+    return tr
+  }
+
+  setSelection(selection: EditorSelection): Transaction {
+    return new Transaction(this.startState, this.changes, this.docs, selection, this.meta,
+                           this.flags | FLAG_SELECTION_SET)
+  }
+
+  get selectionSet() {
+    return (this.flags & FLAG_SELECTION_SET) > 0
+  }
+
+  get docChanged(): boolean {
+    return this.changes.length > 0
+  }
+
+  scrollIntoView() {
+    return new Transaction(this.startState, this.changes, this.docs, this.selection,
+                           this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
+  }
+
+  get scrolledIntoView() {
+    return (this.flags & FLAG_SCROLL_INTO_VIEW) > 0
+  }
+
+  apply(): EditorState {
+    return this.startState.applyTransaction(this)
+  }
+}

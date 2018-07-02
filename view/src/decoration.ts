@@ -1,4 +1,4 @@
-import {Mapping} from "../../state/src/state"
+import {Mapping} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator} from "../../rangeset/src/rangeset"
 import {ChangedRange} from "../../doc/src/diff"
 

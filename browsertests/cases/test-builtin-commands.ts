@@ -1,5 +1,5 @@
 import {Builder, By, Key, until} from "selenium-webdriver"
-import {EditorSelection} from "../../state/src/state"
+import {EditorSelection} from "../../state/src"
 const ist = require("ist")
 
 const driver = new Builder().forBrowser("chrome").build()

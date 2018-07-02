@@ -1,4 +1,4 @@
-import {MetaSlot} from "../../state/src/state"
+import {MetaSlot} from "../../state/src"
 import {EditorView} from "./editorview"
 import browser from "./browser"
 import {beforeKeyDown} from "./capturekeys"

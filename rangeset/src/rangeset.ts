@@ -1,4 +1,4 @@
-import {Mapping, ChangeSet, Change} from "../../state/src/state"
+import {Mapping, ChangeSet, Change} from "../../state/src"
 import {ChangedRange} from "../../doc/src/diff"
 
 type A<T> = ReadonlyArray<T>

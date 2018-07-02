@@ -1,4 +1,4 @@
-import {EditorState, Transaction, Selection, MetaSlot} from "../../state/src/state"
+import {EditorState, Transaction, EditorSelection, MetaSlot} from "../../state/src"
 import {DocView} from "./docview"
 import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
@@ -91,7 +91,7 @@ function selectionFromDOM(view: EditorView) {
   let domSel = getRoot(view.contentDOM).getSelection()
   let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
   let anchor = selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
-  return Selection.single(anchor, head)
+  return EditorSelection.single(anchor, head)
 }
 
 function applySelectionChange(view: EditorView) {

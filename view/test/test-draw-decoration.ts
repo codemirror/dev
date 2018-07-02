@@ -1,6 +1,6 @@
 import {Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
-import {StateField, MetaSlot, Plugin, EditorSelection} from "../../state/src/state"
+import {StateField, MetaSlot, Plugin, EditorSelection} from "../../state/src"
 import ist from "ist"
 
 const filterSlot = new MetaSlot<(from: number, to: number, spec: any) => boolean>("filterDeco")

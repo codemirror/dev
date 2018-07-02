@@ -1,6 +1,6 @@
 import {base, keyName} from "w3c-keyname"
 
-import {EditorState, Transaction, Plugin} from "../../state/src/state"
+import {EditorState, Transaction, Plugin} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (state: EditorState, dispatch: (tr: Transaction) => void, view: EditorView) => (boolean | void)

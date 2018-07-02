@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorState, Change, EditorSelection, SelectionRange, MetaSlot} from "../src/state"
+import {EditorState, Change, EditorSelection, SelectionRange, MetaSlot} from "../src"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {

@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {Change, ChangeSet} from "../src/state"
+import {Change, ChangeSet} from "../src"
 
 function testMapping(mapping, ...cases) {
   let inverted = mapping.partialMapping(mapping.length, 0)

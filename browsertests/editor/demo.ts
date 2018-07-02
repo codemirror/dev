@@ -1,4 +1,4 @@
-import {EditorState, Plugin, EditorSelection, StateField} from "../../state/src/state"
+import {EditorState, Plugin, EditorSelection, StateField} from "../../state/src"
 import {EditorView, Decoration, DecorationSet} from "../../view/src/"
 import {keymap} from "../../keymap/src/keymap"
 import {history, redo, undo} from "../../history/src/history"
