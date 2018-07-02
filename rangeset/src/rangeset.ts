@@ -165,6 +165,11 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
+  // FIXME there is still a problem with mapping inclusive ranges
+  // through replacements — i.e. a range inclusive on both sides will
+  // span the whole document after select-all, paste, since its end
+  // points were mapped to the endpoints of the insertion. This is
+  // probably rarely the intended behavior.
   map(changes: ChangeSet): RangeSet<T> {
     if (changes.length == 0 || this == RangeSet.empty) return this
     return this.mapInner(changes, 0, 0, changes.mapPos(this.length, 1)).set
@@ -233,6 +238,13 @@ export class RangeSet<T extends RangeValue> {
       : new RangeSet<T>(newLength, newSize + (newLocal || this.local).length,
                           newLocal || this.local, newChildren || this.children)
     return {set, escaped}
+  }
+
+  forEach(f: (from: number, to: number, value: T) => void) { this.forEachInner(f, 0) }
+
+  private forEachInner(f: (from: number, to: number, value: T) => void, offset: number) {
+    for (let range of this.local) f(range.from + offset, range.to + offset, range.value)
+    for (let child of this.children) { child.forEachInner(f, offset); offset += child.length }
   }
 
   compare(other: RangeSet<T>, textDiff: A<ChangedRange>, comparator: RangeComparator<T>) {

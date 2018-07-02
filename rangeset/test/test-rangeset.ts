@@ -217,6 +217,18 @@ describe("RangeSet", () => {
     })
   })
 
+  describe("forEach", () => {
+    it("calls the callback with the proper positions", () => {
+      let called = 0
+      set0.forEach((from, to, value) => {
+        ++called
+        ist(from, value.pos)
+        ist(to, value.pos + 1 + value.pos % 4)
+      })
+      ist(called, set0.size)
+    })
+  })
+
   class Comparator implements RangeComparator<Value> {
     ranges: number[] = []
     compareRange(from: number, to: number, activeA: Value[], activeB: Value[]) {
