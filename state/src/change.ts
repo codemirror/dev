@@ -39,12 +39,12 @@ export class ChangeSet implements Mapping {
 
   static empty: ChangeSet = new ChangeSet(empty)
 
-  mapPos(pos: number, bias: number = 1, trackDel: boolean = false): number {
+  mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
     return this.mapInner(pos, bias, trackDel, 0, this.length)
   }
 
   /** @internal */
-  mapInner(pos: number, bias: number = 1, trackDel: boolean, fromI: number, toI: number): number {
+  mapInner(pos: number, bias: number, trackDel: boolean, fromI: number, toI: number): number {
     let dir = toI < fromI ? -1 : 1
     let recoverables: {[key: number]: number} | null = null
     let hasMirrors = this.mirror.length > 0, rec, mirror
@@ -94,7 +94,7 @@ export class ChangeSet implements Mapping {
 
 class PartialMapping implements Mapping {
   constructor(readonly changes: ChangeSet, readonly from: number, readonly to: number) {}
-  mapPos(pos: number, bias: number = 1, trackDel: boolean = false): number {
+  mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
     return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
   }
 }

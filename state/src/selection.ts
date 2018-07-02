@@ -28,7 +28,8 @@ export class EditorSelection {
   }
 
   eq(other: EditorSelection): boolean {
-    if (this.ranges.length != other.ranges.length) return false
+    if (this.ranges.length != other.ranges.length ||
+        this.primaryIndex != other.primaryIndex) return false
     for (let i = 0; i < this.ranges.length; i++)
       if (!this.ranges[i].eq(other.ranges[i])) return false
     return true

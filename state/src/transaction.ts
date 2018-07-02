@@ -76,18 +76,26 @@ export class Transaction {
 
   replaceSelection(text: string): Transaction {
     return this.reduceRanges((state, r) => {
-      return state.change(new Change(r.from, r.to, text))
+      return {transaction: state.change(new Change(r.from, r.to, text)),
+              range: new SelectionRange(r.from + text.length)}
     })
   }
 
-  reduceRanges(f: (transaction: Transaction, range: SelectionRange) => Transaction): Transaction {
+  reduceRanges(f: (transaction: Transaction, range: SelectionRange) => (Transaction | {transaction: Transaction, range: SelectionRange})): Transaction {
     let tr: Transaction = this
-    let sel = tr.selection, start = tr.changes.length
+    let sel = tr.selection, start = tr.changes.length, newRanges: SelectionRange[] = []
     for (let range of sel.ranges) {
       range = range.map(tr.changes.partialMapping(start))
-      tr = f(tr, range)
+      let result = f(tr, range)
+      if (result instanceof Transaction) {
+        tr = result
+        newRanges.push(range.map(tr.changes.partialMapping(tr.changes.length - 1)))
+      } else {
+        tr = result.transaction
+        newRanges.push(result.range)
+      }
     }
-    return tr
+    return tr.setSelection(EditorSelection.create(newRanges, sel.primaryIndex))
   }
 
   setSelection(selection: EditorSelection): Transaction {

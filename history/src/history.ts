@@ -71,7 +71,7 @@ function isAdjacent(prev: Change | null, cur: Change): boolean {
   if (!prev) return true
   // FIXME not great, maybe bring back Change.mapPos
   let mapping = new ChangeSet([prev])
-  return cur.from <= mapping.mapPos(prev.to) && cur.to >= mapping.mapPos(prev.from, -1)
+  return cur.from <= mapping.mapPos(prev.to, 1) && cur.to >= mapping.mapPos(prev.from)
 }
 
 const historyField = new StateField({
