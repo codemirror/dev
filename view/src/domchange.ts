@@ -1,8 +1,10 @@
 import {EditorView} from "./editorview"
 
 export function applyDOMChange(view: EditorView, start: number, end: number) {
-  let {from, to, text} = view.docView.readDOMRange(start, end)
-
+  let bounds = view.docView.domBoundsAround(start, end, 0)
+  if (!bounds) { view.setState(view.state); return }
+  let {from, to} = bounds, text = readDOM(bounds.startDOM, bounds.endDOM)
+  
   let preferredPos = view.state.selection.primary.from, preferredSide = null
   // Prefer anchoring to end when Backspace is pressed
   if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100) {
@@ -23,7 +25,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
     if (start == view.state.selection.primary.from && end == view.state.selection.primary.to)
       tr = tr.replaceSelection(inserted)
     else
-      tr = tr.replace(from, to, inserted)
+      tr = tr.replace(start, end, inserted)
     // FIXME maybe also try to detect (Android) enter here and call
     // the key handler
     view.dispatch(tr)
@@ -57,4 +59,31 @@ function findDiff(a: string, b: string, preferredPos: number, preferredSide: str
     toB = from
   }
   return {from, toA, toB}
+}
+
+export function readDOM(start: Node | null, end: Node | null): string {
+  let text = "", cur = start
+  if (cur) for (;;) {
+    text += readDOMNode(cur!)
+    let next: Node | null = cur!.nextSibling
+    if (next == end) break
+    if (isBlockNode(cur!)) text += "\n"
+    cur = next
+  }
+  return text
+}
+
+function readDOMNode(node: Node): string {
+  if (node.cmIgnore) return ""
+  let view = node.cmView
+  let fromView = view && view.overrideDOMText
+  if (fromView != null) return fromView
+  if (node.nodeType == 3) return node.nodeValue as string
+  if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
+  if (node.nodeType == 1) return readDOM(node.firstChild, null)
+  return ""
+}
+
+function isBlockNode(node: Node): boolean {
+  return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
 }

@@ -87,6 +87,10 @@ export class TextView extends InlineView {
   }
 
   domFromPos(pos: number) { return {node: this.textDOM!, offset: pos} }
+
+  domBoundsAround(from: number, to: number, offset: number) {
+    return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
+  }
 }
 
 export class WidgetView extends InlineView {
@@ -124,12 +128,18 @@ export class CollapsedView extends InlineView {
   constructor(public length: number) {
     super(null, null)
   }
+
   finish(parent: ContentView) { this.parent = parent }
+
   merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
     if (!(other instanceof CollapsedView)) return false
     this.length = from + other.length + (this.length - to)
     return true
   }
+
+  // FIXME needs an overrideDOMText method that somehow needs access to the current doc
+
+  domBoundsAround() { return null }
 }
 
 export class InlineBuilder implements RangeIterator<Decoration> {

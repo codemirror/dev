@@ -253,24 +253,6 @@ export class DocView extends ContentView {
     return null
   }
 
-  readDOMRange(from: number, to: number): {from: number, to: number, text: string} {
-    // FIXME partially parse lines when possible
-    let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
-      /*      if (pos < from && end > to) {
-        let result = child.parseRange(from - pos, to - pos)
-        return {from: result.from + pos, to: result.to + pos, text: result.text}
-      }*/
-      if (end >= from && fromI == -1) { fromI = i; fromStart = pos }
-      if (end >= to && toI == -1) { toI = i; toEnd = end; break }
-      pos = end + 1
-    }
-    let startDOM = (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom.firstChild
-    let endDOM = toI < this.children.length - 1 ? this.children[toI + 1].dom : null
-    return {from: fromStart, to: toEnd, text: readDOM(startDOM, endDOM)}
-  }
-
   posFromDOM(node: Node, offset: number): number {
     let view = this.nearest(node)
     if (!view) throw new RangeError("Trying to find position for a DOM position outside of the document")
@@ -349,6 +331,8 @@ class GapView extends ContentView {
   get overrideDOMText() {
     return this.parent ? (this.parent as DocView).text.slice(this.posAtStart, this.posAtEnd) : ""
   }
+
+  domBoundsAround() { return null }
 }
 
 function findPluginDeco(decorations: A<PluginDeco>, plugin: Plugin | null): DecorationSet | null {
@@ -490,31 +474,4 @@ function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>, 
     result.push(new Viewport(at, at))
   }
   return result
-}
-
-function readDOM(start: Node | null, end: Node | null): string {
-  let text = "", cur = start
-  if (cur) for (;;) {
-    text += readDOMNode(cur!)
-    let next: Node | null = cur!.nextSibling
-    if (next == end) break
-    if (isBlockNode(cur!)) text += "\n"
-    cur = next
-  }
-  return text
-}
-
-function readDOMNode(node: Node): string {
-  if (node.cmIgnore) return ""
-  let view = node.cmView
-  let fromView = view && view.overrideDOMText
-  if (fromView != null) return fromView
-  if (node.nodeType == 3) return node.nodeValue as string
-  if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
-  if (node.nodeType == 1) return readDOM(node.firstChild, null)
-  return ""
-}
-
-function isBlockNode(node: Node): boolean {
-  return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
 }

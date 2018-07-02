@@ -91,6 +91,20 @@ export abstract class ContentView {
     }
   }
 
+  domBoundsAround(from: number, to: number, offset = 0): {startDOM: Node | null, endDOM: Node | null, from: number, to: number} | null {
+    let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
+    for (let i = 0, pos = offset; i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length
+      if (pos < from && end > to) return child.domBoundsAround(from, to, pos)
+      if (end >= from && fromI == -1) { fromI = i; fromStart = pos }
+      if (end >= to && toI == -1) { toI = i; toEnd = end; break }
+      pos = end + this.childGap
+    }
+    return {from: fromStart, to: toEnd,
+            startDOM: (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom!.firstChild,
+            endDOM: toI < this.children.length - 1 ? this.children[toI + 1].dom : null}
+  }
+
   // FIXME track precise dirty ranges, to avoid full DOM sync on every touched node?
   markDirty() {
     if (this.dirty & dirty.node) return
