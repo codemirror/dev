@@ -4,7 +4,7 @@ import {InlineView, InlineBuilder} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
-import {EditorState, Plugin, Selection} from "../../state/src/state"
+import {EditorState, Plugin, EditorSelection} from "../../state/src/state"
 import {HeightMap, HeightOracle} from "./heightmap"
 import {changedRanges, ChangedRange} from "../../doc/src/diff"
 import {DecorationSet, joinRanges, findChangedRanges} from "./decoration"
@@ -21,7 +21,7 @@ export class DocView extends ContentView {
 
   text: Text = Text.create("")
   decorations: PluginDeco[] = []
-  selection: Selection = Selection.default
+  selection: EditorSelection = EditorSelection.default
 
   observer: DOMObserver
 

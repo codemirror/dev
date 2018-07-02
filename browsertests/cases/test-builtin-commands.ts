@@ -1,5 +1,5 @@
 import {Builder, By, Key, until} from "selenium-webdriver"
-import {Selection} from "../../state/src/state"
+import {EditorSelection} from "../../state/src/state"
 const ist = require("ist")
 
 const driver = new Builder().forBrowser("chrome").build()
@@ -87,7 +87,7 @@ describe("builtin commands", () => {
     if (i == 4) ist(pos == 5 || pos == 3)
     else if (i == 13) ist(pos == 3 || pos == 5)
     else if (i == 14) ist(pos == 4 || pos == 13)
-    else ist(Selection.single(next.hasOwnProperty(i) ? next[i] : i - 1).eq(await tests.getSelection()))
+    else ist(EditorSelection.single(next.hasOwnProperty(i) ? next[i] : i - 1).eq(await tests.getSelection()))
   }))
 
   it("right", forAllValidPositions(async function (cm, i) {
@@ -103,7 +103,7 @@ describe("builtin commands", () => {
     else if (i == 6) ist(pos == 5 || pos == 4)
     else if (i == 10) ist(pos == 9 || pos == 8)
     else if (i == 13) ist(pos == 11 || pos == 14)
-    else ist(Selection.single(next.hasOwnProperty(i) ? next[i] : i + 1).eq(await tests.getSelection()))
+    else ist(EditorSelection.single(next.hasOwnProperty(i) ? next[i] : i + 1).eq(await tests.getSelection()))
   }))
 
   it("up", notFirefox && forAllValidPositions(async function (cm, i) {
@@ -119,7 +119,7 @@ describe("builtin commands", () => {
     else if (i == 14) ist(pos == 4 || pos == 12)
     else if (i == 18) ist(pos == 5 || pos == 6)
     else if (i == 19) ist(pos == 4 || pos == 13)
-    else ist(Selection.single(next[i]).eq(await tests.getSelection()))
+    else ist(EditorSelection.single(next[i]).eq(await tests.getSelection()))
   }))
 
   it("down", notFirefox && forAllValidPositions(async function (cm, i) {

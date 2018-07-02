@@ -1,5 +1,5 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {Selection} from "../../state/src/state"
+import {EditorSelection} from "../../state/src/state"
 import ist from "ist"
 
 function setDOMSel(node, offset) {
@@ -41,7 +41,7 @@ describe("EditorView selection", () => {
 
     let cm = tempEditor("abc\n\ndef")
     function test(pos, node, offset) {
-      cm.dispatch(cm.state.transaction.setSelection(Selection.single(pos)))
+      cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(pos)))
       ist(window.getSelection().focusNode, node)
       ist(window.getSelection().focusOffset, offset)
     }

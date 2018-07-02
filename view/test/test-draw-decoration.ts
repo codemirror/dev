@@ -1,6 +1,6 @@
 import {Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
-import {StateField, MetaSlot, Plugin, Selection} from "../../state/src/state"
+import {StateField, MetaSlot, Plugin, EditorSelection} from "../../state/src/state"
 import ist from "ist"
 
 const filterSlot = new MetaSlot<(from: number, to: number, spec: any) => boolean>("filterDeco")
@@ -153,7 +153,7 @@ describe("EditorView decoration", () => {
       requireFocus()
       let cm = decoEditor("abc", [d(2, {widget: new WordWidget("A"), side: -1}),
                                   d(2, {widget: new WordWidget("B"), side: 1})])
-      cm.dispatch(cm.state.transaction.setSelection(Selection.single(2)))
+      cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(2)))
       cm.focus()
       let domSel = document.getSelection()
       ist(domSel.focusNode.childNodes[domSel.focusOffset - 1].textContent, "A")

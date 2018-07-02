@@ -1,5 +1,5 @@
 import {tempEditor} from "./temp-editor"
-import {Selection} from "../../state/src/state"
+import {EditorSelection} from "../../state/src/state"
 import ist from "ist"
 
 function flush(cm) {
@@ -40,7 +40,7 @@ describe("DOM changes", () => {
 
   it("properly handles selection for ambiguous backspace", () => {
     let cm = tempEditor("foo")
-    cm.dispatch(cm.state.transaction.setSelection(Selection.single(2)))
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(2)))
     cm.domAtPos(1).node.nodeValue = "fo"
     cm.inputState.lastKeyCode = 8
     cm.inputState.lastKeyTime = Date.now()

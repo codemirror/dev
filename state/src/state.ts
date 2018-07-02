@@ -66,7 +66,7 @@ class Configuration {
 
 export interface EditorStateConfig {
   doc?: string | Text;
-  selection?: Selection;
+  selection?: EditorSelection;
   plugins?: ReadonlyArray<Plugin>;
 }
 
@@ -74,7 +74,7 @@ export class EditorState {
   /** @internal */
   constructor(/** @internal */ public readonly config: Configuration,
               public readonly doc: Text,
-              public readonly selection: Selection = Selection.default) {}
+              public readonly selection: EditorSelection = EditorSelection.default) {}
 
   getField<T>(field: StateField<T>): T | undefined {
     return (this as any)[field.key]
@@ -96,66 +96,65 @@ export class EditorState {
   static create(config: EditorStateConfig = {}): EditorState {
     let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
     let $config = new Configuration(config.plugins || [])
-    let state = new EditorState($config, doc, config.selection || Selection.default)
+    let state = new EditorState($config, doc, config.selection || EditorSelection.default)
     for (let field of $config.fields) (state as any)[field.key] = field.init(state)
     return state
   }
 }
 
-export class Range {
+export class SelectionRange {
   constructor(public readonly anchor: number, public readonly head: number = anchor) {}
 
   get from(): number { return Math.min(this.anchor, this.head) }
   get to(): number { return Math.max(this.anchor, this.head) }
   get empty(): boolean { return this.anchor == this.head }
 
-  map(mapping: Mapping): Range {
+  map(mapping: Mapping): SelectionRange {
     let anchor = mapping.mapPos(this.anchor), head = mapping.mapPos(this.head)
     if (anchor == this.anchor && head == this.head) return this
-    else return new Range(anchor, head)
+    else return new SelectionRange(anchor, head)
   }
 
-  eq(other: Range): boolean {
+  eq(other: SelectionRange): boolean {
     return this.anchor == other.anchor && this.head == other.head
   }
 }
 
-// FIXME maybe rename to avoid name clash with DOM Selection type?
-export class Selection {
+export class EditorSelection {
   /** @internal */
-  constructor(readonly ranges: ReadonlyArray<Range>,
+  constructor(readonly ranges: ReadonlyArray<SelectionRange>,
               readonly primaryIndex: number) {}
 
-  map(mapping: Mapping): Selection {
-    return Selection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)
+  map(mapping: Mapping): EditorSelection {
+    return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)
   }
 
-  eq(other: Selection): boolean {
+  eq(other: EditorSelection): boolean {
     if (this.ranges.length != other.ranges.length) return false
     for (let i = 0; i < this.ranges.length; i++)
       if (!this.ranges[i].eq(other.ranges[i])) return false
     return true
   }
 
-  get primary(): Range { return this.ranges[this.primaryIndex] }
+  get primary(): SelectionRange { return this.ranges[this.primaryIndex] }
 
   static single(anchor: number, head: number = anchor) {
-    return new Selection([new Range(anchor, head)], 0)
+    return new EditorSelection([new SelectionRange(anchor, head)], 0)
   }
 
-  static create(ranges: ReadonlyArray<Range>, primaryIndex: number = 0) {
+  static create(ranges: ReadonlyArray<SelectionRange>, primaryIndex: number = 0) {
     for (let pos = 0, i = 0; i < ranges.length; i++) {
       let range = ranges[i]
       if (range.from < pos) return normalized(ranges.slice(), primaryIndex)
       pos = range.to
     }
-    return new Selection(ranges, primaryIndex)
+    return new EditorSelection(ranges, primaryIndex)
   }
 
-  static default: Selection = Selection.single(0)
+  static default: EditorSelection = EditorSelection.single(0)
 }
 
-function normalized(ranges: Range[], primaryIndex: number = 0): Selection {
+function normalized(ranges: SelectionRange[], primaryIndex: number = 0): EditorSelection {
   let primary = ranges[primaryIndex]
   ranges.sort((a, b) => a.from - b.from)
   primaryIndex = ranges.indexOf(primary)
@@ -164,10 +163,10 @@ function normalized(ranges: Range[], primaryIndex: number = 0): Selection {
     if (range.from < prev.to) {
       let from = prev.from, to = Math.max(range.to, prev.to)
       if (i == primaryIndex) primaryIndex--
-      ranges.splice(--i, 2, range.anchor > range.head ? new Range(to, from) : new Range(from, to))
+      ranges.splice(--i, 2, range.anchor > range.head ? new SelectionRange(to, from) : new SelectionRange(from, to))
     }
   }
-  return new Selection(ranges, primaryIndex)
+  return new EditorSelection(ranges, primaryIndex)
 }
 
 const empty: ReadonlyArray<any> = []
@@ -284,7 +283,7 @@ export class Transaction {
   private constructor(readonly startState: EditorState,
                       readonly changes: ChangeSet,
                       readonly docs: ReadonlyArray<Text>,
-                      readonly selection: Selection,
+                      readonly selection: EditorSelection,
                       private readonly meta: Meta,
                       private readonly flags: number) {}
 
@@ -327,7 +326,7 @@ export class Transaction {
     })
   }
 
-  reduceRanges(f: (transaction: Transaction, range: Range) => Transaction): Transaction {
+  reduceRanges(f: (transaction: Transaction, range: SelectionRange) => Transaction): Transaction {
     let tr: Transaction = this
     let sel = tr.selection, start = tr.changes.length
     for (let range of sel.ranges) {
@@ -337,7 +336,7 @@ export class Transaction {
     return tr
   }
 
-  setSelection(selection: Selection): Transaction {
+  setSelection(selection: EditorSelection): Transaction {
     return new Transaction(this.startState, this.changes, this.docs, selection, this.meta,
                            this.flags | FLAG_SELECTION_SET)
   }

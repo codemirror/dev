@@ -1,6 +1,6 @@
 const ist = require("ist")
 
-import {Change, ChangeSet, EditorState, Selection, Transaction, MetaSlot} from "../../state/src/state"
+import {Change, ChangeSet, EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src/state"
 import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
 const mkState = (config?) => EditorState.create({plugins: [history(config)]})
@@ -209,7 +209,7 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "hi")
     state = closeHistory(state.transaction).apply()
-    state = state.transaction.setSelection(Selection.single(0, 2)).apply()
+    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
     const selection = state.selection
     state = state.transaction.replaceSelection("hello").apply()
     const selection2 = state.selection
@@ -223,7 +223,7 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "hi")
     state = closeHistory(state.transaction).apply()
-    state = state.transaction.setSelection(Selection.single(0, 2)).apply()
+    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
     state = type(state, "hello", 0)
     state = receive(state, "---", 0)
     state = command(state, undo)
@@ -235,7 +235,7 @@ describe("history", () => {
     state = type(state, "a")
     state = type(state, "b")
     state = closeHistory(state.transaction).apply()
-    state = state.transaction.setSelection(Selection.single(0, 2)).apply()
+    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
     state = type(state, "c")
     state = command(state, undo)
     state = command(state, undo)
