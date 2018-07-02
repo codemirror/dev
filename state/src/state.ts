@@ -9,7 +9,6 @@ function unique(prefix: string, names: {[key: string]: string}): string {
 
 export interface Mapping {
   mapPos(pos: number, bias?: number, trackDel?: boolean): number
-  length: number
 }
 
 const fieldNames = Object.create(null)
@@ -252,7 +251,6 @@ class PartialMapping implements Mapping {
   mapPos(pos: number, bias: number = 1, trackDel: boolean = false): number {
     return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
   }
-  get length() { return Math.abs(this.to - this.from) }
 }
     
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
