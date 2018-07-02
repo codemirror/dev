@@ -60,9 +60,6 @@ const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
 export type RangeFilter<T> = (from: number, to: number, value: T) => boolean
 
-// FIXME look into generalizing this to a generic mappable
-// position-data container
-
 export class RangeSet<T extends RangeValue> {
   /** @internal */
   constructor(
@@ -138,9 +135,6 @@ export class RangeSet<T extends RangeValue> {
       return collapseSet(children || this.children, local || this.local.slice(),
                          added, decI, offset, length)
 
-
-    // FIXME going from leaf to non-leaf is currently a mess—will
-    // leave all the locals alongside a newly created child
 
     let childSize = Math.max(BASE_NODE_SIZE, size >> BASE_NODE_SIZE_SHIFT)
     if (decI < added.length) {
@@ -399,10 +393,10 @@ function byPos(a: Range<RangeValue>, b: Range<RangeValue>): number {
   return a.from - b.from || a.value.bias - b.value.bias
 }
 
-function insertSorted(target: Range<RangeValue>[], deco: Range<RangeValue>) {
+function insertSorted(target: Range<RangeValue>[], range: Range<RangeValue>) {
   let i = target.length
-  while (i > 0 && byPos(target[i - 1], deco) >= 0) i--
-  target.splice(i, 0, deco)
+  while (i > 0 && byPos(target[i - 1], range) >= 0) i--
+  target.splice(i, 0, range)
 }
 
 function filterRanges<T extends RangeValue>(ranges: A<Range<T>>,
@@ -448,9 +442,17 @@ function appendRanges<T extends RangeValue>(local: Range<T>[], children: RangeSe
     let end = Math.min(i + childSize, ranges.length)
     let endPos = end == ranges.length ? offset + length : ranges[end].from
     for (; i < end; i++) {
-      let deco = ranges[i]
-      if (deco.to > endPos) insertSorted(local, deco.move(-offset))
-      else add.push(deco)
+      let range = ranges[i]
+      if (range.to > endPos) insertSorted(local, range.move(-offset))
+      else add.push(range)
+    }
+    // Move locals that fit in this new child from `local` to `add`
+    for (let i = 0; i < local.length; i++) {
+      let range = local[i]
+      if (range.from >= pos && range.to <= endPos) {
+        local.splice(i--, 1)
+        insertSorted(add, range.move(offset))
+      }
     }
     if (add.length) {
       children.push(RangeSet.empty.updateInner(add, null, 0, 0, pos, endPos - pos))

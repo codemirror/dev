@@ -148,6 +148,12 @@ describe("RangeSet", () => {
         .update([mk(3, 9, "b"), mk(16, 17, "b")])
       ist(set.local.map(d => d.from).join(","), "2,3,8,16")
     })
+
+    it("moves locals down when splitting a leaf", () => {
+      let set = mkSet([mk(2), mk(3), mk(4), mk(5)])
+        .update(new Array(200).fill().map((_, i) => mk(i, i + 1)))
+      ist(set.local.length, 0)
+    })
   })
 
   describe("map", () => {
