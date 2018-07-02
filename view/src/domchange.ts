@@ -13,10 +13,20 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
 
   let diff = findDiff(view.state.doc.slice(from, to), text, preferredPos - from, preferredSide)
   if (diff) {
-    // FIXME apply generic insertText functionality when appropriate
-    // (including mapping selection forward in case of replace), maybe
-    // detect enter, allow a textInput hook
-    view.dispatch(view.state.transaction.replace(from + diff.from, from + diff.toA, text.slice(diff.from, diff.toB)))
+    let start = from + diff.from, end = from + diff.toA
+    let tr = view.state.transaction, inserted = text.slice(diff.from, diff.toB)
+    // FIXME this tries to see the difference between insertions at
+    // the selection and other changes—the former should be handled
+    // with replaceSelection, the latter not. But it's not robust and
+    // what we _should_ be doing is recording whether the changes are
+    // within the selection in the DOM observer
+    if (start == view.state.selection.primary.from && end == view.state.selection.primary.to)
+      tr = tr.replaceSelection(inserted)
+    else
+      tr = tr.replace(from, to, inserted)
+    // FIXME maybe also try to detect (Android) enter here and call
+    // the key handler
+    view.dispatch(tr)
   } else { // Force DOM update to clear damage
     view.setState(view.state)
   }
