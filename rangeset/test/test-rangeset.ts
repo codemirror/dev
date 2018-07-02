@@ -69,7 +69,7 @@ function checkSet(set: RangeSet<Value>, offset: number = 0) {
   }
 }
 
-function mk(from: number, to: any, spec?: any): Range<Value> {
+function mk(from: number, to?: any, spec?: any): Range<Value> {
   if (typeof to != "number") { spec = to; to = from }
   if (typeof spec == "string") spec = {name: spec}
   return new Range(from, to, new Value(spec))
@@ -157,47 +157,38 @@ describe("RangeSet", () => {
   })
 
   describe("map", () => {
-    type Pos = number | [number, number] | [number, number, any]
-
-    function asRange(pos: Pos): {from: number, to: number} {
-      return typeof pos == "number" ? {from: pos, to: pos} : {from: pos[0], to: pos[1]}
-    }
-
-    function test(positions: Pos[], changes: [number, number, number][], newPositions: Pos[]) {
-      let set = mkSet(positions.map(pos => {
-        let {from, to} = asRange(pos)
-        return mk(from, to, pos[2])
-      }))
+    function test(positions: Range<Value>[], changes: [number, number, number][], newPositions: (number | [number, number])[]) {
+      let set = mkSet(positions)
       let mapped = set.map(new ChangeSet(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len)))))
       let out = []
       mapped.collect(out, 0)
       ist(JSON.stringify(out.map(d => d.from + "-" + d.to)),
-          JSON.stringify(newPositions.map(asRange).map(r => r.from + "-" + r.to)))
+          JSON.stringify(newPositions.map(p => Array.isArray(p) ? {from: p[0], to: p[1]} : {from: p, to: p}).map(r => r.from + "-" + r.to)))
     }
 
     it("can map through changes", () =>
-       test([1, 4, 10], [[0, 0, 1], [2, 3, 0], [8, 8, 20]], [2, 4, 30]))
+       test([mk(1), mk(4), mk(10)], [[0, 0, 1], [2, 3, 0], [8, 8, 20]], [2, 4, 30]))
 
     it("takes inclusivity into account", () =>
-       test([[1, 2, {bias: -1, biasEnd: 1}]], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
+       test([mk(1, 2, {bias: -1, biasEnd: 1})], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
 
     it("uses side to determine mapping of points", () =>
-       test([[1, 1, {bias: 1}], [1, 1, {bias: -1}]], [[1, 1, 2]], [1, 3]))
+       test([mk(1, 1, {bias: 1}), mk(1, 1, {bias: -1})], [[1, 1, 2]], [1, 3]))
 
     it("defaults to exclusive on both sides", () =>
-       test([[1, 2]], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
+       test([mk(1, 2)], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
 
     it("drops collapsed ranges", () =>
-       test([[1, 2]], [[1, 2, 0], [1, 1, 1]], []))
+       test([mk(1, 2)], [[1, 2, 0], [1, 1, 1]], []))
 
     it("drops ranges in deleted regions", () =>
-       test([[1, 2], 3], [[0, 4, 0]], []))
+       test([mk(1, 2), mk(3)], [[0, 4, 0]], []))
 
     it("shrinks range ranges", () =>
-       test([[2, 4], [2, 8], [6, 8]], [[3, 7, 0]], [[2, 3], [2, 4], [3, 4]]))
+       test([mk(2, 4), mk(2, 8), mk(6, 8)], [[3, 7, 0]], [[2, 3], [2, 4], [3, 4]]))
 
     it("leaves point ranges on change boundaries", () =>
-       test([2, 4], [[2, 4, 6]], [2, 8]))
+       test([mk(2), mk(4)], [[2, 4, 6]], [2, 8]))
 
     it("adjusts the set tree shape", () => {
       let child0Size = set0.children[0].length, child1Size = set0.children[1].length
