@@ -2,7 +2,7 @@ import {EditorView} from "./editorview"
 import {getRoot} from "./dom"
 import {EditorSelection} from "../../state/src"
 
-export function applyDOMChange(view: EditorView, start: number, end: number) {
+export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
   let bounds = view.docView.domBoundsAround(start, end, 0)
   if (!bounds) { view.setState(view.state); return }
   let {from, to} = bounds
@@ -10,15 +10,18 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
   reader.readRange(bounds.startDOM, bounds.endDOM)
   let newSelection = selectionFromPoints(selPoints, from)
   
-  let preferredPos = view.state.selection.primary.from, preferredSide = null
+  let oldSel = view.state.selection.primary, preferredPos = oldSel.from, preferredSide = null
   // Prefer anchoring to end when Backspace is pressed
   if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100) {
-    preferredPos = view.state.selection.primary.to
+    preferredPos = oldSel.to
     preferredSide = "end"
   }
   view.inputState.lastKeyCode = 0
 
   let diff = findDiff(view.state.doc.slice(from, to), reader.text, preferredPos - from, preferredSide)
+  // Heuristic to notice typing over a selected character
+  if (!diff && typeOver && !oldSel.empty && newSelection && newSelection.primary.empty)
+    diff = {from: oldSel.from - from, toA: oldSel.to - from, toB: oldSel.to - from}
   if (diff) {
     let start = from + diff.from, end = from + diff.toA
     let tr = view.state.transaction, inserted = reader.text.slice(diff.from, diff.toB)
@@ -31,7 +34,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
     // FIXME maybe also try to detect (Android) enter here and call
     // the key handler
     view.dispatch(tr)
-  } else if (newSelection && !newSelection.eq(view.state.selection)) {
+  } else if (newSelection && !newSelection.primary.eq(oldSel)) {
     view.dispatch(view.state.transaction.setSelection(newSelection))
   } else {
     view.setState(view.state)

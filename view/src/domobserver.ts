@@ -27,7 +27,7 @@ export class DOMObserver {
   intersection: IntersectionObserver
 
   constructor(private docView: DocView,
-              private onDOMChange: (from: number, to: number) => void,
+              private onDOMChange: (from: number, to: number, typeOver: boolean) => void,
               private onSelectionChange: () => void,
               private onIntersect: () => void) {
     this.dom = docView.dom
@@ -115,10 +115,11 @@ export class DOMObserver {
     }
     if (records.length == 0) return false
 
-    let from = -1, to = -1
+    let from = -1, to = -1, typeOver = false
     for (let record of records) {
       let range = this.readMutation(record)
       if (!range) continue
+      if (range.typeOver) typeOver = true
       if (from == -1) {
         ;({from, to} = range)
       } else {
@@ -128,12 +129,12 @@ export class DOMObserver {
     }
 
     let apply = from > -1 && this.active
-    if (apply) this.onDOMChange(from, to)
+    if (apply) this.onDOMChange(from, to, typeOver)
     if (this.docView.dirty) this.docView.sync()
     return apply
   }
 
-  readMutation(rec: MutationRecord): {from: number, to: number} | null {
+  readMutation(rec: MutationRecord): {from: number, to: number, typeOver: boolean} | null {
     let cView = this.docView.nearest(rec.target)
     if (!cView || cView.ignoreMutation(rec)) return null
     cView.markDirty()
@@ -142,10 +143,9 @@ export class DOMObserver {
       let childBefore = findChild(cView, rec.previousSibling || rec.target.previousSibling, -1)
       let childAfter = findChild(cView, rec.nextSibling || rec.target.nextSibling, 1)
       return {from: childBefore ? cView.posAfter(childBefore) : cView.posAtStart,
-              to: childAfter ? cView.posBefore(childAfter) : cView.posAtEnd}
+              to: childAfter ? cView.posBefore(childAfter) : cView.posAtEnd, typeOver: false}
     } else { // "characterData"
-      // FIXME insert ProseMirror's typeOver hack
-      return {from: cView.posAtStart, to: cView.posAtEnd}
+      return {from: cView.posAtStart, to: cView.posAtEnd, typeOver: rec.target.nodeValue == rec.oldValue}
     }
   }
 

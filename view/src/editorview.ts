@@ -35,7 +35,7 @@ export class EditorView {
 
     this.inputState = new InputState(this)
 
-    this.docView = new DocView(this.contentDOM, (start, end) => applyDOMChange(this, start, end),
+    this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
                                () => applySelectionChange(this))
     this.docView.update(state)
   }

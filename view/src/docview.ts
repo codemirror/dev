@@ -37,7 +37,7 @@ export class DocView extends ContentView {
   get childGap() { return 1 }
 
   constructor(dom: HTMLElement,
-              onDOMChange: (from: number, to: number) => void,
+              onDOMChange: (from: number, to: number, typeOver: boolean) => void,
               onSelectionChange: () => void) {
     super(null, dom)
     this.dirty = dirty.node
