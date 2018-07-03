@@ -205,7 +205,7 @@ describe("history", () => {
     }
   })
 
-  it("restores selection on undo", () => {
+  it.skip("restores selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
     state = closeHistory(state.transaction).apply()
