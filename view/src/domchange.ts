@@ -1,9 +1,14 @@
 import {EditorView} from "./editorview"
+import {getRoot} from "./dom"
+import {EditorSelection} from "../../state/src"
 
 export function applyDOMChange(view: EditorView, start: number, end: number) {
   let bounds = view.docView.domBoundsAround(start, end, 0)
   if (!bounds) { view.setState(view.state); return }
-  let {from, to} = bounds, text = readDOM(bounds.startDOM, bounds.endDOM)
+  let {from, to} = bounds
+  let selPoints = selectionPoints(view.contentDOM), reader = new DOMReader(selPoints)
+  reader.readRange(bounds.startDOM, bounds.endDOM)
+  let newSelection = selectionFromPoints(selPoints, from)
   
   let preferredPos = view.state.selection.primary.from, preferredSide = null
   // Prefer anchoring to end when Backspace is pressed
@@ -13,23 +18,22 @@ export function applyDOMChange(view: EditorView, start: number, end: number) {
   }
   view.inputState.lastKeyCode = 0
 
-  let diff = findDiff(view.state.doc.slice(from, to), text, preferredPos - from, preferredSide)
+  let diff = findDiff(view.state.doc.slice(from, to), reader.text, preferredPos - from, preferredSide)
   if (diff) {
     let start = from + diff.from, end = from + diff.toA
-    let tr = view.state.transaction, inserted = text.slice(diff.from, diff.toB)
-    // FIXME this tries to see the difference between insertions at
-    // the selection and other changes—the former should be handled
-    // with replaceSelection, the latter not. But it's not robust and
-    // what we _should_ be doing is recording whether the changes are
-    // within the selection in the DOM observer
-    if (start == view.state.selection.primary.from && end == view.state.selection.primary.to)
+    let tr = view.state.transaction, inserted = reader.text.slice(diff.from, diff.toB)
+    if (start >= tr.selection.primary.from && end <= tr.selection.primary.to)
       tr = tr.replaceSelection(inserted)
     else
       tr = tr.replace(start, end, inserted)
+    if (newSelection && !tr.selection.primary.eq(newSelection.primary))
+      tr = tr.setSelection(newSelection)
     // FIXME maybe also try to detect (Android) enter here and call
     // the key handler
     view.dispatch(tr)
-  } else { // Force DOM update to clear damage
+  } else if (newSelection && !newSelection.eq(view.state.selection)) {
+    view.dispatch(view.state.transaction.setSelection(newSelection))
+  } else {
     view.setState(view.state)
   }
 }
@@ -61,29 +65,75 @@ function findDiff(a: string, b: string, preferredPos: number, preferredSide: str
   return {from, toA, toB}
 }
 
-export function readDOM(start: Node | null, end: Node | null): string {
-  let text = "", cur = start
-  if (cur) for (;;) {
-    text += readDOMNode(cur!)
-    let next: Node | null = cur!.nextSibling
-    if (next == end) break
-    if (isBlockNode(cur!)) text += "\n"
-    cur = next
-  }
-  return text
-}
+class DOMReader {
+  text: string = ""
+  constructor(private points: DOMPoint[]) {}
 
-function readDOMNode(node: Node): string {
-  if (node.cmIgnore) return ""
-  let view = node.cmView
-  let fromView = view && view.overrideDOMText
-  if (fromView != null) return fromView
-  if (node.nodeType == 3) return node.nodeValue as string
-  if (node.nodeName == "BR") return node.nextSibling ? "\n" : ""
-  if (node.nodeType == 1) return readDOM(node.firstChild, null)
-  return ""
+  readRange(start: Node | null, end: Node | null) {
+    if (!start) return
+    let parent = start.parentNode!
+    for (let cur = start!;;) {
+      this.findPointBefore(parent, cur)
+      this.readNode(cur)
+      let next: Node | null = cur.nextSibling
+      if (next == end) break
+      if (isBlockNode(cur)) this.text += "\n"
+      cur = next!
+    }
+    this.findPointBefore(parent, end)
+  }
+
+  readNode(node: Node) {
+    if (node.cmIgnore) return
+    let view = node.cmView
+    let fromView = view && view.overrideDOMText
+    let text: string | undefined
+    if (fromView != null) text = fromView
+    else if (node.nodeType == 3) text = node.nodeValue!
+    else if (node.nodeName == "BR") text = node.nextSibling ? "\n" : ""
+    else if (node.nodeType == 1) this.readRange(node.firstChild, null)
+    if (text != null) {
+      this.findPointIn(node, text.length)
+      this.text += text
+    }
+  }
+
+  findPointBefore(node: Node, next: Node | null) {
+    for (let point of this.points)
+      if (point.node == node && node.childNodes[point.offset] == next)
+        point.pos = this.text.length
+  }
+
+  findPointIn(node: Node, maxLen: number) {
+    for (let point of this.points)
+      if (point.node == node)
+        point.pos = this.text.length + Math.min(point.offset, maxLen)
+  }
 }
 
 function isBlockNode(node: Node): boolean {
   return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
+}
+
+class DOMPoint {
+  pos: number = -1
+  constructor(readonly node: Node, readonly offset: number) {}
+}
+
+function selectionPoints(dom: HTMLElement): DOMPoint[] {
+  let root = getRoot(dom), result = []
+  if (root.activeElement != dom) return result
+  let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()
+  if (anchorNode) {
+    result.push(new DOMPoint(anchorNode, anchorOffset))
+    if (focusNode != anchorNode || focusOffset != anchorOffset)
+      result.push(new DOMPoint(focusNode, focusOffset))
+  }
+  return result
+}
+
+function selectionFromPoints(points: DOMPoint[], base: number): EditorSelection | null {
+  if (points.length == 0) return null
+  let anchor = points[0].pos, head = points.length == 2 ? points[1].pos : anchor
+  return anchor > -1 && head > -1 ? EditorSelection.single(anchor + base, head + base) : null
 }
