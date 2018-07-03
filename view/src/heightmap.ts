@@ -65,11 +65,12 @@ class ReplaceSide {
 }
 
 export abstract class HeightMap {
-  abstract size: number
   constructor(
     public length: number, // The number of characters covered
     public height: number // Height of this part of the document, or -1 when uninitialized
   ) {}
+
+  abstract size: number
 
   abstract heightAt(pos: number, bias?: 1 | -1): number
   abstract posAt(height: number, doc: Text, bias?: 1 | -1, offset?: number): number
@@ -145,11 +146,14 @@ export class HeightMapLine extends HeightMap {
     return new Viewport(offset, offset + this.length)
   }
 
-  // FIXME it would be nice to preserve height information in some
-  // circumstances, so that simple changes don't invalidate known
-  // heights. Getting the circumstances right is the tricky part (line
-  // may not be visible, change may actually cause a height
-  // difference, et)
+  replace(from: number, to: number, nodes: HeightMap[], start: ReplaceSide, end: ReplaceSide): HeightMap {
+    if (nodes.length != 1 || !(nodes[0] instanceof HeightMapLine))
+      return super.replace(from, to, nodes, start, end)
+    this.deco = insertDeco(offsetDeco(this.deco, from, to, nodes[0].length), (nodes[0] as HeightMapLine).deco, from)
+    this.length += nodes[0].length - (to - from)
+    this.height = -1
+    return this
+  }
 
   decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
     if (to == 0) {
@@ -224,7 +228,7 @@ function insertDeco(deco: number[], newDeco: number[], pos: number): number[] {
       inserted = true
     }
     if (next == 2e9) return result
-    newDeco.push(next, deco[i + 1])
+    result.push(next, deco[i + 1])
   }
 }
 
@@ -242,6 +246,14 @@ export class HeightMapRange extends HeightMap {
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
     return new Viewport(doc.lineStartAt(pos + offset), doc.lineEndAt(pos + offset))
+  }
+
+  replace(from: number, to: number, nodes: HeightMap[], start: ReplaceSide, end: ReplaceSide): HeightMap {
+    if (nodes.length != 1 || !(nodes[0] instanceof HeightMapRange))
+      return super.replace(from, to, nodes, start, end)
+    this.length += nodes[0].length - (to - from)
+    this.height = -1
+    return this
   }
 
   decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
