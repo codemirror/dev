@@ -77,7 +77,7 @@ export class Transaction {
   replaceSelection(text: string): Transaction {
     return this.reduceRanges((state, r) => {
       return {transaction: state.change(new Change(r.from, r.to, text)),
-              range: new SelectionRange(r.from, r.from + text.length)}
+              range: new SelectionRange(r.from + text.length)}
     })
   }
 
