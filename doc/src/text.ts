@@ -172,9 +172,6 @@ export class TextLeaf extends Text {
   }
 
   static split(text: string, target: Text[]): Text[] {
-    // FIXME maybe introduce some random (or deterministic) jitter
-    // here to prevent getting too many equal-sized nodes in the tree
-    // (which are more expensive to compare)
     for (let i = 0;;) {
       if (i + MAX_LEAF > text.length) {
         target.push(new TextLeaf(text.slice(i)))
@@ -400,7 +397,7 @@ export class TextNode extends Text {
 }
 
 function eqContent(a: Text, b: Text): boolean {
-  if (a.length != b.length) return false
+  if (a.length != b.length || a.lineBreaks != b.lineBreaks) return false
   let iterA = a.iter(), iterB = b.iter()
   for (let strA = iterA.next(), strB = iterB.next();;) {
     let lenA = strA.length, lenB = strB.length
