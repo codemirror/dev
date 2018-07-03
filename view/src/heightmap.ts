@@ -148,6 +148,12 @@ export class HeightMapLine extends HeightMap {
 
   copy() { return new HeightMapLine(this.length, this.deco) }
 
+  // FIXME it would be nice to preserve height information in some
+  // circumstances, so that simple changes don't invalidate known
+  // heights. Getting the circumstances right is the tricky part (line
+  // may not be visible, change may actually cause a height
+  // difference, et)
+
   decomposeLeft(to: number, target: HeightMap[], node: HeightMap, start: ReplaceSide) {
     if (to == 0) {
       target.push(node)
