@@ -156,4 +156,8 @@ describe("doc", () => {
       ist(doc0.lineEndAt(i), i - (i % 101) + 100)
     }
   })
+
+  it("can delete a range at the start of a child node", () => {
+    ist(doc0.replace(0, 100, "x").text, "x" + lines.slice(100))
+  })
 })

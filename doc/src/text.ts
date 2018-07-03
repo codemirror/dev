@@ -216,7 +216,7 @@ export class TextNode extends Text {
       if (from >= pos && to <= end &&
           (lengthDiff > 0
            ? child.length + lengthDiff < Math.max(newLength >> (TARGET_BRANCH_SHIFT - 1), MAX_LEAF)
-           : child.length + lengthDiff > newLength >> TARGET_BRANCH_SHIFT)) {
+           : child.length + lengthDiff > newLength >> (TARGET_BRANCH_SHIFT + 1))) {
         // Fast path: if the change only affects one child and the
         // child's size remains in the acceptable range, only update
         // that child
@@ -229,8 +229,8 @@ export class TextNode extends Text {
         if (pos < from) {
           if (end == from) children.push(child)
           else child.decomposeStart(from - pos, children)
-          if (end >= to) TextLeaf.split(text, children)
         }
+        if (pos <= from && end >= from) TextLeaf.split(text, children)
         if (pos >= to) children.push(child)
         else if (end > to) child.decomposeEnd(to - pos, children)
       }
