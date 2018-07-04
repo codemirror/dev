@@ -9,16 +9,18 @@ export class EditorView {
   private _state: EditorState
   get state(): EditorState { return this._state }
 
-  public dispatch: (tr: Transaction) => void
+  readonly dispatch: (tr: Transaction) => void
 
-  public dom: HTMLElement
-  public contentDOM: HTMLElement
-
-  /** @internal */
-  public inputState: InputState
+  readonly dom: HTMLElement
+  readonly contentDOM: HTMLElement
 
   /** @internal */
-  public docView: DocView;
+  readonly inputState: InputState
+
+  /** @internal */
+  readonly docView: DocView;
+
+  private pluginViews: PluginView[] = []
 
   constructor(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
@@ -38,15 +40,22 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
                                () => applySelectionChange(this))
     this.docView.update(state)
+    this.createPluginViews()
   }
 
   setState(state: EditorState) {
-    let configChanged = !this._state.sameConfig(state)
+    let prevState = this._state
     this._state = state
     this.docView.update(state)
-    if (configChanged) this.inputState.updateCustomHandlers(this)
+    if (prevState.plugins != state.plugins) {
+      this.inputState.updateCustomHandlers(this)
+      this.createPluginViews()
+    } else {
+      for (let pluginView of this.pluginViews) if (pluginView.update) pluginView.update(this, prevState)
+    }
   }
 
+  /** @internal */
   someProp<N extends keyof EditorProps, R>(propName: N, f: (value: NonNullable<EditorProps[N]>) => R | undefined): R | undefined {
     let value: R | undefined = undefined
     for (let plugin of this.state.plugins) {
@@ -56,12 +65,25 @@ export class EditorView {
     return value
   }
 
+  /** @internal */
   getProp<N extends keyof EditorProps>(propName: N): EditorProps[N] {
     for (let plugin of this.state.plugins) {
       let prop = plugin.props[propName]
       if (prop != null) return prop
     }
     return undefined
+  }
+
+  private createPluginViews() {
+    this.destroyPluginViews()
+    for (let plugin of this.state.plugins) if (plugin.view)
+      this.pluginViews.push(plugin.view(this))
+  }
+
+  private destroyPluginViews() {
+    for (let pluginView of this.pluginViews) if (pluginView.destroy)
+      pluginView.destroy()
+    this.pluginViews.length = 0
   }
 
   domAtPos(pos: number): {node: Node, offset: number} | null {
@@ -77,6 +99,7 @@ export class EditorView {
   }
 
   destroy() {
+    this.destroyPluginViews()
     this.dom.remove()
     this.docView.destroy()
   }
@@ -85,6 +108,11 @@ export class EditorView {
 export interface EditorProps {
   readonly handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
   readonly decorations?: (state: EditorState) => DecorationSet;
+}
+
+export interface PluginView {
+  update?: (view: EditorView, prevState: EditorState) => void
+  destroy?: () => void
 }
 
 function selectionFromDOM(view: EditorView) {

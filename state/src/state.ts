@@ -44,10 +44,6 @@ export class EditorState {
     throw new Error("Plugin for field not configured")
   }
 
-  sameConfig(other: EditorState): boolean {
-    return this.config == other.config
-  }
-
   /** @internal */
   applyTransaction(tr: Transaction): EditorState {
     let $conf = this.config

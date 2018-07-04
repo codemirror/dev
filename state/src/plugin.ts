@@ -24,17 +24,20 @@ export interface PluginSpec {
   state?: StateField<any>
   config?: any
   props?: any
+  view?: any
 }
 
 export class Plugin {
   readonly config: any
   readonly stateField: StateField<any> | null
   readonly props: any
+  readonly view: any
 
   constructor(spec: PluginSpec) {
     this.config = spec.config
     this.stateField = spec.state || null
     this.props = spec.props || {}
+    this.view = spec.view
   }
 }
 
