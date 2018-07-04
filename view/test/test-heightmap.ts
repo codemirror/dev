@@ -1,4 +1,4 @@
-import {HeightMap, HeightMapLine, HeightMapRange, HeightMapBranch, HeightOracle} from "../src/heightmap"
+import {HeightMap, HeightOracle} from "../src/heightmap"
 import {Decoration, DecorationSet, WidgetType} from "../src/decoration"
 import {Text} from "../../doc/src/text"
 import {ChangedRange} from "../../doc/src/diff"
@@ -40,7 +40,7 @@ describe("HeightMap", () => {
                  [Decoration.point(5, {widget: new MyWidget(20)}),
                   Decoration.range(25, 46, {collapsed: true})])
     ist(map.length, 48)
-    ist(map.toString(), "line(10:5,20) range(10) line(26:3,-21)")
+    ist(map.toString(), "line(10:5,20) gap(10) line(26:3,-21)")
   })
 
   it("ignores irrelevant decorations", () => {
@@ -48,7 +48,7 @@ describe("HeightMap", () => {
                  [Decoration.point(5, {}),
                   Decoration.range(25, 46, {class: "ahah"})])
     ist(map.length, 48)
-    ist(map.toString(), "range(48)")
+    ist(map.toString(), "gap(48)")
   })
 
   it("drops decorations from the tree when they are deleted", () => {
@@ -62,16 +62,16 @@ describe("HeightMap", () => {
   it("joins ranges", () => {
     let text = doc(10, 10, 10, 10)
     let map = mk(text, [Decoration.range(16, 27, {collapsed: true})])
-    ist(map.toString(), "range(10) line(21:5,-11) range(10)")
+    ist(map.toString(), "gap(10) line(21:5,-11) gap(10)")
     map = map.applyChanges([], o(text.replace(5, 38, "yyy")), [new ChangedRange(5, 38, 5, 8)])
-    ist(map.toString(), "range(13)")
+    ist(map.toString(), "gap(13)")
   })
 
   it("joins lines", () => {
     let text = doc(10, 10, 10)
     let map = mk(text, [Decoration.range(2, 5, {collapsed: true}),
                         Decoration.point(24, {widget: new MyWidget(20)})])
-    ist(map.toString(), "line(10:2,-3) range(10) line(10:2,20)")
+    ist(map.toString(), "line(10:2,-3) gap(10) line(10:2,20)")
     map = map.applyChanges([
       Decoration.set([Decoration.range(2, 5, {collapsed: true}),
                       Decoration.point(12, {widget: new MyWidget(20)})])
@@ -80,10 +80,10 @@ describe("HeightMap", () => {
   })
 
   it("materializes lines for measured heights", () => {
-    let oracle = (new HeightOracle).setDoc(doc(10, 10, 10, 10))
-    let map: HeightMap = new HeightMapRange(0, 43, oracle)
-    map = map.updateHeight(oracle, 0, false, 11, 43, [10, 28, 10, 14, 10, 5])
-    ist(map.toString(), "range(10) line(10) line(10) line(10)")
+    let text = doc(10, 10, 10, 10), oracle = (new HeightOracle).setDoc(text)
+    let map: HeightMap = mk(text, [])
+      .updateHeight(oracle, 0, false, 11, 43, [10, 28, 10, 14, 10, 5])
+    ist(map.toString(), "gap(10) line(10) line(10) line(10)")
     ist(map.height, 61)
   })
 
@@ -101,7 +101,7 @@ describe("HeightMap", () => {
   })
 
   function depth(heightMap) {
-    return heightMap instanceof HeightMapBranch ? Math.max(depth(heightMap.left), depth(heightMap.right)) + 1 : 1
+    return heightMap.left ? Math.max(depth(heightMap.left), depth(heightMap.right)) + 1 : 1
   }
 
   it("balances a big tree", () => {

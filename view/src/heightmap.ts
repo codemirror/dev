@@ -13,7 +13,7 @@ export class HeightOracle {
   lineHeight: number = 14
   lineLength: number = 30
 
-  heightForRange(from: number, to: number): number {
+  heightForGap(from: number, to: number): number {
     let lines = this.doc.linePos(to).line - this.doc.linePos(from).line + 1
     if (this.lineWrapping)
       lines += Math.ceil(((to - from) - (lines * this.lineLength * 0.5)) / this.lineLength)
@@ -128,7 +128,7 @@ export abstract class HeightMap {
 
 const noDeco: number[] = []
 
-export class HeightMapLine extends HeightMap {
+class HeightMapLine extends HeightMap {
   constructor(length: number, height: number, public deco: number[] = noDeco) { super(length, height) }
 
   get size(): number { return 1 }
@@ -144,7 +144,7 @@ export class HeightMapLine extends HeightMap {
   }
 
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    if (nodes.length != 1 || (nodes[0] instanceof HeightMapRange && oracle.doc.lineEndAt(newFrom) < newTo))
+    if (nodes.length != 1 || (nodes[0] instanceof HeightMapGap && oracle.doc.lineEndAt(newFrom) < newTo))
       return super.replace(from, to, nodes, oracle, newFrom, newTo)
     this.deco = offsetDeco(this.deco, from, to, nodes[0].length)
     if (nodes[0] instanceof HeightMapLine) this.deco = insertDeco(this.deco, (nodes[0] as HeightMapLine).deco, from)
@@ -163,7 +163,7 @@ export class HeightMapLine extends HeightMap {
       let newLen = to + (breakInside ? nextEnd - newTo : node.length)
       target.push(new HeightMapLine(newLen, this.height, offsetDeco(this.deco, to, this.length, 0)))
       if (breakInside)
-        target.push(new HeightMapRange(nextEnd + 1, newTo + node.length, oracle))
+        target.push(new HeightMapGap(nextEnd + 1, newTo + node.length, oracle))
     }
   }
 
@@ -175,7 +175,7 @@ export class HeightMapLine extends HeightMap {
     } else {
       let prevStart = oracle.doc.lineStartAt(newFrom), breakInside = prevStart > newFrom - node.length
       if (breakInside)
-        target.push(new HeightMapRange(newFrom - node.length, prevStart - 1, oracle))
+        target.push(new HeightMapGap(newFrom - node.length, prevStart - 1, oracle))
       let newLen = (breakInside ? newFrom - prevStart : node.length) + (this.length - from)
       target.push(new HeightMapLine(newLen, this.height, offsetDeco(this.deco, 0, from, newLen - this.length)))
     }
@@ -237,10 +237,9 @@ function insertDeco(deco: number[], newDeco: number[], pos: number): number[] {
   }
 }
 
-// FIXME rename to HeightMapGap
-export class HeightMapRange extends HeightMap {
+class HeightMapGap extends HeightMap {
   constructor(from: number, to: number, oracle: HeightOracle) {
-    super(to - from, oracle.heightForRange(from, to), false)
+    super(to - from, oracle.heightForGap(from, to), false)
   }
 
   get size(): number { return 1 }
@@ -259,7 +258,7 @@ export class HeightMapRange extends HeightMap {
   }
 
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    if (nodes.length != 1 || !(nodes[0] instanceof HeightMapRange))
+    if (nodes.length != 1 || !(nodes[0] instanceof HeightMapGap))
       return super.replace(from, to, nodes, oracle, newFrom, newTo)
     this.length += nodes[0].length - (to - from)
     this.outdated = true
@@ -268,11 +267,11 @@ export class HeightMapRange extends HeightMap {
 
   decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number) {
     let newOffset = newTo - to
-    if (node instanceof HeightMapRange) {
-      target.push(new HeightMapRange(newOffset, newTo + node.length, oracle))
+    if (node instanceof HeightMapGap) {
+      target.push(new HeightMapGap(newOffset, newTo + node.length, oracle))
     } else {
       let lineStart = oracle.doc.lineStartAt(newTo)
-      if (lineStart > newOffset) target.push(new HeightMapRange(newOffset, lineStart - 1, oracle))
+      if (lineStart > newOffset) target.push(new HeightMapGap(newOffset, lineStart - 1, oracle))
       let deco = offsetDeco((node as HeightMapLine).deco, 0, 0, newTo - lineStart)
       target.push(new HeightMapLine(newTo + node.length - lineStart, node.height, deco))
     }
@@ -280,12 +279,12 @@ export class HeightMapRange extends HeightMap {
 
   decomposeRight(from: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number) {
     let newEnd = newFrom + (this.length - from)
-    if (node instanceof HeightMapRange) {
-      target.push(new HeightMapRange(newFrom - node.length, newEnd, oracle))
+    if (node instanceof HeightMapGap) {
+      target.push(new HeightMapGap(newFrom - node.length, newEnd, oracle))
     } else {
       let lineEnd = oracle.doc.lineEndAt(newFrom)
       target.push(new HeightMapLine(lineEnd - (newFrom - from), node.height, (node as HeightMapLine).deco))
-      if (newEnd > lineEnd) target.push(new HeightMapRange(lineEnd + 1, newEnd, oracle))
+      if (newEnd > lineEnd) target.push(new HeightMapGap(lineEnd + 1, newEnd, oracle))
     }
   }
 
@@ -294,28 +293,28 @@ export class HeightMapRange extends HeightMap {
     if (lines) {
       let nodes = []
       if (from! > offset)
-        nodes.push(new HeightMapRange(offset, from! - 1, oracle))
+        nodes.push(new HeightMapGap(offset, from! - 1, oracle))
       for (let i = 0; i < lines.length; i += 2)
         nodes.push(new HeightMapLine(lines[i], lines[i + 1]))
       if (to! < offset + this.length)
-        nodes.push(new HeightMapRange(to! + 1, offset + this.length, oracle))
+        nodes.push(new HeightMapGap(to! + 1, offset + this.length, oracle))
       for (let node of nodes) node.outdated = false
       return HeightMap.of(nodes)
     } else if (force || this.outdated) {
-      this.height = oracle.heightForRange(offset, offset + this.length)
+      this.height = oracle.heightForGap(offset, offset + this.length)
     }
     this.outdated = false
     return this
   }
 
-  toString() { return `range(${this.length})` }
+  toString() { return `gap(${this.length})` }
 
   forEachLine() {
-    throw new Error("forEachLine called on a range")
+    throw new Error("forEachLine called on a gap")
   }
 }
 
-export class HeightMapBranch extends HeightMap {
+class HeightMapBranch extends HeightMap {
   size: number
 
   constructor(public left: HeightMap, public right: HeightMap) {
@@ -418,7 +417,7 @@ export class HeightMapBranch extends HeightMap {
 
 // FIXME This could probably be optimized. Measure how often it's
 // actually running during regular use. (Current theory is that,
-// becuase most of the document will simply be an unparsed range, and
+// becuase most of the document will simply be an unparsed gap, and
 // collapsed regions/widgets are relatively rare, and the viewport is
 // filled in through updateHeight, it's not going to be calling
 // `lineEndAt`/`lineStartAt` a significant amount of times except in
@@ -471,7 +470,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
 
   flushTo(pos: number) {
     if (pos > this.writtenTo) {
-      this.nodes.push(new HeightMapRange(this.writtenTo, pos, this.oracle))
+      this.nodes.push(new HeightMapGap(this.writtenTo, pos, this.oracle))
       this.writtenTo = pos
     }
   }
@@ -495,6 +494,6 @@ function buildChangedNodes(oracle: HeightOracle, decorations: ReadonlyArray<Deco
   RangeSet.iterateSpans(decorations, from, to, builder)
   if (builder.curLine) builder.curLine.updateHeight(oracle, builder.pos - builder.curLine.length)
   else builder.flushTo(builder.pos)
-  if (builder.nodes.length == 0) builder.nodes.push(new HeightMapRange(0, 0, oracle))
+  if (builder.nodes.length == 0) builder.nodes.push(new HeightMapGap(0, 0, oracle))
   return builder.nodes
 }
