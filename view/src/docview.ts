@@ -67,9 +67,8 @@ export class DocView extends ContentView {
     this.text = state.doc
     this.decorations = decorations
     this.selection = state.selection
-    this.heightMap = this.heightMap
-      .applyChanges(state.doc, decorations.map(d => d.decorations), changes.height)
-      .updateHeight(this.heightOracle.setDoc(state.doc))
+    this.heightMap = this.heightMap.applyChanges(decorations.map(d => d.decorations),
+                                                 this.heightOracle.setDoc(state.doc), changes.height)
 
     this.updateInner(changes.content, oldLength)
 

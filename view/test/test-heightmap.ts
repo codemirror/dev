@@ -4,6 +4,10 @@ import {Text} from "../../doc/src/text"
 import {ChangedRange} from "../../doc/src/diff"
 const ist = require("ist")
 
+function o(doc) {
+  return (new HeightOracle).setDoc(doc)
+}
+
 describe("HeightMap", () => {
   it("starts empty", () => {
     let empty = HeightMap.empty()
@@ -12,7 +16,7 @@ describe("HeightMap", () => {
   })
 
   function mk(text, deco = []) {
-    return HeightMap.empty().applyChanges(text, [Decoration.set(deco)],
+    return HeightMap.empty().applyChanges([Decoration.set(deco)], o(text),
                                           [new ChangedRange(0, 0, 0, text.length)])
   }
   function doc(... lineLen) {
@@ -51,7 +55,7 @@ describe("HeightMap", () => {
     let text = doc(20)
     let map = mk(text, [Decoration.point(5, {widget: new MyWidget(20)})])
     ist(map.toString(), "line(20:5,20)")
-    map = map.applyChanges(text, [], [new ChangedRange(16, 16, 16, 16)])
+    map = map.applyChanges([], o(text), [new ChangedRange(5, 5, 5, 5)])
     ist(map.toString(), "line(20)")
   })
 
@@ -59,7 +63,7 @@ describe("HeightMap", () => {
     let text = doc(10, 10, 10, 10)
     let map = mk(text, [Decoration.range(16, 27, {collapsed: true})])
     ist(map.toString(), "range(10) line(21:5,-11) range(10)")
-    map = map.applyChanges(text.replace(5, 38, "yyy"), [], [new ChangedRange(5, 38, 5, 8)])
+    map = map.applyChanges([], o(text.replace(5, 38, "yyy")), [new ChangedRange(5, 38, 5, 8)])
     ist(map.toString(), "range(13)")
   })
 
@@ -68,16 +72,16 @@ describe("HeightMap", () => {
     let map = mk(text, [Decoration.range(2, 5, {collapsed: true}),
                         Decoration.point(24, {widget: new MyWidget(20)})])
     ist(map.toString(), "line(10:2,-3) range(10) line(10:2,20)")
-    map = map.applyChanges(text.replace(10, 22, ""), [
+    map = map.applyChanges([
       Decoration.set([Decoration.range(2, 5, {collapsed: true}),
                       Decoration.point(12, {widget: new MyWidget(20)})])
-    ], [new ChangedRange(10, 22, 10, 10)])
+    ], o(text.replace(10, 22, "")), [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20:2,-3,12,20)")
   })
 
   it("materializes lines for measured heights", () => {
-    let map: HeightMap = new HeightMapRange(43)
     let oracle = (new HeightOracle).setDoc(doc(10, 10, 10, 10))
+    let map: HeightMap = new HeightMapRange(0, 43, oracle)
     map = map.updateHeight(oracle, 0, false, 11, 43, [10, 28, 10, 14, 10, 5])
     ist(map.toString(), "range(10) line(10) line(10) line(10)")
     ist(map.height, 61)
@@ -110,12 +114,12 @@ describe("HeightMap", () => {
     ist(map.size, 100)
     ist(depth(map), 9, "<")
     text = text.replace(0, 31 * 80, "")
-    map = map.applyChanges(text, [], [new ChangedRange(0, 31 * 80, 0, 0)])
+    map = map.applyChanges([], o(text), [new ChangedRange(0, 31 * 80, 0, 0)])
     ist(map.size, 20)
     ist(depth(map), 7, "<")
     let len = text.length
     text = text.replace(len, len, "\nfoo".repeat(200))
-    map = map.applyChanges(text, [], [new ChangedRange(len, len, len, len + 800)])
+    map = map.applyChanges([], o(text), [new ChangedRange(len, len, len, len + 800)])
     heights.length = 0
     for (let i = 0; i < 200; i++) heights.push(3, 10)
     map = map.updateHeight(oracle.setDoc(text), 0, false, len + 1, text.length, heights)
@@ -129,7 +133,7 @@ describe("HeightMap", () => {
     let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, [3, 10, 3, 10, 3, 10])
     ist(map.size, 3)
     text = text.replace(3, 3, "\n")
-    map = map.applyChanges(text, [], [new ChangedRange(3, 3, 3, 4)])
+    map = map.applyChanges([], o(text), [new ChangedRange(3, 3, 3, 4)])
       .updateHeight(oracle, 0, false, 0, text.length, [3, 10, 0, 10, 3, 10, 3, 10])
     ist(map.size, 4)
     ist(map.height, 40)
@@ -140,7 +144,7 @@ describe("HeightMap", () => {
     let oracle = (new HeightOracle).setDoc(text)
     let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, [3, 10, 3, 10, 3, 10])
     text = text.replace(5, 5, "foo\nbar\nbaz\nbug")
-    map = map.applyChanges(text, [], [new ChangedRange(5, 5, 5, 20)])
+    map = map.applyChanges([], o(text), [new ChangedRange(5, 5, 5, 20)])
       .updateHeight(oracle, 0, false, 0, text.length, [3, 10, 4, 10, 3, 10, 3, 10, 5, 10, 3, 10])
     ist(map.size, 6)
     ist(map.height, 60)
