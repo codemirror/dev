@@ -1,53 +1,21 @@
-import {Builder, By, Key, until} from "selenium-webdriver"
-import {EditorSelection} from "../../state/src"
+import {Builder, By, Key} from "selenium-webdriver"
 const ist = require("ist")
 
 const driver = new Builder().forBrowser("chrome").build()
 const browser = process.env.SELENIUM_BROWSER || "chrome"
-const notChrome = browser != "chrome"
-const notFirefox = browser != "firefox"
-let charSize
+const firefox = browser == "firefox"
 const tests = {
-  async setCursor(n: number) {
-    return driver.executeScript(`tests.setCursor(${n})`)
-
-/*
-    // How it could be if geckodriver would support actions
-    if (!charSize) {
-      charSize = await driver.executeScript(`const s = document.querySelector("span")
-      const r = document.createRange()
-      r.setStart(s, 0)
-      r.setEnd(s, 1)
-window.document.onclick = e => console.log(e.pageX, e.pageY)
-      return r.getBoundingClientRect()`)
-    }
-    const cm = driver.findElement(By.className("CM-content"))
-    const pos = {
-      y: charSize.y + charSize.height * (n < 3 ? 0 : (n < 15 ? 1 : 2)),
-      x: charSize.x + charSize.width * (n < 3 ? n : (n < 15 ? 15 - n : n - 15))
-    }
-for (let i = -100; i < 100; i+=10) {
-await driver.actions({bridge: true}).move({x: -i, y: i, origin: cm}).click().perform()
-}
-console.log(pos)
-    return driver.actions({bridge: true}).move({x: pos.x, y: pos.x, origin: cm}).click().perform()
-*/
-
-    // How it is in Firefox
-    const cm = driver.findElement(By.className("CM-content"))
-    await driver.executeScript(`tests.setCursor(0)`)
-    let amount = (n < 4 ? n : (n < 14 ? 13 - (n > 12 ? n - 4 : (n > 9 ? n - 3: (n > 7 ? n - 2 : (n > 5 ? n -1 : n)))) : n - 4))
-    while(amount--) await cm.sendKeys(Key.RIGHT)
-  },
+  async setCursor(n: number) { return driver.executeScript(`tests.setCursor(${n})`) },
   getSelection() { return driver.executeScript("return tests.getSelection()") },
-  setText(text: string) { return driver.executeScript(`return tests.setText(${JSON.stringify(text)})`) }
+  setText(text: string) { return driver.executeScript(`return tests.setText(${JSON.stringify(text)})`) },
+  getText() { return driver.executeScript(`return tests.getText()`) }
 }
 
 let cm = null
 const getCm = async function() {
   if (cm) return cm
   await driver.get(process.env.TARGET)
-  cm = driver.findElement(By.className("CM-content"))
+  cm = driver.findElement(By.className("CodeMirror-content"))
   await cm.click()
   return cm
 }
@@ -56,15 +24,32 @@ let pending = 0
 const forAllPositions = (onlyValid, f) => async function () {
   ++pending
   const cm = await getCm()
-  for (let i = 0; i < 20; ++i) {
-    const nonspacing = (i == 5 || i == 7 || i == 9 || i == 12)
-    if (nonspacing && onlyValid) continue
+  const run = async function(i) {
+    const nonspacing = [5, 7, 9, 12].indexOf(i % 20) != -1
+    if (nonspacing && onlyValid) return
     await tests.setCursor(i)
     await f(cm, i, nonspacing)
   }
+  for (let i = 0; i <= 20 * 100; i += 63) await run(i)
+  await run(4)
+  await run(1997)
+  await run(2000)
   --pending
 }
 const forAllValidPositions = f => forAllPositions(true, f)
+
+const lines =  [
+  [        0,        1,  2,  3],
+  [  [4, 13], [11, 12], 10,  8,  6, [4, 13]],
+  [       14,       15, 16, 17, 18,      19]
+]
+const getAllCoords = (pos) => {
+  const ret = []
+  for (let y = 0; y < lines.length; ++y)
+    for (let x = 0; x < lines[y].length; ++x)
+      if (lines[y][x] === pos || (Array.isArray(lines[y][x]) && lines[y][x].indexOf(pos) !== -1)) ret.push([y, x])
+  return ret
+}
 
 describe("builtin commands", () => {
   after(async function () {
@@ -76,66 +61,67 @@ describe("builtin commands", () => {
     ist(pos == i || (nonspacing && pos == i + 1))
   }))
 
-  it("left", forAllValidPositions(async function (cm, i) {
-    const next = {
-      0: 0,
-     13: 3, 11: 12, 10: 11, 8: 9, 6: 8, 4: 5,
-     14: 4
-    }
+  it("left", forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.LEFT)
-    const pos = (await tests.getSelection()).primary.anchor
-    if (i == 4) ist(pos == 5 || pos == 3)
-    else if (i == 13) ist(pos == 3 || pos == 5)
-    else if (i == 14) ist(pos == 4 || pos == 13)
-    else ist(EditorSelection.single(next.hasOwnProperty(i) ? next[i] : i - 1).eq(await tests.getSelection()))
+    const result = (await tests.getSelection()).primary.anchor
+
+    if (start == 0) {
+      ist(result, start)
+      return
+    }
+    const acceptable = getAllCoords(start % 20).reduce((acceptable, [y, x]) => {
+      const cur = x > 0 ? lines[y][x - 1] : (y > 0 ? lines[y - 1][lines[y - 1].length - 1] : 19)
+      return acceptable.concat(cur)
+    }, [])
+    ist(acceptable.indexOf(result % 20) !== -1)
+    ist(result < start + 10) // These are logical positions
+    ist(result > start - 20)
   }))
 
-  it("right", forAllValidPositions(async function (cm, i) {
-    const next = {
-     3: 13,
-     13: 11, 11: 10, 10: 8, 8: 6, 6: 4, 4: 14,
-     19: 19
-    }
+  it("right", forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.RIGHT)
-    const pos = (await tests.getSelection()).primary.anchor
-    if (i == 3) ist(pos == 13 || pos == 4)
-    else if (i == 4) ist(pos == 12 || pos == 14)
-    else if (i == 6) ist(pos == 5 || pos == 4)
-    else if (i == 10) ist(pos == 9 || pos == 8)
-    else if (i == 13) ist(pos == 11 || pos == 14)
-    else ist(EditorSelection.single(next.hasOwnProperty(i) ? next[i] : i + 1).eq(await tests.getSelection()))
+    const result = (await tests.getSelection()).primary.anchor
+
+    if (start == 2000) return ist(result, start)
+    const acceptable = getAllCoords(start % 20).reduce((acceptable, [y, x]) => {
+      const cur = x < lines[y].length - 1 ? lines[y][x + 1] : (y < lines.length - 1 ? lines[y + 1][0] : 0)
+      return acceptable.concat(cur)
+    }, [])
+    ist(acceptable.indexOf(result % 20) !== -1)
+    ist(result > start - 10) // These are logical positions
+    ist(result < start + 20)
   }))
 
-  it("up", notFirefox && forAllValidPositions(async function (cm, i) {
-    const next = {
-      0: 0, 1: 0, 2: 0, 3: 0,
-      13: 0, 11: 1, 10: 2, 8: 3, 6: 3, 4: 3,
-      14: 12, 15: 11, 16: 9, 17: 8, 18: 5, 19: 4
-    }
+  it("up", forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.UP)
-    const pos = (await tests.getSelection()).primary.anchor
-    if (i == 4) ist(pos == 3 || pos == 0)
-    else if (i == 13) ist(pos == 3 || pos == 0)
-    else if (i == 14) ist(pos == 4 || pos == 12)
-    else if (i == 18) ist(pos == 5 || pos == 6)
-    else if (i == 19) ist(pos == 4 || pos == 13)
-    else ist(EditorSelection.single(next[i]).eq(await tests.getSelection()))
+    const result = (await tests.getSelection()).primary.anchor
+    if (start < 4) {
+      ist(result, 0)
+      return
+    }
+    const acceptable = getAllCoords(start % 20).reduce((acceptable, [y, x]) => {
+      const line = lines[y == 0 ? lines.length - 1 : y - 1]
+      return acceptable.concat(line[Math.min(x, line.length - 1)])
+    }, [])
+    ist(acceptable.indexOf(result % 20) !== -1)
+    ist(result < start)
+    ist(result > start - 20)
   }))
 
-  it("down", notFirefox && forAllValidPositions(async function (cm, i) {
-    const next = {
-      0: 12, 1: 11, 2: 9, 3: 8,
-      13: 14, 11: 15, 10: 16, 8: 17, 6: 18, 4: 19,
-      14: 19, 15: 19, 16: 19, 17: 19, 18: 19, 19: 19
-    }
-    const other_next = {
-      0: 4, 2: 10,
-      4: 14, 11: 14, 10: 15, 8: 16, 6: 16,
-      13: 19, 14: 18, 15: 18
-    }
+  it("down", forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.DOWN)
-    const pos = (await tests.getSelection()).primary.anchor
-    ist(next[i] == pos || other_next[i] === pos)
+    const result = (await tests.getSelection()).primary.anchor
+    if (start >= 20*99 + 14) {
+      ist(result, 20*100)
+      return
+    }
+    const acceptable = getAllCoords(start % 20).reduce((acceptable, [y, x]) => {
+      const line = lines[(y + 1) % lines.length]
+      return acceptable.concat(line[Math.min(x, line.length - 1)])
+    }, [])
+    ist(acceptable.indexOf(result % 20) !== -1)
+    ist(result > start)
+    ist(result < start + 20)
   }))
 
   // Doesn't work in Firefox, probably due to
@@ -143,52 +129,60 @@ describe("builtin commands", () => {
   // The synthesized keydown event has code = ""
   // FIXME goLineStartSmart
   // FIXME longer lines
-  it("home", notFirefox && forAllValidPositions(async function (cm, i) {
+  it("home", !firefox && forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.HOME)
     const pos = (await tests.getSelection()).primary.anchor
+    const i = start % 20
     const line = (i < 4 ? 0 : (i < 14 ? 1 : 2))
-    ist({0: 0, 1: 4, 2: 14}[line], pos)
+    ist({0: 0, 1: 4, 2: 14}[line], pos % 20)
   }))
 
   // FIXME longer lines
-  it("end", notFirefox && forAllValidPositions(async function (cm, i) {
+  it("end", !firefox && forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.END)
     const pos = (await tests.getSelection()).primary.anchor
+    if (start == 2000) {
+      ist(pos, start)
+      return
+    }
+    const i = start % 20
     const line = (i < 4 ? 0 : (i < 14 ? 1 : 2))
-    ist({0: 3, 1: 13, 2: 19}[line], pos)
+    ist({0: 3, 1: 13, 2: 19}[line], pos % 20)
   }))
 
-  // FIXME longer doc
-  it("page up", notFirefox && forAllValidPositions(async function (cm) {
+  it("page up", !firefox && forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.PAGE_UP)
     const pos = (await tests.getSelection()).primary.anchor
-    ist(0, pos)
+    if (pos > 0) ist(start % 20, pos % 20)
+    ist(pos <= Math.max(0, start - 200))
   }))
 
-  // FIXME longer doc
-  it("page down", notFirefox && forAllValidPositions(async function (cm) {
+  it("page down", !firefox && forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.PAGE_DOWN)
     const pos = (await tests.getSelection()).primary.anchor
-    ist(19, pos)
+    if (pos < 20*100) ist(start % 20, pos % 20)
+    ist(pos >= Math.min(20*100, start + 200))
   }))
 
-  it("del", notChrome && forAllValidPositions(async function (cm, i) {
-    const text = await cm.getText()
+  it("del", forAllValidPositions(async function (cm, start) {
+    if (firefox && start === 2000) return // https://github.com/codemirror/codemirror.next/issues/32
+    const text = await tests.getText()
     await cm.sendKeys(Key.DELETE)
     const pos = (await tests.getSelection()).primary.anchor
-    ist(i, pos)
-    const expected = text.substr(0, i) + text.substr(i + (i >= 4 && i != 10 && i < 13 ? 2 : 1))
-    const actual = await cm.getText()
-    ist(expected, actual)
+    ist(start, pos)
+    const i = start % 20
+    const expected = text.substr(0, start) + text.substr(start + (i >= 4 && i != 10 && i < 13 ? 2 : 1))
+    const actual = await tests.getText()
+    ist(expected === actual)
     await tests.setText(text)
   }))
 
-  it("backspace", notChrome && forAllValidPositions(async function (cm, i) {
-    const text = await cm.getText()
+  it("backspace", forAllValidPositions(async function (cm, start) {
+    const text = await tests.getText()
     await cm.sendKeys(Key.BACK_SPACE)
     const pos = (await tests.getSelection()).primary.anchor
-    ist(Math.max(0, i - 1), pos)
-    ist(text.substr(0, i - 1) + text.substr(i), await cm.getText())
+    ist(Math.max(0, start - 1), pos)
+    ist(text.substr(0, start - 1) + text.substr(start), await tests.getText())
     await tests.setText(text)
   }))
 })
