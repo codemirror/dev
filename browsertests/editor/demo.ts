@@ -4,7 +4,7 @@ import {keymap} from "../../keymap/src/keymap"
 import {history, redo, undo} from "../../history/src/history"
 
 let field = new StateField<DecorationSet>({
-  init() {return DecorationSet.of([
+  init() {return Decoration.set([
     Decoration.range(0, 2, {attributes: {style: "color: red"}, inclusiveEnd: true}),
     Decoration.range(4, 5, {attributes: {style: "color: blue"}, inclusiveStart: true}),
     Decoration.range(9, 12, {attributes: {style: "color: orange"}})
