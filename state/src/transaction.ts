@@ -10,7 +10,7 @@ class Meta {
   constructor(from: Meta | null = null) {
     if (from) for (let prop in from) this[prop] = from[prop]
   }
-  [key: string]: any;
+  [key: string]: any
 }
 Meta.prototype["__proto__"] = null
 
@@ -18,13 +18,13 @@ const metaSlotNames = Object.create(null)
 
 export class MetaSlot<T> {
   /** @internal */
-  name: string;
+  name: string
 
   constructor(debugName: string = "meta") {
     this.name = unique(debugName, metaSlotNames)
   }
 
-  static time: MetaSlot<number> = new MetaSlot("time");
+  static time: MetaSlot<number> = new MetaSlot("time")
   static origin: MetaSlot<string> = new MetaSlot("origin")
   static userEvent: MetaSlot<string> = new MetaSlot("userEvent")
   static addToHistory: MetaSlot<boolean> = new MetaSlot("addToHistory")

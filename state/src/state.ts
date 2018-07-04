@@ -4,7 +4,7 @@ import {Plugin, StateField} from "./plugin"
 import {Transaction} from "./transaction"
 
 class Configuration {
-  readonly fields: ReadonlyArray<StateField<any>>;
+  readonly fields: ReadonlyArray<StateField<any>>
 
   constructor(readonly plugins: ReadonlyArray<Plugin>) {
     let fields = []
@@ -20,9 +20,9 @@ class Configuration {
 }
 
 export interface EditorStateConfig {
-  doc?: string | Text;
-  selection?: EditorSelection;
-  plugins?: ReadonlyArray<Plugin>;
+  doc?: string | Text
+  selection?: EditorSelection
+  plugins?: ReadonlyArray<Plugin>
 }
 
 export class EditorState {

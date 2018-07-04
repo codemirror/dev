@@ -5,9 +5,9 @@ const fieldNames = Object.create(null)
 
 export class StateField<T> {
   /** @internal */
-  readonly key: string;
-  readonly init: (state: EditorState) => T;
-  readonly apply: (tr: Transaction, value: T, newState: EditorState) => T;
+  readonly key: string
+  readonly init: (state: EditorState) => T
+  readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
 
   constructor({init, apply, debugName = "field"}: {
     init: (state: EditorState) => T,
@@ -21,15 +21,15 @@ export class StateField<T> {
 }
 
 export interface PluginSpec {
-  state?: StateField<any>;
-  config?: any;
-  props?: any;
+  state?: StateField<any>
+  config?: any
+  props?: any
 }
 
 export class Plugin {
-  readonly config: any;
-  readonly stateField: StateField<any> | null;
-  readonly props: any;
+  readonly config: any
+  readonly stateField: StateField<any> | null
+  readonly props: any
 
   constructor(spec: PluginSpec) {
     this.config = spec.config
