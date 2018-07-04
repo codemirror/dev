@@ -18,7 +18,9 @@ export class EditorView {
   readonly inputState: InputState
 
   /** @internal */
-  readonly docView: DocView;
+  readonly docView: DocView
+
+  readonly viewport: EditorViewport
 
   private pluginViews: PluginView[] = []
 
@@ -27,12 +29,14 @@ export class EditorView {
     this.dispatch = dispatch || (tr => this.setState(tr.apply()))
 
     this.contentDOM = document.createElement("pre")
-    this.contentDOM.className = "CM-content"
+    this.contentDOM.className = "CodeMirror-content"
+    this.contentDOM.style.cssText = contentCSS
     this.contentDOM.setAttribute("contenteditable", "true")
     this.contentDOM.setAttribute("spellcheck", "false")
 
     this.dom = document.createElement("div")
-    this.dom.className = "CM"
+    this.dom.style.cssText = editorCSS
+    this.dom.className = "CodeMirror"
     this.dom.appendChild(this.contentDOM)
 
     this.inputState = new InputState(this)
@@ -40,6 +44,7 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
                                () => applySelectionChange(this))
     this.docView.update(state)
+    this.viewport = new EditorViewport(this.docView)
     this.createPluginViews()
   }
 
@@ -130,4 +135,24 @@ function applySelectionChange(view: EditorView) {
     view.dispatch(tr)
   }
   view.inputState.lastSelectionTime = 0
+}
+
+const editorCSS = `
+position: relative;
+display: flex;`
+
+const contentCSS = `
+margin: 0;`
+
+// Public shim for giving client code access to viewport information
+export class EditorViewport {
+  /** @internal */
+  constructor(readonly docView: DocView) {}
+
+  get from() { return this.docView.visiblePart.from }
+  get to() { return this.docView.visiblePart.to }
+
+  forEachLine(f: (from: number, to: number, height: number) => void) {
+    this.docView.heightMap.forEachLine(this.from, this.to, 0, f)
+  }
 }

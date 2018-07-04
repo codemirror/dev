@@ -68,6 +68,7 @@ export abstract class HeightMap {
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean,
                         from?: number, to?: number, lines?: number[]): HeightMap
   abstract toString(): void
+  abstract forEachLine(from: number, to: number, offset: number, f: (from: number, to: number, height: number) => void): void
 
   // from/to are node-relative positions pointing into the node itself
   // newFrom/newTo are document-relative positions in the updated
@@ -204,6 +205,10 @@ export class HeightMapLine extends HeightMap {
   }
 
   toString() { return `line(${this.length}${this.deco.length ? ":" + this.deco.join(",") : ""})` }
+
+  forEachLine(from: number, to: number, offset: number, f: (from: number, to: number, height: number) => void) {
+    f(offset, offset + this.length, this.height)
+  }
 }
 
 function offsetDeco(deco: number[], from: number, to: number, length: number): number[] {
@@ -232,6 +237,7 @@ function insertDeco(deco: number[], newDeco: number[], pos: number): number[] {
   }
 }
 
+// FIXME rename to HeightMapGap
 export class HeightMapRange extends HeightMap {
   constructor(from: number, to: number, oracle: HeightOracle) {
     super(to - from, oracle.heightForRange(from, to), false)
@@ -303,6 +309,10 @@ export class HeightMapRange extends HeightMap {
   }
 
   toString() { return `range(${this.length})` }
+
+  forEachLine() {
+    throw new Error("forEachLine called on a range")
+  }
 }
 
 export class HeightMapBranch extends HeightMap {
@@ -398,6 +408,12 @@ export class HeightMapBranch extends HeightMap {
   }
 
   toString() { return this.left + " " + this.right }
+
+  forEachLine(from: number, to: number, offset: number, f: (from: number, to: number, height: number) => void) {
+    let rightStart = this.left.length + 1
+    if (from < rightStart) this.left.forEachLine(from, to, offset, f)
+    if (to > rightStart) this.right.forEachLine(from - rightStart, to - rightStart, offset + rightStart, f)
+  }
 }
 
 // FIXME This could probably be optimized. Measure how often it's

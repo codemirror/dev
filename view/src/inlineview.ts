@@ -1,6 +1,5 @@
 import {ContentView, dirty} from "./contentview"
 import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, PointDecoration} from "./decoration"
-import {DocView} from "./docview"
 import {Text, TextCursor} from "../../doc/src/text"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 
@@ -139,9 +138,10 @@ export class CollapsedView extends InlineView {
   }
 
   get overrideDOMText() {
-    let top: ContentView = this, start = this.posAtStart
+    let top: ContentView = this
     while (top.parent) top = top.parent
-    return top instanceof DocView ? top.text.slice(start, start + this.length) : ""
+    let text = (top as any).text, start = this.posAtStart
+    return text ? text.slice(start, start + this.length) : ""
   }
 
   domBoundsAround() { return null }
