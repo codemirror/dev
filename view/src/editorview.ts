@@ -42,7 +42,7 @@ export class EditorView {
     this.inputState = new InputState(this)
 
     this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-                               () => applySelectionChange(this))
+                               () => applySelectionChange(this), () => this.layoutChange())
     this.docView.update(state)
     this.viewport = new EditorViewport(this.docView)
     this.createPluginViews()
@@ -50,6 +50,7 @@ export class EditorView {
 
   setState(state: EditorState) {
     let prevState = this._state
+    // FIXME scroll selection into view when needed
     this._state = state
     this.docView.update(state)
     if (prevState.plugins != state.plugins) {
@@ -91,8 +92,17 @@ export class EditorView {
     this.pluginViews.length = 0
   }
 
+  private layoutChange() {
+    for (let pluginView of this.pluginViews) if (pluginView.layoutChange)
+      pluginView.layoutChange(this)
+  }
+
   domAtPos(pos: number): {node: Node, offset: number} | null {
     return this.docView.domFromPos(pos)
+  }
+
+  heightAtPos(pos: number, top: boolean): number {
+    return this.docView.heightMap.heightAt(pos, top ? -1 : 1)
   }
 
   hasFocus(): boolean {
@@ -117,6 +127,7 @@ export interface EditorProps {
 
 export interface PluginView {
   update?: (view: EditorView, prevState: EditorState) => void
+  layoutChange?: (view: EditorView) => void
   destroy?: () => void
 }
 
@@ -139,10 +150,12 @@ function applySelectionChange(view: EditorView) {
 
 const editorCSS = `
 position: relative;
-display: flex;`
+display: flex;
+align-items: stretch;`
 
 const contentCSS = `
-margin: 0;`
+margin: 0;
+flex-grow: 2;`
 
 // Public shim for giving client code access to viewport information
 export class EditorViewport {
@@ -152,7 +165,7 @@ export class EditorViewport {
   get from() { return this.docView.visiblePart.from }
   get to() { return this.docView.visiblePart.to }
 
-  forEachLine(f: (from: number, to: number, height: number) => void) {
-    this.docView.heightMap.forEachLine(this.from, this.to, 0, f)
+  forEachLine(f: (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void) {
+    this.docView.heightMap.forEachLine(this.from, this.to, 0, this.docView.heightOracle, f)
   }
 }

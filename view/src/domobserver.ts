@@ -42,6 +42,7 @@ export class DOMObserver {
     this.readSelection = this.readSelection.bind(this)
     this.listenForSelectionChanges()
     // FIXME need a fallback for IE11
+    // FIXME doesn't seem to work when the editor element has a scrollbar
     this.intersection = new IntersectionObserver(entries => {
       let intersects = false, full = false
       for (let {intersectionRatio} of entries) if (intersectionRatio > 0) {

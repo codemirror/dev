@@ -38,7 +38,8 @@ export class DocView extends ContentView {
 
   constructor(dom: HTMLElement,
               onDOMChange: (from: number, to: number, typeOver: boolean) => void,
-              onSelectionChange: () => void) {
+              onSelectionChange: () => void,
+              readonly onLayoutChange: () => void) {
     super(null, dom)
     this.dirty = dirty.node
 
@@ -227,17 +228,22 @@ export class DocView extends ContentView {
                                           lineHeight, (this.dom).clientWidth / charWidth)
     }
 
+    this.heightOracle.heightChanged = false
+    let updated = false
     for (let i = 0;; i++) {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.from, this.visiblePart.to,
                                                    lineHeights || this.measureVisibleLineHeights())
       if (this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap)) break
+      updated = true
       if (i > 10) throw new Error("Layout failed to converge")
       this.updateInner()
       lineHeights = null
       refresh = false
       this.viewportState.updateFromDOM(this.dom)
     }
+    if (updated || this.heightOracle.heightChanged)
+      this.onLayoutChange()
   }
 
   nearest(dom: Node): ContentView | null {

@@ -12,6 +12,8 @@ export class HeightOracle {
   heightSamples: {[key: number]: boolean} = {}
   lineHeight: number = 14
   lineLength: number = 30
+  // Used to track, during updateHeight, if any actual heights changed
+  heightChanged: boolean = false
 
   heightForGap(from: number, to: number): number {
     let lines = this.doc.linePos(to).line - this.doc.linePos(from).line + 1
@@ -51,6 +53,8 @@ export class HeightOracle {
   }
 }
 
+type LineIterator = (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void
+
 export abstract class HeightMap {
   constructor(
     public length: number, // The number of characters covered
@@ -68,7 +72,14 @@ export abstract class HeightMap {
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean,
                         from?: number, to?: number, lines?: number[]): HeightMap
   abstract toString(): void
-  abstract forEachLine(from: number, to: number, offset: number, f: (from: number, to: number, height: number) => void): void
+  abstract forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator): void
+
+  setHeight(oracle: HeightOracle, height: number) {
+    if (this.height != height) {
+      this.height = height
+      oracle.heightChanged = true
+    }
+  }
 
   // from/to are node-relative positions pointing into the node itself
   // newFrom/newTo are document-relative positions in the updated
@@ -190,7 +201,7 @@ class HeightMapLine extends HeightMap {
                from?: number, to?: number, lines?: number[]): HeightMap {
     if (lines) {
       if (lines.length != 2) throw new Error("Mismatch between height map and line data")
-      this.height = lines[1]
+      this.setHeight(oracle, lines[1])
     } else if (force || this.outdated) {
       let len = this.length, minH = 0
       for (let i = 1; i < this.deco.length; i += 2) {
@@ -198,7 +209,7 @@ class HeightMapLine extends HeightMap {
         if (val < 0) len += val
         else minH = Math.max(val, minH)
       }
-      this.height = Math.max(oracle.heightForLine(len), minH)
+      this.setHeight(oracle, Math.max(oracle.heightForLine(len), minH))
     }
     this.outdated = false
     return this
@@ -206,8 +217,13 @@ class HeightMapLine extends HeightMap {
 
   toString() { return `line(${this.length}${this.deco.length ? ":" + this.deco.join(",") : ""})` }
 
-  forEachLine(from: number, to: number, offset: number, f: (from: number, to: number, height: number) => void) {
-    f(offset, offset + this.length, this.height)
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
+    f(offset, offset + this.length, this)
+  }
+
+  get hasCollapsedRanges(): boolean {
+    for (let i = 1; i < this.deco.length; i += 2) if (this.deco[i] < 0) return true
+    return false
   }
 }
 
@@ -299,9 +315,10 @@ class HeightMapGap extends HeightMap {
       if (to! < offset + this.length)
         nodes.push(new HeightMapGap(to! + 1, offset + this.length, oracle))
       for (let node of nodes) node.outdated = false
+      oracle.heightChanged = true
       return HeightMap.of(nodes)
     } else if (force || this.outdated) {
-      this.height = oracle.heightForGap(offset, offset + this.length)
+      this.setHeight(oracle, oracle.heightForGap(offset, offset + this.length))
     }
     this.outdated = false
     return this
@@ -309,8 +326,14 @@ class HeightMapGap extends HeightMap {
 
   toString() { return `gap(${this.length})` }
 
-  forEachLine() {
-    throw new Error("forEachLine called on a gap")
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
+    let line = {height: -1, hasCollapsedRanges: false}
+    for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos < end;) {
+      let end = oracle.doc.lineEndAt(pos)
+      line.height = oracle.heightForLine(end - pos)
+      f(pos, end, line)
+      pos = end + 1
+    }
   }
 }
 
@@ -390,6 +413,7 @@ class HeightMapBranch extends HeightMap {
         right = right.updateHeight(oracle, rightOffset, force, from, to, lines)
         if (force) left.updateHeight(oracle, offset, true)
       } else {
+        // FIXME try to reduce the array copying here?
         let i = 0, pos = from! - 1
         while (i < lines.length && pos <= rightOffset - 2) { pos += lines[i] + 1; i += 2 }
         right = right.updateHeight(oracle, rightOffset, force, rightOffset, to, lines.slice(i))
@@ -408,10 +432,10 @@ class HeightMapBranch extends HeightMap {
 
   toString() { return this.left + " " + this.right }
 
-  forEachLine(from: number, to: number, offset: number, f: (from: number, to: number, height: number) => void) {
-    let rightStart = this.left.length + 1
-    if (from < rightStart) this.left.forEachLine(from, to, offset, f)
-    if (to > rightStart) this.right.forEachLine(from - rightStart, to - rightStart, offset + rightStart, f)
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
+    let rightStart = offset + this.left.length + 1
+    if (from < rightStart) this.left.forEachLine(from, to, offset, oracle, f)
+    if (to > rightStart) this.right.forEachLine(from, to, rightStart, oracle, f)
   }
 }
 
