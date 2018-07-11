@@ -86,6 +86,26 @@ function findLastNewline(string: string) {
   return -1
 }
 
+export class LineCursor implements TextCursor {
+  private buf: string = ""
+
+  constructor(private cursor: TextCursor) {}
+
+  next(skip?: number): string {
+    let chunk, newlinePos = findNewline(this.buf), res = this.buf
+    while(newlinePos == -1 && (chunk = this.cursor.next())) {
+      newlinePos = findNewline(chunk)
+      if (newlinePos != -1) newlinePos += res.length
+      res += chunk
+    }
+    if (newlinePos == -1) newlinePos = res.length
+    this.buf = res.substr(newlinePos + 1)
+    res = res.substr(0, newlinePos)
+    if (skip) res = res.substr(skip)
+    return res
+  }
+}
+
 export class TextLeaf extends Text {
   readonly lineBreaks: number;
 

@@ -1,4 +1,4 @@
-import {Text, TextLeaf, LinePos} from "../src/text"
+import {Text, TextLeaf, LineCursor, LinePos} from "../src/text"
 const ist = require("ist")
 
 function depth(node) {
@@ -159,5 +159,39 @@ describe("doc", () => {
 
   it("can delete a range at the start of a child node", () => {
     ist(doc0.replace(0, 100, "x").text, "x" + lines.slice(100))
+  })
+})
+
+class ArrayCursor {
+  constructor(private strings: string[]) {}
+
+  next(skip?: number): string {
+    return this.strings.shift() || ""
+  }
+}
+
+describe("LineCursor", () => {
+  it("works with empty documents", () => {
+    const cursor = new LineCursor(new ArrayCursor([]))
+    for (let i = 0; i < 10; ++i) ist(cursor.next(i), "")
+    ist(cursor.next(), "")
+  })
+  it("works with documents that start with an empty line", () => {
+    const cursor = new LineCursor(new ArrayCursor(["\na", "b", "c"]))
+    ist(cursor.next(), "")
+    ist(cursor.next(), "abc")
+    ist(cursor.next(), "")
+  })
+  it("works with documents that end with an empty line", () => {
+    const cursor = new LineCursor(new ArrayCursor(["a", "b", "c\n"]))
+    ist(cursor.next(), "abc")
+    ist(cursor.next(), "")
+  })
+  it("works with multiple lines in one chunk", () => {
+    const cursor = new LineCursor(new ArrayCursor(["a\nb\nc\n"]))
+    ist(cursor.next(), "a")
+    ist(cursor.next(), "b")
+    ist(cursor.next(), "c")
+    ist(cursor.next(), "")
   })
 })
