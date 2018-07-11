@@ -1,26 +1,18 @@
-import {EditorState, Plugin, StateField} from "../state/src"
-import {EditorView, Decoration, DecorationSet} from "../view/src/"
+import {EditorState} from "../state/src"
+import {EditorView} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, undo} from "../history/src/history"
 import {gutter} from "../gutter/src/index"
 import {baseKeymap} from "../commands/src/commands"
+import {legacyMode} from "../legacy-modes/src/"
+import javascript from "../legacy-modes/src/javascript"
 
-let field = new StateField<DecorationSet>({
-  init() {return Decoration.set([
-    Decoration.range(0, 2, {attributes: {style: "color: red"}, inclusiveEnd: true}),
-    Decoration.range(4, 5, {attributes: {style: "color: blue"}, inclusiveStart: true}),
-    Decoration.range(9, 12, {attributes: {style: "color: orange"}})
-  ])},
-  apply(tr, decos) { return decos.map(tr.changes) }
-})
-let decos = new Plugin({
-  state: field,
-  view(v) {
-    return {get decorations() { return v.state.getField(field) }}
-  }
-})
+let state = EditorState.create({doc: `"use strict";
+const {readFile} = require("fs");
 
-let state = EditorState.create({doc: "one\ntwo\nthree\n".repeat(200), plugins: [history(), decos, gutter(), keymap(baseKeymap), keymap({
+readFile("package.json", "utf8", (err, data) => {
+  console.log(data);
+});`, plugins: [gutter(), history(), legacyMode(javascript({}, {})), keymap(baseKeymap), keymap({
   "ctrl-z": undo,
   "ctrl-shift-z": redo
 })]})
