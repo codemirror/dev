@@ -33,7 +33,7 @@ export class DocView extends ContentView {
   dom!: HTMLElement
 
   get length() { return this.text.length }
-  
+
   get childGap() { return 1 }
 
   constructor(dom: HTMLElement,

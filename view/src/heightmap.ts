@@ -435,7 +435,7 @@ class HeightMapBranch extends HeightMap {
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
     let rightStart = offset + this.left.length + 1
     if (from < rightStart) this.left.forEachLine(from, to, offset, oracle, f)
-    if (to > rightStart) this.right.forEachLine(from, to, rightStart, oracle, f)
+    if (to >= rightStart) this.right.forEachLine(from, to, rightStart, oracle, f)
   }
 }
 
