@@ -36,6 +36,7 @@ class GutterView {
   constructor(view: EditorView, config: GutterConfig) {
     this.dom = document.createElement("div")
     this.dom.className = "CodeMirror-gutter"
+    this.dom.setAttribute("role", "presentation")
     this.dom.style.cssText = `flex-basis: 0; left: 0`
     if (config.fixed !== false) {
       // FIXME IE11 fallback, which doesn't support position: sticky,
