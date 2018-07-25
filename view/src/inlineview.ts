@@ -124,6 +124,9 @@ export class WidgetView extends InlineView {
   ignoreEvent(): boolean { return true }
 }
 
+// FIXME these not being rendered means that reading the DOM around
+// collapsed text will currently delete the text, since `DOMReader`
+// won't see it
 export class CollapsedView extends InlineView {
   constructor(public length: number) {
     super(null, null)
