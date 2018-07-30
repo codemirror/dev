@@ -23,6 +23,7 @@ export class DOMObserver {
   charDataQueue: MutationRecord[] = []
   charDataTimeout: any = null
   active: boolean = false
+  selectionActive: boolean = false
   dom: HTMLElement
   intersection: IntersectionObserver
 
@@ -79,6 +80,15 @@ export class DOMObserver {
       f()
     } finally {
       this.start()
+    }
+  }
+
+  withoutSelectionListening(f: () => void) {
+    try {
+      this.selectionActive = false
+      f()
+    } finally {
+      this.selectionActive = true
     }
   }
 
@@ -152,7 +162,7 @@ export class DOMObserver {
 
   readSelection() {
     let root = getRoot(this.dom)
-    if (!this.active || root.activeElement != this.dom || !hasSelection(this.dom)) return
+    if (!this.active || !this.selectionActive || root.activeElement != this.dom || !hasSelection(this.dom)) return
     if (!this.flush()) this.onSelectionChange()
   }
 

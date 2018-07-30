@@ -80,11 +80,11 @@ describe("EditorView drawing", () => {
     cm.dom.scrollTop = 0
     cm.docView.checkLayout()
     ist(cm.contentDOM.childNodes.length, 500, "<")
-    ist(cm.contentDOM.clientHeight, 10000, ">")
+    ist(cm.contentDOM.scrollHeight, 10000, ">")
     ist(!cm.contentDOM.textContent.match(/b/))
     cm.dom.scrollTop = cm.dom.scrollHeight / 2
     cm.docView.checkLayout()
-    ist(cm.contentDOM.textContent.match(/b/))
+    ist(cm.contentDOM.textContent.test(/b/))
   })
 
   it("keeps a drawn area around selection ends", () => {

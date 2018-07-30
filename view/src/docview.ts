@@ -58,7 +58,7 @@ export class DocView extends ContentView {
       if (state.selection.primary.from >= this.visiblePart.from &&
           state.selection.primary.to <= this.visiblePart.to) {
         this.selection = state.selection
-        this.observer.withoutListening(() => this.updateSelection())
+        this.observer.withoutSelectionListening(() => this.updateSelection())
         return
       }
     }
@@ -206,7 +206,7 @@ export class DocView extends ContentView {
   }
 
   focus() {
-    this.observer.withoutListening(() => this.updateSelection(true))
+    this.observer.withoutSelectionListening(() => this.updateSelection(true))
   }
 
   registerIntersection() {

@@ -45,7 +45,7 @@ function skipIgnoredNodes(view: EditorView, dir: -1 | 1) {
 
 function setSelFocus(view: EditorView, node: Node, offset: number) {
   let sel = getRoot(view.contentDOM).getSelection()
-  view.docView.observer.withoutListening(() => {
+  view.docView.observer.withoutSelectionListening(() => {
     if (selectionCollapsed(sel)) {
       let range = document.createRange()
       range.setEnd(node, offset)
