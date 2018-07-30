@@ -4,7 +4,7 @@ import {EditorSelection} from "../../state/src"
 
 export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
   let bounds = view.docView.domBoundsAround(start, end, 0)
-  if (!bounds) { view.setState(view.state); return }
+  if (!bounds) { view.updateState([], view.state); return }
   let {from, to} = bounds
   let selPoints = selectionPoints(view.contentDOM), reader = new DOMReader(selPoints)
   reader.readRange(bounds.startDOM, bounds.endDOM)
@@ -37,7 +37,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   } else if (newSelection && !newSelection.primary.eq(oldSel)) {
     view.dispatch(view.state.transaction.setSelection(newSelection))
   } else {
-    view.setState(view.state)
+    view.updateState([], view.state)
   }
 }
 

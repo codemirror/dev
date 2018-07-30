@@ -26,7 +26,7 @@ export class EditorView {
 
   constructor(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
     this._state = state
-    this.dispatch = dispatch || (tr => this.setState(tr.apply()))
+    this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
 
     this.contentDOM = document.createElement("pre")
     this.contentDOM.className = "CodeMirror-content"
@@ -49,16 +49,18 @@ export class EditorView {
   }
 
   setState(state: EditorState) {
-    let prevState = this._state
-    // FIXME scroll selection into view when needed
     this._state = state
     this.docView.update(state)
-    if (prevState.plugins != state.plugins) {
-      this.inputState.updateCustomHandlers(this)
-      this.createPluginViews()
-    } else {
-      for (let pluginView of this.pluginViews) if (pluginView.update) pluginView.update(this, prevState)
-    }
+    this.inputState.updateCustomHandlers(this)
+    this.createPluginViews()
+  }
+
+  updateState(transactions: Transaction[], state: EditorState) {
+    let prevState = this._state
+    this._state = state
+    this.docView.update(state) // FIXME pass transactions
+    // FIXME scroll selection into view when needed
+    for (let pluginView of this.pluginViews) if (pluginView.update) pluginView.update(this, prevState, transactions)
   }
 
   /** @internal */
@@ -126,7 +128,7 @@ export interface EditorProps {
 }
 
 export interface PluginView {
-  update?: (view: EditorView, prevState: EditorState) => void
+  update?: (view: EditorView, prevState: EditorState, transactions: Transaction[]) => void
   layoutChange?: (view: EditorView) => void
   destroy?: () => void
 }
