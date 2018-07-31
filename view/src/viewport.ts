@@ -21,26 +21,35 @@ function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
   return {top: top - rect.top, bottom: bottom - rect.top}
 }
 
-const VIEWPORT_MARGIN = 500 // FIXME look into appropriate value of this through benchmarking etc
-const COVER_MARGIN = 10 // coveredBy requires at least this many extra pixels to be covered
+const VIEWPORT_MARGIN = 1000 // FIXME look into appropriate value of this through benchmarking etc
+const MIN_COVER_MARGIN = 10, MAX_COVER_MARGIN = VIEWPORT_MARGIN / 4 // coveredBy requires at least this many extra pixels to be covered
 
 export class ViewportState {
   top: number = 0;
   bottom: number = 0;
 
-  updateFromDOM(dom: HTMLElement) {
-    ;({top: this.top, bottom: this.bottom} = visiblePixelRange(dom))
+  updateFromDOM(dom: HTMLElement): number {
+    let {top, bottom} = visiblePixelRange(dom)
+    let dTop = top - this.top, dBottom = bottom - this.bottom, bias = 0
+    if (dTop > 0 && dBottom > 0) bias = Math.max(dTop, dBottom)
+    else if (dTop < 0 && dBottom < 0) bias = Math.min(dTop, dBottom)
+    this.top = top; this.bottom = bottom
+    return bias
   }
 
-  getViewport(doc: Text, heightMap: HeightMap): Viewport {
-    return new Viewport(heightMap.posAt(this.top - VIEWPORT_MARGIN, doc, -1),
-                        heightMap.posAt(this.bottom + VIEWPORT_MARGIN, doc, 1))
+  getViewport(doc: Text, heightMap: HeightMap, bias = 0): Viewport {
+    // This will divide VIEWPORT_MARGIN between the top and the
+    // bottom, depending on the bias (the change in viewport position
+    // since the last update). It'll hold a number between 0 and 1
+    let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VIEWPORT_MARGIN / 2))
+    return new Viewport(heightMap.posAt(this.top - marginTop * VIEWPORT_MARGIN, doc, -1),
+                        heightMap.posAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, doc, 1))
   }
 
-  coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap) {
+  coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap, bias = 0) {
     let top = heightMap.heightAt(viewport.from, -1), bottom = heightMap.heightAt(viewport.to, 1)
-    return (top <= this.top - COVER_MARGIN || viewport.from == 0) &&
-      (bottom >= this.bottom + COVER_MARGIN || viewport.to == doc.length)
+    return (viewport.from == 0 || top <= this.top - Math.max(MIN_COVER_MARGIN, Math.min(-bias, MAX_COVER_MARGIN))) &&
+      (viewport.to == doc.length || bottom >= this.bottom + Math.max(MIN_COVER_MARGIN, Math.min(bias, MAX_COVER_MARGIN)))
   }
 }
 

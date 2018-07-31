@@ -78,8 +78,8 @@ export class DocView extends ContentView {
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
-  private updateInner(changes: A<ChangedRange> = [], oldLength: number = this.text.length) {
-    let visible = this.visiblePart = this.viewportState.getViewport(this.text, this.heightMap)
+  private updateInner(changes: A<ChangedRange>, oldLength: number, scrollBias = 0) {
+    let visible = this.visiblePart = this.viewportState.getViewport(this.text, this.heightMap, scrollBias)
     let viewports: Viewport[] = [visible]
     let {head, anchor} = this.selection.primary
     if (head < visible.from || head > visible.to)
@@ -213,7 +213,7 @@ export class DocView extends ContentView {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1
 
-    this.viewportState.updateFromDOM(this.dom)
+    let scrollBias = this.viewportState.updateFromDOM(this.dom)
     if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
     if (this.heightOracle.maybeRefresh(lineHeights)) {
@@ -228,12 +228,13 @@ export class DocView extends ContentView {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.from, this.visiblePart.to,
                                                    lineHeights || this.measureVisibleLineHeights())
-      if (this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap)) break
+      if (this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)) break
       updated = true
       if (i > 10) throw new Error("Layout failed to converge")
-      this.updateInner()
+      this.updateInner([], this.text.length, scrollBias)
       lineHeights = null
       refresh = false
+      scrollBias = 0
       this.viewportState.updateFromDOM(this.dom)
     }
     if (updated || this.heightOracle.heightChanged) {
