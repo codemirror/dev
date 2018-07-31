@@ -25,7 +25,7 @@ export class EditorView {
 
   private pluginViews: PluginView[] = []
 
-  constructor(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined = undefined) {
+  constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
     this._state = state
     this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
 
@@ -45,15 +45,15 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
                                () => applySelectionChange(this), () => this.layoutChange())
     this.viewport = new EditorViewport(this.docView)
-    this.createPluginViews()
+    this.createPluginViews(plugins)
     this.docView.update(state.doc, state.selection, this.decorations)
   }
 
-  setState(state: EditorState) {
+  setState(state: EditorState, ...plugins: PluginView[]) {
     this._state = state
     this.docView.update(state.doc, state.selection, this.decorations)
     this.inputState.updateCustomHandlers(this)
-    this.createPluginViews()
+    this.createPluginViews(plugins)
   }
 
   updateState(transactions: Transaction[], state: EditorState) {
@@ -83,8 +83,9 @@ export class EditorView {
     return undefined
   }
 
-  private createPluginViews() {
+  private createPluginViews(plugins: PluginView[]) {
     this.destroyPluginViews()
+    for (let plugin of plugins) this.pluginViews.push(plugin)
     for (let plugin of this.state.plugins) if (plugin.view)
       this.pluginViews.push(plugin.view(this))
   }
