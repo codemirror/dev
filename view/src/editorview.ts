@@ -157,7 +157,8 @@ align-items: flex-start;`
 
 const contentCSS = `
 margin: 0;
-flex-grow: 2;`
+flex-grow: 2;
+min-height: 100%;`
 
 // Public shim for giving client code access to viewport information
 export class EditorViewport {

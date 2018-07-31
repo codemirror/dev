@@ -14,23 +14,20 @@ const observeOptions = {
 // DOMCharacterDataModified there
 const useCharData = browser.ie && browser.ie_version <= 11
 
-const thresholds: number[] = []
-for (let i = 0; i <= 100; i += 2) thresholds.push(i / 100)
-
 export class DOMObserver {
   observer: MutationObserver
   onCharData: any
   charDataQueue: MutationRecord[] = []
   charDataTimeout: any = null
+  scrollTargets: HTMLElement[] = []
   active: boolean = false
   selectionActive: boolean = false
   dom: HTMLElement
-  intersection: IntersectionObserver
 
   constructor(private docView: DocView,
               private onDOMChange: (from: number, to: number, typeOver: boolean) => void,
               private onSelectionChange: () => void,
-              private onIntersect: () => void) {
+              private onScrollChanged: () => void) {
     this.dom = docView.dom
     this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
     if (useCharData)
@@ -42,20 +39,9 @@ export class DOMObserver {
       }
     this.readSelection = this.readSelection.bind(this)
     this.listenForSelectionChanges()
-    // FIXME need a fallback for IE11
-    // FIXME doesn't seem to work when the editor element has a scrollbar
-    this.intersection = new IntersectionObserver(entries => {
-      let intersects = false, full = false
-      for (let {intersectionRatio} of entries) if (intersectionRatio > 0) {
-        intersects = true
-        if (intersectionRatio == 1) full = true
-      }
-      if (intersects) this.onIntersect()
-      // Sometimes, during quick scrolling, it seems even though a
-      // redraw happens, intersection stays at 1 and no new entries
-      // are fired—this makes sure an extra check happens in that case
-      if (full) setTimeout(() => this.onIntersect(), 100)
-    }, {threshold: thresholds})
+    this.onScroll = this.onScroll.bind(this)
+    window.addEventListener("scroll", this.onScroll)
+    this.listenForScroll()
     this.start()
   }
 
@@ -72,6 +58,31 @@ export class DOMObserver {
       this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
       listening = false
     })
+  }
+
+  onScroll() {
+    this.onScrollChanged()
+  }
+
+  listenForScroll() {
+    let i = 0, changed: HTMLElement[] | null = null
+    for (let dom = this.dom as any; dom;) {
+      if (dom.nodeType == 1) {
+        if (!changed && i < this.scrollTargets.length && this.scrollTargets[i] == dom) i++
+        else if (!changed) changed = this.scrollTargets.slice(0, i)
+        if (changed) changed.push(dom)
+        dom = dom.parentNode
+      } else if (dom.nodeType == 11) { // Shadow root
+        dom = dom.host
+      } else {
+        break
+      }
+    }
+    if (i < this.scrollTargets.length) changed = this.scrollTargets.slice(0, i)
+    if (changed) {
+      for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
+      for (let dom of this.scrollTargets = changed) dom.addEventListener("scroll", this.onScroll)
+    }
   }
 
   withoutListening(f: () => void) {
@@ -97,7 +108,6 @@ export class DOMObserver {
     this.observer.observe(this.dom, observeOptions)
     if (useCharData)
       this.dom.addEventListener("DOMCharacterDataModified", this.onCharData)
-    this.intersection.takeRecords() // Dump any existing records
     this.active = true
   }
 
@@ -166,14 +176,11 @@ export class DOMObserver {
     if (!this.flush()) this.onSelectionChange()
   }
 
-  observeIntersection(dom: HTMLElement[]) {
-    this.intersection.disconnect()
-    for (let elt of dom) this.intersection.observe(elt)
-  }
-
   destroy() {
     this.stop()
     this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
+    for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
+    window.removeEventListener("scroll", this.onScroll)
   }
 }
 

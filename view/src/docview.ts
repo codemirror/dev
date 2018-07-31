@@ -89,7 +89,7 @@ export class DocView extends ContentView {
     let matchingRanges = findMatchingRanges(viewports, this.viewports, changes)
 
     let decoSets = this.decorations.map(d => d.decorations)
-    let gaps: HTMLElement[] = [], newGaps = false
+    let gaps: HTMLElement[] = []
 
     let cursor = new ChildCursor(this.children, oldLength, 1)
     let posB = this.text.length
@@ -100,7 +100,7 @@ export class DocView extends ContentView {
       let nextB = i < 0 ? 0 : viewports[i].to + 1
       if (posB >= nextB) {
         if (!gap || endI - cursor.i != 1) {
-          if (!gap) { gap = new GapView(this); newGaps = true }
+          if (!gap) gap = new GapView(this)
           this.children.splice(cursor.i, endI - cursor.i, gap)
           this.markDirty()
         }
@@ -125,7 +125,6 @@ export class DocView extends ContentView {
       posB = viewport.from - 1
     }
 
-    if (newGaps) this.observer.observeIntersection(gaps)
     this.viewports = viewports
     this.observer.withoutListening(() => {
       // Lock the height during redrawing, since Chrome sometimes
@@ -209,12 +208,6 @@ export class DocView extends ContentView {
     this.observer.withoutSelectionListening(() => this.updateSelection(true))
   }
 
-  registerIntersection() {
-    let gapDOM: HTMLElement[] = []
-    for (let child of this.children) if (child instanceof GapView) gapDOM.push(child.dom as HTMLElement)
-    this.observer.observeIntersection(gapDOM)
-  }
-
   checkLayout() {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1
@@ -242,8 +235,10 @@ export class DocView extends ContentView {
       refresh = false
       this.viewportState.updateFromDOM(this.dom)
     }
-    if (updated || this.heightOracle.heightChanged)
+    if (updated || this.heightOracle.heightChanged) {
+      this.observer.listenForScroll()
       this.onLayoutChange()
+    }
   }
 
   nearest(dom: Node): ContentView | null {
