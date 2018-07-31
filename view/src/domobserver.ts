@@ -20,6 +20,8 @@ export class DOMObserver {
   charDataQueue: MutationRecord[] = []
   charDataTimeout: any = null
   scrollTargets: HTMLElement[] = []
+  intersection: IntersectionObserver | null = null
+  intersecting: boolean = true
   active: boolean = false
   selectionActive: boolean = false
   dom: HTMLElement
@@ -41,6 +43,15 @@ export class DOMObserver {
     this.listenForSelectionChanges()
     this.onScroll = this.onScroll.bind(this)
     window.addEventListener("scroll", this.onScroll)
+    if (typeof IntersectionObserver == "function") {
+      this.intersection = new IntersectionObserver(entries => {
+        if (entries[entries.length - 1].intersectionRatio > 0 != this.intersecting) {
+          this.intersecting = !this.intersecting
+          this.onScroll()
+        }
+      }, {})
+      this.intersection.observe(this.dom)
+    }
     this.listenForScroll()
     this.start()
   }
@@ -61,7 +72,7 @@ export class DOMObserver {
   }
 
   onScroll() {
-    this.onScrollChanged()
+    if (this.intersecting) this.onScrollChanged()
   }
 
   listenForScroll() {
@@ -178,6 +189,7 @@ export class DOMObserver {
 
   destroy() {
     this.stop()
+    if (this.intersection) this.intersection.disconnect()
     this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
     for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
     window.removeEventListener("scroll", this.onScroll)
