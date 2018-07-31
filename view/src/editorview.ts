@@ -59,9 +59,12 @@ export class EditorView {
   updateState(transactions: Transaction[], state: EditorState) {
     let prevState = this._state
     this._state = state
+    for (let pluginView of this.pluginViews)
+      if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
     this.docView.update(state.doc, state.selection, this.decorations, changedRanges(transactions))
+    for (let pluginView of this.pluginViews)
+      if (pluginView.updateDOM) pluginView.updateDOM(this)
     // FIXME scroll selection into view when needed
-    for (let pluginView of this.pluginViews) if (pluginView.update) pluginView.update(this, prevState, transactions)
   }
 
   /** @internal */
@@ -129,7 +132,8 @@ export class EditorView {
 }
 
 export interface PluginView {
-  update?: (view: EditorView, prevState: EditorState, transactions: Transaction[]) => void
+  updateState?: (view: EditorView, prevState: EditorState, transactions: Transaction[]) => void
+  updateDOM?: (view: EditorView) => void
   handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
   decorations?: DecorationSet;
   layoutChange?: (view: EditorView) => void

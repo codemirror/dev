@@ -7,9 +7,6 @@ import {EditorView} from "../../view/src"
 // that it has to do another layout check when the gutter's width
 // changes, which should be relatively rare)
 
-// FIXME always render last line number (or some rounded-up version)
-// invisibly to force width.
-
 // FIXME at some point, add support for custom gutter space and
 // per-line markers
 
@@ -49,10 +46,10 @@ class GutterView {
     this.lastLine = new GutterLine(1, 0, this.formatNumber)
     this.lastLine.dom.style.cssText += "visibility: hidden; pointer-events: none"
     this.dom.appendChild(this.lastLine.dom)
-    this.update(view)
+    this.updateDOM(view)
   }
 
-  update(view: EditorView) {
+  updateDOM(view: EditorView) {
     // Create the first number consisting of all 9s that is at least
     // as big as the line count, and put that in this.lastLine to make
     // sure the gutter width is stable
@@ -87,6 +84,7 @@ class GutterView {
       i++
     })
     while (this.lines.length > i) this.dom.removeChild(this.lines.pop()!.dom)
+    this.dom.style.minHeight = view.heightAtPos(view.state.doc.length, false) + "px"
   }
 }
 
