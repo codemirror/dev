@@ -91,6 +91,13 @@ export class TextView extends InlineView {
   domBoundsAround(from: number, to: number, offset: number) {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
   }
+
+  coordsAt(pos: number): ClientRect {
+    let range = document.createRange()
+    range.setEnd(this.textDOM!, pos)
+    range.setStart(this.textDOM!, pos)
+    return range.getBoundingClientRect()
+  }
 }
 
 export class WidgetView extends InlineView {

@@ -37,13 +37,26 @@ export class ViewportState {
     return bias
   }
 
-  getViewport(doc: Text, heightMap: HeightMap, bias = 0): Viewport {
+  getViewport(doc: Text, heightMap: HeightMap, bias: number, scrollTo: number): Viewport {
     // This will divide VIEWPORT_MARGIN between the top and the
     // bottom, depending on the bias (the change in viewport position
     // since the last update). It'll hold a number between 0 and 1
     let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VIEWPORT_MARGIN / 2))
-    return new Viewport(heightMap.posAt(this.top - marginTop * VIEWPORT_MARGIN, doc, -1),
-                        heightMap.posAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, doc, 1))
+    let viewport = new Viewport(heightMap.posAt(this.top - marginTop * VIEWPORT_MARGIN, doc, -1),
+                                heightMap.posAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, doc, 1))
+    // If scrollTo is > -1, make sure the viewport includes that position
+    if (scrollTo > -1) {
+      if (scrollTo < viewport.from) {
+        let top = heightMap.heightAt(scrollTo, -1)
+        viewport = new Viewport(heightMap.posAt(top - VIEWPORT_MARGIN / 2, doc, -1),
+                                heightMap.posAt(top + (this.bottom - this.top) + VIEWPORT_MARGIN / 2, doc, 1))
+      } else if (scrollTo > viewport.to) {
+        let bottom = heightMap.heightAt(scrollTo, 1)
+        viewport = new Viewport(heightMap.posAt(bottom - (this.bottom - this.top) - VIEWPORT_MARGIN / 2, doc, -1),
+                                heightMap.posAt(bottom + VIEWPORT_MARGIN / 2, doc, 1))
+      }
+    }
+    return viewport
   }
 
   coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap, bias = 0) {

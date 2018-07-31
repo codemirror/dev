@@ -26,7 +26,10 @@ export class DocView extends ContentView {
   viewportState: ViewportState
   heightMap: HeightMap = HeightMap.empty()
   heightOracle: HeightOracle = new HeightOracle
+
   layoutCheckScheduled: number = -1
+  // A document position that has to be scrolled into view at the next layout check
+  scrollIntoView: number = -1
 
   dom!: HTMLElement
 
@@ -48,9 +51,11 @@ export class DocView extends ContentView {
   // FIXME need some way to stabilize viewport—if a change causes the
   // top of the visible viewport to move, scroll position should be
   // adjusted to keep the content in place
-  update(doc: Text, selection: EditorSelection, decorations: A<DecorationSet>, changedRanges?: ChangedRange[]) {
+  update(doc: Text, selection: EditorSelection, decorations: A<DecorationSet>,
+         changedRanges?: ChangedRange[], scrollIntoView: number = -1) {
+    this.scrollIntoView = scrollIntoView
     if (this.dirty == dirty.not && this.text.eq(doc) && sameArray(decorations, this.decorations)) {
-      if (selection.eq(this.selection)) return
+      if (selection.eq(this.selection) && scrollIntoView < 0) return
       if (selection.primary.from >= this.visiblePart.from &&
           selection.primary.to <= this.visiblePart.to) {
         this.selection = selection
@@ -68,14 +73,14 @@ export class DocView extends ContentView {
     this.heightMap = this.heightMap.applyChanges(decorations.filter(d => d.size > 0),
                                                  this.heightOracle.setDoc(doc), changes.height)
 
-    this.updateInner(changes.content, oldLength)
+    this.updateInner(changes.content, oldLength, 0, scrollIntoView)
 
     if (this.layoutCheckScheduled < 0)
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
-  private updateInner(changes: A<ChangedRange>, oldLength: number, scrollBias = 0) {
-    let visible = this.visiblePart = this.viewportState.getViewport(this.text, this.heightMap, scrollBias)
+  private updateInner(changes: A<ChangedRange>, oldLength: number, scrollBias: number, scrollIntoView: number = -1) {
+    let visible = this.visiblePart = this.viewportState.getViewport(this.text, this.heightMap, scrollBias, scrollIntoView)
     let viewports: Viewport[] = [visible]
     let {head, anchor} = this.selection.primary
     if (head < visible.from || head > visible.to)
@@ -209,14 +214,19 @@ export class DocView extends ContentView {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1
 
+    let scrollIntoView = Math.min(this.scrollIntoView, this.text.length)
+    this.scrollIntoView = -1
     let scrollBias = this.viewportState.updateFromDOM(this.dom)
-    if (this.viewportState.top == this.viewportState.bottom) return // We're invisible!
+    if (this.viewportState.top >= this.viewportState.bottom) return // We're invisible!
+
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
     if (this.heightOracle.maybeRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
                                           lineHeight, (this.dom).clientWidth / charWidth)
     }
+
+    if (scrollIntoView > -1) scrollRectIntoView(this.dom, this.coordsAt(scrollIntoView)!)
 
     this.heightOracle.heightChanged = false
     let updated = false
@@ -294,6 +304,52 @@ export class DocView extends ContentView {
   destroy() {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.observer.destroy()
+  }
+}
+
+function windowRect(win: Window): ClientRect {
+  return {left: 0, right: win.innerWidth,
+          top: 0, bottom: win.innerHeight} as ClientRect
+}
+
+function scrollRectIntoView(dom: HTMLElement, rect: ClientRect) {
+  let scrollThreshold = 0, scrollMargin = 5 // FIXME
+  let doc = dom.ownerDocument, win = doc.defaultView
+  for (let cur: any = dom.parentNode; cur;) {
+    if (cur.nodeType == 1 || cur.nodeType == 9) { // Element or document
+      let bounding: ClientRect
+      if (cur.nodeType == 1) {
+        if (cur.scrollHeight <= cur.clientHeight) { cur = cur.parentNode; continue }
+        bounding = cur.getBoundingClientRect()
+      } else {
+        bounding = windowRect(win)
+      }
+      let moveX = 0, moveY = 0
+      if (rect.top < bounding.top + scrollThreshold)
+        moveY = -(bounding.top - rect.top + scrollMargin)
+      else if (rect.bottom > bounding.bottom - scrollThreshold)
+        moveY = rect.bottom - bounding.bottom + scrollMargin
+      if (rect.left < bounding.left + scrollThreshold)
+        moveX = -(bounding.left - rect.left + scrollMargin)
+      else if (rect.right > bounding.right - scrollThreshold)
+        moveX = rect.right - bounding.right + scrollMargin
+      if (moveX || moveY) {
+        if (cur.nodeType == 9) {
+          win.scrollBy(moveX, moveY)
+        } else {
+          if (moveY) cur.scrollTop += moveY
+          if (moveX) cur.scrollLeft += moveX
+          rect = {left: rect.left - moveX, top: rect.top - moveY,
+                  right: rect.right - moveX, bottom: rect.bottom - moveY} as ClientRect
+        }
+      }
+      if (cur.nodeType == 9) break
+      cur = cur.parentNode
+    } else if (cur.nodeType == 11) { // A shadow root
+      cur = cur.host
+    } else {
+      break
+    }
   }
 }
 

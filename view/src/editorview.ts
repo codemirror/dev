@@ -61,10 +61,10 @@ export class EditorView {
     this._state = state
     for (let pluginView of this.pluginViews)
       if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
-    this.docView.update(state.doc, state.selection, this.decorations, changedRanges(transactions))
+    this.docView.update(state.doc, state.selection, this.decorations, changedRanges(transactions),
+                        transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
     for (let pluginView of this.pluginViews)
       if (pluginView.updateDOM) pluginView.updateDOM(this)
-    // FIXME scroll selection into view when needed
   }
 
   /** @internal */

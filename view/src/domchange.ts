@@ -33,9 +33,9 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       tr = tr.setSelection(newSelection)
     // FIXME maybe also try to detect (Android) enter here and call
     // the key handler
-    view.dispatch(tr)
+    view.dispatch(tr.scrollIntoView())
   } else if (newSelection && !newSelection.primary.eq(oldSel)) {
-    view.dispatch(view.state.transaction.setSelection(newSelection))
+    view.dispatch(view.state.transaction.setSelection(newSelection).scrollIntoView())
   } else {
     view.updateState([], view.state)
   }

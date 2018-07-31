@@ -37,6 +37,15 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length
   }
 
+  coordsAt(pos: number): ClientRect | null {
+    for (let off = 0, i = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = off + child.length
+      if (end >= pos && end != off) return child.coordsAt(pos - off)
+      off = end + this.childGap
+    }
+    return null
+  }
+
   syncDOMChildren() {
     if (!this.dom) return
     let dom = this.dom.firstChild

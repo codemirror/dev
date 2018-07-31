@@ -103,7 +103,7 @@ export class Transaction {
                            this.flags | FLAG_SELECTION_SET)
   }
 
-  get selectionSet() {
+  get selectionSet(): boolean {
     return (this.flags & FLAG_SELECTION_SET) > 0
   }
 
@@ -111,12 +111,12 @@ export class Transaction {
     return this.changes.length > 0
   }
 
-  scrollIntoView() {
+  scrollIntoView(): Transaction {
     return new Transaction(this.startState, this.changes, this.docs, this.selection,
                            this.meta, this.flags | FLAG_SCROLL_INTO_VIEW)
   }
 
-  get scrolledIntoView() {
+  get scrolledIntoView(): boolean {
     return (this.flags & FLAG_SCROLL_INTO_VIEW) > 0
   }
 
