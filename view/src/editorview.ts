@@ -2,7 +2,7 @@ import {EditorState, Transaction, EditorSelection, MetaSlot} from "../../state/s
 import {DocView} from "./docview"
 import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
-import {DecorationSet} from "./decoration"
+import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {changedRanges} from "./changes"
 
@@ -44,14 +44,14 @@ export class EditorView {
 
     this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
                                () => applySelectionChange(this), () => this.layoutChange())
-    this.docView.update(state)
     this.viewport = new EditorViewport(this.docView)
     this.createPluginViews()
+    this.docView.update(state.doc, state.selection, this.decorations)
   }
 
   setState(state: EditorState) {
     this._state = state
-    this.docView.update(state)
+    this.docView.update(state.doc, state.selection, this.decorations)
     this.inputState.updateCustomHandlers(this)
     this.createPluginViews()
   }
@@ -59,25 +59,25 @@ export class EditorView {
   updateState(transactions: Transaction[], state: EditorState) {
     let prevState = this._state
     this._state = state
-    this.docView.update(state, changedRanges(transactions))
+    this.docView.update(state.doc, state.selection, this.decorations, changedRanges(transactions))
     // FIXME scroll selection into view when needed
     for (let pluginView of this.pluginViews) if (pluginView.update) pluginView.update(this, prevState, transactions)
   }
 
   /** @internal */
-  someProp<N extends keyof EditorProps, R>(propName: N, f: (value: NonNullable<EditorProps[N]>) => R | undefined): R | undefined {
+  someProp<N extends keyof PluginView, R>(propName: N, f: (value: NonNullable<PluginView[N]>) => R | undefined): R | undefined {
     let value: R | undefined = undefined
-    for (let plugin of this.state.plugins) {
-      let prop = plugin.props[propName]
-      if (prop != null && (value = f(prop)) != null) break
+    for (let pluginView of this.pluginViews) {
+      let prop = pluginView[propName]
+      if (prop != null && (value = f(prop as NonNullable<PluginView[N]>)) != null) break
     }
     return value
   }
 
   /** @internal */
-  getProp<N extends keyof EditorProps>(propName: N): EditorProps[N] {
-    for (let plugin of this.state.plugins) {
-      let prop = plugin.props[propName]
+  getProp<N extends keyof PluginView>(propName: N): PluginView[N] {
+    for (let pluginView of this.pluginViews) {
+      let prop = pluginView[propName]
       if (prop != null) return prop
     }
     return undefined
@@ -121,15 +121,16 @@ export class EditorView {
     this.dom.remove()
     this.docView.destroy()
   }
-}
 
-export interface EditorProps {
-  readonly handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
-  readonly decorations?: (state: EditorState) => DecorationSet;
+  private get decorations(): DecorationSet[] {
+    return this.pluginViews.map(v => v.decorations || Decoration.none)
+  }
 }
 
 export interface PluginView {
   update?: (view: EditorView, prevState: EditorState, transactions: Transaction[]) => void
+  handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
+  decorations?: DecorationSet;
   layoutChange?: (view: EditorView) => void
   destroy?: () => void
 }

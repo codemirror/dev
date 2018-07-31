@@ -14,8 +14,8 @@ let field = new StateField<DecorationSet>({
 })
 let decos = new Plugin({
   state: field,
-  props: {
-    decorations(state) { return state.getField(field) }
+  view(v) {
+    return {get decorations() { return v.state.getField(field) }}
   }
 })
 

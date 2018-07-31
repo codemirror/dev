@@ -18,8 +18,10 @@ function decos(startState: DecorationSet = Decoration.none) {
   })
   return new Plugin({
     state: field,
-    props: {
-      decorations(state) { return state.getField(field) }
+    view(editorView) {
+      return {
+        get decorations() { return editorView.state.getField(field) }
+      }
     }
   })
 }

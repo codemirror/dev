@@ -3,22 +3,7 @@ import {EditorView, Decoration, DecorationSet} from "../../view/src/"
 import {keymap} from "../../keymap/src/keymap"
 import {history, redo, undo} from "../../history/src/history"
 
-let field = new StateField<DecorationSet>({
-  init() {return Decoration.set([
-    Decoration.range(0, 2, {attributes: {style: "color: red"}, inclusiveEnd: true}),
-    Decoration.range(4, 5, {attributes: {style: "color: blue"}, inclusiveStart: true}),
-    Decoration.range(9, 12, {attributes: {style: "color: orange"}})
-  ])},
-  apply(tr, decos) { return decos.map(tr.changes) }
-})
-let decos = new Plugin({
-  state: field,
-  props: {
-    decorations(state) { return state.getField(field) }
-  }
-})
-
-let state = EditorState.create({doc: "one\nاِثْنَانِ\nthree", plugins: [history(), decos, keymap({
+let state = EditorState.create({doc: "one\nاِثْنَانِ\nthree", plugins: [history(), keymap({
   "ctrl-z": undo,
   "ctrl-shift-z": redo
 })]})

@@ -75,11 +75,10 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 // which they appear determines their precedence (the ones early in
 // the array get to dispatch first).
 export function keymap(bindings: {[key: string]: Command}): Plugin {
+  let keydown = keydownHandler(bindings)
   return new Plugin({
-    props: {
-      handleDOMEvents: {
-        keydown: keydownHandler(bindings)
-      }
+    view() {
+      return {handleDOMEvents: {keydown}}
     }
   })
 }

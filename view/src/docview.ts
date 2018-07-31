@@ -4,14 +4,12 @@ import {InlineView, InlineBuilder} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
-import {EditorState, Plugin, EditorSelection} from "../../state/src"
+import {EditorSelection} from "../../state/src"
 import {HeightMap, HeightOracle} from "./heightmap"
 import {ChangedRange} from "./changes"
-import {DecorationSet, joinRanges, findChangedRanges} from "./decoration"
+import {Decoration, DecorationSet, joinRanges, findChangedRanges} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition} from "./dom"
-import {RangeSet} from "../../rangeset/src/rangeset"
 
-type PluginDeco = {plugin: Plugin | null, decorations: DecorationSet}
 type A<T> = ReadonlyArray<T>
 
 export class DocView extends ContentView {
@@ -20,7 +18,7 @@ export class DocView extends ContentView {
   viewports: Viewport[] = []
 
   text: Text = Text.create("")
-  decorations: PluginDeco[] = []
+  decorations: A<DecorationSet> = []
   selection: EditorSelection = EditorSelection.default
 
   observer: DOMObserver
@@ -50,27 +48,25 @@ export class DocView extends ContentView {
   // FIXME need some way to stabilize viewport—if a change causes the
   // top of the visible viewport to move, scroll position should be
   // adjusted to keep the content in place
-  update(state: EditorState, changedRanges?: ChangedRange[]) {
-    let decorations = getDecorations(state)
-
-    if (this.dirty == dirty.not && this.text.eq(state.doc) && sameDecorations(decorations, this.decorations)) {
-      if (state.selection.eq(this.selection)) return
-      if (state.selection.primary.from >= this.visiblePart.from &&
-          state.selection.primary.to <= this.visiblePart.to) {
-        this.selection = state.selection
+  update(doc: Text, selection: EditorSelection, decorations: A<DecorationSet>, changedRanges?: ChangedRange[]) {
+    if (this.dirty == dirty.not && this.text.eq(doc) && sameArray(decorations, this.decorations)) {
+      if (selection.eq(this.selection)) return
+      if (selection.primary.from >= this.visiblePart.from &&
+          selection.primary.to <= this.visiblePart.to) {
+        this.selection = selection
         this.observer.withoutSelectionListening(() => this.updateSelection())
         return
       }
     }
 
     let oldLength = this.text.length
-    let changes = fullChangedRanges(changedRanges || [new ChangedRange(0, oldLength, 0, state.doc.length)],
+    let changes = fullChangedRanges(changedRanges || [new ChangedRange(0, oldLength, 0, doc.length)],
                                     decorations, this.decorations)
-    this.text = state.doc
+    this.text = doc
     this.decorations = decorations
-    this.selection = state.selection
-    this.heightMap = this.heightMap.applyChanges(decorations.map(d => d.decorations),
-                                                 this.heightOracle.setDoc(state.doc), changes.height)
+    this.selection = selection
+    this.heightMap = this.heightMap.applyChanges(decorations.filter(d => d.size > 0),
+                                                 this.heightOracle.setDoc(doc), changes.height)
 
     this.updateInner(changes.content, oldLength)
 
@@ -89,7 +85,7 @@ export class DocView extends ContentView {
     viewports.sort((a, b) => a.from - b.from)
     let matchingRanges = findMatchingRanges(viewports, this.viewports, changes)
 
-    let decoSets = this.decorations.map(d => d.decorations)
+    let decoSets = this.decorations.filter(d => d.size > 0)
     let gaps: HTMLElement[] = []
 
     let cursor = new ChildCursor(this.children, oldLength, 1)
@@ -337,29 +333,17 @@ class GapView extends ContentView {
   domBoundsAround() { return null }
 }
 
-function findPluginDeco(decorations: A<PluginDeco>, plugin: Plugin | null): DecorationSet | null {
-  for (let deco of decorations)
-    if (deco.plugin == plugin) return deco.decorations
-  return null
-}
-
 function fullChangedRanges(diff: A<ChangedRange>,
-                           decorations: A<PluginDeco>,
-                           oldDecorations: A<PluginDeco>
+                           decorations: A<DecorationSet>,
+                           oldDecorations: A<DecorationSet>
                           ): {content: A<ChangedRange>, height: A<ChangedRange>} {
   let contentRanges: number[] = [], heightRanges: number[] = []
-  for (let deco of decorations) {
-    let newRanges = findChangedRanges(findPluginDeco(oldDecorations, deco.plugin) || RangeSet.empty,
-                                      deco.decorations, diff)
+  for (let i = Math.max(decorations.length, oldDecorations.length) - 1; i >= 0; i--) {
+    let deco = decorations[i] || Decoration.none, oldDeco = oldDecorations[i] || Decoration.none
+    if (deco.size == 0 && oldDeco.size == 0) continue
+    let newRanges = findChangedRanges(oldDeco, deco, diff)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
-  }
-  for (let old of oldDecorations) {
-    if (!findPluginDeco(decorations, old.plugin)) {
-      let newRanges = findChangedRanges(old.decorations, RangeSet.empty, diff)
-      contentRanges = joinRanges(contentRanges, newRanges.content)
-      heightRanges = joinRanges(heightRanges, newRanges.height)
-    }
   }
   return {content: extendWithRanges(diff, contentRanges),
           height: extendWithRanges(diff, heightRanges)}
@@ -391,21 +375,10 @@ function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRan
   }
 }
 
-function sameDecorations(a: PluginDeco[], b: PluginDeco[]) {
+function sameArray<T>(a: A<T>, b: A<T>) {
   if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i].decorations != b[i].decorations) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
-}
-
-function getDecorations(state: EditorState): PluginDeco[] {
-  let result: PluginDeco[] = [], plugins = state.plugins
-  for (let plugin of plugins) {
-    let prop = plugin.props.decorations
-    if (!prop) continue
-    let decorations = prop(state)
-    if (decorations.size) result.push({plugin, decorations})
-  }
-  return result
 }
 
 function boundAfter(viewport: Viewport, pos: number): number {

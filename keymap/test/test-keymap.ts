@@ -7,7 +7,7 @@ function dispatch(map, key, mods?) {
   let event = {}
   if (mods) for (let prop in mods) event[prop] = mods[prop]
   event.key = key
-  map.props.handleDOMEvents.keydown(fakeView, event)
+  map.view().handleDOMEvents.keydown(fakeView, event)
 }
 
 function counter() {
