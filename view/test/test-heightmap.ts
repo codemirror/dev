@@ -1,7 +1,7 @@
 import {HeightMap, HeightOracle} from "../src/heightmap"
 import {Decoration, DecorationSet, WidgetType} from "../src/decoration"
 import {Text} from "../../doc/src/text"
-import {ChangedRange} from "../../doc/src/diff"
+import {ChangedRange} from "../src/changes"
 const ist = require("ist")
 
 function o(doc) {

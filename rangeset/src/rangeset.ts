@@ -1,5 +1,4 @@
 import {Mapping, ChangeSet, Change} from "../../state/src"
-import {ChangedRange} from "../../doc/src/diff"
 
 type A<T> = ReadonlyArray<T>
 
@@ -247,7 +246,7 @@ export class RangeSet<T extends RangeValue> {
     for (let child of this.children) { child.forEachInner(f, offset); offset += child.length }
   }
 
-  compare(other: RangeSet<T>, textDiff: A<ChangedRange>, comparator: RangeComparator<T>) {
+  compare(other: RangeSet<T>, textDiff: A<{fromA: number, toA: number, fromB: number, toB: number}>, comparator: RangeComparator<T>) {
     let oldPos = 0, newPos = 0
     for (let range of textDiff) {
       if (range.fromB > newPos && (this != other || oldPos != newPos))

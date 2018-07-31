@@ -6,7 +6,7 @@ import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
 import {EditorState, Plugin, EditorSelection} from "../../state/src"
 import {HeightMap, HeightOracle} from "./heightmap"
-import {changedRanges, ChangedRange} from "../../doc/src/diff"
+import {ChangedRange} from "./changes"
 import {DecorationSet, joinRanges, findChangedRanges} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition} from "./dom"
 import {RangeSet} from "../../rangeset/src/rangeset"
@@ -50,7 +50,7 @@ export class DocView extends ContentView {
   // FIXME need some way to stabilize viewport—if a change causes the
   // top of the visible viewport to move, scroll position should be
   // adjusted to keep the content in place
-  update(state: EditorState) {
+  update(state: EditorState, changedRanges?: ChangedRange[]) {
     let decorations = getDecorations(state)
 
     if (this.dirty == dirty.not && this.text.eq(state.doc) && sameDecorations(decorations, this.decorations)) {
@@ -63,8 +63,9 @@ export class DocView extends ContentView {
       }
     }
 
-    let changes = fullChangedRanges(changedRanges(this.text, state.doc), decorations, this.decorations)
     let oldLength = this.text.length
+    let changes = fullChangedRanges(changedRanges || [new ChangedRange(0, oldLength, 0, state.doc.length)],
+                                    decorations, this.decorations)
     this.text = state.doc
     this.decorations = decorations
     this.selection = state.selection

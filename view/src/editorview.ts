@@ -4,6 +4,7 @@ import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
+import {changedRanges} from "./changes"
 
 export class EditorView {
   private _state: EditorState
@@ -58,7 +59,7 @@ export class EditorView {
   updateState(transactions: Transaction[], state: EditorState) {
     let prevState = this._state
     this._state = state
-    this.docView.update(state) // FIXME pass transactions
+    this.docView.update(state, changedRanges(transactions))
     // FIXME scroll selection into view when needed
     for (let pluginView of this.pluginViews) if (pluginView.update) pluginView.update(this, prevState, transactions)
   }

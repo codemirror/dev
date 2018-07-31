@@ -84,7 +84,7 @@ describe("EditorView drawing", () => {
     ist(!cm.contentDOM.textContent.match(/b/))
     cm.dom.scrollTop = cm.dom.scrollHeight / 2
     cm.docView.checkLayout()
-    ist(cm.contentDOM.textContent.test(/b/))
+    ist(cm.contentDOM.textContent.match(/b/))
   })
 
   it("keeps a drawn area around selection ends", () => {

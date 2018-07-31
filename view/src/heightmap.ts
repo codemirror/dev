@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src/text"
-import {ChangedRange} from "../../doc/src/diff"
+import {ChangedRange} from "./changes"
 import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
 import {DecorationSet, RangeDecoration, Decoration} from "./decoration"
 import {Viewport} from "./viewport"

@@ -23,7 +23,7 @@ export class DOMObserver {
   intersection: IntersectionObserver | null = null
   intersecting: boolean = true
   active: boolean = false
-  selectionActive: boolean = false
+  selectionActive: boolean = true
   dom: HTMLElement
 
   constructor(private docView: DocView,
