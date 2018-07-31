@@ -24,4 +24,4 @@ let state = EditorState.create({doc: "one\ntwo\nthree\n".repeat(200), plugins: [
   "ctrl-shift-z": redo
 })]})
 let view = (window as any).view = new EditorView(state)
-document.body.appendChild(view.dom)
+document.querySelector("#editor").appendChild(view.dom)

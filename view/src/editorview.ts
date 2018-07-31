@@ -153,7 +153,7 @@ function applySelectionChange(view: EditorView) {
 const editorCSS = `
 position: relative;
 display: flex;
-align-items: stretch;`
+align-items: flex-start;`
 
 const contentCSS = `
 margin: 0;
