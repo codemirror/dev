@@ -129,4 +129,9 @@ export class LineView extends ContentView {
     return {lineHeight: this.dom.getBoundingClientRect().height,
             charWidth: totalWidth / this.length}
   }
+
+  coordsAt(pos: number): ClientRect | null {
+    if (this.length == 0) return (this.dom.lastChild as HTMLElement).getBoundingClientRect()
+    return super.coordsAt(pos)
+  }
 }

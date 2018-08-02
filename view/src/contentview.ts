@@ -40,7 +40,7 @@ export abstract class ContentView {
   coordsAt(pos: number): ClientRect | null {
     for (let off = 0, i = 0; i < this.children.length; i++) {
       let child = this.children[i], end = off + child.length
-      if (end >= pos && end != off) return child.coordsAt(pos - off)
+      if (end >= pos && (end != off || this.childGap)) return child.coordsAt(pos - off)
       off = end + this.childGap
     }
     return null
