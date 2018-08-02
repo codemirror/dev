@@ -395,7 +395,7 @@ function sameArray<T>(a: A<T>, b: A<T>) {
 }
 
 function boundAfter(viewport: Viewport, pos: number): number {
-  return pos < viewport.from ? viewport.from : pos < viewport.to ? viewport.to : 2e9
+  return pos < viewport.from ? viewport.from : pos < viewport.to ? viewport.to : 2e9 + 1
 }
  
 // Transforms a plan to take viewports into account. Discards changes
@@ -404,8 +404,8 @@ function boundAfter(viewport: Viewport, pos: number): number {
 // old text is cleared out and newly visible text is drawn).
 function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewport): A<ChangedRange> {
   let result: ChangedRange[] = []
-   let posA = 0, posB = 0
-   for (let i = 0;; i++) {
+  let posA = 0, posB = 0
+  for (let i = 0;; i++) {
     let range = i < plan.length ? plan[i] : null
     // Look at the unchanged range before the next range (or the end
     // if there is no next range), divide it by viewport boundaries,
@@ -414,7 +414,7 @@ function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewpor
     let nextA = range ? range.fromA : 2e9, nextB = range ? range.fromB : 2e9
     while (posA < nextA) {
       let boundA = boundAfter(viewportA, posA), boundB = boundAfter(viewportB, posB)
-      if (boundA >= nextA && boundB >= nextB) break
+      if (boundA > nextA && boundB > nextB) break
       let advance = Math.min(Math.min(boundA, nextA) - posA, Math.min(boundB, nextB) - posB)
       let endA = posA + advance, endB = posB + advance
       if ((posA >= viewportA.to || endA <= viewportA.from) != (posB >= viewportB.to || endB <= viewportB.from))

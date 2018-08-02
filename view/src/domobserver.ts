@@ -128,7 +128,8 @@ export class DOMObserver {
     // FIXME we're throwing away DOM events when flushing like this,
     // to avoid recursively calling `setState` when setting a new
     // state, but that could in some circumstances drop information
-    this.flush()
+    this.observer.takeRecords()
+    this.charDataQueue.length = 0
     this.observer.disconnect()
     if (useCharData)
       this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
