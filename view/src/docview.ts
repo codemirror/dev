@@ -73,14 +73,15 @@ export class DocView extends ContentView {
     this.heightMap = this.heightMap.applyChanges(decorations.filter(d => d.size > 0),
                                                  this.heightOracle.setDoc(doc), changes.height)
 
-    this.updateInner(changes.content, oldLength, 0, scrollIntoView)
+    this.updateInner(changes.content, oldLength,
+                     this.viewportState.getViewport(this.text, this.heightMap, 0, scrollIntoView))
 
     if (this.layoutCheckScheduled < 0)
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
-  private updateInner(changes: A<ChangedRange>, oldLength: number, scrollBias: number, scrollIntoView: number = -1) {
-    let visible = this.visiblePart = this.viewportState.getViewport(this.text, this.heightMap, scrollBias, scrollIntoView)
+  private updateInner(changes: A<ChangedRange>, oldLength: number, visible: Viewport) {
+    this.visiblePart = visible
     let viewports: Viewport[] = [visible]
     let {head, anchor} = this.selection.primary
     if (head < visible.from || head > visible.to)
@@ -234,11 +235,12 @@ export class DocView extends ContentView {
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.from, this.visiblePart.to,
                                                    lineHeights || this.measureVisibleLineHeights())
-      if (!this.heightOracle.heightChanged &&
-          this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)) break
+      let covered = this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)
+      if (covered && !this.heightOracle.heightChanged) break
       updated = true
       if (i > 10) throw new Error("Layout failed to converge")
-      this.updateInner([], this.text.length, scrollBias)
+      let viewport = covered ? this.visiblePart : this.viewportState.getViewport(this.text, this.heightMap, scrollBias, -1)
+      this.updateInner([], this.text.length, viewport)
       lineHeights = null
       refresh = false
       scrollBias = 0
