@@ -109,7 +109,7 @@ export class EditorView {
   }
 
   heightAtPos(pos: number, top: boolean): number {
-    return this.docView.heightMap.heightAt(pos, top ? -1 : 1)
+    return this.docView.heightMap.heightAt(pos, this.state.doc, top ? -1 : 1)
   }
 
   hasFocus(): boolean {

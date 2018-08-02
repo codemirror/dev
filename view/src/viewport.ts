@@ -47,11 +47,11 @@ export class ViewportState {
     // If scrollTo is > -1, make sure the viewport includes that position
     if (scrollTo > -1) {
       if (scrollTo < viewport.from) {
-        let top = heightMap.heightAt(scrollTo, -1)
+        let top = heightMap.heightAt(scrollTo, doc, -1)
         viewport = new Viewport(heightMap.posAt(top - VIEWPORT_MARGIN / 2, doc, -1),
                                 heightMap.posAt(top + (this.bottom - this.top) + VIEWPORT_MARGIN / 2, doc, 1))
       } else if (scrollTo > viewport.to) {
-        let bottom = heightMap.heightAt(scrollTo, 1)
+        let bottom = heightMap.heightAt(scrollTo, doc, 1)
         viewport = new Viewport(heightMap.posAt(bottom - (this.bottom - this.top) - VIEWPORT_MARGIN / 2, doc, -1),
                                 heightMap.posAt(bottom + VIEWPORT_MARGIN / 2, doc, 1))
       }
@@ -60,7 +60,7 @@ export class ViewportState {
   }
 
   coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap, bias = 0) {
-    let top = heightMap.heightAt(viewport.from, -1), bottom = heightMap.heightAt(viewport.to, 1)
+    let top = heightMap.heightAt(viewport.from, doc, -1), bottom = heightMap.heightAt(viewport.to, doc, 1)
     return (viewport.from == 0 || top <= this.top - Math.max(MIN_COVER_MARGIN, Math.min(-bias, MAX_COVER_MARGIN))) &&
       (viewport.to == doc.length || bottom >= this.bottom + Math.max(MIN_COVER_MARGIN, Math.min(bias, MAX_COVER_MARGIN)))
   }

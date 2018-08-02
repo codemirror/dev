@@ -107,7 +107,7 @@ export class DocView extends ContentView {
           this.children.splice(cursor.i, endI - cursor.i, gap)
           this.markDirty()
         }
-        gap.update(posB - nextB, this.heightMap.heightAt(posB, 1) - this.heightMap.heightAt(nextB, -1))
+        gap.update(posB - nextB, this.heightMap.heightAt(posB, this.text, 1) - this.heightMap.heightAt(nextB, this.text, -1))
         gaps.push(gap.dom)
       } else if (endI != cursor.i) {
         this.children.splice(cursor.i, endI - cursor.i)

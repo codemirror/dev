@@ -64,7 +64,7 @@ export abstract class HeightMap {
 
   abstract size: number
 
-  abstract heightAt(pos: number, bias?: 1 | -1): number
+  abstract heightAt(pos: number, doc: Text, bias?: 1 | -1, offset?: number): number
   abstract posAt(height: number, doc: Text, bias?: 1 | -1, offset?: number): number
   abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
   abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number): void
@@ -144,9 +144,9 @@ class HeightMapLine extends HeightMap {
 
   get size(): number { return 1 }
 
-  heightAt(pos: number, bias: 1 | -1 = -1): number { return bias < 0 ? 0 : this.height }
+  heightAt(pos: number, doc: Text, bias: 1 | -1): number { return bias < 0 ? 0 : this.height }
 
-  posAt(height: number, doc: Text, bias: 1 | -1 = -1, offset: number = 0) {
+  posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0) {
     return offset + (bias < 0 ? 0 : this.length)
   }
 
@@ -260,13 +260,17 @@ class HeightMapGap extends HeightMap {
 
   get size(): number { return 1 }
 
-  heightAt(pos: number) {
-    return this.height * (pos / this.length)
+  heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
+    let firstLine = doc.linePos(offset).line, lastLine = doc.linePos(offset + this.length).line
+    let lines = lastLine - firstLine + 1
+    if (pos < 0) throw new Error("YOU")
+    return (doc.linePos(pos).line - firstLine + (offset > 0 ? 1 : 0)) * (this.height / lines)
   }
 
-  posAt(height: number, doc: Text, bias: 1 | -1 = -1, offset: number = 0): number {
-    let pos = offset + Math.floor(this.length * Math.max(0, Math.min(1, height / this.height)))
-    return bias < 0 ? doc.lineStartAt(pos) : doc.lineEndAt(pos)
+  posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
+    let firstLine = doc.linePos(offset).line, lastLine = doc.linePos(offset + this.length).line
+    let line = firstLine + Math.floor((lastLine - firstLine) * Math.max(0, Math.min(1, height / this.height)))
+    return bias < 0 ? doc.lineStart(line) : doc.lineEnd(line)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -345,12 +349,13 @@ class HeightMapBranch extends HeightMap {
     this.size = left.size + right.size
   }
 
-  heightAt(pos: number, bias: 1 | -1 = -1): number {
-    let leftLen = this.left.length
-    return pos <= leftLen ? this.left.heightAt(pos, bias) : this.left.height + this.right.heightAt(pos - leftLen - 1, bias)
+  heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
+    let rightStart = offset + this.left.length + 1
+    return pos < rightStart ? this.left.heightAt(pos, doc, bias, offset)
+      : this.left.height + this.right.heightAt(pos, doc, bias, rightStart)
   }
 
-  posAt(height: number, doc: Text, bias: -1 | 1 = -1, offset: number = 0): number {
+  posAt(height: number, doc: Text, bias: -1 | 1, offset: number = 0): number {
     let right = height - this.left.height
     return right < 0 ? this.left.posAt(height, doc, bias, offset)
       : this.right.posAt(right, doc, bias, offset + this.left.length + 1)
