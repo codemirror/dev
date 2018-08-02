@@ -228,13 +228,14 @@ export class DocView extends ContentView {
 
     if (scrollIntoView > -1) scrollRectIntoView(this.dom, this.coordsAt(scrollIntoView)!)
 
-    this.heightOracle.heightChanged = false
     let updated = false
     for (let i = 0;; i++) {
+      this.heightOracle.heightChanged = false
       this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
                                                    this.visiblePart.from, this.visiblePart.to,
                                                    lineHeights || this.measureVisibleLineHeights())
-      if (this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)) break
+      if (!this.heightOracle.heightChanged &&
+          this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)) break
       updated = true
       if (i > 10) throw new Error("Layout failed to converge")
       this.updateInner([], this.text.length, scrollBias)
@@ -243,7 +244,7 @@ export class DocView extends ContentView {
       scrollBias = 0
       this.viewportState.updateFromDOM(this.dom)
     }
-    if (updated || this.heightOracle.heightChanged) {
+    if (updated) {
       this.observer.listenForScroll()
       this.onLayoutChange()
     }
