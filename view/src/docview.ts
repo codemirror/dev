@@ -8,7 +8,7 @@ import {EditorSelection} from "../../state/src"
 import {HeightMap, HeightOracle} from "./heightmap"
 import {ChangedRange} from "./changes"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges} from "./decoration"
-import {getRoot, clientRectsFor, isEquivalentPosition} from "./dom"
+import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
 
 type A<T> = ReadonlyArray<T>
 
@@ -305,52 +305,6 @@ export class DocView extends ContentView {
   destroy() {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.observer.destroy()
-  }
-}
-
-function windowRect(win: Window): ClientRect {
-  return {left: 0, right: win.innerWidth,
-          top: 0, bottom: win.innerHeight} as ClientRect
-}
-
-function scrollRectIntoView(dom: HTMLElement, rect: ClientRect) {
-  let scrollThreshold = 0, scrollMargin = 5 // FIXME
-  let doc = dom.ownerDocument, win = doc.defaultView
-  for (let cur: any = dom.parentNode; cur;) {
-    if (cur.nodeType == 1 || cur.nodeType == 9) { // Element or document
-      let bounding: ClientRect
-      if (cur.nodeType == 1) {
-        if (cur.scrollHeight <= cur.clientHeight) { cur = cur.parentNode; continue }
-        bounding = cur.getBoundingClientRect()
-      } else {
-        bounding = windowRect(win)
-      }
-      let moveX = 0, moveY = 0
-      if (rect.top < bounding.top + scrollThreshold)
-        moveY = -(bounding.top - rect.top + scrollMargin)
-      else if (rect.bottom > bounding.bottom - scrollThreshold)
-        moveY = rect.bottom - bounding.bottom + scrollMargin
-      if (rect.left < bounding.left + scrollThreshold)
-        moveX = -(bounding.left - rect.left + scrollMargin)
-      else if (rect.right > bounding.right - scrollThreshold)
-        moveX = rect.right - bounding.right + scrollMargin
-      if (moveX || moveY) {
-        if (cur.nodeType == 9) {
-          win.scrollBy(moveX, moveY)
-        } else {
-          if (moveY) cur.scrollTop += moveY
-          if (moveX) cur.scrollLeft += moveX
-          rect = {left: rect.left - moveX, top: rect.top - moveY,
-                  right: rect.right - moveX, bottom: rect.bottom - moveY} as ClientRect
-        }
-      }
-      if (cur.nodeType == 9) break
-      cur = cur.parentNode
-    } else if (cur.nodeType == 11) { // A shadow root
-      cur = cur.host
-    } else {
-      break
-    }
   }
 }
 
