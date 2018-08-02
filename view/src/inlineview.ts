@@ -30,7 +30,7 @@ export class TextView extends InlineView {
 
   constructor(public text: string,
               public tagName: string | null,
-              public clss: string | null,
+              clss: string | null,
               public attrs: {[key: string]: string} | null) {
     super(null, null)
     this.class = clss
