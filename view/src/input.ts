@@ -95,7 +95,7 @@ function capturePaste(view: EditorView) {
 
 function doPaste(view: EditorView, text: string) {
   // FIXME normalize input text (newlines)?
-  view.dispatch(view.state.transaction.replaceSelection(text).setMeta(MetaSlot.userEvent, "paste"))
+  view.dispatch(view.state.transaction.replaceSelection(text).setMeta(MetaSlot.userEvent, "paste").scrollIntoView())
 }
 
 handlers.keydown = (view: EditorView, event: KeyboardEvent) => {
