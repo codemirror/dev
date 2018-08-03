@@ -427,8 +427,8 @@ function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewpor
     // Clip existing ranges to the viewports
     if ((range.toA >= viewportA.from && range.fromA <= viewportA.to) ||
         (range.toB >= viewportB.from && range.fromB <= viewportB.to))
-      addChangedRange(result, Math.max(range.fromA, viewportA.from), Math.min(range.toA, viewportA.to),
-                      Math.max(range.fromB, viewportB.from), Math.min(range.toB, viewportB.to))
+      addChangedRange(result, viewportA.clip(range.fromA), viewportA.clip(range.toA),
+                      viewportB.clip(range.fromB), viewportB.clip(range.toB))
 
     posA = range.toA; posB = range.toB
   }
