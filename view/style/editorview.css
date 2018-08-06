@@ -6,7 +6,8 @@
   line-height: 1.3;
   font-family: inherit;
   padding: 0 2px 0 4px;
-  tab-width: 4;
+  tab-size: 4;
+  -moz-tab-size: 4;
 }  
 
 .CodeMirror-gutter {
