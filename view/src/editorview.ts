@@ -57,6 +57,8 @@ export class EditorView {
   }
 
   updateState(transactions: Transaction[], state: EditorState) {
+    if (transactions.length && transactions[0].startState != this._state)
+      throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     let prevState = this._state
     this._state = state
     for (let pluginView of this.pluginViews)
