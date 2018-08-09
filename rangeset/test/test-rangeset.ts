@@ -154,6 +154,10 @@ describe("RangeSet", () => {
         .update(new Array(200).fill().map((_, i) => mk(i, i + 1)))
       ist(set.local.length, 0)
     })
+
+    it.skip("can add 33 pathological ranges", () => {
+      const set = RangeSet.empty.update(new Array(33).fill().map((_, i) => mk(0, 1 + i)))
+    })
   })
 
   describe("map", () => {
