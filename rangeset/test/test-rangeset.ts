@@ -156,7 +156,7 @@ describe("RangeSet", () => {
       ist(set.local.length, 0)
     })
 
-    it.skip("can add 33 pathological ranges", () => {
+    it("can add 33 pathological ranges", () => {
       const set = RangeSet.empty.update(new Array(33).fill().map((_, i) => mk(0, 1 + i)))
     })
   })
