@@ -79,7 +79,8 @@ function mkSet(ranges: Range<Value>[]) { return RangeSet.of<Value>(ranges) }
 let smallRanges = []
 for (let i = 0; i < 5000; i++)
   smallRanges.push(mk(i, i + 1 + (i % 4), {pos: i}))
-let set0 = mkSet(smallRanges)
+let _set0 = null
+function set0() { return _set0 || (_set0 = mkSet(smallRanges)) }
 
 describe("RangeSet", () => {
   it("creates a balanced tree", () => {
@@ -94,11 +95,11 @@ describe("RangeSet", () => {
 
   describe("update", () => {
     it("can add ranges to an existing set", () => {
-      let set = set0.update([mk(2000, {pos: 2000}), mk(2008, 2200, {pos: 2008})])
+      let set = set0().update([mk(2000, {pos: 2000}), mk(2008, 2200, {pos: 2008})])
       ist(set.size, 5002)
       checkSet(set)
-      ist(set.children[0], set0.children[0])
-      ist(set.children[set.children.length - 1], set0.children[set0.children.length - 1])
+      ist(set.children[0], set0().children[0])
+      ist(set.children[set.children.length - 1], set0().children[set0().children.length - 1])
     })
 
     it("can add a large amount of ranges", () => {
@@ -109,38 +110,38 @@ describe("RangeSet", () => {
     })
 
     it("can filter ranges", () => {
-      let set = set0.update([], from => from >= 2500)
+      let set = set0().update([], from => from >= 2500)
       ist(set.size, 2500)
       checkSet(set)
-      ist(set.children[set.children.length - 1], set0.children[set0.children.length - 1])
+      ist(set.children[set.children.length - 1], set0().children[set0().children.length - 1])
     })
 
     it("can filter all over", () => {
-      let set = set0.update([], from => (from % 200) >= 100)
+      let set = set0().update([], from => (from % 200) >= 100)
       ist(set.size, 2500)
       checkSet(set)
     })
 
     it("can add and remove in one go", () => {
-      let set = set0.update([mk(25, 30, {pos: 25})], from => from % 1000 > 0)
+      let set = set0().update([mk(25, 30, {pos: 25})], from => from % 1000 > 0)
       ist(set.size, 4996)
       checkSet(set)
     })
 
     it("collapses the tree when removing almost all ranges", () => {
-      let set = set0.update([], from => from == 500 || from == 501)
+      let set = set0().update([], from => from == 500 || from == 501)
       ist(set.size, 2)
       ist(depth(set), 1)
     })
 
     it("doesn't call filter on ranges outside the filter range", () => {
       let called = 0
-      set0.update([], () => (called++, true), 2000, 2005)
+      set0().update([], () => (called++, true), 2000, 2005)
       ist(called, 10, "<")
     })
 
     it("reuses unchanged nodes", () => {
-      ist(set0.update([], () => true), set0)
+      ist(set0().update([], () => true), set0())
     })
 
     it("creates a sorted set", () => {
@@ -195,27 +196,27 @@ describe("RangeSet", () => {
        test([mk(2), mk(4)], [[2, 4, 6]], [2, 8]))
 
     it("adjusts the set tree shape", () => {
-      let child0Size = set0.children[0].length, child1Size = set0.children[1].length
-      let set = set0.map(new ChangeSet([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")]))
-      ist(set.size, set0.size, "<=")
-      ist(set.size, set0.size - 2, ">")
+      let child0Size = set0().children[0].length, child1Size = set0().children[1].length
+      let set = set0().map(new ChangeSet([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")]))
+      ist(set.size, set0().size, "<=")
+      ist(set.size, set0().size - 2, ">")
       ist(set.children[0].length, child0Size + 2)
       ist(set.children[1].length, child1Size - 2)
-      ist(set.children[2].length, set0.children[2].length)
+      ist(set.children[2].length, set0().children[2].length)
     })
 
     it("allows ranges to escape their parent node", () => {
       let ranges = []
       for (let i = 0; i < 100; i++)
         ranges.push(mk(i, i + 1, {bias: -1, biasEnd: 1}))
-      let set0 = mkSet(ranges), nodeBoundary = set0.children[0].length
+      let set0 = mkSet(ranges), nodeBoundary = set0().children[0].length
       let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, "hello")]))
       ist(set.size, set0.size)
       checkSet(set)
     })
 
     it("removes collapsed tree nodes", () => {
-      let set = set0.map(new ChangeSet([new Change(0, 6000, "")]))
+      let set = set0().map(new ChangeSet([new Change(0, 6000, "")]))
       ist(set.size, 0)
       ist(depth(set), 1)
     })
@@ -224,12 +225,12 @@ describe("RangeSet", () => {
   describe("forEach", () => {
     it("calls the callback with the proper positions", () => {
       let called = 0
-      set0.forEach((from, to, value) => {
+      set0().forEach((from, to, value) => {
         ++called
         ist(from, value.pos)
         ist(to, value.pos + 1 + value.pos % 4)
       })
-      ist(called, set0.size)
+      ist(called, set0().size)
     })
   })
 
