@@ -413,9 +413,9 @@ function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewpor
     // changed range.
     let nextA = range ? range.fromA : 2e9, nextB = range ? range.fromB : 2e9
     while (posA < nextA) {
-      let boundA = boundAfter(viewportA, posA), boundB = boundAfter(viewportB, posB)
-      if (boundA > nextA && boundB > nextB) break
-      let advance = Math.min(Math.min(boundA, nextA) - posA, Math.min(boundB, nextB) - posB)
+      let advance = Math.min(Math.min(boundAfter(viewportA, posA), nextA) - posA,
+                             Math.min(boundAfter(viewportB, posB), nextB) - posB)
+      if (advance == 0) break
       let endA = posA + advance, endB = posB + advance
       if ((posA >= viewportA.to || endA <= viewportA.from) != (posB >= viewportB.to || endB <= viewportB.from))
         addChangedRange(result, viewportA.clip(posA), viewportA.clip(endA), viewportB.clip(posB), viewportB.clip(endB))
