@@ -120,6 +120,7 @@ export class DocView extends ContentView {
       endI = cursor.i
       if (matching.from == matching.to) {
         this.children.splice(cursor.i, endI - cursor.i, new LineView(this, []))
+        this.markDirty()
         endI = cursor.i + 1
       } else {
         cursor.findPos(matching.from)
