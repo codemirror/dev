@@ -17,7 +17,6 @@ export class LineView extends ContentView {
   }
 
   update(from: number, to: number = this.length, content: InlineView[]) {
-    this.markDirty()
     let cur = new ChildCursor(this.children, this.length)
     let {i: toI, off: toOff} = cur.findPos(to, 1)
     let {i: fromI, off: fromOff} = cur.findPos(from, -1)
@@ -72,7 +71,7 @@ export class LineView extends ContentView {
     // And if anything remains, splice the child array to insert the new content
     if (content.length || fromI != toI) {
       for (let view of content) view.finish(this)
-      this.children.splice(fromI, toI - fromI, ...content)
+      this.replaceChildren(fromI, toI, content)
     }
   }
 
@@ -88,8 +87,7 @@ export class LineView extends ContentView {
     }
     if (i < this.children.length) {
       for (let j = i; j < this.children.length; j++) result.push(this.children[j] as TextView)
-      this.children.length = i
-      this.markDirty()
+      this.replaceChildren(i, this.children.length)
     }
     this.length = from
     return result

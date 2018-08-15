@@ -4,6 +4,8 @@ declare global {
 
 export const enum dirty { not = 0, child = 1, node = 2 }
 
+const none: any[] = []
+
 export abstract class ContentView {
   constructor(public parent: ContentView | null, public dom: Node | null) {
     if (dom) dom.cmView = this
@@ -122,6 +124,11 @@ export abstract class ContentView {
       if (parent.dirty & dirty.child) return
       parent.dirty |= dirty.child
     }
+  }
+
+  replaceChildren(from: number, to: number, children: ContentView[] = none) {
+    this.children.splice(from, to - from, ...children)
+    this.markDirty()
   }
 
   ignoreMutation(rec: MutationRecord): boolean { return false }

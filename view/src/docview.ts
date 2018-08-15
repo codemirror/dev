@@ -92,7 +92,6 @@ export class DocView extends ContentView {
     let matchingRanges = findMatchingRanges(viewports, this.viewports, changes)
 
     let decoSets = this.decorations.filter(d => d.size > 0)
-    let gaps: HTMLElement[] = []
 
     let cursor = new ChildCursor(this.children, oldLength, 1)
     let posB = this.text.length
@@ -104,14 +103,11 @@ export class DocView extends ContentView {
       if (posB >= nextB) {
         if (!gap || endI - cursor.i != 1) {
           if (!gap) gap = new GapView(this)
-          this.children.splice(cursor.i, endI - cursor.i, gap)
-          this.markDirty()
+          this.replaceChildren(cursor.i, endI, [gap])
         }
         gap.update(posB - nextB, this.heightMap.heightAt(posB, this.text, 1) - this.heightMap.heightAt(nextB, this.text, -1))
-        gaps.push(gap.dom)
       } else if (endI != cursor.i) {
-        this.children.splice(cursor.i, endI - cursor.i)
-        this.markDirty()
+        this.replaceChildren(cursor.i, endI)
       }
 
       if (i < 0) break
@@ -119,8 +115,7 @@ export class DocView extends ContentView {
       let viewport = viewports[i], matching = matchingRanges[i]
       endI = cursor.i
       if (matching.from == matching.to) {
-        this.children.splice(cursor.i, endI - cursor.i, new LineView(this, []))
-        this.markDirty()
+        this.replaceChildren(cursor.i, endI, [new LineView(this, [])])
         endI = cursor.i + 1
       } else {
         cursor.findPos(matching.from)
@@ -163,8 +158,7 @@ export class DocView extends ContentView {
       } else { // Join lines
         let tail = children[toI].detachTail(toOff)
         children[fromI].update(fromOff, undefined, InlineView.appendInline(lines[0], tail))
-        children.splice(fromI + 1, toI - fromI)
-        this.markDirty()
+        this.replaceChildren(fromI + 1, toI + 1)
       }
     } else { // Across lines
       let tail = children[toI].detachTail(toOff)
@@ -172,8 +166,7 @@ export class DocView extends ContentView {
       let insert = []
       for (let j = 1; j < lines.length; j++)
         insert.push(new LineView(this, j < lines.length - 1 ? lines[j] : InlineView.appendInline(lines[j], tail)))
-      children.splice(fromI + 1, toI - fromI, ...insert)
-      this.markDirty()
+      this.replaceChildren(fromI + 1, toI + 1, insert)
     }
   }
 
