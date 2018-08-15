@@ -333,6 +333,7 @@ class GapView extends ContentView {
   }
 
   sync() {
+    // FIXME on Firefox heights over 17895697 are ignored. Work around that?
     if (this.dirty) {
       this.dom.style.height = this.height + "px"
       this.dirty = dirty.not

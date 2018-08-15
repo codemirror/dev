@@ -3,13 +3,13 @@ import {HeightMap} from "./heightmap"
 
 function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
   let rect = dom.getBoundingClientRect()
-  let top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom)
+  let top = Math.max(0, Math.min(innerHeight, rect.top)), bottom = Math.max(0, Math.min(innerHeight, rect.bottom))
   for (let parent = dom.parentNode as any; parent;) { // (Cast to any because TypeScript is useless with Node types)
     if (parent.nodeType == 1) {
       if (parent.scrollHeight > parent.clientHeight) {
         let parentRect = parent.getBoundingClientRect()
-        top = Math.max(top, parentRect.top)
-        bottom = Math.min(bottom, parentRect.bottom)
+        top = Math.min(parentRect.bottom, Math.max(parentRect.top, top))
+        bottom = Math.min(parentRect.bottom, Math.max(parentRect.top, bottom))
       }
       parent = parent.parentNode
     } else if (parent.nodeType == 11) { // Shadow root
