@@ -209,7 +209,7 @@ describe("RangeSet", () => {
       let ranges = []
       for (let i = 0; i < 100; i++)
         ranges.push(mk(i, i + 1, {bias: -1, biasEnd: 1}))
-      let set0 = mkSet(ranges), nodeBoundary = set0().children[0].length
+      let set0 = mkSet(ranges), nodeBoundary = set0.children[0].length
       let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, "hello")]))
       ist(set.size, set0.size)
       checkSet(set)
