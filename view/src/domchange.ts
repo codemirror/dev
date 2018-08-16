@@ -9,7 +9,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   let selPoints = selectionPoints(view.contentDOM), reader = new DOMReader(selPoints)
   reader.readRange(bounds.startDOM, bounds.endDOM)
   let newSelection = selectionFromPoints(selPoints, from)
-  
+
   let oldSel = view.state.selection.primary, preferredPos = oldSel.from, preferredSide = null
   // Prefer anchoring to end when Backspace is pressed
   if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100) {
@@ -124,7 +124,7 @@ class DOMPoint {
 }
 
 function selectionPoints(dom: HTMLElement): DOMPoint[] {
-  let root = getRoot(dom), result = []
+  let root = getRoot(dom), result: DOMPoint[] = []
   if (root.activeElement != dom) return result
   let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()
   if (anchorNode) {
