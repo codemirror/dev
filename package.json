@@ -4,7 +4,7 @@
   "description": "Text/code editor component",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts view/test/test-heightmap.ts",
+    "test": "mocha -r ts-node/register/transpile-only doc/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts view/test/test-heightmap.ts",
     "watch-demo": "rollup -w -c rollup.demo.config.js",
     "watch-view-tests": "rollup -w -c rollup.view-tests.config.js"
   },
@@ -30,12 +30,12 @@
     "@types/mocha": "^5.2.0",
     "ist": "^1.0.1",
     "mocha": "^5.1.1",
-    "rollup": "^0.58.2",
+    "rollup": "^0.64.1",
     "rollup-plugin-commonjs": "^9.1.3",
-    "rollup-plugin-typescript2": "^0.14.0",
+    "rollup-plugin-typescript2": "^0.16.1",
     "selenium-webdriver": "^4.0.0-alpha.1",
-    "ts-node": "^5.0.1",
-    "typescript": "^2.8.4",
+    "ts-node": "^7.0.1",
+    "typescript": "^3.0.1",
     "w3c-keyname": "^2.0.0"
   }
 }
