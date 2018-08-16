@@ -246,8 +246,8 @@ export class RangeSet<T extends RangeValue> {
     for (let child of this.children) { child.forEachInner(f, offset); offset += child.length }
   }
 
-  iter(): any {
-    const heap: Heapable[] = []
+  iter(): {next: () => Range<T> | void} {
+    const heap: (Range<T> | LocalSet<T>)[] = []
 
     if (this.size > 0) {
       addIterToHeap(heap, [new IteratedSet(0, this)], 0)
@@ -255,7 +255,7 @@ export class RangeSet<T extends RangeValue> {
     }
 
     return {
-      next() {
+      next(): Range<T> | void {
         if (heap.length == 0) return
 
         const next = takeFromHeap(heap)
@@ -407,7 +407,7 @@ function addToHeap(heap: Heapable[], elt: Heapable) {
   }
 }
 
-function takeFromHeap(heap: Heapable[]): Heapable {
+function takeFromHeap<T extends Heapable>(heap: T[]): T {
   let elt = heap[0], replacement = heap.pop()!
   if (heap.length == 0) return elt
   heap[0] = replacement
