@@ -494,7 +494,7 @@ function appendRanges<T extends RangeValue>(local: Range<T>[], children: RangeSe
     }
     if (add.length) {
       if (add.length == ranges.length)
-        children.push(new RangeSet(endPos - pos, add.length, add, noChildren))
+        children.push(new RangeSet(endPos - pos, add.length, add.map(r => r.move(-pos)), noChildren))
       else
         children.push(RangeSet.empty.updateInner(add, null, 0, 0, pos, endPos - pos))
       pos = endPos
