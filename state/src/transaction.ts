@@ -16,7 +16,8 @@ Meta.prototype["__proto__"] = null
 
 const metaSlotNames = Object.create(null)
 
-export class MetaSlot<T> {
+// _T is a phantom type parameter
+export class MetaSlot<_T> {
   /** @internal */
   name: string
 
