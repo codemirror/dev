@@ -1,73 +1,53 @@
+import {EditorView} from "../../view/src"
 import {Text} from "../../doc/src/text"
+import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, Plugin, StateField} from "../../state/src"
-import {Decoration, DecorationSet} from "../../view/src/decoration"
+import {DecoratedRange, Decoration} from "../../view/src/decoration"
 
-import {StringStream} from "./StringStream"
-import {IteratorStringStream} from "./IteratorStringStream"
+import {StringStreamCursor} from "./stringstreamcursor"
+import {DecorationCache} from "./decorationcache"
+import {copyState, readToken, Mode} from "./util"
 
-type State = boolean | {[{key: string}]: any}
-
-type Mode<S> = {
-  token(stream: StringStream, state: S): string,
-  copyState?: (state: S) => S,
-  name: string
-}
-
-function readToken<S>(mode: Mode<S>, stream: StringStream, state: S, inner = null) {
-  for (let i = 0; i < 10; i++) {
-    //if (inner) inner[0] = innerMode(mode, state).mode
-    let style = mode.token(stream, state)
-    if (stream.pos > stream.start) return style
-  }
-  throw new Error("Mode " + mode.name + " failed to advance stream.")
-}
-
-function copyState<S>(mode: Mode<S>, state: S) {
-  if (state === true) return state
-  if (mode.copyState) return mode.copyState(state)
-  let nstate = {}
-  for (let n in state) {
-    let val = state[n]
-    if (val instanceof Array) val = val.concat([])
-    nstate[n] = val
-  }
-  return nstate
-}
-
-// TODO
-// Implement all the tricks for faster highlighting:
-// - keep everything above change
-// - keep everything after change with same start state
-// - don't highlight outside viewport?
-
-function getDecorations<S>(mode: Mode<S>, doc: Text): DecorationSet {
+function getDecorations<S>(mode: Mode<S>, doc: Text, from: number, to: number, state: S = mode.startState()): [ReadonlyArray<DecoratedRange>, ReadonlyArray<Range<S>>] {
   const decorations = []
-  let state = mode.startState()
-  const stream = new IteratorStringStream(doc)
-  while (!stream.eof()) {
+  const states: Range<S>[] = []
+  const cursor = new StringStreamCursor(doc.iterRange(from, to), from)
+  let stream = cursor.next()
+  const pushState = () => states.push(new Range(stream.pos + cursor.offset, stream.pos + cursor.offset, copyState(mode, state)))
+  for (let line = 0; cursor.offset < to; stream = cursor.next(), ++line) {
     while (!stream.eol()) {
       const style = readToken(mode, stream, state)
-      if (style) decorations.push(Decoration.range(stream.start + stream.offset, stream.pos + stream.offset,
+      if (style) decorations.push(Decoration.range(stream.start + cursor.offset, stream.pos + cursor.offset,
                                                    {attributes: {class: 'cm-' + style.replace(/ /g, ' cm-')}}))
       stream.start = stream.pos
+      if ((stream.pos + 1) % 4096 == 0) pushState()
     }
-    stream.nextLine()
-    state = copyState(mode, state)
+    if ((line + 1) % 5 == 0) pushState()
   }
-  return Decoration.set(decorations)
+  pushState()
+  return [decorations, states]
 }
 
 export function legacyMode<S>(mode: Mode<S>) {
-  const field = new StateField<DecorationSet>({
-    init(state: EditorState) { return getDecorations(mode, state.doc) },
-    apply(tr, decos) { return getDecorations(mode, tr.doc) } // decos.map(tr.changes) }
+  const field = new StateField<DecorationCache<S>>({
+    init(state: EditorState) { return new DecorationCache((doc, from, to, startState) => getDecorations(mode, doc, from, to, startState), state.doc) },
+    apply(tr, state) { return state.update(tr) }
   })
 
   return new Plugin({
     state: field,
-    view(v) {
+    view(v: EditorView) {
+      let updateDocView = null, from, to
       return {
-        get decorations() { return v.state.getField(field) }
+        get decorations() {
+          ({from, to} = v.viewport)
+          return v.state.getField(field)!.getDecorations(from, to)
+        },
+        layoutChange(v: EditorView) {
+          if (updateDocView) clearTimeout(updateDocView)
+          if (v.viewport.from < from || v.viewport.to > to)
+            updateDocView = setTimeout(() => v.docView.update(v.state.doc, v.state.selection, v.decorations), 100)
+        }
       }
     }
   })

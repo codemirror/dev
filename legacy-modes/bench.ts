@@ -1,18 +1,15 @@
 import {EditorState} from "../state/src"
-import { PerformanceObserver, performance } from "perf_hooks"
-import {legacyMode} from "./src/"
+import {legacyMode} from "./src/old"
+import {legacyMode as legacyMode2} from "./src/"
 import toml from "./src/toml"
 import javascript from "./src/javascript"
 
 const BenchTable = require("benchtable")
-const ist = require("ist")
 const fs = require("fs")
 
-let suite = new BenchTable('legacyMode', { isTransposed: false })
+let suite = new BenchTable('legacyMode', { isTransposed: true })
 
-suite.addFunction("legacyMode", (mode, inp) => EditorState.create({doc: inp, plugins: [legacyMode(mode)]}))
-
-suite.addInput("toml", [toml(), `# This is a TOML document. Boom.
+const tomlDocument = `# This is a TOML document. Boom.
 
 title = "TOML Example"
 
@@ -46,10 +43,51 @@ data = [ ["gamma", "delta"], [1, 2] ]
 hosts = [
   "alpha",
   "omega"
-]
-`.repeat(1000)])
+]`.repeat(1000)
 
-suite.addInput("ts", [javascript({}, {typescript: true}), fs.readFileSync(__dirname + "/../doc/src/text.ts", "utf8")])
+const tsDocument = fs.readFileSync(__dirname + "/../doc/src/text.ts", "utf8")
+
+suite.addFunction("base", f => f(legacyMode))
+suite.addFunction("adv", f => f(legacyMode2))
+
+const create = (mode, inp) => EditorState.create({doc: inp, plugins: [mode]})
+suite.addInput("create toml", [impl => create(impl(toml()), tomlDocument)])
+suite.addInput("create ts", [impl => create(impl(javascript({}, {typescript: true})), tsDocument)])
+
+const renderOnce = (mode, inp) => mode.view({state: create(mode, inp), viewport: {from: 0, to: inp.length}}).decorations
+suite.addInput("render once toml", [impl => renderOnce(impl(toml()), tomlDocument)])
+suite.addInput("render once ts", [impl => renderOnce(impl(javascript({}, {typescript: true})), tsDocument)])
+
+const renderTwice = (mode, inp) => {
+  const state = mode.view({state: create(mode, inp), viewport: {from: 0, to: inp.length}})
+  state.decorations
+  state.decorations
+}
+suite.addInput("render twice toml", [impl => renderTwice(impl(toml()), tomlDocument)])
+suite.addInput("render twice ts", [impl => renderTwice(impl(javascript({}, {typescript: true})), tsDocument)])
+
+const someEdits = (mode, inp) => {
+  let state = EditorState.create({doc: inp, plugins: [mode]})
+  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+  state = state.transaction.replace(0, 5, "something\n").apply()
+  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+  state = state.transaction.replace(state.doc.length - 10, state.doc.length - 5, "somethingelse\n").apply()
+  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+}
+suite.addInput("some edits toml", [impl => someEdits(impl(toml()), tomlDocument)])
+suite.addInput("some edits ts", [impl => someEdits(impl(javascript({}, {typescript: true})), tsDocument)])
+
+const lotsOfEdits = (mode, inp) => {
+  let state = EditorState.create({doc: inp, plugins: [mode]})
+  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+  for (let i = 0; i < 13; ++i) { // FIXME more than 13 triggers the RangeSet bug
+    const at = Math.min((i*99971) % state.doc.length, state.doc.length - 5)
+    state = state.transaction.replace(at, at + 5, "something").apply()
+    mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+  }
+}
+suite.addInput("lotsOfEdits toml", [impl => lotsOfEdits(impl(toml()), tomlDocument)])
+suite.addInput("lotsOfEdits ts", [impl => lotsOfEdits(impl(javascript({}, {typescript: true})), tsDocument)])
 
 suite
 .on('cycle', function (event) {

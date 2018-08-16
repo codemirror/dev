@@ -1,11 +1,11 @@
-import { countColumn } from "./misc"
+const { countColumn } = require("./misc")
 
 // STRING STREAM
 
 // Fed to the mode parsers, provides helper functions to make
 // parsers more succinct.
 
-class StringStream {
+exports.StringStream = class StringStream {
   constructor(string, tabSize, lineOracle) {
     this.pos = this.start = 0
     this.string = string
@@ -86,5 +86,3 @@ class StringStream {
     return oracle && oracle.baseToken(this.pos)
   }
 }
-
-export default StringStream
