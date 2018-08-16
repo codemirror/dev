@@ -4,15 +4,12 @@ const ist = require("ist")
 const fakeView = {state: {}, dispatch: () => {}}
 
 function dispatch(map, key, mods?) {
-  let event = {}
-  if (mods) for (let prop in mods) event[prop] = mods[prop]
-  event.key = key
+  let event: Partial<KeyboardEvent> = Object.assign({}, mods, {key})
   map.view().handleDOMEvents.keydown(fakeView, event)
 }
 
 function counter() {
-  function result() { result.count++ }
-  result.count = 0
+  const result = Object.assign(() => { result.count++ }, {count: 0})
   return result
 }
 

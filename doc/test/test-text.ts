@@ -1,7 +1,7 @@
 import {Text, TextLeaf, LineCursor, LinePos} from "../src/text"
 const ist = require("ist")
 
-function depth(node) {
+function depth(node: Text): number {
   return node instanceof TextLeaf ? 0 : 1 + Math.max(...node.children.map(depth))
 }
 

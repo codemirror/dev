@@ -152,12 +152,12 @@ describe("RangeSet", () => {
 
     it("moves locals down when splitting a leaf", () => {
       let set = mkSet([mk(2), mk(3), mk(4), mk(5)])
-        .update(new Array(200).fill().map((_, i) => mk(i, i + 1)))
+        .update(new Array(200).fill(undefined).map((_, i) => mk(i, i + 1)))
       ist(set.local.length, 0)
     })
 
     it("can add 33 pathological ranges", () => {
-      const set = RangeSet.empty.update(new Array(33).fill().map((_, i) => mk(0, 1 + i)))
+      RangeSet.empty.update(new Array(33).fill(undefined).map((_, i) => mk(0, 1 + i)))
     })
   })
 
