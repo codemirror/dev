@@ -277,7 +277,7 @@ export class RangeSet<T extends RangeValue> {
         if (range.to + next.offset >= from) {
           if (range.from < range.to && !iterator.ignoreRange(range.value)) {
             range = range.move(next.offset)
-            
+
             iterator.advance(range.from, active)
             let collapsed = range.value.collapsed
             if (collapsed) {

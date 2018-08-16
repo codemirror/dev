@@ -446,7 +446,7 @@ class HeightMapBranch extends HeightMap {
 
 // FIXME This could probably be optimized. Measure how often it's
 // actually running during regular use. (Current theory is that,
-// becuase most of the document will simply be an unparsed gap, and
+// because most of the document will simply be an unparsed gap, and
 // collapsed regions/widgets are relatively rare, and the viewport is
 // filled in through updateHeight, it's not going to be calling
 // `lineEndAt`/`lineStartAt` a significant amount of times except in

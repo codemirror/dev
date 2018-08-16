@@ -98,4 +98,3 @@ class PartialMapping implements Mapping {
     return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
   }
 }
-    

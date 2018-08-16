@@ -196,7 +196,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 
   ignorePoint(value: Decoration) { return !value.widget }
-}  
+}
 
 export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>): Changes {
   let comp = new DecorationComparator
