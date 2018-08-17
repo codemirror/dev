@@ -40,12 +40,11 @@ export class EditorView {
     this.dom.className = "CodeMirror"
     this.dom.appendChild(this.contentDOM)
 
-    this.inputState = new InputState(this)
-
     this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
                                () => applySelectionChange(this), () => this.layoutChange())
     this.viewport = new EditorViewport(this.docView)
     this.createPluginViews(plugins)
+    this.inputState = new InputState(this)
     this.docView.update(state.doc, state.selection, this.decorations)
   }
 
