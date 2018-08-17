@@ -11,10 +11,8 @@
 }  
 
 .CodeMirror-gutter {
-  box-sizing: border-box;
   background: #f5f5f5;
   border-right: 1px solid silver;
-  height: 100%;
 }
 
 .CodeMirror-gutter-element {
