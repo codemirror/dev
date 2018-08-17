@@ -22,8 +22,9 @@ export class InputState {
     for (let type in handlers) {
       let handler = handlers[type]
       view.contentDOM.addEventListener(type, event => {
-        if (eventBelongsToEditor(view, event) && !this.runCustomHandlers(type, view, event))
-          handler(view, event)
+        if (!eventBelongsToEditor(view, event)) return
+        if (this.runCustomHandlers(type, view, event)) event.preventDefault()
+        else handler(view, event)
       })
       this.registeredEvents.push(type)
     }
@@ -41,7 +42,8 @@ export class InputState {
       if (this.registeredEvents.indexOf(type) < 0) {
         this.registeredEvents.push(type)
         view.contentDOM.addEventListener(type, event => {
-          if (eventBelongsToEditor(view, event)) this.runCustomHandlers(type, view, event)
+          if (!eventBelongsToEditor(view, event)) return
+          if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         })
       }
     }
