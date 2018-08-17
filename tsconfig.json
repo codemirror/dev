@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["ES6", "dom"],
+    "lib": ["es5", "es6", "dom"],
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "sourceMap": true,
