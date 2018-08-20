@@ -25,6 +25,8 @@ export class EditorView {
 
   private pluginViews: PluginView[] = []
 
+  private scheduledDecoUpdate: number = -1
+
   constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
     this._state = state
     this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
@@ -120,6 +122,14 @@ export class EditorView {
 
   heightAtPos(pos: number, top: boolean): number {
     return this.docView.heightMap.heightAt(pos, this.state.doc, top ? -1 : 1)
+  }
+
+  // To be used by plugin views when they update their decorations asynchronously
+  decorationUpdate() {
+    if (this.scheduledDecoUpdate < 0) this.scheduledDecoUpdate = requestAnimationFrame(() => {
+      this.scheduledDecoUpdate = -1
+      this.docView.update(this.state.doc, this.state.selection)
+    })
   }
 
   hasFocus(): boolean {
