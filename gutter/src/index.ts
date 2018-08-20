@@ -60,10 +60,6 @@ class GutterView {
     this.updateGutter(view)
   }
 
-  layoutChange(view: EditorView) {
-    this.updateGutter(view)
-  }
-
   updateGutter(view: EditorView) {
     let spaceAbove = view.heightAtPos(view.viewport.from, true)
     if (spaceAbove != this.spaceAbove) {

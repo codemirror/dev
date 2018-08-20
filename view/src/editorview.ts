@@ -1,5 +1,5 @@
 import {EditorState, Transaction, EditorSelection, MetaSlot} from "../../state/src"
-import {DocView} from "./docview"
+import {DocView, EditorViewport} from "./docview"
 import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
@@ -40,17 +40,26 @@ export class EditorView {
     this.dom.className = "CodeMirror"
     this.dom.appendChild(this.contentDOM)
 
-    this.docView = new DocView(this.contentDOM, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-                               () => applySelectionChange(this), () => this.layoutChange())
-    this.viewport = new EditorViewport(this.docView)
+    this.docView = new DocView(this.contentDOM, {
+      onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
+      onSelectionChange: () => applySelectionChange(this),
+      onUpdateDOM: () => {
+        for (let plugin of this.pluginViews) if (plugin.updateDOM) plugin.updateDOM(this)
+      },
+      onUpdateViewport: () => {
+        for (let plugin of this.pluginViews) if (plugin.updateViewport) plugin.updateViewport(this)
+      },
+      getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
+    })
+    this.viewport = this.docView.publicViewport
     this.createPluginViews(plugins)
     this.inputState = new InputState(this)
-    this.docView.update(state.doc, state.selection, this.decorations)
+    this.docView.update(state.doc, state.selection)
   }
 
   setState(state: EditorState, ...plugins: PluginView[]) {
     this._state = state
-    this.docView.update(state.doc, state.selection, this.decorations)
+    this.docView.update(state.doc, state.selection)
     this.inputState.updateCustomHandlers(this)
     this.createPluginViews(plugins)
   }
@@ -60,12 +69,12 @@ export class EditorView {
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     let prevState = this._state
     this._state = state
+    // Make sure viewport still points into the current doc, before calling updateState on plugins
+    this.viewport.map(transactions)
     for (let pluginView of this.pluginViews)
       if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
-    this.docView.update(state.doc, state.selection, this.decorations, changedRanges(transactions),
+    this.docView.update(state.doc, state.selection, changedRanges(transactions),
                         transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
-    for (let pluginView of this.pluginViews)
-      if (pluginView.updateDOM) pluginView.updateDOM(this)
   }
 
   /** @internal */
@@ -126,18 +135,14 @@ export class EditorView {
     this.dom.remove()
     this.docView.destroy()
   }
-
-  private get decorations(): DecorationSet[] {
-    return this.pluginViews.map(v => v.decorations || Decoration.none)
-  }
 }
 
 export interface PluginView {
   updateState?: (view: EditorView, prevState: EditorState, transactions: Transaction[]) => void
   updateDOM?: (view: EditorView) => void
-  handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean};
-  decorations?: DecorationSet;
-  layoutChange?: (view: EditorView) => void
+  updateViewport?: (view: EditorView) => void
+  handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean}
+  decorations?: DecorationSet
   destroy?: () => void
 }
 
@@ -167,16 +172,3 @@ const contentCSS = `
 margin: 0;
 flex-grow: 2;
 min-height: 100%;`
-
-// Public shim for giving client code access to viewport information
-export class EditorViewport {
-  /** @internal */
-  constructor(readonly docView: DocView) {}
-
-  get from() { return this.docView.visiblePart.from }
-  get to() { return this.docView.visiblePart.to }
-
-  forEachLine(f: (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void) {
-    this.docView.heightMap.forEachLine(this.from, this.to, 0, this.docView.heightOracle, f)
-  }
-}

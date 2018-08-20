@@ -4,7 +4,7 @@ import {InlineView, InlineBuilder} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
-import {EditorSelection} from "../../state/src"
+import {EditorSelection, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle} from "./heightmap"
 import {ChangedRange} from "./changes"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges} from "./decoration"
@@ -16,6 +16,7 @@ export class DocView extends ContentView {
   children: ContentView[] = [new LineView(this, [])]
   visiblePart: Viewport = Viewport.empty
   viewports: Viewport[] = []
+  publicViewport: EditorViewport
 
   text: Text = Text.create("")
   decorations: A<DecorationSet> = []
@@ -37,23 +38,27 @@ export class DocView extends ContentView {
 
   get childGap() { return 1 }
 
-  constructor(dom: HTMLElement,
-              onDOMChange: (from: number, to: number, typeOver: boolean) => void,
-              onSelectionChange: () => void,
-              readonly onLayoutChange: () => void) {
+  constructor(dom: HTMLElement, private callbacks: {
+    onDOMChange: (from: number, to: number, typeOver: boolean) => void,
+    onSelectionChange: () => void,
+    onUpdateDOM: () => void,
+    onUpdateViewport: () => void,
+    getDecorations: () => DecorationSet[]
+  }) {
     super(null, dom)
     this.dirty = dirty.node
 
     this.viewportState = new ViewportState
-    this.observer = new DOMObserver(this, onDOMChange, onSelectionChange, () => this.checkLayout())
+    this.observer = new DOMObserver(this, callbacks.onDOMChange, callbacks.onSelectionChange, () => this.checkLayout())
+    this.publicViewport = new EditorViewport(this, 0, 0) // FIXME initialize differently?x
   }
 
   // FIXME need some way to stabilize viewport—if a change causes the
   // top of the visible viewport to move, scroll position should be
   // adjusted to keep the content in place
-  update(doc: Text, selection: EditorSelection, decorations: A<DecorationSet>,
-         changedRanges?: ChangedRange[], scrollIntoView: number = -1) {
+  update(doc: Text, selection: EditorSelection, changedRanges?: ChangedRange[], scrollIntoView: number = -1) {
     this.scrollIntoView = scrollIntoView
+    let decorations = this.callbacks.getDecorations()
     if (this.dirty == dirty.not && this.text.eq(doc) && sameArray(decorations, this.decorations)) {
       if (selection.eq(this.selection) && scrollIntoView < 0) return
       if (selection.primary.from >= this.visiblePart.from &&
@@ -65,19 +70,20 @@ export class DocView extends ContentView {
     }
 
     let oldLength = this.text.length
-    let changes = fullChangedRanges(changedRanges || [new ChangedRange(0, oldLength, 0, doc.length)],
-                                    decorations, this.decorations)
+    if (!changedRanges) changedRanges = [new ChangedRange(0, oldLength, 0, doc.length)]
+    let changes = decoChanges(changedRanges, decorations, this.decorations)
     this.text = doc
     this.decorations = decorations
     this.selection = selection
     this.heightMap = this.heightMap.applyChanges(decorations.filter(d => d.size > 0),
-                                                 this.heightOracle.setDoc(doc), changes.height)
+                                                 this.heightOracle.setDoc(doc), extendWithRanges(changedRanges, changes.height))
 
-    this.updateInner(changes.content, oldLength,
-                     this.viewportState.getViewport(this.text, this.heightMap, 0, scrollIntoView))
+    let {viewport, changes: contentChanges} = this.getViewport(0, scrollIntoView, extendWithRanges(changedRanges, changes.content))
+    this.updateInner(contentChanges, oldLength, viewport)
 
     if (this.layoutCheckScheduled < 0)
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
+    this.callbacks.onUpdateDOM()
   }
 
   private updateInner(changes: A<ChangedRange>, oldLength: number, visible: Viewport) {
@@ -201,6 +207,24 @@ export class DocView extends ContentView {
     if (domSel.extend) domSel.extend(head.node, head.offset)
   }
 
+  getViewport(bias: number, scrollIntoView: number, changes: A<ChangedRange> = []): {
+    viewport: Viewport,
+    changes: A<ChangedRange>
+  } {
+    for (;;) {
+      let viewport = this.viewportState.getViewport(this.text, this.heightMap, bias, scrollIntoView)
+      if (viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to) return {viewport, changes}
+      ;({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
+      this.callbacks.onUpdateViewport()
+      let decorations = this.callbacks.getDecorations()
+      if (sameArray(decorations, this.decorations)) return {viewport, changes}
+      let {content, height} = decoChanges([], decorations, this.decorations)
+      this.decorations = decorations
+      changes = extendWithRanges(changes, content)
+      this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, extendWithRanges([], height))
+    }
+  }
+
   focus() {
     this.observer.withoutSelectionListening(() => this.updateSelection(true))
   }
@@ -233,8 +257,9 @@ export class DocView extends ContentView {
       if (covered && !this.heightOracle.heightChanged) break
       updated = true
       if (i > 10) throw new Error("Layout failed to converge")
-      let viewport = covered ? this.visiblePart : this.viewportState.getViewport(this.text, this.heightMap, scrollBias, -1)
-      this.updateInner([], this.text.length, viewport)
+      let viewport = this.visiblePart, contentChanges: A<ChangedRange> = []
+      if (!covered) ({viewport, changes: contentChanges} = this.getViewport(scrollBias, -1, []))
+      this.updateInner(contentChanges, this.text.length, viewport)
       lineHeights = null
       refresh = false
       scrollBias = 0
@@ -242,7 +267,7 @@ export class DocView extends ContentView {
     }
     if (updated) {
       this.observer.listenForScroll()
-      this.onLayoutChange()
+      this.callbacks.onUpdateDOM()
     }
   }
 
@@ -341,20 +366,17 @@ class GapView extends ContentView {
   domBoundsAround() { return null }
 }
 
-function fullChangedRanges(diff: A<ChangedRange>,
-                           decorations: A<DecorationSet>,
-                           oldDecorations: A<DecorationSet>
-                          ): {content: A<ChangedRange>, height: A<ChangedRange>} {
+function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
+                     oldDecorations: A<DecorationSet>): {content: number[], height: number[]} {
   let contentRanges: number[] = [], heightRanges: number[] = []
-  for (let i = Math.max(decorations.length, oldDecorations.length) - 1; i >= 0; i--) {
-    let deco = decorations[i] || Decoration.none, oldDeco = oldDecorations[i] || Decoration.none
+  for (let i = decorations.length - 1; i >= 0; i--) {
+    let deco = decorations[i], oldDeco = i < oldDecorations.length ? oldDecorations[i] : Decoration.none
     if (deco.size == 0 && oldDeco.size == 0) continue
     let newRanges = findChangedRanges(oldDeco, deco, diff)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
   }
-  return {content: extendWithRanges(diff, contentRanges),
-          height: extendWithRanges(diff, heightRanges)}
+  return {content: contentRanges, height: heightRanges}
 }
 
 function addChangedRange(ranges: ChangedRange[], fromA: number, toA: number, fromB: number, toB: number) {
@@ -374,8 +396,11 @@ function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRan
     let next = dI == diff.length ? null : diff[dI], off = posA - posB
     let end = next ? next.fromB : 2e9
     while (rI < ranges.length && ranges[rI] < end) {
-      let from = ranges[rI++], to = ranges[rI++]
-      addChangedRange(result, from + off, to + off, from, to)
+      let from = ranges[rI], to = ranges[rI + 1]
+      let fromB = Math.max(posB, from), toB = Math.min(end, to)
+      if (fromB < toB) addChangedRange(result, fromB + off, toB + off, fromB, toB)
+      if (to > end) break
+      else rI += 2
     }
     if (!next) return result
     addChangedRange(result, next.fromA, next.toA, next.fromB, next.toB)
@@ -457,4 +482,25 @@ function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>, 
     result.push(new Viewport(at, at))
   }
   return result
+}
+
+// Public shim for giving client code access to viewport information
+export class EditorViewport {
+  /** @internal */
+  constructor(private docView: DocView, public _from: number, public _to: number) {}
+
+  /** @internal */
+  map(transactions: Transaction[]) {
+    for (let tr of transactions) {
+      this._from = tr.changes.mapPos(this._from, 1)
+      this._to = Math.max(this._from, tr.changes.mapPos(this._to, -1))
+    }
+  }
+
+  get from() { return this._from }
+  get to() { return this._to }
+
+  forEachLine(f: (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void) {
+    this.docView.heightMap.forEachLine(this.from, this.to, 0, this.docView.heightOracle, f)
+  }
 }

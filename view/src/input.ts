@@ -148,3 +148,5 @@ handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
     view.dispatch(view.state.transaction.replaceSelection("").scrollIntoView().setMeta(MetaSlot.userEvent, "cut"))
   }
 }
+
+// FIXME add wheel event handlers that predictively adjust the viewport
