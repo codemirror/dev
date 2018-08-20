@@ -55,4 +55,66 @@ describe("DOM changes", () => {
     ist(cm.state.doc.text, "foo\nbar\n".repeat(15) + "a")
   })
 
+  it("handles replacing a selection with a prefix of itself", () => {
+    let cm = tempEditor("foo\nbar")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
+    cm.contentDOM.textContent = "f"
+    flush(cm)
+    ist(cm.state.doc.text, "f")
+  })
+
+  it("handles replacing a selection with a suffix of itself", () => {
+    let cm = tempEditor("foo\nbar")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
+    cm.contentDOM.textContent = "r"
+    flush(cm)
+    ist(cm.state.doc.text, "r")
+  })
+
+  it("handles replacing a selection with a prefix of itself and something else", () => {
+    let cm = tempEditor("foo\nbar")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
+    cm.contentDOM.textContent = "fa"
+    flush(cm)
+    ist(cm.state.doc.text, "fa")
+  })
+
+  it("handles replacing a selection with a suffix of itself and something else", () => {
+    let cm = tempEditor("foo\nbar")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
+    cm.contentDOM.textContent = "br"
+    flush(cm)
+    ist(cm.state.doc.text, "br")
+  })
+
+  it("handles replacing a selection with new content that shares a prefix and a suffix", () => {
+    let cm = tempEditor("foo\nbar")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1, 6)))
+    cm.contentDOM.textContent = "fo--ar"
+    flush(cm)
+    ist(cm.state.doc.text, "fo--ar")
+  })
+
+  it("handles appending", () => {
+    let cm = tempEditor("foo\nbar")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(7, 7)))
+    cm.contentDOM.appendChild(document.createElement("div"))
+    flush(cm)
+    ist(cm.state.doc.text, "foo\nbar\n")
+  })
+
+  it("handles deleting the first line and the newline after it", () => {
+    let cm = tempEditor("foo\nbar\n\nbaz")
+    cm.contentDOM.innerHTML = "bar<div><br></div><div>baz</div>"
+    flush(cm)
+    ist(cm.state.doc.text, "bar\n\nbaz")
+  })
+
+  it("handles deleting a line with an empty line after it", () => {
+    let cm = tempEditor("foo\nbar\n\nbaz")
+    cm.contentDOM.innerHTML = "<div>foo</div><br><div>baz</div>"
+    flush(cm)
+    ist(cm.state.doc.text, "foo\n\nbaz")
+  })
+
 })

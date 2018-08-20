@@ -24,11 +24,14 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     diff = {from: oldSel.from - from, toA: oldSel.to - from, toB: oldSel.to - from}
   if (diff) {
     let start = from + diff.from, end = from + diff.toA
-    let tr = view.state.transaction, inserted = reader.text.slice(diff.from, diff.toB)
-    if (start >= tr.selection.primary.from && end <= tr.selection.primary.to)
+    let tr = view.state.transaction
+    if (start >= tr.selection.primary.from && end <= tr.selection.primary.to) {
+      const inserted = reader.text.slice(tr.selection.primary.from - from, diff.toB) + reader.text.slice(diff.toB, tr.selection.primary.to - diff.toA + diff.toB - from)
       tr = tr.replaceSelection(inserted)
-    else
+    } else {
+      const inserted = reader.text.slice(diff.from, diff.toB)
       tr = tr.replace(start, end, inserted)
+    }
     if (newSelection && !tr.selection.primary.eq(newSelection.primary))
       tr = tr.setSelection(newSelection)
     // FIXME maybe also try to detect (Android) enter here and call
@@ -80,7 +83,7 @@ class DOMReader {
       this.readNode(cur)
       let next: Node | null = cur.nextSibling
       if (next == end) break
-      if (isBlockNode(cur)) this.text += "\n"
+      if (isBlockNode(cur) || (isBlockNode(next) && cur.nodeName != "BR")) this.text += "\n"
       cur = next!
     }
     this.findPointBefore(parent, end)
