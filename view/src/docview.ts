@@ -211,9 +211,11 @@ export class DocView extends ContentView {
     viewport: Viewport,
     changes: A<ChangedRange>
   } {
-    for (;;) {
+    for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(this.text, this.heightMap, bias, scrollIntoView)
-      if (viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to) return {viewport, changes}
+      if (i == 5) console.warn("Viewport and decorations failed to converge")
+      if (i == 5 || (viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to))
+        return {viewport, changes}
       ;({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
       this.callbacks.onUpdateViewport()
       let decorations = this.callbacks.getDecorations()
