@@ -37,17 +37,18 @@ export function legacyMode<S>(mode: Mode<S>) {
   return new Plugin({
     state: field,
     view(v: EditorView) {
-      let updateDocView = null, from, to
-      return {
-        get decorations() {
-          ({from, to} = v.viewport)
-          return v.state.getField(field)!.getDecorations(from, to)
-        },
-        layoutChange(v: EditorView) {
-          if (updateDocView) clearTimeout(updateDocView)
-          if (v.viewport.from < from || v.viewport.to > to)
-            updateDocView = setTimeout(() => v.docView.update(v.state.doc, v.state.selection, v.decorations), 100)
+      let decorations = Decoration.none, from = -1, to = -1
+      function update(v: EditorView, force: boolean) {
+        let vp = v.viewport
+        if (force || vp.from < from || vp.to > to) {
+          ;({from, to} = vp)
+          decorations = v.state.getField(field)!.getDecorations(from, to)
         }
+      }
+      return {
+        get decorations() { return decorations },
+        updateViewport: update,
+        updateState: (v: EditorView) => update(v, true)
       }
     }
   })
