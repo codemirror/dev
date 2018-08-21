@@ -244,7 +244,7 @@ export class DocView extends ContentView {
     if (this.heightOracle.maybeRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
-                                          lineHeight, (this.dom).clientWidth / charWidth)
+                                          lineHeight, (this.dom).clientWidth / charWidth, lineHeights)
     }
 
     if (scrollIntoView > -1) scrollRectIntoView(this.dom, this.coordsAt(scrollIntoView)!)
@@ -316,6 +316,7 @@ export class DocView extends ContentView {
     }
     // If no workable line exists, force a layout of a measurable element
     let dummy = document.createElement("div"), lineHeight!: number, charWidth!: number
+    dummy.style.cssText = "contain: strict"
     dummy.textContent = "abc def ghi jkl mno pqr stu"
     this.observer.withoutListening(() => {
       this.dom.appendChild(dummy)

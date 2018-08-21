@@ -42,13 +42,16 @@ export class HeightOracle {
     return newHeight
   }
 
-  refresh(whiteSpace: string, lineHeight: number, lineLength: number): boolean {
+  refresh(whiteSpace: string, lineHeight: number, lineLength: number, knownHeights: number[]): boolean {
     let lineWrapping = wrappingWhiteSpace.indexOf(whiteSpace) > -1
     let changed = Math.round(lineHeight) != Math.round(this.lineHeight) || this.lineWrapping != lineWrapping
     this.lineWrapping = lineWrapping
     this.lineHeight = lineHeight
     this.lineLength = lineLength
-    if (changed) this.heightSamples = {}
+    if (changed) {
+      this.heightSamples = {}
+      for (let height of knownHeights) this.heightSamples[Math.floor(height * 10)] = true
+    }
     return changed
   }
 }
