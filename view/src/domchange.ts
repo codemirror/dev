@@ -23,14 +23,12 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   if (!diff && typeOver && !oldSel.empty && newSelection && newSelection.primary.empty)
     diff = {from: oldSel.from - from, toA: oldSel.to - from, toB: oldSel.to - from}
   if (diff) {
-    let start = from + diff.from, end = from + diff.toA
+    let start = from + diff.from, end = from + diff.toA, sel = view.state.selection.primary
     let tr = view.state.transaction
-    if (start >= tr.selection.primary.from && end <= tr.selection.primary.to) {
-      const inserted = reader.text.slice(tr.selection.primary.from - from, diff.toB) + reader.text.slice(diff.toB, tr.selection.primary.to - diff.toA + diff.toB - from)
-      tr = tr.replaceSelection(inserted)
+    if (start >= sel.from && end <= sel.to && end - start >= (sel.to - sel.from) / 3) {
+      tr = tr.replaceSelection(reader.text.slice(sel.from - from, sel.to - diff.toA + diff.toB - from))
     } else {
-      const inserted = reader.text.slice(diff.from, diff.toB)
-      tr = tr.replace(start, end, inserted)
+      tr = tr.replace(start, end, reader.text.slice(diff.from, diff.toB))
     }
     if (newSelection && !tr.selection.primary.eq(newSelection.primary))
       tr = tr.setSelection(newSelection)
