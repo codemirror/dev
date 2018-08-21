@@ -32,7 +32,7 @@ export function clientRectsFor(dom: Node): DOMRectList {
     range.setEnd(dom, dom.nodeValue!.length)
     range.setStart(dom, 0)
     return range.getClientRects() as DOMRectList
-  } else if (dom.nodeType == 3) {
+  } else if (dom.nodeType == 1) {
     return (dom as HTMLElement).getClientRects() as DOMRectList
   } else {
     return [] as any as DOMRectList
