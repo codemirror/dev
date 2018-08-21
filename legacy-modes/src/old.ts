@@ -16,7 +16,7 @@ function getDecorations<S>(mode: Mode<S>, doc: Text): DecorationSet {
     while (!stream.eol()) {
       const style = readToken(mode, stream, state)
       if (style) decorations.push(Decoration.range(stream.start + cursor.offset, stream.pos + cursor.offset,
-                                                   {attributes: {class: 'cm-' + style.replace(/ /g, ' cm-')}}))
+                                                   {class: 'cm-' + style.replace(/ /g, ' cm-')}))
       stream.start = stream.pos
     }
     state = copyState(mode, state)
