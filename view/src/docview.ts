@@ -71,7 +71,7 @@ export class DocView extends ContentView {
 
     let oldLength = this.text.length
     if (!changedRanges) changedRanges = [new ChangedRange(0, oldLength, 0, doc.length)]
-    let changes = decoChanges(changedRanges, decorations, this.decorations)
+    let changes = decoChanges(changedRanges, decorations, this.decorations, doc.length)
     this.text = doc
     this.decorations = decorations
     this.selection = selection
@@ -220,7 +220,7 @@ export class DocView extends ContentView {
       this.callbacks.onUpdateViewport()
       let decorations = this.callbacks.getDecorations()
       if (sameArray(decorations, this.decorations)) return {viewport, changes}
-      let {content, height} = decoChanges([], decorations, this.decorations)
+      let {content, height} = decoChanges([], decorations, this.decorations, this.text.length)
       this.decorations = decorations
       changes = extendWithRanges(changes, content)
       this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, extendWithRanges([], height))
@@ -372,12 +372,12 @@ class GapView extends ContentView {
 }
 
 function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
-                     oldDecorations: A<DecorationSet>): {content: number[], height: number[]} {
+                     oldDecorations: A<DecorationSet>, length: number): {content: number[], height: number[]} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let i = decorations.length - 1; i >= 0; i--) {
     let deco = decorations[i], oldDeco = i < oldDecorations.length ? oldDecorations[i] : Decoration.none
     if (deco.size == 0 && oldDeco.size == 0) continue
-    let newRanges = findChangedRanges(oldDeco, deco, diff)
+    let newRanges = findChangedRanges(oldDeco, deco, diff, length)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
   }

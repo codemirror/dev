@@ -178,9 +178,11 @@ export function joinRanges(a: number[], b: number[]): number[] {
 
 class DecorationComparator implements RangeComparator<Decoration> {
   changes: Changes = new Changes
+  constructor(private length: number) {}
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
-    if (!sameActiveSets(activeA as RangeDecoration[], activeB as RangeDecoration[])) {
+    if (!sameActiveSets(activeA as RangeDecoration[], activeB as RangeDecoration[]) && from < this.length) {
+      to = Math.min(to, this.length)
       addRange(from, to, this.changes.content)
       if (isCollapsed(activeA as RangeDecoration[]) != isCollapsed(activeB as RangeDecoration[])) addRange(from, to, this.changes.height)
     }
@@ -189,7 +191,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
   ignoreRange(value: Decoration) { return !(value as RangeDecoration).affectsSpans }
 
   comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
-    if (!sameWidgetSets(pointsA, pointsB)) {
+    if (!sameWidgetSets(pointsA, pointsB) && pos <= this.length) {
       addRange(pos, pos, this.changes.content)
       addRange(pos, pos, this.changes.height)
     }
@@ -198,8 +200,8 @@ class DecorationComparator implements RangeComparator<Decoration> {
   ignorePoint(value: Decoration) { return !value.widget }
 }
 
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>): Changes {
-  let comp = new DecorationComparator
+export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, length: number): Changes {
+  let comp = new DecorationComparator(length)
   a.compare(b, diff, comp)
   return comp.changes
 }
