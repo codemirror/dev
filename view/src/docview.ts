@@ -315,14 +315,16 @@ export class DocView extends ContentView {
       }
     }
     // If no workable line exists, force a layout of a measurable element
-    let dummy = document.createElement("div")
+    let dummy = document.createElement("div"), lineHeight!: number, charWidth!: number
     dummy.textContent = "abc def ghi jkl mno pqr stu"
-    this.dom.appendChild(dummy)
-    let rect = clientRectsFor(dummy.firstChild!)[0]
-    let result = {lineHeight: dummy.getBoundingClientRect().height,
-                  charWidth: rect ? rect.width / 27 : 7}
-    dummy.remove()
-    return result
+    this.observer.withoutListening(() => {
+      this.dom.appendChild(dummy)
+      let rect = clientRectsFor(dummy.firstChild!)[0]
+      lineHeight = dummy.getBoundingClientRect().height
+      charWidth = rect ? rect.width / 27 : 7
+      dummy.remove()
+    })
+    return {lineHeight, charWidth}
   }
 
   destroy() {
