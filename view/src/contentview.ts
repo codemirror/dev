@@ -120,10 +120,19 @@ export abstract class ContentView {
   markDirty() {
     if (this.dirty & dirty.node) return
     this.dirty |= dirty.node
+    this.markParentsDirty()
+  }
+
+  markParentsDirty() {
     for (let parent = this.parent; parent; parent = parent.parent) {
       if (parent.dirty & dirty.child) return
       parent.dirty |= dirty.child
     }
+  }
+
+  setParent(parent: ContentView) {
+    this.parent = parent
+    if (this.dirty) this.markParentsDirty()
   }
 
   replaceChildren(from: number, to: number, children: ContentView[] = none) {

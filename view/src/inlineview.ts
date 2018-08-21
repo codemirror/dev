@@ -37,7 +37,7 @@ export class TextView extends InlineView {
   }
 
   finish(parent: ContentView) {
-    this.parent = parent
+    this.setParent(parent)
     if (this.dom) return
     this.textDOM = document.createTextNode(this.text)
     let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
@@ -108,7 +108,7 @@ export class WidgetView extends InlineView {
   }
 
   finish(parent: ContentView) {
-    this.parent = parent
+    this.setParent(parent)
     if (!this.dom) {
       this.dom = this.widget.toDOM()
       this.dom.contentEditable = "false"
@@ -139,7 +139,7 @@ export class CollapsedView extends InlineView {
     super(null, null)
   }
 
-  finish(parent: ContentView) { this.parent = parent }
+  finish(parent: ContentView) { this.setParent(parent) }
 
   merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
     if (!(other instanceof CollapsedView)) return false
