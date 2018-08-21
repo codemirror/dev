@@ -403,7 +403,7 @@ function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRan
     while (rI < ranges.length && ranges[rI] < end) {
       let from = ranges[rI], to = ranges[rI + 1]
       let fromB = Math.max(posB, from), toB = Math.min(end, to)
-      if (fromB < toB) addChangedRange(result, fromB + off, toB + off, fromB, toB)
+      if (fromB <= toB) addChangedRange(result, fromB + off, toB + off, fromB, toB)
       if (to > end) break
       else rI += 2
     }
