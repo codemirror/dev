@@ -54,36 +54,45 @@ const create = (mode, inp) => EditorState.create({doc: inp, plugins: [mode]})
 suite.addInput("create toml", [impl => create(impl(toml()), tomlDocument)])
 suite.addInput("create ts", [impl => create(impl(javascript({}, {typescript: true})), tsDocument)])
 
-const renderOnce = (mode, inp) => mode.view({state: create(mode, inp), viewport: {from: 0, to: inp.length}}).decorations
+const renderOnce = (mode, inp) => {
+  const editorView = {state: create(mode, inp), viewport: {from: 0, to: inp.length}}
+  const view = mode.view(editorView)
+  if (view.updateState) view.updateState(editorView)
+  view.decorations
+  return {view, editorView}
+}
 suite.addInput("render once toml", [impl => renderOnce(impl(toml()), tomlDocument)])
 suite.addInput("render once ts", [impl => renderOnce(impl(javascript({}, {typescript: true})), tsDocument)])
 
 const renderTwice = (mode, inp) => {
-  const state = mode.view({state: create(mode, inp), viewport: {from: 0, to: inp.length}})
-  state.decorations
-  state.decorations
+  const {view} = renderOnce(mode, inp)
+  view.decorations
 }
 suite.addInput("render twice toml", [impl => renderTwice(impl(toml()), tomlDocument)])
 suite.addInput("render twice ts", [impl => renderTwice(impl(javascript({}, {typescript: true})), tsDocument)])
 
 const someEdits = (mode, inp) => {
-  let state = EditorState.create({doc: inp, plugins: [mode]})
-  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
-  state = state.transaction.replace(0, 5, "something\n").apply()
-  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
-  state = state.transaction.replace(state.doc.length - 10, state.doc.length - 5, "somethingelse\n").apply()
-  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+  let {view, editorView} = renderOnce(mode, inp)
+  editorView.state = editorView.state.transaction.replace(0, 5, "something\n").apply()
+  editorView.viewport.to = editorView.state.doc.length
+  if (view.updateState) view.updateState(editorView)
+  view.decorations
+  editorView.state = editorView.state.transaction.replace(editorView.state.doc.length - 10, editorView.state.doc.length - 5, "somethingelse\n").apply()
+  editorView.viewport.to = editorView.state.doc.length
+  if (view.updateState) view.updateState(editorView)
+  view.decorations
 }
 suite.addInput("some edits toml", [impl => someEdits(impl(toml()), tomlDocument)])
 suite.addInput("some edits ts", [impl => someEdits(impl(javascript({}, {typescript: true})), tsDocument)])
 
 const lotsOfEdits = (mode, inp) => {
-  let state = EditorState.create({doc: inp, plugins: [mode]})
-  mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
-  for (let i = 0; i < 13; ++i) { // FIXME more than 13 triggers the RangeSet bug
-    const at = Math.min((i*99971) % state.doc.length, state.doc.length - 5)
-    state = state.transaction.replace(at, at + 5, "something").apply()
-    mode.view({state, viewport: {from: 0, to: inp.length}}).decorations
+  let {view, editorView} = renderOnce(mode, inp)
+  for (let i = 0; i < 13; ++i) {
+    const at = Math.min((i*99971) % editorView.state.doc.length, editorView.state.doc.length - 5)
+    editorView.state = editorView.state.transaction.replace(at, at + 5, "something").apply()
+    editorView.viewport.to = editorView.state.doc.length
+    if (view.updateState) view.updateState(editorView)
+    view.decorations
   }
 }
 suite.addInput("lotsOfEdits toml", [impl => lotsOfEdits(impl(toml()), tomlDocument)])
