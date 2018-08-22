@@ -8,7 +8,8 @@ import {StringStreamCursor} from "./stringstreamcursor"
 import {DecorationCache} from "./decorationcache"
 import {copyState, readToken, Mode} from "./util"
 
-function getDecorations<S>(mode: Mode<S>, doc: Text, from: number, to: number, state: S = mode.startState()): [ReadonlyArray<DecoratedRange>, ReadonlyArray<Range<S>>] {
+function getDecorations<S>(mode: Mode<S>, doc: Text, from: number, to: number, state?: S): [ReadonlyArray<DecoratedRange>, ReadonlyArray<Range<S>>] {
+  state = state ? copyState(mode, state) : mode.startState()
   const decorations = []
   const states: Range<S>[] = []
   const cursor = new StringStreamCursor(doc.iterRange(from, to), from)
