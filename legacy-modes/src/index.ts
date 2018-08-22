@@ -72,7 +72,7 @@ export function legacyMode<S>(mode: Mode<S>) {
         stream.start = stream.pos
       }        
     }
-    return mode.indent(modeState, stream.string.slice(stream.pos))
+    return mode.indent(modeState, stream.string.slice(stream.pos).match(/^\s*(.*)/)![1])
   }
 
   return plugin

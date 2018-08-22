@@ -15,7 +15,8 @@ let mode = legacyMode(javascript({indentUnit: 2}, {}))
 function crudeInsertNewlineAndIndent(state: EditorState, dispatch?: (tr: Transaction) => void): boolean {
   if (dispatch) {
     let indentation = (mode as any).indentation(state, state.selection.primary.from)
-    dispatch(state.transaction.replaceSelection("\n" + " ".repeat(indentation)).scrollIntoView())
+    if (indentation > -1)
+      dispatch(state.transaction.replaceSelection("\n" + " ".repeat(indentation)).scrollIntoView())
   }
   return true
 }
@@ -26,6 +27,7 @@ function crudeIndentLine(state: EditorState, dispatch: (tr: Transaction) => void
     let line = state.doc.slice(lineStart, cursor + 100)
     let space = /^ */.exec(line)[0].length // FIXME doesn't handle tabs
     let indentation = (mode as any).indentation(state, lineStart)
+    if (indentation == -1) indentation = space
     let tr = state.transaction.replace(lineStart, lineStart + space, " ".repeat(indentation)).scrollIntoView()
     if (cursor <= lineStart + space)
       tr = tr.setSelection(EditorSelection.single(lineStart + indentation))
