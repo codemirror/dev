@@ -26,7 +26,12 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "Mod-A": selectAll
 }
 
-export const macBaseKeymap: {[key: string]: Command} = {}
+export const macBaseKeymap: {[key: string]: Command} = {
+  "Cmd-ArrowUp": selectDocStart,
+  "Ctrl-ArrowUp": selectDocStart,
+  "Cmd-ArrowDown": selectDocEnd,
+  "Ctrl-ArrowDown": selectDocEnd
+}
 for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key]
 
 declare global { const os: any }
