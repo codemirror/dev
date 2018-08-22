@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src/text"
 import {HeightMap} from "./heightmap"
 
-function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
+function visiblePixelRange(dom: HTMLElement, paddingTop: number): {top: number, bottom: number} {
   let rect = dom.getBoundingClientRect()
   let top = Math.max(0, Math.min(innerHeight, rect.top)), bottom = Math.max(0, Math.min(innerHeight, rect.bottom))
   for (let parent = dom.parentNode as any; parent;) { // (Cast to any because TypeScript is useless with Node types)
@@ -18,7 +18,7 @@ function visiblePixelRange(dom: HTMLElement): {top: number, bottom: number} {
       break
     }
   }
-  return {top: top - rect.top, bottom: bottom - rect.top}
+  return {top: top - (rect.top + paddingTop), bottom: bottom - (rect.top + paddingTop)}
 }
 
 const VIEWPORT_MARGIN = 1000 // FIXME look into appropriate value of this through benchmarking etc
@@ -28,8 +28,8 @@ export class ViewportState {
   top: number = 0;
   bottom: number = 0;
 
-  updateFromDOM(dom: HTMLElement): number {
-    let {top, bottom} = visiblePixelRange(dom)
+  updateFromDOM(dom: HTMLElement, paddingTop: number): number {
+    let {top, bottom} = visiblePixelRange(dom, paddingTop)
     let dTop = top - this.top, dBottom = bottom - this.bottom, bias = 0
     if (dTop > 0 && dBottom > 0) bias = Math.max(dTop, dBottom)
     else if (dTop < 0 && dBottom < 0) bias = Math.min(dTop, dBottom)

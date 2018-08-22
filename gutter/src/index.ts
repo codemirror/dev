@@ -80,7 +80,7 @@ class GutterView {
       i++
     })
     while (this.lines.length > i) this.dom.removeChild(this.lines.pop()!.dom)
-    this.dom.style.minHeight = view.heightAtPos(view.state.doc.length, false) + "px"
+    this.dom.style.minHeight = view.contentHeight + "px"
   }
 }
 

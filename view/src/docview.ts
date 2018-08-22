@@ -32,6 +32,9 @@ export class DocView extends ContentView {
   // A document position that has to be scrolled into view at the next layout check
   scrollIntoView: number = -1
 
+  paddingTop: number = 0;
+  paddingBottom: number = 0;
+
   dom!: HTMLElement
 
   get length() { return this.text.length }
@@ -111,7 +114,7 @@ export class DocView extends ContentView {
           if (!gap) gap = new GapView(this)
           this.replaceChildren(cursor.i, endI, [gap])
         }
-        gap.update(posB - nextB, this.heightMap.heightAt(posB, this.text, 1) - this.heightMap.heightAt(nextB, this.text, -1))
+        gap.update(posB - nextB, this.heightAt(posB, 1) - this.heightAt(nextB, -1))
       } else if (endI != cursor.i) {
         this.replaceChildren(cursor.i, endI)
       }
@@ -141,6 +144,10 @@ export class DocView extends ContentView {
       this.updateSelection()
       this.dom.style.height = ""
     })
+  }
+
+  heightAt(pos: number, bias: 1 | -1) {
+    return this.heightMap.heightAt(pos, this.text, bias) + this.paddingTop
   }
 
   private updatePart(startI: number, endI: number, oldPort: Viewport, newPort: Viewport,
@@ -235,9 +242,10 @@ export class DocView extends ContentView {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1
 
+    this.measureVerticalPadding()
     let scrollIntoView = Math.min(this.scrollIntoView, this.text.length)
     this.scrollIntoView = -1
-    let scrollBias = this.viewportState.updateFromDOM(this.dom)
+    let scrollBias = this.viewportState.updateFromDOM(this.dom, this.paddingTop)
     if (this.viewportState.top >= this.viewportState.bottom) return // We're invisible!
 
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
@@ -265,7 +273,7 @@ export class DocView extends ContentView {
       lineHeights = null
       refresh = false
       scrollBias = 0
-      this.viewportState.updateFromDOM(this.dom)
+      this.viewportState.updateFromDOM(this.dom, this.paddingTop)
     }
     if (updated) {
       this.observer.listenForScroll()
@@ -305,6 +313,12 @@ export class DocView extends ContentView {
       pos += child.length + 1
     }
     return result
+  }
+
+  measureVerticalPadding() {
+    let outer = this.dom.getBoundingClientRect()
+    this.paddingTop = (this.children[0].dom as HTMLElement).getBoundingClientRect().top - outer.top
+    this.paddingBottom = outer.bottom - (this.children[this.children.length - 1].dom as HTMLElement).getBoundingClientRect().bottom
   }
 
   measureTextSize(): {lineHeight: number, charWidth: number} {

@@ -121,7 +121,11 @@ export class EditorView {
   }
 
   heightAtPos(pos: number, top: boolean): number {
-    return this.docView.heightMap.heightAt(pos, this.state.doc, top ? -1 : 1)
+    return this.docView.heightAt(pos, top ? -1 : 1)
+  }
+
+  get contentHeight() {
+    return this.docView.heightMap.height + this.docView.paddingTop + this.docView.paddingBottom
   }
 
   // To be used by plugin views when they update their decorations asynchronously
