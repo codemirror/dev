@@ -5,6 +5,7 @@ declare interface Mode<S> {
   startState: () => S
   copyState?: (state: S) => S
   name: string
+  indent(state: S, textAfter: string): number
 }
 
 declare function readToken<S>(mode: Mode<S>, stream: StringStream, state: S, inner?: any): string

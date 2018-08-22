@@ -34,7 +34,7 @@ export function legacyMode<S>(mode: Mode<S>) {
     apply(tr, state) { return state.update(tr) }
   })
 
-  return new Plugin({
+  let plugin = new Plugin({
     state: field,
     view(v: EditorView) {
       let decorations = Decoration.none, from = -1, to = -1
@@ -52,4 +52,27 @@ export function legacyMode<S>(mode: Mode<S>) {
       }
     }
   })
+
+  // FIXME Short-term hack—it'd be nice to have a better mechanism for this,
+  // not sure yet what it'd look like
+  ;(plugin as any).indentation = function(state: EditorState, pos: number): number {
+    if (!mode.indent) return -1
+    let {pos: statePos, state: modeState} = state.getField(field)!.getStateBefore(pos)
+    let cursor = new StringStreamCursor(state.doc.iterRange(statePos), statePos)
+    let stream = cursor.next()
+    modeState = modeState ? copyState(mode, modeState) : mode.startState()
+    while (statePos < pos) {
+      if (stream.eol()) {
+        stream = cursor.next()
+        statePos++
+      } else {
+        readToken(mode, stream, modeState)
+        statePos += stream.pos - stream.start
+        stream.start = stream.pos
+      }        
+    }
+    return mode.indent(modeState, stream.string.slice(stream.pos))
+  }
+
+  return plugin
 }

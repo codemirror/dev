@@ -73,6 +73,13 @@ export class DecorationCache<S> {
     return RangeSet.of(newDecorations)
   }
 
+  getStateBefore(pos: number): {state: S | null, pos: number} {
+    const stateIterator = this.modeStates.iter()
+    let state: S | null = null, from: number = 0, next
+    while ((next = stateIterator.next()) && next.from <= pos) ({value: state, from} = next)
+    return {pos: from, state: state}
+  }
+
   update(tr: Transaction): DecorationCache<S> {
     const unchangedTill = Math.min(...tr.changes.changes.map(c => c.from))
     return new DecorationCache(this.decorator, tr.doc,
