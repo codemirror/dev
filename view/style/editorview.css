@@ -1,9 +1,10 @@
 .CodeMirror {
   font-family: monospace;
+  line-height: 1.4;
 }
 
 .CodeMirror-content {
-  line-height: 1.3;
+  line-height: inherit;
   font-family: inherit;
   padding: 4px 2px 4px 4px;
   tab-size: 4;
@@ -17,9 +18,10 @@
 
 .CodeMirror-gutter-element {
   box-sizing: border-box;
-  padding: 1.5px 3px 0 2px;
+  /* FIXME this is line number specific */
+  padding: 0 3px 0 5px;
+  min-width: 20px;
   text-align: right;
-  font-size: 75%;
-  color: #666;
-  min-width: 1.6em;
+  color: #999;
+  white-space: nowrap;
 }
