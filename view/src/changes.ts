@@ -36,7 +36,7 @@ export function changedRanges(transactions: Transaction[]) {
       }
       for (let k = j ? i : i - 1; k >= 0; k--) {
         let tr = transactions[k]
-        let mapping = tr.changes.partialMapping(k == i ? j - 1 : tr.changes.length, 0)
+        let mapping = tr.changes.partialMapping(k == i ? j : tr.changes.length, 0)
         fromA = mapping.mapPos(fromA, 1); toA = mapping.mapPos(toA, -1)
       }
       addChangedRange(ranges, fromA, toA, fromB, toB)
