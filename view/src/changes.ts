@@ -31,7 +31,7 @@ export function changedRanges(transactions: Transaction[]) {
       let step = tr.changes.changes[j]
       let fromA = step.from, toA = step.to, fromB = step.from, toB = step.from + step.text.length
       for (let k = j == tr.changes.length - 1 ? i + 1 : i; k < transactions.length; k++) {
-        let mapping = k == i ? tr.changes.partialMapping(j) : transactions[k].changes
+        let mapping = k == i ? tr.changes.partialMapping(j + 1) : transactions[k].changes
         fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, -1)
       }
       for (let k = j ? i : i - 1; k >= 0; k--) {

@@ -6,7 +6,7 @@ function domText(view) {
   let text = "", eol = false
   function scan(node) {
     if (node.nodeType == 1) {
-      if (node.nodeName == "BR") return
+      if (node.nodeName == "BR" || node.contentEditable == "false") return
       if (eol) { text += "\n"; eol = false }
       for (let ch = node.firstChild; ch; ch = ch.nextSibling) scan(ch)
       eol = true
@@ -99,5 +99,22 @@ describe("EditorView drawing", () => {
     ist(text.length, 500, "<")
     ist(/second/.test(text))
     ist(/last/.test(text))
+  })
+
+  it("can handle replace-all like events", () => {
+    let content = "", chars = "abcdefghijklmn    \n"
+    for (let i = 0; i < 5000; i++) content += chars[Math.floor(Math.random() * chars.length)]
+    let cm = tempEditor(content), tr = cm.state.transaction
+    for (let pos = content.length;;) {
+      let end = pos - Math.floor(Math.random() * 200)
+      let start = end - Math.floor(Math.random() * 10)
+      if (start < 0) break
+      tr = tr.replace(start, end, "XYZ")
+      content = content.slice(0, start) + "XYZ" + content.slice(end)
+      pos = start
+    }
+    ist(tr.doc.toString(), content)
+    cm.dispatch(tr)
+    ist(domText(cm), content.slice(cm.viewport.from, cm.viewport.to))
   })
 })
