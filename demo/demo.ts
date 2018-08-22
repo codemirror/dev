@@ -3,6 +3,7 @@ import {EditorView, Decoration, DecorationSet} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, undo} from "../history/src/history"
 import {gutter} from "../gutter/src/index"
+import {baseKeymap} from "../commands/src/commands"
 
 let field = new StateField<DecorationSet>({
   init() {return Decoration.set([
@@ -19,7 +20,7 @@ let decos = new Plugin({
   }
 })
 
-let state = EditorState.create({doc: "one\ntwo\nthree\n".repeat(200), plugins: [history(), decos, gutter(), keymap({
+let state = EditorState.create({doc: "one\ntwo\nthree\n".repeat(200), plugins: [history(), decos, gutter(), keymap(baseKeymap), keymap({
   "ctrl-z": undo,
   "ctrl-shift-z": redo
 })]})
