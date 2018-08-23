@@ -111,11 +111,6 @@ export class EditorView {
     this.pluginViews.length = 0
   }
 
-  private layoutChange() {
-    for (let pluginView of this.pluginViews) if (pluginView.layoutChange)
-      pluginView.layoutChange(this)
-  }
-
   domAtPos(pos: number): {node: Node, offset: number} | null {
     return this.docView.domFromPos(pos)
   }
