@@ -150,6 +150,7 @@ export interface PluginView {
   updateDOM?: (view: EditorView) => void
   updateViewport?: (view: EditorView) => void
   handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean}
+  // This should return a stable value, not compute something on the fly
   decorations?: DecorationSet
   destroy?: () => void
 }

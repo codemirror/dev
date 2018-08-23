@@ -58,10 +58,14 @@ export class DocView extends ContentView {
     this.publicViewport = new EditorViewport(this, 0, 0) // FIXME initialize differently?x
   }
 
-  // FIXME need some way to stabilize viewport—if a change causes the
-  // top of the visible viewport to move, scroll position should be
-  // adjusted to keep the content in place
+  // Update the document view to a given state. scrollIntoView can be
+  // used as a hint to compute a new viewport that includes that
+  // position, if we know the editor is going to scroll that position
+  // into view.
   update(state: EditorState, prevState: EditorState | null = null, transactions: Transaction[] = [], scrollIntoView: number = -1) {
+    // FIXME need some way to stabilize viewport—if a change causes the
+    // top of the visible viewport to move, scroll position should be
+    // adjusted to keep the content in place
     let oldLength = this.text.length
     this.scrollIntoView = scrollIntoView
     this.text = state.doc
@@ -83,6 +87,8 @@ export class DocView extends ContentView {
     }
   }
 
+  // Used both by update and checkLayout do perform the actual DOM
+  // update
   private updateInner(changes: A<ChangedRange>, oldLength: number, visible: Viewport) {
     this.visiblePart = visible
     let viewports: Viewport[] = [visible]
@@ -140,10 +146,7 @@ export class DocView extends ContentView {
     })
   }
 
-  heightAt(pos: number, bias: 1 | -1) {
-    return this.heightMap.heightAt(pos, this.text, bias) + this.paddingTop
-  }
-
+  // Update a single viewport in the DOM
   private updatePart(startI: number, endI: number, oldPort: Viewport, newPort: Viewport,
                      changes: A<ChangedRange>, decoSets: A<DecorationSet>) {
     let plan = clipPlan(changes, oldPort, newPort)
@@ -156,6 +159,9 @@ export class DocView extends ContentView {
     }
   }
 
+  // Update a single changed range by replacing its old DOM
+  // representation with the inline views that represent the new
+  // content.
   private updatePartRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: InlineView[][]) {
     // All children in the touched range should be line views
     let children = this.children as LineView[]
@@ -177,6 +183,7 @@ export class DocView extends ContentView {
     }
   }
 
+  // Sync the DOM selection to this.selection
   updateSelection(takeFocus: boolean = false) {
     let root = getRoot(this.dom)
     if (!takeFocus && root.activeElement != this.dom) return
@@ -208,35 +215,55 @@ export class DocView extends ContentView {
     if (domSel.extend) domSel.extend(head.node, head.offset)
   }
 
-  computeViewport(contentChanges: A<ChangedRange> = [], prevState: EditorState | null, transactions: Transaction[] | null, bias: number, scrollIntoView: number): {
+  heightAt(pos: number, bias: 1 | -1) {
+    return this.heightMap.heightAt(pos, this.text, bias) + this.paddingTop
+  }
+
+  // Compute the new viewport and set of decorations, while giving
+  // plugin views the opportunity to respond to state and viewport
+  // changes. Might require more than one iteration to become stable.
+  computeViewport(contentChanges: A<ChangedRange> = [], prevState: EditorState | null, transactions: Transaction[] | null,
+                  bias: number, scrollIntoView: number): {
+    // Passing transactions != null means at least one iteration is necessary
     viewport: Viewport,
     contentChanges: A<ChangedRange>
   } {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(this.text, this.heightMap, bias, scrollIntoView)
       let stateChange = transactions && transactions.length > 0
-      if (i == 5 || (!stateChange && viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to)) {
+      // After 5 tries, or when the viewport is stable and no more iterations are needed, return
+      if (i == 5 || (transactions == null && viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to)) {
         if (i == 5) console.warn("Viewport and decorations failed to converge")
         return {viewport, contentChanges}
       }
+      // Update the public viewport so that plugins can observe its current value
       ;({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
       let prevLen = this.text.length
       if (stateChange) {
+        // For a state change, call `updateState`
         this.callbacks.onUpdateState(prevState!, transactions!)
         prevLen = prevState!.doc.length
-        transactions = null
       } else {
+        // Otherwise call `updateViewport`
         this.callbacks.onUpdateViewport()
       }
       let decorations = this.callbacks.getDecorations()
+      // If the decorations are stable, stop.
       if (!stateChange && sameArray(decorations, this.decorations))
         return {viewport, contentChanges}
+      // Compare the decorations (between document changes)
       let {content, height} = decoChanges(stateChange ? contentChanges : [], decorations, this.decorations, prevLen)
       this.decorations = decorations
+      // Update the heightmap with these changes. If this is the first
+      // iteration and the document changed, also include decorations
+      // for inserted ranges.
       let heightChanges = extendWithRanges([], height)
       if (stateChange) heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
-      contentChanges = extendWithRanges(contentChanges, content)
       this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, heightChanges)
+      // Accumulate content changes so that they can be redrawn
+      contentChanges = extendWithRanges(contentChanges, content)
+      // Make sure only one iteration is marked as required / state changing
+      transactions = null
     }
   }
 
