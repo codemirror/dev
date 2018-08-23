@@ -41,8 +41,8 @@ describe("EditorView drawing", () => {
     cm.dispatch(cm.state.transaction.replace(100, 104, "$"))
     doc = doc.slice(0, 100) + "$" + doc.slice(104)
     ist(domText(cm), doc)
-    cm.dispatch(cm.state.transaction.replace(500, 510, ""))
-    doc = doc.slice(0, 500)
+    cm.dispatch(cm.state.transaction.replace(200, 268, ""))
+    doc = doc.slice(0, 200)
     ist(domText(cm), doc)
   })
 
