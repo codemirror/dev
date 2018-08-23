@@ -306,7 +306,7 @@ class HeightMapGap extends HeightMap {
       target.push(new HeightMapGap(newFrom - node.length, newEnd, oracle))
     } else {
       let lineEnd = oracle.doc.lineEndAt(newFrom)
-      target.push(new HeightMapLine(lineEnd - (newFrom - from), node.height, (node as HeightMapLine).deco))
+      target.push(new HeightMapLine(node.length + (lineEnd - newFrom), node.height, (node as HeightMapLine).deco))
       if (newEnd > lineEnd) target.push(new HeightMapGap(lineEnd + 1, newEnd, oracle))
     }
   }
@@ -518,7 +518,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   }
 
   ignoreRange(value: Decoration) { return !(value as RangeDecoration).collapsed }
-  ignorePoint(value: Decoration) { return !value.widget }
+  ignorePoint(value: Decoration) { return !value.widget || value.widget.estimatedHeight < 0 }
 }
 
 function buildChangedNodes(oracle: HeightOracle, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMap[] {
