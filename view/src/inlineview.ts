@@ -172,6 +172,7 @@ export class InlineBuilder implements RangeIterator<Decoration> {
     while (length > 0) {
       if (this.textOff == this.text.length) {
         this.text = this.cursor.next()
+        if (this.text.length == 0) throw new Error("Ran out of text content when drawing inline views")
         this.textOff = 0
       }
 

@@ -4,10 +4,10 @@ import {InlineView, InlineBuilder} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
-import {EditorSelection, Transaction} from "../../state/src"
+import {EditorState, EditorSelection, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle} from "./heightmap"
-import {ChangedRange} from "./changes"
-import {Decoration, DecorationSet, joinRanges, findChangedRanges} from "./decoration"
+import {ChangedRange, computeChangedRanges} from "./changes"
+import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
 
 type A<T> = ReadonlyArray<T>
@@ -42,8 +42,10 @@ export class DocView extends ContentView {
   get childGap() { return 1 }
 
   constructor(dom: HTMLElement, private callbacks: {
+    // FIXME These suggest that the strict separation between docview and editorview isn't really working
     onDOMChange: (from: number, to: number, typeOver: boolean) => void,
     onSelectionChange: () => void,
+    onUpdateState: (prevState: EditorState, transactions: Transaction[]) => void,
     onUpdateDOM: () => void,
     onUpdateViewport: () => void,
     getDecorations: () => DecorationSet[]
@@ -59,34 +61,26 @@ export class DocView extends ContentView {
   // FIXME need some way to stabilize viewport—if a change causes the
   // top of the visible viewport to move, scroll position should be
   // adjusted to keep the content in place
-  update(doc: Text, selection: EditorSelection, changedRanges?: ChangedRange[], scrollIntoView: number = -1) {
-    this.scrollIntoView = scrollIntoView
-    let decorations = this.callbacks.getDecorations()
-    if (this.dirty == dirty.not && this.text.eq(doc) && sameArray(decorations, this.decorations)) {
-      if (selection.eq(this.selection) && scrollIntoView < 0) return
-      if (selection.primary.from >= this.visiblePart.from &&
-          selection.primary.to <= this.visiblePart.to) {
-        this.selection = selection
-        this.observer.withoutSelectionListening(() => this.updateSelection())
-        return
-      }
-    }
-
+  update(state: EditorState, prevState: EditorState | null = null, transactions: Transaction[] = [], scrollIntoView: number = -1) {
     let oldLength = this.text.length
-    if (!changedRanges) changedRanges = [new ChangedRange(0, oldLength, 0, doc.length)]
-    let changes = decoChanges(changedRanges, decorations, this.decorations, doc.length)
-    this.text = doc
-    this.decorations = decorations
-    this.selection = selection
-    this.heightMap = this.heightMap.applyChanges(decorations.filter(d => d.size > 0),
-                                                 this.heightOracle.setDoc(doc), extendWithRanges(changedRanges, changes.height))
+    this.scrollIntoView = scrollIntoView
+    this.text = state.doc
+    this.selection = state.selection
 
-    let {viewport, changes: contentChanges} = this.getViewport(0, scrollIntoView, extendWithRanges(changedRanges, changes.content))
-    this.updateInner(contentChanges, oldLength, viewport)
+    let changedRanges = !prevState ? [new ChangedRange(0, oldLength, 0, state.doc.length)] : computeChangedRanges(transactions)
+    this.heightMap = this.heightMap.applyChanges([], this.heightOracle.setDoc(state.doc), changedRanges)
 
-    if (this.layoutCheckScheduled < 0)
-      this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
-    this.callbacks.onUpdateDOM()
+    let {viewport, contentChanges} = this.computeViewport(changedRanges, prevState, transactions, 0, scrollIntoView)
+    if (this.dirty == dirty.not && contentChanges.length == 0 &&
+        this.selection.primary.from >= this.visiblePart.from &&
+        this.selection.primary.to <= this.visiblePart.to) {
+      this.observer.withoutSelectionListening(() => this.updateSelection())
+    } else {
+      this.updateInner(contentChanges, oldLength, viewport)
+      if (this.layoutCheckScheduled < 0)
+        this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
+      this.callbacks.onUpdateDOM()
+    }
   }
 
   private updateInner(changes: A<ChangedRange>, oldLength: number, visible: Viewport) {
@@ -214,23 +208,35 @@ export class DocView extends ContentView {
     if (domSel.extend) domSel.extend(head.node, head.offset)
   }
 
-  getViewport(bias: number, scrollIntoView: number, changes: A<ChangedRange> = []): {
+  computeViewport(contentChanges: A<ChangedRange> = [], prevState: EditorState | null, transactions: Transaction[] | null, bias: number, scrollIntoView: number): {
     viewport: Viewport,
-    changes: A<ChangedRange>
+    contentChanges: A<ChangedRange>
   } {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(this.text, this.heightMap, bias, scrollIntoView)
-      if (i == 5) console.warn("Viewport and decorations failed to converge")
-      if (i == 5 || (viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to))
-        return {viewport, changes}
+      let stateChange = transactions && transactions.length > 0
+      if (i == 5 || (!stateChange && viewport.from == this.publicViewport._from && viewport.to == this.publicViewport._to)) {
+        if (i == 5) console.warn("Viewport and decorations failed to converge")
+        return {viewport, contentChanges}
+      }
       ;({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
-      this.callbacks.onUpdateViewport()
+      let prevLen = this.text.length
+      if (stateChange) {
+        this.callbacks.onUpdateState(prevState!, transactions!)
+        prevLen = prevState!.doc.length
+        transactions = null
+      } else {
+        this.callbacks.onUpdateViewport()
+      }
       let decorations = this.callbacks.getDecorations()
-      if (sameArray(decorations, this.decorations)) return {viewport, changes}
-      let {content, height} = decoChanges([], decorations, this.decorations, this.text.length)
+      if (!stateChange && sameArray(decorations, this.decorations))
+        return {viewport, contentChanges}
+      let {content, height} = decoChanges(stateChange ? contentChanges : [], decorations, this.decorations, prevLen)
       this.decorations = decorations
-      changes = extendWithRanges(changes, content)
-      this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, extendWithRanges([], height))
+      let heightChanges = extendWithRanges([], height)
+      if (stateChange) heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
+      contentChanges = extendWithRanges(contentChanges, content)
+      this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, heightChanges)
     }
   }
 
@@ -268,7 +274,7 @@ export class DocView extends ContentView {
       updated = true
       if (i > 10) throw new Error("Layout failed to converge")
       let viewport = this.visiblePart, contentChanges: A<ChangedRange> = []
-      if (!covered) ({viewport, changes: contentChanges} = this.getViewport(scrollBias, -1, []))
+      if (!covered) ({viewport, contentChanges} = this.computeViewport([], null, null, scrollBias, -1))
       this.updateInner(contentChanges, this.text.length, viewport)
       lineHeights = null
       refresh = false
@@ -507,14 +513,6 @@ function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>, 
 export class EditorViewport {
   /** @internal */
   constructor(private docView: DocView, public _from: number, public _to: number) {}
-
-  /** @internal */
-  map(transactions: Transaction[]) {
-    for (let tr of transactions) {
-      this._from = tr.changes.mapPos(this._from, 1)
-      this._to = Math.max(this._from, tr.changes.mapPos(this._to, -1))
-    }
-  }
 
   get from() { return this._from }
   get to() { return this._to }

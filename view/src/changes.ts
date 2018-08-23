@@ -23,7 +23,7 @@ function addChangedRange(ranges: ChangedRange[], fromA: number, toA: number, fro
   ranges.splice(i, 0, new ChangedRange(fromA, toA, fromB, toB))
 }
 
-export function changedRanges(transactions: Transaction[]) {
+export function computeChangedRanges(transactions: Transaction[]) {
   let ranges: ChangedRange[] = []
   for (let i = 0; i < transactions.length; i++) {
     let tr = transactions[i]

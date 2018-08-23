@@ -4,7 +4,6 @@ import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
-import {changedRanges} from "./changes"
 
 export class EditorView {
   private _state: EditorState
@@ -45,6 +44,10 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
       onSelectionChange: () => applySelectionChange(this),
+      onUpdateState: (prevState: EditorState, transactions: Transaction[]) => {
+        for (let pluginView of this.pluginViews)
+          if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
+      },
       onUpdateDOM: () => {
         for (let plugin of this.pluginViews) if (plugin.updateDOM) plugin.updateDOM(this)
       },
@@ -56,27 +59,23 @@ export class EditorView {
     this.viewport = this.docView.publicViewport
     this.createPluginViews(plugins)
     this.inputState = new InputState(this)
-    this.docView.update(state.doc, state.selection)
+    this.docView.update(state)
   }
 
   setState(state: EditorState, ...plugins: PluginView[]) {
     this._state = state
-    this.docView.update(state.doc, state.selection)
+    this.docView.update(state)
     this.inputState.updateCustomHandlers(this)
     this.createPluginViews(plugins)
   }
 
+  // FIXME arrange for an error to be raised when this is called recursively
   updateState(transactions: Transaction[], state: EditorState) {
     if (transactions.length && transactions[0].startState != this._state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     let prevState = this._state
     this._state = state
-    // Make sure viewport still points into the current doc, before calling updateState on plugins
-    this.viewport.map(transactions)
-    for (let pluginView of this.pluginViews)
-      if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
-    this.docView.update(state.doc, state.selection, changedRanges(transactions),
-                        transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+    this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
   }
 
   /** @internal */
@@ -127,7 +126,7 @@ export class EditorView {
   decorationUpdate() {
     if (this.scheduledDecoUpdate < 0) this.scheduledDecoUpdate = requestAnimationFrame(() => {
       this.scheduledDecoUpdate = -1
-      this.docView.update(this.state.doc, this.state.selection)
+      this.docView.update(this.state, this.state)
     })
   }
 

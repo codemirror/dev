@@ -1,5 +1,5 @@
 import {Mapping} from "../../state/src"
-import {RangeValue, Range, RangeSet, RangeComparator} from "../../rangeset/src/rangeset"
+import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
 import {ChangedRange} from "./changes"
 
 export interface RangeDecorationSpec {
@@ -204,4 +204,24 @@ export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: Read
   let comp = new DecorationComparator(length)
   a.compare(b, diff, comp)
   return comp.changes
+}
+
+class HeightDecoScanner implements RangeIterator<Decoration> {
+  ranges: number[] = []
+  pos: number = 0
+
+  advance(pos: number, active: ReadonlyArray<Decoration>) { this.pos = pos }
+  advanceCollapsed(pos: number) { addRange(this.pos, pos, this.ranges); this.pos = pos }
+  point(value: Decoration) { addRange(this.pos, this.pos, this.ranges) }
+  ignoreRange(value: Decoration) { return true }
+  ignorePoint(value: Decoration) { return !value.widget }
+}
+
+export function heightRelevantDecorations(decorations: DecorationSet[], ranges: ReadonlyArray<ChangedRange>): number[] {
+  let scanner = new HeightDecoScanner
+  for (let {fromB, toB} of ranges) if (fromB < toB) {
+    scanner.pos = fromB
+    RangeSet.iterateSpans(decorations, fromB, toB, scanner)
+  }
+  return scanner.ranges
 }
