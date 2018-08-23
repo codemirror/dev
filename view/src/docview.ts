@@ -316,9 +316,9 @@ export class DocView extends ContentView {
   }
 
   measureVerticalPadding() {
-    let outer = this.dom.getBoundingClientRect()
-    this.paddingTop = (this.children[0].dom as HTMLElement).getBoundingClientRect().top - outer.top
-    this.paddingBottom = outer.bottom - (this.children[this.children.length - 1].dom as HTMLElement).getBoundingClientRect().bottom
+    let style = window.getComputedStyle(this.dom)
+    this.paddingTop = parseInt(style.paddingTop!) || 0
+    this.paddingBottom = parseInt(style.paddingBottom!) || 0
   }
 
   measureTextSize(): {lineHeight: number, charWidth: number} {
