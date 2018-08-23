@@ -264,8 +264,8 @@ export class DocView extends ContentView {
                                                    this.visiblePart.from, this.visiblePart.to,
                                                    lineHeights || this.measureVisibleLineHeights())
       let covered = this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)
-      if (this.heightOracle.heightChanged || !covered) updated = true
-      if (covered) break
+      if (covered && !this.heightOracle.heightChanged) break
+      updated = true
       if (i > 10) throw new Error("Layout failed to converge")
       let viewport = this.visiblePart, contentChanges: A<ChangedRange> = []
       if (!covered) ({viewport, changes: contentChanges} = this.getViewport(scrollBias, -1, []))
