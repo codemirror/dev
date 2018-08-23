@@ -29,4 +29,11 @@ describe("EditorState", () => {
     let tr = EditorState.create({doc: "foo"}).transaction.setMeta(someMeta, 55)
     ist(tr.getMeta(someMeta), 55)
   })
+  
+  it("throws when a change's bounds are invalid", () => {
+    let state = EditorState.create({doc: "1234"})
+    ist.throws(() => state.transaction.replace(-1, 1, ""))
+    ist.throws(() => state.transaction.replace(2, 1, ""))
+    ist.throws(() => state.transaction.replace(2, 10, "x"))
+  })
 })

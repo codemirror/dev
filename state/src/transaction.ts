@@ -65,6 +65,8 @@ export class Transaction {
 
   change(change: Change, mirror?: number): Transaction {
     if (change.from == change.to && change.text == "") return this
+    if (change.from < 0 || change.to < change.from || change.to > this.doc.length)
+      throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
     let changes = this.changes.append(change, mirror)
     return new Transaction(this.startState, changes, this.docs.concat(change.apply(this.doc)),
                            this.selection.map(changes.partialMapping(changes.length - 1)),
