@@ -105,13 +105,10 @@ describe("EditorView drawing", () => {
     let content = "", chars = "abcdefghijklmn    \n"
     for (let i = 0; i < 5000; i++) content += chars[Math.floor(Math.random() * chars.length)]
     let cm = tempEditor(content), tr = cm.state.transaction
-    for (let pos = content.length;;) {
-      let end = pos - Math.floor(Math.random() * 200)
-      let start = end - Math.floor(Math.random() * 10)
-      if (start < 0) break
-      tr = tr.replace(start, end, "XYZ")
-      content = content.slice(0, start) + "XYZ" + content.slice(end)
-      pos = start
+    for (let i = Math.floor(content.length / 100); i >= 0; i--) {
+      let from = Math.floor(Math.random() * (tr.doc.length - 10)), to = from + Math.floor(Math.random() * 10)
+      tr = tr.replace(from, to, "XYZ")
+      content = content.slice(0, from) + "XYZ" + content.slice(to)
     }
     ist(tr.doc.toString(), content)
     cm.dispatch(tr)

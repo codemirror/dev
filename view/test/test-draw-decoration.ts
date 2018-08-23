@@ -118,7 +118,7 @@ describe("EditorView decoration", () => {
 
     it("supports editing around widgets", () => {
       let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
-      cm.dispatch(cm.state.transaction.replace(3, 4, "").replace(3, 5, ""))
+      cm.dispatch(cm.state.transaction.replace(3, 4, "").replace(3, 4, ""))
       ist(cm.contentDOM.querySelector("strong"))
     })
 
