@@ -88,11 +88,15 @@ export function scrollRectIntoView(dom: HTMLElement, rect: ClientRect) {
     if (cur.nodeType == 1 || cur.nodeType == 9) { // Element or document
       let bounding: ClientRect
       if (cur.nodeType == 1) {
-        if (cur.scrollHeight <= cur.clientHeight) { cur = cur.parentNode; continue }
+        if (cur.scrollHeight <= cur.clientHeight && cur.scrollWidth <= cur.clientWidht) {
+          cur = cur.parentNode
+          continue
+        }
         bounding = cur.getBoundingClientRect()
       } else {
         bounding = windowRect(win)
       }
+
       let moveX = 0, moveY = 0
       if (rect.top < bounding.top + scrollThreshold)
         moveY = -(bounding.top - rect.top + scrollMargin)
