@@ -114,4 +114,31 @@ describe("EditorView drawing", () => {
     cm.dispatch(tr)
     ist(domText(cm), content.slice(cm.viewport.from, cm.viewport.to))
   })
+
+  it("correctly handles very complicated transactions", () => {
+    let doc = "foo\nbar\nbaz", chars = "abcdef  \n"
+    let cm = tempEditor(doc)
+    for (let i = 0; i < 10; i++) {
+      let tr = cm.state.transaction, pos = Math.min(20, doc.length)
+      for (let j = 0; j < 100; j++) {
+        let choice = Math.random(), r = Math.random()
+        if (choice < 0.15) {
+          pos = Math.min(doc.length, Math.max(0, pos + 5 - Math.floor(r * 10)))
+        } else if (choice < 0.5) {
+          let from = Math.max(0, pos - Math.floor(r * 2)), to = Math.min(doc.length, pos + Math.floor(r * 4))
+          tr = tr.replace(from, to, "")
+          doc = doc.slice(0, from) + doc.slice(to)
+          pos = from
+        } else {
+          let text = ""
+          for (let k = Math.floor(r * 6); k >= 0; k--) text += chars[Math.floor(chars.length * Math.random())]
+          tr = tr.replace(pos, pos, text)
+          doc = doc.slice(0, pos) + text + doc.slice(pos)
+          pos += text.length
+        }
+      }
+      cm.dispatch(tr)
+      ist(domText(cm), doc.slice(cm.viewport.from, cm.viewport.to))
+    }
+  })
 })
