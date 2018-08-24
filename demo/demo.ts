@@ -41,7 +41,7 @@ const {readFile} = require("fs");
 
 readFile("package.json", "utf8", (err, data) => {
   console.log(data);
-});`, plugins: [gutter(), history(), mode, keymap(baseKeymap), keymap({
+});` + "x".repeat(500) + "\n1".repeat(40), plugins: [gutter(), history(), mode, keymap(baseKeymap), keymap({
   "Mod-z": undo,
   "Mod-Shift-z": redo,
   "Ctrl-y": /Mac/.test(navigator.platform) ? undefined : redo,

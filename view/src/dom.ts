@@ -76,23 +76,27 @@ export function maxOffset(node: Node): number {
   return node.nodeType == 3 ? node.nodeValue!.length : node.childNodes.length
 }
 
-function windowRect(win: Window): ClientRect {
+type Rect = {left: number, right: number, top: number, bottom: number}
+
+function windowRect(win: Window): Rect {
   return {left: 0, right: win.innerWidth,
-          top: 0, bottom: win.innerHeight} as ClientRect
+          top: 0, bottom: win.innerHeight}
 }
 
-export function scrollRectIntoView(dom: HTMLElement, rect: ClientRect) {
+export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
   let scrollThreshold = 0, scrollMargin = 5 // FIXME
   let doc = dom.ownerDocument, win = doc.defaultView
   for (let cur: any = dom.parentNode; cur;) {
     if (cur.nodeType == 1 || cur.nodeType == 9) { // Element or document
-      let bounding: ClientRect
+      let bounding: Rect
       if (cur.nodeType == 1) {
-        if (cur.scrollHeight <= cur.clientHeight && cur.scrollWidth <= cur.clientWidht) {
+        if (cur.scrollHeight <= cur.clientHeight && cur.scrollWidth <= cur.clientWidth) {
           cur = cur.parentNode
           continue
         }
-        bounding = cur.getBoundingClientRect()
+        let rect = cur.getBoundingClientRect()
+        bounding = {left: rect.left, right: rect.left + cur.clientWidth,
+                    top: rect.top, bottom: rect.top + cur.clientHeight}
       } else {
         bounding = windowRect(win)
       }
