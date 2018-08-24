@@ -97,6 +97,8 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
         let rect = cur.getBoundingClientRect()
         bounding = {left: rect.left, right: rect.left + cur.clientWidth,
                     top: rect.top, bottom: rect.top + cur.clientHeight}
+        // Take gutter space into account (FIXME kinda fragile, broken if gutter is set to stay in place)
+        if (cur == dom.parentNode) bounding.left += dom.offsetLeft
       } else {
         bounding = windowRect(win)
       }
