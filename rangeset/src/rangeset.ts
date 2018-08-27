@@ -52,29 +52,32 @@ export class Range<T extends RangeValue> {
   get heapPos() { return this.to }
 }
 
-const noRanges: A<Range<any>> = []
-const noChildren: A<RangeSet<any>> = []
+const none: A<any> = []
+
+function maybeNone<T>(array: A<T>): A<T> { return array.length ? array : none }
 
 const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
 export type RangeFilter<T> = (from: number, to: number, value: T) => boolean
 
 export class RangeSet<T extends RangeValue> {
-  /** @internal */
+  // @internal
   constructor(
-    /** @internal The text length covered by this set */
+    // @internal The text length covered by this set
     public length: number,
-    /** The number of ranges in the set */
+    // The number of ranges in the set
     public size: number,
-    /** @internal The locally stored ranges—which are all of them
-     * for leaf nodes, and the ones that don't fit in child sets for
-     * non-leaves. Sorted by start position, then end position, then startAssoc. */
+    // @internal The locally stored ranges—which are all of them
+    // for leaf nodes, and the ones that don't fit in child sets for
+    // non-leaves. Sorted by start position, then bias.
     public local: A<Range<T>>,
-    /** @internal The child sets, in position order */
+    // @internal The child sets, in position order. Their total
+    // length may be smaller than .length if the end is empty (never
+    // greater)
     public children: A<RangeSet<T>>
   ) {}
 
-  update(added: A<Range<T>> = noRanges,
+  update(added: A<Range<T>> = none,
          filter: RangeFilter<T> | null = null,
          filterFrom: number = 0,
          filterTo: number = this.length): RangeSet<T> {
@@ -113,7 +116,7 @@ export class RangeSet<T extends RangeValue> {
       }
       let newChild = child
       if (localRanges || filter && filterFrom <= endPos && filterTo >= pos)
-        newChild = newChild.updateInner(localRanges || noRanges, filter, filterFrom, filterTo,
+        newChild = newChild.updateInner(localRanges || none, filter, filterFrom, filterTo,
                                         pos, newChild.length)
       if (newChild != child)
         (children || (children = this.children.slice(0, i))).push(newChild)
@@ -126,14 +129,13 @@ export class RangeSet<T extends RangeValue> {
     // If nothing was actually updated, return the existing object
     if (!local && !children && decI == added.length) return this
 
-    // Compute final size and length
+    // Compute final size
     size += (local || this.local).length + added.length - decI
 
     // This is a small node—turn it into a flat leaf
     if (size <= BASE_NODE_SIZE)
       return collapseSet(children || this.children, local || this.local.slice(),
                          added, decI, offset, length)
-
 
     let childSize = Math.max(BASE_NODE_SIZE, size >> BASE_NODE_SIZE_SHIFT)
     if (decI < added.length) {
@@ -147,7 +149,7 @@ export class RangeSet<T extends RangeValue> {
       rebalanceChildren(local, children, childSize)
     }
 
-    return new RangeSet<T>(length, size, local || this.local, children || this.children)
+    return new RangeSet<T>(length, size, maybeNone(local || this.local), maybeNone(children || this.children))
   }
 
   grow(length: number): RangeSet<T> {
@@ -169,6 +171,10 @@ export class RangeSet<T extends RangeValue> {
     return this.mapInner(changes, 0, 0, changes.mapPos(this.length, 1)).set
   }
 
+  // Child boundaries are always mapped forward. This may cause ranges
+  // at the start of a set to end up sticking out before its new
+  // start, if they map backward. Such ranges are returned in
+  // `escaped`.
   private mapInner(changes: ChangeSet,
                    oldStart: number, newStart: number,
                    newEnd: number): {set: RangeSet<T>, escaped: Range<T>[] | null} {
@@ -179,7 +185,7 @@ export class RangeSet<T extends RangeValue> {
     for (let i = 0; i < this.local.length; i++) {
       let range = this.local[i], mapped = range.map(changes, oldStart, newStart)
       let escape = mapped != null && (mapped.from < 0 || mapped.to > newLength)
-      if (newLocal == null && (range != mapped || escaped)) newLocal = this.local.slice(0, i)
+      if (newLocal == null && (range != mapped || escape)) newLocal = this.local.slice(0, i)
       if (escape) (escaped || (escaped = [])).push(mapped!)
       else if (newLocal && mapped) newLocal.push(mapped)
     }
@@ -189,21 +195,19 @@ export class RangeSet<T extends RangeValue> {
       let child = this.children[i], newChild = child
       let oldChildEnd = oldPos + child.length
       let newChildEnd = changes.mapPos(oldPos + child.length, 1)
-      // FIXME immediately collapse children entirely covered by a change
-      if (touchesChanges(oldPos, oldChildEnd, changes.changes)) {
+      let touch = touchesChanges(oldPos, oldChildEnd, changes.changes)
+      if (touch == touched.yes) {
         let inner = child.mapInner(changes, oldPos, newPos, newChildEnd)
         newChild = inner.set
         if (inner.escaped) for (let range of inner.escaped) {
           range = range.move(newPos - newStart)
-          if (range.from < 0 || range.to > newLength) {
-            ;(escaped || (escaped = [])).push(range)
-          } else {
-            if (newLocal == null) newLocal = this.local.slice()
-            insertSorted(newLocal, range)
-          }
+          if (range.from < 0 || range.to > newLength)
+            insertSorted(escaped || (escaped = []), range)
+          else
+            insertSorted(newLocal || (newLocal = this.local.slice()), range)
         }
-      } else if (newChildEnd - newPos != oldChildEnd - oldPos) {
-        newChild = new RangeSet<T>(newChildEnd - newPos, child.size, child.local, child.children)
+      } else if (touch == touched.covered) {
+        newChild = RangeSet.empty.grow(newChildEnd - newPos)
       }
       if (newChild != child) {
         if (newChildren == null) newChildren = this.children.slice(0, i)
@@ -230,7 +234,7 @@ export class RangeSet<T extends RangeValue> {
     let set = newLength == this.length && newChildren == null && newLocal == null
       ? this
       : new RangeSet<T>(newLength, newSize + (newLocal || this.local).length,
-                          newLocal || this.local, newChildren || this.children)
+                        newLocal || this.local, newChildren || this.children)
     return {set, escaped}
   }
 
@@ -329,13 +333,10 @@ export class RangeSet<T extends RangeValue> {
   }
 
   static of<T extends RangeValue>(ranges: A<Range<T>> | Range<T>): RangeSet<T> {
-    let set = RangeSet.empty
-    if (ranges instanceof Range) set = set.update([ranges])
-    else if (ranges.length) set = set.update(ranges)
-    return set
+    return RangeSet.empty.update(ranges instanceof Range ? [ranges] : ranges)
   }
 
-  static empty = new RangeSet<any>(0, 0, noRanges, noChildren);
+  static empty = new RangeSet<any>(0, 0, none, none);
 }
 
 // Stack element for iterating over a range set
@@ -461,7 +462,7 @@ function collapseSet<T extends RangeValue>(
   for (let added of add) local.push(added.move(-offset))
   if (mustSort) local.sort(byPos)
 
-  return new RangeSet<T>(length, local.length, local, noChildren)
+  return new RangeSet<T>(length, local.length, local, none)
 }
 
 function appendRanges<T extends RangeValue>(local: Range<T>[], children: RangeSet<T>[],
@@ -489,7 +490,7 @@ function appendRanges<T extends RangeValue>(local: Range<T>[], children: RangeSe
     }
     if (add.length) {
       if (add.length == ranges.length)
-        children.push(new RangeSet(endPos - pos, add.length, add.map(r => r.move(-pos)), noChildren))
+        children.push(new RangeSet(endPos - pos, add.length, add.map(r => r.move(-pos)), none))
       else
         children.push(RangeSet.empty.updateInner(add, null, 0, 0, pos, endPos - pos))
       pos = endPos
@@ -516,8 +517,7 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
       children.splice(i, 2, new RangeSet<T>(child.length + next.length,
                                             child.size + next.size,
                                             child.local.concat(next.local.map(d => d.move(child.length))),
-                                            noChildren))
-      off += child.length + next.length
+                                            none))
     } else {
       // Join a number of nodes into a wrapper node
       let joinTo = i + 1, size = child.size, length = child.length
@@ -530,19 +530,18 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
         }
       }
       if (joinTo > i + 1) {
-        let joined = new RangeSet<T>(length, size, noRanges, children.slice(i, joinTo))
+        let joined = new RangeSet<T>(length, size, none, children.slice(i, joinTo))
         let joinedLocals = []
         for (let j = 0; j < local.length; j++) {
           let range = local[j]
           if (range.from >= off && range.to <= off + length) {
             local.splice(j--, 1)
-            if (local.length == 0) local = noRanges as Range<T>[]
             joinedLocals.push(range.move(-off))
           }
         }
         if (joinedLocals.length) joined = joined.update(joinedLocals.sort(byPos))
         children.splice(i, joinTo - i, joined)
-        i = joinTo
+        i++
         off += length
       } else {
         i++
@@ -682,12 +681,18 @@ function remove<T>(array: T[], elt: T) {
   if (found != array.length) array[found] = last
 }
 
-function touchesChanges(from: number, to: number, changes: A<Change>): boolean {
+const enum touched {yes, no, covered}
+
+function touchesChanges(from: number, to: number, changes: A<Change>): touched {
+  let result = touched.no
   for (let change of changes) {
-    if (change.to >= from && change.from <= to) return true
+    if (change.to >= from && change.from <= to) {
+      if (change.from < from && change.to > to) result = touched.covered
+      else if (result == touched.no) result = touched.yes
+    }
     let diff = change.text.length - (change.to - change.from)
     if (from > change.from) from += diff
     if (to > change.to) to += diff
   }
-  return false
+  return result
 }
