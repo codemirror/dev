@@ -98,6 +98,13 @@ describe("EditorView decoration", () => {
     ist(cm.contentDOM.querySelector("strong"), null)
   })
 
+  it("shrinks inclusive decorations when their sides are replaced", () => {
+    let cm = decoEditor("abcde", [d(1, 4, {inclusiveStart: true, inclusiveEnd: true, tagName: "strong"})])
+    cm.dispatch(cm.state.transaction.replace(3, 5, "a"))
+    cm.dispatch(cm.state.transaction.replace(0, 2, "a"))
+    ist(cm.contentDOM.querySelector("strong").textContent, "c")
+  })
+
   class WordWidget extends WidgetType<string> {
     eq(otherSpec) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
     toDOM() {

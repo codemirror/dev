@@ -83,9 +83,9 @@ export class RangeDecoration extends Decoration {
     let newFrom = mapping.mapPos(from, this.bias, true), newTo = mapping.mapPos(to, this.endBias, true)
     if (newFrom < 0) {
       if (newTo < 0) return null
-      newFrom = -(newFrom + 1)
+      newFrom = this.bias >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
     } else if (newTo < 0) {
-      newTo = -(newFrom + 1)
+      newTo = this.endBias < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
     }
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
