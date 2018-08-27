@@ -4,7 +4,7 @@ import {keymap} from "../keymap/src/keymap"
 import {history, redo, undo} from "../history/src/history"
 import {gutter} from "../gutter/src/index"
 import {baseKeymap} from "../commands/src/commands"
-import {legacyMode} from "../legacy-modes/src/"
+import {legacyMode} from "../legacy-modes/src/index2"
 import javascript from "../legacy-modes/src/javascript"
 
 let mode = legacyMode(javascript({indentUnit: 2}, {}))
