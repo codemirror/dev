@@ -72,7 +72,10 @@ export class DOMObserver {
   }
 
   onScroll() {
-    if (this.intersecting) this.onScrollChanged()
+    if (this.intersecting) {
+      this.readSelection()
+      this.onScrollChanged()
+    }
   }
 
   listenForScroll() {
@@ -135,17 +138,22 @@ export class DOMObserver {
       this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
-  flush(): boolean {
-    return this.applyMutations(this.observer.takeRecords())
-  }
-
-  applyMutations(records: MutationRecord[]): boolean {
+  getMutations() {
+    let records = this.observer.takeRecords()
     if (this.charDataQueue.length) {
       clearTimeout(this.charDataTimeout)
       this.charDataTimeout = null
       records = records.concat(this.charDataQueue)
       this.charDataQueue.length = 0
     }
+    return records
+  }
+
+  flush(): boolean {
+    return this.applyMutations(this.getMutations())
+  }
+
+  applyMutations(records: MutationRecord[]): boolean {
     if (records.length == 0) return false
 
     let from = -1, to = -1, typeOver = false
@@ -184,7 +192,8 @@ export class DOMObserver {
 
   readSelection() {
     let root = getRoot(this.dom)
-    if (!this.active || !this.selectionActive || root.activeElement != this.dom || !hasSelection(this.dom)) return
+    if (!this.active || !this.selectionActive || root.activeElement != this.dom || !hasSelection(this.dom) ||
+        this.docView.drawnSelection.eq(root.getSelection())) return
     if (!this.flush()) this.onSelectionChange()
   }
 

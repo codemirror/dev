@@ -21,6 +21,7 @@ export class DocView extends ContentView {
   text: Text = Text.create("")
   decorations: A<DecorationSet> = []
   selection: EditorSelection = EditorSelection.default
+  drawnSelection: DOMSelection = new DOMSelection
 
   observer: DOMObserver
 
@@ -213,6 +214,7 @@ export class DocView extends ContentView {
     domSel.removeAllRanges()
     domSel.addRange(range)
     if (domSel.extend) domSel.extend(head.node, head.offset)
+    this.drawnSelection.set(domSel)
   }
 
   heightAt(pos: number, bias: 1 | -1) {
@@ -382,6 +384,23 @@ export class DocView extends ContentView {
 }
 
 const noChildren: ContentView[] = []
+
+class DOMSelection {
+  anchorNode: Node | null = null
+  anchorOffset: number = 0
+  focusNode: Node | null = null
+  focusOffset: number = 0
+
+  eq(domSel: Selection): boolean {
+    return this.anchorNode == domSel.anchorNode && this.anchorOffset == domSel.anchorOffset &&
+      this.focusNode == domSel.focusNode && this.focusOffset == domSel.focusOffset
+  }
+
+  set(domSel: Selection) {
+    this.anchorNode = domSel.anchorNode; this.anchorOffset = domSel.anchorOffset
+    this.focusNode = domSel.focusNode; this.focusOffset = domSel.focusOffset
+  }
+}
 
 class GapView extends ContentView {
   length: number = 0
