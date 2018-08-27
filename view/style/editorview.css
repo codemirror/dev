@@ -3,6 +3,14 @@
   line-height: 1.4;
 }
 
+.CodeMirror-focused {
+  /* FIXME it would be great if we could directly use the browser's
+     default focus outline, but it appears we can't, so this tries to
+     approximate that */
+  outline: 1px dotted #212121;
+  outline: 5px auto -webkit-focus-ring-color;
+}
+
 .CodeMirror-content {
   box-sizing: border-box;
   line-height: inherit;
@@ -10,6 +18,7 @@
   padding: 4px 2px 4px 4px;
   tab-size: 4;
   -moz-tab-size: 4;
+  outline: none;
 }  
 
 .CodeMirror-gutter {
