@@ -92,6 +92,12 @@ describe("EditorView decoration", () => {
     ist(span.style.textDecoration, "underline")
   })
 
+  it("drops entirely deleted decorations", () => {
+    let cm = decoEditor("abc", [d(1, 2, {inclusiveStart: true, inclusiveEnd: true, tagName: "strong"})])
+    cm.dispatch(cm.state.transaction.replace(0, 3, "a"))
+    ist(cm.contentDOM.querySelector("strong"), null)
+  })
+
   class WordWidget extends WidgetType<string> {
     eq(otherSpec) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
     toDOM() {

@@ -79,11 +79,14 @@ export class RangeDecoration extends Decoration {
     this.affectsSpans = !!(this.attributes || this.tagName || this.class || this.collapsed)
   }
 
-  // FIXME this has issues—for example, replacing text at a
-  // non-inclusive side will cover the text in the decoration, though
-  // it probably shouldn't
   map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
-    let newFrom = mapping.mapPos(from, this.bias), newTo = mapping.mapPos(to, this.endBias)
+    let newFrom = mapping.mapPos(from, this.bias, true), newTo = mapping.mapPos(to, this.endBias, true)
+    if (newFrom < 0) {
+      if (newTo < 0) return null
+      newFrom = -(newFrom + 1)
+    } else if (newTo < 0) {
+      newTo = -(newFrom + 1)
+    }
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
