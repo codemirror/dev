@@ -1,7 +1,7 @@
 import {ContentView, ChildCursor} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView} from "./inlineview"
-import {clientRectsFor} from "./dom"
+import {clientRectsFor, Rect} from "./dom"
 
 export class LineView extends ContentView {
   children: InlineView[]
@@ -128,7 +128,7 @@ export class LineView extends ContentView {
             charWidth: totalWidth / this.length}
   }
 
-  coordsAt(pos: number): ClientRect | null {
+  coordsAt(pos: number): Rect | null {
     if (this.length == 0) return (this.dom.lastChild as HTMLElement).getBoundingClientRect()
     return super.coordsAt(pos)
   }

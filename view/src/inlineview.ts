@@ -2,6 +2,8 @@ import {ContentView, dirty} from "./contentview"
 import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, PointDecoration} from "./decoration"
 import {Text, TextCursor} from "../../doc/src/text"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
+import {Rect} from "./dom"
+import browser from "./browser"
 
 const noChildren: ContentView[] = []
 
@@ -92,11 +94,22 @@ export class TextView extends InlineView {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
   }
 
-  coordsAt(pos: number): ClientRect {
+  coordsAt(pos: number): Rect {
     let range = document.createRange()
-    range.setEnd(this.textDOM!, pos)
-    range.setStart(this.textDOM!, pos)
-    return range.getBoundingClientRect()
+    if (browser.chrome || browser.gecko) {
+      // These browsers reliably return valid rectangles for empty ranges
+      range.setEnd(this.textDOM!, pos)
+      range.setStart(this.textDOM!, pos)
+      return range.getBoundingClientRect()
+    } else {
+      // Otherwise, get the rectangle around a character and take one side
+      let extend = pos == 0 ? 1 : -1
+      range.setEnd(this.textDOM!, pos + (extend > 0 ? 1 : 0))
+      range.setStart(this.textDOM!, pos - (extend < 0 ? 1 : 0))
+      let rect = range.getBoundingClientRect()
+      let x = extend < 0 ? rect.right : rect.left
+      return {left: x, right: x, top: rect.top, bottom: rect.bottom}
+    }
   }
 }
 

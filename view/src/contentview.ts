@@ -1,3 +1,5 @@
+import {Rect} from "./dom"
+
 declare global {
   interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
 }
@@ -39,7 +41,7 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length
   }
 
-  coordsAt(pos: number): ClientRect | null {
+  coordsAt(pos: number): Rect | null {
     for (let off = 0, i = 0; i < this.children.length; i++) {
       let child = this.children[i], end = off + child.length
       if (end >= pos && (end != off || this.childGap)) return child.coordsAt(pos - off)

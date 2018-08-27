@@ -76,7 +76,7 @@ export function maxOffset(node: Node): number {
   return node.nodeType == 3 ? node.nodeValue!.length : node.childNodes.length
 }
 
-type Rect = {left: number, right: number, top: number, bottom: number}
+export type Rect = {left: number, right: number, top: number, bottom: number}
 
 function windowRect(win: Window): Rect {
   return {left: 0, right: win.innerWidth,
