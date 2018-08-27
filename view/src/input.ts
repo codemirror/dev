@@ -103,6 +103,11 @@ function doPaste(view: EditorView, text: string) {
 
 handlers.keydown = (view: EditorView, event: KeyboardEvent) => {
   if (beforeKeyDown(view, event)) event.preventDefault()
+  view.inputState.setSelectionOrigin("keyboard")
+}
+
+handlers.mousedown = (view: EditorView, event: MouseEvent) => {
+  view.inputState.setSelectionOrigin("pointer")
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
