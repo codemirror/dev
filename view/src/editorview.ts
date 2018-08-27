@@ -167,7 +167,10 @@ function applySelectionChange(view: EditorView) {
   let selection = selectionFromDOM(view)
   if (!view.state.selection.eq(selection)) {
     let tr = view.state.transaction.setSelection(selection)
-    if (view.inputState.lastSelectionTime > Date.now() - 50) tr = tr.setMeta(MetaSlot.origin, view.inputState.lastSelectionOrigin)
+    if (view.inputState.lastSelectionTime > Date.now() - 50) {
+      tr = tr.setMeta(MetaSlot.origin, view.inputState.lastSelectionOrigin)
+      if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()
+    }
     view.dispatch(tr)
   }
   view.inputState.lastSelectionTime = 0
