@@ -28,9 +28,7 @@ export const pcBaseKeymap: {[key: string]: Command} = {
 
 export const macBaseKeymap: {[key: string]: Command} = {
   "Cmd-ArrowUp": selectDocStart,
-  "Ctrl-ArrowUp": selectDocStart,
-  "Cmd-ArrowDown": selectDocEnd,
-  "Ctrl-ArrowDown": selectDocEnd
+  "Cmd-ArrowDown": selectDocEnd
 }
 for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key]
 
