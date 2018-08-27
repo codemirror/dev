@@ -33,6 +33,7 @@ export class InputState {
       view.inputState.lastKeyCode = event.keyCode
       view.inputState.lastKeyTime = Date.now()
     })
+    if (document.activeElement == view.contentDOM) view.dom.classList.add("CodeMirror-focused")
     this.updateCustomHandlers(view)
   }
 
@@ -147,6 +148,14 @@ handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
   if (event.type == "cut") {
     view.dispatch(view.state.transaction.replaceSelection("").scrollIntoView().setMeta(MetaSlot.userEvent, "cut"))
   }
+}
+
+handlers.focus = (view: EditorView) => {
+  view.dom.classList.add("CodeMirror-focused")
+}
+
+handlers.blur = (view: EditorView) => {
+  view.dom.classList.remove("CodeMirror-focused")
 }
 
 // FIXME add wheel event handlers that predictively adjust the viewport
