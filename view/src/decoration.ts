@@ -104,7 +104,7 @@ export class PointDecoration extends Decoration {
 
   map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
     let pos = mapping.mapPos(from, this.bias, true)
-    return pos == -1 ? null : new Range(pos, pos, this)
+    return pos < 0 ? null : new Range(pos, pos, this)
   }
 
   eq(other: PointDecoration) {

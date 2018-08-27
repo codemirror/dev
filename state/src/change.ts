@@ -47,7 +47,7 @@ export class ChangeSet implements Mapping {
   mapInner(pos: number, bias: number, trackDel: boolean, fromI: number, toI: number): number {
     let dir = toI < fromI ? -1 : 1
     let recoverables: {[key: number]: number} | null = null
-    let hasMirrors = this.mirror.length > 0, rec, mirror
+    let hasMirrors = this.mirror.length > 0, rec, mirror, deleted = false
     for (let i = fromI - (dir < 0 ? 1 : 0), endI = toI - (dir < 0 ? 1 : 0); i != endI; i += dir) {
       let {from, to, text: {length}} = this.changes[i]
       if (dir < 0) {
@@ -77,13 +77,13 @@ export class ChangeSet implements Mapping {
         ;(recoverables || (recoverables = {}))[mirror] = pos - from
       }
       if (pos > from && pos < to) {
-        if (trackDel) return -1
+        deleted = true
         pos = bias < 0 ? from : from + length
       } else {
         pos = (from == to ? bias < 0 : pos == from) ? from : from + length
       }
     }
-    return pos
+    return trackDel && deleted ? -pos - 1 : pos
   }
 
   partialMapping(from: number, to: number = this.length): Mapping {

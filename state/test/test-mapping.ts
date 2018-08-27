@@ -4,7 +4,7 @@ import {Change, ChangeSet} from "../src"
 function testMapping(mapping, ...cases) {
   let inverted = mapping.partialMapping(mapping.length, 0)
   for (let i = 0; i < cases.length; i++) {
-    let [from, to, {bias = 1, trackDel = false, lossy = false} = {}] = cases[i]
+    let [from, to, {bias = 1, trackDel = false, lossy = trackDel || false} = {}] = cases[i]
     ist(mapping.mapPos(from, bias, trackDel), to)
     if (!lossy) ist(inverted.mapPos(to, bias), from)
   }
@@ -42,5 +42,10 @@ describe("Mapping", () => {
 
   it("can map through an delete-insert with an insert in between", () => {
     testMapping(mk([2, 6, 0], [1, 1, 1], [3, 3, 4], {0: 2}), [0, 0], [1, 2], [4, 5], [6, 7], [7, 8])
+  })
+
+  it("tracks deletions when asked", () => {
+    let t = {trackDel: true}
+    testMapping(mk([0, 3, 0], [2, 6, 6]), [0, 0, t], [1, -1, t], [4, 1, t], [5, 2, t], [6, -9, t], [11, 10, t], [14, 13, t])
   })
 })
