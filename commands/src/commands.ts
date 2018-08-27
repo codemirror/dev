@@ -23,7 +23,7 @@ export const selectAll: Command = (state, dispatch) => {
 export const pcBaseKeymap: {[key: string]: Command} = {
   "Mod-Home": selectDocStart,
   "Mod-End": selectDocEnd,
-  "Mod-A": selectAll
+  "Mod-a": selectAll
 }
 
 export const macBaseKeymap: {[key: string]: Command} = {
