@@ -86,6 +86,9 @@ function windowRect(win: Window): Rect {
 export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
   let scrollThreshold = 0, scrollMargin = 5 // FIXME
   let doc = dom.ownerDocument, win = doc.defaultView
+  let gutterCover = 0, prev = dom.previousSibling
+  if (prev && getComputedStyle(prev as HTMLElement).position == "sticky") gutterCover = dom.offsetLeft
+
   for (let cur: any = dom.parentNode; cur;) {
     if (cur.nodeType == 1 || cur.nodeType == 9) { // Element or document
       let bounding: Rect
@@ -97,8 +100,6 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
         let rect = cur.getBoundingClientRect()
         bounding = {left: rect.left, right: rect.left + cur.clientWidth,
                     top: rect.top, bottom: rect.top + cur.clientHeight}
-        // Take gutter space into account (FIXME kinda fragile, broken if gutter is set to stay in place)
-        if (cur == dom.parentNode) bounding.left += dom.offsetLeft
       } else {
         bounding = windowRect(win)
       }
@@ -108,8 +109,8 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
         moveY = -(bounding.top - rect.top + scrollMargin)
       else if (rect.bottom > bounding.bottom - scrollThreshold)
         moveY = rect.bottom - bounding.bottom + scrollMargin
-      if (rect.left < bounding.left + scrollThreshold)
-        moveX = -(bounding.left - rect.left + scrollMargin)
+      if (rect.left < bounding.left + gutterCover + scrollThreshold)
+        moveX = -(bounding.left + gutterCover - rect.left + scrollMargin)
       else if (rect.right > bounding.right - scrollThreshold)
         moveX = rect.right - bounding.right + scrollMargin
       if (moveX || moveY) {
