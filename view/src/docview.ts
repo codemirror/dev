@@ -56,7 +56,7 @@ export class DocView extends ContentView {
 
     this.viewportState = new ViewportState
     this.observer = new DOMObserver(this, callbacks.onDOMChange, callbacks.onSelectionChange, () => this.checkLayout())
-    this.publicViewport = new EditorViewport(this, 0, 0) // FIXME initialize differently?x
+    this.publicViewport = new EditorViewport(this, 0, 0)
   }
 
   // Update the document view to a given state. scrollIntoView can be

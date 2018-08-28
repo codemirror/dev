@@ -84,7 +84,7 @@ function windowRect(win: Window): Rect {
 }
 
 export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
-  let scrollThreshold = 0, scrollMargin = 5 // FIXME
+  let scrollThreshold = 0, scrollMargin = 5
   let doc = dom.ownerDocument, win = doc.defaultView
   let gutterCover = 0, prev = dom.previousSibling
   if (prev && getComputedStyle(prev as HTMLElement).position == "sticky") gutterCover = dom.offsetLeft

@@ -70,7 +70,6 @@ export class EditorView {
   }
 
   // FIXME arrange for an error to be raised when this is called recursively
-  // FIXME explicit cursor motion should also scroll the cursor into view (native behavior doesn't account for gutter)
   updateState(transactions: Transaction[], state: EditorState) {
     if (transactions.length && transactions[0].startState != this._state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
