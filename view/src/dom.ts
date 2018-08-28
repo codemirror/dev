@@ -90,9 +90,11 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
   if (prev && getComputedStyle(prev as HTMLElement).position == "sticky") gutterCover = dom.offsetLeft
 
   for (let cur: any = dom.parentNode; cur;) {
-    if (cur.nodeType == 1 || cur.nodeType == 9) { // Element or document
-      let bounding: Rect
-      if (cur.nodeType == 1) {
+    if (cur.nodeType == 1) { // Element or document
+      let bounding: Rect, top = cur == document.body
+      if (top) {
+        bounding = windowRect(win)
+      } else {
         if (cur.scrollHeight <= cur.clientHeight && cur.scrollWidth <= cur.clientWidth) {
           cur = cur.parentNode
           continue
@@ -100,8 +102,6 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
         let rect = cur.getBoundingClientRect()
         bounding = {left: rect.left, right: rect.left + cur.clientWidth,
                     top: rect.top, bottom: rect.top + cur.clientHeight}
-      } else {
-        bounding = windowRect(win)
       }
 
       let moveX = 0, moveY = 0
@@ -114,7 +114,7 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
       else if (rect.right > bounding.right - scrollThreshold)
         moveX = rect.right - bounding.right + scrollMargin
       if (moveX || moveY) {
-        if (cur.nodeType == 9) {
+        if (top) {
           win.scrollBy(moveX, moveY)
         } else {
           if (moveY) cur.scrollTop += moveY
@@ -123,7 +123,7 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
                   right: rect.right - moveX, bottom: rect.bottom - moveY} as ClientRect
         }
       }
-      if (cur.nodeType == 9) break
+      if (top) break
       cur = cur.parentNode
     } else if (cur.nodeType == 11) { // A shadow root
       cur = cur.host
