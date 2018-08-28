@@ -56,8 +56,8 @@ class StateCache {
     return i
   }
 
-  // FIXME use frontier/staleness, somehow
   stateBefore(pos: number, mode: Mode<any>): {state: any, pos: number} {
+    if (pos > this.frontier && pos - this.frontier < MAX_SCAN_DIST) pos = this.frontier
     let index = this.findIndex(pos)
     if (index < this.states.length && this.states[index].pos == pos) index++
     return index == 0 ? new CachedState(mode.startState(), 0) : this.states[index - 1].copy(mode)
@@ -69,16 +69,19 @@ class StateCache {
     if (statePos < pos) {
       let cursor = new StringStreamCursor(doc.iterRange(statePos), statePos)
       let stream = cursor.next()
+      let start = statePos, i = 0, states: CachedState[] = []
       while (statePos < pos) {
         if (stream.eol()) {
           stream = cursor.next()
           statePos++
+          if (++i % 50) states.push(new CachedState(copyState(mode, state), statePos))
         } else {
           readToken(mode, stream, state)
           statePos += stream.pos - stream.start
           stream.start = stream.pos
         }
       }
+      this.storeStates(start, pos, states)
     }
     return state
   }
