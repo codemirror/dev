@@ -52,7 +52,7 @@ class StateCache {
   findIndex(pos: number): number {
     // FIXME could be binary search
     let i = 0
-    for (; i < this.states.length && this.states[i].pos >= pos; i++) {}
+    while (i < this.states.length && this.states[i].pos < pos) i++
     return i
   }
 
@@ -101,7 +101,8 @@ class StateCache {
 export function legacyMode<S>(mode: Mode<S>) {
   const field = new StateField<StateCache>({
     init(state: EditorState) { return new StateCache([], 0) },
-    apply(tr, cache) { return cache.apply(tr) }
+    apply(tr, cache) { return cache.apply(tr) },
+    debugName: "mode"
   })
 
   let plugin = new Plugin({
@@ -118,7 +119,7 @@ export function legacyMode<S>(mode: Mode<S>) {
       return {
         get decorations() { return decorations },
         updateViewport: update,
-        updateState: (v: EditorView) => update(v, true)
+        updateState: (v: EditorView, p: EditorState, trs: Transaction[]) => update(v, trs.some(tr => tr.docChanged))
       }
     }
   })
