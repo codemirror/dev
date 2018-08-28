@@ -1,6 +1,6 @@
 // Counts the column offset in a string, taking tabs into account.
 // Used mostly to find indentation.
-exports.countColumn = function countColumn(string, end, tabSize, startIndex, startValue) {
+export function countColumn(string: string, end: number, tabSize: number, startIndex?: number, startValue?: number): number {
   if (end == null) {
     end = string.search(/[^\s\u00a0]/)
     if (end == -1) end = string.length

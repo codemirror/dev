@@ -1,4 +1,6 @@
-export function readToken(mode, stream, state, inner = null) {
+import {StringStream} from "./stringstream"
+
+export function readToken(mode: any, stream: StringStream, state: any) {
   for (let i = 0; i < 10; i++) {
     //if (inner) inner[0] = innerMode(mode, state).mode
     let style = mode.token(stream, state)
@@ -7,10 +9,10 @@ export function readToken(mode, stream, state, inner = null) {
   throw new Error("Mode " + mode.name + " failed to advance stream.")
 }
 
-export function copyState(mode, state) {
+export function copyState(mode: any, state: any) {
   if (state === true) return state
   if (mode.copyState) return mode.copyState(state)
-  let nstate = {}
+  let nstate: any = {}
   for (let n in state) {
     let val = state[n]
     if (val instanceof Array) val = val.concat([])
