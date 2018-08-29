@@ -1,13 +1,17 @@
 import {Text} from "../../doc/src/text"
 import {EditorSelection} from "./selection"
 import {Plugin, StateField} from "./plugin"
-import {Transaction} from "./transaction"
+import {Transaction, MetaSlot} from "./transaction"
 
 class Configuration {
-  readonly fields: ReadonlyArray<StateField<any>>
+  constructor(
+    readonly plugins: ReadonlyArray<Plugin>,
+    readonly fields: ReadonlyArray<StateField<any>>,
+    readonly tabSize: number,
+    readonly lineSeparator: string | null) {}
 
-  constructor(readonly plugins: ReadonlyArray<Plugin>) {
-    let fields = []
+  static create(config: EditorStateConfig): Configuration {
+    let plugins = config.plugins || [], fields = []
     for (let plugin of plugins) {
       let field = plugin.stateField
       if (!field) continue
@@ -15,7 +19,15 @@ class Configuration {
         throw new Error(`A state field (${field.key}) can only be added to a state once`)
       fields.push(field)
     }
-    this.fields = fields
+    return new Configuration(plugins, fields, config.tabSize || 4, config.lineSeparator || null)
+  }
+
+  updateTabSize(tabSize: number) {
+    return new Configuration(this.plugins, this.fields, tabSize, this.lineSeparator)
+  }
+
+  updateLineSeparator(lineSep: string | null) {
+    return new Configuration(this.plugins, this.fields, this.tabSize, lineSep)
   }
 }
 
@@ -23,6 +35,8 @@ export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
   plugins?: ReadonlyArray<Plugin>
+  tabSize?: number
+  lineSeparator?: string | null
 }
 
 export class EditorState {
@@ -47,6 +61,9 @@ export class EditorState {
   /** @internal */
   applyTransaction(tr: Transaction): EditorState {
     let $conf = this.config
+    let tabSize = tr.getMeta(MetaSlot.changeTabSize), lineSep = tr.getMeta(MetaSlot.changeLineSeparator)
+    if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
+    if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
     let newState = new EditorState($conf, tr.doc, tr.selection)
     for (let field of $conf.fields)
       (newState as any)[field.key] = field.apply(tr, (this as any)[field.key], newState)
@@ -57,9 +74,15 @@ export class EditorState {
     return Transaction.start(this)
   }
 
+  get tabSize(): number { return this.config.tabSize }
+
+  get lineSeparator(): string { return this.config.lineSeparator || "\n" }
+
+  get strictLineSeparator(): boolean { return this.config.lineSeparator != null }
+
   static create(config: EditorStateConfig = {}): EditorState {
     let doc = config.doc instanceof Text ? config.doc : Text.create(config.doc || "")
-    let $config = new Configuration(config.plugins || [])
+    let $config = Configuration.create(config)
     let state = new EditorState($config, doc, config.selection || EditorSelection.default)
     for (let field of $config.fields) (state as any)[field.key] = field.init(state)
     return state

@@ -36,4 +36,22 @@ describe("EditorState", () => {
     ist.throws(() => state.transaction.replace(2, 1, ""))
     ist.throws(() => state.transaction.replace(2, 10, "x"))
   })
+
+  it("stores and updates tab size", () => {
+    let deflt = EditorState.create({}), two = EditorState.create({tabSize: 2})
+    ist(deflt.tabSize, 4)
+    ist(two.tabSize, 2)
+    let updated = deflt.transaction.setMeta(MetaSlot.changeTabSize, 8).apply()
+    ist(updated.tabSize, 8)
+  })
+
+  it("stores and updates the line separator", () => {
+    let deflt = EditorState.create({}), crlf = EditorState.create({lineSeparator: "\r\n"})
+    ist(deflt.lineSeparator, "\n")
+    ist(deflt.strictLineSeparator, false)
+    ist(crlf.lineSeparator, "\r\n")
+    ist(crlf.strictLineSeparator, true)
+    let updated = crlf.transaction.setMeta(MetaSlot.changeLineSeparator, "\n").apply()
+    ist(updated.lineSeparator, "\n")
+  })
 })

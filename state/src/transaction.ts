@@ -27,6 +27,8 @@ export class MetaSlot<_T> {
 
   static time: MetaSlot<number> = new MetaSlot("time")
   static origin: MetaSlot<string> = new MetaSlot("origin")
+  static changeTabSize: MetaSlot<number> = new MetaSlot("changeTabSize")
+  static changeLineSeparator: MetaSlot<string | null> = new MetaSlot("changeLineSeparator")
   static userEvent: MetaSlot<string> = new MetaSlot("userEvent")
   static addToHistory: MetaSlot<boolean> = new MetaSlot("addToHistory")
   static rebased: MetaSlot<number> = new MetaSlot("rebased")
