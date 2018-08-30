@@ -20,3 +20,11 @@ export function copyState(mode: any, state: any) {
   }
   return nstate
 }
+
+export interface Mode<S> {
+  token(stream: StringStream, state: S): string
+  startState: () => S
+  copyState?: (state: S) => S
+  name: string
+  indent(state: S, textAfter: string): number
+}
