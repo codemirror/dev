@@ -48,9 +48,9 @@ describe("EditorState", () => {
   it("stores and updates the line separator", () => {
     let deflt = EditorState.create({}), crlf = EditorState.create({lineSeparator: "\r\n"})
     ist(deflt.lineSeparator, "\n")
-    ist(deflt.strictLineSeparator, false)
+    ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.lineSeparator, "\r\n")
-    ist(crlf.strictLineSeparator, true)
+    ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
     let updated = crlf.transaction.setMeta(MetaSlot.changeLineSeparator, "\n").apply()
     ist(updated.lineSeparator, "\n")
   })

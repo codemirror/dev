@@ -1,20 +1,21 @@
-import {LineCursor, TextCursor} from "../../doc/src/text"
+import {Text, TextIterator} from "../../doc/src/text"
 import {StringStream} from "./stringstream"
 
 export class StringStreamCursor {
   private curLineEnd: number
-  private readonly iter: LineCursor
+  private readonly iter: TextIterator
 
-  constructor(iter: TextCursor, public offset: number) {
-    this.iter = new LineCursor(iter)
+  constructor(text: Text, public offset: number, readonly tabSize: number = 4) {
+    this.iter = text.iterLines(offset)
     this.curLineEnd = this.offset - 1
   }
 
   next() {
-    const chunk = this.iter.next()
-    const res = new StringStream(chunk)
+    let {value, done} = this.iter.next()
+    if (done) throw new RangeError("Reached end of document")
+    const res = new StringStream(value, this.tabSize, null)
     this.offset = this.curLineEnd + 1
-    this.curLineEnd += chunk.length + 1
+    this.curLineEnd += value.length + 1
     return res
   }
 }

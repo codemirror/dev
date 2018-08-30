@@ -12,7 +12,7 @@ function getDecorations<S>(mode: Mode<S>, doc: Text, from: number, to: number, s
   state = state ? copyState(mode, state) : mode.startState()
   const decorations = []
   const states: Range<S>[] = []
-  const cursor = new StringStreamCursor(doc.iterRange(from, to), from)
+  const cursor = new StringStreamCursor(doc, from)
   let stream = cursor.next()
   const pushState = () => states.push(new Range(stream.pos + cursor.offset, stream.pos + cursor.offset, copyState(mode, state)))
   for (let line = 0; cursor.offset < to; stream = cursor.next(), ++line) {
@@ -59,7 +59,7 @@ export function legacyMode<S>(mode: Mode<S>) {
   ;(plugin as any).indentation = function(state: EditorState, pos: number): number {
     if (!mode.indent) return -1
     let {pos: statePos, state: modeState} = state.getField(field)!.getStateBefore(pos)
-    let cursor = new StringStreamCursor(state.doc.iterRange(statePos), statePos)
+    let cursor = new StringStreamCursor(state.doc, statePos)
     let stream = cursor.next()
     modeState = modeState ? copyState(mode, modeState) : mode.startState()
     while (statePos < pos) {

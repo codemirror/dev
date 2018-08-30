@@ -15,7 +15,7 @@ class Value implements RangeValue {
     this.name = spec.name || null
     this.pos = spec.pos == null ? null : spec.pos
   }
-  map(mapping: Mapping, from: number, to: number) {
+  map(mapping: Mapping, from: number, to: number): Range<Value> | null {
     if (from == to) {
       let pos = mapping.mapPos(from, this.bias, true)
       return pos < 0 ? null : new Range(pos, pos, this)
@@ -76,10 +76,10 @@ function mk(from: number, to?: any, spec?: any): Range<Value> {
 }
 function mkSet(ranges: Range<Value>[]) { return RangeSet.of<Value>(ranges) }
 
-let smallRanges = []
+let smallRanges: Range<Value>[] = []
 for (let i = 0; i < 5000; i++)
   smallRanges.push(mk(i, i + 1 + (i % 4), {pos: i}))
-let _set0 = null
+let _set0: RangeSet<Value> | null = null
 function set0() { return _set0 || (_set0 = mkSet(smallRanges)) }
 
 describe("RangeSet", () => {
@@ -164,8 +164,8 @@ describe("RangeSet", () => {
   describe("map", () => {
     function test(positions: Range<Value>[], changes: [number, number, number][], newPositions: (number | [number, number])[]) {
       let set = mkSet(positions)
-      let mapped = set.map(new ChangeSet(changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len)))))
-      let out = []
+      let mapped = set.map(new ChangeSet(changes.map(([from, to, len]) => new Change(from, to, ["x".repeat(len)]))))
+      let out: Range<Value>[] = []
       mapped.collect(out, 0)
       ist(JSON.stringify(out.map(d => d.from + "-" + d.to)),
           JSON.stringify(newPositions.map(p => Array.isArray(p) ? {from: p[0], to: p[1]} : {from: p, to: p}).map(r => r.from + "-" + r.to)))
@@ -197,7 +197,7 @@ describe("RangeSet", () => {
 
     it("adjusts the set tree shape", () => {
       let child0Size = set0().children[0].length, child1Size = set0().children[1].length
-      let set = set0().map(new ChangeSet([new Change(0, 0, "hi"), new Change(child0Size + 3, child0Size + 5, "")]))
+      let set = set0().map(new ChangeSet([new Change(0, 0, ["hi"]), new Change(child0Size + 3, child0Size + 5, [""])]))
       ist(set.size, set0().size, "<=")
       ist(set.size, set0().size - 2, ">")
       ist(set.children[0].length, child0Size + 2)
@@ -210,13 +210,13 @@ describe("RangeSet", () => {
       for (let i = 0; i < 100; i++)
         ranges.push(mk(i, i + 1, {bias: -1, biasEnd: 1}))
       let set0 = mkSet(ranges), nodeBoundary = set0.children[0].length
-      let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, "hello")]))
+      let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, ["hello"])]))
       ist(set.size, set0.size)
       checkSet(set)
     })
 
     it("removes collapsed tree nodes", () => {
-      let set = set0().map(new ChangeSet([new Change(0, 6000, "")]))
+      let set = set0().map(new ChangeSet([new Change(0, 6000, [""])]))
       ist(set.size, 0)
       ist(depth(set), 1)
     })
@@ -228,7 +228,7 @@ describe("RangeSet", () => {
       set0().forEach((from, to, value) => {
         ++called
         ist(from, value.pos)
-        ist(to, value.pos + 1 + value.pos % 4)
+        ist(to, value.pos! + 1 + value.pos! % 4)
       })
       ist(called, set0().size)
     })
@@ -242,26 +242,26 @@ describe("RangeSet", () => {
     comparePoints(pos: number, pointsA: Value[], pointsB: Value[]) {
       if (Value.names(pointsA) != Value.names(pointsB)) this.addRange(pos, pos)
     }
-    ignoreRange(value) { return !value.name && !value.collapsed }
-    ignorePoint(value) { return !value.name }
-    addRange(from, to) {
+    ignoreRange(value: Value) { return !value.name && !value.collapsed }
+    ignorePoint(value: Value) { return !value.name }
+    addRange(from: number, to: number) {
       if (this.ranges.length && this.ranges[this.ranges.length - 1] == from) this.ranges[this.ranges.length - 1] = to
       else this.ranges.push(from, to)
     }
   }
 
   describe("compare", () => {
-    function test(ranges, update, changes) {
+    function test(ranges: RangeSet<Value> | Range<Value>[], update: any, changes: number[]) {
       let set = Array.isArray(ranges) ? mkSet(ranges) : ranges
       let newSet = set
       let docRanges = []
       if (update.changes) {
-        let changes = new ChangeSet(update.changes.map(([from, to, len]) => new Change(from, to, "x".repeat(len))))
+        let changes = new ChangeSet(update.changes.map(([from, to, len]: [number, number, number]) => new Change(from, to, ["x".repeat(len)])))
         newSet = newSet.map(changes)
         for (let i = 0, off = 0; i < changes.length; i++) {
-          let {from, to, text} = changes.changes[i]
-          docRanges.push({fromA: from + off, toA: to + off, fromB: from, toB: from + text.length})
-          off += (to - from) - text.length
+          let {from, to, length} = changes.changes[i]
+          docRanges.push({fromA: from + off, toA: to + off, fromB: from, toB: from + length})
+          off += (to - from) - length
         }
       }
       if (update.add || update.filter)
@@ -279,7 +279,7 @@ describe("RangeSet", () => {
 
     it("notices deleted ranges", () =>
        test([mk(4, 6, "a"), mk(5, 7, "b"), mk(6, 8, "c"), mk(20, 30, "d")], {
-         filter: from => from != 5 && from != 20
+         filter: (from: number) => from != 5 && from != 20
        }, [5, 7, 20, 30]))
 
     it("recognizes identical ranges", () =>
@@ -300,7 +300,7 @@ describe("RangeSet", () => {
       test(ranges, {
         changes: [[900, 1000, 0]],
         add: [mk(850, 860, "b")],
-        prepare: set => Object.defineProperty(set.children[0], "local", {get() { throw new Error("NO TOUCH") }})
+        prepare: (set: RangeSet<Value>) => Object.defineProperty(set.children[0], "local", {get() { throw new Error("NO TOUCH") }})
       }, [850, 860])
     })
 
@@ -310,7 +310,7 @@ describe("RangeSet", () => {
       let set = mkSet(ranges)
       test(set, {
         add: [mk(set.children[0].length + 1, set.children[0].length + 2, "b")],
-        prepare: set => Object.defineProperty(set.children[2], "local", {get() { throw new Error("NO TOUCH") }})
+        prepare: (set: RangeSet<Value>) => Object.defineProperty(set.children[2], "local", {get() { throw new Error("NO TOUCH") }})
       }, [])
     })
 
@@ -343,7 +343,7 @@ describe("RangeSet", () => {
       }
       test(ranges, {
         changes: [[0, 0, 50], [100, 150, 0], [150, 200, 0]],
-        filter: from => from % 50 > 0
+        filter: (from: number) => from % 50 > 0
       }, [50, 51, 100, 103, 150, 153])
     })
   })

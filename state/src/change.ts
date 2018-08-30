@@ -3,10 +3,15 @@ import {Text} from "../../doc/src/text"
 const empty: ReadonlyArray<any> = []
 
 export class Change {
-  constructor(public readonly from: number, public readonly to: number, public readonly text: string) {}
+  length: number
+
+  constructor(public readonly from: number, public readonly to: number, public readonly text: ReadonlyArray<string>) {
+    this.length = -1
+    for (let line of text) this.length += line.length + 1
+  }
 
   invert(doc: Text): Change {
-    return new Change(this.from, this.from + this.text.length, doc.slice(this.from, this.to))
+    return new Change(this.from, this.from + this.length, doc.slice(this.from, this.to))
   }
 
   apply(doc: Text): Text {
@@ -49,7 +54,7 @@ export class ChangeSet implements Mapping {
     let recoverables: {[key: number]: number} | null = null
     let hasMirrors = this.mirror.length > 0, rec, mirror, deleted = false
     for (let i = fromI - (dir < 0 ? 1 : 0), endI = toI - (dir < 0 ? 1 : 0); i != endI; i += dir) {
-      let {from, to, text: {length}} = this.changes[i]
+      let {from, to, length} = this.changes[i]
       if (dir < 0) {
         let len = to - from
         to = from + length

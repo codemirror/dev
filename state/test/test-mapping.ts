@@ -13,7 +13,7 @@ function testMapping(mapping, ...cases) {
 function mk(...args) {
   let changes = [], mirror = []
   for (let arg of args) {
-    if (Array.isArray(arg)) changes.push(new Change(arg[0], arg[1], "x".repeat(arg[2])))
+    if (Array.isArray(arg)) changes.push(new Change(arg[0], arg[1], ["x".repeat(arg[2])]))
     else for (let from in arg) mirror.push(+from, arg[from])
   }
   return new ChangeSet(changes, mirror)

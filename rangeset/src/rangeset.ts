@@ -690,7 +690,7 @@ function touchesChanges(from: number, to: number, changes: A<Change>): touched {
       if (change.from < from && change.to > to) result = touched.covered
       else if (result == touched.no) result = touched.yes
     }
-    let diff = change.text.length - (change.to - change.from)
+    let diff = change.length - (change.to - change.from)
     if (from > change.from) from += diff
     if (to > change.to) to += diff
   }

@@ -66,7 +66,7 @@ export class Transaction {
   }
 
   change(change: Change, mirror?: number): Transaction {
-    if (change.from == change.to && change.text == "") return this
+    if (change.from == change.to && change.length == 0) return this
     if (change.from < 0 || change.to < change.from || change.to > this.doc.length)
       throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
     let changes = this.changes.append(change, mirror)
@@ -75,14 +75,15 @@ export class Transaction {
                            this.meta, this.flags)
   }
 
-  replace(from: number, to: number, text: string): Transaction {
-    return this.change(new Change(from, to, text))
+  replace(from: number, to: number, text: string | ReadonlyArray<string>): Transaction {
+    return this.change(new Change(from, to, typeof text == "string" ? this.startState.splitLines(text) : text))
   }
 
-  replaceSelection(text: string): Transaction {
+  replaceSelection(text: string | ReadonlyArray<string>): Transaction {
+    let content = typeof text == "string" ? this.startState.splitLines(text) : text
     return this.reduceRanges((state, r) => {
-      return {transaction: state.change(new Change(r.from, r.to, text)),
-              range: new SelectionRange(r.from + text.length)}
+      let change = new Change(r.from, r.to, content)
+      return {transaction: state.change(change), range: new SelectionRange(r.from + change.length)}
     })
   }
 

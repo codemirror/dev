@@ -10,7 +10,7 @@ function getDecorations<S>(mode: Mode<S>, doc: Text): DecorationSet {
   const decorations = []
   let state = mode.startState()
   const to = doc.length
-  const cursor = new StringStreamCursor(doc.iter(), 0)
+  const cursor = new StringStreamCursor(doc, 0)
   while (cursor.offset < to) {
     const stream = cursor.next()
     while (!stream.eol()) {

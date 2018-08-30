@@ -2,7 +2,6 @@
 // handles huge documents better. Doesn't always highlight accurately.
 
 import {EditorView} from "../../view/src"
-import {Text} from "../../doc/src/text"
 import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, Plugin, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
@@ -20,9 +19,9 @@ const MAX_SCAN_DIST = 20000
 class StateCache {
   constructor(private states: CachedState[], private frontier: number) {}
 
-  getDecorations<S>(doc: Text, from: number, to: number, mode: Mode<any>): Range<Decoration>[] {
-    let state = this.getState(doc, from, mode)
-    let cursor = new StringStreamCursor(doc.iterRange(from, to), from)
+  getDecorations<S>(editorState: EditorState, from: number, to: number, mode: Mode<any>): Range<Decoration>[] {
+    let state = this.getState(editorState, from, mode)
+    let cursor = new StringStreamCursor(editorState.doc, from, editorState.tabSize)
     let states: CachedState[] = [], decorations: Range<Decoration>[] = [], stream = cursor.next()
     for (let i = 0, pos = from; pos < to;) {
       if (stream.eol()) {
@@ -63,11 +62,11 @@ class StateCache {
     return index == 0 ? new CachedState(mode.startState(), 0) : this.states[index - 1].copy(mode)
   }
 
-  getState(doc: Text, pos: number, mode: Mode<any>): any {
+  getState(editorState: EditorState, pos: number, mode: Mode<any>): any {
     let {pos: statePos, state} = this.stateBefore(pos, mode)
     if (statePos < pos - MAX_SCAN_DIST) { statePos = pos; state = mode.startState() }
     if (statePos < pos) {
-      let cursor = new StringStreamCursor(doc.iterRange(statePos), statePos)
+      let cursor = new StringStreamCursor(editorState.doc, statePos, editorState.tabSize)
       let stream = cursor.next()
       let start = statePos, i = 0, states: CachedState[] = []
       while (statePos < pos) {
@@ -113,7 +112,7 @@ export function legacyMode<S>(mode: Mode<S>) {
         let vp = v.viewport
         if (force || vp.from < from || vp.to > to) {
           ;({from, to} = vp)
-          decorations = Decoration.set(v.state.getField(field)!.getDecorations(v.state.doc, from, to, mode))
+          decorations = Decoration.set(v.state.getField(field)!.getDecorations(v.state, from, to, mode))
         }
       }
       return {
@@ -128,8 +127,8 @@ export function legacyMode<S>(mode: Mode<S>) {
   // not sure yet what it'd look like
   ;(plugin as any).indentation = function(state: EditorState, pos: number): number {
     if (!mode.indent) return -1
-    let modeState = state.getField(field)!.getState(state.doc, pos, mode)
-    return mode.indent(modeState, state.doc.slice(pos, state.doc.lineEndAt(pos)).match(/^\s*(.*)/)![1])
+    let modeState = state.getField(field)!.getState(state, pos, mode)
+    return mode.indent(modeState, state.doc.slice(pos, state.doc.lineEndAt(pos))[0].match(/^\s*(.*)/)![1])
   }
 
   return plugin

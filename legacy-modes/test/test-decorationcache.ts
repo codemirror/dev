@@ -23,7 +23,7 @@ const arrEql = (a1, a2) => a1.reduce((eql, o1, i) => eql && o1 === a2[i], true)
 describe("DecorationCache", () => {
   it("calls the decorator once", () => {
     const [calls, decorator] = getDecorator()
-    const cache = new DecorationCache(decorator, Text.create("ab"))
+    const cache = new DecorationCache(decorator, Text.of("ab"))
     ist(cache.getDecorations().size, 2)
     ist(calls.length, 1)
     ist(cache.getDecorations().size, 2)
@@ -31,7 +31,7 @@ describe("DecorationCache", () => {
   })
   it("supports sub-ranges", () => {
     const [calls, decorator] = getDecorator()
-    const cache = new DecorationCache(decorator, Text.create("ab"))
+    const cache = new DecorationCache(decorator, Text.of("ab"))
     ist(cache.getDecorations(0, 1).size, 1)
     ist(cache.getDecorations().size, 2)
     ist(calls[0], [0, 1], arrEql)
@@ -40,7 +40,7 @@ describe("DecorationCache", () => {
   })
   it("maps decorations", () => {
     const [calls, decorator] = getDecorator()
-    const doc = Text.create("ab")
+    const doc = Text.of("ab")
     let cache = new DecorationCache(decorator, doc)
     ist(cache.getDecorations().size, 2)
     ist(calls.length, 1)
@@ -52,7 +52,7 @@ describe("DecorationCache", () => {
     const calls = []
     const decorator: Decorator<boolean> = (doc, from, to, state) => {
       calls.push([from, to])
-      const text = doc.text.slice(from, to)
+      const text = doc.slice(from, to).join("\n")
       const arr = []
       for (let i = 0; i < text.length; ++i) {
         if (state && text[i] === '_') arr.push(Decoration.range(i, i + 1, {}))
@@ -60,7 +60,7 @@ describe("DecorationCache", () => {
       }
       return [arr, [new Range(to, to, state)]]
     }
-    const doc = Text.create("a_b1_2a4_b")
+    const doc = Text.of("a_b1_2a4_b")
     let cache = new DecorationCache(decorator, doc)
     ist(cache.getDecorations(0, 4).size, 0)
     ist(calls[0], [0, 4], arrEql)
@@ -74,7 +74,7 @@ describe("DecorationCache", () => {
     const calls = []
     const decorator: Decorator<boolean> = (doc, from, to, state) => {
       calls.push([from, to])
-      const text = doc.text.slice(from, to)
+      const text = doc.slice(from, to).join("\n")
       const decorations = []
       const states = []
       for (let i = 0; i < text.length; ++i) {
@@ -84,7 +84,7 @@ describe("DecorationCache", () => {
       }
       return [decorations, states]
     }
-    const doc = Text.create("a_b1_2a4_b")
+    const doc = Text.of("a_b1_2a4_b")
     let cache = new DecorationCache(decorator, doc)
     ist(cache.getDecorations(0, 5).size, 1)
     ist(calls[0], [0, 5], arrEql)
@@ -96,7 +96,7 @@ describe("DecorationCache", () => {
     const calls = []
     const decorator: Decorator<boolean> = (doc, from, to, state) => {
       calls.push([from, to])
-      const text = doc.text.slice(from, to)
+      const text = doc.slice(from, to).join("\n")
       const decorations = []
       const states = []
       for (let i = 0; i < text.length; ++i) {
@@ -106,7 +106,7 @@ describe("DecorationCache", () => {
       }
       return [decorations, states]
     }
-    const doc = Text.create("a_b1_2a4_b")
+    const doc = Text.of("a_b1_2a4_b")
     let cache = new DecorationCache(decorator, doc)
     ist(cache.getDecorations(0, 4).size, 0)
     ist(calls[0], [0, 4], arrEql)

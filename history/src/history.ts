@@ -15,14 +15,14 @@ class MyMapping /*implements Mapping<Change, MyMapping>*/ {
 
   deletesChange(change: Change): boolean {
     return this._map(change.from, 1, true) as boolean ||
-           this._map(change.from + change.text.length, -1, true) as boolean
+           this._map(change.from + change.length, -1, true) as boolean
   }
 
   _map(pos: number, assoc: -1 | 1, deleted: boolean = false): number | boolean {
     for (const change of this.changes) {
       const start = change.from
       if (start > pos) continue
-      const oldSize = change.to - change.from, newSize = change.text.length, end = start + oldSize
+      const oldSize = change.to - change.from, newSize = change.length, end = start + oldSize
       if (pos <= end) {
         const side = !oldSize ? assoc : pos == start ? -1 : pos == end ? 1 : assoc
         if (deleted && (assoc < 0 ? pos != start : pos != end)) return true

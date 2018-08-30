@@ -23,7 +23,7 @@ describe("HeightMap", () => {
     let text = ""
     for (let len of lineLen)
       text += (text ? "\n" : "") + "x".repeat(len)
-    return Text.create(text)
+    return Text.of(text)
   }
 
   it("grows to match the document", () => {
@@ -63,7 +63,7 @@ describe("HeightMap", () => {
     let text = doc(10, 10, 10, 10)
     let map = mk(text, [Decoration.range(16, 27, {collapsed: true})])
     ist(map.toString(), "gap(10) line(21:5,-11) gap(10)")
-    map = map.applyChanges([], o(text.replace(5, 38, "yyy")), [new ChangedRange(5, 38, 5, 8)])
+    map = map.applyChanges([], o(text.replace(5, 38, ["yyy"])), [new ChangedRange(5, 38, 5, 8)])
     ist(map.toString(), "gap(13)")
   })
 
@@ -75,7 +75,7 @@ describe("HeightMap", () => {
     map = map.applyChanges([
       Decoration.set([Decoration.range(2, 5, {collapsed: true}),
                       Decoration.point(12, {widget: new MyWidget(20)})])
-    ], o(text.replace(10, 22, "")), [new ChangedRange(10, 22, 10, 10)])
+    ], o(text.replace(10, 22, [""])), [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20:2,-3,12,20)")
   })
 
@@ -113,12 +113,12 @@ describe("HeightMap", () => {
     ist(map.height, 1500)
     ist(map.size, 100)
     ist(depth(map), 9, "<")
-    text = text.replace(0, 31 * 80, "")
+    text = text.replace(0, 31 * 80, [""])
     map = map.applyChanges([], o(text), [new ChangedRange(0, 31 * 80, 0, 0)])
     ist(map.size, 20)
     ist(depth(map), 7, "<")
     let len = text.length
-    text = text.replace(len, len, "\nfoo".repeat(200))
+    text = text.replace(len, len, "\nfoo".repeat(200).split("\n"))
     map = map.applyChanges([], o(text), [new ChangedRange(len, len, len, len + 800)])
     heights.length = 0
     for (let i = 0; i < 200; i++) heights.push(3, 10)
@@ -132,7 +132,7 @@ describe("HeightMap", () => {
     let oracle = (new HeightOracle).setDoc(text)
     let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, [3, 10, 3, 10, 3, 10])
     ist(map.size, 3)
-    text = text.replace(3, 3, "\n")
+    text = text.replace(3, 3, ["", ""])
     map = map.applyChanges([], o(text), [new ChangedRange(3, 3, 3, 4)])
       .updateHeight(oracle, 0, false, 0, text.length, [3, 10, 0, 10, 3, 10, 3, 10])
     ist(map.size, 4)
@@ -143,7 +143,7 @@ describe("HeightMap", () => {
     let text = doc(3, 3, 3)
     let oracle = (new HeightOracle).setDoc(text)
     let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, [3, 10, 3, 10, 3, 10])
-    text = text.replace(5, 5, "foo\nbar\nbaz\nbug")
+    text = text.replace(5, 5, ["foo", "bar", "baz", "bug"])
     map = map.applyChanges([], o(text), [new ChangedRange(5, 5, 5, 20)])
       .updateHeight(oracle, 0, false, 0, text.length, [3, 10, 4, 10, 3, 10, 3, 10, 5, 10, 3, 10])
     ist(map.size, 6)
