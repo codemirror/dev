@@ -4,9 +4,8 @@ import {InlineView, InlineBuilder} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src/text"
 import {DOMObserver} from "./domobserver"
-import {EditorState, EditorSelection, Transaction} from "../../state/src"
+import {EditorState, EditorSelection, Transaction, ChangeSet, ChangedRange} from "../../state/src"
 import {HeightMap, HeightOracle} from "./heightmap"
-import {ChangedRange, computeChangedRanges} from "./changes"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
 
@@ -72,7 +71,11 @@ export class DocView extends ContentView {
     this.text = state.doc
     this.selection = state.selection
 
-    let changedRanges = !prevState ? [new ChangedRange(0, oldLength, 0, state.doc.length)] : computeChangedRanges(transactions)
+    let changedRanges = !prevState
+      ? [new ChangedRange(0, oldLength, 0, state.doc.length)]
+      : ChangedRange.fromChanges(
+          transactions.length == 1 ? transactions[0].changes :
+            transactions.reduce((changes: ChangeSet, tr: Transaction) => changes.appendSet(tr.changes), ChangeSet.empty))
     this.heightMap = this.heightMap.applyChanges([], this.heightOracle.setDoc(state.doc), changedRanges)
 
     let {viewport, contentChanges} = this.computeViewport(changedRanges, prevState, transactions, 0, scrollIntoView)
@@ -454,17 +457,6 @@ function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
   return {content: contentRanges, height: heightRanges}
 }
 
-function addChangedRange(ranges: ChangedRange[], fromA: number, toA: number, fromB: number, toB: number) {
-  if (ranges.length) {
-    let last = ranges[ranges.length - 1]
-    if (last.toA == fromA && last.toB == fromB) {
-      ranges[ranges.length - 1] = new ChangedRange(last.fromA, toA, last.fromB, toB)
-      return
-    }
-  }
-  ranges.push(new ChangedRange(fromA, toA, fromB, toB))
-}
-
 function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRange> {
   let result: ChangedRange[] = []
   for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
@@ -473,12 +465,12 @@ function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRan
     while (rI < ranges.length && ranges[rI] < end) {
       let from = ranges[rI], to = ranges[rI + 1]
       let fromB = Math.max(posB, from), toB = Math.min(end, to)
-      if (fromB <= toB) addChangedRange(result, fromB + off, toB + off, fromB, toB)
+      if (fromB <= toB) new ChangedRange(fromB + off, toB + off, fromB, toB).addToSet(result)
       if (to > end) break
       else rI += 2
     }
     if (!next) return result
-    addChangedRange(result, next.fromA, next.toA, next.fromB, next.toB)
+    new ChangedRange(next.fromA, next.toA, next.fromB, next.toB).addToSet(result)
     posA = next.toA; posB = next.toB
   }
 }
@@ -513,7 +505,8 @@ function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewpor
       if (advance == 0) break
       let endA = posA + advance, endB = posB + advance
       if ((posA >= viewportA.to || endA <= viewportA.from) != (posB >= viewportB.to || endB <= viewportB.from))
-        addChangedRange(result, viewportA.clip(posA), viewportA.clip(endA), viewportB.clip(posB), viewportB.clip(endB))
+        new ChangedRange(viewportA.clip(posA), viewportA.clip(endA),
+                         viewportB.clip(posB), viewportB.clip(endB)).addToSet(result)
       posA = endA; posB = endB
     }
 
@@ -522,8 +515,8 @@ function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewpor
     // Clip existing ranges to the viewports
     if ((range.toA >= viewportA.from && range.fromA <= viewportA.to) ||
         (range.toB >= viewportB.from && range.fromB <= viewportB.to))
-      addChangedRange(result, viewportA.clip(range.fromA), viewportA.clip(range.toA),
-                      viewportB.clip(range.fromB), viewportB.clip(range.toB))
+      new ChangedRange(viewportA.clip(range.fromA), viewportA.clip(range.toA),
+                       viewportB.clip(range.fromB), viewportB.clip(range.toB)).addToSet(result)
 
     posA = range.toA; posB = range.toB
   }

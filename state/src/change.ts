@@ -42,6 +42,11 @@ export class ChangeSet implements Mapping {
                          mirror != null ? this.mirror.concat(this.length, mirror) : this.mirror)
   }
 
+  appendSet(changes: ChangeSet): ChangeSet {
+    return new ChangeSet(this.changes.concat(changes.changes),
+                         this.mirror.concat(changes.mirror.map(i => i + this.length)))
+  }
+
   static empty: ChangeSet = new ChangeSet(empty)
 
   mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
@@ -101,5 +106,45 @@ class PartialMapping implements Mapping {
   constructor(readonly changes: ChangeSet, readonly from: number, readonly to: number) {}
   mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
     return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
+  }
+}
+
+export class ChangedRange {
+  constructor(readonly fromA: number, readonly toA: number,
+              readonly fromB: number, readonly toB: number) {}
+
+  join(other: ChangedRange): ChangedRange {
+    return new ChangedRange(Math.min(this.fromA, other.fromA), Math.max(this.toA, other.toA),
+                            Math.min(this.fromB, other.fromB), Math.max(this.toB, other.toB))
+  }
+
+  addToSet(set: ChangedRange[]) {
+    let i = set.length, me: ChangedRange = this
+    for (; i > 0; i--) {
+      let range = set[i - 1]
+      if (range.fromA > me.toA) continue
+      if (range.toA < me.fromA) break
+      me = me.join(range)
+      set.splice(i - 1, 1)
+    }
+    set.splice(i, 0, me)
+  }
+
+  static fromChanges(changes: ChangeSet) {
+    let set: ChangedRange[] = []
+    for (let i = 0; i < changes.length; i++) {
+      let change = changes.changes[i]
+      let fromA = change.from, toA = change.to, fromB = change.from, toB = change.from + change.length
+      if (i < changes.length - 1) {
+        let mapping = changes.partialMapping(i + 1)
+        fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, -1)
+      }
+      if (i > 0) {
+        let mapping = changes.partialMapping(i, 0)
+        fromA = mapping.mapPos(fromA, 1); toA = mapping.mapPos(toA, -1)
+      }
+      new ChangedRange(fromA, toA, fromB, toB).addToSet(set)
+    }
+    return set
   }
 }

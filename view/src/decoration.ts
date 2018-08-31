@@ -1,6 +1,5 @@
-import {Mapping} from "../../state/src"
+import {Mapping, ChangedRange} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
-import {ChangedRange} from "./changes"
 
 export interface RangeDecorationSpec {
   inclusiveStart?: boolean
