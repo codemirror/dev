@@ -15,11 +15,11 @@ describe("HeightMap", () => {
     ist(empty.size, 1)
   })
 
-  function mk(text, deco = []) {
+  function mk(text: Text, deco: any = []) {
     return HeightMap.empty().applyChanges([Decoration.set(deco)], o(text),
                                           [new ChangedRange(0, 0, 0, text.length)])
   }
-  function doc(... lineLen) {
+  function doc(... lineLen: number[]) {
     let text = ""
     for (let len of lineLen)
       text += (text ? "\n" : "") + "x".repeat(len)
@@ -100,8 +100,9 @@ describe("HeightMap", () => {
     ist(map.size, 100)
   })
 
-  function depth(heightMap) {
-    return heightMap.left ? Math.max(depth(heightMap.left), depth(heightMap.right)) + 1 : 1
+  function depth(heightMap: HeightMap): number {
+    let {left, right} = heightMap as any
+    return left ? Math.max(depth(left), depth(right)) + 1 : 1
   }
 
   it("balances a big tree", () => {

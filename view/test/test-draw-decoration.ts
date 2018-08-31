@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
+import {EditorView, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
 import {StateField, MetaSlot, Plugin, EditorSelection} from "../../state/src"
 import ist from "ist"
@@ -18,7 +18,7 @@ function decos(startState: DecorationSet = Decoration.none) {
   })
   return new Plugin({
     state: field,
-    view(editorView) {
+    view(editorView: EditorView) {
       return {
         get decorations() { return editorView.state.getField(field) }
       }
@@ -26,13 +26,13 @@ function decos(startState: DecorationSet = Decoration.none) {
   })
 }
 
-function d(from, to, spec = null) {
+function d(from: number, to: any, spec: any = null) {
   if (typeof to != "number") { spec = to; to = from }
   if (typeof spec == "string") spec = {attributes: {[spec]: "y"}}
   return from == to ? Decoration.point(from, spec) : Decoration.range(from, to, spec)
 }
 
-function decoEditor(doc, decorations: any = []) {
+function decoEditor(doc: string, decorations: any = []) {
   return tempEditor(doc, [decos(Decoration.set(decorations))])
 }
 
@@ -46,7 +46,7 @@ describe("EditorView decoration", () => {
     let cm = decoEditor("foo bar", [d(0, 3, {attributes: {title: "t"}}),
                                     d(4, 7, {attributes: {lang: "nl"}})])
     ist(cm.contentDOM.querySelectorAll("[title]").length, 1)
-    ist(cm.contentDOM.querySelector("[title]").title, "t")
+    ist((cm.contentDOM.querySelector("[title]") as any).title, "t")
     ist(cm.contentDOM.querySelectorAll("[lang]").length, 1)
   })
 
@@ -56,22 +56,22 @@ describe("EditorView decoration", () => {
     let spans = cm.contentDOM.querySelectorAll(".c")
     ist(spans.length, 2)
     ist(spans[0].textContent, "llo")
-    ist(spans[0].previousSibling.textContent, "he")
+    ist(spans[0].previousSibling!.textContent, "he")
     ist(spans[1].textContent, "go")
-    ist(spans[1].nextSibling.textContent, "odbye")
+    ist(spans[1].nextSibling!.textContent, "odbye")
   })
 
   it("updates for removed decorations", () => {
     let cm = decoEditor("one\ntwo\nthree", [d(1, 12, {class: "x"}),
                                             d(4, 7, {tagName: "strong"})])
-    cm.dispatch(cm.state.transaction.setMeta(filterSlot, from => from == 4))
+    cm.dispatch(cm.state.transaction.setMeta(filterSlot, (from: number) => from == 4))
     ist(cm.contentDOM.querySelectorAll(".x").length, 0)
     ist(cm.contentDOM.querySelectorAll("strong").length, 1)
   })
 
   it("doesn't update DOM that doesn't need to change", () => {
     let cm = decoEditor("one\ntwo", [d(0, 3, {tagName: "em"})])
-    let secondLine = cm.contentDOM.lastChild, secondLineText = secondLine.firstChild
+    let secondLine = cm.contentDOM.lastChild!, secondLineText = secondLine.firstChild
     cm.dispatch(cm.state.transaction.setMeta(filterSlot, () => false))
     ist(cm.contentDOM.lastChild, secondLine)
     ist(secondLine.firstChild, secondLineText)
@@ -87,7 +87,7 @@ describe("EditorView decoration", () => {
   it("combines decoration styles", () => {
     let cm = decoEditor("abc", [d(1, 2, {attributes: {style: "color: red"}}),
                                 d(1, 2, {attributes: {style: "text-decoration: underline"}})])
-    let span = cm.contentDOM.querySelector("span")
+    let span = cm.contentDOM.querySelector("span")!
     ist(span.style.color, "red")
     ist(span.style.textDecoration, "underline")
   })
@@ -102,11 +102,11 @@ describe("EditorView decoration", () => {
     let cm = decoEditor("abcde", [d(1, 4, {inclusiveStart: true, inclusiveEnd: true, tagName: "strong"})])
     cm.dispatch(cm.state.transaction.replace(3, 5, "a"))
     cm.dispatch(cm.state.transaction.replace(0, 2, "a"))
-    ist(cm.contentDOM.querySelector("strong").textContent, "c")
+    ist(cm.contentDOM.querySelector("strong")!.textContent, "c")
   })
 
   class WordWidget extends WidgetType<string> {
-    eq(otherSpec) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
+    eq(otherSpec: string) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
     toDOM() {
       let dom = document.createElement("strong")
       dom.textContent = this.spec
@@ -121,11 +121,11 @@ describe("EditorView decoration", () => {
 
     it("draws widgets", () => {
       let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
-      let w = cm.contentDOM.querySelector("strong")
+      let w = cm.contentDOM.querySelector("strong")!
       ist(w)
       ist(w.textContent, "hi")
-      ist(w.previousSibling.textContent, "hell")
-      ist(w.nextSibling.textContent, "o")
+      ist(w.previousSibling!.textContent, "hell")
+      ist(w.nextSibling!.textContent, "o")
       ist(w.contentEditable, "false")
     })
 
@@ -185,7 +185,7 @@ describe("EditorView decoration", () => {
     it("can collapse across lines", () => {
       let cm = decoEditor("foo\nbar\nbaz\nbug", [d(1, 14, {collapsed: true})])
       ist(cm.contentDOM.childNodes.length, 1)
-      ist(cm.contentDOM.firstChild.textContent, "fg")
+      ist(cm.contentDOM.firstChild!.textContent, "fg")
     })
 
     it("draws replacement widgets", () => {
@@ -196,7 +196,7 @@ describe("EditorView decoration", () => {
     it("can handle multiple overlapping collapsed ranges", () => {
       let cm = decoEditor("foo\nbar\nbaz\nbug", [d(1, 6, {collapsed: true}), d(6, 9, {collapsed: true}), d(8, 14, {collapsed: true})])
       ist(cm.contentDOM.childNodes.length, 1)
-      ist(cm.contentDOM.firstChild.textContent, "fg")
+      ist(cm.contentDOM.firstChild!.textContent, "fg")
     })
   })
 })

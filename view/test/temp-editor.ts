@@ -3,16 +3,16 @@ import {EditorState, Plugin} from "../../state/src"
 
 const workspace = document.querySelector("#workspace")
 
-let tempView = null
+let tempView: EditorView | null = null
 
-export function tempEditor(doc = "", plugins: Plugin[] = []) {
+export function tempEditor(doc = "", plugins: Plugin[] = []): EditorView {
   if (tempView) {
     tempView.destroy()
     tempView = null
   }
 
   tempView = new EditorView(EditorState.create({doc, plugins}))
-  workspace.appendChild(tempView.dom)
+  workspace!.appendChild(tempView.dom)
   return tempView
 }
 

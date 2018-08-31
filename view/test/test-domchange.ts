@@ -9,39 +9,39 @@ function flush(cm) {
 describe("DOM changes", () => {
   it("notices text changes", () => {
     let cm = tempEditor("foo\nbar")
-    cm.domAtPos(1).node.nodeValue = "froo"
+    cm.domAtPos(1)!.node.nodeValue = "froo"
     flush(cm)
-    ist(cm.state.doc.text, "froo\nbar")
+    ist(cm.state.doc.toString(), "froo\nbar")
   })
 
   it("handles browser enter behavior", () => {
-    let cm = tempEditor("foo\nbar"), line0 = cm.domAtPos(0).node
+    let cm = tempEditor("foo\nbar"), line0 = cm.domAtPos(0)!.node
     line0.appendChild(document.createElement("br"))
     line0.appendChild(document.createElement("br"))
     flush(cm)
-    ist(cm.state.doc.text, "foo\n\nbar")
+    ist(cm.state.doc.toString(), "foo\n\nbar")
   })
 
   it("supports deleting lines", () => {
     let cm = tempEditor("1\n2\n3\n4\n5\n6")
-    for (let i = 0, lineDOM = cm.domAtPos(0).node.parentNode; i < 4; i++) lineDOM.childNodes[1].remove()
+    for (let i = 0, lineDOM = cm.domAtPos(0)!.node.parentNode!; i < 4; i++) lineDOM.childNodes[1].remove()
     flush(cm)
-    ist(cm.state.doc.text, "1\n6")
+    ist(cm.state.doc.toString(), "1\n6")
   })
 
   it("can deal with large insertions", () => {
     let cm = tempEditor("okay")
     let node = document.createElement("div")
     node.textContent = "ayayayayayay"
-    for (let i = 0, lineDOM = cm.domAtPos(0).node.parentNode; i < 100; i++) lineDOM.appendChild(node.cloneNode(true))
+    for (let i = 0, lineDOM = cm.domAtPos(0)!.node.parentNode!; i < 100; i++) lineDOM.appendChild(node.cloneNode(true))
     flush(cm)
-    ist(cm.state.doc.text, "okay" + "\nayayayayayay".repeat(100))
+    ist(cm.state.doc.toString(), "okay" + "\nayayayayayay".repeat(100))
   })
 
   it("properly handles selection for ambiguous backspace", () => {
     let cm = tempEditor("foo")
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(2)))
-    cm.domAtPos(1).node.nodeValue = "fo"
+    cm.domAtPos(1)!.node.nodeValue = "fo"
     cm.inputState.lastKeyCode = 8
     cm.inputState.lastKeyTime = Date.now()
     flush(cm)
@@ -50,9 +50,9 @@ describe("DOM changes", () => {
 
   it("notices text changes at the end of a long document", () => {
     let cm = tempEditor("foo\nbar\n".repeat(15))
-    cm.domAtPos(8*15).node.textContent = "a"
+    cm.domAtPos(8*15)!.node.textContent = "a"
     flush(cm)
-    ist(cm.state.doc.text, "foo\nbar\n".repeat(15) + "a")
+    ist(cm.state.doc.toString(), "foo\nbar\n".repeat(15) + "a")
   })
 
   it("handles replacing a selection with a prefix of itself", () => {
@@ -60,7 +60,7 @@ describe("DOM changes", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
     cm.contentDOM.textContent = "f"
     flush(cm)
-    ist(cm.state.doc.text, "f")
+    ist(cm.state.doc.toString(), "f")
   })
 
   it("handles replacing a selection with a suffix of itself", () => {
@@ -68,7 +68,7 @@ describe("DOM changes", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
     cm.contentDOM.textContent = "r"
     flush(cm)
-    ist(cm.state.doc.text, "r")
+    ist(cm.state.doc.toString(), "r")
   })
 
   it("handles replacing a selection with a prefix of itself and something else", () => {
@@ -76,7 +76,7 @@ describe("DOM changes", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
     cm.contentDOM.textContent = "fa"
     flush(cm)
-    ist(cm.state.doc.text, "fa")
+    ist(cm.state.doc.toString(), "fa")
   })
 
   it("handles replacing a selection with a suffix of itself and something else", () => {
@@ -84,7 +84,7 @@ describe("DOM changes", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(0, 7)))
     cm.contentDOM.textContent = "br"
     flush(cm)
-    ist(cm.state.doc.text, "br")
+    ist(cm.state.doc.toString(), "br")
   })
 
   it("handles replacing a selection with new content that shares a prefix and a suffix", () => {
@@ -92,7 +92,7 @@ describe("DOM changes", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1, 6)))
     cm.contentDOM.textContent = "fo--ar"
     flush(cm)
-    ist(cm.state.doc.text, "fo--ar")
+    ist(cm.state.doc.toString(), "fo--ar")
   })
 
   it("handles appending", () => {
@@ -100,21 +100,20 @@ describe("DOM changes", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(7, 7)))
     cm.contentDOM.appendChild(document.createElement("div"))
     flush(cm)
-    ist(cm.state.doc.text, "foo\nbar\n")
+    ist(cm.state.doc.toString(), "foo\nbar\n")
   })
 
   it("handles deleting the first line and the newline after it", () => {
     let cm = tempEditor("foo\nbar\n\nbaz")
     cm.contentDOM.innerHTML = "bar<div><br></div><div>baz</div>"
     flush(cm)
-    ist(cm.state.doc.text, "bar\n\nbaz")
+    ist(cm.state.doc.toString(), "bar\n\nbaz")
   })
 
   it("handles deleting a line with an empty line after it", () => {
     let cm = tempEditor("foo\nbar\n\nbaz")
     cm.contentDOM.innerHTML = "<div>foo</div><br><div>baz</div>"
     flush(cm)
-    ist(cm.state.doc.text, "foo\n\nbaz")
+    ist(cm.state.doc.toString(), "foo\n\nbaz")
   })
-
 })

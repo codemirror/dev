@@ -1,12 +1,13 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
+import {EditorView} from "../src/"
 import ist from "ist"
 
-function domText(view) {
+function domText(view: EditorView) {
   let text = "", eol = false
-  function scan(node) {
+  function scan(node: Node) {
     if (node.nodeType == 1) {
-      if (node.nodeName == "BR" || node.contentEditable == "false") return
+      if (node.nodeName == "BR" || (node as HTMLElement).contentEditable == "false") return
       if (eol) { text += "\n"; eol = false }
       for (let ch = node.firstChild; ch; ch = ch.nextSibling) scan(ch)
       eol = true
@@ -24,7 +25,7 @@ describe("EditorView drawing", () => {
     ist(domText(cm), "one\ntwo")
     cm.dispatch(cm.state.transaction.replace(1, 2, "x"))
     ist(domText(cm), "oxe\ntwo")
-    cm.dispatch(cm.state.transaction.replace(2, 5, "1\n2\n3"))
+    cm.dispatch(cm.state.transaction.replace(2, 5, ["1", "2", "3"]))
     ist(domText(cm), "ox1\n2\n3wo")
     cm.dispatch(cm.state.transaction.replace(1, 8, ""))
     ist(domText(cm), "oo")
@@ -48,8 +49,8 @@ describe("EditorView drawing", () => {
 
   it("redraws lazily", () => {
     let cm = tempEditor("one\ntwo\nthree")
-    let line0 = cm.domAtPos(0).node, line1 = line0.nextSibling, line2 = line1.nextSibling
-    let text0 = line0.firstChild, text2 = line2.firstChild
+    let line0 = cm.domAtPos(0)!.node, line1 = line0.nextSibling!, line2 = line1.nextSibling!
+    let text0 = line0.firstChild!, text2 = line2.firstChild!
     cm.dispatch(cm.state.transaction.replace(5, 5, "x"))
     ist(text0.parentElement, line0)
     ist(cm.contentDOM.contains(line0))
@@ -66,11 +67,11 @@ describe("EditorView drawing", () => {
 
   it("draws BR nodes on empty lines", () => {
     let cm = tempEditor("one\n\ntwo")
-    let emptyLine = cm.domAtPos(4).node
+    let emptyLine = cm.domAtPos(4)!.node
     ist(emptyLine.childNodes.length, 1)
-    ist(emptyLine.firstChild.nodeName, "BR")
+    ist(emptyLine.firstChild!.nodeName, "BR")
     cm.dispatch(cm.state.transaction.replace(4, 4, "x"))
-    ist(!Array.from(cm.domAtPos(4).node.childNodes).some(n => (n as any).nodeName == "BR"))
+    ist(!Array.from(cm.domAtPos(4)!.node.childNodes).some(n => (n as any).nodeName == "BR"))
   })
 
   it("only draws visible content", () => {
@@ -81,10 +82,10 @@ describe("EditorView drawing", () => {
     cm.docView.checkLayout()
     ist(cm.contentDOM.childNodes.length, 500, "<")
     ist(cm.contentDOM.scrollHeight, 10000, ">")
-    ist(!cm.contentDOM.textContent.match(/b/))
+    ist(!cm.contentDOM.textContent!.match(/b/))
     cm.dom.scrollTop = cm.dom.scrollHeight / 2
     cm.docView.checkLayout()
-    ist(cm.contentDOM.textContent.match(/b/))
+    ist(cm.contentDOM.textContent!.match(/b/))
   })
 
   it("keeps a drawn area around selection ends", () => {
@@ -95,7 +96,7 @@ describe("EditorView drawing", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1, cm.state.doc.length)))
     cm.docView.checkLayout()
     cm.focus()
-    let text = cm.contentDOM.textContent
+    let text = cm.contentDOM.textContent!
     ist(text.length, 500, "<")
     ist(/second/.test(text))
     ist(/last/.test(text))
