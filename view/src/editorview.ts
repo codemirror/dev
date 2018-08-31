@@ -62,6 +62,7 @@ export class EditorView {
 
   setState(state: EditorState, ...plugins: PluginView[]) {
     this._state = state
+    setTabSize(this.contentDOM, state.tabSize)
     this.createPluginViews(plugins)
     this.inputState.updateCustomHandlers(this)
     this.docView.update(state)
@@ -73,6 +74,7 @@ export class EditorView {
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     let prevState = this._state
     this._state = state
+    if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
     this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
   }
 
@@ -171,6 +173,10 @@ function applySelectionChange(view: EditorView) {
     view.dispatch(tr)
   }
   view.inputState.lastSelectionTime = 0
+}
+
+function setTabSize(elt: HTMLElement, size: number) {
+  (elt.style as any).tabSize = (elt.style as any).MozTabSize = size
 }
 
 const editorCSS = `
