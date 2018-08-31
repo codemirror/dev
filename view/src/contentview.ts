@@ -18,7 +18,7 @@ export abstract class ContentView {
   dirty: number = dirty.not;
 
   get childGap() { return 0 }
-  get overrideDOMText(): string | null { return null }
+  get overrideDOMText(): ReadonlyArray<string> | null { return null }
 
   get posAtStart(): number {
     return this.parent ? this.parent.posBefore(this) : 0

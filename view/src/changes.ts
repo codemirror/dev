@@ -29,7 +29,7 @@ export function computeChangedRanges(transactions: Transaction[]) {
     let tr = transactions[i]
     for (let j = 0; j < tr.changes.length; j++) {
       let step = tr.changes.changes[j]
-      let fromA = step.from, toA = step.to, fromB = step.from, toB = step.from + step.text.length
+      let fromA = step.from, toA = step.to, fromB = step.from, toB = step.from + step.length
       for (let k = j == tr.changes.length - 1 ? i + 1 : i; k < transactions.length; k++) {
         let mapping = k == i ? tr.changes.partialMapping(j + 1) : transactions[k].changes
         fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, -1)

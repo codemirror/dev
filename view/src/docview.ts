@@ -108,7 +108,11 @@ export class DocView extends ContentView {
     for (let i = viewports.length - 1;; i--) {
       let endI = cursor.i
       cursor.findPos(i < 0 ? 0 : matchingRanges[i].to + 1)
-      let gap = cursor.i < endI && this.children[cursor.i] instanceof GapView ? this.children[cursor.i] as GapView : null
+      let gap: GapView | null = null
+      if (cursor.i < endI) {
+        let nextChild = this.children[cursor.i]
+        if (nextChild instanceof GapView) gap = nextChild
+      }
       let nextB = i < 0 ? 0 : viewports[i].to + 1
       if (posB >= nextB) {
         if (!gap || endI - cursor.i != 1) {
@@ -431,7 +435,7 @@ class GapView extends ContentView {
   }
 
   get overrideDOMText() {
-    return this.parent ? (this.parent as DocView).text.slice(this.posAtStart, this.posAtEnd) : ""
+    return this.parent ? (this.parent as DocView).text.slice(this.posAtStart, this.posAtEnd) : [""]
   }
 
   domBoundsAround() { return null }

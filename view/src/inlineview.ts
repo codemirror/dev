@@ -1,6 +1,6 @@
 import {ContentView, dirty} from "./contentview"
 import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, PointDecoration} from "./decoration"
-import {Text, TextCursor} from "../../doc/src/text"
+import {Text, TextIterator} from "../../doc/src/text"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {Rect} from "./dom"
 import browser from "./browser"
@@ -134,7 +134,7 @@ export class WidgetView extends InlineView {
 
   get length() { return 0 }
   getSide() { return this.side }
-  get overrideDOMText() { return "" }
+  get overrideDOMText() { return [""] }
 
   merge(other: InlineView): boolean {
     return other instanceof WidgetView && other.widget.compare(this.widget) && other.side == this.side
@@ -163,47 +163,45 @@ export class CollapsedView extends InlineView {
   get overrideDOMText() {
     let top: ContentView = this
     while (top.parent) top = top.parent
-    let text = (top as any).text, start = this.posAtStart
-    return text ? text.slice(start, start + this.length) : ""
+    let text: Text = (top as any).text, start = this.posAtStart
+    return text ? text.slice(start, start + this.length) : [""]
   }
 
   domBoundsAround() { return null }
 }
 
 export class InlineBuilder implements RangeIterator<Decoration> {
-  elements: InlineView[][] = [[]];
-  cursor: TextCursor;
-  text: string;
-  textOff: number = 0;
+  elements: InlineView[][] = [[]]
+  cursor: TextIterator
+  text: string = ""
+  skip: number
+  textOff: number = 0
 
   constructor(text: Text, public pos: number) {
     this.cursor = text.iter()
-    this.text = this.cursor.next(pos)
+    this.skip = pos
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null) {
     while (length > 0) {
       if (this.textOff == this.text.length) {
-        this.text = this.cursor.next()
-        if (this.text.length == 0) throw new Error("Ran out of text content when drawing inline views")
-        this.textOff = 0
+        let {value, lineBreak, done} = this.cursor.next(this.skip)
+        this.skip = 0
+        if (done) throw new Error("Ran out of text content when drawing inline views")
+        if (lineBreak) {
+          this.elements.push([])
+          length--
+          continue
+        } else {
+          this.text = value
+          this.textOff = 0
+        }
       }
-
-      let end = Math.min(this.textOff + length, this.text.length)
-      for (let i = this.textOff; i < end; i++) {
-        if (this.text.charCodeAt(i) == 10) { end = i; break }
-      }
-      if (end > this.textOff) {
-        this.elements[this.elements.length - 1].push(
-          new TextView(this.text.slice(this.textOff, end), tagName, clss, attrs))
-        length -= end - this.textOff
-        this.textOff = end
-      }
-      if (end < this.text.length && length) {
-        this.elements.push([])
-        length--
-        this.textOff++
-      }
+      let take = Math.min(this.text.length - this.textOff, length)
+      this.elements[this.elements.length - 1].push(
+        new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
+      length -= take
+      this.textOff += take
     }
   }
 
@@ -245,7 +243,8 @@ export class InlineBuilder implements RangeIterator<Decoration> {
     if (this.textOff + length <= this.text.length) {
       this.textOff += length
     } else {
-      this.text = this.cursor.next(length - (this.text.length - this.textOff))
+      this.skip += length - (this.text.length - this.textOff)
+      this.text = ""
       this.textOff = 0
     }
 

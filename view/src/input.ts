@@ -97,8 +97,8 @@ function capturePaste(view: EditorView) {
 }
 
 function doPaste(view: EditorView, text: string) {
-  // FIXME normalize input text (newlines)?
-  view.dispatch(view.state.transaction.replaceSelection(text).setMeta(MetaSlot.userEvent, "paste").scrollIntoView())
+  view.dispatch(view.state.transaction.replaceSelection(view.state.splitLines(text))
+                .setMeta(MetaSlot.userEvent, "paste").scrollIntoView())
 }
 
 handlers.keydown = (view: EditorView, event: KeyboardEvent) => {
@@ -142,7 +142,7 @@ handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
   if (range.empty) return
 
   let data = brokenClipboardAPI ? null : event.clipboardData
-  let text = view.state.doc.slice(range.from, range.to)
+  let text = view.state.doc.slice(range.from, range.to).join(view.state.lineSeparator)
   if (data) {
     event.preventDefault()
     data.clearData()
@@ -151,7 +151,7 @@ handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut") {
-    view.dispatch(view.state.transaction.replaceSelection("").scrollIntoView().setMeta(MetaSlot.userEvent, "cut"))
+    view.dispatch(view.state.transaction.replaceSelection([""]).scrollIntoView().setMeta(MetaSlot.userEvent, "cut"))
   }
 }
 
