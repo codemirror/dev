@@ -27,7 +27,6 @@ export class EditorView {
   private scheduledDecoUpdate: number = -1
 
   constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
-    this._state = state
     this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
 
     this.contentDOM = document.createElement("pre")
@@ -57,16 +56,15 @@ export class EditorView {
       getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
     })
     this.viewport = this.docView.publicViewport
-    this.createPluginViews(plugins)
     this.inputState = new InputState(this)
-    this.docView.update(state)
+    this.setState(state)
   }
 
   setState(state: EditorState, ...plugins: PluginView[]) {
     this._state = state
-    this.docView.update(state)
-    this.inputState.updateCustomHandlers(this)
     this.createPluginViews(plugins)
+    this.inputState.updateCustomHandlers(this)
+    this.docView.update(state)
   }
 
   // FIXME arrange for an error to be raised when this is called recursively

@@ -34,7 +34,6 @@ export class InputState {
       view.inputState.lastKeyTime = Date.now()
     })
     if (document.activeElement == view.contentDOM) view.dom.classList.add("CodeMirror-focused")
-    this.updateCustomHandlers(view)
   }
 
   updateCustomHandlers(view: EditorView) {
