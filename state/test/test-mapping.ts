@@ -1,19 +1,25 @@
 const ist = require("ist")
-import {Change, ChangeSet} from "../src"
+import {ChangeDesc, ChangeSet} from "../src"
 
-function testMapping(mapping, ...cases) {
+function testMapping(mapping: ChangeSet<ChangeDesc>, ...cases: any[][]) {
   let inverted = mapping.partialMapping(mapping.length, 0)
   for (let i = 0; i < cases.length; i++) {
-    let [from, to, {bias = 1, trackDel = false, lossy = trackDel || false} = {}] = cases[i]
+    let [from, to, {bias = 1, trackDel = false, lossy = trackDel || false} = {}] = cases[i] as any
     ist(mapping.mapPos(from, bias, trackDel), to)
+    if (!mapping.mirror.length && !trackDel) ist(mapThrough(mapping.changes, from, bias), to)
     if (!lossy) ist(inverted.mapPos(to, bias), from)
   }
 }
 
-function mk(...args) {
+function mapThrough(changes: ReadonlyArray<ChangeDesc>, pos: number, bias: number): number {
+  for (let change of changes) pos = change.mapPos(pos, bias)
+  return pos
+}
+
+function mk(...args: (number[] | {[key: number]: number})[]) {
   let changes = [], mirror = []
   for (let arg of args) {
-    if (Array.isArray(arg)) changes.push(new Change(arg[0], arg[1], ["x".repeat(arg[2])]))
+    if (Array.isArray(arg)) changes.push(new ChangeDesc(arg[0], arg[1], arg[2]))
     else for (let from in arg) mirror.push(+from, arg[from])
   }
   return new ChangeSet(changes, mirror)

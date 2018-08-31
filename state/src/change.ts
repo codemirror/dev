@@ -2,12 +2,26 @@ import {Text} from "../../doc/src/text"
 
 const empty: ReadonlyArray<any> = []
 
-export class Change {
-  length: number
+export interface Mapping {
+  mapPos(pos: number, bias?: number, trackDel?: boolean): number
+}
 
+export class ChangeDesc implements Mapping {
+  constructor(public readonly from: number, public readonly to: number, public readonly length: number) {}
+
+  mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
+    let {from, to, length} = this
+    if (pos < from) return pos
+    if (pos > to) return pos + (length - (to - from))
+    if (pos == to || pos == from) return (from == to ? bias < 0 : pos == from) ? from : from + length
+    pos = from + (bias < 0 ? 0 : length)
+    return trackDel ? -pos - 1 : pos
+  }
+}
+
+export class Change extends ChangeDesc {
   constructor(public readonly from: number, public readonly to: number, public readonly text: ReadonlyArray<string>) {
-    this.length = -1
-    for (let line of text) this.length += line.length + 1
+    super(from, to, textLength(text))
   }
 
   invert(doc: Text): Change {
@@ -17,14 +31,18 @@ export class Change {
   apply(doc: Text): Text {
     return doc.replace(this.from, this.to, this.text)
   }
+
+  get desc() { return new ChangeDesc(this.from, this.to, this.length) }
 }
 
-export interface Mapping {
-  mapPos(pos: number, bias?: number, trackDel?: boolean): number
+function textLength(text: ReadonlyArray<string>) {
+  let length = -1
+  for (let line of text) length += line.length + 1
+  return length
 }
 
-export class ChangeSet implements Mapping {
-  constructor(readonly changes: ReadonlyArray<Change>,
+export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
+  constructor(readonly changes: ReadonlyArray<C>,
               readonly mirror: ReadonlyArray<number> = empty) {}
 
   get length(): number {
@@ -37,17 +55,17 @@ export class ChangeSet implements Mapping {
     return null
   }
 
-  append(change: Change, mirror?: number): ChangeSet {
+  append(change: C, mirror?: number): ChangeSet<C> {
     return new ChangeSet(this.changes.concat(change),
                          mirror != null ? this.mirror.concat(this.length, mirror) : this.mirror)
   }
 
-  appendSet(changes: ChangeSet): ChangeSet {
+  appendSet(changes: ChangeSet<C>): ChangeSet<C> {
     return new ChangeSet(this.changes.concat(changes.changes),
                          this.mirror.concat(changes.mirror.map(i => i + this.length)))
   }
 
-  static empty: ChangeSet = new ChangeSet(empty)
+  static empty: ChangeSet<any> = new ChangeSet(empty)
 
   mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
     return this.mapInner(pos, bias, trackDel, 0, this.length)
@@ -103,7 +121,7 @@ export class ChangeSet implements Mapping {
 }
 
 class PartialMapping implements Mapping {
-  constructor(readonly changes: ChangeSet, readonly from: number, readonly to: number) {}
+  constructor(readonly changes: ChangeSet<any>, readonly from: number, readonly to: number) {}
   mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
     return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
   }

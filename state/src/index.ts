@@ -1,5 +1,5 @@
 export {EditorStateConfig, EditorState} from "./state"
 export {EditorSelection, SelectionRange} from "./selection"
-export {Change, ChangeSet, Mapping, ChangedRange} from "./change"
+export {Change, ChangeDesc, ChangeSet, Mapping, ChangedRange} from "./change"
 export {Transaction, MetaSlot} from "./transaction"
 export {StateField, Plugin, PluginSpec} from "./plugin"
