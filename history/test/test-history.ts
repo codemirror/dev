@@ -3,7 +3,7 @@ const ist = require("ist")
 import {Change, ChangeSet, EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
 import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
-const mkState = (config?: any) => EditorState.create({plugins: [history(config)]})
+const mkState = (config?: any, doc?: string) => EditorState.create({plugins: [history(config)], doc})
 
 const type = (state: EditorState, text: string, at = state.doc.length) => state.transaction.replace(at, at, text).apply()
 const timedType = (state: EditorState, text: string, atTime: number) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
@@ -96,6 +96,15 @@ describe("history", () => {
     state = receive(state, "bar", 0, 3)
     state = command(state, undo)
     ist(redo(state), false)
+  })
+
+  it("accurately maps changes through each other", () => {
+    let state = mkState({}, "123")
+    state = state.transaction.replace(1, 2, "cd").replace(3, 4, "ef").replace(0, 1, "ab").apply()
+    state = receive(state, "!!!!!!!!", 2, 2)
+    state = command(state, undo)
+    state = command(state, redo)
+    ist(state.doc.toString(), "ab!!!!!!!!cdef")
   })
 
   function unsyncedComplex(state: EditorState, doCompress: boolean) {
