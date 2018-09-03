@@ -9,6 +9,8 @@ export interface Mapping {
 export class ChangeDesc implements Mapping {
   constructor(public readonly from: number, public readonly to: number, public readonly length: number) {}
 
+  get invertedDesc() { return new ChangeDesc(this.from, this.from + this.length, this.to - this.from) }
+
   mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
     let {from, to, length} = this
     if (pos < from) return pos
@@ -30,6 +32,11 @@ export class Change extends ChangeDesc {
 
   apply(doc: Text): Text {
     return doc.replace(this.from, this.to, this.text)
+  }
+
+  map(mapping: Mapping): Change | null {
+    let from = mapping.mapPos(this.from, 1), to = mapping.mapPos(this.to, -1)
+    return from > to ? null : new Change(from, to, this.text)
   }
 
   get desc() { return new ChangeDesc(this.from, this.to, this.length) }
@@ -117,6 +124,11 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   partialMapping(from: number, to: number = this.length): Mapping {
     if (from == 0 && to == this.length) return this
     return new PartialMapping(this, from, to)
+  }
+
+  get desc(): ChangeSet<ChangeDesc> {
+    if (this.changes.length == 0 || this.changes[0] instanceof ChangeDesc) return this
+    return new ChangeSet(this.changes.map(ch => (ch as any).desc), this.mirror)
   }
 }
 

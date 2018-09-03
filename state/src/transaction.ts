@@ -129,4 +129,12 @@ export class Transaction {
   apply(): EditorState {
     return this.startState.applyTransaction(this)
   }
+
+  invertedChanges(): ChangeSet<Change> {
+    if (!this.changes.length) return ChangeSet.empty
+    let changes: Change[] = [], set = this.changes
+    for (let i = set.length - 1; i >= 0; i--)
+      changes.push(set.changes[i].invert(i == 0 ? this.startState.doc : this.docs[i - 1]))
+    return new ChangeSet(changes, set.mirror.length ? set.mirror.map(i => set.length - i - 1) : set.mirror)
+  }
 }
