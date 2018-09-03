@@ -31,7 +31,6 @@ export class MetaSlot<_T> {
   static changeLineSeparator: MetaSlot<string | null> = new MetaSlot("changeLineSeparator")
   static userEvent: MetaSlot<string> = new MetaSlot("userEvent")
   static addToHistory: MetaSlot<boolean> = new MetaSlot("addToHistory")
-  static rebased: MetaSlot<number> = new MetaSlot("rebased")
 }
 
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2

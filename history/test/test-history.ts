@@ -13,11 +13,6 @@ const command = (state: EditorState, cmd: any) => {
   return state
 }
 
-const compress = (state: EditorState) => {
-  ;(state as any).$historyState.done = (state as any).$historyState.done.compress()
-  return state
-}
-
 describe("history", () => {
   it("allows to undo a change", () => {
     let state = mkState()
@@ -90,10 +85,11 @@ describe("history", () => {
     ist(state.doc.toString(), "oops!")
   })
 
+  // FIXME figure out why a change isn't mapped away by directly overwriting change
   it("doesn't get confused by an undo not adding any redo item", () => {
-    let state = mkState()
-    state = type(state, "foo")
-    state = receive(state, "bar", 0, 3)
+    let state = mkState({}, "ab")
+    state = type(state, "cd", 1)
+    state = receive(state, "123", 0, 4)
     state = command(state, undo)
     ist(redo(state), false)
   })
@@ -107,7 +103,7 @@ describe("history", () => {
     ist(state.doc.toString(), "ab!!!!!!!!cdef")
   })
 
-  function unsyncedComplex(state: EditorState, doCompress: boolean) {
+  function unsyncedComplex(state: EditorState) {
     state = type(state, "hello")
     state = closeHistory(state.transaction).apply()
     state = type(state, "!")
@@ -115,7 +111,6 @@ describe("history", () => {
     state = type(state, "\n\n", 2)
     ist(state.doc.toString(), "..\n\n..hello!")
     state = receive(state, "\n\n", 1)
-    if (doCompress) compress(state)
     state = command(state, undo)
     state = command(state, undo)
     ist(state.doc.toString(), ".\n\n...hello")
@@ -125,10 +120,6 @@ describe("history", () => {
 
   it("can handle complex editing sequences", () => {
     unsyncedComplex(mkState(), false)
-  })
-
-  it("can handle complex editing sequences with compression", () => {
-    unsyncedComplex(mkState(), true)
   })
 
   it("supports overlapping edits", () => {
@@ -206,7 +197,6 @@ describe("history", () => {
     state = type(state, "top", 0)
     state = receive(state, "yyy", 0)
     for (let i = 0; i < 3; i++) {
-      if (i == 2) compress(state)
       for (let j = 0; j < 4; j++) state = command(state, undo)
       ist(state.doc.toString(), "yyyxxx")
       for (let j = 0; j < 4; j++) state = command(state, redo)
@@ -299,56 +289,5 @@ describe("history", () => {
     ist(state.doc.toString(), "cab")
     state = command(state, undo)
     ist(state.doc.toString(), "ab")
-  })
-
-  it("supports rebasing", () => {
-    // This test simulates a collab editing session where the local editor
-    // receives a change (`left`) that's on top of the parent change (`base`) of
-    // the last local change (`right`).
-
-    // Shared base change
-    let state = mkState()
-    state = type(state, "base")
-    state = closeHistory(state.transaction).apply()
-    const baseDoc = state.doc
-
-    // Local unconfirmed change
-    //
-    //        - left
-    //       /
-    // base -
-    //       \
-    //        - right
-    let rightChange = new Change(4, 4, [" right"])
-    state = state.transaction.change(rightChange).apply()
-    ist(state.doc.toString(), "base right")
-    ist(undoDepth(state), 2)
-    let leftChange = new Change(0, 0, ["left "])
-
-    // Receive remote change and rebase local unconfirmed change
-    //
-    // base --> left --> right'
-    let tr = state.transaction
-    tr = tr.change(rightChange.invert(baseDoc))
-    tr = tr.change(leftChange)
-    let leftMap = new ChangeSet([leftChange])
-    tr = tr.change(new Change(leftMap.mapPos(rightChange.from, 1), leftMap.mapPos(rightChange.to, -1), rightChange.text), 0)
-
-    tr = tr.setMeta(MetaSlot.rebased, 1)
-    state = tr.apply()
-    ist(state.doc.toString(), "left base right")
-    ist(undoDepth(state), 2)
-
-    // Undo local unconfirmed change
-    //
-    // base --> left
-    state = command(state, undo)
-    ist(state.doc.toString(), "left base")
-
-    // Redo local unconfirmed change
-    //
-    // base --> left --> right'
-    state = command(state, redo)
-    ist(state.doc.toString(), "left base right")
   })
 })
