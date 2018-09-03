@@ -204,7 +204,7 @@ describe("history", () => {
     }
   })
 
-  it.skip("restores selection on undo", () => {
+  it("restores selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
     state = closeHistory(state.transaction).apply()
@@ -227,18 +227,6 @@ describe("history", () => {
     state = receive(state, "---", 0)
     state = command(state, undo)
     ist(state.selection.ranges[0].head, 5)
-  })
-
-  it.skip("handles change overwriting in item-preserving mode", () => {
-    let state = mkState({preserveItems: true})
-    state = type(state, "a")
-    state = type(state, "b")
-    state = closeHistory(state.transaction).apply()
-    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
-    state = type(state, "c")
-    state = command(state, undo)
-    state = command(state, undo)
-    ist(state.doc.toString(), "")
   })
 
   it("supports querying for the undo and redo depth", () => {
