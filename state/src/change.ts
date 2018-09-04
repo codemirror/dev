@@ -68,8 +68,10 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   }
 
   appendSet(changes: ChangeSet<C>): ChangeSet<C> {
-    return new ChangeSet(this.changes.concat(changes.changes),
-                         this.mirror.concat(changes.mirror.map(i => i + this.length)))
+    return changes.length == 0 ? this :
+      this.length == 0 ? changes :
+      new ChangeSet(this.changes.concat(changes.changes),
+                    this.mirror.concat(changes.mirror.map(i => i + this.length)))
   }
 
   static empty: ChangeSet<any> = new ChangeSet(empty)
