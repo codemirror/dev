@@ -6,7 +6,7 @@ import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 
 export class EditorView {
-  private _state: EditorState
+  private _state!: EditorState
   get state(): EditorState { return this._state }
 
   readonly dispatch: (tr: Transaction) => void

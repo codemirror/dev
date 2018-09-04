@@ -1,8 +1,9 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
+import {EditorSelection, Plugin} from "../../state/src"
+import {Decoration, EditorView} from "../src"
 import ist from "ist"
 
-function flush(cm) {
+function flush(cm: EditorView) {
   cm.docView.observer.flush()
 }
 
@@ -115,5 +116,15 @@ describe("DOM changes", () => {
     cm.contentDOM.innerHTML = "<div>foo</div><br><div>baz</div>"
     flush(cm)
     ist(cm.state.doc.toString(), "foo\n\nbaz")
+  })
+
+  it("doesn't drop collapsed text", () => {
+    let cm = tempEditor("abcd", [new Plugin({view: () => ({
+      decorations: Decoration.set(Decoration.range(1, 3, {collapsed: true})),
+      updateState() { (this as any).decorations = null }
+    })})])
+    cm.domAtPos(0)!.node.firstChild!.textContent = "x"
+    flush(cm)
+    ist(cm.state.doc.toString(), "xbcd")
   })
 })

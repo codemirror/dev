@@ -85,7 +85,6 @@ describe("history", () => {
     ist(state.doc.toString(), "oops!")
   })
 
-  // FIXME figure out why a change isn't mapped away by directly overwriting change
   it("doesn't get confused by an undo not adding any redo item", () => {
     let state = mkState({}, "ab")
     state = type(state, "cd", 1)
