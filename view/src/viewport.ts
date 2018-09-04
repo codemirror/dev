@@ -37,6 +37,11 @@ export class ViewportState {
     return bias
   }
 
+  coverEverything() {
+    this.top = -2e9
+    this.bottom = 2e9
+  }
+
   getViewport(doc: Text, heightMap: HeightMap, bias: number, scrollTo: number): Viewport {
     // This will divide VIEWPORT_MARGIN between the top and the
     // bottom, depending on the bias (the change in viewport position

@@ -75,7 +75,7 @@ function customHandlers(view: EditorView) {
   return result
 }
 
-const handlers = Object.create(null)
+const handlers: {[key: string]: (view: EditorView, event: any) => void} = Object.create(null)
 
 // This is very crude, but unfortunately both these browsers _pretend_
 // that they have a clipboard API—all the objects and methods are
@@ -100,12 +100,12 @@ function doPaste(view: EditorView, text: string) {
                 .setMeta(MetaSlot.userEvent, "paste").scrollIntoView())
 }
 
-handlers.keydown = (view: EditorView, event: KeyboardEvent) => {
+handlers.keydown = (view, event: KeyboardEvent) => {
   if (beforeKeyDown(view, event)) event.preventDefault()
   view.inputState.setSelectionOrigin("keyboard")
 }
 
-handlers.mousedown = (view: EditorView, event: MouseEvent) => {
+handlers.mousedown = (view, event: MouseEvent) => {
   view.inputState.setSelectionOrigin("pointer")
 }
 
@@ -136,7 +136,7 @@ function captureCopy(view: EditorView, text: string) {
   }, 50)
 }
 
-handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
+handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
   let range = view.state.selection.primary
   if (range.empty) return
 
@@ -154,12 +154,16 @@ handlers.copy = handlers.cut = (view: EditorView, event: ClipboardEvent) => {
   }
 }
 
-handlers.focus = (view: EditorView) => {
+handlers.focus = view => {
   view.dom.classList.add("CodeMirror-focused")
 }
 
-handlers.blur = (view: EditorView) => {
+handlers.blur = view => {
   view.dom.classList.remove("CodeMirror-focused")
+}
+
+handlers.beforeprint = view => {
+  view.docView.checkLayout(true)
 }
 
 // FIXME add wheel event handlers that predictively adjust the viewport

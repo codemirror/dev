@@ -280,14 +280,16 @@ export class DocView extends ContentView {
     this.observer.withoutSelectionListening(() => this.updateSelection(true))
   }
 
-  checkLayout() {
+  checkLayout(forceFull = false) {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1
 
     this.measureVerticalPadding()
     let scrollIntoView = Math.min(this.scrollIntoView, this.text.length)
     this.scrollIntoView = -1
-    let scrollBias = this.viewportState.updateFromDOM(this.dom, this.paddingTop)
+    let scrollBias = 0
+    if (forceFull) this.viewportState.coverEverything()
+    else scrollBias = this.viewportState.updateFromDOM(this.dom, this.paddingTop)
     if (this.viewportState.top >= this.viewportState.bottom) return // We're invisible!
 
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
