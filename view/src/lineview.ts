@@ -26,12 +26,12 @@ export class LineView extends ContentView {
 
     // Both from and to point into the same text view
     if (fromI == toI && fromOff) {
-      let start = this.children[fromI] as TextView
+      let start = this.children[fromI]
       // Maybe just update that view and be done
       if (content.length == 1 && start.merge(content[0], fromOff, toOff)) return
       if (content.length == 0) return start.cut(fromOff, toOff)
       // Otherwise split it, so that we don't have to worry about aliasting front/end afterwards
-      InlineView.appendInline(content, [new TextView(start.text.slice(toOff), start.tagName, start.class, start.attrs)])
+      InlineView.appendInline(content, [start.slice(toOff)])
       toI++
       toOff = 0
     }
@@ -41,7 +41,7 @@ export class LineView extends ContentView {
     // start or end of the content can be merged with adjacent nodes,
     // this is done
     if (toOff) {
-      let end = this.children[toI] as TextView
+      let end = this.children[toI]
       if (content.length && end.merge(content[content.length - 1], 0, toOff)) content.pop()
       else end.cut(0, toOff)
     } else if (toI < this.children.length && content.length &&
@@ -49,7 +49,7 @@ export class LineView extends ContentView {
       content.pop()
     }
     if (fromOff) {
-      let start = this.children[fromI] as TextView
+      let start = this.children[fromI]
       if (content.length && start.merge(content[0], fromOff)) content.shift()
       else start.cut(fromOff)
       fromI++
@@ -75,18 +75,18 @@ export class LineView extends ContentView {
     }
   }
 
-  detachTail(from: number): TextView[] {
-    let result: TextView[] = []
+  detachTail(from: number): InlineView[] {
+    let result: InlineView[] = []
     if (this.length == 0) return result
     let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
     if (off > 0) {
-      let child = this.children[i] as TextView
-      result.push(new TextView(child.text.slice(off), child.tagName, child.class, child.attrs))
+      let child = this.children[i]
+      result.push(child.slice(off))
       child.cut(off)
       i++
     }
     if (i < this.children.length) {
-      for (let j = i; j < this.children.length; j++) result.push(this.children[j] as TextView)
+      for (let j = i; j < this.children.length; j++) result.push(this.children[j])
       this.replaceChildren(i, this.children.length)
     }
     this.length = from

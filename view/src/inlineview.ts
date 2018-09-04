@@ -11,6 +11,8 @@ export abstract class InlineView extends ContentView {
   merge(other: InlineView, from: number = 0, to: number = 0): boolean { return false }
   get children() { return noChildren }
   finish(parent: ContentView) {}
+  cut(from: number, to?: number) {}
+  abstract slice(from: number, to?: number): InlineView
   getSide() { return 0 }
 
   static appendInline(a: InlineView[], b: InlineView[]): InlineView[] {
@@ -84,6 +86,10 @@ export class TextView extends InlineView {
     this.markDirty()
   }
 
+  slice(from: number, to: number = this.length) {
+    return new TextView(this.text.slice(from, to), this.tagName, this.class, this.attrs)
+  }
+
   localPosFromDOM(node: Node, offset: number): number {
     return node == this.textDOM ? offset : offset ? this.text.length : 0
   }
@@ -136,6 +142,8 @@ export class WidgetView extends InlineView {
   getSide() { return this.side }
   get overrideDOMText() { return [""] }
 
+  slice(from: number, to: number): InlineView { throw new Error("Trying to slice a widget view") }
+
   merge(other: InlineView): boolean {
     return other instanceof WidgetView && other.widget.compare(this.widget) && other.side == this.side
   }
@@ -150,6 +158,9 @@ export class CollapsedView extends InlineView {
   constructor(public length: number) {
     super(null, null)
   }
+
+  cut(from: number, to: number = this.length) { this.length -= to - from }
+  slice(from: number, to: number = this.length) { return new CollapsedView(to - from) }
 
   finish(parent: ContentView) {
     this.setParent(parent)
