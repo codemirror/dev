@@ -485,8 +485,10 @@ class NodeBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  advanceCollapsed(pos: number) {
+  advanceCollapsed(pos: number, deco: Decoration) {
     if (pos <= this.pos) return
+    if (deco.widget && deco.widget.estimatedHeight >= 0)
+      this.addDeco(deco.widget.estimatedHeight)
     this.addDeco(this.pos - pos)
     if (this.curLine) {
       this.curLine.length += pos - this.pos

@@ -17,7 +17,7 @@ export interface RangeComparator<T extends RangeValue> {
 
 export interface RangeIterator<T extends RangeValue> {
   advance(pos: number, active: A<T>): void
-  advanceCollapsed(pos: number): void
+  advanceCollapsed(pos: number, value: T): void
   point(value: T): void
   ignoreRange(value: T): boolean
   ignorePoint(value: T): boolean
@@ -307,9 +307,8 @@ export class RangeSet<T extends RangeValue> {
             iterator.advance(range.from, active)
             let collapsed = range.value.collapsed
             if (collapsed) {
-              if (!iterator.ignorePoint(range.value)) iterator.point(range.value)
               from = range.to
-              iterator.advanceCollapsed(Math.min(from, to))
+              iterator.advanceCollapsed(Math.min(from, to), range.value)
             } else {
               active.push(range.value)
               addToHeap(heap, range)

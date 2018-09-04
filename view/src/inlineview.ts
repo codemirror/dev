@@ -8,7 +8,7 @@ import browser from "./browser"
 const noChildren: ContentView[] = []
 
 export abstract class InlineView extends ContentView {
-  merge(other: InlineView, from: number = 0, to: number = 0): boolean { return false }
+  abstract merge(other: InlineView, from?: number, to?: number): boolean
   get children() { return noChildren }
   finish(parent: ContentView) {}
   cut(from: number, to?: number) {}
@@ -119,65 +119,42 @@ export class TextView extends InlineView {
   }
 }
 
+// Also used for collapsed ranges that don't have a placeholder widget!
 export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
-  constructor(readonly widget: WidgetType<any>, readonly side: number) {
+  constructor(public length: number, readonly widget: WidgetType<any> | null, readonly side: number) {
     super(null, null)
   }
 
   finish(parent: ContentView) {
     this.setParent(parent)
     if (!this.dom) {
-      this.dom = this.widget.toDOM()
+      this.dom = this.widget ? this.widget.toDOM() : document.createElement("span")
       this.dom.contentEditable = "false"
       this.dom.cmView = this
     }
     this.markDirty()
   }
 
+  cut(from: number, to: number = this.length) { this.length -= to - from }
+  slice(from: number, to: number = this.length) { return new WidgetView(to - from, this.widget, this.side) }
+
   sync() { this.dirty = dirty.not }
 
-  get length() { return 0 }
   getSide() { return this.side }
-  get overrideDOMText() { return [""] }
-
-  slice(from: number, to: number): InlineView { throw new Error("Trying to slice a widget view") }
-
-  merge(other: InlineView): boolean {
-    return other instanceof WidgetView && other.widget.compare(this.widget) && other.side == this.side
-  }
-
-  ignoreMutation(): boolean { return true }
-  ignoreEvent(): boolean { return true }
-}
-
-export class CollapsedView extends InlineView {
-  dom!: HTMLElement | null
-
-  constructor(public length: number) {
-    super(null, null)
-  }
-
-  cut(from: number, to: number = this.length) { this.length -= to - from }
-  slice(from: number, to: number = this.length) { return new CollapsedView(to - from) }
-
-  finish(parent: ContentView) {
-    this.setParent(parent)
-    if (!this.dom) {
-      this.dom = document.createElement("span")
-      this.dom.contentEditable = "false"
-      this.dom.cmView = this
-    }
-  }
 
   merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof CollapsedView)) return false
+    if (!(other instanceof WidgetView) || this.widget || other.widget) return false
     this.length = from + other.length + (this.length - to)
     return true
   }
 
+  ignoreMutation(): boolean { return true }
+  ignoreEvent(): boolean { return true }
+
   get overrideDOMText() {
+    if (this.length == 0) return [""]
     let top: ContentView = this
     while (top.parent) top = top.parent
     let text: Text = (top as any).text, start = this.posAtStart
@@ -246,14 +223,13 @@ export class InlineBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  advanceCollapsed(pos: number) {
+  advanceCollapsed(pos: number, deco: Decoration) {
     if (pos <= this.pos) return
 
     let line = this.elements[this.elements.length - 1]
-    if (line.length && (line[line.length - 1] instanceof CollapsedView))
-      line[line.length - 1].length += (pos - this.pos)
-    else
-      line.push(new CollapsedView(pos - this.pos))
+    let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
+    if (!line.length || !line[line.length - 1].merge(widgetView))
+      line.push(widgetView)
 
     // Advance the iterator past the collapsed content
     let length = pos - this.pos
@@ -268,8 +244,8 @@ export class InlineBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  point(deco: Decoration) {
-    this.elements[this.elements.length - 1].push(new WidgetView(deco.widget!, deco instanceof PointDecoration ? deco.bias : 0))
+  point(deco: PointDecoration) {
+    this.elements[this.elements.length - 1].push(new WidgetView(0, deco.widget!, deco.bias))
   }
 
   ignoreRange(deco: Decoration): boolean { return !(deco as RangeDecoration).affectsSpans }
