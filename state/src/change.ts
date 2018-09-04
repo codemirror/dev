@@ -128,6 +128,24 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
     return new PartialMapping(this, from, to)
   }
 
+  changedRanges(): ChangedRange[] {
+    let set: ChangedRange[] = []
+    for (let i = 0; i < this.length; i++) {
+      let change = this.changes[i]
+      let fromA = change.from, toA = change.to, fromB = change.from, toB = change.from + change.length
+      if (i < this.length - 1) {
+        let mapping = this.partialMapping(i + 1)
+        fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, -1)
+      }
+      if (i > 0) {
+        let mapping = this.partialMapping(i, 0)
+        fromA = mapping.mapPos(fromA, 1); toA = mapping.mapPos(toA, -1)
+      }
+      new ChangedRange(fromA, toA, fromB, toB).addToSet(set)
+    }
+    return set
+  }
+
   get desc(): ChangeSet<ChangeDesc> {
     if (this.changes.length == 0 || this.changes[0] instanceof ChangeDesc) return this
     return new ChangeSet(this.changes.map(ch => (ch as any).desc), this.mirror)
@@ -160,23 +178,5 @@ export class ChangedRange {
       set.splice(i - 1, 1)
     }
     set.splice(i, 0, me)
-  }
-
-  static fromChanges(changes: ChangeSet) {
-    let set: ChangedRange[] = []
-    for (let i = 0; i < changes.length; i++) {
-      let change = changes.changes[i]
-      let fromA = change.from, toA = change.to, fromB = change.from, toB = change.from + change.length
-      if (i < changes.length - 1) {
-        let mapping = changes.partialMapping(i + 1)
-        fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, -1)
-      }
-      if (i > 0) {
-        let mapping = changes.partialMapping(i, 0)
-        fromA = mapping.mapPos(fromA, 1); toA = mapping.mapPos(toA, -1)
-      }
-      new ChangedRange(fromA, toA, fromB, toB).addToSet(set)
-    }
-    return set
   }
 }

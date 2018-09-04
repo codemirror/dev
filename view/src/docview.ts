@@ -73,9 +73,8 @@ export class DocView extends ContentView {
 
     let changedRanges = !prevState
       ? [new ChangedRange(0, oldLength, 0, state.doc.length)]
-      : ChangedRange.fromChanges(
-          transactions.length == 1 ? transactions[0].changes :
-            transactions.reduce((changes: ChangeSet, tr: Transaction) => changes.appendSet(tr.changes), ChangeSet.empty))
+      : (transactions.length == 1 ? transactions[0].changes :
+         transactions.reduce((changes: ChangeSet, tr: Transaction) => changes.appendSet(tr.changes), ChangeSet.empty)).changedRanges()
     this.heightMap = this.heightMap.applyChanges([], this.heightOracle.setDoc(state.doc), changedRanges)
 
     let {viewport, contentChanges} = this.computeViewport(changedRanges, prevState, transactions, 0, scrollIntoView)
