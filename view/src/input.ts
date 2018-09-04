@@ -165,5 +165,3 @@ handlers.blur = view => {
 handlers.beforeprint = view => {
   view.docView.checkLayout(true)
 }
-
-// FIXME add wheel event handlers that predictively adjust the viewport

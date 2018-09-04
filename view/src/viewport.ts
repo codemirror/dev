@@ -22,7 +22,8 @@ function visiblePixelRange(dom: HTMLElement, paddingTop: number): {top: number, 
 }
 
 const VIEWPORT_MARGIN = 1000 // FIXME look into appropriate value of this through benchmarking etc
-const MIN_COVER_MARGIN = 10, MAX_COVER_MARGIN = VIEWPORT_MARGIN / 4 // coveredBy requires at least this many extra pixels to be covered
+const MIN_COVER_MARGIN = 10  // coveredBy requires at least this many extra pixels to be covered
+const MAX_COVER_MARGIN = VIEWPORT_MARGIN / 4
 
 export class ViewportState {
   top: number = 0;
