@@ -162,6 +162,15 @@ export class WidgetView extends InlineView {
   }
 
   domBoundsAround() { return null }
+
+  coordsAt(pos: number): Rect | null {
+    let rects = this.dom!.getClientRects()
+    for (let i = pos > 0 ? rects.length - 1 : 0;; i += (pos > 0 ? -1 : 1)) {
+      let rect = rects[i]
+      if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) return rects[i]
+    }
+    return null
+  }
 }
 
 export class InlineBuilder implements RangeIterator<Decoration> {

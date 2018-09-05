@@ -298,7 +298,10 @@ export class DocView extends ContentView {
                                           lineHeight, (this.dom).clientWidth / charWidth, lineHeights)
     }
 
-    if (scrollIntoView > -1) scrollRectIntoView(this.dom, this.coordsAt(scrollIntoView)!)
+    if (scrollIntoView > -1) {
+      let rect = this.coordsAt(scrollIntoView)
+      if (rect) scrollRectIntoView(this.dom, rect)
+    }
 
     let updated = false
     for (let i = 0;; i++) {
