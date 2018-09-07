@@ -152,7 +152,8 @@ class TextLeaf extends Text {
           part.push(line)
           break
         }
-        let cut = BASE_LEAF - length - 1
+        let cut = BASE_LEAF - length - 1, after = line.charCodeAt(cut)
+        if (after >= 0xdc00 && after < 0xe000) cut++
         part.push(line.slice(0, cut))
         target.push(new TextLeaf(part, BASE_LEAF))
         line = line.slice(cut)
