@@ -46,38 +46,32 @@ function skipIgnoredNodes(view: EditorView, dir: -1 | 1) {
 function setSelFocus(view: EditorView, node: Node, offset: number) {
   let sel = getRoot(view.contentDOM).getSelection()
   view.docView.observer.withoutSelectionListening(() => {
-    if (selectionCollapsed(sel)) {
-      let range = document.createRange()
-      range.setEnd(node, offset)
-      range.setStart(node, offset)
-      sel.removeAllRanges()
-      sel.addRange(range)
-    } else if (sel.extend) {
-      sel.extend(node, offset)
-    }
+    if (selectionCollapsed(sel)) sel.collapse(node, offset)
+    else if (sel.extend) sel.extend(node, offset)
   })
 }
 
-function getMods(event: KeyboardEvent): string {
-  let result = ""
-  if (event.ctrlKey) result += "c"
-  if (event.metaKey) result += "m"
-  if (event.altKey) result += "a"
-  if (event.shiftKey) result += "s"
-  return result
+const enum mod { ctrl = 1, alt = 2, shift = 4, meta = 8 }
+
+function getMods(event: KeyboardEvent): number {
+  return (event.ctrlKey ? mod.ctrl : 0) | (event.metaKey ? mod.meta : 0) |
+    (event.altKey ? mod.alt : 0) | (event.shiftKey ? mod.shift : 0)
 }
 
+// FIXME this isn't valid in RTL, in fact, we're skipping the wrong way there
 export function beforeKeyDown(view: EditorView, event: KeyboardEvent): boolean {
-  let code = event.keyCode, mods = getMods(event)
-  // Backspace, Left Arrow, Up Arrow, Ctrl-h on Mac
-  if (code == 8 || code == 37 || code == 38 || (browser.mac && code == 72 && mods == "c"))
+  let code = event.keyCode, mods = getMods(event), macCtrl = browser.mac && mods == mod.ctrl
+  if (code == 8 || (macCtrl && code == 72) ||  // Backspace, Ctrl-h on Mac
+      code == 37 || (macCtrl && code == 66) || // Left Arrow, Ctrl-b on Mac
+      code == 38 || (macCtrl && code == 80)) { // Up Arrow, Ctrl-p on Mac
     skipIgnoredNodes(view, -1)
-  // Delete, Right Arrow, Down Arrow, Ctrl-d on Mac
-  else if (code == 46 || code == 39 || code == 40 || (browser.mac && code == 68 && mods == "c"))
+  } else if (code == 46 || (macCtrl && code == 68) || // Delete, Ctrl-d on Mac
+             code == 39 || (macCtrl && code == 70) || // Right Arrow, Ctrl-f on Mac
+             code == 40 || (macCtrl && code == 78)) { // Down Arrow, Ctrl-n on Mac
     skipIgnoredNodes(view, 1)
-  // Esc, Mod-[biyz]
-  else if (code == 27 || (mods == (browser.mac ? "m" : "c") &&
-                          (code == 66 || code == 73 || code == 89 || code == 90)))
+  } else if (code == 27 || (mods == (browser.mac ? mod.meta : mod.ctrl) &&
+                            (code == 66 || code == 73 || code == 89 || code == 90))) {
     return true
+  }
   return false
 }

@@ -195,8 +195,9 @@ export class DocView extends ContentView {
     let root = getRoot(this.dom)
     if (!takeFocus && root.activeElement != this.dom) return
 
-    let anchor = this.domFromPos(this.selection.primary.anchor)!
-    let head = this.domFromPos(this.selection.primary.head)!
+    let primary = this.selection.primary
+    let anchor = this.domFromPos(primary.anchor)!
+    let head = this.domFromPos(primary.head)!
 
     let domSel = root.getSelection()
     // If the selection is already here, or in an equivalent position, don't touch it
@@ -204,22 +205,20 @@ export class DocView extends ContentView {
         isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset))
       return
 
-    let range = document.createRange()
     // Selection.extend can be used to create an 'inverted' selection
     // (one where the focus is before the anchor), but not all
     // browsers support it yet.
     if (domSel.extend) {
-      range.setEnd(anchor.node, anchor.offset)
-      range.collapse(false)
+      domSel.collapse(anchor.node, anchor.offset)
+      if (!primary.empty) domSel.extend(head.node, head.offset)
     } else {
-      if (anchor > head) [anchor, head] = [head, anchor]
+      let range = document.createRange()
+      if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
       range.setEnd(head.node, head.offset)
       range.setStart(anchor.node, anchor.offset)
+      domSel.removeAllRanges()
+      domSel.addRange(range)
     }
-
-    domSel.removeAllRanges()
-    domSel.addRange(range)
-    if (domSel.extend) domSel.extend(head.node, head.offset)
     this.drawnSelection.set(domSel)
   }
 
