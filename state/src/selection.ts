@@ -21,7 +21,7 @@ export class SelectionRange {
 export class EditorSelection {
   /** @internal */
   constructor(readonly ranges: ReadonlyArray<SelectionRange>,
-              readonly primaryIndex: number) {}
+              readonly primaryIndex: number = 0) {}
 
   map(mapping: Mapping): EditorSelection {
     return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)

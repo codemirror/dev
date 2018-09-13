@@ -1,4 +1,4 @@
-import {EditorSelection} from "../../state/src"
+import {EditorSelection, SelectionRange} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
@@ -7,14 +7,12 @@ export type Command = (view: EditorView) => boolean
 // FIXME meta properties
 
 function moveChar(view: EditorView, dir: "left" | "right"): boolean {
-  let {primary} = view.state.selection
-  if (!primary.empty) {
-    view.dispatch(view.state.transaction.setSelection(EditorSelection.single(dir == "left" ? primary.from : primary.to)))
-    return true
-  }
-  let target = view.findPosH(primary.head, dir, "character", "move")
-  if (target == primary.head) return false
-  view.dispatch(view.state.transaction.setSelection(EditorSelection.single(target)))
+  let transaction = view.state.transaction.mapRanges(range => {
+    if (!range.empty) return new SelectionRange(dir == "left" ? range.from : range.to)
+    return new SelectionRange(view.findPosH(range.head, dir, "character", "move"))
+  })
+  if (transaction.selection.eq(view.state.selection)) return false
+  view.dispatch(transaction)
   return true
 }
 
@@ -22,10 +20,11 @@ export const moveCharLeft: Command = (view: EditorView) => moveChar(view, "left"
 export const moveCharRight: Command = (view: EditorView) => moveChar(view, "right")
 
 function extendChar(view: EditorView, dir: "left" | "right"): boolean {
-  let {primary} = view.state.selection
-  let head = view.findPosH(primary.head, dir, "character", "extend")
-  if (head == primary.head) return false
-  view.dispatch(view.state.transaction.setSelection(EditorSelection.single(primary.anchor, head)))
+  let transaction = view.state.transaction.mapRanges(range => {
+    return new SelectionRange(range.anchor, view.findPosH(range.head, dir, "character", "extend"))
+  })
+  if (transaction.selection.eq(view.state.selection)) return false
+  view.dispatch(transaction)
   return true
 }
 

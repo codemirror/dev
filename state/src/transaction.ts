@@ -103,6 +103,10 @@ export class Transaction {
     return tr.setSelection(EditorSelection.create(newRanges, sel.primaryIndex))
   }
 
+  mapRanges(f: (range: SelectionRange) => SelectionRange): Transaction {
+    return this.reduceRanges((tr, range) => ({transaction: tr, range: f(range)}))
+  }
+
   setSelection(selection: EditorSelection): Transaction {
     return new Transaction(this.startState, this.changes, this.docs, selection, this.meta,
                            this.flags | FLAG_SELECTION_SET)
