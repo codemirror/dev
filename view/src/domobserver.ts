@@ -99,19 +99,19 @@ export class DOMObserver {
     }
   }
 
-  withoutListening(f: () => void) {
+  withoutListening<T>(f: () => T): T {
     try {
       this.stop()
-      f()
+      return f()
     } finally {
       this.start()
     }
   }
 
-  withoutSelectionListening(f: () => void) {
+  withoutSelectionListening<T>(f: () => T): T {
     try {
       this.selectionActive = false
-      f()
+      return f()
     } finally {
       this.selectionActive = true
     }

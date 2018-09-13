@@ -4,6 +4,7 @@ import {InputState} from "./input"
 import {getRoot, selectionCollapsed} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
+import {findPosH} from "./cursor"
 
 export class EditorView {
   private _state!: EditorState
@@ -120,6 +121,12 @@ export class EditorView {
 
   get contentHeight() {
     return this.docView.heightMap.height + this.docView.paddingTop + this.docView.paddingBottom
+  }
+
+  findPosH(start: number, direction: "forward" | "backward" | "left" | "right",
+           granularity: "character" | "word" | "line" = "character",
+           leave: "move" | "extend" | null = null): number {
+    return findPosH(this, start, direction, granularity, leave)
   }
 
   // To be used by plugin views when they update their decorations asynchronously

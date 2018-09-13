@@ -391,6 +391,14 @@ export class DocView extends ContentView {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.observer.destroy()
   }
+
+  lineAround(pos: number): {line: LineView, start: number} | null {
+    for (let i = 0, off = 0;; i++) {
+      let line = this.children[i], end = off + line.length
+      if (end >= pos) return line instanceof LineView ? {line, start: off} : null
+      off = end + 1
+    }
+  }
 }
 
 const noChildren: ContentView[] = []
