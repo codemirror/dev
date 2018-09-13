@@ -127,4 +127,6 @@ describe("DOM changes", () => {
     flush(cm)
     ist(cm.state.doc.toString(), "xbcd")
   })
+
+  // FIXME test text node preservation (middle, start, end of node)
 })

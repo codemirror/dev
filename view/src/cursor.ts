@@ -18,18 +18,17 @@ declare global {
 export function findPosH(view: EditorView, start: number,
                          direction: "forward" | "backward" | "left" | "right",
                          granularity: "character" | "word" | "line" = "character",
-                         leave: "move" | "extend" | null = null): number {
+                         action: "move" | "extend"): number {
   let sel = getRoot(view.contentDOM).getSelection()
   if (sel.modify && isInViewport(view, start)) {
-    let startDOM = view.docView.domFromPos(start)! // FIXME handle when in collapsed?
+    // FIXME work around unwanted DOM behavior (captureKeys + FF widget issues)
+    let startDOM = view.docView.domFromPos(start)!
     return view.docView.observer.withoutSelectionListening(() => {
-      let action = leave || "move"
       let equiv = isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset)
       if (action == "move" && !(equiv && sel.isCollapsed)) sel.collapse(startDOM.node, startDOM.offset)
       else if (action == "extend" && !equiv) sel.extend(startDOM.node, startDOM.offset)
-      sel.modify(leave || "move", direction, granularity)
-      // FIXME cleanup
-      // FIXME set selection-dirty flag
+      sel.modify(action, direction, granularity)
+      view.docView.setSelectionDirty()
       return view.docView.posFromDOM(sel.focusNode, sel.focusOffset)
     })
   } else if (granularity == "character") {

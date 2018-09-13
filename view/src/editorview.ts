@@ -125,8 +125,8 @@ export class EditorView {
 
   findPosH(start: number, direction: "forward" | "backward" | "left" | "right",
            granularity: "character" | "word" | "line" = "character",
-           leave: "move" | "extend" | null = null): number {
-    return findPosH(this, start, direction, granularity, leave)
+           action: "move" | "extend" = "move"): number {
+    return findPosH(this, start, direction, granularity, action)
   }
 
   // To be used by plugin views when they update their decorations asynchronously

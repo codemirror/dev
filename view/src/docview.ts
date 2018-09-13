@@ -21,6 +21,7 @@ export class DocView extends ContentView {
   decorations: A<DecorationSet> = []
   selection: EditorSelection = EditorSelection.default
   drawnSelection: DOMSelection = new DOMSelection
+  selectionDirty: any = null
 
   observer: DOMObserver
 
@@ -192,6 +193,7 @@ export class DocView extends ContentView {
 
   // Sync the DOM selection to this.selection
   updateSelection(takeFocus: boolean = false) {
+    this.clearSelectionDirty()
     let root = getRoot(this.dom)
     if (!takeFocus && root.activeElement != this.dom) return
 
@@ -398,6 +400,18 @@ export class DocView extends ContentView {
       if (end >= pos) return line instanceof LineView ? {line, start: off} : null
       off = end + 1
     }
+  }
+
+  clearSelectionDirty() {
+    if (this.selectionDirty != null) {
+      cancelAnimationFrame(this.selectionDirty)
+      this.selectionDirty = null
+    }
+  }
+
+  setSelectionDirty() {
+    if (this.selectionDirty == null)
+      this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
   }
 }
 
