@@ -12,27 +12,23 @@ let mode = legacyMode(javascript({indentUnit: 2}, {}))
 // FIXME these should move to commands and access the indentation
 // feature through some kind of generic mechanism that allows plugins
 // to advertise that they can do indentation
-function crudeInsertNewlineAndIndent(state: EditorState, dispatch?: (tr: Transaction) => void): boolean {
-  if (dispatch) {
-    let indentation = (mode as any).indentation(state, state.selection.primary.from)
-    if (indentation > -1)
-      dispatch(state.transaction.replaceSelection("\n" + " ".repeat(indentation)).scrollIntoView())
-  }
+function crudeInsertNewlineAndIndent({state, dispatch}: EditorView): boolean {
+  let indentation = (mode as any).indentation(state, state.selection.primary.from)
+  if (indentation > -1)
+    dispatch(state.transaction.replaceSelection("\n" + " ".repeat(indentation)).scrollIntoView())
   return true
 }
-function crudeIndentLine(state: EditorState, dispatch: (tr: Transaction) => void): boolean {
-  if (dispatch) {
-    let cursor = state.selection.primary.head // FIXME doesn't indent multiple lines
-    let lineStart = state.doc.lineStartAt(cursor)
-    let line = state.doc.slice(lineStart, cursor + 100)
-    let space = /^ */.exec(line)[0].length // FIXME doesn't handle tabs
-    let indentation = (mode as any).indentation(state, lineStart)
-    if (indentation == -1) indentation = space
-    let tr = state.transaction.replace(lineStart, lineStart + space, " ".repeat(indentation)).scrollIntoView()
-    if (cursor <= lineStart + space)
-      tr = tr.setSelection(EditorSelection.single(lineStart + indentation))
-    dispatch(tr)
-  }
+function crudeIndentLine({state, dispatch}: EditorView): boolean {
+  let cursor = state.selection.primary.head // FIXME doesn't indent multiple lines
+  let lineStart = state.doc.lineStartAt(cursor)
+  let line = state.doc.slice(lineStart, cursor + 100)
+  let space = /^ */.exec(line)[0].length // FIXME doesn't handle tabs
+  let indentation = (mode as any).indentation(state, lineStart)
+  if (indentation == -1) indentation = space
+  let tr = state.transaction.replace(lineStart, lineStart + space, " ".repeat(indentation)).scrollIntoView()
+  if (cursor <= lineStart + space)
+    tr = tr.setSelection(EditorSelection.single(lineStart + indentation))
+  dispatch(tr)
   return true
 }
 

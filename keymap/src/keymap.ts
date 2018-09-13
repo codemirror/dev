@@ -1,11 +1,9 @@
 import {base, keyName} from "w3c-keyname"
 
-import {EditorState, Transaction, Plugin} from "../../state/src"
+import {Plugin} from "../../state/src"
 import {EditorView} from "../../view/src"
 
-export type Command = (state: EditorState, dispatch: (tr: Transaction) => void, view: EditorView) => (boolean | void)
-
-// declare global: navigator
+export type Command = (view: EditorView) => boolean
 
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false
 
@@ -93,11 +91,11 @@ export function keydownHandler(bindings: {[key: string]: Command}): (view: Edito
     const name = keyName(event), isChar = name.length == 1 && name != " "
     const direct = map[modifiers(name, event, !isChar)]
     let baseName
-    if (direct && direct(view.state, view.dispatch, view)) return true
+    if (direct && direct(view)) return true
     if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
         (baseName = base[event.keyCode]) && baseName != name) {
       const fromCode = map[modifiers(baseName, event, true)]
-      if (fromCode && fromCode(view.state, view.dispatch, view)) return true
+      if (fromCode && fromCode(view)) return true
     }
     return false
   }

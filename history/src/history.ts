@@ -34,22 +34,20 @@ export function history({minDepth = 100, newGroupDelay = 500}: {minDepth?: numbe
   })
 }
 
-function historyCmd(target: PopTarget, state: EditorState, dispatch?: (tr: Transaction) => void | null): boolean {
+function historyCmd(target: PopTarget, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
   const historyState: HistoryState | undefined = state.getField(historyField)
   if (!historyState || !historyState.canPop(target)) return false
-  if (dispatch) {
-    const {minDepth} = state.getPluginWithField(historyField).config
-    const {transaction, state: newState} = historyState.pop(target, state.transaction, minDepth)
-    dispatch(transaction.setMeta(historyStateSlot, newState))
-  }
+  const {minDepth} = state.getPluginWithField(historyField).config
+  const {transaction, state: newState} = historyState.pop(target, state.transaction, minDepth)
+  dispatch(transaction.setMeta(historyStateSlot, newState))
   return true
 }
 
-export function undo(state: EditorState, dispatch?: (tr: Transaction) => void | null): boolean {
+export function undo({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
   return historyCmd(PopTarget.Done, state, dispatch)
 }
 
-export function redo(state: EditorState, dispatch?: (tr: Transaction) => void | null): boolean {
+export function redo({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
   return historyCmd(PopTarget.Undone, state, dispatch)
 }
 
