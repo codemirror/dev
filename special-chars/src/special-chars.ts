@@ -119,7 +119,7 @@ function placeHolder(code: number): string | null {
 const DEFAULT_PLACEHOLDER = "\u2022"
 
 class SpecialCharWidget extends WidgetType<number> {
-  constructor(private options: Options, code: number) { super(code) }
+  constructor(_options: Options, code: number) { super(code) }
 
   toDOM() { // FIXME tab
     let span = document.createElement("span")

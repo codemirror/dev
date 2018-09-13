@@ -28,7 +28,7 @@
   "license": "MIT",
   "dependencies": {
     "@types/mocha": "^5.2.0",
-    "ist": "^1.0.1",
+    "ist": "^1.1.1",
     "mocha": "^5.1.1",
     "rollup": "^0.64.1",
     "rollup-plugin-commonjs": "^9.1.3",

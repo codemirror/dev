@@ -3,13 +3,13 @@ const ist = require("ist")
 
 const fakeView = {state: {}, dispatch: () => {}}
 
-function dispatch(map, key, mods?) {
+function dispatch(map: any, key: string, mods?: any) {
   let event: Partial<KeyboardEvent> = Object.assign({}, mods, {key})
   map.view().handleDOMEvents.keydown(fakeView, event)
 }
 
 function counter() {
-  const result = Object.assign(() => { result.count++ }, {count: 0})
+  const result = Object.assign(() => { result.count++; return true }, {count: 0})
   return result
 }
 
@@ -34,11 +34,9 @@ describe("keymap", () => {
 
   it("passes the state, dispatch, and view", () => {
     let called = false
-    dispatch(keymap({X: (state, dispatch, view) => {
-      called = true
-      ist(state, fakeView.state)
-      ist(dispatch, fakeView.dispatch)
+    dispatch(keymap({X: (view) => {
       ist(view, fakeView)
+      return called = true
     }}), "X")
     ist(called)
   })

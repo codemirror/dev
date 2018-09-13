@@ -1,6 +1,6 @@
 const ist = require("ist")
 
-import {Change, ChangeSet, EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
+import {EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
 import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
 
 const mkState = (config?: any, doc?: string) => EditorState.create({plugins: [history(config)], doc})
@@ -9,7 +9,7 @@ const type = (state: EditorState, text: string, at = state.doc.length) => state.
 const timedType = (state: EditorState, text: string, atTime: number) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
 const receive = (state: EditorState, text: string, from: number, to = from) => state.transaction.replace(from, to, text).setMeta(MetaSlot.addToHistory, false).apply()
 const command = (state: EditorState, cmd: any) => {
-  ist(cmd(state, (tr: Transaction) => state = tr.apply()), true)
+  ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), true)
   return state
 }
 
@@ -90,7 +90,7 @@ describe("history", () => {
     state = type(state, "cd", 1)
     state = receive(state, "123", 0, 4)
     state = command(state, undo)
-    ist(redo(state), false)
+    ist(redo({state, dispatch() {}}), false)
   })
 
   it("accurately maps changes through each other", () => {
@@ -118,7 +118,7 @@ describe("history", () => {
   }
 
   it("can handle complex editing sequences", () => {
-    unsyncedComplex(mkState(), false)
+    unsyncedComplex(mkState())
   })
 
   it("supports overlapping edits", () => {
@@ -248,8 +248,8 @@ describe("history", () => {
     let state = EditorState.create()
     ist(undoDepth(state), 0)
     ist(redoDepth(state), 0)
-    ist(undo(state), false)
-    ist(redo(state), false)
+    ist(undo({state, dispatch() {}}), false)
+    ist(redo({state, dispatch() {}}), false)
   })
 
   it("truncates history", () => {
