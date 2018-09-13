@@ -1,7 +1,36 @@
-import {EditorState, Transaction, EditorSelection} from "../../state/src"
+import {EditorSelection} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
+
+// FIXME multiple cursors
+// FIXME meta properties
+
+function moveChar(view: EditorView, dir: "left" | "right"): boolean {
+  let {primary} = view.state.selection
+  if (!primary.empty) {
+    view.dispatch(view.state.transaction.setSelection(EditorSelection.single(dir == "left" ? primary.from : primary.to)))
+    return true
+  }
+  let target = view.findPosH(primary.head, dir, "character", "move")
+  if (target == primary.head) return false
+  view.dispatch(view.state.transaction.setSelection(EditorSelection.single(target)))
+  return true
+}
+
+export const moveCharLeft: Command = (view: EditorView) => moveChar(view, "left")
+export const moveCharRight: Command = (view: EditorView) => moveChar(view, "right")
+
+function extendChar(view: EditorView, dir: "left" | "right"): boolean {
+  let {primary} = view.state.selection
+  let head = view.findPosH(primary.head, dir, "character", "extend")
+  if (head == primary.head) return false
+  view.dispatch(view.state.transaction.setSelection(EditorSelection.single(primary.anchor, head)))
+  return true
+}
+
+export const extendCharLeft: Command = (view: EditorView) => extendChar(view, "left")
+export const extendCharRight: Command = (view: EditorView) => extendChar(view, "right")
 
 export const selectDocStart: Command = ({state, dispatch}) => {
   dispatch(state.transaction.setSelection(EditorSelection.single(0)).scrollIntoView())
@@ -19,6 +48,10 @@ export const selectAll: Command = ({state, dispatch}) => {
 }
 
 export const pcBaseKeymap: {[key: string]: Command} = {
+  "ArrowLeft": moveCharLeft,
+  "ArrowRight": moveCharRight,
+  "Shift-ArrowLeft": extendCharLeft,
+  "Shift-ArrowRight": extendCharRight,
   "Mod-Home": selectDocStart,
   "Mod-End": selectDocEnd,
   "Mod-a": selectAll
