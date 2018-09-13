@@ -6,30 +6,44 @@ export type Command = (view: EditorView) => boolean
 // FIXME multiple cursors
 // FIXME meta properties
 
-function moveChar(view: EditorView, dir: "left" | "right"): boolean {
+function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
+                       granularity: "character" | "line" | "lineboundary"): boolean {
   let transaction = view.state.transaction.mapRanges(range => {
-    if (!range.empty) return new SelectionRange(dir == "left" ? range.from : range.to)
-    return new SelectionRange(view.findPosH(range.head, dir, "character", "move"))
+    if (!range.empty) return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
+    return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
   view.dispatch(transaction)
   return true
 }
 
-export const moveCharLeft: Command = (view: EditorView) => moveChar(view, "left")
-export const moveCharRight: Command = (view: EditorView) => moveChar(view, "right")
+export const moveCharLeft: Command = (view: EditorView) => moveSelection(view, "left", "character")
+export const moveCharRight: Command = (view: EditorView) => moveSelection(view, "right", "character")
 
-function extendChar(view: EditorView, dir: "left" | "right"): boolean {
+export const moveLineUp: Command = (view: EditorView) => moveSelection(view, "backward", "line")
+export const moveLineDown: Command = (view: EditorView) => moveSelection(view, "forward", "line")
+
+export const moveLineStart: Command = (view: EditorView) => moveSelection(view, "backward", "lineboundary")
+export const moveLineEnd: Command = (view: EditorView) => moveSelection(view, "forward", "lineboundary")
+
+function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
+                         granularity: "character" | "line" | "lineboundary"): boolean {
   let transaction = view.state.transaction.mapRanges(range => {
-    return new SelectionRange(range.anchor, view.findPosH(range.head, dir, "character", "extend"))
+    return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
   view.dispatch(transaction)
   return true
 }
 
-export const extendCharLeft: Command = (view: EditorView) => extendChar(view, "left")
-export const extendCharRight: Command = (view: EditorView) => extendChar(view, "right")
+export const extendCharLeft: Command = (view: EditorView) => extendSelection(view, "left", "character")
+export const extendCharRight: Command = (view: EditorView) => extendSelection(view, "right", "character")
+
+export const extendLineUp: Command = (view: EditorView) => extendSelection(view, "backward", "line")
+export const extendLineDown: Command = (view: EditorView) => extendSelection(view, "forward", "line")
+
+export const extendLineStart: Command = (view: EditorView) => extendSelection(view, "backward", "lineboundary")
+export const extendLineEnd: Command = (view: EditorView) => extendSelection(view, "forward", "lineboundary")
 
 export const selectDocStart: Command = ({state, dispatch}) => {
   dispatch(state.transaction.setSelection(EditorSelection.single(0)).scrollIntoView())
@@ -51,12 +65,32 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "ArrowRight": moveCharRight,
   "Shift-ArrowLeft": extendCharLeft,
   "Shift-ArrowRight": extendCharRight,
+  "ArrowUp": moveLineUp,
+  "ArrowDown": moveLineDown,
+  "Shift-ArrowUp": extendLineUp,
+  "Shift-ArrowDown": extendLineDown,
+  "Home": moveLineStart,
+  "End": moveLineEnd,
+  "Shift-Home": extendLineStart,
+  "Shift-End": extendLineEnd,
   "Mod-Home": selectDocStart,
   "Mod-End": selectDocEnd,
   "Mod-a": selectAll
 }
 
 export const macBaseKeymap: {[key: string]: Command} = {
+  "Control-b": moveCharLeft,
+  "Control-f": moveCharRight,
+  "Shift-Control-b": extendCharLeft,
+  "Shift-Control-f": extendCharRight,
+  "Control-p": moveLineUp,
+  "Control-n": moveLineDown,
+  "Shift-Control-p": extendLineUp,
+  "Shift-Control-n": extendLineDown,
+  "Control-a": moveLineStart,
+  "Control-e": moveLineEnd,
+  "Shift-Control-a": extendLineStart,
+  "Shift-Control-e": extendLineEnd,
   "Cmd-ArrowUp": selectDocStart,
   "Cmd-ArrowDown": selectDocEnd
 }

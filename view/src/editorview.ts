@@ -1,10 +1,10 @@
 import {EditorState, Transaction, EditorSelection, MetaSlot} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
 import {InputState} from "./input"
-import {getRoot, selectionCollapsed} from "./dom"
+import {getRoot, selectionCollapsed, Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
-import {findPosH} from "./cursor"
+import {movePos, posAtCoords} from "./cursor"
 
 export class EditorView {
   private _state!: EditorState
@@ -119,15 +119,23 @@ export class EditorView {
     return this.docView.heightAt(pos, top ? -1 : 1)
   }
 
+  posAtHeight(height: number, top: boolean): number {
+    return this.docView.posAtHeight(height, top ? -1 : 1)
+  }
+
   get contentHeight() {
     return this.docView.heightMap.height + this.docView.paddingTop + this.docView.paddingBottom
   }
 
-  findPosH(start: number, direction: "forward" | "backward" | "left" | "right",
-           granularity: "character" | "word" | "line" = "character",
-           action: "move" | "extend" = "move"): number {
-    return findPosH(this, start, direction, granularity, action)
+  movePos(start: number, direction: "forward" | "backward" | "left" | "right",
+          granularity: "character" | "word" | "line" | "lineboundary" = "character",
+          action: "move" | "extend" = "move"): number {
+    return movePos(this, start, direction, granularity, action)
   }
+
+  posAtCoords(coords: {x: number, y: number}): number { return posAtCoords(this, coords) }
+
+  coordsAtPos(pos: number): Rect | null { return this.docView.coordsAt(pos) }
 
   // To be used by plugin views when they update their decorations asynchronously
   decorationUpdate() {

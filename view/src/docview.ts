@@ -228,6 +228,10 @@ export class DocView extends ContentView {
     return this.heightMap.heightAt(pos, this.text, bias) + this.paddingTop
   }
 
+  posAtHeight(height: number, bias: 1 | -1) {
+    return this.heightMap.posAt(height - this.paddingTop, this.text, bias)
+  }
+
   // Compute the new viewport and set of decorations, while giving
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
