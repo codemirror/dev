@@ -1,6 +1,7 @@
 import {EditorView} from "./editorview"
 import {LineView} from "./lineview"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
+import browser from "./browser"
 
 declare global {
   interface Selection { modify(action: string, direction: string, granularity: string): void }
@@ -22,7 +23,11 @@ export function movePos(view: EditorView, start: number,
   let sel = getRoot(view.contentDOM).getSelection()
   let context = view.docView.lineAround(start)
   let dir = direction == "forward" || direction == "right" ? 1 : -1
-  if (sel.modify && context && !nearViewportEnd(view, context)) {
+  // Can only query native behavior when Selection.modify is
+  // supported, the cursor is well inside the rendered viewport, and
+  // we're not doing by-line motion on Gecko (which will mess up goal
+  // column motion)
+  if (sel.modify && context && !nearViewportEnd(view, context) && !(browser.gecko && granularity == "line")) {
     // FIXME work around unwanted DOM behavior (captureKeys + FF widget issues)
     // FIXME firefox is dumb about goal columns when moving by line like this
     let startDOM = view.docView.domFromPos(start)!
@@ -44,15 +49,20 @@ export function movePos(view: EditorView, start: number,
     if (context && !nearViewportEnd(view, context, dir)) {
       // FIXME goal column
       let startCoords = view.docView.coordsAt(start)!
+      let goal = getGoalColumn(view, start, startCoords.left)
       // FIXME skip between-line widgets when implemented
       for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, dist = 5; dist < 50; dist += 10) {
-        let pos = posAtCoords(view, {x: startCoords.left, y: startY + dist * dir})
+        let pos = posAtCoords(view, {x: goal.column, y: startY + dist * dir})
         if (pos < 0) break
-        if (pos != start) return pos
+        if (pos != start) {
+          goal.pos = pos
+          return pos
+        }
       }
     }
     // Can't do a precise one based on DOM positions, fall back to per-column
     let lineStart = view.state.doc.lineStartAt(start)
+    // FIXME also needs goal column?
     let col = countColumn(view.state.doc.slice(lineStart, start)[0], view.state.tabSize)
     if (dir < 0) {
       if (lineStart == 0) return 0
@@ -90,6 +100,14 @@ function findColumn(string: string, col: number, tabSize: number): number {
     n += code == 9 ? tabSize - (n % tabSize) : 1
   }
   return string.length
+}
+
+function getGoalColumn(view: EditorView, pos: number, column: number): {pos: number, column: number} {
+  for (let goal of view.inputState.goalColumns)
+    if (goal.pos == pos) return goal
+  let goal = {pos: 0, column}
+  view.inputState.goalColumns.push(goal)
+  return goal
 }
 
 // Search the DOM for the {node, offset} position closest to the given

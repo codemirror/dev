@@ -13,6 +13,8 @@ export class InputState {
   registeredEvents: string[] = []
   customHandlers!: {[key: string]: ((view: EditorView, event: Event) => boolean)[]}
 
+  goalColumns: {pos: number, column: number}[] = []
+
   setSelectionOrigin(origin: string) {
     this.lastSelectionOrigin = origin
     this.lastSelectionTime = Date.now()
@@ -36,7 +38,8 @@ export class InputState {
     if (document.activeElement == view.contentDOM) view.dom.classList.add("CodeMirror-focused")
   }
 
-  updateCustomHandlers(view: EditorView) {
+  setState(view: EditorView) {
+    this.goalColumns.length = 0
     this.customHandlers = customHandlers(view)
     for (let type in this.customHandlers) {
       if (this.registeredEvents.indexOf(type) < 0) {

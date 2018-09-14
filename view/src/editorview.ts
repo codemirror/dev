@@ -65,7 +65,7 @@ export class EditorView {
     this._state = state
     setTabSize(this.contentDOM, state.tabSize)
     this.createPluginViews(plugins)
-    this.inputState.updateCustomHandlers(this)
+    this.inputState.setState(this)
     this.docView.update(state)
   }
 
@@ -76,6 +76,8 @@ export class EditorView {
     let prevState = this._state
     this._state = state
     if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
+    if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
+      this.inputState.goalColumns.length = 0
     this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
   }
 

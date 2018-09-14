@@ -1,4 +1,4 @@
-import {EditorSelection, SelectionRange} from "../../state/src"
+import {EditorSelection, SelectionRange, MetaSlot} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
@@ -13,6 +13,7 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
     return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
+  if (granularity == "line") transaction = transaction.setMeta(MetaSlot.preserveGoalColumn, true)
   view.dispatch(transaction)
   return true
 }
@@ -32,6 +33,7 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
     return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
+  if (granularity == "line") transaction = transaction.setMeta(MetaSlot.preserveGoalColumn, true)
   view.dispatch(transaction)
   return true
 }
