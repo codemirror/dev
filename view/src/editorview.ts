@@ -27,6 +27,8 @@ export class EditorView {
 
   private scheduledDecoUpdate: number = -1
 
+  private updatingState: boolean = false
+
   constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
     this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
 
@@ -63,22 +65,25 @@ export class EditorView {
 
   setState(state: EditorState, ...plugins: PluginView[]) {
     this._state = state
-    setTabSize(this.contentDOM, state.tabSize)
-    this.createPluginViews(plugins)
-    this.inputState.setState(this)
-    this.docView.update(state)
+    this.withUpdating(() => {
+      setTabSize(this.contentDOM, state.tabSize)
+      this.createPluginViews(plugins)
+      this.inputState.setState(this)
+      this.docView.update(state)
+    })
   }
 
-  // FIXME arrange for an error to be raised when this is called recursively
   updateState(transactions: Transaction[], state: EditorState) {
     if (transactions.length && transactions[0].startState != this._state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
-    let prevState = this._state
-    this._state = state
-    if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
-    if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
-      this.inputState.goalColumns.length = 0
-    this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+    this.withUpdating(() => {
+      let prevState = this._state
+      this._state = state
+      if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
+      if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
+        this.inputState.goalColumns.length = 0
+      this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+    })
   }
 
   /** @internal */
@@ -98,6 +103,13 @@ export class EditorView {
       if (prop != null) return prop
     }
     return undefined
+  }
+
+  private withUpdating(f: () => void) {
+    if (this.updatingState) throw new Error("Recursive calls of EditorView.updateState or EditorView.setState are not allowed")
+    this.updatingState = true
+    try { f() }
+    finally { this.updatingState = false }
   }
 
   private createPluginViews(plugins: PluginView[]) {
