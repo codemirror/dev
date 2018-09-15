@@ -1,4 +1,4 @@
-import {EditorState, EditorSelection, Transaction} from "../state/src"
+import {EditorState, EditorSelection} from "../state/src"
 import {EditorView} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, undo} from "../history/src/history"
@@ -21,7 +21,7 @@ function crudeInsertNewlineAndIndent({state, dispatch}: EditorView): boolean {
 function crudeIndentLine({state, dispatch}: EditorView): boolean {
   let cursor = state.selection.primary.head // FIXME doesn't indent multiple lines
   let lineStart = state.doc.lineStartAt(cursor)
-  let line = state.doc.slice(lineStart, cursor + 100)
+  let line = state.doc.slice(lineStart, cursor + 100)[0]
   let space = /^ */.exec(line)[0].length // FIXME doesn't handle tabs
   let indentation = (mode as any).indentation(state, lineStart)
   if (indentation == -1) indentation = space
@@ -47,4 +47,3 @@ readFile("package.json", "utf8", (err, data) => {
 
 let view = (window as any).view = new EditorView(state)
 document.querySelector("#editor").appendChild(view.dom)
-

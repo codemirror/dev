@@ -38,7 +38,7 @@ export abstract class Text {
   }
   // @internal
   abstract replaceInner(from: number, to: number, text: ReadonlyArray<string>, length: number): Text
-    
+
   slice(from: number, to: number = this.length): ReadonlyArray<string> {
     return this.sliceTo(from, to, [""])
   }
