@@ -9,20 +9,20 @@ import {Decoration} from "../../view/src/decoration"
 import {StringStreamCursor} from "./stringstreamcursor"
 import {copyState, readToken, Mode} from "./util"
 
-class CachedState {
-  constructor(public state: any, public pos: number) {}
-  copy(mode: Mode<any>) { return new CachedState(copyState(mode, this.state), this.pos) }
+class CachedState<S> {
+  constructor(public state: S, public pos: number) {}
+  copy(mode: Mode<S>) { return new CachedState(copyState(mode, this.state), this.pos) }
 }
 
 const MAX_SCAN_DIST = 20000
 
-class StateCache {
-  constructor(private states: CachedState[], private frontier: number) {}
+class StateCache<S> {
+  constructor(private states: CachedState<S>[], private frontier: number) {}
 
-  getDecorations<S>(editorState: EditorState, from: number, to: number, mode: Mode<any>): Range<Decoration>[] {
+  getDecorations(editorState: EditorState, from: number, to: number, mode: Mode<S>): Range<Decoration>[] {
     let state = this.getState(editorState, from, mode)
     let cursor = new StringStreamCursor(editorState.doc, from, editorState.tabSize)
-    let states: CachedState[] = [], decorations: Range<Decoration>[] = [], stream = cursor.next()
+    let states: CachedState<S>[] = [], decorations: Range<Decoration>[] = [], stream = cursor.next()
     for (let i = 0, pos = from; pos < to;) {
       if (stream.eol()) {
         pos++
@@ -40,7 +40,7 @@ class StateCache {
     return decorations
   }
 
-  storeStates(from: number, to: number, states: CachedState[]) {
+  storeStates(from: number, to: number, states: CachedState<S>[]) {
     let start = this.findIndex(from), end = this.findIndex(to)
     this.states.splice(start, end - start, ...states)
     if (from < this.frontier) this.frontier = Math.max(this.frontier, to)
@@ -55,7 +55,7 @@ class StateCache {
     return i
   }
 
-  stateBefore(pos: number, mode: Mode<any>): {state: any, pos: number} {
+  stateBefore(pos: number, mode: Mode<S>): {state: S, pos: number} {
     if (pos > this.frontier && pos - this.frontier < MAX_SCAN_DIST) pos = this.frontier
     let index = this.findIndex(pos)
     if (index < this.states.length && this.states[index].pos == pos) index++
@@ -68,7 +68,7 @@ class StateCache {
     if (statePos < pos) {
       let cursor = new StringStreamCursor(editorState.doc, statePos, editorState.tabSize)
       let stream = cursor.next()
-      let start = statePos, i = 0, states: CachedState[] = []
+      let start = statePos, i = 0, states: CachedState<S>[] = []
       while (statePos < pos) {
         if (stream.eol()) {
           stream = cursor.next()
@@ -98,7 +98,7 @@ class StateCache {
 }
 
 export function legacyMode<S>(mode: Mode<S>) {
-  const field = new StateField<StateCache>({
+  const field = new StateField<StateCache<S>>({
     init(state: EditorState) { return new StateCache([], 0) },
     apply(tr, cache) { return cache.apply(tr) },
     debugName: "mode"
