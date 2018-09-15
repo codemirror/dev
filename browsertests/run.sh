@@ -1,5 +1,5 @@
 #!/bin/sh
-cd browsertests/editor/ && python -m SimpleHTTPServer &
+cd demo/ && python -m SimpleHTTPServer &
 httpserver=$!
 sleep 1
 

@@ -5,10 +5,10 @@ const driver = new Builder().forBrowser("chrome").build()
 const browser = process.env.SELENIUM_BROWSER || "chrome"
 const firefox = browser == "firefox"
 const tests = {
-  async setCursor(n: number) { return driver.executeScript(`tests.setCursor(${n})`) },
-  getSelection() { return driver.executeScript("return tests.getSelection()") },
-  setText(text: string) { return driver.executeScript(`return tests.setText(${JSON.stringify(text)})`) },
-  getText() { return driver.executeScript(`return tests.getText()`) }
+  async setCursor(n: number) { return driver.executeScript(`view.dispatch(view.state.transaction.setSelection(view.state.selection.constructor.single(${n})).scrollIntoView())`) },
+  getSelection() { return driver.executeScript("return view.state.selection") },
+  setText(text: string) { return driver.executeScript(`view.dispatch(view.state.transaction.replace(0, view.state.doc.length, ${JSON.stringify(text)}))`) },
+  getText() { return driver.executeScript(`return view.state.doc.toString()`) }
 }
 
 let cm = null
@@ -24,6 +24,7 @@ let pending = 0
 const forAllPositions = (onlyValid, f) => async function () {
   ++pending
   const cm = await getCm()
+  await tests.setText("one\nاِثْنَانِ\nthree\n".repeat(100))
   const run = async function(i) {
     const nonspacing = [5, 7, 9, 12].indexOf(i % 20) != -1
     if (nonspacing && onlyValid) return
