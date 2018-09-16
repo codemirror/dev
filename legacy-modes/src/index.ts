@@ -1,6 +1,3 @@
-// This is a temporary, simplified version of the mode plugin, which
-// handles huge documents better. Doesn't always highlight accurately.
-
 import {EditorView} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, Plugin, StateField, Transaction} from "../../state/src"
@@ -23,17 +20,15 @@ class StateCache<S> {
     let state = this.getState(editorState, from, mode)
     let cursor = new StringStreamCursor(editorState.doc, from, editorState.tabSize)
     let states: CachedState<S>[] = [], decorations: Range<Decoration>[] = [], stream = cursor.next()
-    for (let i = 0, pos = from; pos < to;) {
+    for (let i = 0; cursor.offset + stream.start < to;) {
       if (stream.eol()) {
-        pos++
         stream = cursor.next()
-        if (++i % 5 == 0) states.push(new CachedState(copyState(mode, state), pos))
+        if (++i % 5 == 0) states.push(new CachedState(copyState(mode, state), cursor.offset))
       } else {
-        let style = readToken(mode, stream, state), len = stream.pos - stream.start
+        let style = readToken(mode, stream, state)
         if (style)
-          decorations.push(Decoration.range(pos, pos + len, {class: 'cm-' + style.replace(/ /g, ' cm-')}))
+          decorations.push(Decoration.range(cursor.offset + stream.start, cursor.offset + stream.pos, {class: 'cm-' + style.replace(/ /g, ' cm-')}))
         stream.start = stream.pos
-        pos += len
       }
     }
     this.storeStates(from, to, states)
