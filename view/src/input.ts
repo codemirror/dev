@@ -108,7 +108,7 @@ handlers.keydown = (view, event: KeyboardEvent) => {
   view.inputState.setSelectionOrigin("keyboard")
 }
 
-handlers.mousedown = (view, event: MouseEvent) => {
+handlers.mousedown = handlers.mousemove = handlers.touchdown = handlers.touchmove = (view, event: MouseEvent) => {
   view.inputState.setSelectionOrigin("pointer")
 }
 
