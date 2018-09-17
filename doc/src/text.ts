@@ -39,11 +39,14 @@ export abstract class Text {
   // @internal
   abstract replaceInner(from: number, to: number, text: ReadonlyArray<string>, length: number): Text
 
-  slice(from: number, to: number = this.length): ReadonlyArray<string> {
+  sliceLines(from: number, to: number = this.length): ReadonlyArray<string> {
     return this.sliceTo(from, to, [""])
   }
   // @internal
   abstract sliceTo(from: number, to: number, target: string[]): string[]
+  slice(from: number, to: number = this.length, lineSeparator: string = "\n"): string {
+    return this.sliceLines(from, to).join(lineSeparator)
+  }
 
   eq(other: Text): boolean { return this == other || eqContent(this, other) }
 
@@ -60,7 +63,7 @@ export abstract class Text {
   // @internal
   abstract firstLineLength(): number
 
-  toString() { return this.slice(0, this.length).join("\n") }
+  toString() { return this.slice(0, this.length) }
 
   // @internal
   protected constructor() {}
@@ -178,7 +181,7 @@ class TextNode extends Text {
   replaceInner(from: number, to: number, text: ReadonlyArray<string>, length: number): Text {
     let lengthDiff = length - (to - from), newLength = this.length + lengthDiff
     if (newLength <= BASE_LEAF)
-      return new TextLeaf(appendText(this.slice(to), appendText(text, this.sliceTo(0, from, [""]))), newLength)
+      return new TextLeaf(appendText(this.sliceLines(to), appendText(text, this.sliceTo(0, from, [""]))), newLength)
 
     let children
     for (let i = 0, pos = 0; i < this.children.length; i++) {
@@ -278,7 +281,7 @@ class TextNode extends Text {
       if (n > line && n < end) return child.getLine(n - line + 1)
       line = end
     }
-    return this.slice(this.lineStart(n), n == this.lines ? this.length : this.lineStart(n + 1) - 1)[0]
+    return this.slice(this.lineStart(n), n == this.lines ? this.length : this.lineStart(n + 1) - 1)
   }
 
   decomposeStart(to: number, target: Text[]) {

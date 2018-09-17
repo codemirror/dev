@@ -158,7 +158,7 @@ export class WidgetView extends InlineView {
     let top: ContentView = this
     while (top.parent) top = top.parent
     let text: Text = (top as any).text, start = this.posAtStart
-    return text ? text.slice(start, start + this.length) : [""]
+    return text ? text.sliceLines(start, start + this.length) : [""]
   }
 
   domBoundsAround() { return null }

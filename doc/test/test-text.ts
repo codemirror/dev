@@ -76,7 +76,7 @@ describe("doc", () => {
     for (let i = 0; i < 400; i++) {
       let start = i == 0 ? 0 : Math.floor(Math.random() * doc.length)
       let end = i == 399 ? doc.length : start + Math.floor(Math.random() * (doc.length - start))
-      ist(doc.slice(start, end).join("\n"), str.slice(start, end))
+      ist(doc.slice(start, end), str.slice(start, end))
     }
   })
 

@@ -63,15 +63,15 @@ export function movePos(view: EditorView, start: number,
     // Can't do a precise one based on DOM positions, fall back to per-column
     let lineStart = view.state.doc.lineStartAt(start)
     // FIXME also needs goal column?
-    let col = countColumn(view.state.doc.slice(lineStart, start)[0], view.state.tabSize)
+    let col = countColumn(view.state.doc.slice(lineStart, start), view.state.tabSize)
     if (dir < 0) {
       if (lineStart == 0) return 0
       let prevLine = view.state.doc.lineStartAt(lineStart - 1)
-      return prevLine + findColumn(view.state.doc.slice(prevLine, lineStart - 1)[0], col, view.state.tabSize)
+      return prevLine + findColumn(view.state.doc.slice(prevLine, lineStart - 1), col, view.state.tabSize)
     } else {
       let lineEnd = view.state.doc.lineEndAt(start)
       if (lineEnd == view.state.doc.length) return lineEnd
-      let nextLine = view.state.doc.slice(lineEnd + 1, view.state.doc.lineEndAt(lineEnd + 1))[0]
+      let nextLine = view.state.doc.slice(lineEnd + 1, view.state.doc.lineEndAt(lineEnd + 1))
       return lineEnd + 1 + findColumn(nextLine, col, view.state.tabSize)
     }
   } else if (granularity == "word") {
@@ -85,7 +85,7 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: {line: LineVie
   if (context == null) {
     for (let pos = start;; pos += dir) {
       if (pos == 0 || pos == doc.length) return pos
-      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1))[0].charCodeAt(0))) {
+      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)).charCodeAt(0))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
       }

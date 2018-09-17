@@ -20,7 +20,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   }
   view.inputState.lastKeyCode = 0
 
-  let diff = findDiff(view.state.doc.slice(from, to).join(LINE_SEP), reader.text, preferredPos - from, preferredSide)
+  let diff = findDiff(view.state.doc.slice(from, to, LINE_SEP), reader.text, preferredPos - from, preferredSide)
   // Heuristic to notice typing over a selected character
   if (!diff && typeOver && !oldSel.empty && newSelection && newSelection.primary.empty)
     diff = {from: oldSel.from - from, toA: oldSel.to - from, toB: oldSel.to - from}

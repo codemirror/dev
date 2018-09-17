@@ -3,6 +3,8 @@ import {EditorSelection} from "../../state/src"
 import {EditorView} from "../src/"
 import ist from "ist"
 
+console.log(ist)
+
 function domText(view: EditorView) {
   let text = "", eol = false
   function scan(node: Node) {

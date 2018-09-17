@@ -468,7 +468,7 @@ class GapView extends ContentView {
   }
 
   get overrideDOMText() {
-    return this.parent ? (this.parent as DocView).text.slice(this.posAtStart, this.posAtEnd) : [""]
+    return this.parent ? (this.parent as DocView).text.sliceLines(this.posAtStart, this.posAtEnd) : [""]
   }
 
   domBoundsAround() { return null }

@@ -27,7 +27,7 @@ export class Change extends ChangeDesc {
   }
 
   invert(doc: Text): Change {
-    return new Change(this.from, this.from + this.length, doc.slice(this.from, this.to))
+    return new Change(this.from, this.from + this.length, doc.sliceLines(this.from, this.to))
   }
 
   apply(doc: Text): Text {
