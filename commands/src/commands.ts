@@ -3,9 +3,6 @@ import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
 
-// FIXME multiple cursors
-// FIXME meta properties
-
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "line" | "lineboundary"): boolean {
   let transaction = view.state.transaction.mapRanges(range => {
