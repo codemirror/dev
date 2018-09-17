@@ -44,7 +44,7 @@ const lines =  [
   [  [4, 13], [11, 12], 10,  8,  6, [4, 13]],
   [       14,       15, 16, 17, 18,      19]
 ]
-const getAllCoords = (pos) => {
+const getAllCoords = pos => {
   const ret = []
   for (let y = 0; y < lines.length; ++y)
     for (let x = 0; x < lines[y].length; ++x)
@@ -154,14 +154,30 @@ describe("builtin commands", () => {
   it("page up", !firefox && forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.PAGE_UP)
     const pos = (await tests.getSelection()).primary.anchor
-    if (pos > 0) ist(start % 20, pos % 20)
+    if (pos > 0) {
+      const startColumns = getAllCoords(start % 20).map(([y, x]) => x)
+      const resultCoords = getAllCoords(pos % 20)
+      let found = false
+      for (const column of startColumns)
+        for (const [y, x] of resultCoords)
+          if ((x == column) || (x < column && x == lines[y].length - 1)) found = true
+      ist(found)
+    }
     ist(pos <= Math.max(0, start - 200))
   }))
 
   it("page down", !firefox && forAllValidPositions(async function (cm, start) {
     await cm.sendKeys(Key.PAGE_DOWN)
     const pos = (await tests.getSelection()).primary.anchor
-    if (pos < 20*100) ist(start % 20, pos % 20)
+    if (pos < 20*100) {
+      const startColumns = getAllCoords(start % 20).map(([y, x]) => x)
+      const resultCoords = getAllCoords(pos % 20)
+      let found = false
+      for (const column of startColumns)
+        for (const [y, x] of resultCoords)
+          if ((x == column) || (x < column && x == lines[y].length - 1)) found = true
+      ist(found)
+    }
     ist(pos >= Math.min(20*100, start + 200))
   }))
 
