@@ -56,10 +56,10 @@ class StateCache<S> {
     return decorations
   }
 
-  storeStates(from: number, to: number, states: CachedState<S>[]) {
+  storeStates(from: number, to: number, states: ReadonlyArray<CachedState<S>>) {
     let start = this.findIndex(from), end = this.findIndex(to)
     this.states.splice(start, end - start, ...states)
-    if (from < this.frontier) this.frontier = Math.max(this.frontier, to)
+    if (from <= this.frontier) this.frontier = Math.max(this.frontier, to)
   }
 
   // Return the first index for which all cached states after it have
@@ -78,7 +78,7 @@ class StateCache<S> {
     return index == 0 ? new CachedState(mode.startState(), 0) : this.states[index - 1].copy(mode)
   }
 
-  getState(editorState: EditorState, pos: number, mode: Mode<any>): any {
+  getState(editorState: EditorState, pos: number, mode: Mode<S>): S {
     let {pos: statePos, state} = this.stateBefore(pos, mode)
     if (statePos < pos - MAX_SCAN_DIST) { statePos = pos; state = mode.startState() }
     if (statePos < pos) {
@@ -101,7 +101,7 @@ class StateCache<S> {
     return state
   }
 
-  apply(transaction: Transaction) {
+  apply(transaction: Transaction): StateCache<S> {
     if (transaction.changes.length == 0) return this
     let start = transaction.changes.changes.reduce((m, ch) => Math.min(m, ch.from), 1e9)
     let states = []
