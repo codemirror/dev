@@ -39,6 +39,7 @@
     "w3c-keyname": "^2.0.0"
   },
   "devDependencies": {
-    "benchtable": "^0.1.0"
+    "benchtable": "^0.1.0",
+    "rollup-plugin-node-resolve": "^3.4.0"
   }
 }
