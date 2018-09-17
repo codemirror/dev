@@ -14,7 +14,7 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
   })
   if (transaction.selection.eq(view.state.selection)) return false
   if (granularity == "line") transaction = transaction.setMeta(MetaSlot.preserveGoalColumn, true)
-  view.dispatch(transaction)
+  view.dispatch(transaction.scrollIntoView())
   return true
 }
 
@@ -34,7 +34,7 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
   })
   if (transaction.selection.eq(view.state.selection)) return false
   if (granularity == "line") transaction = transaction.setMeta(MetaSlot.preserveGoalColumn, true)
-  view.dispatch(transaction)
+  view.dispatch(transaction.scrollIntoView())
   return true
 }
 
