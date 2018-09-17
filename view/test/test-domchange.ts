@@ -128,5 +128,24 @@ describe("DOM changes", () => {
     ist(cm.state.doc.toString(), "xbcd")
   })
 
-  // FIXME test text node preservation (middle, start, end of node)
+  it("preserves text nodes when edited in the middle", () => {
+    let cm = tempEditor("abcd"), text = cm.domAtPos(1)!.node
+    text.textContent = "axxd"
+    flush(cm)
+    ist(cm.domAtPos(1)!.node, text)
+  })
+
+  it("preserves text nodes when edited at the start", () => {
+    let cm = tempEditor("abcd"), text = cm.domAtPos(1)!.node
+    text.textContent = "xxcd"
+    flush(cm)
+    ist(cm.domAtPos(1)!.node, text)
+  })
+
+  it("preserves text nodes when edited at the end", () => {
+    let cm = tempEditor("abcd"), text = cm.domAtPos(1)!.node
+    text.textContent = "abxx"
+    flush(cm)
+    ist(cm.domAtPos(1)!.node, text)
+  })
 })
