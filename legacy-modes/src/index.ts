@@ -13,10 +13,12 @@ class CachedState<S> {
 
 const MAX_SCAN_DIST = 20000
 
-class StateCache<S> {
-  constructor(private states: CachedState<S>[], private frontier: number) {}
+type DecoratedRange = Range<ReadonlyArray<Range<Decoration>>>
 
-  getDecorations(editorState: EditorState, from: number, to: number, mode: Mode<S>): Range<Decoration>[] {
+class StateCache<S> {
+  constructor(private states: CachedState<S>[], private frontier: number, private lastDecorations: null | DecoratedRange) {}
+
+  private calculateDecorations(editorState: EditorState, from: number, to: number, mode: Mode<S>): Range<Decoration>[] {
     let state = this.getState(editorState, from, mode)
     let cursor = new StringStreamCursor(editorState.doc, from, editorState.tabSize)
     let states: CachedState<S>[] = [], decorations: Range<Decoration>[] = [], stream = cursor.next()
@@ -32,6 +34,25 @@ class StateCache<S> {
       }
     }
     this.storeStates(from, to, states)
+    return decorations
+  }
+
+  getDecorations(editorState: EditorState, from: number, to: number, mode: Mode<S>): Range<Decoration>[] {
+    let upto = from, decorations: Range<Decoration>[] = []
+    if (this.lastDecorations) {
+      if (from < this.lastDecorations.from) {
+        upto = Math.min(to, this.lastDecorations.from)
+        decorations = this.calculateDecorations(editorState, from, upto, mode)
+      }
+      if (upto < to) {
+        upto = this.lastDecorations.to
+        decorations = decorations.concat(this.lastDecorations.value)
+      }
+    }
+    if (upto < to) {
+      decorations = decorations.concat(this.calculateDecorations(editorState, upto, to, mode))
+    }
+    this.lastDecorations = new Range(from, to, decorations)
     return decorations
   }
 
@@ -88,13 +109,14 @@ class StateCache<S> {
       let mapped = transaction.changes.mapPos(cached.pos, -1, true)
       if (mapped > 0) states.push(mapped == cached.pos ? cached : new CachedState(cached.state, mapped))
     }
-    return new StateCache(states, Math.min(start, this.frontier))
+    const lastDecorationsTill = transaction.doc.lineStartAt(start)
+    return new StateCache(states, Math.min(start, this.frontier), lastDecorationsTill <= this.lastDecorations.from ? null : new Range(this.lastDecorations.from, Math.min(lastDecorationsTill, this.lastDecorations.to), this.lastDecorations.value.filter(({from}) => from <= lastDecorationsTill)))
   }
 }
 
 export function legacyMode<S>(mode: Mode<S>) {
   const field = new StateField<StateCache<S>>({
-    init(state: EditorState) { return new StateCache([], 0) },
+    init(state: EditorState) { return new StateCache([], 0, null) },
     apply(tr, cache) { return cache.apply(tr) },
     debugName: "mode"
   })
