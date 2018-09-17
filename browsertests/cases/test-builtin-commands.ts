@@ -39,7 +39,7 @@ const forAllPositions = (onlyValid, f) => async function () {
 }
 const forAllValidPositions = f => forAllPositions(true, f)
 
-const lines =  [
+const lines = [
   [        0,        1,  2,  3],
   [  [4, 13], [11, 12], 10,  8,  6, [4, 13]],
   [       14,       15, 16, 17, 18,      19]
@@ -47,8 +47,10 @@ const lines =  [
 const getAllCoords = pos => {
   const ret = []
   for (let y = 0; y < lines.length; ++y)
-    for (let x = 0; x < lines[y].length; ++x)
-      if (lines[y][x] === pos || (Array.isArray(lines[y][x]) && lines[y][x].indexOf(pos) !== -1)) ret.push([y, x])
+    for (let x = 0; x < lines[y].length; ++x) {
+      const field = lines[y][x]
+      if (field === pos || (Array.isArray(field) && field.indexOf(pos) !== -1)) ret.push([y, x])
+    }
   return ret
 }
 
