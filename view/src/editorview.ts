@@ -195,6 +195,7 @@ function applySelectionChange(view: EditorView) {
   let selection = selectionFromDOM(view)
   if (!view.state.selection.eq(selection)) {
     let tr = view.state.transaction.setSelection(selection)
+    // FIXME this is a mess (won't work for drag, touch, or commands bound by keymaps). Find another approach
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
       tr = tr.setMeta(MetaSlot.origin, view.inputState.lastSelectionOrigin)
       if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()

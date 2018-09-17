@@ -1,5 +1,7 @@
 import {EditorView} from "./editorview"
 import {LineView} from "./lineview"
+import {TextView} from "./inlineview"
+import {Text as Doc} from "../../doc/src/text"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
 import browser from "./browser"
 
@@ -21,15 +23,15 @@ export function movePos(view: EditorView, start: number,
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
                         action: "move" | "extend"): number {
   let sel = getRoot(view.contentDOM).getSelection()
-  let context = view.docView.lineAround(start)
-  let dir = direction == "forward" || direction == "right" ? 1 : -1
+  let context = view.docView.lineContext(start)
+  let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
   // Can only query native behavior when Selection.modify is
   // supported, the cursor is well inside the rendered viewport, and
   // we're not doing by-line motion on Gecko (which will mess up goal
   // column motion)
-  if (sel.modify && context && !nearViewportEnd(view, context) && !(browser.gecko && granularity == "line")) {
+  if (sel.modify && context && !nearViewportEnd(view, context) &&
+      !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
     // FIXME work around unwanted DOM behavior (captureKeys + FF widget issues)
-    // FIXME firefox is dumb about goal columns when moving by line like this
     let startDOM = view.docView.domFromPos(start)!
     return view.docView.observer.withoutSelectionListening(() => {
       let equiv = isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset)
@@ -40,14 +42,12 @@ export function movePos(view: EditorView, start: number,
       return view.docView.posFromDOM(sel.focusNode, sel.focusOffset)
     })
   } else if (granularity == "character") {
-    // FIXME take collapsed regions and extending chars into account
-    return Math.max(0, Math.min(view.state.doc.length, start + dir))
+    return moveCharacterSimple(start, dir, context, view.state.doc)
   } else if (granularity == "lineboundary") {
     if (context) return context.start + (dir < 0 ? 0 : context.line.length)
     return dir < 0 ? view.state.doc.lineStartAt(start) : view.state.doc.lineEndAt(start)
   } else if (granularity == "line") {
     if (context && !nearViewportEnd(view, context, dir)) {
-      // FIXME goal column
       let startCoords = view.docView.coordsAt(start)!
       let goal = getGoalColumn(view, start, startCoords.left)
       // FIXME skip between-line widgets when implemented
@@ -75,9 +75,39 @@ export function movePos(view: EditorView, start: number,
       return lineEnd + 1 + findColumn(nextLine, col, view.state.tabSize)
     }
   } else if (granularity == "word") {
-    throw new RangeError("FIXME")
+    throw new Error("FIXME")
   } else {
     throw new RangeError("Invalid move granularity: " + granularity)
+  }
+}
+
+function moveCharacterSimple(start: number, dir: 1 | -1, context: {line: LineView, start: number} | null, doc: Doc): number {
+  if (context == null) {
+    for (let pos = start;; pos += dir) {
+      if (pos == 0 || pos == doc.length) return pos
+      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1))[0].charCodeAt(0))) {
+        if (dir < 0) return pos - 1
+        else if (pos != start) return pos
+      }
+    }
+  }
+  for (let {i, off} = context.line.childPos(start - context.start), {children} = context.line, pos = start;;) {
+    if (off == (dir < 0 || i == children.length ? 0 : children[i].length)) {
+      i += dir
+      if (i < 0 || i >= children.length) // End/start of line
+        return Math.max(0, Math.min(doc.length, pos + (start == pos ? dir : 0)))
+      off = dir < 0 ? children[i].length : 0
+    }
+    let inline = children[i]
+    if (inline instanceof TextView) {
+      if (!isExtendingChar(inline.text.charCodeAt(off - (dir < 0 ? 1 : 0)))) {
+        if (dir < 0) return pos - 1
+        else if (pos != start) return pos
+      }
+      off += dir; pos += dir
+    } else if (inline.length > 0) {
+      return pos - off + (dir < 0 ? 0 : inline.length)
+    }
   }
 }
 
@@ -90,6 +120,8 @@ function countColumn(string: string, tabSize: number): number {
   }
   return n
 }
+
+// FIXME move somewhere reasonable, export
 
 function findColumn(string: string, col: number, tabSize: number): number {
   let n = 0
@@ -108,6 +140,13 @@ function getGoalColumn(view: EditorView, pos: number, column: number): {pos: num
   let goal = {pos: 0, column}
   view.inputState.goalColumns.push(goal)
   return goal
+}
+
+let extendingChars = /[\u0300\u036f\u0483\u0489\u0591\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7\u0610\u061a\u064b\u065e\u0670\u06d6\u06dc\u06de\u06e4\u06e7\u06e8\u06ea\u06ed\u0711\u0730\u074a\u0b82\u0bbe\u0bc0\u0bcd\u0bd7\u0d3e\u0d41\u0d44\u0d4d\u0d57\u0d62\u0d63\u0e31\u0e34\u0e3a\u0e47\u0e4e\u0eb1\u0eb4\u0eb9\u0ebb\u0ebc\u0ec8\u0ecd\u180b\u180d\u18a9\u200c\u200d]/
+try { extendingChars = new RegExp("\\p{Grapheme_Extend}", "u") } catch (_) {}
+
+function isExtendingChar(code: number): boolean {
+  return code >= 768 && (code >= 0xdc00 && code < 0xe000 || extendingChars.test(String.fromCharCode(code)))
 }
 
 // Search the DOM for the {node, offset} position closest to the given
@@ -194,7 +233,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): n
 
   // No luck, do our own (potentially expensive) expensive search
   if (!node) {
-    let {line} = view.docView.lineAround(lineStart)!
+    let {line} = view.docView.lineContext(lineStart)!
     ;({node, offset} = domPosAtCoords(line.dom, x, y))
   }
   return view.docView.posFromDOM(node, offset)

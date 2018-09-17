@@ -144,6 +144,10 @@ export abstract class ContentView {
 
   ignoreMutation(rec: MutationRecord): boolean { return false }
   ignoreEvent(event: Event): boolean { return false }
+
+  childPos(pos: number, bias: number = 1): {i: number, off: number} {
+    return new ChildCursor(this.children, this.length, this.childGap).findPos(pos, bias)
+  }
 }
 
 // Remove a DOM node and return its next sibling.
