@@ -29,7 +29,7 @@ export function movePos(view: EditorView, start: number,
   // supported, the cursor is well inside the rendered viewport, and
   // we're not doing by-line motion on Gecko (which will mess up goal
   // column motion)
-  if (sel.modify && context && !nearViewportEnd(view, context) &&
+  if (sel.modify && context && !nearViewportEnd(view, context) && view.hasFocus() &&
       !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
     // FIXME work around unwanted DOM behavior (captureKeys + FF widget issues)
     let startDOM = view.docView.domFromPos(start)!

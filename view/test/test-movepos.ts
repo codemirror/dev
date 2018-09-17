@@ -31,4 +31,14 @@ describe("EditorView.movePos", () => {
       }
     }
   })
+
+  it("does the right thing for character motion when not focused", () => {
+    let cm = tempEditor("ao\u030c\u0318a\u030b\u0319x\n\n")
+    cm.contentDOM.blur()
+    let order = [0, 1, 4, 7, 8, 9, 10]
+    for (let i = 0; i < order.length; i++)
+      ist(cm.movePos(order[i], "right", "character"), order[Math.min(order.length - 1, i + 1)])
+    for (let i = order.length - 1; i >= 0; i--)
+      ist(cm.movePos(order[i], "left", "character"), order[Math.max(0, i - 1)])
+  })
 })
