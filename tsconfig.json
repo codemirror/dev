@@ -8,5 +8,5 @@
     "target": "es5",
     "newLine": "lf"
   },
-  "include": ["*/src/*.ts", "*/test/*.ts"]
+  "include": ["*/src/*.ts", "*/test/*.ts", "browsertests/cases/*.ts"]
 }

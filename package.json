@@ -28,6 +28,7 @@
   "license": "MIT",
   "dependencies": {
     "@types/mocha": "^5.2.0",
+    "@types/selenium-webdriver": "^3.0.10",
     "ist": "^1.1.1",
     "mocha": "^5.1.1",
     "rollup": "^0.64.1",
