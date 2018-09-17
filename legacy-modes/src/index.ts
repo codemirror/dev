@@ -13,7 +13,7 @@ class CachedState<S> {
 
 const MAX_SCAN_DIST = 20000
 
-type DecoratedRange = Range<ReadonlyArray<Range<Decoration>>>
+type DecoratedRange = {from: number, to: number, decorations: ReadonlyArray<Range<Decoration>>}
 
 class StateCache<S> {
   constructor(private states: CachedState<S>[], private frontier: number, private lastDecorations: null | DecoratedRange) {}
@@ -46,13 +46,13 @@ class StateCache<S> {
       }
       if (upto < to) {
         upto = this.lastDecorations.to
-        decorations = decorations.concat(this.lastDecorations.value)
+        decorations = decorations.concat(this.lastDecorations.decorations)
       }
     }
     if (upto < to) {
       decorations = decorations.concat(this.calculateDecorations(editorState, upto, to, mode))
     }
-    this.lastDecorations = new Range(from, to, decorations)
+    this.lastDecorations = {from, to, decorations}
     return decorations
   }
 
@@ -110,7 +110,7 @@ class StateCache<S> {
       if (mapped > 0) states.push(mapped == cached.pos ? cached : new CachedState(cached.state, mapped))
     }
     const lastDecorationsTill = transaction.doc.lineStartAt(start)
-    return new StateCache(states, Math.min(start, this.frontier), lastDecorationsTill <= this.lastDecorations.from ? null : new Range(this.lastDecorations.from, Math.min(lastDecorationsTill, this.lastDecorations.to), this.lastDecorations.value.filter(({from}) => from <= lastDecorationsTill)))
+    return new StateCache(states, Math.min(start, this.frontier), (!this.lastDecorations || lastDecorationsTill <= this.lastDecorations.from) ? null : {from: this.lastDecorations.from, to: Math.min(lastDecorationsTill, this.lastDecorations.to), decorations: this.lastDecorations.decorations.filter(({from}) => from <= lastDecorationsTill)})
   }
 }
 

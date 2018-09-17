@@ -26,5 +26,5 @@ export interface Mode<S> {
   startState: () => S
   copyState?: (state: S) => S
   name: string
-  indent(state: S, textAfter: string): number
+  indent?: (state: S, textAfter: string) => number
 }

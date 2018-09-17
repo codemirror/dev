@@ -1,16 +1,18 @@
-import {Text} from "../../doc/src/text"
-import {EditorState} from "../../state/src/state"
-import {Decoration} from "../../view/src/decoration"
+import {EditorState, Transaction} from "../../state/src"
+import {RangeDecoration} from "../../view/src/decoration"
 import {Range} from "../../rangeset/src/rangeset"
 
-import {Mode} from "../src/misc"
+import {Mode} from "../src/util"
 import {legacyMode} from "../src/"
 
 const ist = require("ist")
 
+type Viewport = {from: number, to: number}
+
 function getModeTest(doc: string) {
-  const calls = []
-  const mode = {
+  const calls: number[] = []
+  const mode: Mode<{pos: number}> = {
+    name: "testmode",
     startState() {
       return {pos: 0}
     },
@@ -21,22 +23,22 @@ function getModeTest(doc: string) {
     }
   }
   const plugin = legacyMode(mode)
-  const view = {state: EditorState.create({doc, plugins: [plugin]})}
+  const view: {state: EditorState, viewport?: Viewport} = {state: EditorState.create({doc, plugins: [plugin]})}
   const viewPlugin = plugin.view(view)
 
   return {
     calls,
-    getDecorations(vp) {
+    getDecorations(vp: Viewport) {
       view.viewport = vp
       viewPlugin.updateViewport(view)
-      const decorations = []
+      const decorations: Range<RangeDecoration>[] = []
       viewPlugin.decorations.collect(decorations)
       return decorations
     },
     get transaction() {
       return view.state.transaction
     },
-    apply(transaction, {from, to}) {
+    apply(transaction: Transaction, {from, to}: Viewport) {
       view.state = transaction.apply()
       view.viewport = {from, to}
       viewPlugin.updateState(view, view.state, [transaction])
@@ -73,7 +75,7 @@ describe("legacyMode", () => {
     ist(modeTest.calls.length, 2)
   })
   it("re-uses previously-rendered decorations", () => {
-    const modeTest = getModeTest((new Array(26)).fill().map((_, i) => String.fromCharCode(97 + i) + "\n").join(""))
+    const modeTest = getModeTest((new Array(26)).fill("").map((_: string, i: number) => String.fromCharCode(97 + i) + "\n").join(""))
     const decorations = modeTest.getDecorations({from: 0, to: 10*2})
 
     ist(decorations.length, 10)
