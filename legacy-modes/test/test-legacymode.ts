@@ -15,6 +15,7 @@ function getModeTest(doc: string) {
       return {pos: 0}
     },
     token(stream, state) {
+      stream.next()
       calls.push(state.pos)
       return String(++state.pos)
     }
