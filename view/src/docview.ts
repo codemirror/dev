@@ -284,6 +284,10 @@ export class DocView extends ContentView {
     this.observer.withoutSelectionListening(() => this.updateSelection(true))
   }
 
+  forceLayout() {
+    if (this.layoutCheckScheduled > -1) this.checkLayout()
+  }
+
   checkLayout(forceFull = false) {
     cancelAnimationFrame(this.layoutCheckScheduled)
     this.layoutCheckScheduled = -1

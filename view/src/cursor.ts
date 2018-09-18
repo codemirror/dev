@@ -216,7 +216,7 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
 
 export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): number {
   let content = view.contentDOM.getBoundingClientRect()
-  let lineStart = view.docView.posAtHeight(y - content.top, -1)
+  let lineStart = view.posAtHeight(y - content.top, false)
   // If this is outside of the rendered viewport, we can't determine a position 
   if (lineStart < view.viewport.from)
     return view.viewport.from == 0 ? 0 : -1 // FIXME lineStart(0) to account for bidi?

@@ -1,4 +1,5 @@
 import {tempEditor, requireFocus} from "./temp-editor"
+import {EditorSelection} from "../../state/src"
 import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)
@@ -40,5 +41,31 @@ describe("EditorView.movePos", () => {
       ist(cm.movePos(order[i], "right", "character"), order[Math.min(order.length - 1, i + 1)])
     for (let i = order.length - 1; i >= 0; i--)
       ist(cm.movePos(order[i], "left", "character"), order[Math.max(0, i - 1)])
+  })
+
+  function testLineMotion(focus: boolean) {
+    let cm = tempEditor("one two\nthree\nتممين")
+    if (focus) cm.focus()
+    else cm.contentDOM.blur()
+    ist(cm.movePos(0, "forward", "line"), 8)
+    ist(cm.movePos(1, "forward", "line"), 9)
+    ist(cm.movePos(7, "forward", "line"), 13)
+    let last = cm.movePos(10, "forward", "line")
+    ist(last, 19, "<")
+    ist(last, 14, ">")
+    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1))) // Clear goal columns
+    ist(cm.movePos(last, "backward", "line"), 10)
+    ist(cm.movePos(12, "backward", "line"), 4)
+    ist(cm.movePos(13, "backward", "line"), 5)
+    ist(cm.movePos(8, "backward", "line"), 0)
+  }
+
+  it("properly handles line motion when focused", () => {
+    requireFocus()
+    testLineMotion(true)
+  })
+
+  it("properly handles line motion when not focused", () => {
+    testLineMotion(false)
   })
 })

@@ -130,10 +130,12 @@ export class EditorView {
   }
 
   heightAtPos(pos: number, top: boolean): number {
+    this.docView.forceLayout()
     return this.docView.heightAt(pos, top ? -1 : 1)
   }
 
   posAtHeight(height: number, top: boolean): number {
+    this.docView.forceLayout()
     return this.docView.posAtHeight(height, top ? -1 : 1)
   }
 
@@ -147,7 +149,10 @@ export class EditorView {
     return movePos(this, start, direction, granularity, action)
   }
 
-  posAtCoords(coords: {x: number, y: number}): number { return posAtCoords(this, coords) }
+  posAtCoords(coords: {x: number, y: number}): number {
+    this.docView.forceLayout()
+    return posAtCoords(this, coords)
+  }
 
   coordsAtPos(pos: number): Rect | null { return this.docView.coordsAt(pos) }
 
