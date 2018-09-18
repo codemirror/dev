@@ -1,5 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
+import {EditorSelection, Plugin} from "../../state/src"
+import {Decoration, WidgetType, EditorView} from "../src"
 import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)
@@ -67,6 +68,34 @@ describe("EditorView.movePos", () => {
 
   it("properly handles line motion when not focused", () => {
     testLineMotion(false)
+  })
+
+  class OWidget extends WidgetType<void> {
+    toDOM() {
+      let node = document.createElement("span")
+      node.textContent = "ø"
+      return node
+    }
+  }
+
+  const oWidgets = new Plugin({
+    view: (view: EditorView) => {
+      let doc = view.state.doc.toString(), deco = []
+      for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
+        deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
+      return {decorations: Decoration.set(deco)}
+    }
+  })
+
+  it("can handle line motion around widgets when not focused", () => {
+    let cm = tempEditor("hey\nooh\naah", [oWidgets])
+    cm.contentDOM.blur()
+    ist(cm.movePos(0, "forward", "line"), 4)
+    ist(cm.movePos(1, "forward", "line"), 5)
+    ist(cm.movePos(2, "forward", "line"), 6)
+    ist(cm.movePos(8, "backward", "line"), 4)
+    ist(cm.movePos(9, "backward", "line"), 5)
+    ist(cm.movePos(10, "backward", "line"), 6)
   })
 
   function testLineBoundaryMotion(focus: boolean) {

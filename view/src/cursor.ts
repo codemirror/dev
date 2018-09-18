@@ -183,8 +183,10 @@ function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node,
         offset = childIndex + 1
     }
   }
-  if (closest && closest.nodeType == 3) return domPosInText(closest as Text, xClosest, y)
-  if (!closest || (dxClosest && closest.nodeType == 1)) return {node: parent, offset}
+  if (closest && closest.nodeType == 3)
+    return domPosInText(closest as Text, xClosest, y)
+  if (!closest || (closest as HTMLElement).contentEditable == "false" || (dxClosest && closest.nodeType == 1))
+    return {node: parent, offset}
   return domPosAtCoords(closest as HTMLElement, xClosest, y)
 }
 
@@ -228,9 +230,8 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): n
 
   // There's visible editor content under the point, so we can try
   // using caret(Position|Range)FromPoint as a shortcut
-  // FIXME this also suffers from the browser's bad cursor decisions around widgets
   let node: Node | undefined, offset: number = -1
-  if (element && view.contentDOM.contains(element) && false) {
+  if (element && view.contentDOM.contains(element)) {
     if (root.caretPositionFromPoint) {
       let pos = root.caretPositionFromPoint(x, y)
       if (pos) ({offsetNode: node, offset} = pos)
