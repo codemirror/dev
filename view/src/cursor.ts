@@ -1,4 +1,5 @@
 import {EditorView} from "./editorview"
+import {DocView} from "./docview"
 import {LineView} from "./lineview"
 import {TextView} from "./inlineview"
 import {Text as Doc} from "../../doc/src/text"
@@ -10,7 +11,7 @@ declare global {
   interface Document { caretPositionFromPoint(x: number, y: number): {offsetNode: Node, offset: number} }
 }
 
-function nearViewportEnd(view: EditorView, context: {line: LineView, start: number}, side: number = 0): boolean {
+function nearViewportEnd(view: EditorView, context: LineContext, side: number = 0): boolean {
   for (let {from, to} of view.docView.viewports)
     if (from > 0 && from == context.start && side <= 0 ||
         to < view.state.doc.length && to == context.start + context.line.length && side >= 0)
@@ -23,7 +24,7 @@ export function movePos(view: EditorView, start: number,
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
                         action: "move" | "extend"): number {
   let sel = getRoot(view.contentDOM).getSelection()
-  let context = view.docView.lineContext(start)
+  let context = LineContext.get(view.docView, start)
   let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
   // Can only query native behavior when Selection.modify is
   // supported, the cursor is well inside the rendered viewport, and
@@ -83,7 +84,7 @@ export function movePos(view: EditorView, start: number,
   }
 }
 
-function moveCharacterSimple(start: number, dir: 1 | -1, context: {line: LineView, start: number} | null, doc: Doc): number {
+function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | null, doc: Doc): number {
   if (context == null) {
     for (let pos = start;; pos += dir) {
       if (pos == 0 || pos == doc.length) return pos
@@ -150,6 +151,33 @@ try { extendingChars = new RegExp("\\p{Grapheme_Extend}", "u") } catch (_) {}
 function isExtendingChar(code: number): boolean {
   return code >= 768 && (code >= 0xdc00 && code < 0xe000 || extendingChars.test(String.fromCharCode(code)))
 }
+
+class LineContext {
+  constructor(public line: LineView, public start: number, public index: number) {}
+
+  static get(docView: DocView, pos: number): LineContext | null {
+    for (let i = 0, off = 0;; i++) {
+      let line = docView.children[i], end = off + line.length
+      if (end >= pos)
+        return line instanceof LineView ? new LineContext(line, off, i) : null
+      off = end + 1
+    }
+  }
+
+  get prev(): LineContext | null {
+    if (this.index == 0) return null
+    let prev = this.line.parent!.children[this.index - 1]
+    return prev instanceof LineView ? new LineContext(prev, this.start - prev.length - 1, this.index - 1) : null
+  }
+
+  get next(): LineContext | null {
+    if (this.index == this.line.parent!.children.length - 1) return null
+    let next = this.line.parent!.children[this.index + 1]
+    return next instanceof LineView ? new LineContext(next, this.start + this.line.length + 1, this.index + 1) : null
+  }
+}
+
+
 
 // Search the DOM for the {node, offset} position closest to the given
 // coordinates. Very inefficient and crude, but can usually be avoided
@@ -245,7 +273,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): n
 
   // No luck, do our own (potentially expensive) expensive search
   if (!node) {
-    let {line} = view.docView.lineContext(lineStart)!
+    let {line} = LineContext.get(view.docView, lineStart)!
     ;({node, offset} = domPosAtCoords(line.dom, x, y))
   }
   return view.docView.posFromDOM(node, offset)
