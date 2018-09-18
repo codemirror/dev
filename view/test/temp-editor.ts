@@ -1,9 +1,10 @@
 import {EditorView} from "../src"
 import {EditorState, Plugin} from "../../state/src"
 
-const workspace = document.querySelector("#workspace")
+const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElement
 
 let tempView: EditorView | null = null
+let hide: any = null
 
 export function tempEditor(doc = "", plugins: Plugin[] = []): EditorView {
   if (tempView) {
@@ -12,7 +13,12 @@ export function tempEditor(doc = "", plugins: Plugin[] = []): EditorView {
   }
 
   tempView = new EditorView(EditorState.create({doc, plugins}))
-  workspace!.appendChild(tempView.dom)
+  workspace.appendChild(tempView.dom)
+  workspace.style.pointerEvents = ""
+  if (hide == null) hide = setTimeout(() => {
+    hide = null
+    workspace.style.pointerEvents = "none"
+  }, 100)
   return tempView
 }
 
