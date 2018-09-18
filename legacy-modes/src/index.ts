@@ -171,7 +171,7 @@ export function legacyMode<S>(mode: Mode<S>) {
   ;(plugin as any).indentation = function(state: EditorState, pos: number): number {
     if (!mode.indent) return -1
     let modeState = state.getField(field)!.getState(state, pos, mode)
-    return mode.indent(modeState, state.doc.slice(pos, state.doc.lineEndAt(pos)).match(/^\s*(.*)/)![1])
+    return mode.indent(modeState, state.doc.getLine(state.doc.linePos(pos).line).match(/^\s*(.*)/)![1])
   }
 
   return plugin

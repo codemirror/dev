@@ -61,17 +61,19 @@ export function movePos(view: EditorView, start: number,
       }
     }
     // Can't do a precise one based on DOM positions, fall back to per-column
-    let lineStart = view.state.doc.lineStartAt(start)
+    let linePos = view.state.doc.linePos(start)
+    let lineStart = start - linePos.col
+    let line = view.state.doc.getLine(linePos.line)
     // FIXME also needs goal column?
-    let col = countColumn(view.state.doc.slice(lineStart, start), view.state.tabSize)
+    let col = countColumn(line, view.state.tabSize)
     if (dir < 0) {
-      if (lineStart == 0) return 0
-      let prevLine = view.state.doc.lineStartAt(lineStart - 1)
-      return prevLine + findColumn(view.state.doc.slice(prevLine, lineStart - 1), col, view.state.tabSize)
+      if (linePos.line == 0) return 0
+      let prevLine = view.state.doc.getLine(linePos.line - 1)
+      return lineStart - 1 - prevLine.length + findColumn(prevLine, col, view.state.tabSize)
     } else {
-      let lineEnd = view.state.doc.lineEndAt(start)
+      let lineEnd = lineStart + line.length
       if (lineEnd == view.state.doc.length) return lineEnd
-      let nextLine = view.state.doc.slice(lineEnd + 1, view.state.doc.lineEndAt(lineEnd + 1))
+      let nextLine = view.state.doc.getLine(linePos.line + 1)
       return lineEnd + 1 + findColumn(nextLine, col, view.state.tabSize)
     }
   } else if (granularity == "word") {
