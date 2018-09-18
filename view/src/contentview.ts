@@ -1,4 +1,4 @@
-import {Rect} from "./dom"
+import {Rect, maxOffset} from "./dom"
 
 declare global {
   interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
@@ -81,7 +81,7 @@ export abstract class ContentView {
     if (node == this.dom) {
       after = this.dom.childNodes[offset]
     } else {
-      let bias = !node.firstChild ? 0 : offset == 0 ? -1 : 1
+      let bias = maxOffset(node) == 0 ? 0 : offset == 0 ? -1 : 1
       for (;;) {
         let parent = node.parentNode!
         if (parent == this.dom) break
@@ -94,6 +94,7 @@ export abstract class ContentView {
       if (bias < 0) after = node
       else after = node.nextSibling
     }
+    if (after == this.dom.firstChild) return 0
     while (after && !after.cmView) after = after.nextSibling
     if (!after) return this.length
 
