@@ -68,4 +68,25 @@ describe("EditorView.movePos", () => {
   it("properly handles line motion when not focused", () => {
     testLineMotion(false)
   })
+
+  function testLineBoundaryMotion(focus: boolean) {
+    let cm = tempEditor("\none two\n")
+    if (focus) cm.focus()
+    else cm.contentDOM.blur()
+    ist(cm.movePos(1, "left", "lineboundary"), 1)
+    ist(cm.movePos(5, "left", "lineboundary"), 1)
+    ist(cm.movePos(8, "left", "lineboundary"), 1)
+    ist(cm.movePos(1, "right", "lineboundary"), 8)
+    ist(cm.movePos(5, "right", "lineboundary"), 8)
+    ist(cm.movePos(8, "right", "lineboundary"), 8)
+  }
+
+  it("properly handles line-boundary motion when focused", () => {
+    requireFocus()
+    testLineBoundaryMotion(true)
+  })
+
+  it("properly handles line-boundary motion when not focused", () => {
+    testLineBoundaryMotion(false)
+  })
 })
