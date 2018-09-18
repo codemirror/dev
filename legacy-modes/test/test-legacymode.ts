@@ -23,7 +23,10 @@ function getModeTest(doc: string) {
     }
   }
   const plugin = legacyMode(mode)
-  const view: {state: EditorState, viewport?: Viewport} = {state: EditorState.create({doc, plugins: [plugin]})}
+  const view: {state: EditorState, viewport?: Viewport, decorationUpdate: () => void} = {
+    state: EditorState.create({doc, plugins: [plugin]}),
+    decorationUpdate() {}
+  }
   const viewPlugin = plugin.view(view)
 
   return {
@@ -84,5 +87,20 @@ describe("legacyMode", () => {
     ist(modeTest.calls.length, 20)
     modeTest.getDecorations({from: 0, to: 10*2})
     ist(modeTest.calls.length, 28)
+  })
+  it("updates frontier in the background", async function() {
+    const modeTest = getModeTest("abcdefghi\n".repeat(2500))
+    ist(modeTest.getDecorations({from: 0, to: 10}).length, 9)
+    ist(modeTest.calls.length, 9)
+    ist(modeTest.getDecorations({from: 24000, to: 24010}).length, 9)
+    ist(modeTest.calls.length, 9 + 9)
+    return new Promise(resolve => setTimeout(() => {
+      ist(modeTest.calls.length, (10 // Render (0, 10)
+                                + 10 // Optimistic render (24000, 24010)
+                                + (10010 - 0) + (20010 - 10010) + (24000 - 20000) // Background frontier updating
+                                + (24000 - 23990) + 10 // getState + second render (24000, 24010)
+                                 ) * 0.9)
+      resolve()
+    }, 150))
   })
 })

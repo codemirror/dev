@@ -16,7 +16,28 @@ const MAX_SCAN_DIST = 20000
 type DecoratedRange = {from: number, to: number, decorations: ReadonlyArray<Range<Decoration>>}
 
 class StateCache<S> {
+  private timeout?: number | NodeJS.Timer
+
   constructor(private states: CachedState<S>[], private frontier: number, private lastDecorations: null | DecoratedRange) {}
+
+  advanceFrontier(editorState: EditorState, to: number, mode: Mode<S>): Promise<void> {
+    if (this.frontier >= to) return Promise.reject()
+    clearTimeout(this.timeout as any)
+    return new Promise((resolve, reject) => {
+      const f = () => {
+        const endTime = +new Date + 100
+        do {
+          const target = Math.min(to, this.frontier + MAX_SCAN_DIST / 2)
+          // If we are going to advance the frontier to lastDecorations, clear it
+          if (this.lastDecorations && (this.frontier < this.lastDecorations.from && this.lastDecorations.from <= target)) this.lastDecorations = null
+          this.getState(editorState, target, mode)
+          if (this.frontier >= to) return resolve()
+        } while (+new Date < endTime)
+        this.timeout = setTimeout(f, 100)
+      }
+      this.timeout = setTimeout(f, 100)
+    })
+  }
 
   private calculateDecorations(editorState: EditorState, from: number, to: number, mode: Mode<S>): Range<Decoration>[] {
     let state = this.getState(editorState, from, mode)
@@ -129,7 +150,12 @@ export function legacyMode<S>(mode: Mode<S>) {
         let vp = v.viewport
         if (force || vp.from < from || vp.to > to) {
           ;({from, to} = vp)
-          decorations = Decoration.set(v.state.getField(field)!.getDecorations(v.state, from, to, mode))
+          const stateCache = v.state.getField(field)!
+          decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
+          stateCache.advanceFrontier(v.state, from, mode).then(() => {
+            update(v, true)
+            v.decorationUpdate()
+          }, () => {})
         }
       }
       return {
