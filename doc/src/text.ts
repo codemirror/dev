@@ -44,8 +44,8 @@ export abstract class Text {
   }
   // @internal
   abstract sliceTo(from: number, to: number, target: string[]): string[]
-  slice(from: number, to: number = this.length, lineSeparator: string = "\n"): string {
-    return this.sliceLines(from, to).join(lineSeparator)
+  slice(from: number, to?: number, lineSeparator?: string): string {
+    return joinLines(this.sliceLines(from, to), lineSeparator)
   }
 
   eq(other: Text): boolean { return this == other || eqContent(this, other) }
@@ -78,6 +78,10 @@ export abstract class Text {
 
 export function splitLines(text: string, lineSeparator: string | RegExp = DEFAULT_SPLIT): string[] {
   return text.split(lineSeparator)
+}
+
+export function joinLines(text: ReadonlyArray<string>, lineSeparator: string = "\n"): string {
+  return text.join(lineSeparator)
 }
 
 const DEFAULT_SPLIT = /\r\n?|\n/

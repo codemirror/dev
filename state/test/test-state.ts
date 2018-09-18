@@ -29,7 +29,7 @@ describe("EditorState", () => {
     let tr = EditorState.create({doc: "foo"}).transaction.setMeta(someMeta, 55)
     ist(tr.getMeta(someMeta), 55)
   })
-  
+
   it("throws when a change's bounds are invalid", () => {
     let state = EditorState.create({doc: "1234"})
     ist.throws(() => state.transaction.replace(-1, 1, ""))
@@ -47,11 +47,12 @@ describe("EditorState", () => {
 
   it("stores and updates the line separator", () => {
     let deflt = EditorState.create({}), crlf = EditorState.create({lineSeparator: "\r\n"})
-    ist(deflt.lineSeparator, "\n")
+    ist(deflt.joinLines(["a", "b"]), "a\nb")
     ist(deflt.splitLines("foo\rbar").length, 2)
-    ist(crlf.lineSeparator, "\r\n")
+    ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
     let updated = crlf.transaction.setMeta(MetaSlot.changeLineSeparator, "\n").apply()
-    ist(updated.lineSeparator, "\n")
+    ist(updated.joinLines(["a", "b"]), "a\nb")
+    ist(updated.splitLines("foo\nbar").length, 2)
   })
 })

@@ -144,7 +144,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
   if (range.empty) return
 
   let data = brokenClipboardAPI ? null : event.clipboardData
-  let text = view.state.doc.slice(range.from, range.to, view.state.lineSeparator)
+  let text = view.state.joinLines(view.state.doc.sliceLines(range.from, range.to))
   if (data) {
     event.preventDefault()
     data.clearData()

@@ -1,4 +1,4 @@
-import {splitLines, Text} from "../../doc/src/text"
+import {joinLines, splitLines, Text} from "../../doc/src/text"
 import {EditorSelection} from "./selection"
 import {Plugin, StateField} from "./plugin"
 import {Transaction, MetaSlot} from "./transaction"
@@ -76,9 +76,7 @@ export class EditorState {
 
   get tabSize(): number { return this.config.tabSize }
 
-  get lineSeparator(): string { return this.config.lineSeparator || "\n" }
-
-  // FIXME move somewhere else?
+  joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.config.lineSeparator || undefined) }
   splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
 
   static create(config: EditorStateConfig = {}): EditorState {
