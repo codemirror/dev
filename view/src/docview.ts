@@ -17,7 +17,7 @@ export class DocView extends ContentView {
   viewports: Viewport[] = []
   publicViewport: EditorViewport
 
-  text: Text = Text.of("")
+  text: Text = Text.of([""])
   decorations: A<DecorationSet> = []
   selection: EditorSelection = EditorSelection.default
   drawnSelection: DOMSelection = new DOMSelection

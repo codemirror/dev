@@ -79,15 +79,19 @@ export class EditorState {
   get lineSeparator(): string { return this.config.lineSeparator || "\n" }
 
   // FIXME move somewhere else?
-  splitLines(text: string): string[] { return text.split(this.config.lineSeparator || DEFAULT_SPLIT) }
+  splitLines(text: string): string[] { return splitLines(this.config, text) }
 
   static create(config: EditorStateConfig = {}): EditorState {
     let $config = Configuration.create(config)
-    let doc = config.doc instanceof Text ? config.doc : Text.of(config.doc || "", config.lineSeparator || DEFAULT_SPLIT)
+    let doc = config.doc instanceof Text ? config.doc : Text.of(splitLines($config, config.doc || ""))
     let state = new EditorState($config, doc, config.selection || EditorSelection.default)
     for (let field of $config.fields) (state as any)[field.key] = field.init(state)
     return state
   }
+}
+
+function splitLines(config: Configuration, text: string): string[] {
+  return text.split(config.lineSeparator || DEFAULT_SPLIT)
 }
 
 const DEFAULT_SPLIT = /\r\n?|\n/

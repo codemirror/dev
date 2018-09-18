@@ -20,9 +20,7 @@ describe("HeightMap", () => {
                                           [new ChangedRange(0, 0, 0, text.length)])
   }
   function doc(... lineLen: number[]) {
-    let text = ""
-    for (let len of lineLen)
-      text += (text ? "\n" : "") + "x".repeat(len)
+    let text = lineLen.map(len => "x".repeat(len))
     return Text.of(text)
   }
 

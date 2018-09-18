@@ -68,15 +68,12 @@ export abstract class Text {
   // @internal
   protected constructor() {}
 
-  static of(text: string | ReadonlyArray<string>, lineSeparator: string | RegExp = DEFAULT_SEPARATOR): Text {
-    if (typeof text == "string") text = text.split(lineSeparator)
-    else if (text.length == 0) throw new RangeError("A document must have at least one line")
+  static of(text: ReadonlyArray<string>): Text {
+    if (text.length == 0) throw new RangeError("A document must have at least one line")
     let length = textLength(text)
     return length < MAX_LEAF ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
   }
 }
-
-const DEFAULT_SEPARATOR = /\r\n?|\n/
 
 class TextLeaf extends Text {
   constructor(readonly text: ReadonlyArray<string>, readonly length: number = textLength(text)) {

@@ -32,11 +32,11 @@ describe("doc", () => {
   })
 
   it("handles deleting at start", () => {
-    ist(Text.of(text0 + "!").replace(0, 9500, [""]).toString(), text0.slice(9500) + "!")
+    ist(Text.of(lines.slice(0, -1).concat([line + "!"])).replace(0, 9500, [""]).toString(), text0.slice(9500) + "!")
   })
 
   it("handles deleting at end", () => {
-    ist(Text.of("?" + text0).replace(9500, text0.length + 1, [""]).toString(), "?" + text0.slice(0, 9499))
+    ist(Text.of(["?" + line].concat(lines.slice(1))).replace(9500, text0.length + 1, [""]).toString(), "?" + text0.slice(0, 9499))
   })
 
   it("can insert on node boundaries", () => {
@@ -45,7 +45,7 @@ describe("doc", () => {
   })
 
   it("can build up a doc by repeated appending", () => {
-    let doc = Text.of(""), text = ""
+    let doc = Text.of([""]), text = ""
     for (let i = 1; i < 1000; ++i) {
       let add = "newtext" + i + " "
       doc = doc.replace(doc.length, doc.length, [add])
@@ -70,9 +70,10 @@ describe("doc", () => {
   })
 
   it("returns the correct strings for slice", () => {
-    let str = ""
-    for (let i = 0; i < 1000; i++) str += String(i).padStart(4, "0") + "\n"
-    let doc = Text.of(str)
+    let text = []
+    for (let i = 0; i < 1000; i++) text.push(String(i).padStart(4, "0"))
+    let doc = Text.of(text)
+    let str = text.join("\n")
     for (let i = 0; i < 400; i++) {
       let start = i == 0 ? 0 : Math.floor(Math.random() * doc.length)
       let end = i == 399 ? doc.length : start + Math.floor(Math.random() * (doc.length - start))
@@ -81,7 +82,7 @@ describe("doc", () => {
   })
 
   it("can be compared", () => {
-    let doc = doc0, doc2 = Text.of(text0)
+    let doc = doc0, doc2 = Text.of(lines)
     ist(doc.eq(doc))
     ist(doc.eq(doc2))
     ist(doc2.eq(doc))
@@ -90,12 +91,12 @@ describe("doc", () => {
   })
 
   it("can be compared despite different tree shape", () => {
-    ist(doc0.replace(100, 200, ["abc"]).eq(Text.of(text0.slice(0, 100) + "abc" + text0.slice(200))))
+    ist(doc0.replace(100, 201, ["abc"]).eq(Text.of([line + "abc"].concat(lines.slice(2)))))
   })
 
   it("can compare small documents", () => {
-    ist(Text.of("foo\nbar").eq(Text.of("foo\nbar")))
-    ist(!Text.of("foo\nbar").eq(Text.of("foo\nbaz")))
+    ist(Text.of(["foo", "bar"]).eq(Text.of(["foo", "bar"])))
+    ist(!Text.of(["foo", "bar"]).eq(Text.of(["foo", "baz"])))
   })
 
   it("is iterable", () => {
@@ -150,7 +151,7 @@ describe("doc", () => {
 
   it("iterates lines in empty documents", () => {
     let result = []
-    for (let iter = Text.of("").iterLines(); !iter.next().done;) result.push(iter.value)
+    for (let iter = Text.of([""]).iterLines(); !iter.next().done;) result.push(iter.value)
     ist(JSON.stringify(result), JSON.stringify([""]))
   })
 
@@ -162,7 +163,7 @@ describe("doc", () => {
 
   it("iterates over long lines", () => {
     let long = line.repeat(100), result = []
-    for (let iter = Text.of(long).iterLines(); !iter.next().done;) result.push(iter.value)
+    for (let iter = Text.of([long]).iterLines(); !iter.next().done;) result.push(iter.value)
     ist(JSON.stringify(result), JSON.stringify([long]))
   })
 

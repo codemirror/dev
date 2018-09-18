@@ -7,7 +7,7 @@ import {Viewport} from "./viewport"
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
 export class HeightOracle {
-  doc: Text = Text.of("")
+  doc: Text = Text.of([""])
   lineWrapping: boolean = false
   heightSamples: {[key: number]: boolean} = {}
   lineHeight: number = 14

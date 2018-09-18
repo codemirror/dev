@@ -99,7 +99,7 @@ function capturePaste(view: EditorView) {
 }
 
 function doPaste(view: EditorView, text: string) {
-  view.dispatch(view.state.transaction.replaceSelection(view.state.splitLines(text))
+  view.dispatch(view.state.transaction.replaceSelection(text)
                 .setMeta(MetaSlot.userEvent, "paste").scrollIntoView())
 }
 
