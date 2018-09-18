@@ -1,4 +1,4 @@
-import {Text} from "../../doc/src/text"
+import {splitLines, Text} from "../../doc/src/text"
 import {EditorSelection} from "./selection"
 import {Plugin, StateField} from "./plugin"
 import {Transaction, MetaSlot} from "./transaction"
@@ -79,19 +79,13 @@ export class EditorState {
   get lineSeparator(): string { return this.config.lineSeparator || "\n" }
 
   // FIXME move somewhere else?
-  splitLines(text: string): string[] { return splitLines(this.config, text) }
+  splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
 
   static create(config: EditorStateConfig = {}): EditorState {
     let $config = Configuration.create(config)
-    let doc = config.doc instanceof Text ? config.doc : Text.of(splitLines($config, config.doc || ""))
+    let doc = config.doc instanceof Text ? config.doc : Text.of(config.doc || "", config.lineSeparator || undefined)
     let state = new EditorState($config, doc, config.selection || EditorSelection.default)
     for (let field of $config.fields) (state as any)[field.key] = field.init(state)
     return state
   }
 }
-
-function splitLines(config: Configuration, text: string): string[] {
-  return text.split(config.lineSeparator || DEFAULT_SPLIT)
-}
-
-const DEFAULT_SPLIT = /\r\n?|\n/
