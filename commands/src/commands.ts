@@ -15,14 +15,14 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
   return true
 }
 
-export const moveCharLeft: Command = (view: EditorView) => moveSelection(view, "left", "character")
-export const moveCharRight: Command = (view: EditorView) => moveSelection(view, "right", "character")
+export const moveCharLeft: Command = view => moveSelection(view, "left", "character")
+export const moveCharRight: Command = view => moveSelection(view, "right", "character")
 
-export const moveLineUp: Command = (view: EditorView) => moveSelection(view, "backward", "line")
-export const moveLineDown: Command = (view: EditorView) => moveSelection(view, "forward", "line")
+export const moveLineUp: Command = view => moveSelection(view, "backward", "line")
+export const moveLineDown: Command = view => moveSelection(view, "forward", "line")
 
-export const moveLineStart: Command = (view: EditorView) => moveSelection(view, "backward", "lineboundary")
-export const moveLineEnd: Command = (view: EditorView) => moveSelection(view, "forward", "lineboundary")
+export const moveLineStart: Command = view => moveSelection(view, "backward", "lineboundary")
+export const moveLineEnd: Command = view => moveSelection(view, "forward", "lineboundary")
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "line" | "lineboundary"): boolean {
@@ -35,14 +35,14 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
   return true
 }
 
-export const extendCharLeft: Command = (view: EditorView) => extendSelection(view, "left", "character")
-export const extendCharRight: Command = (view: EditorView) => extendSelection(view, "right", "character")
+export const extendCharLeft: Command = view => extendSelection(view, "left", "character")
+export const extendCharRight: Command = view => extendSelection(view, "right", "character")
 
-export const extendLineUp: Command = (view: EditorView) => extendSelection(view, "backward", "line")
-export const extendLineDown: Command = (view: EditorView) => extendSelection(view, "forward", "line")
+export const extendLineUp: Command = view => extendSelection(view, "backward", "line")
+export const extendLineDown: Command = view => extendSelection(view, "forward", "line")
 
-export const extendLineStart: Command = (view: EditorView) => extendSelection(view, "backward", "lineboundary")
-export const extendLineEnd: Command = (view: EditorView) => extendSelection(view, "forward", "lineboundary")
+export const extendLineStart: Command = view => extendSelection(view, "backward", "lineboundary")
+export const extendLineEnd: Command = view => extendSelection(view, "forward", "lineboundary")
 
 export const selectDocStart: Command = ({state, dispatch}) => {
   dispatch(state.transaction.setSelection(EditorSelection.single(0)).scrollIntoView())
@@ -59,6 +59,26 @@ export const selectAll: Command = ({state, dispatch}) => {
   return true
 }
 
+function deleteText(view: EditorView, dir: "forward" | "backward") {
+  let transaction = view.state.transaction.reduceRanges((transaction, range) => {
+    let {from, to} = range
+    if (from == to) {
+      let target = view.movePos(range.head, dir, "character", "move")
+      from = Math.min(from, target); to = Math.max(to, target)
+    }
+    if (from == to) return {transaction, range}
+    return {transaction: transaction.replace(from, to, ""),
+            range: new SelectionRange(from)}
+  })
+  if (!transaction.docChanged) return false
+
+  view.dispatch(transaction.scrollIntoView())
+  return true
+}
+
+export const deleteCharBackward: Command = view => deleteText(view, "backward")
+export const deleteCharForward: Command = view => deleteText(view, "forward")
+
 export const pcBaseKeymap: {[key: string]: Command} = {
   "ArrowLeft": moveCharLeft,
   "ArrowRight": moveCharRight,
@@ -74,7 +94,9 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "Shift-End": extendLineEnd,
   "Mod-Home": selectDocStart,
   "Mod-End": selectDocEnd,
-  "Mod-a": selectAll
+  "Mod-a": selectAll,
+  "Backspace": deleteCharBackward,
+  "Delete": deleteCharForward
 }
 
 export const macBaseKeymap: {[key: string]: Command} = {
@@ -91,7 +113,9 @@ export const macBaseKeymap: {[key: string]: Command} = {
   "Shift-Control-a": extendLineStart,
   "Shift-Control-e": extendLineEnd,
   "Cmd-ArrowUp": selectDocStart,
-  "Cmd-ArrowDown": selectDocEnd
+  "Cmd-ArrowDown": selectDocEnd,
+  "Control-d": deleteCharForward,
+  "Control-h": deleteCharBackward
 }
 for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key]
 
