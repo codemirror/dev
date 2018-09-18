@@ -67,7 +67,7 @@ export function movePos(view: EditorView, start: number,
     // FIXME also needs goal column?
     let col = countColumn(line, view.state.tabSize)
     if (dir < 0) {
-      if (linePos.line == 0) return 0
+      if (linePos.line == 1) return 0
       let prevLine = view.state.doc.getLine(linePos.line - 1)
       return lineStart - 1 - prevLine.length + findColumn(prevLine, col, view.state.tabSize)
     } else {
