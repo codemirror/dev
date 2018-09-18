@@ -44,7 +44,7 @@ class StateCache<S> {
         upto = Math.min(to, this.lastDecorations.from)
         decorations = this.calculateDecorations(editorState, from, upto, mode)
       }
-      if (upto < to) {
+      if (upto < to && this.lastDecorations.to > upto) {
         upto = this.lastDecorations.to
         decorations = decorations.concat(this.lastDecorations.decorations)
       }
