@@ -86,9 +86,9 @@ export class DocView extends ContentView {
       this.observer.withoutSelectionListening(() => this.updateSelection())
     } else {
       this.updateInner(contentChanges, oldLength, viewport)
-      if (this.layoutCheckScheduled < 0)
-        this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
+      this.cancelLayoutCheck()
       this.callbacks.onUpdateDOM()
+      this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
     }
   }
 
@@ -299,14 +299,19 @@ export class DocView extends ContentView {
     this.observer.withoutSelectionListening(() => this.updateSelection(true))
   }
 
+  cancelLayoutCheck() {
+    if (this.layoutCheckScheduled > -1) {
+      cancelAnimationFrame(this.layoutCheckScheduled)
+      this.layoutCheckScheduled = -1
+    }
+  }
+
   forceLayout() {
     if (this.layoutCheckScheduled > -1 && !this.computingViewport) this.checkLayout()
   }
 
   checkLayout(forceFull = false) {
-    cancelAnimationFrame(this.layoutCheckScheduled)
-    this.layoutCheckScheduled = -1
-
+    this.cancelLayoutCheck()
     this.measureVerticalPadding()
     let scrollIntoView = Math.min(this.scrollIntoView, this.text.length)
     this.scrollIntoView = -1
