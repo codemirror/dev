@@ -1,5 +1,5 @@
 import {ChangeDesc, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src"
-import {HistoryState, PopTarget} from "./core"
+import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
 export const closeHistorySlot = new MetaSlot<boolean>("historyClose")
@@ -19,7 +19,7 @@ const historyField = new StateField({
     const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
     if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
     if (tr.getMeta(MetaSlot.addToHistory) !== false)
-      return state.addChanges(tr.changes, tr.invertedChanges(), tr.startState.selection,
+      return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null, tr.startState.selection,
                               isAdjacent, tr.getMeta(MetaSlot.time)!, newGroupDelay, minDepth)
     return state.addMapping(tr.changes.desc, minDepth)
   },
@@ -34,21 +34,29 @@ export function history({minDepth = 100, newGroupDelay = 500}: {minDepth?: numbe
   })
 }
 
-function historyCmd(target: PopTarget, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
+function historyCmd(target: PopTarget, only: ItemFilter, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
   const historyState: HistoryState | undefined = state.getField(historyField)
-  if (!historyState || !historyState.canPop(target)) return false
+  if (!historyState || !historyState.canPop(target, only)) return false
   const {minDepth} = state.getPluginWithField(historyField).config
-  const {transaction, state: newState} = historyState.pop(target, state.transaction, minDepth)
+  const {transaction, state: newState} = historyState.pop(target, only, state.transaction, minDepth)
   dispatch(transaction.setMeta(historyStateSlot, newState))
   return true
 }
 
 export function undo({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
-  return historyCmd(PopTarget.Done, state, dispatch)
+  return historyCmd(PopTarget.Done, ItemFilter.OnlyChanges, state, dispatch)
 }
 
 export function redo({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
-  return historyCmd(PopTarget.Undone, state, dispatch)
+  return historyCmd(PopTarget.Undone, ItemFilter.OnlyChanges, state, dispatch)
+}
+
+export function undoSelection({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
+  return historyCmd(PopTarget.Done, ItemFilter.Any, state, dispatch)
+}
+
+export function redoSelection({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
+  return historyCmd(PopTarget.Undone, ItemFilter.Any, state, dispatch)
 }
 
 // Set a flag on the given transaction that will prevent further steps

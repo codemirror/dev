@@ -1,7 +1,7 @@
 import {EditorState, EditorSelection} from "../state/src"
 import {EditorView} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
-import {history, redo, undo} from "../history/src/history"
+import {history, redo, redoSelection, undo, undoSelection} from "../history/src/history"
 import {gutter} from "../gutter/src/index"
 import {baseKeymap} from "../commands/src/commands"
 import {legacyMode} from "../legacy-modes/src/index"
@@ -32,6 +32,7 @@ function crudeIndentLine({state, dispatch}: EditorView): boolean {
   return true
 }
 
+let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `"use strict";
 const {readFile} = require("fs");
 
@@ -40,7 +41,9 @@ readFile("package.json", "utf8", (err, data) => {
 });`, plugins: [gutter(), history(), mode, keymap(baseKeymap), keymap({
   "Mod-z": undo,
   "Mod-Shift-z": redo,
-  "Ctrl-y": /Mac/.test(navigator.platform) ? undefined : redo,
+  "Mod-u": undoSelection,
+  [isMac ? "Mod-Shift-u" : "Alt-u"]: redoSelection,
+  "Ctrl-y": isMac ? undefined : redo,
   "Enter": crudeInsertNewlineAndIndent,
   "Shift-Tab": crudeIndentLine
 })]})

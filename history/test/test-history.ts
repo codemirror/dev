@@ -1,15 +1,15 @@
 const ist = require("ist")
 
 import {EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
-import {closeHistory, history, redo, redoDepth, undo, undoDepth} from "../src/history"
+import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth, undoSelection} from "../src/history"
 
 const mkState = (config?: any, doc?: string) => EditorState.create({plugins: [history(config)], doc})
 
 const type = (state: EditorState, text: string, at = state.doc.length) => state.transaction.replace(at, at, text).apply()
 const timedType = (state: EditorState, text: string, atTime: number) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
 const receive = (state: EditorState, text: string, from: number, to = from) => state.transaction.replace(from, to, text).setMeta(MetaSlot.addToHistory, false).apply()
-const command = (state: EditorState, cmd: any) => {
-  ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), true)
+const command = (state: EditorState, cmd: any, success: boolean = true) => {
+  ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), success)
   return state
 }
 
@@ -276,5 +276,46 @@ describe("history", () => {
     ist(state.doc.toString(), "cab")
     state = command(state, undo)
     ist(state.doc.toString(), "ab")
+  })
+
+  it("doesn't undo selection-only transactions", () => {
+    let state = mkState(undefined, "abc")
+    ist(state.selection.primary.head, 0)
+    state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+    state = command(state, undo, false)
+    ist(state.selection.primary.head, 2)
+  })
+
+  describe("undoSelection", () => {
+    it("allows to undo a change", () => {
+      let state = mkState()
+      state = type(state, "newtext")
+      state = command(state, undoSelection)
+      ist(state.doc.toString(), "")
+    })
+
+    it("allows to undo selection-only transactions", () => {
+      let state = mkState(undefined, "abc")
+      ist(state.selection.primary.head, 0)
+      state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 0)
+    })
+    it("allows to redo a change", () => {
+      let state = mkState()
+      state = type(state, "newtext")
+      state = command(state, undoSelection)
+      state = command(state, redoSelection)
+      ist(state.doc.toString(), "newtext")
+    })
+
+    it("allows to redo selection-only transactions", () => {
+      let state = mkState(undefined, "abc")
+      ist(state.selection.primary.head, 0)
+      state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+      state = command(state, undoSelection)
+      state = command(state, redoSelection)
+      ist(state.selection.primary.head, 2)
+    })
   })
 })
