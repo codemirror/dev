@@ -201,8 +201,10 @@ describe("builtin commands", () => {
     const text = await tests.getText()
     await cm.sendKeys(Key.BACK_SPACE)
     const pos = await tests.getCursor()
-    ist(Math.max(0, start - 1), pos)
-    ist(text.substr(0, start - 1) + text.substr(start), await tests.getText())
+    const i = start % 20
+    const expected = start - (i > 4 && i != 11 && i <= 13 ? 2 : 1)
+    ist(Math.max(0, expected), pos)
+    ist(text.substr(0, expected) + text.substr(start), await tests.getText())
     await tests.setText(text)
   }))
 })
