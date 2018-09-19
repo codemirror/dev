@@ -1,7 +1,7 @@
 import {EditorView} from "./editorview"
 import {DocView} from "./docview"
 import {LineView} from "./lineview"
-import {InlineView, TextView, WidgetView} from "./inlineview"
+import {InlineView, TextView} from "./inlineview"
 import {Text as Doc} from "../../doc/src/text"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
 import browser from "./browser"
