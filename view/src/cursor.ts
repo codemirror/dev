@@ -1,7 +1,7 @@
 import {EditorView} from "./editorview"
 import {DocView} from "./docview"
 import {LineView} from "./lineview"
-import {TextView} from "./inlineview"
+import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc} from "../../doc/src/text"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
 import browser from "./browser"
@@ -9,14 +9,6 @@ import browser from "./browser"
 declare global {
   interface Selection { modify(action: string, direction: string, granularity: string): void }
   interface Document { caretPositionFromPoint(x: number, y: number): {offsetNode: Node, offset: number} }
-}
-
-function nearViewportEnd(view: EditorView, context: LineContext, side: number = 0): boolean {
-  for (let {from, to} of view.docView.viewports)
-    if (from > 0 && from == context.start && side <= 0 ||
-        to < view.state.doc.length && to == context.start + context.line.length && side >= 0)
-      return true
-  return false
 }
 
 export function movePos(view: EditorView, start: number,
@@ -30,17 +22,20 @@ export function movePos(view: EditorView, start: number,
   // supported, the cursor is well inside the rendered viewport, and
   // we're not doing by-line motion on Gecko (which will mess up goal
   // column motion)
-  if (sel.modify && context && !nearViewportEnd(view, context) && view.hasFocus() &&
+  if (sel.modify && context && !context.nearViewportEnd(view) && view.hasFocus() &&
       !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
-    // FIXME work around unwanted DOM behavior (captureKeys + FF widget issues)
-    let startDOM = view.docView.domFromPos(start)!
     return view.docView.observer.withoutSelectionListening(() => {
-      let equiv = isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset)
+      let prepared = context!.prepareForQuery(view, start)
+      let startDOM = view.docView.domFromPos(start)!
+      let equiv = (!browser.chrome || prepared.length == 0) &&
+        isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset) && false
       if (action == "move" && !(equiv && sel.isCollapsed)) sel.collapse(startDOM.node, startDOM.offset)
       else if (action == "extend" && !equiv) sel.extend(startDOM.node, startDOM.offset)
       sel.modify(action, direction, granularity)
       view.docView.setSelectionDirty()
-      return view.docView.posFromDOM(sel.focusNode, sel.focusOffset)
+      let result = view.docView.posFromDOM(sel.focusNode, sel.focusOffset)
+      context!.undoQueryPreparation(view, prepared)
+      return result
     })
   } else if (granularity == "character") {
     return moveCharacterSimple(start, dir, context, view.state.doc)
@@ -48,7 +43,7 @@ export function movePos(view: EditorView, start: number,
     if (context) return context.start + (dir < 0 ? 0 : context.line.length)
     return dir < 0 ? view.state.doc.lineStartAt(start) : view.state.doc.lineEndAt(start)
   } else if (granularity == "line") {
-    if (context && !nearViewportEnd(view, context, dir)) {
+    if (context && !context.nearViewportEnd(view, dir)) {
       let startCoords = view.docView.coordsAt(start)!
       let goal = getGoalColumn(view, start, startCoords.left)
       // FIXME skip between-line widgets when implemented
@@ -164,19 +159,59 @@ class LineContext {
     }
   }
 
-  get prev(): LineContext | null {
-    if (this.index == 0) return null
-    let prev = this.line.parent!.children[this.index - 1]
-    return prev instanceof LineView ? new LineContext(prev, this.start - prev.length - 1, this.index - 1) : null
+
+  nearViewportEnd(view: EditorView, side: number = 0): boolean {
+    for (let {from, to} of view.docView.viewports)
+      if (from > 0 && from == this.start && side <= 0 ||
+          to < view.state.doc.length && to == this.start + this.line.length && side >= 0)
+        return true
+    return false
   }
 
-  get next(): LineContext | null {
-    if (this.index == this.line.parent!.children.length - 1) return null
-    let next = this.line.parent!.children[this.index + 1]
-    return next instanceof LineView ? new LineContext(next, this.start + this.line.length + 1, this.index + 1) : null
+  // FIXME limit the amount of work in character motion in non-bidi
+  // context? or not worth it?
+  prepareForQuery(view: EditorView, pos: number) {
+    // FIXME only call withoutListening when necessary?
+    return view.docView.observer.withoutListening(() => {
+      let linesToSync: LineView[] = []
+      function maybeHide(view: InlineView) {
+        if (view.length > 0) return false
+        ;(view.dom as any).remove()
+        if (linesToSync.indexOf(view.parent as LineView) < 0) linesToSync.push(view.parent as LineView)
+        return true
+      }
+      let {i, off} = this.line.childPos(pos - this.start)
+      if (off == 0) {
+        for (let j = i; j < this.line.children.length; j++) if (!maybeHide(this.line.children[j])) break
+        for (let j = i; j > 0; j--) if (!maybeHide(this.line.children[j - 1])) break
+      }
+      function addForLine(line: LineView, omit: number = -1) {
+        if (line.children.length == 0) return
+        for (let i = 0, off = 0; i <= line.children.length; i++) {
+          let next = i == line.children.length ? null : line.children[i]
+          if ((!next || !(next instanceof TextView)) && off != pos &&
+              (i == 0 || !(line.children[i - 1] instanceof TextView))) {
+            line.dom!.insertBefore(document.createTextNode("\u200b"), next ? next.dom : null)
+            if (linesToSync.indexOf(line) < 0) linesToSync.push(line)
+          }
+          if (next) off += next.length
+        }
+      }
+      if (this.index > 0)
+        addForLine(this.line.parent!.children[this.index - 1] as LineView)
+      addForLine(this.line, pos - this.start)
+      if (this.index < this.line.parent!.children.length - 1)
+        addForLine(this.line.parent!.children[this.index + 1] as LineView)
+      return linesToSync
+    })
+  }
+
+  undoQueryPreparation(view: EditorView, toSync: LineView[]) {
+    if (toSync.length) view.docView.observer.withoutListening(() => {
+      for (let line of toSync) line.syncDOMChildren()
+    })
   }
 }
-
 
 
 // Search the DOM for the {node, offset} position closest to the given

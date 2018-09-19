@@ -5,6 +5,23 @@ import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)
 
+class OWidget extends WidgetType<void> {
+  toDOM() {
+    let node = document.createElement("span")
+    node.textContent = "ø"
+    return node
+  }
+}
+
+const oWidgets = new Plugin({
+  view: (view: EditorView) => {
+    let doc = view.state.doc.toString(), deco = []
+    for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
+      deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
+    return {decorations: Decoration.set(deco)}
+  }
+})
+
 describe("EditorView.movePos", () => {
   it("does the right thing for character motion when focused", () => {
     requireFocus()
@@ -44,6 +61,16 @@ describe("EditorView.movePos", () => {
       ist(cm.movePos(order[i], "left", "character"), order[Math.max(0, i - 1)])
   })
 
+  it("can move through widgets by character when focused", () => {
+    requireFocus()
+    let cm = tempEditor("o, foo, do", [oWidgets]), len = cm.state.doc.length
+    cm.focus()
+    for (let i = 0; i <= len; i++)
+      ist(cm.movePos(i, "right", "character"), Math.min(i + 1, len))
+    for (let i = len; i >= 0; i--)
+      ist(cm.movePos(i, "left", "character"), Math.max(0, i - 1))
+  })
+
   function testLineMotion(focus: boolean) {
     let cm = tempEditor("one two\nthree\nتممين")
     if (focus) cm.focus()
@@ -68,23 +95,6 @@ describe("EditorView.movePos", () => {
 
   it("properly handles line motion when not focused", () => {
     testLineMotion(false)
-  })
-
-  class OWidget extends WidgetType<void> {
-    toDOM() {
-      let node = document.createElement("span")
-      node.textContent = "ø"
-      return node
-    }
-  }
-
-  const oWidgets = new Plugin({
-    view: (view: EditorView) => {
-      let doc = view.state.doc.toString(), deco = []
-      for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
-        deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
-      return {decorations: Decoration.set(deco)}
-    }
   })
 
   it("can handle line motion around widgets when not focused", () => {

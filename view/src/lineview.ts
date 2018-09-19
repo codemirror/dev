@@ -1,7 +1,7 @@
 import {ContentView, ChildCursor} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView} from "./inlineview"
-import {clientRectsFor, Rect} from "./dom"
+import {clientRectsFor, Rect, domIndex} from "./dom"
 
 export class LineView extends ContentView {
   children: InlineView[]
@@ -95,11 +95,12 @@ export class LineView extends ContentView {
 
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
-    while (off == 0 && i > 0 && this.children[i - 1].getSide() > 0) i--
-    if (off == 0) return {node: this.dom, offset: i}
-    let child = this.children[i]
-    if (child instanceof TextView) return {node: child.textDOM!, offset: off}
-    else return {node: this.dom, offset: i}
+    if (off) {
+      let child = this.children[i]
+      if (child instanceof TextView) return {node: child.textDOM!, offset: off}
+    }
+    while (i > 0 && this.children[i - 1].getSide() > 0) i--
+    return {node: this.dom, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
   }
 
   // FIXME might need another hack to work around Firefox's behavior
