@@ -28,6 +28,7 @@ export class DocView extends ContentView {
   viewportState: ViewportState
   heightMap: HeightMap = HeightMap.empty()
   heightOracle: HeightOracle = new HeightOracle
+  computingViewport = false
 
   layoutCheckScheduled: number = -1
   // A document position that has to be scrolled into view at the next layout check
@@ -241,6 +242,20 @@ export class DocView extends ContentView {
     viewport: Viewport,
     contentChanges: A<ChangedRange>
   } {
+    try {
+      this.computingViewport = true
+      return this.computeViewportInner(contentChanges, prevState, transactions, bias, scrollIntoView)
+    } finally {
+      this.computingViewport = false
+    }
+  }
+
+  computeViewportInner(contentChanges: A<ChangedRange> = [], prevState: EditorState | null, transactions: Transaction[] | null,
+                       bias: number, scrollIntoView: number): {
+    // Passing transactions != null means at least one iteration is necessary
+    viewport: Viewport,
+    contentChanges: A<ChangedRange>
+  } {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(this.text, this.heightMap, bias, scrollIntoView)
       let stateChange = transactions && transactions.length > 0
@@ -285,7 +300,7 @@ export class DocView extends ContentView {
   }
 
   forceLayout() {
-    if (this.layoutCheckScheduled > -1) this.checkLayout()
+    if (this.layoutCheckScheduled > -1 && !this.computingViewport) this.checkLayout()
   }
 
   checkLayout(forceFull = false) {
