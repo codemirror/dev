@@ -5,6 +5,7 @@ import {history, redo, redoSelection, undo, undoSelection} from "../history/src/
 import {gutter} from "../gutter/src/index"
 import {baseKeymap} from "../commands/src/commands"
 import {legacyMode} from "../legacy-modes/src/index"
+import {matchBrackets} from "../matchbrackets/src/matchbrackets"
 import javascript from "../legacy-modes/src/javascript"
 
 let mode = legacyMode(javascript({indentUnit: 2}, {}))
@@ -38,7 +39,7 @@ const {readFile} = require("fs");
 
 readFile("package.json", "utf8", (err, data) => {
   console.log(data);
-});`, plugins: [gutter(), history(), mode, keymap(baseKeymap), keymap({
+});`, plugins: [matchBrackets(), gutter(), history(), mode, keymap(baseKeymap), keymap({
   "Mod-z": undo,
   "Mod-Shift-z": redo,
   "Mod-u": undoSelection,
