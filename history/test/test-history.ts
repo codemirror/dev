@@ -355,7 +355,6 @@ describe("history", () => {
       state = type(state, "hello")
       const selection = state.selection
       state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
-      const selection2 = state.selection
       state = receive(state, "oops", 0)
       state = receive(state, "!", 9)
       ist(state.selection.eq(EditorSelection.single(0, 6)))
