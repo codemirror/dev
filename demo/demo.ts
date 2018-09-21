@@ -42,7 +42,7 @@ readFile("package.json", "utf8", (err, data) => {
 });`, plugins: [matchBrackets(), gutter(), history(), mode, keymap(baseKeymap), keymap({
   "Mod-z": undo,
   "Mod-Shift-z": redo,
-  "Mod-u": undoSelection,
+  "Mod-u": view => undoSelection(view) || true,
   [isMac ? "Mod-Shift-u" : "Alt-u"]: redoSelection,
   "Ctrl-y": isMac ? undefined : redo,
   "Enter": crudeInsertNewlineAndIndent,
