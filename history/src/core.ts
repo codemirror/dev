@@ -20,11 +20,18 @@ function updateBranch(branch: Branch, to: number, maxLen: number, newItem: Item)
 function addChanges(branch: Branch, changes: ChangeSet, inverted: ChangeSet | null,
                     selectionBefore: EditorSelection, maxLen: number,
                     mayMerge: (prevChange: ChangeDesc | null, curChange: ChangeDesc) => boolean): Branch {
-  let lastItem
-  if (inverted && branch.length && (lastItem = branch[branch.length - 1]).isChange &&
-      mayMerge(lastItem.map.changes[lastItem.map.length - 1], changes.changes[0]))
-    return updateBranch(branch, branch.length - 1, maxLen,
-                        new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), lastItem.selection))
+  if (inverted) {
+    for (let i = branch.length - 1; i >= 0; --i) {
+      const lastItem = branch[i]
+      if (lastItem.isChange) {
+        if (mayMerge(lastItem.map.changes[lastItem.map.length - 1], changes.changes[0])) {
+          return branch.slice(0, i).concat([new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), selectionBefore)])
+}
+        branch = branch.slice(0, i + 1)
+        break
+      } else if (!lastItem.selection) break // Don't discard remote changes
+    }
+  }
   return updateBranch(branch, branch.length, maxLen, new Item(changes.desc, inverted, selectionBefore))
 }
 
@@ -34,7 +41,7 @@ function popChanges(branch: Branch, only: ItemFilter): {changes: ChangeSet, bran
   for (;; idx--) {
     if (idx < 0) throw new RangeError("popChanges called on empty branch")
     let entry = branch[idx]
-    if ((only == ItemFilter.Any) || entry.isChange) break
+    if (entry.isChange || (only == ItemFilter.Any && entry.selection)) break
     map = map ? entry.map.appendSet(map) : entry.map
   }
 
@@ -45,8 +52,8 @@ function popChanges(branch: Branch, only: ItemFilter): {changes: ChangeSet, bran
     let startIndex = changeItem.map.length
     map = changeItem.map.appendSet(map)
     let mappedChanges = []
-    for (let i = 0; i < changeItem.inverted!.length; i++) {
-      let mapped = changeItem.inverted!.changes[i].map(map.partialMapping(startIndex - i))
+    for (let i = 0; i < changes.length; i++) {
+      let mapped = changes.changes[i].map(map.partialMapping(startIndex - i))
       if (mapped) {
         map = map.append(mapped.desc)
         mappedChanges.push(mapped)
@@ -77,7 +84,7 @@ export class HistoryState {
              newGroupDelay: number, maxLen: number): HistoryState {
     return new HistoryState(addChanges(this.done, changes, inverted, selection, maxLen,
                                        this.prevTime !== null && time - this.prevTime < newGroupDelay ? mayMerge : nope),
-                            this.undone, time)
+                            this.undone, inverted ? time : this.prevTime)
   }
 
   addMapping(map: ChangeSet<ChangeDesc>, maxLen: number): HistoryState {
@@ -87,8 +94,8 @@ export class HistoryState {
 
   canPop(done: PopTarget, only: ItemFilter): boolean {
     const target = done == PopTarget.Done ? this.done : this.undone
-    if (only == ItemFilter.Any) return target.length > 0
-    for (const {isChange} of target) if (isChange) return true
+    for (const {isChange, selection} of target)
+      if (isChange || (only == ItemFilter.Any && selection)) return true
     return false
   }
 
@@ -104,9 +111,10 @@ export class HistoryState {
                                                  done == PopTarget.Done ? otherBranch : branch)}
   }
 
-  eventCount(done: PopTarget) {
+  eventCount(done: PopTarget, only: ItemFilter) {
     let count = 0, branch = done == PopTarget.Done ? this.done : this.undone
-    for (let i = 0; i < branch.length; ++i) if (branch[i].isChange) ++count
+    for (const {isChange, selection} of branch)
+      if (isChange || (only == ItemFilter.Any && selection)) ++count
     return count
   }
 

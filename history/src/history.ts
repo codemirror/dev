@@ -16,8 +16,11 @@ const historyField = new StateField({
   apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
     const fromMeta = tr.getMeta(historyStateSlot)
     if (fromMeta) return fromMeta
-    const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
     if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
+    if (!tr.changes.length && tr.startState.selection.eq(editorState.selection))
+      return state
+
+    const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
     if (tr.getMeta(MetaSlot.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null, tr.startState.selection,
                               isAdjacent, tr.getMeta(MetaSlot.time)!, newGroupDelay, minDepth)
@@ -66,14 +69,26 @@ export function closeHistory(tr: Transaction): Transaction {
   return tr.setMeta(closeHistorySlot, true)
 }
 
-// The amount of undoable events available in a given state.
+// The amount of undoable change events available in a given state.
 export function undoDepth(state: EditorState): number {
   let hist = state.getField(historyField)
-  return hist ? hist.eventCount(PopTarget.Done) : 0
+  return hist ? hist.eventCount(PopTarget.Done, ItemFilter.OnlyChanges) : 0
+}
+
+// The amount of redoable change events available in a given state.
+export function redoDepth(state: EditorState): number {
+  let hist = state.getField(historyField)
+  return hist ? hist.eventCount(PopTarget.Undone, ItemFilter.OnlyChanges) : 0
+}
+
+// The amount of undoable events available in a given state.
+export function undoSelectionDepth(state: EditorState): number {
+  let hist = state.getField(historyField)
+  return hist ? hist.eventCount(PopTarget.Done, ItemFilter.Any) : 0
 }
 
 // The amount of redoable events available in a given state.
-export function redoDepth(state: EditorState): number {
+export function redoSelectionDepth(state: EditorState): number {
   let hist = state.getField(historyField)
-  return hist ? hist.eventCount(PopTarget.Undone) : 0
+  return hist ? hist.eventCount(PopTarget.Undone, ItemFilter.Any) : 0
 }

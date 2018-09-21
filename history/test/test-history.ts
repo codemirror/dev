@@ -1,7 +1,7 @@
 const ist = require("ist")
 
 import {EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
-import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth, undoSelection} from "../src/history"
+import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth, undoSelection, undoSelectionDepth} from "../src/history"
 
 const mkState = (config?: any, doc?: string) => EditorState.create({plugins: [history(config)], doc})
 
@@ -90,7 +90,7 @@ describe("history", () => {
     state = type(state, "cd", 1)
     state = receive(state, "123", 0, 4)
     state = command(state, undo)
-    ist(redo({state, dispatch() {}}), false)
+    ist(command(state, redo, false))
   })
 
   it("accurately maps changes through each other", () => {
@@ -217,6 +217,18 @@ describe("history", () => {
     ist(state.selection.eq(selection2))
   })
 
+  it("drops selection-only history items on document change", () => {
+    let state = mkState()
+    state = type(state, "hi")
+    state = closeHistory(state.transaction).apply()
+    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+    ist(undoDepth(state), 1)
+    ist(undoSelectionDepth(state), 2)
+    state = state.transaction.replaceSelection("hello").apply()
+    ist(undoDepth(state), 2)
+    ist(undoSelectionDepth(state), 2)
+  })
+
   it("rebases selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
@@ -248,8 +260,8 @@ describe("history", () => {
     let state = EditorState.create()
     ist(undoDepth(state), 0)
     ist(redoDepth(state), 0)
-    ist(undo({state, dispatch() {}}), false)
-    ist(redo({state, dispatch() {}}), false)
+    ist(command(state, undo, false))
+    ist(command(state, redo, false))
   })
 
   it("truncates history", () => {
@@ -316,6 +328,40 @@ describe("history", () => {
       state = command(state, undoSelection)
       state = command(state, redoSelection)
       ist(state.selection.primary.head, 2)
+    })
+
+    it("only changes selection", () => {
+      let state = mkState()
+      state = type(state, "hi")
+      state = closeHistory(state.transaction).apply()
+      const selection = state.selection
+      state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+      const selection2 = state.selection
+      state = command(state, undoSelection)
+      ist(state.selection.eq(selection))
+      ist(state.doc.toString(), "hi")
+      state = command(state, redoSelection)
+      ist(state.selection.eq(selection2))
+      state = state.transaction.replaceSelection("hello").apply()
+      const selection3 = state.selection
+      state = command(state, undoSelection)
+      ist(state.selection.eq(selection2))
+      state = command(state, redo)
+      ist(state.selection.eq(selection3))
+    })
+
+    it("can undo a selection through remote changes", () => {
+      let state = mkState()
+      state = type(state, "hello")
+      const selection = state.selection
+      state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+      const selection2 = state.selection
+      state = receive(state, "oops", 0)
+      state = receive(state, "!", 9)
+      ist(state.selection.eq(EditorSelection.single(0, 6)))
+      state = command(state, undoSelection)
+      ist(state.doc.toString(), "oopshello!")
+      ist(state.selection.eq(selection))
     })
   })
 })
