@@ -22,7 +22,7 @@ function getModeTest(doc: string) {
       return String(++state.pos)
     }
   }
-  const plugin = legacyMode(mode)
+  const plugin = legacyMode(mode, {sleepTime: 0})
   const view: {state: EditorState, viewport?: Viewport, decorationUpdate: () => void} = {
     state: EditorState.create({doc, plugins: [plugin]}),
     decorationUpdate() {}
@@ -101,6 +101,6 @@ describe("legacyMode", () => {
                                 + (24000 - 23990) + 10 // getState + second render (24000, 24010)
                                  ) * 0.9)
       resolve()
-    }, 150))
+    }, 10))
   })
 })

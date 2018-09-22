@@ -20,12 +20,12 @@ class StateCache<S> {
 
   constructor(private states: CachedState<S>[], private frontier: number, private lastDecorations: null | DecoratedRange) {}
 
-  advanceFrontier(editorState: EditorState, to: number, mode: Mode<S>): Promise<void> {
+  advanceFrontier(editorState: EditorState, to: number, mode: Mode<S>, sleepTime: number, maxWorkTime: number): Promise<void> {
     if (this.frontier >= to) return Promise.reject()
     clearTimeout(this.timeout as any)
     return new Promise((resolve, reject) => {
       const f = () => {
-        const endTime = +new Date + 100
+        const endTime = +new Date + maxWorkTime
         do {
           const target = Math.min(to, this.frontier + MAX_SCAN_DIST / 2)
           // If we are going to advance the frontier to lastDecorations, clear it
@@ -33,9 +33,9 @@ class StateCache<S> {
           this.getState(editorState, target, mode)
           if (this.frontier >= to) return resolve()
         } while (+new Date < endTime)
-        this.timeout = setTimeout(f, 100)
+        this.timeout = setTimeout(f, sleepTime)
       }
-      this.timeout = setTimeout(f, 100)
+      this.timeout = setTimeout(f, sleepTime)
     })
   }
 
@@ -135,7 +135,13 @@ class StateCache<S> {
   }
 }
 
-export function legacyMode<S>(mode: Mode<S>) {
+type Config = {
+  sleepTime?: number,
+  maxWorkTime?: number
+}
+
+export function legacyMode<S>(mode: Mode<S>, config: Config = {}) {
+  const {sleepTime = 100, maxWorkTime = 100} = config
   const field = new StateField<StateCache<S>>({
     init(state: EditorState) { return new StateCache([], 0, null) },
     apply(tr, cache) { return cache.apply(tr) },
@@ -152,7 +158,7 @@ export function legacyMode<S>(mode: Mode<S>) {
           ;({from, to} = vp)
           const stateCache = v.state.getField(field)!
           decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
-          stateCache.advanceFrontier(v.state, from, mode).then(() => {
+          stateCache.advanceFrontier(v.state, from, mode, sleepTime, maxWorkTime).then(() => {
             update(v, true)
             v.decorationUpdate()
           }, () => {})
