@@ -1,12 +1,8 @@
-import {ChangeDesc, EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src"
+import {EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
 export const closeHistorySlot = new MetaSlot<boolean>("historyClose")
-
-function isAdjacent(prev: ChangeDesc | null, cur: ChangeDesc): boolean {
-  return !!prev && cur.from <= prev.mapPos(prev.to, 1) && cur.to >= prev.mapPos(prev.from)
-}
 
 const historyField = new StateField({
   init(editorState: EditorState): HistoryState {
@@ -22,7 +18,7 @@ const historyField = new StateField({
     const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
     if (tr.getMeta(MetaSlot.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null, tr.startState.selection,
-                              isAdjacent, tr.getMeta(MetaSlot.time)!, newGroupDelay, minDepth)
+                              tr.getMeta(MetaSlot.time)!, newGroupDelay, minDepth)
     return state.addMapping(tr.changes.desc, minDepth)
   },
 

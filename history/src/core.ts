@@ -17,14 +17,18 @@ function updateBranch(branch: Branch, to: number, maxLen: number, newItem: Item)
   return newBranch
 }
 
+function isAdjacent(prev: ChangeDesc | null, cur: ChangeDesc): boolean {
+  return !!prev && cur.from <= prev.mapPos(prev.to, 1) && cur.to >= prev.mapPos(prev.from)
+}
+
 function addChanges(branch: Branch, changes: ChangeSet, inverted: ChangeSet | null,
                     selectionBefore: EditorSelection, maxLen: number,
-                    mayMerge: (prevChange: ChangeDesc | null, curChange: ChangeDesc) => boolean): Branch {
+                    mayMerge: (prevItem: Item) => boolean): Branch {
   if (inverted) {
     for (let i = branch.length - 1; i >= 0; --i) {
       const lastItem = branch[i]
       if (lastItem.isChange) {
-        if (mayMerge(lastItem.map.changes[lastItem.map.length - 1], changes.changes[0])) {
+        if (mayMerge(lastItem)) {
           return branch.slice(0, i).concat([new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), selectionBefore)])
 }
         branch = branch.slice(0, i + 1)
@@ -80,10 +84,9 @@ export class HistoryState {
   }
 
   addChanges(changes: ChangeSet, inverted: ChangeSet | null, selection: EditorSelection,
-             mayMerge: (prevChange: ChangeDesc | null, curChange: ChangeDesc) => boolean, time: number,
-             newGroupDelay: number, maxLen: number): HistoryState {
+             time: number, newGroupDelay: number, maxLen: number): HistoryState {
     return new HistoryState(addChanges(this.done, changes, inverted, selection, maxLen,
-                                       this.prevTime !== null && time - this.prevTime < newGroupDelay ? mayMerge : nope),
+                                       this.prevTime !== null && time - this.prevTime < newGroupDelay ? prev => isAdjacent(prev.map.changes[prev.map.length - 1], changes.changes[0]): nope),
                             this.undone, inverted ? time : this.prevTime)
   }
 
