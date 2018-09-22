@@ -9,7 +9,7 @@ const ist = require("ist")
 
 type Viewport = {from: number, to: number}
 
-function getModeTest(doc: string) {
+function getModeTest(doc: string, onDecorationUpdate = () => {}) {
   const calls: number[] = []
   const mode: Mode<{pos: number}> = {
     name: "testmode",
@@ -25,7 +25,7 @@ function getModeTest(doc: string) {
   const plugin = legacyMode(mode, {sleepTime: 0})
   const view: {state: EditorState, viewport?: Viewport, decorationUpdate: () => void} = {
     state: EditorState.create({doc, plugins: [plugin]}),
-    decorationUpdate() {}
+    decorationUpdate: onDecorationUpdate
   }
   const viewPlugin = plugin.view(view)
 
@@ -89,18 +89,21 @@ describe("legacyMode", () => {
     ist(modeTest.calls.length, 28)
   })
   it("updates frontier in the background", async function() {
-    const modeTest = getModeTest("abcdefghi\n".repeat(2500))
+    let afterFrontierUpdating
+    const modeTest = getModeTest("abcdefghi\n".repeat(2500), () => afterFrontierUpdating())
     ist(modeTest.getDecorations({from: 0, to: 10}).length, 9)
     ist(modeTest.calls.length, 9)
     ist(modeTest.getDecorations({from: 24000, to: 24010}).length, 9)
     ist(modeTest.calls.length, 9 + 9)
-    return new Promise(resolve => setTimeout(() => {
-      ist(modeTest.calls.length, (10 // Render (0, 10)
-                                + 10 // Optimistic render (24000, 24010)
-                                + (10010 - 0) + (20010 - 10010) + (24000 - 20000) // Background frontier updating
-                                + (24000 - 23990) + 10 // getState + second render (24000, 24010)
-                                 ) * 0.9)
-      resolve()
-    }, 10))
+    return new Promise(resolve => {
+      afterFrontierUpdating = () => {
+        ist(modeTest.calls.length, (10 // Render (0, 10)
+                                  + 10 // Optimistic render (24000, 24010)
+                                  + (10010 - 0) + (20010 - 10010) + (24000 - 20000) // Background frontier updating
+                                  + (24000 - 23990) + 10 // getState + second render (24000, 24010)
+                                   ) * 0.9)
+        resolve()
+      }
+    })
   })
 })
