@@ -89,7 +89,7 @@ describe("legacyMode", () => {
     ist(modeTest.calls.length, 28)
   })
   it("updates frontier in the background", async function() {
-    let afterFrontierUpdating
+    let afterFrontierUpdating: () => void
     const modeTest = getModeTest("abcdefghi\n".repeat(2500), () => afterFrontierUpdating())
     ist(modeTest.getDecorations({from: 0, to: 10}).length, 9)
     ist(modeTest.calls.length, 9)
