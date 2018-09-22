@@ -23,13 +23,11 @@ class StateCache<S> {
   advanceFrontier(editorState: EditorState, to: number, mode: Mode<S>, sleepTime: number, maxWorkTime: number): Promise<void> {
     if (this.frontier >= to) return Promise.reject()
     clearTimeout(this.timeout as any)
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       const f = () => {
         const endTime = +new Date + maxWorkTime
         do {
           const target = Math.min(to, this.frontier + MAX_SCAN_DIST / 2)
-          // If we are going to advance the frontier to lastDecorations, clear it
-          if (this.lastDecorations && (this.frontier < this.lastDecorations.from && this.lastDecorations.from <= target)) this.lastDecorations = null
           this.getState(editorState, target, mode)
           if (this.frontier >= to) return resolve()
         } while (+new Date < endTime)
@@ -102,6 +100,11 @@ class StateCache<S> {
   getState(editorState: EditorState, pos: number, mode: Mode<S>): S {
     let {pos: statePos, state} = this.stateBefore(pos, mode)
     if (statePos < pos - MAX_SCAN_DIST) { statePos = pos; state = mode.startState() }
+    else if (this.lastDecorations && (statePos < this.lastDecorations.from && this.lastDecorations.from <= pos))
+      // If we are calculating a correct state for a position that is after the
+      // beginning of the cached decorations (which suggests that the cached
+      // decorations were rendered based on an approximate state), clear that cache
+      this.lastDecorations = null
     if (statePos < pos) {
       let cursor = new StringStreamCursor(editorState.doc, statePos, editorState.tabSize)
       let stream = cursor.next()
