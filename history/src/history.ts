@@ -18,7 +18,7 @@ const historyField = new StateField({
     const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
     if (tr.getMeta(MetaSlot.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null, tr.startState.selection,
-                              tr.getMeta(MetaSlot.time)!, newGroupDelay, minDepth)
+                              tr.getMeta(MetaSlot.time)!, tr.getMeta(MetaSlot.userEvent), newGroupDelay, minDepth)
     return state.addMapping(tr.changes.desc, minDepth)
   },
 

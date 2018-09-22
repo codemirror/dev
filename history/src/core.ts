@@ -24,17 +24,10 @@ function isAdjacent(prev: ChangeDesc | null, cur: ChangeDesc): boolean {
 function addChanges(branch: Branch, changes: ChangeSet, inverted: ChangeSet | null,
                     selectionBefore: EditorSelection, maxLen: number,
                     mayMerge: (prevItem: Item) => boolean): Branch {
-  if (inverted) {
-    for (let i = branch.length - 1; i >= 0; --i) {
-      const lastItem = branch[i]
-      if (lastItem.isChange) {
-        if (mayMerge(lastItem)) {
-          return branch.slice(0, i).concat([new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), selectionBefore)])
-}
-        branch = branch.slice(0, i + 1)
-        break
-      } else if (!lastItem.selection) break // Don't discard remote changes
-    }
+  if (branch.length) {
+    const lastItem = branch[branch.length - 1]
+    if (lastItem.selection && lastItem.isChange == Boolean(inverted) && mayMerge(lastItem))
+      return inverted ? updateBranch(branch, branch.length - 1, maxLen, new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), selectionBefore)) : branch
   }
   return updateBranch(branch, branch.length, maxLen, new Item(changes.desc, inverted, selectionBefore))
 }
@@ -72,22 +65,33 @@ function popChanges(branch: Branch, only: ItemFilter): {changes: ChangeSet, bran
 
 function nope() { return false }
 
+function eqSelectionShape(a: EditorSelection, b: EditorSelection) {
+  return a.ranges.length == b.ranges.length &&
+         a.ranges.filter((r, i) => r.empty != b.ranges[i].empty).length === 0
+}
+
 export const enum PopTarget { Done, Undone }
 
 export class HistoryState {
   private constructor(public readonly done: Branch,
                       public readonly undone: Branch,
-                      private readonly prevTime: number | null = null) {}
+                      private readonly prevTime: number | null = null,
+                      private readonly prevUserEvent: string | undefined = undefined) {}
 
   resetTime(): HistoryState {
     return new HistoryState(this.done, this.undone)
   }
 
   addChanges(changes: ChangeSet, inverted: ChangeSet | null, selection: EditorSelection,
-             time: number, newGroupDelay: number, maxLen: number): HistoryState {
-    return new HistoryState(addChanges(this.done, changes, inverted, selection, maxLen,
-                                       this.prevTime !== null && time - this.prevTime < newGroupDelay ? prev => isAdjacent(prev.map.changes[prev.map.length - 1], changes.changes[0]): nope),
-                            this.undone, inverted ? time : this.prevTime)
+             time: number, userEvent: string | undefined, newGroupDelay: number, maxLen: number): HistoryState {
+    let mayMerge: (item: Item) => boolean = nope
+    if (this.prevTime !== null && time - this.prevTime < newGroupDelay &&
+        (inverted || (this.prevUserEvent == userEvent && userEvent == "keyboard")))
+      mayMerge = inverted
+                 ? prev => isAdjacent(prev.map.changes[prev.map.length - 1], changes.changes[0])
+                 : prev => eqSelectionShape(prev.selection!, selection)
+    return new HistoryState(addChanges(this.done, changes, inverted, selection, maxLen, mayMerge),
+                            this.undone, time, userEvent)
   }
 
   addMapping(map: ChangeSet<ChangeDesc>, maxLen: number): HistoryState {

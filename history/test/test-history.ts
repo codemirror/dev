@@ -1,7 +1,7 @@
 const ist = require("ist")
 
-import {EditorState, EditorSelection, Transaction, MetaSlot} from "../../state/src"
-import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth, undoSelection, undoSelectionDepth} from "../src/history"
+import {EditorState, EditorSelection, SelectionRange, Transaction, MetaSlot} from "../../state/src"
+import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth, undoSelection} from "../src/history"
 
 const mkState = (config?: any, doc?: string) => EditorState.create({plugins: [history(config)], doc})
 
@@ -217,16 +217,12 @@ describe("history", () => {
     ist(state.selection.eq(selection2))
   })
 
-  it("drops selection-only history items on document change", () => {
+  it("doesn't merge document changes if there's a selection change in between", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = closeHistory(state.transaction).apply()
     state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
-    ist(undoDepth(state), 1)
-    ist(undoSelectionDepth(state), 2)
     state = state.transaction.replaceSelection("hello").apply()
     ist(undoDepth(state), 2)
-    ist(undoSelectionDepth(state), 2)
   })
 
   it("rebases selection on undo", () => {
@@ -313,6 +309,56 @@ describe("history", () => {
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 0)
     })
+
+    it("merges selection-only transactions from keyboard", () => {
+      let state = mkState(undefined, "abc")
+      ist(state.selection.primary.head, 0)
+      state = state.transaction.setSelection(EditorSelection.single(2)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = state.transaction.setSelection(EditorSelection.single(3)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 0)
+    })
+
+    it("doesn't merge selection-only transactions from other sources", () => {
+      let state = mkState(undefined, "abc")
+      ist(state.selection.primary.head, 0)
+      state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+      state = state.transaction.setSelection(EditorSelection.single(3)).apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).apply()
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 3)
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 2)
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 0)
+    })
+
+    it("doesn't merge selection-only transactions if they change the number of selections", () => {
+      let state = mkState(undefined, "abc")
+      ist(state.selection.primary.head, 0)
+      state = state.transaction.setSelection(EditorSelection.single(2)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = state.transaction.setSelection(EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)])).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = command(state, undoSelection)
+      ist(state.selection.ranges.length, 2)
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 0)
+    })
+
+    it("doesn't merge selection-only transactions if a selection changes empty state", () => {
+      let state = mkState(undefined, "abc")
+      ist(state.selection.primary.head, 0)
+      state = state.transaction.setSelection(EditorSelection.single(2)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = state.transaction.setSelection(EditorSelection.single(2, 3)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).setMeta(MetaSlot.userEvent, "keyboard").apply()
+      state = command(state, undoSelection)
+      ist(state.selection.primary.anchor, 2)
+      ist(state.selection.primary.head, 3)
+      state = command(state, undoSelection)
+      ist(state.selection.primary.head, 0)
+    })
+
     it("allows to redo a change", () => {
       let state = mkState()
       state = type(state, "newtext")
