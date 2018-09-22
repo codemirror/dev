@@ -17,8 +17,7 @@ const historyField = new StateField({
     const fromMeta = tr.getMeta(historyStateSlot)
     if (fromMeta) return fromMeta
     if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
-    if (!tr.changes.length && tr.startState.selection.eq(editorState.selection))
-      return state
+    if (!tr.changes.length && !tr.selectionSet) return state
 
     const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
     if (tr.getMeta(MetaSlot.addToHistory) !== false)
