@@ -27,8 +27,11 @@ export function movePos(view: EditorView, start: number,
     return view.docView.observer.withoutSelectionListening(() => {
       let prepared = context!.prepareForQuery(view, start)
       let startDOM = view.docView.domFromPos(start)!
-      let equiv = (!browser.chrome || prepared.length == 0) &&
+      let equiv = (!browser.chrome || prepared.lines.length == 0) &&
         isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset) && false
+      // Firefox skips an extra character ahead when extending across
+      // an uneditable element (but not when moving)
+      if (prepared.atWidget && browser.gecko && action == "extend") action = "move"
       if (action == "move" && !(equiv && sel.isCollapsed)) sel.collapse(startDOM.node, startDOM.offset)
       else if (action == "extend" && !equiv) sel.extend(startDOM.node, startDOM.offset)
       sel.modify(action, direction, granularity)
@@ -173,8 +176,9 @@ class LineContext {
   prepareForQuery(view: EditorView, pos: number) {
     // FIXME only call withoutListening when necessary?
     return view.docView.observer.withoutListening(() => {
-      let linesToSync: LineView[] = []
+      let linesToSync: LineView[] = [], atWidget = false
       function maybeHide(view: InlineView) {
+        if (!(view instanceof TextView)) atWidget = true
         if (view.length > 0) return false
         ;(view.dom as any).remove()
         if (linesToSync.indexOf(view.parent as LineView) < 0) linesToSync.push(view.parent as LineView)
@@ -202,13 +206,13 @@ class LineContext {
       addForLine(this.line, pos - this.start)
       if (this.index < this.line.parent!.children.length - 1)
         addForLine(this.line.parent!.children[this.index + 1] as LineView)
-      return linesToSync
+      return {lines: linesToSync, atWidget}
     })
   }
 
-  undoQueryPreparation(view: EditorView, toSync: LineView[]) {
-    if (toSync.length) view.docView.observer.withoutListening(() => {
-      for (let line of toSync) line.syncDOMChildren()
+  undoQueryPreparation(view: EditorView, toSync: {lines: LineView[]}) {
+    if (toSync.lines.length) view.docView.observer.withoutListening(() => {
+      for (let line of toSync.lines) line.syncDOMChildren()
     })
   }
 }
