@@ -1,7 +1,6 @@
 import {MetaSlot} from "../../state/src"
 import {EditorView} from "./editorview"
 import browser from "./browser"
-import {beforeKeyDown} from "./capturekeys"
 
 // This will also be where dragging info and such goes
 export class InputState {
@@ -103,8 +102,20 @@ function doPaste(view: EditorView, text: string) {
                 .setMeta(MetaSlot.userEvent, "paste").scrollIntoView())
 }
 
+function mustCapture(event: KeyboardEvent): boolean {
+  const enum mod { ctrl = 1, alt = 2, shift = 4, meta = 8 }
+  let mods = (event.ctrlKey ? mod.ctrl : 0) | (event.metaKey ? mod.meta : 0) |
+    (event.altKey ? mod.alt : 0) | (event.shiftKey ? mod.shift : 0)
+  let code = event.keyCode, macCtrl = browser.mac && mods == mod.ctrl
+  return code == 8 || (macCtrl && code == 72) ||  // Backspace, Ctrl-h on Mac
+    code == 46 || (macCtrl && code == 68) || // Delete, Ctrl-d on Mac
+    code == 27 || // Esc
+    (mods == (browser.mac ? mod.meta : mod.ctrl) && // Ctrl/Cmd-[biyz]
+     (code == 66 || code == 73 || code == 89 || code == 90))
+}
+
 handlers.keydown = (view, event: KeyboardEvent) => {
-  if (beforeKeyDown(view, event)) event.preventDefault()
+  if (mustCapture(event)) event.preventDefault()
   view.inputState.setSelectionOrigin("keyboard")
 }
 
