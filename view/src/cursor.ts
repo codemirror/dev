@@ -193,7 +193,7 @@ class LineContext {
         if (line.children.length == 0) return
         for (let i = 0, off = 0; i <= line.children.length; i++) {
           let next = i == line.children.length ? null : line.children[i]
-          if ((!next || !(next instanceof TextView)) && off != pos &&
+          if ((!next || !(next instanceof TextView)) && off != omit &&
               (i == 0 || !(line.children[i - 1] instanceof TextView))) {
             line.dom!.insertBefore(document.createTextNode("\u200b"), next ? next.dom : null)
             if (linesToSync.indexOf(line) < 0) linesToSync.push(line)
