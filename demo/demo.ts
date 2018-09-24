@@ -38,7 +38,7 @@ let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `"use strict";
 const {readFile} = require("fs");
 
-readFile("pac\0\0kage.json", "utf8", (err, data) => {
+readFile("package.json", "utf8", (err, data) => {
   console.log(data);
 });`, plugins: [
   matchBrackets(),
