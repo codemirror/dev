@@ -124,6 +124,7 @@ handlers.mousedown = handlers.mousemove = handlers.touchdown = handlers.touchmov
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
+  view.docView.observer.readSelection()
   let data = brokenClipboardAPI ? null : event.clipboardData
   let text = data && data.getData("text/plain")
   if (text) {
