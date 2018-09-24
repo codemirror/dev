@@ -6,7 +6,8 @@ export type Command = (view: EditorView) => boolean
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "line" | "lineboundary"): boolean {
   let transaction = view.state.transaction.mapRanges(range => {
-    if (!range.empty) return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
+    if (!range.empty && granularity != "lineboundary")
+      return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
     return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
