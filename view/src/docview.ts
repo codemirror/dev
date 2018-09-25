@@ -69,7 +69,6 @@ export class DocView extends ContentView {
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
     let oldLength = this.text.length
-    this.scrollIntoView = scrollIntoView
     this.text = state.doc
     this.selection = state.selection
 
@@ -84,10 +83,12 @@ export class DocView extends ContentView {
         this.selection.primary.from >= this.visiblePart.from &&
         this.selection.primary.to <= this.visiblePart.to) {
       this.observer.withoutSelectionListening(() => this.updateSelection())
+      if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {
       this.updateInner(contentChanges, oldLength, viewport)
       this.cancelLayoutCheck()
       this.callbacks.onUpdateDOM()
+      if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
     }
   }
@@ -327,10 +328,7 @@ export class DocView extends ContentView {
                                           lineHeight, (this.dom).clientWidth / charWidth, lineHeights)
     }
 
-    if (scrollIntoView > -1) {
-      let rect = this.coordsAt(scrollIntoView)
-      if (rect) scrollRectIntoView(this.dom, rect)
-    }
+    if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
 
     let updated = false
     for (let i = 0;; i++) {
@@ -354,6 +352,11 @@ export class DocView extends ContentView {
       this.observer.listenForScroll()
       this.callbacks.onUpdateDOM()
     }
+  }
+
+  scrollPosIntoView(pos: number) {
+    let rect = this.coordsAt(pos)
+    if (rect) scrollRectIntoView(this.dom, rect)
   }
 
   nearest(dom: Node): ContentView | null {
