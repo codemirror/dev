@@ -47,6 +47,16 @@ export class EditorSelection {
     return this.ranges.length == 1 ? this : new EditorSelection([this.primary])
   }
 
+  addRange(range: SelectionRange, primary: boolean = true) {
+    return EditorSelection.create([range].concat(this.ranges), primary ? 0 : this.primaryIndex + 1)
+  }
+
+  replaceRange(range: SelectionRange, which: number = this.primaryIndex) {
+    let ranges = this.ranges.slice()
+    ranges[which] = range
+    return EditorSelection.create(ranges, this.primaryIndex)
+  }
+
   static single(anchor: number, head: number = anchor) {
     return new EditorSelection([new SelectionRange(anchor, head)], 0)
   }

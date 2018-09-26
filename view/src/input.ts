@@ -248,15 +248,12 @@ function updateMouseSelection(type: number): MouseSelectionUpdate {
   return (view, startSelection, startPos, curPos, extend, multiple) => {
     let range = rangeForClick(view, curPos, type)
     if (startPos < range.from || startPos > range.to) range = range.extend(startPos)
-    if (extend) {
-      let ranges = startSelection.ranges.slice(), {primaryIndex} = startSelection
-      ranges[primaryIndex] = ranges[primaryIndex].extend(range.from, range.to)
-      return EditorSelection.create(ranges, primaryIndex)
-    } else if (multiple) {
-      return EditorSelection.create([range].concat(startSelection.ranges), 0)
-    } else {
+    if (extend)
+      return startSelection.replaceRange(startSelection.primary.extend(range.from, range.to))
+    else if (multiple)
+      return startSelection.addRange(range)
+    else
       return EditorSelection.create([range])
-    }
   }
 }
 
