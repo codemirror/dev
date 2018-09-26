@@ -96,7 +96,7 @@ class MouseSelection {
 
     // FIXME make these configurable somehow
     this.extend = event.shiftKey
-    this.multiple = browser.mac ? event.metaKey : event.ctrlKey
+    this.multiple = view.state.multipleSelections && (browser.mac ? event.metaKey : event.ctrlKey)
 
     this.startSelection = view.state.selection
     this.startPos = this.lastPos = view.posAtCoords({x: event.clientX, y: event.clientY})

@@ -8,6 +8,7 @@ import {legacyMode} from "../legacy-modes/src/index"
 import {matchBrackets} from "../matchbrackets/src/matchbrackets"
 import javascript from "../legacy-modes/src/javascript"
 import {specialChars} from "../special-chars/src/special-chars"
+import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 
 let mode = legacyMode(javascript({indentUnit: 2}, {}))
 
@@ -44,6 +45,7 @@ readFile("package.json", "utf8", (err, data) => {
   gutter(),
   history(),
   specialChars({}),
+  multipleSelections(),
   mode,
   matchBrackets({decorationsPlugin: mode}),
   keymap({

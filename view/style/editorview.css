@@ -33,3 +33,19 @@
   color: #999;
   white-space: nowrap;
 }
+
+.CodeMirror-secondary-selection {
+  background-color: #3297FD;
+  color: white !important;
+  background-color: Highlight;
+  color: HighlightText !important;
+}
+
+.CodeMirror-secondary-cursor {
+  display: inline-block;
+  vertical-align: text-top;
+  border-left: 1px solid #555;
+  width: 0px;
+  height: 1.15em;
+  margin: 0 -0.5px -.5em;
+}
