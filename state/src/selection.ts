@@ -13,6 +13,12 @@ export class SelectionRange {
     else return new SelectionRange(anchor, head)
   }
 
+  extend(from: number, to: number = from) {
+    if (from <= this.anchor && to >= this.anchor) return new SelectionRange(from, to)
+    let head = Math.abs(from - this.anchor) > Math.abs(to - this.anchor) ? from : to
+    return new SelectionRange(this.anchor, head)
+  }
+
   eq(other: SelectionRange): boolean {
     return this.anchor == other.anchor && this.head == other.head
   }

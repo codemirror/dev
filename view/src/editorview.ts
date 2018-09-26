@@ -1,6 +1,6 @@
 import {EditorState, Transaction, EditorSelection, MetaSlot} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
-import {InputState} from "./input"
+import {InputState, MouseSelectionUpdate} from "./input"
 import {getRoot, selectionCollapsed, Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
@@ -15,10 +15,10 @@ export class EditorView {
   readonly dom: HTMLElement
   readonly contentDOM: HTMLElement
 
-  /** @internal */
-  readonly inputState: InputState
+  // @internal
+  inputState!: InputState
 
-  /** @internal */
+  // @internal
   readonly docView: DocView
 
   readonly viewport: EditorViewport
@@ -59,7 +59,6 @@ export class EditorView {
       getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
     })
     this.viewport = this.docView.publicViewport
-    this.inputState = new InputState(this)
     this.setState(state)
   }
 
@@ -68,7 +67,7 @@ export class EditorView {
     this.withUpdating(() => {
       setTabSize(this.contentDOM, state.tabSize)
       this.createPluginViews(plugins)
-      this.inputState.setState(this)
+      this.inputState = new InputState(this)
       this.docView.update(state)
     })
   }
@@ -83,6 +82,7 @@ export class EditorView {
       if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
       this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+      this.inputState.update(transactions)
     })
   }
 
@@ -164,6 +164,11 @@ export class EditorView {
     })
   }
 
+  startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
+    this.focus()
+    this.inputState.startMouseSelection(this, event, update)
+  }
+
   hasFocus(): boolean {
     return getRoot(this.dom).activeElement == this.contentDOM
   }
@@ -174,6 +179,7 @@ export class EditorView {
 
   destroy() {
     this.destroyPluginViews()
+    this.inputState.destroy()
     this.dom.remove()
     this.docView.destroy()
   }

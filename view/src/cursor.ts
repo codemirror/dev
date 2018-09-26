@@ -1,5 +1,4 @@
 import {EditorView} from "./editorview"
-import {DocView} from "./docview"
 import {LineView} from "./lineview"
 import {InlineView, TextView} from "./inlineview"
 import {Text as Doc} from "../../doc/src/text"
@@ -16,7 +15,7 @@ export function movePos(view: EditorView, start: number,
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
                         action: "move" | "extend"): number {
   let sel = getRoot(view.contentDOM).getSelection()
-  let context = LineContext.get(view.docView, start)
+  let context = LineContext.get(view, start)
   let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
   // Can only query native behavior when Selection.modify is
   // supported, the cursor is well inside the rendered viewport, and
@@ -150,12 +149,12 @@ function isExtendingChar(code: number): boolean {
   return code >= 768 && (code >= 0xdc00 && code < 0xe000 || extendingChars.test(String.fromCharCode(code)))
 }
 
-class LineContext {
+export class LineContext {
   constructor(public line: LineView, public start: number, public index: number) {}
 
-  static get(docView: DocView, pos: number): LineContext | null {
+  static get(view: EditorView, pos: number): LineContext | null {
     for (let i = 0, off = 0;; i++) {
-      let line = docView.children[i], end = off + line.length
+      let line = view.docView.children[i], end = off + line.length
       if (end >= pos)
         return line instanceof LineView ? new LineContext(line, off, i) : null
       off = end + 1
@@ -312,7 +311,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): n
 
   // No luck, do our own (potentially expensive) expensive search
   if (!node) {
-    let {line} = LineContext.get(view.docView, lineStart)!
+    let {line} = LineContext.get(view, lineStart)!
     ;({node, offset} = domPosAtCoords(line.dom, x, y))
   }
   return view.docView.posFromDOM(node, offset)
