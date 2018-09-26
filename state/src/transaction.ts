@@ -108,8 +108,9 @@ export class Transaction {
   }
 
   setSelection(selection: EditorSelection): Transaction {
-    return new Transaction(this.startState, this.changes, this.docs, selection, this.meta,
-                           this.flags | FLAG_SELECTION_SET)
+    return new Transaction(this.startState, this.changes, this.docs,
+                           this.startState.multipleSelections ? selection : selection.asSingle(),
+                           this.meta, this.flags | FLAG_SELECTION_SET)
   }
 
   get selectionSet(): boolean {

@@ -7,27 +7,29 @@ class Configuration {
   constructor(
     readonly plugins: ReadonlyArray<Plugin>,
     readonly fields: ReadonlyArray<StateField<any>>,
+    readonly multipleSelections: boolean,
     readonly tabSize: number,
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let plugins = config.plugins || [], fields = []
+    let plugins = config.plugins || [], fields = [], multiple = !!config.multipleSelections
     for (let plugin of plugins) {
+      if (plugin.spec.multipleSelections) multiple = true
       let field = plugin.stateField
       if (!field) continue
       if (fields.indexOf(field) > -1)
         throw new Error(`A state field (${field.key}) can only be added to a state once`)
       fields.push(field)
     }
-    return new Configuration(plugins, fields, config.tabSize || 4, config.lineSeparator || null)
+    return new Configuration(plugins, fields, multiple, config.tabSize || 4, config.lineSeparator || null)
   }
 
   updateTabSize(tabSize: number) {
-    return new Configuration(this.plugins, this.fields, tabSize, this.lineSeparator)
+    return new Configuration(this.plugins, this.fields, this.multipleSelections, tabSize, this.lineSeparator)
   }
 
   updateLineSeparator(lineSep: string | null) {
-    return new Configuration(this.plugins, this.fields, this.tabSize, lineSep)
+    return new Configuration(this.plugins, this.fields, this.multipleSelections, this.tabSize, lineSep)
   }
 }
 
@@ -37,6 +39,7 @@ export interface EditorStateConfig {
   plugins?: ReadonlyArray<Plugin>
   tabSize?: number
   lineSeparator?: string | null
+  multipleSelections?: boolean
 }
 
 export class EditorState {
@@ -76,13 +79,17 @@ export class EditorState {
 
   get tabSize(): number { return this.config.tabSize }
 
+  get multipleSelections(): boolean { return this.config.multipleSelections }
+
   joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.config.lineSeparator || undefined) }
   splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
 
   static create(config: EditorStateConfig = {}): EditorState {
     let $config = Configuration.create(config)
     let doc = config.doc instanceof Text ? config.doc : Text.of(config.doc || "", config.lineSeparator || undefined)
-    let state = new EditorState($config, doc, config.selection || EditorSelection.default)
+    let selection = config.selection || EditorSelection.default
+    if (!$config.multipleSelections) selection = selection.asSingle()
+    let state = new EditorState($config, doc, selection)
     for (let field of $config.fields) (state as any)[field.key] = field.init(state)
     return state
   }

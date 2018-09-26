@@ -43,6 +43,10 @@ export class EditorSelection {
 
   get primary(): SelectionRange { return this.ranges[this.primaryIndex] }
 
+  asSingle() {
+    return this.ranges.length == 1 ? this : new EditorSelection([this.primary])
+  }
+
   static single(anchor: number, head: number = anchor) {
     return new EditorSelection([new SelectionRange(anchor, head)], 0)
   }

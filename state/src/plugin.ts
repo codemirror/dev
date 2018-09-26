@@ -24,6 +24,7 @@ export interface PluginSpec {
   state?: StateField<any>
   config?: any
   view?: any
+  multipleSelections?: boolean
 }
 
 export class Plugin {
@@ -31,7 +32,7 @@ export class Plugin {
   readonly stateField: StateField<any> | null
   readonly view: (editorView: any) => any
 
-  constructor(spec: PluginSpec) {
+  constructor(readonly spec: PluginSpec) {
     this.config = spec.config
     this.stateField = spec.state || null
     this.view = spec.view
