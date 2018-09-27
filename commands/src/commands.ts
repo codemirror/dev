@@ -4,7 +4,7 @@ import {EditorView} from "../../view/src"
 export type Command = (view: EditorView) => boolean
 
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
-                       granularity: "character" | "line" | "lineboundary"): boolean {
+                       granularity: "character" | "word" | "line" | "lineboundary"): boolean {
   let transaction = view.state.transaction.mapRanges(range => {
     if (!range.empty && granularity != "lineboundary")
       return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
@@ -19,6 +19,9 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
 export const moveCharLeft: Command = view => moveSelection(view, "left", "character")
 export const moveCharRight: Command = view => moveSelection(view, "right", "character")
 
+export const moveWordLeft: Command = view => moveSelection(view, "left", "word")
+export const moveWordRight: Command = view => moveSelection(view, "right", "word")
+
 export const moveLineUp: Command = view => moveSelection(view, "backward", "line")
 export const moveLineDown: Command = view => moveSelection(view, "forward", "line")
 
@@ -26,7 +29,7 @@ export const moveLineStart: Command = view => moveSelection(view, "backward", "l
 export const moveLineEnd: Command = view => moveSelection(view, "forward", "lineboundary")
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
-                         granularity: "character" | "line" | "lineboundary"): boolean {
+                         granularity: "character" | "word" | "line" | "lineboundary"): boolean {
   let transaction = view.state.transaction.mapRanges(range => {
     return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
@@ -38,6 +41,9 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
 
 export const extendCharLeft: Command = view => extendSelection(view, "left", "character")
 export const extendCharRight: Command = view => extendSelection(view, "right", "character")
+
+export const extendWordLeft: Command = view => extendSelection(view, "left", "word")
+export const extendWordRight: Command = view => extendSelection(view, "right", "word")
 
 export const extendLineUp: Command = view => extendSelection(view, "backward", "line")
 export const extendLineDown: Command = view => extendSelection(view, "forward", "line")
@@ -85,6 +91,10 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "ArrowRight": moveCharRight,
   "Shift-ArrowLeft": extendCharLeft,
   "Shift-ArrowRight": extendCharRight,
+  "Mod-ArrowLeft": moveWordLeft,
+  "Mod-ArrowRight": moveWordRight,
+  "Shift-Mod-ArrowLeft": extendWordLeft,
+  "Shift-Mod-ArrowRight": extendWordRight,
   "ArrowUp": moveLineUp,
   "ArrowDown": moveLineDown,
   "Shift-ArrowUp": extendLineUp,

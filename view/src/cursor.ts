@@ -2,6 +2,7 @@ import {EditorView} from "./editorview"
 import {LineView} from "./lineview"
 import {InlineView, TextView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
+import {SelectionRange} from "../../state/src"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
 import browser from "./browser"
 
@@ -10,6 +11,7 @@ declare global {
   interface Document { caretPositionFromPoint(x: number, y: number): {offsetNode: Node, offset: number} }
 }
 
+// FIXME rename "word" to something more descriptive of what it actually does?
 export function movePos(view: EditorView, start: number,
                         direction: "forward" | "backward" | "left" | "right",
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
@@ -22,6 +24,7 @@ export function movePos(view: EditorView, start: number,
   // we're not doing by-line motion on Gecko (which will mess up goal
   // column motion)
   if (sel.modify && context && !context.nearViewportEnd(view) && view.hasFocus() &&
+      granularity != "word" &&
       !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
     return view.docView.observer.withoutSelectionListening(() => {
       let prepared = context!.prepareForQuery(view, start)
@@ -75,7 +78,7 @@ export function movePos(view: EditorView, start: number,
       return lineEnd + 1 + findColumn(nextLine, col, view.state.tabSize)
     }
   } else if (granularity == "word") {
-    throw new Error("FIXME")
+    return moveWord(view, start, direction)
   } else {
     throw new RangeError("Invalid move granularity: " + granularity)
   }
@@ -108,6 +111,24 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
     } else if (inline.length > 0) {
       return pos - off + (dir < 0 ? 0 : inline.length)
     }
+  }
+}
+
+function moveWord(view: EditorView, start: number, direction: "forward" | "backward" | "left" | "right") {
+  let {doc} = view.state
+  for (let pos = start, i = 0;; i++) {
+    let next = movePos(view, pos, direction, "character", "move")
+    if (next == pos) return pos // End of document
+    if (doc.sliceLines(Math.min(next, pos), Math.max(next, pos)).length > 1) return next // Crossed a line boundary
+    let group = SelectionRange.groupAt(view.state, next, next > pos ? -1 : 1)
+    let away = pos < group.from && pos > group.to
+    // If the group is away from its start position, we jumped over a
+    // bidi boundary, and should take the side closest (in index
+    // coordinates) to the start position
+    let start = away ? pos < group.head : group.from == pos ? false : group.to == pos ? true : next < pos
+    pos = start ? group.from : group.to
+    if (i > 0 || /\S/.test(doc.slice(group.from, group.to))) return pos
+    next = Math.max(0, Math.min(doc.length, pos + (start ? -1 : 1)))
   }
 }
 

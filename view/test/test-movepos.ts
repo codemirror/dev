@@ -24,12 +24,11 @@ const oWidgets = new Plugin({
 
 describe("EditorView.movePos", () => {
   it("does the right thing for character motion when focused", () => {
-    requireFocus()
     let cm = tempEditor([/*  0 */ "foo bar",
                          /*  8 */ "ao\u030c\u0318a\u030b\u0319x",
                          /* 17 */ "",
                          /* 18 */ "abcتممين"].join("\n"))
-    cm.focus()
+    requireFocus(cm)
     for (let [from, to] of [[0, 1], [3, 4], [7, 8], [8, 9], [9, 12], [12, 15], [15, 16], [16, 17], [17, 18]])
       ist(cm.movePos(from, "right", "character"), to)
     for (let [from, to] of [[0, 0], [3, 2], [7, 6], [8, 7], [16, 15], [15, 12], [12, 9], [9, 8]])
@@ -62,9 +61,8 @@ describe("EditorView.movePos", () => {
   })
 
   it("can move through widgets by character when focused", () => {
-    requireFocus()
     let cm = tempEditor("o, foo, do", [oWidgets]), len = cm.state.doc.length
-    cm.focus()
+    requireFocus(cm)
     for (let i = 0; i <= len; i++)
       ist(cm.movePos(i, "right", "character"), Math.min(i + 1, len))
     for (let i = len; i >= 0; i--)
@@ -73,7 +71,7 @@ describe("EditorView.movePos", () => {
 
   function testLineMotion(focus: boolean) {
     let cm = tempEditor("one two\nthree\nتممين")
-    if (focus) cm.focus()
+    if (focus) requireFocus(cm)
     else cm.contentDOM.blur()
     ist(cm.movePos(0, "forward", "line"), 8)
     ist(cm.movePos(1, "forward", "line"), 9)
@@ -89,7 +87,6 @@ describe("EditorView.movePos", () => {
   }
 
   it("properly handles line motion when focused", () => {
-    requireFocus()
     testLineMotion(true)
   })
 
@@ -110,7 +107,7 @@ describe("EditorView.movePos", () => {
 
   function testLineBoundaryMotion(focus: boolean) {
     let cm = tempEditor("\none two\n")
-    if (focus) cm.focus()
+    if (focus) requireFocus(cm)
     else cm.contentDOM.blur()
     ist(cm.movePos(1, "left", "lineboundary"), 1)
     ist(cm.movePos(5, "left", "lineboundary"), 1)
@@ -121,11 +118,37 @@ describe("EditorView.movePos", () => {
   }
 
   it("properly handles line-boundary motion when focused", () => {
-    requireFocus()
     testLineBoundaryMotion(true)
   })
 
   it("properly handles line-boundary motion when not focused", () => {
     testLineBoundaryMotion(false)
+  })
+
+  it("can move by word", () => {
+    let cm = tempEditor("foo bar 国的狗 ...y\nx \n")
+    for (let [from, to] of [[0, 3], [2, 3], [3, 7], [7, 11], [10, 11], [11, 15],
+                            [15, 16], [16, 17], [18, 20], [20, 20]])
+      ist(cm.movePos(from, "right", "word"), to)
+    for (let [from, to] of [[0, 0], [2, 0], [4, 0], [5, 4], [11, 8], [15, 12], [16, 15],
+                            [17, 16], [18, 17], [19, 17], [20, 19]])
+      ist(cm.movePos(from, "left", "word"), to)
+  })
+
+  // FIXME at this point this test is happy if by-word motion at least
+  // makes consistent progress through bidi text, but it would be nice
+  // if it actually behaved correctly.
+  it("can move by word through bidi text", () => {
+    if (!visualBidi) return
+    let cm = tempEditor("foo خحج bar خحج خحج baz")
+    requireFocus(cm)
+    for (let i = 0, pos = 0;; i++) {
+      if ((pos = cm.movePos(pos, "right", "word")) == 23) break
+      ist(i < 10)
+    }
+    for (let i = 0, pos = 23;; i++) {
+      if ((pos = cm.movePos(pos, "left", "word")) == 0) break
+      ist(i < 10)
+    }
   })
 })
