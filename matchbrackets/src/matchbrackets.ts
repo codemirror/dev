@@ -1,19 +1,29 @@
 import {Text} from "../../doc/src/text"
-import {EditorState, Plugin} from "../../state/src"
+import {Plugin} from "../../state/src"
 import {EditorView} from "../../view/src/"
-import {Decoration} from "../../view/src/decoration"
+import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
 const matching: {[key: string]: string | undefined} = {"(": ")>", ")": "(<", "[": "]>", "]": "[<", "{": "}>", "}": "{<"}
 
 export type Config = {
   afterCursor?: boolean,
+  decorationsPlugin?: Plugin,
   bracketRegex?: RegExp,
   maxScanLineLength?: number,
   maxScanLines?: number,
   strict?: boolean,
 }
 
-export function findMatchingBracket(doc: Text, where: number, config: Config = {}): {from: number, to: number | null, forward: boolean, match: boolean} | null {
+function getStyle(decorations: DecorationSet | undefined, at: number): string | void {
+  if (!decorations) return
+  const iter = decorations.iter()
+  let decoration
+  while (decoration = iter.next())
+    if (decoration.from <= at && at < decoration.to)
+      return (decoration.value as RangeDecoration).class
+}
+
+export function findMatchingBracket(doc: Text, decorations: DecorationSet | undefined, where: number, config: Config = {}): {from: number, to: number | null, forward: boolean, match: boolean} | null {
   let pos = where - 1
   // A cursor is defined as between two characters, but in in vim command mode
   // (i.e. not insert mode), the cursor is visually represented as a
@@ -24,11 +34,9 @@ export function findMatchingBracket(doc: Text, where: number, config: Config = {
   if (!match) return null
   const dir = match[1] == ">" ? 1 : -1
   if (config.strict && (dir > 0) != (pos == where)) return null
-  // FIXME
-  // const style = cm.getTokenTypeAt(Pos(where.line, pos + 1))
-  let style
+  const style = getStyle(decorations, pos)
 
-  const found = scanForBracket(doc, pos + (dir > 0 ? 1 : 0), dir, style || null, config)
+  const found = scanForBracket(doc, decorations, pos + (dir > 0 ? 1 : 0), dir, style || null, config)
   if (found == null) return null
   return {from: pos, to: found ? found.pos : null,
           match: found && found.ch == match.charAt(0), forward: dir > 0}
@@ -41,7 +49,7 @@ export function findMatchingBracket(doc: Text, where: number, config: Config = {
 //
 // Returns false when no bracket was found, null when it reached
 // maxScanLines and gave up
-export function scanForBracket(doc: Text, where: number, dir: -1 | 1, style: string | null, config: Config) {
+export function scanForBracket(doc: Text, decorations: DecorationSet | undefined, where: number, dir: -1 | 1, style: string | null, config: Config) {
   const maxScanLen = config.maxScanLineLength || 10000
   const maxScanLines = config.maxScanLines || 1000
 
@@ -56,13 +64,13 @@ export function scanForBracket(doc: Text, where: number, dir: -1 | 1, style: str
     if (line.length > maxScanLen) continue
     let pos = dir > 0 ? 0 : line.length - 1, end = dir > 0 ? line.length : -1
     if (lineNo == linePos.line) pos = linePos.col - (dir < 0 ? 1 : 0)
+    const lineStart = doc.lineStart(lineNo)
     for (; pos != end; pos += dir) {
       const ch = line.charAt(pos)
-      // FIXME
-      if (re.test(ch) /*&& (style === undefined || cm.getTokenTypeAt(Pos(lineNo, pos + 1)) == style)*/) {
+      if (re.test(ch) && (style === undefined || getStyle(decorations, lineStart + pos) == style)) {
         const match = matching[ch]!
         if ((match.charAt(1) == ">") == (dir > 0)) stack.push(ch)
-        else if (!stack.length) return {pos: doc.lineStart(lineNo) + pos, ch}
+        else if (!stack.length) return {pos: lineStart + pos, ch}
         else stack.pop()
       }
     }
@@ -70,16 +78,15 @@ export function scanForBracket(doc: Text, where: number, dir: -1 | 1, style: str
   return lineNo - dir == (dir > 0 ? doc.lines : 1) ? false : null
 }
 
-function doMatchBrackets(state: EditorState, config: Config) {
-  const decorations = [], ranges = state.selection.ranges
-  for (let i = 0; i < ranges.length; i++) {
-    const match = ranges[i].empty && findMatchingBracket(state.doc, ranges[i].head, config)
-    if (match) {
-      const style = match.match ? "CodeMirror-matchingbracket" : "CodeMirror-nonmatchingbracket"
-      decorations.push(Decoration.range(match.from, match.from + 1, {class: style}))
-      if (match.to)
-        decorations.push(Decoration.range(match.to, match.to + 1, {class: style}))
-    }
+function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet | undefined, config: Config) {
+  const decorations = []
+  for (const range of state.selection.ranges) {
+    if (!range.empty) continue
+    const match = findMatchingBracket(state.doc, referenceDecorations, range.head, config)
+    if (!match) continue
+    const style = match.match ? "CodeMirror-matchingbracket" : "CodeMirror-nonmatchingbracket"
+    decorations.push(Decoration.range(match.from, match.from + 1, {class: style}))
+    if (match.to) decorations.push(Decoration.range(match.to, match.to + 1, {class: style}))
   }
   return Decoration.set(decorations)
 }
@@ -87,10 +94,14 @@ function doMatchBrackets(state: EditorState, config: Config) {
 export function matchBrackets(config: Config = {}) {
   return new Plugin({
     view(v: EditorView) {
+      const idx = config.decorationsPlugin && v.state.plugins.filter(p => p.view).indexOf(config.decorationsPlugin)
       let decorations = Decoration.none
       return {
         get decorations() { return decorations },
-        updateState(v: EditorView) { decorations = doMatchBrackets(v.state, config) }
+        updateState(v: EditorView) {
+          const refDecos = idx == undefined ? undefined : v.pluginViews[idx].decorations
+          decorations = doMatchBrackets(v.state, refDecos, config)
+        }
       }
     }
   })

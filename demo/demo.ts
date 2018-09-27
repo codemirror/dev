@@ -41,11 +41,11 @@ const {readFile} = require("fs");
 readFile("package.json", "utf8", (err, data) => {
   console.log(data);
 });`, plugins: [
-  matchBrackets(),
   gutter(),
   history(),
   specialChars({}),
   mode,
+  matchBrackets({decorationsPlugin: mode}),
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,
