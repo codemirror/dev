@@ -27,14 +27,14 @@ export class SelectionRange {
 
   static groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
     // FIXME at some point, take language-specific identifier characters into account
-    let {line, col} = state.doc.linePos(pos), text = state.doc.getLine(line)
+    let {line, pos: linePos} = state.doc.linePos(pos), text = state.doc.getLine(line)
     if (text.length == 0) return new SelectionRange(pos)
-    if (col == 0) bias = 1
-    else if (col == text.length) bias = -1
-    let type = charType(text.charAt(col + (bias < 0 ? -1 : 0)))
+    if (linePos == 0) bias = 1
+    else if (linePos == text.length) bias = -1
+    let type = charType(text.charAt(linePos + (bias < 0 ? -1 : 0)))
     let from = pos, to = pos
-    for (let fromCol = col; fromCol > 0 && charType(text.charAt(fromCol - 1)) == type; fromCol--) from--
-    for (let toCol = col; toCol < text.length && charType(text.charAt(toCol)) == type; toCol++) to++
+    for (let lineFrom = linePos; lineFrom > 0 && charType(text.charAt(lineFrom - 1)) == type; lineFrom--) from--
+    for (let lineTo = linePos; lineTo < text.length && charType(text.charAt(lineTo)) == type; lineTo++) to++
     return new SelectionRange(to, from)
   }
 }

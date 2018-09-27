@@ -6,10 +6,9 @@ const MAX_LEAF = BASE_LEAF << 1
 // means 8 branches)
 const TARGET_BRANCH_SHIFT = 3
 
-// FIXME stop calling the offset `col`—it is not a column in any reasonable sense
 export class LinePos {
-  constructor(readonly line: number, readonly col: number) {}
-  toString() { return `${this.line}:${this.col}` }
+  constructor(readonly line: number, readonly pos: number) {}
+  toString() { return `${this.line}:${this.pos}` }
 }
 
 export interface TextIterator extends Iterator<string> {
@@ -273,7 +272,7 @@ class TextNode extends Text {
       if (end >= pos) {
         let result = child.linePos(pos - curPos)
         // Crude patching of officially-readonly LinePos (which was created by the recursive call)
-        if (result.line == 1) (result as any).col += this.lineLengthTo(i)
+        if (result.line == 1) (result as any).pos += this.lineLengthTo(i)
         ;(result as any).line += line - 1
         return result
       }

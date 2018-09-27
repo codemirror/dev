@@ -181,8 +181,8 @@ describe("doc", () => {
     ist(doc.getLine(200), "1?")
   })
 
-  function eqPos(a: {line: number, col: number}, b: {line: number, col: number}): boolean {
-    return a.line == b.line && a.col == b.col
+  function eqPos(a: {line: number, pos: number}, b: {line: number, pos: number}): boolean {
+    return a.line == b.line && a.pos == b.pos
   }
 
   it("finds line positions", () => {

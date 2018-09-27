@@ -63,7 +63,7 @@ export function scanForBracket(doc: Text, decorations: DecorationSet | undefined
     const line = doc.getLine(lineNo)
     if (line.length > maxScanLen) continue
     let pos = dir > 0 ? 0 : line.length - 1, end = dir > 0 ? line.length : -1
-    if (lineNo == linePos.line) pos = linePos.col - (dir < 0 ? 1 : 0)
+    if (lineNo == linePos.line) pos = linePos.pos - (dir < 0 ? 1 : 0)
     const lineStart = doc.lineStart(lineNo)
     for (; pos != end; pos += dir) {
       const ch = line.charAt(pos)
