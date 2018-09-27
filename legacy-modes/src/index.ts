@@ -15,6 +15,11 @@ const MAX_SCAN_DIST = 20000
 
 type DecoratedRange = {from: number, to: number, decorations: ReadonlyArray<Range<Decoration>>}
 
+function cutDecoratedRange(range: DecoratedRange | null, at: number) {
+  if (!range || at <= range.from) return null
+  return {from: range.from, to: Math.min(at, range.to), decorations: range.decorations.filter(({to}) => to <= at)}
+}
+
 class StateCache<S> {
   private timeout?: number | NodeJS.Timer
 
@@ -127,14 +132,13 @@ class StateCache<S> {
 
   apply(transaction: Transaction): StateCache<S> {
     if (transaction.changes.length == 0) return this
-    let start = transaction.changes.changes.reduce((m, ch) => Math.min(m, ch.from), 1e9)
+    let start = transaction.doc.lineStartAt(transaction.changes.changes.reduce((m, ch) => Math.min(m, ch.from), 1e9))
     let states = []
     for (let cached of this.states) {
       let mapped = transaction.changes.mapPos(cached.pos, -1, true)
       if (mapped > 0) states.push(mapped == cached.pos ? cached : new CachedState(cached.state, mapped))
     }
-    const lastDecorationsTill = transaction.doc.lineStartAt(start)
-    return new StateCache(states, Math.min(start, this.frontier), (!this.lastDecorations || lastDecorationsTill <= this.lastDecorations.from) ? null : {from: this.lastDecorations.from, to: Math.min(lastDecorationsTill, this.lastDecorations.to), decorations: this.lastDecorations.decorations.filter(({from}) => from <= lastDecorationsTill)})
+    return new StateCache(states, Math.min(start, this.frontier), cutDecoratedRange(this.lastDecorations, start))
   }
 }
 
