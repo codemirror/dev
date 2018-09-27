@@ -204,7 +204,7 @@ function selectionFromDOM(view: EditorView) {
 
 function applySelectionChange(view: EditorView) {
   let selection = selectionFromDOM(view)
-  if (!view.state.selection.eq(selection)) {
+  if (!view.state.selection.primary.eq(selection.primary)) {
     let tr = view.state.transaction.setSelection(selection)
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
       if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()

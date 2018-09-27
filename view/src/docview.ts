@@ -206,8 +206,10 @@ export class DocView extends ContentView {
     let domSel = root.getSelection()
     // If the selection is already here, or in an equivalent position, don't touch it
     if (isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
-        isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset))
+        isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {
+      this.drawnSelection.set(domSel)
       return
+    }
 
     // Selection.extend can be used to create an 'inverted' selection
     // (one where the focus is before the anchor), but not all

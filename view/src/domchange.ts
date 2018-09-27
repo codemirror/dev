@@ -31,9 +31,9 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       tr = tr.replaceSelection(reader.text.slice(sel.from - from, sel.to - diff.toA + diff.toB - from).split(LINE_SEP))
     } else {
       tr = tr.replace(start, end, reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
+      if (newSelection && !tr.selection.primary.eq(newSelection.primary))
+        tr = tr.setSelection(tr.selection.replaceRange(newSelection.primary))
     }
-    if (newSelection && !tr.selection.primary.eq(newSelection.primary))
-      tr = tr.setSelection(newSelection)
     // FIXME maybe also try to detect (Android) enter here and call
     // the key handler
     view.dispatch(tr.scrollIntoView())
