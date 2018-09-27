@@ -79,13 +79,14 @@ const enum Dragging {
 }
 
 export type MouseSelectionUpdate = (view: EditorView, startSelection: EditorSelection, startPos: number, curPos: number,
-                                    extend: boolean, multiple: boolean) => EditorSelection
+                                    curBias: -1 | 1, extend: boolean, multiple: boolean) => EditorSelection
 
 class MouseSelection {
   dragging: Dragging
   startSelection: EditorSelection
   startPos: number
-  lastPos: number
+  curPos: number
+  curBias: 1 | -1
   extend: boolean
   multiple: boolean
 
@@ -99,7 +100,9 @@ class MouseSelection {
     this.multiple = view.state.multipleSelections && (browser.mac ? event.metaKey : event.ctrlKey)
 
     this.startSelection = view.state.selection
-    this.startPos = this.lastPos = view.posAtCoords({x: event.clientX, y: event.clientY})
+    let {pos, bias} = this.queryPos(event)
+    this.startPos = this.curPos = pos
+    this.curBias = bias
     this.dragging = isInPrimarySelection(view, this.startPos, event) ? Dragging.MAYBE : Dragging.NO
     // When clicking outside of the selection, immediately apply the
     // effect of starting the selection
@@ -109,12 +112,22 @@ class MouseSelection {
     }
   }
 
+  queryPos(event: MouseEvent): {pos: number, bias: 1 | -1} {
+    let pos = this.view.posAtCoords({x: event.clientX, y: event.clientY})
+    let coords = this.view.coordsAtPos(pos)
+    let bias: 1 | -1 = !coords ? 1 :
+      coords.top > event.clientY ? -1 :
+      coords.bottom < event.clientY ? 1 :
+      coords.left > event.clientX ? -1 : 1
+    return {pos, bias}
+  }
+
   move(event: MouseEvent) {
     if (event.buttons == 0) return this.destroy()
     if (this.dragging != Dragging.NO) return
-    let curPos = this.view.posAtCoords({x: event.clientX, y: event.clientY})
-    if (curPos == this.lastPos) return
-    this.lastPos = curPos
+    let {pos, bias} = this.queryPos(event)
+    if (pos == this.curPos && bias == this.curBias) return
+    this.curPos = pos; this.curBias = bias
     this.select()
   }
 
@@ -131,7 +144,7 @@ class MouseSelection {
   }
 
   select() {
-    let selection = this.update(this.view, this.startSelection, this.startPos, this.lastPos, this.extend, this.multiple)
+    let selection = this.update(this.view, this.startSelection, this.startPos, this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.transaction.setSelection(selection).setMeta(MetaSlot.userEvent, "pointer"))
   }
@@ -140,7 +153,7 @@ class MouseSelection {
     if (changes.length) {
       this.startSelection = this.startSelection.map(changes)
       this.startPos = changes.mapPos(this.startPos)
-      this.lastPos = changes.mapPos(this.lastPos)
+      this.curPos = changes.mapPos(this.curPos)
     }
   }
 }
@@ -232,11 +245,11 @@ handlers.mousedown = (view, event: MouseEvent) => {
     view.startMouseSelection(event, updateMouseSelection(event.detail))
 }
 
-function rangeForClick(view: EditorView, pos: number, type: number): SelectionRange {
+function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number): SelectionRange {
   if (type == 1) { // Single click
     return new SelectionRange(pos)
   } else if (type == 2) { // Double click
-    return SelectionRange.groupAt(view.state, pos) // FIXME pass bias
+    return SelectionRange.groupAt(view.state, pos, bias)
   } else { // Triple click
     let context = LineContext.get(view, pos)
     if (context) return new SelectionRange(context.start + context.line.length, context.start)
@@ -245,8 +258,8 @@ function rangeForClick(view: EditorView, pos: number, type: number): SelectionRa
 }
 
 function updateMouseSelection(type: number): MouseSelectionUpdate {
-  return (view, startSelection, startPos, curPos, extend, multiple) => {
-    let range = rangeForClick(view, curPos, type)
+  return (view, startSelection, startPos, curPos, curBias, extend, multiple) => {
+    let range = rangeForClick(view, curPos, curBias, type)
     if (startPos < range.from || startPos > range.to) range = range.extend(startPos)
     if (extend)
       return startSelection.replaceRange(startSelection.primary.extend(range.from, range.to))
