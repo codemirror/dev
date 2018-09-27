@@ -81,7 +81,7 @@ function normalized(ranges: SelectionRange[], primaryIndex: number = 0): EditorS
     let range = ranges[i], prev = ranges[i - 1]
     if (range.from < prev.to) {
       let from = prev.from, to = Math.max(range.to, prev.to)
-      if (i == primaryIndex) primaryIndex--
+      if (i <= primaryIndex) primaryIndex--
       ranges.splice(--i, 2, range.anchor > range.head ? new SelectionRange(to, from) : new SelectionRange(from, to))
     }
   }
