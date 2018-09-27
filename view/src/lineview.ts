@@ -99,7 +99,7 @@ export class LineView extends ContentView {
       let child = this.children[i]
       if (child instanceof TextView) return {node: child.textDOM!, offset: off}
     }
-    while (i > 0 && this.children[i - 1].getSide() > 0) i--
+    while (i > 0 && (this.children[i - 1].getSide() > 0 || this.children[i - 1].dom!.parentNode != this.dom)) i--
     return {node: this.dom, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
   }
 
