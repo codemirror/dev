@@ -6,6 +6,7 @@ const MAX_LEAF = BASE_LEAF << 1
 // means 8 branches)
 const TARGET_BRANCH_SHIFT = 3
 
+// FIXME stop calling the offset `col`—it is not a column in any reasonable sense
 export class LinePos {
   constructor(readonly line: number, readonly col: number) {}
   toString() { return `${this.line}:${this.col}` }

@@ -1,6 +1,6 @@
 import {HeightMap, HeightOracle} from "../src/heightmap"
 import {Decoration, WidgetType} from "../src/decoration"
-import {Text} from "../../doc/src/text"
+import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 const ist = require("ist")
 

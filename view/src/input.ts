@@ -239,8 +239,8 @@ function rangeForClick(view: EditorView, pos: number, type: number): SelectionRa
     return new SelectionRange(pos) // FIXME by-word, language sensitive
   } else { // Triple click
     let context = LineContext.get(view, pos)
-    if (context) return new SelectionRange(context.start, context.start + context.line.length)
-    return new SelectionRange(view.state.doc.lineStartAt(pos), view.state.doc.lineEndAt(pos))
+    if (context) return new SelectionRange(context.start + context.line.length, context.start)
+    return new SelectionRange(view.state.doc.lineEndAt(pos), view.state.doc.lineStartAt(pos))
   }
 }
 

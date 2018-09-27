@@ -1,6 +1,6 @@
 import {ContentView, dirty} from "./contentview"
 import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, PointDecoration} from "./decoration"
-import {Text, TextIterator} from "../../doc/src/text"
+import {Text, TextIterator} from "../../doc/src"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {Rect} from "./dom"
 import browser from "./browser"

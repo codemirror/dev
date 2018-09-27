@@ -1,5 +1,5 @@
 import {StringStreamCursor} from "../src/stringstreamcursor"
-import {Text} from "../../doc/src/text"
+import {Text} from "../../doc/src"
 
 const ist = require("ist")
 

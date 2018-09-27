@@ -1,7 +1,7 @@
 import {EditorView} from "./editorview"
 import {LineView} from "./lineview"
 import {InlineView, TextView} from "./inlineview"
-import {Text as Doc} from "../../doc/src/text"
+import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
 import browser from "./browser"
 
@@ -85,7 +85,7 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
   if (context == null) {
     for (let pos = start;; pos += dir) {
       if (pos == 0 || pos == doc.length) return pos
-      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)).charCodeAt(0))) {
+      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
       }
@@ -100,7 +100,7 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
     }
     let inline = children[i]
     if (inline instanceof TextView) {
-      if (!isExtendingChar(inline.text.charCodeAt(off - (dir < 0 ? 1 : 0)))) {
+      if (!isExtendingChar(inline.text.charAt(off - (dir < 0 ? 1 : 0)))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
       }
@@ -111,42 +111,12 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
   }
 }
 
-function countColumn(string: string, tabSize: number): number {
-  let n = 0
-  for (let i = 0; i < string.length; i++) {
-    let code = string.charCodeAt(i)
-    if (code == 9) n += tabSize - (n % tabSize)
-    else if (code < 0xdc00 || code >= 0xe000) n++
-  }
-  return n
-}
-
-// FIXME move somewhere reasonable, export
-
-function findColumn(string: string, col: number, tabSize: number): number {
-  let n = 0
-  for (let i = 0; i < string.length; i++) {
-    let code = string.charCodeAt(i)
-    if (code >= 0xdc00 && code < 0xe000) continue
-    if (n >= col) return i
-    n += code == 9 ? tabSize - (n % tabSize) : 1
-  }
-  return string.length
-}
-
 function getGoalColumn(view: EditorView, pos: number, column: number): {pos: number, column: number} {
   for (let goal of view.inputState.goalColumns)
     if (goal.pos == pos) return goal
   let goal = {pos: 0, column}
   view.inputState.goalColumns.push(goal)
   return goal
-}
-
-let extendingChars = /[\u0300-\u036f\u0483-\u0489\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7\u0610-\u061a\u064b-\u065e\u0670\u06d6-\u06dc\u06de-\u06e4\u06e7\u06e8\u06ea-\u06ed\u0711\u0730-\u074a\u0b82\u0bbe\u0bc0\u0bcd\u0bd7\u0d3e\u0d41-\u0d44\u0d4d\u0d57\u0d62\u0d63\u0e31\u0e34-\u0e3a\u0e47-\u0e4e\u0eb1\u0eb4-\u0eb9\u0ebb\u0ebc\u0ec8-\u0ecd\u180b-\u180d\u18a9\u200c\u200d]/
-try { extendingChars = new RegExp("\\p{Grapheme_Extend}", "u") } catch (_) {}
-
-function isExtendingChar(code: number): boolean {
-  return code >= 768 && (code >= 0xdc00 && code < 0xe000 || extendingChars.test(String.fromCharCode(code)))
 }
 
 export class LineContext {

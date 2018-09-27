@@ -1,4 +1,4 @@
-import {Text, TextIterator} from "../../doc/src/text"
+import {Text, TextIterator} from "../../doc/src"
 import {StringStream} from "./stringstream"
 
 export class StringStreamCursor {

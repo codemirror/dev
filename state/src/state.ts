@@ -1,4 +1,4 @@
-import {joinLines, splitLines, Text} from "../../doc/src/text"
+import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Plugin, StateField} from "./plugin"
 import {Transaction, MetaSlot} from "./transaction"

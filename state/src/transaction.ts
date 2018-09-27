@@ -1,4 +1,4 @@
-import {Text} from "../../doc/src/text"
+import {Text} from "../../doc/src"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {unique} from "./plugin"
