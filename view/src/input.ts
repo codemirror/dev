@@ -236,7 +236,7 @@ function rangeForClick(view: EditorView, pos: number, type: number): SelectionRa
   if (type == 1) { // Single click
     return new SelectionRange(pos)
   } else if (type == 2) { // Double click
-    return new SelectionRange(pos) // FIXME by-word, language sensitive
+    return SelectionRange.groupAt(view.state, pos) // FIXME pass bias
   } else { // Triple click
     let context = LineContext.get(view, pos)
     if (context) return new SelectionRange(context.start + context.line.length, context.start)

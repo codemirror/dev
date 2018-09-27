@@ -1,4 +1,6 @@
 import {Mapping} from "./change"
+import {EditorState} from "./state"
+import {charType} from "../../doc/src"
 
 export class SelectionRange {
   constructor(public readonly anchor: number, public readonly head: number = anchor) {}
@@ -21,6 +23,19 @@ export class SelectionRange {
 
   eq(other: SelectionRange): boolean {
     return this.anchor == other.anchor && this.head == other.head
+  }
+
+  static groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
+    // FIXME at some point, take language-specific identifier characters into account
+    let {line, col} = state.doc.linePos(pos), text = state.doc.getLine(line)
+    if (text.length == 0) return new SelectionRange(pos)
+    if (col == 0) bias = 1
+    else if (col == text.length) bias = -1
+    let type = charType(text.charAt(col + (bias < 0 ? -1 : 0)))
+    let from = pos, to = pos
+    for (let fromCol = col; fromCol > 0 && charType(text.charAt(fromCol - 1)) == type; fromCol--) from--
+    for (let toCol = col; toCol < text.length && charType(text.charAt(toCol)) == type; toCol++) to++
+    return new SelectionRange(to, from)
   }
 }
 
