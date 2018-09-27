@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src/text"
-import {Plugin} from "../../state/src"
+import {EditorState, Plugin} from "../../state/src"
 import {EditorView} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
