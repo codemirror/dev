@@ -78,15 +78,18 @@ const enum Dragging {
   YES, NO
 }
 
-export type MouseSelectionUpdate = (view: EditorView, startSelection: EditorSelection, startPos: number, curPos: number,
-                                    curBias: -1 | 1, extend: boolean, multiple: boolean) => EditorSelection
+export type MouseSelectionUpdate = (view: EditorView, startSelection: EditorSelection,
+                                    startPos: number, startBias: -1 | 1,
+                                    curPos: number, curBias: -1 | 1,
+                                    extend: boolean, multiple: boolean) => EditorSelection
 
 class MouseSelection {
   dragging: Dragging
   startSelection: EditorSelection
   startPos: number
+  startBias: -1 | 1
   curPos: number
-  curBias: 1 | -1
+  curBias: -1 | 1
   extend: boolean
   multiple: boolean
 
@@ -102,7 +105,7 @@ class MouseSelection {
     this.startSelection = view.state.selection
     let {pos, bias} = this.queryPos(event)
     this.startPos = this.curPos = pos
-    this.curBias = bias
+    this.startBias = this.curBias = bias
     this.dragging = isInPrimarySelection(view, this.startPos, event) ? Dragging.MAYBE : Dragging.NO
     // When clicking outside of the selection, immediately apply the
     // effect of starting the selection
@@ -144,7 +147,8 @@ class MouseSelection {
   }
 
   select() {
-    let selection = this.update(this.view, this.startSelection, this.startPos, this.curPos, this.curBias, this.extend, this.multiple)
+    let selection = this.update(this.view, this.startSelection, this.startPos, this.startBias,
+                                this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.transaction.setSelection(selection).setMeta(MetaSlot.userEvent, "pointer"))
   }
@@ -258,9 +262,12 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
 }
 
 function updateMouseSelection(type: number): MouseSelectionUpdate {
-  return (view, startSelection, startPos, curPos, curBias, extend, multiple) => {
+  return (view, startSelection, startPos, startBias, curPos, curBias, extend, multiple) => {
     let range = rangeForClick(view, curPos, curBias, type)
-    if (startPos < range.from || startPos > range.to) range = range.extend(startPos)
+    if (startPos != curPos && !extend) {
+      let startRange = rangeForClick(view, startPos, startBias, type)
+      range = range.extend(Math.min(startRange.from, range.from), Math.max(startRange.to, range.to))
+    }
     if (extend)
       return startSelection.replaceRange(startSelection.primary.extend(range.from, range.to))
     else if (multiple)
