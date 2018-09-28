@@ -32,6 +32,17 @@ export abstract class Text {
   abstract linePos(pos: number): LinePos
   abstract getLine(n: number): string
 
+  lineAt(pos: number): Line {
+    if (pos < 0 || pos > this.length) throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
+    return this.lineInner(pos, false, 1, 0).finish(this)
+  }
+  line(n: number): Line {
+    if (n < 1 || n > this.lines) throw new RangeError("Invalid line number ${n} in ${this.lines}-line document")
+    return this.lineInner(n, true, 1, 0).finish(this)
+  }
+  // @internal
+  abstract lineInner(target: number, isLine: boolean, line: number, offset: number): Line
+
   replace(from: number, to: number, text: ReadonlyArray<string>): Text {
     if (text.length == 0) throw new RangeError("An inserted range must have at least one line")
     return this.replaceInner(from, to, text, textLength(text))
@@ -109,6 +120,16 @@ class TextLeaf extends Text {
       pos += this.text[i].length + 1
     }
     throw new RangeError("Invalid line number")
+  }
+
+  lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
+    for (let i = 0;; i++) {
+      let string = this.text[i], end = offset + string.length
+      if ((isLine ? line : end) >= target)
+        return new Line(offset, end, line, string)
+      offset = end + 1
+      line++
+    }
   }
 
   lineStartAt(pos: number): number {
@@ -239,6 +260,26 @@ class TextNode extends Text {
       line = endLine
     }
     throw new RangeError("Invalid line number")
+  }
+
+  lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
+    for (let i = 0;; i++) {
+      let child = this.children[i], end = offset + child.length, endLine = line + child.lines - 1
+      if ((isLine ? endLine : end) >= target) {
+        let inner = child.lineInner(target, isLine, line, offset), add
+        if (inner.start == offset && (add = this.lineLengthTo(i))) {
+          ;(inner as any).start -= add
+          ;(inner as any).content = null
+        }
+        if (inner.end == end && (add = this.lineLengthFrom(i + 1))) {
+          ;(inner as any).end += add
+          ;(inner as any).content = null
+        }
+        return inner
+      }
+      offset = end
+      line = endLine
+    }
   }
 
   lineStartAt(pos: number): number {
@@ -562,4 +603,50 @@ class LineCursor implements TextIterator {
   }
 
   get lineBreak() { return false }
+}
+
+export class Line {
+  constructor(readonly start: number,
+              readonly end: number,
+              readonly line: number,
+              // @internal
+              public content: string | null | LineContent) {}
+
+  get length() { return this.end - this.start }
+
+  slice(from: number = 0, to: number = this.length) {
+    if (typeof this.content == "string")
+      return to == from + 1 ? this.content.charAt(from) : this.content.slice(from, to)
+    if (from == to) return ""
+    return this.content!.slice(from, to)
+  }
+
+  // @internal
+  finish(text: Text): this {
+    if (this.content == null) this.content = new LineContent(text, this.start)
+    return this
+  }
+}
+
+class LineContent {
+  cursor: null | TextIterator = null
+  strings: string[] | null = null
+
+  constructor(private doc: Text, private start: number) {}
+
+  // FIXME quadratic complexity (somewhat) when iterating long lines in small pieces
+  slice(from: number, to: number) {
+    if (!this.cursor) {
+      this.cursor = this.doc.iter()
+      this.strings = [this.cursor.next(this.start).value]
+    }
+    for (let result = "", pos = 0, i = 0;; i++) {
+      if (i == this.strings!.length) this.strings!.push(this.cursor!.next().value)
+      let string = this.strings![i], end = pos + string.length
+      if (end <= from) continue
+      result += string.slice(Math.max(0, from - pos), Math.min(string.length, to - pos))
+      if (end >= to) return result
+      pos += string.length
+    }
+  }
 }

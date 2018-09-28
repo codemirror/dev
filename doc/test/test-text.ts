@@ -181,19 +181,27 @@ describe("doc", () => {
     ist(doc.getLine(200), "1?")
   })
 
-  function eqPos(a: {line: number, pos: number}, b: {line: number, pos: number}): boolean {
-    return a.line == b.line && a.pos == b.pos
-  }
-
-  it("finds line positions", () => {
-    for (let i = 0; i < doc0.length; i += 5)
-      ist(doc0.linePos(i), new LinePos(Math.floor(i / 101) + 1, i % 101), eqPos)
+  it("can get line info by line number", () => {
+    ist.throws(() => doc0.line(0), /Invalid line/)
+    ist.throws(() => doc0.line(doc0.lines + 1), /Invalid line/)
+    for (let i = 1; i < doc0.lines; i += 5) {
+      let l = doc0.line(i)
+      ist(l.start, (i - 1) * 101)
+      ist(l.end, i * 101 - 1)
+      ist(l.line, i)
+      ist(l.slice(), line)
+    }
   })
 
-  it("can find line starts and ends", () => {
+  it("can get line info by position", () => {
+    ist.throws(() => doc0.lineAt(-10), /Invalid position/)
+    ist.throws(() => doc0.lineAt(doc0.length + 1), /Invalid position/)
     for (let i = 0; i < doc0.length; i += 5) {
-      ist(doc0.lineStartAt(i), i - (i % 101))
-      ist(doc0.lineEndAt(i), i - (i % 101) + 100)
+      let l = doc0.lineAt(i)
+      ist(l.start, i - (i % 101))
+      ist(l.end, i - (i % 101) + 100)
+      ist(l.line, Math.floor(i / 101) + 1)
+      ist(l.slice(), line)
     }
   })
 
