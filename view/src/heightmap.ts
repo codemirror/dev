@@ -283,8 +283,6 @@ class HeightMapGap extends HeightMap {
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
     if (nodes.length != 1 || !(nodes[0] instanceof HeightMapGap))
       return super.replace(from, to, nodes, oracle, newFrom, newTo)
-    console.log("here", from, to, "-", newFrom, newTo)
-    let newStart = newFrom - from
     this.setHeight(oracle, oracle.heightForGap(newFrom - from, newTo + this.length - to))
     this.length += nodes[0].length - (to - from)
     return this

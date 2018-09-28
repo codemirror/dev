@@ -20,14 +20,23 @@ export abstract class Text {
   abstract readonly lines: number
   abstract readonly children: ReadonlyArray<Text> | null
 
-  // FIXME cache a few of these?
   lineAt(pos: number): Line {
     if (pos < 0 || pos > this.length) throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
-    return this.lineInner(pos, false, 1, 0).finish(this)
+    for (let i = 0; i < lineCache.length; i += 2) {
+      if (lineCache[i] != this) continue
+      let line = lineCache[i + 1]
+      if (line.start <= pos && line.end >= pos) return line
+    }
+    return cacheLine(this, this.lineInner(pos, false, 1, 0).finish(this))
   }
   line(n: number): Line {
     if (n < 1 || n > this.lines) throw new RangeError("Invalid line number ${n} in ${this.lines}-line document")
-    return this.lineInner(n, true, 1, 0).finish(this)
+    for (let i = 0; i < lineCache.length; i += 2) {
+      if (lineCache[i] != this) continue
+      let line = lineCache[i + 1]
+      if (line.number == n) return line
+    }
+    return cacheLine(this, this.lineInner(n, true, 1, 0).finish(this))
   }
   // @internal
   abstract lineInner(target: number, isLine: boolean, line: number, offset: number): Line
@@ -74,6 +83,15 @@ export abstract class Text {
     let length = textLength(text)
     return length < MAX_LEAF ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
   }
+}
+
+let lineCache: any[] = [], lineCachePos = -2, lineCacheSize = 12
+
+function cacheLine(text: Text, line: Line): Line {
+  lineCachePos = (lineCachePos + 2) % lineCacheSize
+  lineCache[lineCachePos] = text
+  lineCache[lineCachePos + 1] = line
+  return line
 }
 
 export function splitLines(text: string, lineSeparator: string | RegExp = DEFAULT_SPLIT): string[] {
