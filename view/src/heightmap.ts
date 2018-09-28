@@ -102,11 +102,12 @@ export abstract class HeightMap {
   }
 
   applyChanges(decorations: ReadonlyArray<DecorationSet>, oracle: HeightOracle, changes: ReadonlyArray<ChangedRange>): HeightMap {
-    let me: HeightMap = this
-    for (let i = changes.length - 1; i >= 0; i--) {
+    let me: HeightMap = this, off = 0
+    for (let i = 0; i < changes.length; i++) {
       let range = changes[i]
       let nodes = buildChangedNodes(oracle, decorations, range.fromB, range.toB)
-      me = me.replace(range.fromA, range.toA, nodes, oracle, range.fromB, range.toB)
+      me = me.replace(range.fromA + off, range.toA + off, nodes, oracle, range.fromB, range.toB)
+      off += (range.toB - range.fromB) - (range.toA - range.fromA)
     }
     return me
   }
@@ -283,8 +284,12 @@ class HeightMapGap extends HeightMap {
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
     if (nodes.length != 1 || !(nodes[0] instanceof HeightMapGap))
       return super.replace(from, to, nodes, oracle, newFrom, newTo)
-    this.setHeight(oracle, oracle.heightForGap(newFrom - from, newTo + this.length - to))
-    this.length += nodes[0].length - (to - from)
+    this.length += (newTo - newFrom) - (to - from)
+    let newStart = newFrom - from
+    // FIXME the Math.min is a kludge to deal with the fact that, if
+    // there are further changes that'll be applied by applyChanges,
+    // the estimated length here may extend past the end of the document
+    this.setHeight(oracle, oracle.heightForGap(newStart, Math.min(oracle.doc.length, newStart + this.length)))
     return this
   }
 
