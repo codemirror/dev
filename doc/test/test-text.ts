@@ -1,4 +1,4 @@
-import {Text, LinePos} from "../src/text"
+import {Text} from "../src/text"
 const ist = require("ist")
 
 function depth(node: Text): number {

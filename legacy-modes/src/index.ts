@@ -132,7 +132,7 @@ class StateCache<S> {
 
   apply(transaction: Transaction): StateCache<S> {
     if (transaction.changes.length == 0) return this
-    let start = transaction.doc.lineStartAt(transaction.changes.changes.reduce((m, ch) => Math.min(m, ch.from), 1e9))
+    let {start} = transaction.doc.lineAt(transaction.changes.changes.reduce((m, ch) => Math.min(m, ch.from), 1e9))
     let states = []
     for (let cached of this.states) {
       let mapped = transaction.changes.mapPos(cached.pos, -1, true)

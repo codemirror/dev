@@ -158,7 +158,7 @@ class HeightMapLine extends HeightMap {
   }
 
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    if (nodes.length != 1 || (nodes[0] instanceof HeightMapGap && oracle.doc.lineEndAt(newFrom) < newTo))
+    if (nodes.length != 1 || (nodes[0] instanceof HeightMapGap && oracle.doc.lineAt(newFrom).end < newTo))
       return super.replace(from, to, nodes, oracle, newFrom, newTo)
     this.deco = offsetDeco(this.deco, from, to, nodes[0].length)
     if (nodes[0] instanceof HeightMapLine) this.deco = insertDeco(this.deco, (nodes[0] as HeightMapLine).deco, from)
@@ -173,7 +173,7 @@ class HeightMapLine extends HeightMap {
     } else if (node instanceof HeightMapLine) {
       target.push(this.joinLine(to, this.length, node))
     } else {
-      let nextEnd = oracle.doc.lineEndAt(newTo), breakInside = nextEnd < newTo + node.length
+      let nextEnd = oracle.doc.lineAt(newTo).end, breakInside = nextEnd < newTo + node.length
       let newLen = to + (breakInside ? nextEnd - newTo : node.length)
       target.push(new HeightMapLine(newLen, this.height, offsetDeco(this.deco, to, this.length, 0)))
       if (breakInside)
@@ -187,7 +187,7 @@ class HeightMapLine extends HeightMap {
     } else if (node instanceof HeightMapLine) {
       target.push(this.joinLine(0, from, node))
     } else {
-      let prevStart = oracle.doc.lineStartAt(newFrom), breakInside = prevStart > newFrom - node.length
+      let prevStart = oracle.doc.lineAt(newFrom).start, breakInside = prevStart > newFrom - node.length
       if (breakInside)
         target.push(new HeightMapGap(newFrom - node.length, prevStart - 1, oracle))
       let newLen = (breakInside ? newFrom - prevStart : node.length) + (this.length - from)
@@ -277,7 +277,8 @@ class HeightMapGap extends HeightMap {
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
-    return new Viewport(doc.lineStartAt(pos + offset), doc.lineEndAt(pos + offset))
+    let {start, end} = doc.lineAt(pos + offset)
+    return new Viewport(start, end)
   }
 
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
@@ -293,7 +294,7 @@ class HeightMapGap extends HeightMap {
     if (node instanceof HeightMapGap) {
       target.push(new HeightMapGap(newOffset, newTo + node.length, oracle))
     } else {
-      let lineStart = oracle.doc.lineStartAt(newTo)
+      let lineStart = oracle.doc.lineAt(newTo).start
       if (lineStart > newOffset) target.push(new HeightMapGap(newOffset, lineStart - 1, oracle))
       let deco = offsetDeco((node as HeightMapLine).deco, 0, 0, newTo - lineStart)
       target.push(new HeightMapLine(newTo + node.length - lineStart, node.height, deco))
@@ -305,7 +306,7 @@ class HeightMapGap extends HeightMap {
     if (node instanceof HeightMapGap) {
       target.push(new HeightMapGap(newFrom - node.length, newEnd, oracle))
     } else {
-      let lineEnd = oracle.doc.lineEndAt(newFrom)
+      let lineEnd = oracle.doc.lineAt(newFrom).end
       target.push(new HeightMapLine(node.length + (lineEnd - newFrom), node.height, (node as HeightMapLine).deco))
       if (newEnd > lineEnd) target.push(new HeightMapGap(lineEnd + 1, newEnd, oracle))
     }
@@ -336,7 +337,7 @@ class HeightMapGap extends HeightMap {
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
     let line = {height: -1, hasCollapsedRanges: false}
     for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos < end;) {
-      let end = oracle.doc.lineEndAt(pos)
+      let end = oracle.doc.lineAt(pos).end
       line.height = oracle.heightForLine(end - pos)
       f(pos, end, line)
       pos = end + 1
@@ -468,7 +469,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   advance(pos: number) {
     if (pos <= this.pos) return
     if (this.curLine) {
-      if (this.lineEnd < 0) this.lineEnd = this.oracle.doc.lineEndAt(this.pos)
+      if (this.lineEnd < 0) this.lineEnd = this.oracle.doc.lineAt(this.pos).end
       if (pos > this.lineEnd) {
         this.curLine.length += (this.lineEnd - this.pos)
         this.curLine.updateHeight(this.oracle, this.lineEnd - this.curLine.length)
@@ -511,7 +512,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
 
   addDeco(val: number) {
     if (!this.curLine) {
-      this.lineStart = Math.max(this.writtenTo, this.oracle.doc.lineStartAt(this.pos))
+      this.lineStart = Math.max(this.writtenTo, this.oracle.doc.lineAt(this.pos).start)
       this.flushTo(this.lineStart - 1)
       this.nodes.push(this.curLine = new HeightMapLine(this.pos - this.lineStart, 0, []))
       this.writtenTo = this.pos

@@ -27,11 +27,10 @@ export abstract class Text {
 
   abstract lineStart(n: number): number
   lineEnd(n: number): number { return n == this.lines ? this.length : this.lineStart(n + 1) - 1 }
-  abstract lineStartAt(pos: number): number
-  abstract lineEndAt(pos: number): number
   abstract linePos(pos: number): LinePos
   abstract getLine(n: number): string
 
+  // FIXME cache a few of these?
   lineAt(pos: number): Line {
     if (pos < 0 || pos > this.length) throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
     return this.lineInner(pos, false, 1, 0).finish(this)
@@ -129,22 +128,6 @@ class TextLeaf extends Text {
         return new Line(offset, end, line, string)
       offset = end + 1
       line++
-    }
-  }
-
-  lineStartAt(pos: number): number {
-    for (let start = 0, i = 0;; i++) {
-      let end = start + this.text[i].length
-      if (end >= pos || i == this.text.length - 1) return start
-      start = end + 1
-    }
-  }
-
-  lineEndAt(pos: number): number {
-    for (let end = this.length, i = this.text.length - 1;; i--) {
-      let start = end - this.text[i].length
-      if (start <= pos || i == 0) return end
-      end = start - 1
     }
   }
 
@@ -280,30 +263,6 @@ class TextNode extends Text {
       offset = end
       line = endLine
     }
-  }
-
-  lineStartAt(pos: number): number {
-    for (let i = 0, cur = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = cur + child.length
-      if (end >= pos) {
-        let inner = child.lineStartAt(pos - cur)
-        return inner + cur - (inner == 0 ? inner + this.lineLengthTo(i) : 0)
-      }
-      cur = end
-    }
-    throw new RangeError("Position outside of document")
-  }
-
-  lineEndAt(pos: number): number {
-    for (let i = this.children.length - 1, cur = this.length; i >= 0; i--) {
-      let child = this.children[i], start = cur - child.length
-      if (start <= pos) {
-        let inner = child.lineEndAt(pos - start)
-        return start + inner + (inner == child.length ? this.lineLengthFrom(i + 1) : 0)
-      }
-      cur = start
-    }
-    throw new RangeError("Position outside of document")
   }
 
   linePos(pos: number): LinePos {

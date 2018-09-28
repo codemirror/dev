@@ -23,14 +23,13 @@ function crudeInsertNewlineAndIndent({state, dispatch}: EditorView): boolean {
 }
 function crudeIndentLine({state, dispatch}: EditorView): boolean {
   let cursor = state.selection.primary.head // FIXME doesn't indent multiple lines
-  let lineStart = state.doc.lineStartAt(cursor)
-  let line = state.doc.slice(lineStart, cursor + 100)
-  let space = /^ */.exec(line)[0].length // FIXME doesn't handle tabs
-  let indentation = (mode as any).indentation(state, lineStart)
+  let line = state.doc.lineAt(cursor), text = line.slice(0, 100)
+  let space = /^ */.exec(text)[0].length // FIXME doesn't handle tabs
+  let indentation = (mode as any).indentation(state, line.start)
   if (indentation == -1) indentation = space
-  let tr = state.transaction.replace(lineStart, lineStart + space, " ".repeat(indentation)).scrollIntoView()
-  if (cursor <= lineStart + space)
-    tr = tr.setSelection(EditorSelection.single(lineStart + indentation))
+  let tr = state.transaction.replace(line.start, line.start + space, " ".repeat(indentation)).scrollIntoView()
+  if (cursor <= line.start + space)
+    tr = tr.setSelection(EditorSelection.single(line.start + indentation))
   dispatch(tr)
   return true
 }

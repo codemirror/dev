@@ -46,7 +46,8 @@ export function movePos(view: EditorView, start: number,
     return moveCharacterSimple(start, dir, context, view.state.doc)
   } else if (granularity == "lineboundary") {
     if (context) return context.start + (dir < 0 ? 0 : context.line.length)
-    return dir < 0 ? view.state.doc.lineStartAt(start) : view.state.doc.lineEndAt(start)
+    let line = view.state.doc.lineAt(start)
+    return dir < 0 ? line.start : line.end
   } else if (granularity == "line") {
     if (context && !context.nearViewportEnd(view, dir)) {
       let startCoords = view.docView.coordsAt(start)!
