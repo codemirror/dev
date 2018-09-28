@@ -60,7 +60,8 @@ export function scanForBracket(doc: Text, decorations: DecorationSet | undefined
                           : Math.max(1, linePos.line - maxScanLines)
   let lineNo
   for (lineNo = linePos.line; lineNo != lineEnd; lineNo += dir) {
-    const line = doc.getLine(lineNo)
+    // FIXME don't pull in lines one at a time, since that might incur a lot of string concatenation for long lines
+    const line = doc.line(lineNo).slice()
     if (line.length > maxScanLen) continue
     let pos = dir > 0 ? 0 : line.length - 1, end = dir > 0 ? line.length : -1
     if (lineNo == linePos.line) pos = linePos.pos - (dir < 0 ? 1 : 0)

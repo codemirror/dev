@@ -173,14 +173,6 @@ describe("doc", () => {
     ist.throws(() => doc0.lineStart(0), /Invalid line/)
   })
 
-  it("can retrieve line content", () => {
-    for (let i = 1; i <= 200; i++) ist(doc0.getLine(i), line)
-    ist.throws(() => doc0.getLine(201), /Invalid line/)
-    ist.throws(() => doc0.getLine(0), /Invalid line/)
-    let doc = doc0.replace(doc0.length - 99, doc0.length, ["?"])
-    ist(doc.getLine(200), "1?")
-  })
-
   it("can get line info by line number", () => {
     ist.throws(() => doc0.line(0), /Invalid line/)
     ist.throws(() => doc0.line(doc0.lines + 1), /Invalid line/)
@@ -188,7 +180,7 @@ describe("doc", () => {
       let l = doc0.line(i)
       ist(l.start, (i - 1) * 101)
       ist(l.end, i * 101 - 1)
-      ist(l.line, i)
+      ist(l.number, i)
       ist(l.slice(), line)
     }
   })
@@ -200,7 +192,7 @@ describe("doc", () => {
       let l = doc0.lineAt(i)
       ist(l.start, i - (i % 101))
       ist(l.end, i - (i % 101) + 100)
-      ist(l.line, Math.floor(i / 101) + 1)
+      ist(l.number, Math.floor(i / 101) + 1)
       ist(l.slice(), line)
     }
   })

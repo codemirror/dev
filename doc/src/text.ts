@@ -28,7 +28,6 @@ export abstract class Text {
   abstract lineStart(n: number): number
   lineEnd(n: number): number { return n == this.lines ? this.length : this.lineStart(n + 1) - 1 }
   abstract linePos(pos: number): LinePos
-  abstract getLine(n: number): string
 
   // FIXME cache a few of these?
   lineAt(pos: number): Line {
@@ -138,11 +137,6 @@ class TextLeaf extends Text {
       if (end >= pos) return new LinePos(i + 1, pos - start)
       start = end + 1
     }
-  }
-
-  getLine(n: number): string {
-    if (n < 1 || n > this.lines) throw new RangeError("Invalid line number")
-    return this.text[n - 1]
   }
 
   decomposeStart(to: number, target: Text[]) {
@@ -279,17 +273,6 @@ class TextNode extends Text {
       curPos = end
       line += child.lines - 1
     }
-  }
-
-  // Not written directly on top of getLine and slice to avoid three
-  // trips down the tree for a single call
-  getLine(n: number): string {
-    for (let i = 0, line = 1; i < this.children.length; i++) {
-      let child = this.children[i], end = line + child.lines - 1
-      if (n > line && n < end) return child.getLine(n - line + 1)
-      line = end
-    }
-    return this.slice(this.lineStart(n), n == this.lines ? this.length : this.lineStart(n + 1) - 1)
   }
 
   decomposeStart(to: number, target: Text[]) {
@@ -567,7 +550,7 @@ class LineCursor implements TextIterator {
 export class Line {
   constructor(readonly start: number,
               readonly end: number,
-              readonly line: number,
+              readonly number: number,
               // @internal
               public content: string | null | LineContent) {}
 
