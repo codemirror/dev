@@ -185,7 +185,6 @@ describe("builtin commands", () => {
   }))
 
   it("del", forAllValidPositions(async function (cm, start) {
-    if (firefox && start === 2000) return // https://github.com/codemirror/codemirror.next/issues/32
     const text = await tests.getText()
     await cm.sendKeys(Key.DELETE)
     const pos = await tests.getCursor()
