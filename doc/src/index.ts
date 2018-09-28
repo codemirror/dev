@@ -1,3 +1,3 @@
 export {isExtendingChar, isWordChar, charType} from "./char"
 export {countColumn, findColumn} from "./column"
-export {LinePos, TextIterator, Text, splitLines, joinLines} from "./text"
+export {Line, TextIterator, Text, splitLines, joinLines} from "./text"

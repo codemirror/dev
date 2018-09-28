@@ -167,12 +167,6 @@ describe("doc", () => {
     ist(JSON.stringify(result), JSON.stringify([long]))
   })
 
-  it("finds line starts", () => {
-    for (let i = 1; i <= 200; i++) ist(doc0.lineStart(i), (i - 1) * 101)
-    ist.throws(() => doc0.lineStart(201), /Invalid line/)
-    ist.throws(() => doc0.lineStart(0), /Invalid line/)
-  })
-
   it("can get line info by line number", () => {
     ist.throws(() => doc0.line(0), /Invalid line/)
     ist.throws(() => doc0.line(doc0.lines + 1), /Invalid line/)

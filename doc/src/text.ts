@@ -6,11 +6,6 @@ const MAX_LEAF = BASE_LEAF << 1
 // means 8 branches)
 const TARGET_BRANCH_SHIFT = 3
 
-export class LinePos {
-  constructor(readonly line: number, readonly pos: number) {}
-  toString() { return `${this.line}:${this.pos}` }
-}
-
 export interface TextIterator extends Iterator<string> {
   next(skip?: number): this
   value: string
@@ -24,10 +19,6 @@ export abstract class Text {
   abstract readonly length: number
   abstract readonly lines: number
   abstract readonly children: ReadonlyArray<Text> | null
-
-  abstract lineStart(n: number): number
-  lineEnd(n: number): number { return n == this.lines ? this.length : this.lineStart(n + 1) - 1 }
-  abstract linePos(pos: number): LinePos
 
   // FIXME cache a few of these?
   lineAt(pos: number): Line {
@@ -112,14 +103,6 @@ class TextLeaf extends Text {
     return appendText(this.text, target, from, to)
   }
 
-  lineStart(n: number): number {
-    for (let i = 0, pos = 0; i < this.text.length; i++) {
-      if (n == i + 1) return pos
-      pos += this.text[i].length + 1
-    }
-    throw new RangeError("Invalid line number")
-  }
-
   lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
     for (let i = 0;; i++) {
       let string = this.text[i], end = offset + string.length
@@ -127,15 +110,6 @@ class TextLeaf extends Text {
         return new Line(offset, end, line, string)
       offset = end + 1
       line++
-    }
-  }
-
-  linePos(pos: number): LinePos {
-    if (pos > this.length) throw new RangeError("Position outside of document")
-    for (let i = 0, start = 0;; i++) {
-      let end = start + this.text[i].length
-      if (end >= pos) return new LinePos(i + 1, pos - start)
-      start = end + 1
     }
   }
 
@@ -229,16 +203,6 @@ class TextNode extends Text {
     return target
   }
 
-  lineStart(n: number): number {
-    for (let i = 0, line = 1, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], endLine = line + child.lines - 1
-      if (n <= endLine) return child.lineStart(n - line + 1) + pos
-      pos += child.length
-      line = endLine
-    }
-    throw new RangeError("Invalid line number")
-  }
-
   lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
     for (let i = 0;; i++) {
       let child = this.children[i], end = offset + child.length, endLine = line + child.lines - 1
@@ -256,22 +220,6 @@ class TextNode extends Text {
       }
       offset = end
       line = endLine
-    }
-  }
-
-  linePos(pos: number): LinePos {
-    if (pos > this.length) throw new RangeError("Position outside of document")
-    for (let i = 0, line = 1, curPos = 0;; i++) {
-      let child = this.children[i], end = curPos + child.length
-      if (end >= pos) {
-        let result = child.linePos(pos - curPos)
-        // Crude patching of officially-readonly LinePos (which was created by the recursive call)
-        if (result.line == 1) (result as any).pos += this.lineLengthTo(i)
-        ;(result as any).line += line - 1
-        return result
-      }
-      curPos = end
-      line += child.lines - 1
     }
   }
 

@@ -16,7 +16,7 @@ export class HeightOracle {
   heightChanged: boolean = false
 
   heightForGap(from: number, to: number): number {
-    let lines = this.doc.linePos(to).line - this.doc.linePos(from).line + 1
+    let lines = this.doc.lineAt(to).number - this.doc.lineAt(from).number + 1
     if (this.lineWrapping)
       lines += Math.ceil(((to - from) - (lines * this.lineLength * 0.5)) / this.lineLength)
     return this.lineHeight * lines
@@ -264,16 +264,15 @@ class HeightMapGap extends HeightMap {
   get size(): number { return 1 }
 
   heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
-    let firstLine = doc.linePos(offset).line, lastLine = doc.linePos(offset + this.length).line
+    let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
     let lines = lastLine - firstLine + 1
-    if (pos < 0) throw new Error("YOU")
-    return (doc.linePos(pos).line - firstLine + (offset > 0 ? 1 : 0)) * (this.height / lines)
+    return (doc.lineAt(pos).number - firstLine + (offset > 0 ? 1 : 0)) * (this.height / lines)
   }
 
   posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
-    let firstLine = doc.linePos(offset).line, lastLine = doc.linePos(offset + this.length).line
+    let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
     let line = firstLine + Math.floor((lastLine - firstLine) * Math.max(0, Math.min(1, height / this.height)))
-    return bias < 0 ? doc.lineStart(line) : doc.lineEnd(line)
+    return bias < 0 ? doc.line(line).start : doc.line(line).end
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -284,6 +283,8 @@ class HeightMapGap extends HeightMap {
   replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
     if (nodes.length != 1 || !(nodes[0] instanceof HeightMapGap))
       return super.replace(from, to, nodes, oracle, newFrom, newTo)
+    console.log("here", from, to, "-", newFrom, newTo)
+    let newStart = newFrom - from
     this.setHeight(oracle, oracle.heightForGap(newFrom - from, newTo + this.length - to))
     this.length += nodes[0].length - (to - from)
     return this

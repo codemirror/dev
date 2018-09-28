@@ -68,7 +68,7 @@ class GutterView {
     }
     let i = 0, lineNo = -1
     view.viewport.forEachLine((from, to, line) => {
-      if (lineNo < 0) lineNo = view.state.doc.linePos(from).line
+      if (lineNo < 0) lineNo = view.state.doc.lineAt(from).number
       if (i == this.lines.length) {
         let newLine = new GutterLine(lineNo, line.height, this.formatNumber)
         this.lines.push(newLine)

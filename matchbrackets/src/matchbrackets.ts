@@ -55,23 +55,22 @@ export function scanForBracket(doc: Text, decorations: DecorationSet | undefined
 
   const stack = []
   const re = config.bracketRegex || /[(){}[\]]/
-  const linePos = doc.linePos(where)
-  const lineEnd = dir > 0 ? Math.min(linePos.line + maxScanLines, doc.lines + 1)
-                          : Math.max(1, linePos.line - maxScanLines)
+  const startLine = doc.lineAt(where)
+  const lineEnd = dir > 0 ? Math.min(startLine.number + maxScanLines, doc.lines + 1)
+                          : Math.max(1, startLine.number - maxScanLines)
   let lineNo
-  for (lineNo = linePos.line; lineNo != lineEnd; lineNo += dir) {
+  for (lineNo = startLine.number; lineNo != lineEnd; lineNo += dir) {
     // FIXME don't pull in lines one at a time, since that might incur a lot of string concatenation for long lines
-    const line = doc.line(lineNo).slice()
+    const line = doc.line(lineNo), text = line.slice()
     if (line.length > maxScanLen) continue
     let pos = dir > 0 ? 0 : line.length - 1, end = dir > 0 ? line.length : -1
-    if (lineNo == linePos.line) pos = linePos.pos - (dir < 0 ? 1 : 0)
-    const lineStart = doc.lineStart(lineNo)
+    if (lineNo == startLine.number) pos = (where - startLine.start) - (dir < 0 ? 1 : 0)
     for (; pos != end; pos += dir) {
-      const ch = line.charAt(pos)
-      if (re.test(ch) && (style === undefined || getStyle(decorations, lineStart + pos) == style)) {
+      const ch = text.charAt(pos)
+      if (re.test(ch) && (style === undefined || getStyle(decorations, line.start + pos) == style)) {
         const match = matching[ch]!
         if ((match.charAt(1) == ">") == (dir > 0)) stack.push(ch)
-        else if (!stack.length) return {pos: lineStart + pos, ch}
+        else if (!stack.length) return {pos: line.start + pos, ch}
         else stack.pop()
       }
     }
