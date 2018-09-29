@@ -526,7 +526,9 @@ export class Line {
     if (typeof this.content == "string")
       return to == from + 1 ? this.content.charAt(from) : this.content.slice(from, to)
     if (from == to) return ""
-    return this.content!.slice(from, to)
+    let result = this.content!.slice(from, to)
+    if (from == 0 && to == this.length) this.content = result
+    return result
   }
 
   // @internal
