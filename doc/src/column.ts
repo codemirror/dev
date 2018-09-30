@@ -10,13 +10,13 @@ export function countColumn(string: string, tabSize: number): number {
   return n
 }
 
-export function findColumn(string: string, col: number, tabSize: number): number {
+export function findColumn(string: string, col: number, tabSize: number): {offset: number, leftOver: number} {
   let n = 0
   for (let i = 0; i < string.length; i++) {
     let code = string.charCodeAt(i)
     if (code >= 768 && isExtendingChar(string.charAt(i))) continue
-    if (n >= col) return i
+    if (n >= col) return {offset: i, leftOver: 0}
     n += code == 9 ? tabSize - (n % tabSize) : 1
   }
-  return string.length
+  return {offset: string.length, leftOver: col - n}
 }

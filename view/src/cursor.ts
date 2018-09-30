@@ -63,24 +63,27 @@ export function movePos(view: EditorView, start: number,
       }
     }
     // Can't do a precise one based on DOM positions, fall back to per-column
-    let line = view.state.doc.lineAt(start)
-    // FIXME also needs goal column?
-    // FIXME don't retrieve the whole lines at once
-    let col = countColumn(line.slice(), view.state.tabSize)
-    if (dir < 0) {
-      if (line.start == 0) return 0
-      let prev = view.state.doc.line(line.number - 1)
-      return prev.start + findColumn(prev.slice(), col, view.state.tabSize)
-    } else {
-      if (line.end == view.state.doc.length) return line.end
-      let next = view.state.doc.line(line.number + 1)
-      return next.start + findColumn(next.slice(), col, view.state.tabSize)
-    }
+    return moveLineByColumn(view.state.doc, view.state.tabSize, start, dir)
   } else if (granularity == "word") {
     return moveWord(view, start, direction)
   } else {
     throw new RangeError("Invalid move granularity: " + granularity)
   }
+}
+
+function moveLineByColumn(doc: Doc, tabSize: number, pos: number, dir: -1 | 1): number {
+  let line = doc.lineAt(pos)
+  // FIXME also needs goal column?
+  let col = 0
+  for (const iter = doc.iterRange(line.start, pos); !iter.next().done;)
+    col += countColumn(iter.value, tabSize)
+  if (dir < 0 && line.start == 0) return 0
+  else if (dir > 0 && line.end == doc.length) return line.end
+  let otherLine = doc.line(line.number + dir)
+  let result = otherLine.start
+  for (let offset, iter = doc.iterRange(otherLine.start, otherLine.end); col > 0 && !iter.next().done; result += offset)
+    ({offset, leftOver: col} = findColumn(iter.value, col, tabSize))
+  return result
 }
 
 function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | null, doc: Doc): number {
