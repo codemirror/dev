@@ -9,8 +9,7 @@ export type Config = {
   afterCursor?: boolean,
   decorationsPlugin?: Plugin,
   bracketRegex?: RegExp,
-  maxScanLineLength?: number,
-  maxScanLines?: number,
+  maxScanDistance?: number,
   strict?: boolean,
 }
 
@@ -48,34 +47,29 @@ export function findMatchingBracket(doc: Text, decorations: DecorationSet | unde
 // Note: If "where" is on an open bracket, then this bracket is ignored.
 //
 // Returns false when no bracket was found, null when it reached
-// maxScanLines and gave up
+// maxScanDistance and gave up
 export function scanForBracket(doc: Text, decorations: DecorationSet | undefined, where: number, dir: -1 | 1, style: string | null, config: Config) {
-  const maxScanLen = config.maxScanLineLength || 10000
-  const maxScanLines = config.maxScanLines || 1000
-
-  const stack = []
+  const maxScanDistance = config.maxScanDistance || 10000
   const re = config.bracketRegex || /[(){}[\]]/
-  const startLine = doc.lineAt(where)
-  const lineEnd = dir > 0 ? Math.min(startLine.number + maxScanLines, doc.lines + 1)
-                          : Math.max(1, startLine.number - maxScanLines)
-  let lineNo
-  for (lineNo = startLine.number; lineNo != lineEnd; lineNo += dir) {
-    // FIXME don't pull in lines one at a time, since that might incur a lot of string concatenation for long lines
-    const line = doc.line(lineNo), text = line.slice()
-    if (line.length > maxScanLen) continue
-    let pos = dir > 0 ? 0 : line.length - 1, end = dir > 0 ? line.length : -1
-    if (lineNo == startLine.number) pos = (where - startLine.start) - (dir < 0 ? 1 : 0)
-    for (; pos != end; pos += dir) {
+  const stack = []
+  const iter = doc.iterRange(where, dir > 0 ? doc.length : 0)
+  for (let distance = 0; !iter.done && distance <= maxScanDistance;) {
+    iter.next()
+    const text = iter.value
+    if (dir < 0) distance += text.length
+    const basePos = where + distance * dir
+    for (let pos = dir > 0 ? 0 : text.length - 1, end = dir > 0 ? text.length : -1; pos != end; pos += dir) {
       const ch = text.charAt(pos)
-      if (re.test(ch) && (style === undefined || getStyle(decorations, line.start + pos) == style)) {
+      if (re.test(ch) && (style === undefined || getStyle(decorations, basePos + pos) == style)) {
         const match = matching[ch]!
         if ((match.charAt(1) == ">") == (dir > 0)) stack.push(ch)
-        else if (!stack.length) return {pos: line.start + pos, ch}
+        else if (!stack.length) return {pos: basePos + pos, ch}
         else stack.pop()
       }
     }
+    if (dir > 0) distance += text.length
   }
-  return lineNo - dir == (dir > 0 ? doc.lines : 1) ? false : null
+  return iter.done ? false : null
 }
 
 function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet | undefined, config: Config) {
