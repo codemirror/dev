@@ -11,6 +11,7 @@ export interface RangeValue {
 export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
   ignoreRange(value: T): boolean
+  compareCollapsed(from: number, to: number, byA: T, byB: T): void
   comparePoints(pos: number, pointsA: T[], pointsB: T[]): void
   ignorePoint(value: T): boolean
 }
@@ -557,6 +558,7 @@ class ComparisonSide<T extends RangeValue> {
   active: T[] = []
   points: T[] = []
   tip: LocalSet<T> | null = null
+  collapsedBy: T | null = null
   collapsedTo: number = -1
 
   constructor(readonly stack: IteratedSet<T>[]) {}
@@ -628,12 +630,16 @@ class RangeSetComparison<T extends RangeValue> {
   advancePos(pos: number) {
     if (pos > this.end) pos = this.end
     if (pos <= this.pos) return
+    this.handlePoints()
+    this.comparator.compareRange(this.pos, pos, this.a.active, this.b.active)
+    this.pos = pos
+  }
+
+  handlePoints() {
     if (this.a.points.length || this.b.points.length) {
       this.comparator.comparePoints(this.pos, this.a.points, this.b.points)
       this.a.points.length = this.b.points.length = 0
     }
-    this.comparator.compareRange(this.pos, pos, this.a.active, this.b.active)
-    this.pos = pos
   }
 
   advance(side: ComparisonSide<T>) {
@@ -651,11 +657,15 @@ class RangeSetComparison<T extends RangeValue> {
         range = range.move(next.offset)
         let collapsed = range.value.collapsed
         if (collapsed) {
-          if (!this.comparator.ignorePoint(range.value)) side.points.push(range.value)
+          side.collapsedBy = range.value
           side.collapsedTo = Math.max(side.collapsedTo, range.to)
           // Skip regions that are collapsed on both sides
           let collapsedTo = Math.min(this.a.collapsedTo, this.b.collapsedTo)
-          if (collapsedTo > this.pos) this.pos = collapsedTo
+          if (collapsedTo > this.pos) {
+            this.handlePoints()
+            this.comparator.compareCollapsed(this.pos, collapsedTo, this.a.collapsedBy!, this.b.collapsedBy!)
+            this.pos = collapsedTo
+          }
         }
         side.active.push(range.value)
         addToHeap(side.heap, range)

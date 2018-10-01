@@ -142,11 +142,6 @@ function sameActiveSets(activeA: RangeDecoration[], activeB: RangeDecoration[]):
   return true
 }
 
-function isCollapsed(active: RangeDecoration[]): boolean {
-  for (let deco of active) if (deco.collapsed) return true
-  return false
-}
-
 function sameWidgetSets(pointsA: Decoration[], pointsB: Decoration[]): boolean {
   if (pointsA.length != pointsB.length) return false
   outer: for (let {widget} of pointsA) {
@@ -186,7 +181,14 @@ class DecorationComparator implements RangeComparator<Decoration> {
     if (!sameActiveSets(activeA as RangeDecoration[], activeB as RangeDecoration[]) && from < this.length) {
       to = Math.min(to, this.length)
       addRange(from, to, this.changes.content)
-      if (isCollapsed(activeA as RangeDecoration[]) != isCollapsed(activeB as RangeDecoration[])) addRange(from, to, this.changes.height)
+    }
+  }
+
+  compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
+    let wA = byA.widget, wB = byB.widget
+    if (wA != wB && !(wA && wB && wA.compare(wB))) {
+      addRange(from, to, this.changes.content)
+      addRange(from, to, this.changes.height)
     }
   }
 

@@ -239,6 +239,9 @@ describe("RangeSet", () => {
     compareRange(from: number, to: number, activeA: Value[], activeB: Value[]) {
       if (Value.names(activeA) != Value.names(activeB)) this.addRange(from, to)
     }
+    compareCollapsed(from: number, to: number, byA: Value, byB: Value) {
+      if (byA.name != byB.name) this.addRange(from, to)
+    }
     comparePoints(pos: number, pointsA: Value[], pointsB: Value[]) {
       if (Value.names(pointsA) != Value.names(pointsB)) this.addRange(pos, pos)
     }
