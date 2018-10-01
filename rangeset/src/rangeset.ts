@@ -335,21 +335,21 @@ export class RangeSet<T extends RangeValue> {
     return RangeSet.empty.update(ranges instanceof Range ? [ranges] : ranges)
   }
 
-  static empty = new RangeSet<any>(0, 0, none, none);
+  static empty = new RangeSet<any>(0, 0, none, none)
 }
 
 // Stack element for iterating over a range set
 class IteratedSet<T extends RangeValue> {
   // Index == -1 means the set's locals have not been yielded yet.
   // Otherwise this is an index in the set's child array.
-  index: number = 0;
+  index: number = 0
   constructor(public offset: number,
               public set: RangeSet<T>) {}
 }
 
 // Cursor into a node-local set of ranges
 class LocalSet<T extends RangeValue> {
-  public index: number = 0;
+  public index: number = 0
   constructor(public offset: number,
               public ranges: A<Range<T>>,
               public next: IteratedSet<T>[] | null = null) {}
@@ -553,11 +553,11 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
 const SIDE_A = 1, SIDE_B = 2
 
 class ComparisonSide<T extends RangeValue> {
-  heap: LocalSet<T>[] = [];
-  active: T[] = [];
-  points: T[] = [];
-  tip: LocalSet<T> | null = null;
-  collapsedTo: number = -1;
+  heap: LocalSet<T>[] = []
+  active: T[] = []
+  points: T[] = []
+  tip: LocalSet<T> | null = null
+  collapsedTo: number = -1
 
   constructor(readonly stack: IteratedSet<T>[]) {}
 
@@ -577,10 +577,10 @@ class ComparisonSide<T extends RangeValue> {
 }
 
 class RangeSetComparison<T extends RangeValue> {
-  a: ComparisonSide<T>;
-  b: ComparisonSide<T>;
-  pos: number;
-  end: number;
+  a: ComparisonSide<T>
+  b: ComparisonSide<T>
+  pos: number
+  end: number
 
   constructor(a: RangeSet<T>, startA: number,
               b: RangeSet<T>, startB: number, endB: number,
