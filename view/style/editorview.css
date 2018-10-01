@@ -50,3 +50,9 @@
   height: 1.15em;
   margin: 0 -0.5px -.5em;
 }
+
+.CodeMirror-tab {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}

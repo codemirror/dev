@@ -1,18 +1,17 @@
 import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView} from "../../view/src"
 import {Transaction, ChangeSet, ChangedRange, Plugin} from "../../state/src"
+import {countColumn} from "../../doc/src"
 
 export interface SpecialCharOptions {
-  
+  render?: (code: number, description: string | null, placeHolder: string) => HTMLElement | null
+  specialChars?: RegExp
+  addSpecialChars?: RegExp
 }
 
-class Options {
-  constructor(given: SpecialCharOptions) {}
-}
-
-export function specialChars(options: SpecialCharOptions): Plugin {
+export function specialChars(options: SpecialCharOptions = {}): Plugin {
   return new Plugin({
     view(view: EditorView) {
-      return new SpecialCharHighlighter(view, new Options(options))
+      return new SpecialCharHighlighter(view, options)
     }
   })
 }
@@ -23,9 +22,16 @@ class SpecialCharHighlighter {
   decorations: DecorationSet = Decoration.none
   from = 0
   to = 0
+  specials: RegExp
+  replaceTabs: boolean
 
-  constructor(readonly view: EditorView, readonly options: Options) {
+  constructor(readonly view: EditorView, readonly options: SpecialCharOptions) {
     this.updateForViewport()
+    this.specials = options.specialChars || SPECIALS
+    if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
+    let styles = document.body.style as any
+    if (this.replaceTabs = (styles.tabSize || styles.MozTabSize) == null)
+      this.specials = new RegExp("\t|" + this.specials.source, "gu")
   }
 
   updateState(_view: EditorView, _prev: any, transactions: Transaction[]) {
@@ -44,16 +50,24 @@ class SpecialCharHighlighter {
   }
 
   closeHoles(ranges: ReadonlyArray<ChangedRange>) {
-    let decorations: DecoratedRange[] = [], vp = this.view.viewport
+    let decorations: DecoratedRange[] = [], vp = this.view.viewport, replaced: number[] = []
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]
-      while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JOIN_GAP) to = ranges[++i].toB
+      // Must redraw all tabs further on the line
+      if (this.replaceTabs) to = this.view.state.doc.lineAt(to).end
+      while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JOIN_GAP) to = Math.max(to, ranges[++i].toB)
       // Clip to current viewport, to avoid doing work for invisible text
       from = Math.max(vp.from, from); to = Math.min(vp.to, to)
       if (from >= to) continue
       this.getDecorationsFor(from, to, decorations)
+      replaced.push(from, to)
     }
-    if (decorations.length) this.decorations = this.decorations.update(decorations)
+    if (decorations.length)
+      this.decorations = this.decorations.update(decorations, pos => {
+        for (let i = 0; i < replaced.length; i += 2)
+          if (pos >= replaced[i] && pos < replaced[i + 1]) return false
+        return true
+      }, replaced[0], replaced[replaced.length - 1])
   }
 
   updateForViewport() {
@@ -73,12 +87,20 @@ class SpecialCharHighlighter {
   }
 
   getDecorationsFor(from: number, to: number, target: DecoratedRange[]) {
-    for (let pos = from, cursor = this.view.state.doc.iterRange(from, to), m; !cursor.next().done;) {
+    let {doc} = this.view.state
+    for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {
         while (m = SPECIALS.exec(cursor.value)) {
-          target.push(Decoration.range(pos + m.index, pos + m.index + 1, {
-            collapsed: new SpecialCharWidget(this.options, m[0].charCodeAt(0))
-          }))
+          let code = m[0].codePointAt ? m[0].codePointAt(0) : m[0].charCodeAt(0), widget
+          if (code == null) continue
+          if (code == 9) {
+            let line = doc.lineAt(pos + m.index)
+            let size = this.view.state.tabSize, col = countColumn(doc.slice(line.start, pos + m.index), size)
+            widget = new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth)
+          } else {
+            widget = new SpecialCharWidget(this.options, code)
+          }
+          target.push(Decoration.range(pos + m.index, pos + m.index + m[0].length, {collapsed: widget}))
         }
       }
       pos += cursor.value.length
@@ -87,13 +109,12 @@ class SpecialCharHighlighter {
 }
 
 // FIXME configurable
-const SPECIALS = /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff]/g
+const SPECIALS = /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff]/gu
 
 const NAMES: {[key: number]: string} = {
   0: "null",
   7: "bell",
   8: "backspace",
-  9: "tab",
   10: "newline",
   11: "vertical tab",
   13: "carriage return",
@@ -119,15 +140,28 @@ function placeHolder(code: number): string | null {
 const DEFAULT_PLACEHOLDER = "\u2022"
 
 class SpecialCharWidget extends WidgetType<number> {
-  constructor(_options: Options, code: number) { super(code) }
+  constructor(private options: SpecialCharOptions, code: number) { super(code) }
 
-  toDOM() { // FIXME tab
+  toDOM() {
+    let ph = placeHolder(this.spec) || DEFAULT_PLACEHOLDER
+    let desc = "Control character " + (NAMES[this.spec] || this.spec)
+    let custom = this.options.render && this.options.render(this.spec, desc, ph)
+    if (custom) return custom
     let span = document.createElement("span")
-    span.textContent = placeHolder(this.spec) || DEFAULT_PLACEHOLDER
-    let title = "Control character " + (NAMES[this.spec] || this.spec)
-    span.title = title
-    span.setAttribute("aria-label", title)
+    span.textContent = ph
+    span.title = desc
+    span.setAttribute("aria-label", desc)
     span.style.color = "red"
+    return span
+  }
+}
+
+class TabWidget extends WidgetType<number> {
+  toDOM() {
+    let span = document.createElement("span")
+    span.textContent = "\t"
+    span.className = "CodeMirror-tab"
+    span.style.width = this.spec + "px"
     return span
   }
 }
