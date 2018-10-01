@@ -144,6 +144,14 @@ describe("EditorView decoration", () => {
       ist(w, cm.contentDOM.querySelector("strong"))
     })
 
+    it("notices replaced collapsed decorations", () => {
+      let cm = decoEditor("abc", [d(1, 2, {collapsed: new WordWidget("X")})])
+      cm.dispatch(cm.state.transaction
+                  .setMeta(addSlot, [d(1, 2, {collapsed: new WordWidget("Y")})])
+                  .setMeta(filterSlot, () => false))
+      ist(cm.contentDOM.textContent, "aYc")
+    })
+
     it("doesn't consider different widgets types equivalent", () => {
       let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
       let w = cm.contentDOM.querySelector("strong")
