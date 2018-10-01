@@ -327,7 +327,7 @@ export class DocView extends ContentView {
     if (this.heightOracle.maybeRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
-                                          lineHeight, (this.dom).clientWidth / charWidth, lineHeights)
+                                          lineHeight, charWidth, (this.dom).clientWidth / charWidth, lineHeights)
     }
 
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)

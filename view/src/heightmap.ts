@@ -11,6 +11,7 @@ export class HeightOracle {
   lineWrapping: boolean = false
   heightSamples: {[key: number]: boolean} = {}
   lineHeight: number = 14
+  charWidth: number = 7
   lineLength: number = 30
   // Used to track, during updateHeight, if any actual heights changed
   heightChanged: boolean = false
@@ -42,11 +43,12 @@ export class HeightOracle {
     return newHeight
   }
 
-  refresh(whiteSpace: string, lineHeight: number, lineLength: number, knownHeights: number[]): boolean {
+  refresh(whiteSpace: string, lineHeight: number, charWidth: number, lineLength: number, knownHeights: number[]): boolean {
     let lineWrapping = wrappingWhiteSpace.indexOf(whiteSpace) > -1
     let changed = Math.round(lineHeight) != Math.round(this.lineHeight) || this.lineWrapping != lineWrapping
     this.lineWrapping = lineWrapping
     this.lineHeight = lineHeight
+    this.charWidth = charWidth
     this.lineLength = lineLength
     if (changed) {
       this.heightSamples = {}

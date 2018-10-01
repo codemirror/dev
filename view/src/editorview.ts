@@ -156,6 +156,9 @@ export class EditorView {
 
   coordsAtPos(pos: number): Rect | null { return this.docView.coordsAt(pos) }
 
+  get defaultCharacterWidth() { return this.docView.heightOracle.charWidth }
+  get defaultLineHeight() { return this.docView.heightOracle.lineHeight }
+
   // To be used by plugin views when they update their decorations asynchronously
   decorationUpdate() {
     if (this.scheduledDecoUpdate < 0) this.scheduledDecoUpdate = requestAnimationFrame(() => {
