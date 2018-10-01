@@ -76,13 +76,17 @@ function moveLineByColumn(doc: Doc, tabSize: number, pos: number, dir: -1 | 1): 
   // FIXME also needs goal column?
   let col = 0
   for (const iter = doc.iterRange(line.start, pos); !iter.next().done;)
-    col += countColumn(iter.value, tabSize)
+    col = countColumn(iter.value, col, tabSize)
   if (dir < 0 && line.start == 0) return 0
   else if (dir > 0 && line.end == doc.length) return line.end
   let otherLine = doc.line(line.number + dir)
   let result = otherLine.start
-  for (let offset, iter = doc.iterRange(otherLine.start, otherLine.end); col > 0 && !iter.next().done; result += offset)
-    ({offset, leftOver: col} = findColumn(iter.value, col, tabSize))
+  let seen = 0
+  for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= col && !iter.next().done;) {
+    const ({offset, leftOver} = findColumn(iter.value, seen, col, tabSize))
+    seen = col - leftOver
+    result += offset
+  }
   return result
 }
 

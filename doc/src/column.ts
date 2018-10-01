@@ -1,7 +1,6 @@
 import {isExtendingChar} from "./char"
 
-export function countColumn(string: string, tabSize: number): number {
-  let n = 0
+export function countColumn(string: string, n: number, tabSize: number): number {
   for (let i = 0; i < string.length; i++) {
     let code = string.charCodeAt(i)
     if (code == 9) n += tabSize - (n % tabSize)
@@ -10,8 +9,7 @@ export function countColumn(string: string, tabSize: number): number {
   return n
 }
 
-export function findColumn(string: string, col: number, tabSize: number): {offset: number, leftOver: number} {
-  let n = 0
+export function findColumn(string: string, n: number, col: number, tabSize: number): {offset: number, leftOver: number} {
   for (let i = 0; i < string.length; i++) {
     let code = string.charCodeAt(i)
     if (code >= 768 && isExtendingChar(string.charAt(i))) continue
