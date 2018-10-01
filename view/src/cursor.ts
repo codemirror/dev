@@ -83,7 +83,7 @@ function moveLineByColumn(doc: Doc, tabSize: number, pos: number, dir: -1 | 1): 
   let result = otherLine.start
   let seen = 0
   for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= col && !iter.next().done;) {
-    const ({offset, leftOver} = findColumn(iter.value, seen, col, tabSize))
+    const {offset, leftOver} = findColumn(iter.value, seen, col, tabSize)
     seen = col - leftOver
     result += offset
   }
