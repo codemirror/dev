@@ -38,7 +38,7 @@ export type DecorationSet = RangeSet<Decoration>
 export type DecoratedRange = Range<Decoration>
 
 export abstract class Decoration implements RangeValue {
-  constructor(readonly bias: number, readonly widget: WidgetType<any> | null, readonly data: any) {}
+  constructor(readonly bias: number, readonly widget: WidgetType<any> | null, public lineAttributes: {[key: string]: string} | null, readonly data: any) {}
   abstract map(mapping: Mapping, from: number, to: number): DecoratedRange | null;
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
@@ -70,6 +70,7 @@ export class RangeDecoration extends Decoration {
   constructor(readonly spec: RangeDecorationSpec) {
     super(spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS,
           spec.collapsed instanceof WidgetType ? spec.collapsed : null,
+          spec.lineAttributes || null,
           spec.data)
     this.endBias = spec.inclusiveEnd == true ? BIG_BIAS : -BIG_BIAS
     this.tagName = spec.tagName
@@ -96,13 +97,14 @@ export class RangeDecoration extends Decoration {
       this.class == other.class &&
       this.collapsed == other.collapsed &&
       (this.widget == other.widget || (this.widget && other.widget && this.widget.compare(other.widget))) &&
-      attrsEq(this.attributes, other.attributes)
+      attrsEq(this.attributes, other.attributes) &&
+      attrsEq(this.lineAttributes, other.lineAttributes)
   }
 }
 
 export class PointDecoration extends Decoration {
   constructor(readonly spec: PointDecorationSpec) {
-    super(spec.side || 0, spec.widget || null, spec.data)
+    super(spec.side || 0, spec.widget || null, spec.lineAttributes || null, spec.data)
   }
 
   map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
@@ -127,11 +129,6 @@ export function attrsEq(a: any, b: any): boolean {
   return true
 }
 
-
-class Changes {
-  content: number[] = []
-  height: number[] = []
-}
 
 function sameActiveSets(activeA: RangeDecoration[], activeB: RangeDecoration[]): boolean {
   if (activeA.length != activeB.length) return false
@@ -174,15 +171,20 @@ export function joinRanges(a: number[], b: number[]): number[] {
   return result
 }
 
+class Changes {
+  content: number[] = []
+  height: number[] = []
+  line: number[] = []
+}
+
 class DecorationComparator implements RangeComparator<Decoration> {
   changes: Changes = new Changes
   constructor(private length: number) {}
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
-    if (!sameActiveSets(activeA as RangeDecoration[], activeB as RangeDecoration[]) && from < this.length) {
-      to = Math.min(to, this.length)
-      addRange(from, to, this.changes.content)
-    }
+    if (!sameActiveSets(activeA as RangeDecoration[], activeB as RangeDecoration[]) && from < this.length)
+      addRange(from, Math.min(to, this.length), this.changes.content)
+    
   }
 
   compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
@@ -193,7 +195,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
     }
   }
 
-  ignoreRange(value: Decoration) { return !(value as RangeDecoration).affectsSpans }
+  ignoreRange(value: Decoration) { return !value.lineAttributes && !(value as RangeDecoration).affectsSpans }
 
   comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
     if (!sameWidgetSets(pointsA, pointsB) && pos <= this.length) {
@@ -202,7 +204,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
     }
   }
 
-  ignorePoint(value: Decoration) { return !value.widget }
+  ignorePoint(value: Decoration) { return !value.widget && !value.lineAttributes}
 }
 
 export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, length: number): Changes {
