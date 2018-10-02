@@ -1,6 +1,6 @@
 import {EditorView} from "./editorview"
 import {LineView} from "./lineview"
-import {InlineView, TextView} from "./inlineview"
+import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
 import {SelectionRange} from "../../state/src"
 import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
@@ -238,7 +238,7 @@ function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node,
           closest = child
           dxClosest = dx
           xClosest = dx == 0 ? x : rect.left > x ? rect.left : rect.right
-          if (child.nodeType == 1 && dx)
+          if (child.nodeType == 1)
             offset = childIndex + (x >= (rect.left + rect.right) / 2 ? 1 : 0)
           continue
         }
@@ -296,7 +296,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): n
   // There's visible editor content under the point, so we can try
   // using caret(Position|Range)FromPoint as a shortcut
   let node: Node | undefined, offset: number = -1
-  if (element && view.contentDOM.contains(element)) {
+  if (element && view.contentDOM.contains(element) && !(view.docView.nearest(element) instanceof WidgetView)) {
     if (root.caretPositionFromPoint) {
       let pos = root.caretPositionFromPoint(x, y)
       if (pos) ({offsetNode: node, offset} = pos)
