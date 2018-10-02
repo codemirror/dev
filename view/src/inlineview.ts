@@ -151,7 +151,7 @@ export class WidgetView extends InlineView {
   }
 
   ignoreMutation(): boolean { return true }
-  ignoreEvent(): boolean { return true }
+  ignoreEvent(event: Event): boolean { return this.widget ? this.widget.ignoreEvent(event) : false }
 
   get overrideDOMText() {
     if (this.length == 0) return [""]

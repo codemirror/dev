@@ -154,6 +154,8 @@ class SpecialCharWidget extends WidgetType<number> {
     span.style.color = "red"
     return span
   }
+
+  ignoreEvent(): boolean { return false }
 }
 
 class TabWidget extends WidgetType<number> {
@@ -164,4 +166,6 @@ class TabWidget extends WidgetType<number> {
     span.style.width = this.spec + "px"
     return span
   }
+
+  ignoreEvent(): boolean { return false }
 }

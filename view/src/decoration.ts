@@ -31,6 +31,7 @@ export abstract class WidgetType<T> {
   }
 
   get estimatedHeight(): number { return -1 }
+  ignoreEvent(event: Event): boolean { return true }
 }
 
 export type DecorationSet = RangeSet<Decoration>
