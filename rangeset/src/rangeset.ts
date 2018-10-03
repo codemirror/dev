@@ -10,10 +10,8 @@ export interface RangeValue {
 
 export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
-  ignoreRange(value: T): boolean
   compareCollapsed(from: number, to: number, byA: T, byB: T): void
   comparePoints(pos: number, pointsA: T[], pointsB: T[]): void
-  ignorePoint(value: T): boolean
 }
 
 export interface RangeIterator<T extends RangeValue> {
@@ -556,6 +554,7 @@ const SIDE_A = 1, SIDE_B = 2
 class ComparisonSide<T extends RangeValue> {
   heap: LocalSet<T>[] = []
   active: T[] = []
+  activeTo: number[] = []
   points: T[] = []
   tip: LocalSet<T> | null = null
   collapsedBy: T | null = null
@@ -575,6 +574,12 @@ class ComparisonSide<T extends RangeValue> {
     }
     iterRangeSet(this.stack, start)
     return newTip
+  }
+
+  findActive(to: number, value: T): number {
+    for (let i = 0; i < this.active.length; i++)
+      if (this.activeTo[i] == to && this.active[i] == value) return i
+    return -1
   }
 }
 
@@ -617,9 +622,9 @@ class RangeSetComparison<T extends RangeValue> {
     let heapA = this.a.heap, heapB = this.b.heap
     for (;;) {
       if (heapA.length && (!heapB.length || compareHeapable(heapA[0], heapB[0]) < 0)) {
-        this.advance(this.a)
+        this.advance(this.a, this.b)
       } else if (heapB.length) {
-        this.advance(this.b)
+        this.advance(this.b, this.a)
       } else {
         this.comparator.comparePoints(this.pos, this.a.points, this.b.points)
         break
@@ -642,7 +647,7 @@ class RangeSetComparison<T extends RangeValue> {
     }
   }
 
-  advance(side: ComparisonSide<T>) {
+  advance(side: ComparisonSide<T>, otherSide: ComparisonSide<T>) {
     let next = takeFromHeap(side.heap)!
     if (next instanceof LocalSet) {
       let range = next.ranges[next.index++]
@@ -652,13 +657,12 @@ class RangeSetComparison<T extends RangeValue> {
         return
       }
       // FIXME handle line decoration?
-      if (range.from < range.to && range.to + next.offset > this.pos && !this.comparator.ignoreRange(range.value)) {
+      if (range.from < range.to && range.to + next.offset > this.pos) {
         this.advancePos(range.from + next.offset)
-        range = range.move(next.offset)
         let collapsed = range.value.collapsed
         if (collapsed) {
           side.collapsedBy = range.value
-          side.collapsedTo = Math.max(side.collapsedTo, range.to)
+          side.collapsedTo = Math.max(side.collapsedTo, range.to + next.offset)
           // Skip regions that are collapsed on both sides
           let collapsedTo = Math.min(this.a.collapsedTo, this.b.collapsedTo)
           if (collapsedTo > this.pos) {
@@ -667,11 +671,12 @@ class RangeSetComparison<T extends RangeValue> {
             this.pos = collapsedTo
           }
         }
-        side.active.push(range.value)
-        addToHeap(side.heap, range)
-      } else if (range.from == range.to && !this.comparator.ignorePoint(range.value)) {
-        this.advancePos(range.from)
-        side.points.push(range.value)
+        this.addActiveRange(Math.min(this.end, range.to + next.offset), range.value, side, otherSide)
+      } else if (range.from == range.to) {
+        this.advancePos(range.from + next.offset)
+        let found = otherSide.points.indexOf(range.value)
+        if (found > -1) remove(otherSide.points, found)
+        else side.points.push(range.value)
       }
       if (next.index < next.ranges.length) addToHeap(side.heap, next)
       else if (next == this.a.tip) this.forwardIter(SIDE_A)
@@ -679,15 +684,27 @@ class RangeSetComparison<T extends RangeValue> {
     } else {
       let range = next as Range<T>
       this.advancePos(range.to)
-      remove(side.active, range.value)
+      let found = side.findActive(range.to, range.value)
+      if (found > -1) { remove(side.active, found); remove(side.activeTo, found) }
+    }
+  }
+
+  addActiveRange(to: number, value: T, side: ComparisonSide<T>, otherSide: ComparisonSide<T>) {
+    let found = otherSide.findActive(to, value)
+    if (found > -1) {
+      remove(otherSide.active, found)
+      remove(otherSide.activeTo, found)
+    } else {
+      side.active.push(value)
+      side.activeTo.push(to)
+      addToHeap(side.heap, new Range(this.pos, to, value))
     }
   }
 }
 
-function remove<T>(array: T[], elt: T) {
-  let found = array.indexOf(elt)
+function remove<T>(array: T[], index: number) {
   let last = array.pop()!
-  if (found != array.length) array[found] = last
+  if (index != array.length) array[index] = last
 }
 
 const enum touched {yes, no, covered}

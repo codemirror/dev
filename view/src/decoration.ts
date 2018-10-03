@@ -91,12 +91,12 @@ export class RangeDecoration extends Decoration {
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
-  eq(other: RangeDecoration) {
+  eq(other: RangeDecoration): boolean {
     return this == other ||
       this.tagName == other.tagName &&
       this.class == other.class &&
       this.collapsed == other.collapsed &&
-      (this.widget == other.widget || (this.widget && other.widget && this.widget.compare(other.widget))) &&
+      (this.widget == other.widget || !!(this.widget && other.widget && this.widget.compare(other.widget))) &&
       attrsEq(this.attributes, other.attributes) &&
       attrsEq(this.lineAttributes, other.lineAttributes)
   }
@@ -112,9 +112,9 @@ export class PointDecoration extends Decoration {
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
-  eq(other: PointDecoration) {
+  eq(other: PointDecoration): boolean {
     return this.bias == other.bias &&
-      (this.widget == other.widget || (this.widget && other.widget && this.widget.compare(other.widget)))
+      (this.widget == other.widget || !!(this.widget && other.widget && this.widget.compare(other.widget)))
   }
 }
 
@@ -129,24 +129,15 @@ export function attrsEq(a: any, b: any): boolean {
   return true
 }
 
-
-function sameActiveSets(activeA: RangeDecoration[], activeB: RangeDecoration[]): boolean {
-  if (activeA.length != activeB.length) return false
-  outer: for (let deco of activeA) {
-    if (activeB.indexOf(deco) > -1) continue
-    for (let other of activeB) if (deco.eq(other)) continue outer
+function compareSets<T>(setA: T[], setB: T[], relevant: (val: T) => boolean, same: (a: T, b: T) => boolean): boolean {
+  let countA = 0, countB = 0
+  search: for (let value of setA) if (relevant(value)) {
+    countA++
+    for (let valueB of setB) if (same(value, valueB)) continue search
     return false
   }
-  return true
-}
-
-function sameWidgetSets(pointsA: Decoration[], pointsB: Decoration[]): boolean {
-  if (pointsA.length != pointsB.length) return false
-  outer: for (let {widget} of pointsA) {
-    for (let {widget: other} of pointsB) if (widget!.compare(other!)) continue outer
-    return false
-  }
-  return true
+  for (let value of setB) if (relevant(value)) countB++
+  return countA == countB
 }
 
 const MIN_RANGE_GAP = 4
@@ -182,9 +173,9 @@ class DecorationComparator implements RangeComparator<Decoration> {
   constructor(private length: number) {}
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
-    if (!sameActiveSets(activeA as RangeDecoration[], activeB as RangeDecoration[]) && from < this.length)
+    if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
+                     deco => deco.affectsSpans, (a, b) => a.eq(b)))
       addRange(from, Math.min(to, this.length), this.changes.content)
-    
   }
 
   compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
@@ -195,16 +186,12 @@ class DecorationComparator implements RangeComparator<Decoration> {
     }
   }
 
-  ignoreRange(value: Decoration) { return !value.lineAttributes && !(value as RangeDecoration).affectsSpans }
-
   comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
-    if (!sameWidgetSets(pointsA, pointsB) && pos <= this.length) {
+    if (!compareSets(pointsA, pointsB, deco => !!deco.widget, (a, b) => !!b.widget && a.widget!.compare(b.widget))) {
       addRange(pos, pos, this.changes.content)
       addRange(pos, pos, this.changes.height)
     }
   }
-
-  ignorePoint(value: Decoration) { return !value.widget && !value.lineAttributes}
 }
 
 export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, length: number): Changes {

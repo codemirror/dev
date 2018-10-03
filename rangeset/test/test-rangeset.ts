@@ -237,16 +237,17 @@ describe("RangeSet", () => {
   class Comparator implements RangeComparator<Value> {
     ranges: number[] = []
     compareRange(from: number, to: number, activeA: Value[], activeB: Value[]) {
-      if (Value.names(activeA) != Value.names(activeB)) this.addRange(from, to)
+      if (Value.names(activeA) != Value.names(activeB))
+        this.addRange(from, to)
     }
+    compareRangeValues(a: Value, b: Value) { return a.name == b.name }
     compareCollapsed(from: number, to: number, byA: Value, byB: Value) {
       if (byA.name != byB.name) this.addRange(from, to)
     }
     comparePoints(pos: number, pointsA: Value[], pointsB: Value[]) {
       if (Value.names(pointsA) != Value.names(pointsB)) this.addRange(pos, pos)
     }
-    ignoreRange(value: Value) { return !value.name && !value.collapsed }
-    ignorePoint(value: Value) { return !value.name }
+    comparePointValues(a: Value, b: Value) { return a.name == b.name }
     addRange(from: number, to: number) {
       if (this.ranges.length && this.ranges[this.ranges.length - 1] == from) this.ranges[this.ranges.length - 1] = to
       else this.ranges.push(from, to)
