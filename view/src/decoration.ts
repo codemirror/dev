@@ -38,8 +38,14 @@ export type DecorationSet = RangeSet<Decoration>
 export type DecoratedRange = Range<Decoration>
 
 export abstract class Decoration implements RangeValue {
+  // @internal
   constructor(readonly bias: number, readonly widget: WidgetType<any> | null, public lineAttributes: {[key: string]: string} | null, readonly data: any) {}
   abstract map(mapping: Mapping, from: number, to: number): DecoratedRange | null;
+
+  // @internal
+  sameLineEffect(other: Decoration): boolean {
+    return attrsEq(this.lineAttributes, other.lineAttributes)
+  }
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
     if (from >= to) throw new RangeError("Range decorations may not be empty")
@@ -91,14 +97,13 @@ export class RangeDecoration extends Decoration {
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
-  eq(other: RangeDecoration): boolean {
+  sameSpanEffect(other: RangeDecoration): boolean {
     return this == other ||
       this.tagName == other.tagName &&
       this.class == other.class &&
       this.collapsed == other.collapsed &&
       (this.widget == other.widget || !!(this.widget && other.widget && this.widget.compare(other.widget))) &&
-      attrsEq(this.attributes, other.attributes) &&
-      attrsEq(this.lineAttributes, other.lineAttributes)
+      attrsEq(this.attributes, other.attributes)
   }
 }
 
@@ -174,8 +179,11 @@ class DecorationComparator implements RangeComparator<Decoration> {
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
     if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
-                     deco => deco.affectsSpans, (a, b) => a.eq(b)))
+                     deco => deco.affectsSpans, (a, b) => a.sameSpanEffect(b)))
       addRange(from, Math.min(to, this.length), this.changes.content)
+    if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
+                     deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b)))
+      addRange(from, Math.min(to, this.length), this.changes.line)
   }
 
   compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
@@ -191,6 +199,8 @@ class DecorationComparator implements RangeComparator<Decoration> {
       addRange(pos, pos, this.changes.content)
       addRange(pos, pos, this.changes.height)
     }
+    if (!compareSets(pointsA, pointsB, deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b)))
+      addRange(pos, pos, this.changes.line)
   }
 }
 
