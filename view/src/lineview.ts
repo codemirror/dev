@@ -2,18 +2,29 @@ import {ContentView, ChildCursor} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
+import {attrsEq} from "./decoration"
 
 export class LineView extends ContentView {
   children: InlineView[]
   length: number
   dom!: HTMLElement
+  prevAttrs: {[name: string]: string} | null | undefined = undefined
 
-  constructor(parent: DocView, content: InlineView[]) {
+  constructor(parent: DocView, content: InlineView[], public attrs: {[name: string]: string} | null) {
     super(parent, document.createElement("div"))
+    if (attrs) setAttrs(this.dom, attrs)
     this.length = 0
     this.children = []
     if (content.length) this.update(0, 0, content)
     this.markDirty()
+  }
+
+  setAttrs(attrs: {[name: string]: string} | null) {
+    if (!attrsEq(this.attrs, attrs)) {
+      this.prevAttrs = this.attrs
+      this.attrs = attrs
+      this.markDirty()
+    }
   }
 
   update(from: number, to: number = this.length, content: InlineView[]) {
@@ -108,6 +119,11 @@ export class LineView extends ContentView {
   // the DOM
   sync() {
     super.sync()
+    if (this.prevAttrs !== undefined) {
+      removeAttrs(this.dom, this.prevAttrs)
+      setAttrs(this.dom, this.attrs)
+      this.prevAttrs = undefined
+    }
     let last = this.dom.lastChild
     if (!last || last.nodeName == "BR") {
       let hack = document.createElement("BR")
@@ -133,4 +149,12 @@ export class LineView extends ContentView {
     if (this.length == 0) return (this.dom.lastChild as HTMLElement).getBoundingClientRect()
     return super.coordsAt(pos)
   }
+}
+
+function setAttrs(dom: HTMLElement, attrs: {[name: string]: string} | null) {
+  if (attrs) for (let name in attrs) dom.setAttribute(name, attrs[name])
+}
+
+function removeAttrs(dom: HTMLElement, attrs: {[name: string]: string} | null) {
+  if (attrs) for (let name in attrs) dom.removeAttribute(name)
 }

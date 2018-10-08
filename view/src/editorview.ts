@@ -59,7 +59,7 @@ export class EditorView {
       getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
     })
     this.viewport = this.docView.publicViewport
-    this.setState(state)
+    this.setState(state, ...plugins)
   }
 
   setState(state: EditorState, ...plugins: PluginView[]) {

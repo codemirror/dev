@@ -184,7 +184,15 @@ export class LineContent {
   }
 
   addAttributes(attrs: {[attr: string]: string}) {
-    // FIXME
+    if (!this.attrs) this.attrs = {}
+    for (let name in attrs) {
+      if (name == "class" && Object.prototype.hasOwnProperty.call(this.attrs, "class"))
+        this.attrs.class += " " + attrs.class
+      else if (name == "style" && Object.prototype.hasOwnProperty.call(this.attrs, "style"))
+        this.attrs.style += ";" + attrs.style
+      else
+        this.attrs[name] = attrs[name]
+    }
   }
 }
 
@@ -202,15 +210,16 @@ export class InlineBuilder implements RangeIterator<Decoration> {
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null, ranges: Decoration[]) {
+    let line = this.curLine
     while (length > 0) {
+      if (line.atStart) for (let deco of ranges)
+        if (deco.lineAttributes) line.addAttributes(deco.lineAttributes)
       if (this.textOff == this.text.length) {
         let {value, lineBreak, done} = this.cursor.next(this.skip)
         this.skip = 0
         if (done) throw new Error("Ran out of text content when drawing inline views")
         if (lineBreak) {
-          let line = new LineContent
-          this.lines.push(line)
-          for (let deco of ranges) if (deco.lineAttributes) line.addAttributes(deco.lineAttributes)
+          this.lines.push(line = new LineContent)
           length--
           continue
         } else {
@@ -219,7 +228,7 @@ export class InlineBuilder implements RangeIterator<Decoration> {
         }
       }
       let take = Math.min(this.text.length - this.textOff, length)
-      this.curLine.add(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
+      line.add(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
       length -= take
       this.textOff += take
     }
@@ -245,7 +254,7 @@ export class InlineBuilder implements RangeIterator<Decoration> {
         }
       }
     }
-    
+
     this.buildText(pos - this.pos, tagName, clss, attrs, active)
     this.pos = pos
   }
@@ -280,8 +289,8 @@ export class InlineBuilder implements RangeIterator<Decoration> {
 
   get curLine() { return this.lines[this.lines.length - 1] }
 
-  ignoreRange(deco: Decoration): boolean { return !(deco as RangeDecoration).affectsSpans }
-  ignorePoint(deco: Decoration): boolean { return !deco.widget }
+  ignoreRange(deco: Decoration): boolean { return !(deco as RangeDecoration).affectsSpans && !deco.lineAttributes }
+  ignorePoint(deco: Decoration): boolean { return !deco.widget && !deco.lineAttributes }
 
   static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineContent[] {
     let builder = new InlineBuilder(text, from)
