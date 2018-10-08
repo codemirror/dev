@@ -181,8 +181,8 @@ class DecorationComparator implements RangeComparator<Decoration> {
     if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
                      deco => deco.affectsSpans, (a, b) => a.sameSpanEffect(b)))
       addRange(from, Math.min(to, this.length), this.changes.content)
-    if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
-                     deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b)))
+    else if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
+                          deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b)))
       addRange(from, Math.min(to, this.length), this.changes.line)
   }
 
@@ -198,9 +198,9 @@ class DecorationComparator implements RangeComparator<Decoration> {
     if (!compareSets(pointsA, pointsB, deco => !!deco.widget, (a, b) => !!b.widget && a.widget!.compare(b.widget))) {
       addRange(pos, pos, this.changes.content)
       addRange(pos, pos, this.changes.height)
-    }
-    if (!compareSets(pointsA, pointsB, deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b)))
+    } else if (!compareSets(pointsA, pointsB, deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b))) {
       addRange(pos, pos, this.changes.line)
+    }
   }
 }
 

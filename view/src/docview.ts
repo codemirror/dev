@@ -1,6 +1,6 @@
 import {ContentView, ChildCursor, dirty} from "./contentview"
 import {LineView} from "./lineview"
-import {InlineView, InlineBuilder} from "./inlineview"
+import {InlineView, InlineBuilder, LineContent} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
@@ -172,23 +172,23 @@ export class DocView extends ContentView {
   // Update a single changed range by replacing its old DOM
   // representation with the inline views that represent the new
   // content.
-  private updatePartRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: InlineView[][]) {
+  private updatePartRange(fromI: number, fromOff: number, toI: number, toOff: number, lines: LineContent[]) {
     // All children in the touched range should be line views
     let children = this.children as LineView[]
     if (lines.length == 1) {
       if (fromI == toI) { // Change within single line
-        children[fromI].update(fromOff, toOff, lines[0])
+        children[fromI].update(fromOff, toOff, lines[0].elements)
       } else { // Join lines
         let tail = children[toI].detachTail(toOff)
-        children[fromI].update(fromOff, undefined, InlineView.appendInline(lines[0], tail))
+        children[fromI].update(fromOff, undefined, InlineView.appendInline(lines[0].elements, tail))
         this.replaceChildren(fromI + 1, toI + 1)
       }
     } else { // Across lines
       let tail = children[toI].detachTail(toOff)
-      children[fromI].update(fromOff, undefined, lines[0])
+      children[fromI].update(fromOff, undefined, lines[0].elements)
       let insert = []
       for (let j = 1; j < lines.length; j++)
-        insert.push(new LineView(this, j < lines.length - 1 ? lines[j] : InlineView.appendInline(lines[j], tail)))
+        insert.push(new LineView(this, j < lines.length - 1 ? lines[j].elements : InlineView.appendInline(lines[j].elements, tail)))
       this.replaceChildren(fromI + 1, toI + 1, insert)
     }
   }
