@@ -183,16 +183,20 @@ export class LineContent {
     if (this.atStart && inline instanceof TextView) this.atStart = false
   }
 
-  addAttributes(attrs: {[attr: string]: string}) {
-    if (!this.attrs) this.attrs = {}
-    for (let name in attrs) {
-      if (name == "class" && Object.prototype.hasOwnProperty.call(this.attrs, "class"))
-        this.attrs.class += " " + attrs.class
-      else if (name == "style" && Object.prototype.hasOwnProperty.call(this.attrs, "style"))
-        this.attrs.style += ";" + attrs.style
-      else
-        this.attrs[name] = attrs[name]
+  addLineDeco(deco: PointDecoration) {
+    let attrs = deco.lineAttributes
+    if (attrs) {
+      if (!this.attrs) this.attrs = {}
+      for (let name in attrs) {
+        if (name == "class" && Object.prototype.hasOwnProperty.call(this.attrs, "class"))
+          this.attrs.class += " " + attrs.class
+        else if (name == "style" && Object.prototype.hasOwnProperty.call(this.attrs, "style"))
+          this.attrs.style += ";" + attrs.style
+        else
+          this.attrs[name] = attrs[name]
+      }
     }
+    // FIXME store widgets
   }
 }
 
@@ -210,16 +214,13 @@ export class InlineBuilder implements RangeIterator<Decoration> {
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null, ranges: Decoration[]) {
-    let line = this.curLine
     while (length > 0) {
-      if (line.atStart) for (let deco of ranges)
-        if (deco.lineAttributes) line.addAttributes(deco.lineAttributes)
       if (this.textOff == this.text.length) {
         let {value, lineBreak, done} = this.cursor.next(this.skip)
         this.skip = 0
         if (done) throw new Error("Ran out of text content when drawing inline views")
         if (lineBreak) {
-          this.lines.push(line = new LineContent)
+          this.lines.push(new LineContent)
           length--
           continue
         } else {
@@ -228,7 +229,7 @@ export class InlineBuilder implements RangeIterator<Decoration> {
         }
       }
       let take = Math.min(this.text.length - this.textOff, length)
-      line.add(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
+      this.curLine.add(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
       length -= take
       this.textOff += take
     }
@@ -283,14 +284,14 @@ export class InlineBuilder implements RangeIterator<Decoration> {
   point(deco: PointDecoration) {
     if (deco.widget)
       this.curLine.add(new WidgetView(0, deco.widget, deco.bias))
-    if (deco.lineAttributes && this.curLine.atStart)
-      this.curLine.addAttributes(deco.lineAttributes)
+    if (deco.affectsLine && this.curLine.atStart)
+      this.curLine.addLineDeco(deco)
   }
 
   get curLine() { return this.lines[this.lines.length - 1] }
 
-  ignoreRange(deco: Decoration): boolean { return !(deco as RangeDecoration).affectsSpans && !deco.lineAttributes }
-  ignorePoint(deco: Decoration): boolean { return !deco.widget && !deco.lineAttributes }
+  ignoreRange(deco: RangeDecoration): boolean { return !deco.affectsSpans }
+  ignorePoint(deco: PointDecoration): boolean { return !deco.widget && !deco.affectsLine }
 
   static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineContent[] {
     let builder = new InlineBuilder(text, from)

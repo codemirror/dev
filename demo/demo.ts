@@ -1,5 +1,5 @@
 import {EditorState, EditorSelection} from "../state/src"
-import {EditorView} from "../view/src/"
+import {EditorView, Decoration} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history/src/history"
 import {gutter} from "../gutter/src/index"
@@ -59,5 +59,8 @@ readFile("package.json", "utf8", (err, data) => {
   keymap(baseKeymap),
 ]})
 
-let view = (window as any).view = new EditorView(state)
+let view = (window as any).view = new EditorView(state, undefined, {
+  decorations: Decoration.set([Decoration.range(0, 40, {lineAttributes: {style: "color: orange"}}),
+                               Decoration.point(0, {lineAttributes: {style: "background: silver"}})])
+})
 document.querySelector("#editor").appendChild(view.dom)

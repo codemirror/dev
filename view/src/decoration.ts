@@ -1,5 +1,6 @@
 import {Mapping, ChangedRange} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
+import {Text} from "../../doc/src/"
 
 export interface RangeDecorationSpec {
   inclusiveStart?: boolean
@@ -7,7 +8,6 @@ export interface RangeDecorationSpec {
   attributes?: {[key: string]: string}
   // Shorthand for {attributes: {class: value}}
   class?: string
-  lineAttributes?: {[key: string]: string}
   tagName?: string
   collapsed?: boolean | WidgetType<any>
   data?: any
@@ -17,6 +17,8 @@ export interface PointDecorationSpec {
   side?: number
   lineAttributes?: {[key: string]: string}
   widget?: WidgetType<any>
+  widgetAfterLine?: WidgetType<any>
+  widgetBeforeLine?: WidgetType<any>
   data?: any
 }
 
@@ -39,13 +41,8 @@ export type DecoratedRange = Range<Decoration>
 
 export abstract class Decoration implements RangeValue {
   // @internal
-  constructor(readonly bias: number, readonly widget: WidgetType<any> | null, public lineAttributes: {[key: string]: string} | null, readonly data: any) {}
+  constructor(readonly bias: number, readonly widget: WidgetType<any> | null, readonly data: any) {}
   abstract map(mapping: Mapping, from: number, to: number): DecoratedRange | null;
-
-  // @internal
-  sameLineEffect(other: Decoration): boolean {
-    return attrsEq(this.lineAttributes, other.lineAttributes)
-  }
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
     if (from >= to) throw new RangeError("Range decorations may not be empty")
@@ -76,7 +73,6 @@ export class RangeDecoration extends Decoration {
   constructor(readonly spec: RangeDecorationSpec) {
     super(spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS,
           spec.collapsed instanceof WidgetType ? spec.collapsed : null,
-          spec.lineAttributes || null,
           spec.data)
     this.endBias = spec.inclusiveEnd == true ? BIG_BIAS : -BIG_BIAS
     this.tagName = spec.tagName
@@ -102,14 +98,23 @@ export class RangeDecoration extends Decoration {
       this.tagName == other.tagName &&
       this.class == other.class &&
       this.collapsed == other.collapsed &&
-      (this.widget == other.widget || !!(this.widget && other.widget && this.widget.compare(other.widget))) &&
+      widgetsEq(this.widget, other.widget) &&
       attrsEq(this.attributes, other.attributes)
   }
 }
 
 export class PointDecoration extends Decoration {
+  readonly lineAttributes?: {[key: string]: string} | null
+  readonly widgetBeforeLine: WidgetType<any> | null
+  readonly widgetAfterLine: WidgetType<any> | null
+  readonly affectsLine: boolean
+
   constructor(readonly spec: PointDecorationSpec) {
-    super(spec.side || 0, spec.widget || null, spec.lineAttributes || null, spec.data)
+    super(spec.side || 0, spec.widget || null, spec.data)
+    this.lineAttributes = spec.lineAttributes || null
+    this.widgetBeforeLine = spec.widgetBeforeLine || null
+    this.widgetAfterLine = spec.widgetAfterLine || null
+    this.affectsLine = !!(this.lineAttributes || this.widgetAfterLine || this.widgetBeforeLine)
   }
 
   map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
@@ -117,9 +122,10 @@ export class PointDecoration extends Decoration {
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
-  eq(other: PointDecoration): boolean {
-    return this.bias == other.bias &&
-      (this.widget == other.widget || !!(this.widget && other.widget && this.widget.compare(other.widget)))
+  sameLineEffect(other: PointDecoration): boolean {
+    return attrsEq(this.lineAttributes, other.lineAttributes) &&
+      widgetsEq(this.widgetBeforeLine, other.widgetBeforeLine) &&
+      widgetsEq(this.widgetAfterLine, other.widgetAfterLine)
   }
 }
 
@@ -132,6 +138,10 @@ export function attrsEq(a: any, b: any): boolean {
     if (keysB.indexOf(key) == -1 || a[key] !== b[key]) return false
   }
   return true
+}
+
+export function widgetsEq(a: WidgetType<any> | null, b: WidgetType<any> | null): boolean {
+  return a == b || !!(a && b && a.compare(b))
 }
 
 function compareSets<T>(setA: T[], setB: T[], relevant: (val: T) => boolean, same: (a: T, b: T) => boolean): boolean {
@@ -170,43 +180,39 @@ export function joinRanges(a: number[], b: number[]): number[] {
 class Changes {
   content: number[] = []
   height: number[] = []
-  line: number[] = []
 }
 
 class DecorationComparator implements RangeComparator<Decoration> {
   changes: Changes = new Changes
-  constructor(private length: number) {}
+  constructor(private doc: Text) {}
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
     if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
                      deco => deco.affectsSpans, (a, b) => a.sameSpanEffect(b)))
-      addRange(from, Math.min(to, this.length), this.changes.content)
-    else if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
-                          deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b)))
-      addRange(from, Math.min(to, this.length), this.changes.line)
+      addRange(from, to, this.changes.content)
   }
 
   compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
-    let wA = byA.widget, wB = byB.widget
-    if (wA != wB && !(wA && wB && wA.compare(wB))) {
+    if (!widgetsEq(byA.widget, byB.widget)) {
       addRange(from, to, this.changes.content)
       addRange(from, to, this.changes.height)
     }
   }
 
-  comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
-    if (!compareSets(pointsA, pointsB, deco => !!deco.widget, (a, b) => !!b.widget && a.widget!.compare(b.widget))) {
+  comparePoints(pos: number, pointsA: PointDecoration[], pointsB: PointDecoration[]) {
+    if (!compareSets(pointsA, pointsB, deco => !!deco.widget, (a, b) => widgetsEq(a.widget, b.widget))) {
       addRange(pos, pos, this.changes.content)
       addRange(pos, pos, this.changes.height)
-    } else if (!compareSets(pointsA, pointsB, deco => !!deco.lineAttributes, (a, b) => a.sameLineEffect(b))) {
-      addRange(pos, pos, this.changes.line)
+    } else if (!compareSets(pointsA, pointsB, deco => deco.affectsLine, (a, b) => a.sameLineEffect(b)) &&
+               this.doc.lineAt(pos).start == pos) {
+      addRange(pos, pos, this.changes.content)
     }
   }
 }
 
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, length: number): Changes {
-  let comp = new DecorationComparator(length)
-  a.compare(b, diff, comp)
+export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, docA: Text): Changes {
+  let comp = new DecorationComparator(docA)
+  a.compare(b, diff, comp, docA.length)
   return comp.changes
 }
 

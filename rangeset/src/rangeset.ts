@@ -1,4 +1,4 @@
-import {Mapping, ChangeSet, Change} from "../../state/src"
+import {Mapping, ChangeSet, Change, ChangedRange} from "../../state/src"
 
 type A<T> = ReadonlyArray<T>
 
@@ -271,7 +271,7 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
-  compare(other: RangeSet<T>, textDiff: A<{fromA: number, toA: number, fromB: number, toB: number}>, comparator: RangeComparator<T>) {
+  compare(other: RangeSet<T>, textDiff: A<ChangedRange>, comparator: RangeComparator<T>, oldLen: number) {
     let oldPos = 0, newPos = 0
     for (let range of textDiff) {
       if (range.fromB > newPos && (this != other || oldPos != newPos))
@@ -280,8 +280,7 @@ export class RangeSet<T extends RangeValue> {
       newPos = range.toB
     }
     if (oldPos < this.length || newPos < other.length)
-      new RangeSetComparison<T>(this, oldPos, other, newPos, Math.max(this.length - oldPos + newPos, other.length),
-                                comparator).run()
+      new RangeSetComparison<T>(this, oldPos, other, newPos, newPos + (oldLen - oldPos), comparator).run()
   }
 
   static iterateSpans<T extends RangeValue>(sets: A<RangeSet<T>>, from: number, to: number, iterator: RangeIterator<T>) {
@@ -656,7 +655,6 @@ class RangeSetComparison<T extends RangeValue> {
         this.pos = this.end
         return
       }
-      // FIXME handle line decoration?
       if (range.from < range.to && range.to + next.offset > this.pos) {
         this.advancePos(range.from + next.offset)
         let collapsed = range.value.collapsed

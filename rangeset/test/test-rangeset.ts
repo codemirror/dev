@@ -1,5 +1,5 @@
 import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from "../src/rangeset"
-import {Change, ChangeSet, Mapping} from "../../state/src"
+import {Change, ChangeSet, Mapping, ChangedRange} from "../../state/src"
 const ist = require("ist")
 
 class Value implements RangeValue {
@@ -264,7 +264,7 @@ describe("RangeSet", () => {
         newSet = newSet.map(changes)
         for (let i = 0, off = 0; i < changes.length; i++) {
           let {from, to, length} = changes.changes[i]
-          docRanges.push({fromA: from + off, toA: to + off, fromB: from, toB: from + length})
+          docRanges.push(new ChangedRange(from + off, to + off, from, from + length))
           off += (to - from) - length
         }
       }
@@ -272,7 +272,7 @@ describe("RangeSet", () => {
         newSet = newSet.update(update.add || [], update.filter)
       if (update.prepare) update.prepare(newSet)
       let comp = new Comparator
-      set.compare(newSet, docRanges, comp)
+      set.compare(newSet, docRanges, comp, Math.max(set.length, newSet.length))
       ist(JSON.stringify(comp.ranges), JSON.stringify(changes))
     }
 

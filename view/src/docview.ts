@@ -271,11 +271,11 @@ export class DocView extends ContentView {
       }
       // Update the public viewport so that plugins can observe its current value
       ;({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
-      let prevLen = this.text.length
+      let prevDoc = this.text
       if (stateChange) {
         // For a state change, call `updateState`
         this.callbacks.onUpdateState(prevState!, transactions!)
-        prevLen = prevState!.doc.length
+        prevDoc = prevState!.doc
       } else {
         // Otherwise call `updateViewport`
         this.callbacks.onUpdateViewport()
@@ -285,7 +285,7 @@ export class DocView extends ContentView {
       if (!stateChange && sameArray(decorations, this.decorations))
         return {viewport, contentChanges}
       // Compare the decorations (between document changes)
-      let {content, height} = decoChanges(stateChange ? contentChanges : [], decorations, this.decorations, prevLen)
+      let {content, height} = decoChanges(stateChange ? contentChanges : [], decorations, this.decorations, prevDoc)
       this.decorations = decorations
       // Update the heightmap with these changes. If this is the first
       // iteration and the document changed, also include decorations
@@ -497,12 +497,12 @@ class GapView extends ContentView {
 }
 
 function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
-                     oldDecorations: A<DecorationSet>, length: number): {content: number[], height: number[]} {
+                     oldDecorations: A<DecorationSet>, oldDoc: Text): {content: number[], height: number[]} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let i = decorations.length - 1; i >= 0; i--) {
     let deco = decorations[i], oldDeco = i < oldDecorations.length ? oldDecorations[i] : Decoration.none
     if (deco.size == 0 && oldDeco.size == 0) continue
-    let newRanges = findChangedRanges(oldDeco, deco, diff, length)
+    let newRanges = findChangedRanges(oldDeco, deco, diff, oldDoc)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
   }

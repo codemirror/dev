@@ -207,4 +207,51 @@ describe("EditorView decoration", () => {
       ist(cm.contentDOM.firstChild!.textContent, "fg")
     })
   })
+
+  describe("line attributes", () => {
+    function l(cls: string) { return {lineAttributes: {class: cls}} }
+
+    function classes(cm, ...lines) {
+      for (let i = 0; i < lines.length; i++) {
+        let className = (cm.contentDOM.childNodes[i] as HTMLElement).className.split(" ").sort().join(" ")
+        ist(className, lines[i])
+      }
+    }
+
+    it("adds line attributes", () => {
+      let cm = decoEditor("abc\ndef\nghi", [d(0, l("a")), d(0, l("b")), d(1, l("c")), d(8, l("d"))])
+      classes(cm, "a b", "", "d")
+    })
+
+    it("updates when line attributes are added", () => {
+      let cm = decoEditor("foo\nbar", [d(0, l("a"))])
+      cm.dispatch(cm.state.transaction.setMeta(addSlot, [d(0, l("b")), d(4, l("c"))]))
+      classes(cm, "a b", "c")
+    })
+
+    it("updates when line attributes are removed", () => {
+      let ds = [d(0, l("a")), d(0, l("b")), d(4, l("c"))]
+      let cm = decoEditor("foo\nbar", ds)
+      cm.dispatch(cm.state.transaction.setMeta(filterSlot, (_f: number, _t: number, deco: Decoration) => !ds.slice(1).some(r => r.value == deco)))
+      classes(cm, "a", "")
+    })
+
+    it("handles line joining properly", () => {
+      let cm = decoEditor("x\ny\nz", [d(0, l("a")), d(2, l("b")), d(4, l("c"))])
+      cm.dispatch(cm.state.transaction.replace(1, 4, ""))
+      classes(cm, "a")
+    })
+
+    it("handles line splitting properly", () => {
+      let cm = decoEditor("abc", [d(0, l("a")), d(2, l("b"))])
+      cm.dispatch(cm.state.transaction.replace(1, 2, "\n"))
+      classes(cm, "a", "b")
+    })
+
+    it("can handle insertion", () => {
+      let cm = decoEditor("x\ny\nz", [d(2, l("a"))])
+      cm.dispatch(cm.state.transaction.replace(2, 2, "hi"))
+      classes(cm, "", "a", "")
+    })
+  })
 })
