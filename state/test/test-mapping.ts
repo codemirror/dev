@@ -54,4 +54,8 @@ describe("Mapping", () => {
     let t = {trackDel: true}
     testMapping(mk([0, 3, 0], [2, 6, 6]), [0, 0, t], [1, -1, t], [4, 1, t], [5, 2, t], [6, -9, t], [11, 10, t], [14, 13, t])
   })
+
+  it("maps back when bias equals 0", () => {
+    testMapping(mk([1, 1, 1]), [1, 1, {bias: 0}], [1, 2, {bias: 1}])
+  })
 })

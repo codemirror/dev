@@ -15,8 +15,8 @@ export class ChangeDesc implements Mapping {
     let {from, to, length} = this
     if (pos < from) return pos
     if (pos > to) return pos + (length - (to - from))
-    if (pos == to || pos == from) return (from == to ? bias < 0 : pos == from) ? from : from + length
-    pos = from + (bias < 0 ? 0 : length)
+    if (pos == to || pos == from) return (from == to ? bias <= 0 : pos == from) ? from : from + length
+    pos = from + (bias <= 0 ? 0 : length)
     return trackDel ? -pos - 1 : pos
   }
 }
@@ -115,9 +115,9 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
       }
       if (pos > from && pos < to) {
         deleted = true
-        pos = bias < 0 ? from : from + length
+        pos = bias <= 0 ? from : from + length
       } else {
-        pos = (from == to ? bias < 0 : pos == from) ? from : from + length
+        pos = (from == to ? bias <= 0 : pos == from) ? from : from + length
       }
     }
     return trackDel && deleted ? -pos - 1 : pos
