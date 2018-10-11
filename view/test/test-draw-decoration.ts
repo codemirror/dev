@@ -27,9 +27,15 @@ function decos(startState: DecorationSet = Decoration.none) {
 }
 
 function d(from: number, to: any, spec: any = null) {
-  if (typeof to != "number") { spec = to; to = from }
-  if (typeof spec == "string") spec = {attributes: {[spec]: "y"}}
-  return from == to ? Decoration.point(from, spec) : Decoration.range(from, to, spec)
+  return Decoration.range(from, to, typeof spec == "string" ? {attributes: {[spec]: "y"}} : spec)
+}
+
+function w(pos: number, widget: WidgetType<any>, side: number = 0) {
+  return Decoration.widget(pos, widget, {side})
+}
+
+function l(pos: number, attrs: any) {
+  return Decoration.line(pos, typeof attrs == "string" ? {attributes: {class: attrs}} : attrs)
 }
 
 function decoEditor(doc: string, decorations: any = []) {
@@ -120,28 +126,28 @@ describe("EditorView decoration", () => {
     }
 
     it("draws widgets", () => {
-      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
-      let w = cm.contentDOM.querySelector("strong")!
-      ist(w)
-      ist(w.textContent, "hi")
-      ist(w.previousSibling!.textContent, "hell")
-      ist(w.nextSibling!.textContent, "o")
-      ist(w.contentEditable, "false")
+      let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
+      let elt = cm.contentDOM.querySelector("strong")!
+      ist(elt)
+      ist(elt.textContent, "hi")
+      ist(elt.previousSibling!.textContent, "hell")
+      ist(elt.nextSibling!.textContent, "o")
+      ist(elt.contentEditable, "false")
     })
 
     it("supports editing around widgets", () => {
-      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
+      let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
       cm.dispatch(cm.state.transaction.replace(3, 4, "").replace(3, 4, ""))
       ist(cm.contentDOM.querySelector("strong"))
     })
 
     it("compares widgets with their eq method", () => {
-      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
-      let w = cm.contentDOM.querySelector("strong")
+      let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
+      let elt = cm.contentDOM.querySelector("strong")
       cm.dispatch(cm.state.transaction
-                  .setMeta(addSlot, [d(4, {widget: new WordWidget("HI")})])
+                  .setMeta(addSlot, [w(4, new WordWidget("HI"))])
                   .setMeta(filterSlot, () => false))
-      ist(w, cm.contentDOM.querySelector("strong"))
+      ist(elt, cm.contentDOM.querySelector("strong"))
     })
 
     it("notices replaced collapsed decorations", () => {
@@ -153,18 +159,18 @@ describe("EditorView decoration", () => {
     })
 
     it("doesn't consider different widgets types equivalent", () => {
-      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("hi")})])
-      let w = cm.contentDOM.querySelector("strong")
+      let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
+      let elt = cm.contentDOM.querySelector("strong")
       cm.dispatch(cm.state.transaction
-                  .setMeta(addSlot, [d(4, {widget: new OtherWidget("hi")})])
+                  .setMeta(addSlot, [w(4, new OtherWidget("hi"))])
                   .setMeta(filterSlot, () => false))
-      ist(w, cm.contentDOM.querySelector("strong"), "!=")
+      ist(elt, cm.contentDOM.querySelector("strong"), "!=")
     })
 
     it("orders widgets by side", () => {
-      let cm = decoEditor("hello", [d(4, {widget: new WordWidget("C"), side: 10}),
-                                    d(4, {widget: new WordWidget("B")}),
-                                    d(4, {widget: new WordWidget("A"), side: -1})])
+      let cm = decoEditor("hello", [w(4, new WordWidget("C"), 10),
+                                    w(4, new WordWidget("B")),
+                                    w(4, new WordWidget("A"), -1)])
       let widgets = cm.contentDOM.querySelectorAll("strong")
       ist(widgets.length, 3)
       ist(widgets[0].textContent, "A")
@@ -174,8 +180,8 @@ describe("EditorView decoration", () => {
 
     it("places the cursor based on side", () => {
       requireFocus()
-      let cm = decoEditor("abc", [d(2, {widget: new WordWidget("A"), side: -1}),
-                                  d(2, {widget: new WordWidget("B"), side: 1})])
+      let cm = decoEditor("abc", [w(2, new WordWidget("A"), -1),
+                                  w(2, new WordWidget("B"), 1)])
       cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(2)))
       cm.focus()
       let domSel = document.getSelection()
@@ -209,9 +215,7 @@ describe("EditorView decoration", () => {
   })
 
   describe("line attributes", () => {
-    function l(cls: string) { return {lineAttributes: {class: cls}} }
-
-    function classes(cm, ...lines) {
+    function classes(cm: EditorView, ...lines: string[]) {
       for (let i = 0; i < lines.length; i++) {
         let className = (cm.contentDOM.childNodes[i] as HTMLElement).className.split(" ").sort().join(" ")
         ist(className, lines[i])
@@ -219,37 +223,37 @@ describe("EditorView decoration", () => {
     }
 
     it("adds line attributes", () => {
-      let cm = decoEditor("abc\ndef\nghi", [d(0, l("a")), d(0, l("b")), d(1, l("c")), d(8, l("d"))])
+      let cm = decoEditor("abc\ndef\nghi", [l(0, "a"), l(0, "b"), l(1, "c"), l(8, "d")])
       classes(cm, "a b", "", "d")
     })
 
     it("updates when line attributes are added", () => {
-      let cm = decoEditor("foo\nbar", [d(0, l("a"))])
-      cm.dispatch(cm.state.transaction.setMeta(addSlot, [d(0, l("b")), d(4, l("c"))]))
+      let cm = decoEditor("foo\nbar", [l(0, "a")])
+      cm.dispatch(cm.state.transaction.setMeta(addSlot, [l(0, "b"), l(4, "c")]))
       classes(cm, "a b", "c")
     })
 
     it("updates when line attributes are removed", () => {
-      let ds = [d(0, l("a")), d(0, l("b")), d(4, l("c"))]
+      let ds = [l(0, "a"), l(0, "b"), l(4, "c")]
       let cm = decoEditor("foo\nbar", ds)
       cm.dispatch(cm.state.transaction.setMeta(filterSlot, (_f: number, _t: number, deco: Decoration) => !ds.slice(1).some(r => r.value == deco)))
       classes(cm, "a", "")
     })
 
     it("handles line joining properly", () => {
-      let cm = decoEditor("x\ny\nz", [d(0, l("a")), d(2, l("b")), d(4, l("c"))])
+      let cm = decoEditor("x\ny\nz", [l(0, "a"), l(2, "b"), l(4, "c")])
       cm.dispatch(cm.state.transaction.replace(1, 4, ""))
       classes(cm, "a")
     })
 
     it("handles line splitting properly", () => {
-      let cm = decoEditor("abc", [d(0, l("a")), d(2, l("b"))])
+      let cm = decoEditor("abc", [l(0, "a")])
       cm.dispatch(cm.state.transaction.replace(1, 2, "\n"))
-      classes(cm, "a", "b")
+      classes(cm, "a", "")
     })
 
     it("can handle insertion", () => {
-      let cm = decoEditor("x\ny\nz", [d(2, l("a"))])
+      let cm = decoEditor("x\ny\nz", [l(2, "a")])
       cm.dispatch(cm.state.transaction.replace(2, 2, "hi"))
       classes(cm, "", "a", "")
     })

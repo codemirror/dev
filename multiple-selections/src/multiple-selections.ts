@@ -19,12 +19,10 @@ class CursorWidget extends WidgetType<null> {
 class MultipleSelectionView {
   decorations: DecorationSet = Decoration.none
   rangeConfig: RangeDecorationSpec
-  cursorConfig: PointDecorationSpec
 
   constructor(view: EditorView) {
     this.update(view.state)
     this.rangeConfig = {class: "CodeMirror-secondary-selection"} // FIXME configurable?
-    this.cursorConfig = {widget: new CursorWidget(null)}
   }
 
   updateState(view: EditorView, prevState: EditorState) {
@@ -41,7 +39,7 @@ class MultipleSelectionView {
     let deco = []
     for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {
       let range = ranges[i]
-      deco.push(range.empty ? Decoration.point(range.from, this.cursorConfig) : Decoration.range(ranges[i].from, ranges[i].to, this.rangeConfig))
+      deco.push(range.empty ? Decoration.widget(range.from, new CursorWidget(null)) : Decoration.range(ranges[i].from, ranges[i].to, this.rangeConfig))
     }
     this.decorations = Decoration.set(deco)
   }

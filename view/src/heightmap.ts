@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
-import {DecorationSet, RangeDecoration, Decoration} from "./decoration"
+import {DecorationSet, RangeDecoration, Decoration, WidgetDecoration} from "./decoration"
 import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
@@ -527,7 +527,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   }
 
   ignoreRange(value: Decoration) { return !(value as RangeDecoration).collapsed }
-  ignorePoint(value: Decoration) { return !value.widget || value.widget.estimatedHeight < 0 }
+  ignorePoint(value: Decoration) { return !(value.widget && value.widget.estimatedHeight > 0 && value instanceof WidgetDecoration) }
 }
 
 function buildChangedNodes(oracle: HeightOracle, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMap[] {

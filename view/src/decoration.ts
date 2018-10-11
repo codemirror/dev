@@ -1,4 +1,4 @@
-import {Mapping, ChangedRange} from "../../state/src"
+import {ChangeSet, ChangedRange} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
 import {Text} from "../../doc/src/"
 
@@ -13,12 +13,15 @@ export interface RangeDecorationSpec {
   data?: any
 }
 
-export interface PointDecorationSpec {
+export interface WidgetDecorationSpec {
   side?: number
-  lineAttributes?: {[key: string]: string}
-  widget?: WidgetType<any>
-  widgetAfterLine?: WidgetType<any>
-  widgetBeforeLine?: WidgetType<any>
+  data?: any
+}
+
+export interface LineDecorationSpec {
+  attributes?: {[key: string]: string}
+  widgetAfter?: WidgetType<any>
+  widgetBefore?: WidgetType<any>
   data?: any
 }
 
@@ -42,15 +45,19 @@ export type DecoratedRange = Range<Decoration>
 export abstract class Decoration implements RangeValue {
   // @internal
   constructor(readonly bias: number, readonly widget: WidgetType<any> | null, readonly data: any) {}
-  abstract map(mapping: Mapping, from: number, to: number): DecoratedRange | null;
+  abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null;
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
     if (from >= to) throw new RangeError("Range decorations may not be empty")
     return new Range(from, to, new RangeDecoration(spec))
   }
 
-  static point(pos: number, spec: PointDecorationSpec): DecoratedRange {
-    return new Range(pos, pos, new PointDecoration(spec))
+  static widget(pos: number, widget: WidgetType<any>, spec?: WidgetDecorationSpec): DecoratedRange {
+    return new Range(pos, pos, new WidgetDecoration(widget, spec))
+  }
+
+  static line(pos: number, spec: LineDecorationSpec): DecoratedRange {
+    return new Range(pos, pos, new LineDecoration(spec))
   }
 
   static set(of: DecoratedRange | ReadonlyArray<DecoratedRange>): DecorationSet {
@@ -64,7 +71,6 @@ const BIG_BIAS = 2e9
 
 export class RangeDecoration extends Decoration {
   readonly endBias: number
-  readonly affectsSpans: boolean
   readonly tagName: string | undefined
   readonly class: string | undefined
   readonly attributes: {[key: string]: string} | undefined
@@ -79,10 +85,9 @@ export class RangeDecoration extends Decoration {
     this.class = spec.class
     this.attributes = spec.attributes
     this.collapsed = !!spec.collapsed
-    this.affectsSpans = !!(this.attributes || this.tagName || this.class || this.collapsed)
   }
 
-  map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
+  map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
     let newFrom = mapping.mapPos(from, this.bias, true), newTo = mapping.mapPos(to, this.endBias, true)
     if (newFrom < 0) {
       if (newTo < 0) return null
@@ -93,7 +98,7 @@ export class RangeDecoration extends Decoration {
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
-  sameSpanEffect(other: RangeDecoration): boolean {
+  sameEffect(other: RangeDecoration): boolean {
     return this == other ||
       this.tagName == other.tagName &&
       this.class == other.class &&
@@ -103,29 +108,43 @@ export class RangeDecoration extends Decoration {
   }
 }
 
-export class PointDecoration extends Decoration {
-  readonly lineAttributes?: {[key: string]: string} | null
-  readonly widgetBeforeLine: WidgetType<any> | null
-  readonly widgetAfterLine: WidgetType<any> | null
-  readonly affectsLine: boolean
+export class WidgetDecoration extends Decoration {
+  widget!: WidgetType<any>
 
-  constructor(readonly spec: PointDecorationSpec) {
-    super(spec.side || 0, spec.widget || null, spec.data)
-    this.lineAttributes = spec.lineAttributes || null
-    this.widgetBeforeLine = spec.widgetBeforeLine || null
-    this.widgetAfterLine = spec.widgetAfterLine || null
-    this.affectsLine = !!(this.lineAttributes || this.widgetAfterLine || this.widgetBeforeLine)
+  constructor(widget: WidgetType<any>, readonly spec?: WidgetDecorationSpec) {
+    super(spec && spec.side || 0, widget || null, spec && spec.data)
   }
 
-  map(mapping: Mapping, from: number, to: number): DecoratedRange | null {
-    let pos = mapping.mapPos(from, this.bias, true)
+  map(mapping: ChangeSet, pos: number): DecoratedRange | null {
+    pos = mapping.mapPos(pos, this.bias, true)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
+}
 
-  sameLineEffect(other: PointDecoration): boolean {
-    return attrsEq(this.lineAttributes, other.lineAttributes) &&
-      widgetsEq(this.widgetBeforeLine, other.widgetBeforeLine) &&
-      widgetsEq(this.widgetAfterLine, other.widgetAfterLine)
+export class LineDecoration extends Decoration {
+  readonly attributes?: {[key: string]: string} | null
+  readonly widgetAfter: WidgetType<any> | null
+
+  constructor(spec: LineDecorationSpec) {
+    super(-BIG_BIAS, spec.widgetBefore || null, spec.data)
+    this.attributes = spec.attributes || null
+    this.widgetAfter = spec.widgetAfter || null
+  }
+
+  map(mapping: ChangeSet, pos: number): DecoratedRange | null {
+    for (let change of mapping.changes) {
+      // If the line break before was deleted, drop this decoration
+      if (change.from <= pos - 1 && change.to >= pos) return null
+      if (change.from < pos) pos += change.length - (change.to - change.from)
+    }
+    return new Range(pos, pos, this)
+  }
+
+  sameLineEffect(other: Decoration): boolean {
+    return other instanceof LineDecoration &&
+      attrsEq(this.attributes, other.attributes) &&
+      widgetsEq(this.widget, other.widget) &&
+      widgetsEq(this.widgetAfter, other.widgetAfter)
   }
 }
 
@@ -188,7 +207,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
     if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
-                     deco => deco.affectsSpans, (a, b) => a.sameSpanEffect(b)))
+                     () => true, (a, b) => a.sameEffect(b)))
       addRange(from, to, this.changes.content)
   }
 
@@ -199,11 +218,12 @@ class DecorationComparator implements RangeComparator<Decoration> {
     }
   }
 
-  comparePoints(pos: number, pointsA: PointDecoration[], pointsB: PointDecoration[]) {
-    if (!compareSets(pointsA, pointsB, deco => !!deco.widget, (a, b) => widgetsEq(a.widget, b.widget))) {
+  comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
+    if (!compareSets(pointsA, pointsB, deco => deco instanceof WidgetDecoration, (a, b) => widgetsEq(a.widget, b.widget))) {
       addRange(pos, pos, this.changes.content)
       addRange(pos, pos, this.changes.height)
-    } else if (!compareSets(pointsA, pointsB, deco => deco.affectsLine, (a, b) => a.sameLineEffect(b)) &&
+    } else if (!compareSets(pointsA, pointsB, deco => deco instanceof LineDecoration,
+                            (a, b) => (a as LineDecoration).sameLineEffect(b)) &&
                this.doc.lineAt(pos).start == pos) {
       addRange(pos, pos, this.changes.content)
     }

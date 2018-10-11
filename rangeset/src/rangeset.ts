@@ -1,9 +1,9 @@
-import {Mapping, ChangeSet, Change, ChangedRange} from "../../state/src"
+import {ChangeSet, Change, ChangedRange} from "../../state/src"
 
 type A<T> = ReadonlyArray<T>
 
 export interface RangeValue {
-  map(mapping: Mapping, from: number, to: number): Range<any> | null
+  map(mapping: ChangeSet, from: number, to: number): Range<any> | null
   bias: number
   collapsed?: boolean
 }

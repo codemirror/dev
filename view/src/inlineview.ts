@@ -1,5 +1,5 @@
 import {ContentView, dirty} from "./contentview"
-import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, PointDecoration} from "./decoration"
+import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration} from "./decoration"
 import {Text, TextIterator} from "../../doc/src"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {Rect} from "./dom"
@@ -183,8 +183,8 @@ export class LineContent {
     if (this.atStart && inline instanceof TextView) this.atStart = false
   }
 
-  addLineDeco(deco: PointDecoration) {
-    let attrs = deco.lineAttributes
+  addLineDeco(deco: LineDecoration) {
+    let attrs = deco.attributes
     if (attrs) {
       if (!this.attrs) this.attrs = {}
       for (let name in attrs) {
@@ -281,17 +281,17 @@ export class InlineBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  point(deco: PointDecoration) {
-    if (deco.widget)
+  point(deco: Decoration) {
+    if (deco instanceof WidgetDecoration)
       this.curLine.add(new WidgetView(0, deco.widget, deco.bias))
-    if (deco.affectsLine && this.curLine.atStart)
-      this.curLine.addLineDeco(deco)
+    else if (this.curLine.atStart)
+      this.curLine.addLineDeco(deco as LineDecoration)
   }
 
   get curLine() { return this.lines[this.lines.length - 1] }
 
-  ignoreRange(deco: RangeDecoration): boolean { return !deco.affectsSpans }
-  ignorePoint(deco: PointDecoration): boolean { return !deco.widget && !deco.affectsLine }
+  ignoreRange(deco: RangeDecoration): boolean { return false }
+  ignorePoint(deco: Decoration): boolean { return false }
 
   static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineContent[] {
     let builder = new InlineBuilder(text, from)
