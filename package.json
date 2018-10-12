@@ -25,7 +25,7 @@
     }
   ],
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
-  "license": "MIT",
+  "license": "(MIT OR GPL-3.0)",
   "dependencies": {
     "@types/mocha": "^5.2.0",
     "@types/selenium-webdriver": "^3.0.10",

@@ -6,4 +6,4 @@ Eventually, the content of this repository will move into different packages. Fo
 
 Please see [our announcement](https://codemirror.net/6/) for more information.
 
-This code is released under an MIT license.
+This code is dual-licensed under the MIT and GPL-v3 licenses. This means that you, as user, may choose one of these licenses to abide by. I.e. if complying with the GPL is problematic for you, you can choose the more liberal MIT license.
