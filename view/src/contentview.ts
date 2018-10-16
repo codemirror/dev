@@ -50,20 +50,14 @@ export abstract class ContentView {
     return null
   }
 
+  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
+    return syncNodeInto(parent, pos, this.dom!)
+  }
+
   syncDOMChildren() {
-    if (!this.dom) return
-    let dom: Node | null = this.dom.firstChild
-    for (let view of this.children) {
-      let childDOM = view.dom
-      if (!childDOM) continue
-      if (childDOM.parentNode == this.dom) {
-        while (childDOM != dom) dom = rm(dom!)
-        dom = dom.nextSibling
-      } else {
-        this.dom.insertBefore(childDOM, dom)
-      }
-    }
-    while (dom) dom = rm(dom)
+    let parent = this.dom as HTMLElement, pos: Node | null = parent.firstChild
+    for (let view of this.children) pos = view.syncInto(parent, pos)
+    while (pos) pos = rm(pos)
   }
 
   sync() {
@@ -156,6 +150,16 @@ function rm(dom: Node): Node {
   let next = dom.nextSibling
   dom.parentNode!.removeChild(dom)
   return next!
+}
+
+export function syncNodeInto(parent: HTMLElement, pos: Node | null, dom: Node): Node | null {
+  if (dom.parentNode == parent) {
+    while (pos != dom) pos = rm(pos!)
+    pos = dom.nextSibling
+  } else {
+    parent.insertBefore(dom, pos)
+  }
+  return pos
 }
 
 export class ChildCursor {

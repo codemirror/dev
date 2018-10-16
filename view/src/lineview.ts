@@ -1,11 +1,12 @@
-import {ContentView, ChildCursor} from "./contentview"
+import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {attrsEq} from "./decoration"
+import {attrsEq, WidgetType} from "./decoration"
 
 export class LineView extends ContentView {
   children: InlineView[]
+  widgets: LineWidget[] = none
   length: number
   dom!: HTMLElement
   prevAttrs: {[name: string]: string} | null | undefined = undefined
@@ -114,6 +115,19 @@ export class LineView extends ContentView {
     return {node: this.dom, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
   }
 
+  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
+    for (let i = 0, main = false;; i++) {
+      let widget = i == this.widgets.length ? null : this.widgets[i]
+      if (!main && (!widget || widget.side > 0)) {
+        main = true
+        pos = syncNodeInto(parent, pos, this.dom!)
+      }
+      if (!widget) break
+      pos = syncNodeInto(parent, pos, widget.dom)
+    }
+    return pos
+  }
+
   // FIXME might need another hack to work around Firefox's behavior
   // of not actually displaying the cursor even though it's there in
   // the DOM
@@ -150,6 +164,18 @@ export class LineView extends ContentView {
     return super.coordsAt(pos)
   }
 }
+
+class LineWidget {
+  dom: HTMLElement
+  constructor(readonly widget: WidgetType<any>, readonly side: number) {
+    this.dom = widget.toDOM()
+  }
+  eq(other: LineWidget) {
+    return this.widget.compare(other.widget) && this.side == other.side
+  }
+}
+
+const none: any[] = []
 
 function setAttrs(dom: HTMLElement, attrs: {[name: string]: string} | null) {
   if (attrs) for (let name in attrs) dom.setAttribute(name, attrs[name])
