@@ -20,8 +20,8 @@ export interface WidgetDecorationSpec {
 
 export interface LineDecorationSpec {
   attributes?: {[key: string]: string}
-  widgetAfter?: WidgetType<any>
-  widgetBefore?: WidgetType<any>
+  widget?: WidgetType<any>
+  side?: number
   data?: any
 }
 
@@ -123,12 +123,12 @@ export class WidgetDecoration extends Decoration {
 
 export class LineDecoration extends Decoration {
   readonly attributes?: {[key: string]: string} | null
-  readonly widgetAfter: WidgetType<any> | null
+  readonly side: number
 
   constructor(spec: LineDecorationSpec) {
-    super(-BIG_BIAS, spec.widgetBefore || null, spec.data)
+    super(-BIG_BIAS, spec.widget || null, spec.data)
     this.attributes = spec.attributes || null
-    this.widgetAfter = spec.widgetAfter || null
+    this.side = spec.side || 0
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
@@ -144,7 +144,7 @@ export class LineDecoration extends Decoration {
     return other instanceof LineDecoration &&
       attrsEq(this.attributes, other.attributes) &&
       widgetsEq(this.widget, other.widget) &&
-      widgetsEq(this.widgetAfter, other.widgetAfter)
+      this.side == other.side
   }
 }
 
