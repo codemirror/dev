@@ -258,4 +258,65 @@ describe("EditorView decoration", () => {
       classes(cm, "", "a", "b")
     })
   })
+
+  class LineWidget extends WidgetType<string> {
+    toDOM() {
+      let elt = document.createElement("hr")
+      elt.setAttribute("data-name", this.spec)
+      return elt
+    }
+  }
+
+  function lw(pos: number, side = 0, name = "n") {
+    return Decoration.line(pos, {widget: new LineWidget(name), side})
+  }
+
+  function widgets(cm: EditorView, ...groups: string[][]) {
+    let found: string[][] = [[]]
+    for (let n: Node | null = cm.contentDOM.firstChild; n; n = n.nextSibling) {
+      if ((n as HTMLElement).nodeName == "HR") found[found.length - 1].push((n as HTMLElement).getAttribute("data-name")!)
+      else found.push([])
+    }
+    ist(JSON.stringify(found), JSON.stringify(groups))
+  }
+
+  describe("line widgets", () => {
+    it("draws line widgets in the right place", () => {
+      let cm = decoEditor("foo\nbar", [lw(0, 0, "A"), lw(0, 2, "C"), lw(0, 1, "B"), lw(4, -2, "D"), lw(4, -1, "E"), lw(4, 1, "F")])
+      widgets(cm, ["A"], ["B", "C", "D", "E"], ["F"])
+    })
+
+    it("adds widgets when they appear", () => {
+      let cm = decoEditor("foo\nbar", [lw(4, 1, "Y")])
+      cm.dispatch(cm.state.transaction.setMeta(addSlot, [lw(0, -1, "X"), lw(4, 2, "Z")]))
+      widgets(cm, ["X"], [], ["Y", "Z"])
+    })
+
+    it("removes widgets when they vanish", () => {
+      let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(0, 1, "B"), lw(4, -1, "C"), lw(4, 1, "D")])
+      widgets(cm, ["A"], ["B", "C"], ["D"])
+      cm.dispatch(cm.state.transaction.setMeta(filterSlot, (_f: number, _t: number, deco: any) => deco.side < 0))
+      widgets(cm, ["A"], ["C"], [])
+    })
+
+    it("doesn't redraw unchanged widgets", () => {
+      let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(4, 1, "B")])
+      let ws = cm.contentDOM.querySelectorAll("hr")
+      cm.dispatch(cm.state.transaction
+                  .setMeta(filterSlot, (_f: number, _t: number, deco: any) => deco.side < 0)
+                  .setMeta(addSlot, [lw(4, 1, "B")]))
+      widgets(cm, ["A"], [], ["B"])
+      let newWs = cm.contentDOM.querySelectorAll("hr")
+      ist(newWs[0], ws[0])
+      ist(newWs[1], ws[1])
+    })
+
+    it("does redraw changed widgets", () => {
+      let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(4, 1, "B")])
+      cm.dispatch(cm.state.transaction
+                  .setMeta(filterSlot, (_f: number, _t: number, deco: any) => deco.side < 0)
+                  .setMeta(addSlot, [lw(4, 1, "C")]))
+      widgets(cm, ["A"], [], ["C"])
+    })
+  })
 })

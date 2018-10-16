@@ -25,6 +25,7 @@ export interface LineDecorationSpec {
   data?: any
 }
 
+// FIXME call spec value
 export abstract class WidgetType<T> {
   constructor(readonly spec: T) {}
   abstract toDOM(): HTMLElement;
@@ -42,6 +43,7 @@ export abstract class WidgetType<T> {
 export type DecorationSet = RangeSet<Decoration>
 export type DecoratedRange = Range<Decoration>
 
+// FIXME store spec for less commonly-accessed field, drop data, pass spec to filter
 export abstract class Decoration implements RangeValue {
   // @internal
   constructor(readonly bias: number, readonly widget: WidgetType<any> | null, readonly data: any) {}
@@ -52,6 +54,7 @@ export abstract class Decoration implements RangeValue {
     return new Range(from, to, new RangeDecoration(spec))
   }
 
+  // FIXME move widget into spec again
   static widget(pos: number, widget: WidgetType<any>, spec?: WidgetDecorationSpec): DecoratedRange {
     return new Range(pos, pos, new WidgetDecoration(widget, spec))
   }

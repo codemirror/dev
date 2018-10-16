@@ -1,15 +1,16 @@
 import {ContentView, dirty} from "./contentview"
 import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration} from "./decoration"
+import {LineWidget} from "./lineview"
 import {Text, TextIterator} from "../../doc/src"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {Rect} from "./dom"
 import browser from "./browser"
 
-const noChildren: ContentView[] = []
+const none: any[] = []
 
 export abstract class InlineView extends ContentView {
   abstract merge(other: InlineView, from?: number, to?: number): boolean
-  get children() { return noChildren }
+  get children() { return none }
   finish(parent: ContentView) {}
   cut(from: number, to?: number) {}
   abstract slice(from: number, to?: number): InlineView
@@ -176,6 +177,7 @@ export class WidgetView extends InlineView {
 export class LineContent {
   elements: InlineView[] = []
   attrs: null | {[attr: string]: string} = null
+  widgets: LineWidget[] = none
   constructor(public atStart: boolean = true) {}
 
   add(inline: InlineView) {
@@ -196,7 +198,12 @@ export class LineContent {
           this.attrs[name] = attrs[name]
       }
     }
-    // FIXME store widgets
+    if (deco.widget) {
+      if (this.widgets == none) this.widgets = []
+      let pos = 0
+      while (pos < this.widgets.length && this.widgets[pos].side <= deco.side) pos++
+      this.widgets.splice(pos, 0, new LineWidget(deco.widget, deco.side))
+    }
   }
 }
 

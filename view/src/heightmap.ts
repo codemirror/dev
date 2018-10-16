@@ -6,6 +6,8 @@ import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
+// FIXME handle line widgets
+
 export class HeightOracle {
   doc: Text = Text.of([""])
   lineWrapping: boolean = false
