@@ -9,7 +9,7 @@ function domText(view: EditorView) {
     if (node.nodeType == 1) {
       if (node.nodeName == "BR" || (node as HTMLElement).contentEditable == "false") return
       if (eol) { text += "\n"; eol = false }
-      for (let ch = node.firstChild; ch; ch = ch.nextSibling) scan(ch)
+      for (let ch = node.firstChild as (Node | null); ch; ch = ch.nextSibling) scan(ch)
       eol = true
     } else if (node.nodeType == 3) {
       text += node.nodeValue

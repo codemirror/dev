@@ -199,7 +199,7 @@ export interface PluginView {
 }
 
 function selectionFromDOM(view: EditorView) {
-  let domSel = getRoot(view.contentDOM).getSelection()
+  let domSel = getRoot(view.contentDOM).getSelection()!
   let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
   let anchor = selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
   return EditorSelection.single(anchor, head)

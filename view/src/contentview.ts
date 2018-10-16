@@ -52,7 +52,7 @@ export abstract class ContentView {
 
   syncDOMChildren() {
     if (!this.dom) return
-    let dom = this.dom.firstChild
+    let dom: Node | null = this.dom.firstChild
     for (let view of this.children) {
       let childDOM = view.dom
       if (!childDOM) continue

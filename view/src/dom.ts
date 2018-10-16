@@ -14,7 +14,7 @@ export function selectionCollapsed(domSel: Selection) {
 }
 
 export function hasSelection(dom: HTMLElement): boolean {
-  let sel = getRoot(dom).getSelection()
+  let sel = getRoot(dom).getSelection()!
   if (!sel.anchorNode) return false
   try {
     // Firefox will raise 'permission denied' errors when accessing
@@ -85,7 +85,7 @@ function windowRect(win: Window): Rect {
 
 export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
   let scrollThreshold = 0, scrollMargin = 5
-  let doc = dom.ownerDocument, win = doc.defaultView
+  let doc = dom.ownerDocument!, win = doc.defaultView!
   let gutterCover = 0, prev = dom.previousSibling
   if (prev && getComputedStyle(prev as HTMLElement).position == "sticky") gutterCover = dom.offsetLeft
 

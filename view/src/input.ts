@@ -94,7 +94,7 @@ class MouseSelection {
   multiple: boolean
 
   constructor(private inputState: InputState, private view: EditorView, event: MouseEvent, private update: MouseSelectionUpdate) {
-    let doc = view.contentDOM.ownerDocument
+    let doc = view.contentDOM.ownerDocument!
     doc.addEventListener("mousemove", this.move = this.move.bind(this))
     doc.addEventListener("mouseup", this.up = this.up.bind(this))
 
@@ -140,7 +140,7 @@ class MouseSelection {
   }
 
   destroy() {
-    let doc = this.view.contentDOM.ownerDocument
+    let doc = this.view.contentDOM.ownerDocument!
     doc.removeEventListener("mousemove", this.move)
     doc.removeEventListener("mouseup", this.up)
     this.inputState.mouseSelection = null
@@ -169,7 +169,7 @@ function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) 
   if (pos > primary.from && pos < primary.to) return true
   // On boundary clicks, check whether the coordinates are inside the
   // selection's client rectangles
-  let sel = getRoot(view.contentDOM).getSelection()
+  let sel = getRoot(view.contentDOM).getSelection()!
   if (sel.rangeCount == 0) return true
   let rects = sel.getRangeAt(0).getClientRects()
   for (let i = 0; i < rects.length; i++) {
@@ -207,7 +207,7 @@ const brokenClipboardAPI = (browser.ie && browser.ie_version < 15) ||
   (browser.ios && browser.webkit_version < 604)
 
 function capturePaste(view: EditorView) {
-  let doc = view.dom.ownerDocument
+  let doc = view.dom.ownerDocument!
   let target = doc.body.appendChild(doc.createElement("textarea"))
   target.style.cssText = "position: fixed; left: -10000px; top: 10px"
   target.focus()
@@ -283,8 +283,8 @@ handlers.dragstart = (view, event: DragEvent) => {
   if (mouseSelection) mouseSelection.dragging = Dragging.YES
 
   let {doc, selection: {primary}} = view.state
-  event.dataTransfer.setData("Text", doc.slice(primary.from, primary.to))
-  event.dataTransfer.effectAllowed = "copyMove";
+  event.dataTransfer!.setData("Text", doc.slice(primary.from, primary.to))
+  event.dataTransfer!.effectAllowed = "copyMove";
 }
 
 // FIXME drop support
@@ -304,7 +304,7 @@ handlers.paste = (view: EditorView, event: ClipboardEvent) => {
 function captureCopy(view: EditorView, text: string) {
   // The extra wrapper is somehow necessary on IE/Edge to prevent the
   // content from being mangled when it is put onto the clipboard
-  let doc = view.dom.ownerDocument
+  let doc = view.dom.ownerDocument!
   let target = doc.body.appendChild(doc.createElement("textarea"))
   target.style.cssText = "position: fixed; left: -10000px; top: 10px"
   target.value = text

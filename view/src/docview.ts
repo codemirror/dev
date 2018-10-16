@@ -205,7 +205,7 @@ export class DocView extends ContentView {
     let anchor = this.domFromPos(primary.anchor)!
     let head = this.domFromPos(primary.head)!
 
-    let domSel = root.getSelection()
+    let domSel = root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
     if (isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
         isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {

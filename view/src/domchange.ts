@@ -129,7 +129,7 @@ class DOMPoint {
 function selectionPoints(dom: HTMLElement): DOMPoint[] {
   let root = getRoot(dom), result: DOMPoint[] = []
   if (root.activeElement != dom) return result
-  let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()
+  let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()!
   if (anchorNode) {
     result.push(new DOMPoint(anchorNode, anchorOffset))
     if (focusNode != anchorNode || focusOffset != anchorOffset)

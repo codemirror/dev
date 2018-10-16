@@ -16,7 +16,7 @@ export function movePos(view: EditorView, start: number,
                         direction: "forward" | "backward" | "left" | "right",
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
                         action: "move" | "extend"): number {
-  let sel = getRoot(view.contentDOM).getSelection()
+  let sel = getRoot(view.contentDOM).getSelection()!
   let context = LineContext.get(view, start)
   let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
   // Can only query native behavior when Selection.modify is
@@ -225,7 +225,7 @@ export class LineContext {
 function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node, offset: number} {
   let closest, dxClosest = 2e8, xClosest!: number, offset = 0
   let rowBot = y, rowTop = y
-  for (let child = parent.firstChild, childIndex = 0; child; child = child.nextSibling, childIndex++) {
+  for (let child: Node | null = parent.firstChild, childIndex = 0; child; child = child.nextSibling, childIndex++) {
     let rects = clientRectsFor(child)
     for (let i = 0; i < rects.length; i++) {
       let rect = rects[i]

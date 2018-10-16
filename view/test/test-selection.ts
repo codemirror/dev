@@ -6,7 +6,7 @@ function setDOMSel(node: Node, offset: number) {
   let range = document.createRange()
   range.setEnd(node, offset)
   range.setStart(node, offset)
-  let sel = window.getSelection()
+  let sel = window.getSelection()!
   sel.removeAllRanges()
   sel.addRange(range)
 }
@@ -42,8 +42,8 @@ describe("EditorView selection", () => {
     let cm = tempEditor("abc\n\ndef")
     function test(pos: number, node: Node, offset: number) {
       cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(pos)))
-      ist(window.getSelection().focusNode, node)
-      ist(window.getSelection().focusOffset, offset)
+      ist(window.getSelection()!.focusNode, node)
+      ist(window.getSelection()!.focusOffset, offset)
     }
     let abc = cm.contentDOM.firstChild!.firstChild!
     let def = cm.contentDOM.lastChild!.firstChild!

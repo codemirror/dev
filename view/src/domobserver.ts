@@ -60,13 +60,13 @@ export class DOMObserver {
     let listening = false
     this.dom.addEventListener("focus", () => {
       if (listening) return
-      this.dom.ownerDocument.addEventListener("selectionchange", this.readSelection)
+      this.dom.ownerDocument!.addEventListener("selectionchange", this.readSelection)
       listening = true
       if (hasSelection(this.dom)) this.readSelection()
     })
     this.dom.addEventListener("blur", () => {
       if (!listening) return
-      this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
+      this.dom.ownerDocument!.removeEventListener("selectionchange", this.readSelection)
       listening = false
     })
   }
@@ -193,14 +193,14 @@ export class DOMObserver {
   readSelection() {
     let root = getRoot(this.dom)
     if (!this.active || !this.selectionActive || root.activeElement != this.dom || !hasSelection(this.dom) ||
-        this.docView.drawnSelection.eq(root.getSelection())) return
+        this.docView.drawnSelection.eq(root.getSelection()!)) return
     if (!this.flush()) this.onSelectionChange()
   }
 
   destroy() {
     this.stop()
     if (this.intersection) this.intersection.disconnect()
-    this.dom.ownerDocument.removeEventListener("selectionchange", this.readSelection)
+    this.dom.ownerDocument!.removeEventListener("selectionchange", this.readSelection)
     for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
     window.removeEventListener("scroll", this.onScroll)
   }

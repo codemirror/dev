@@ -1,5 +1,5 @@
 import {Plugin, EditorState} from "../../state/src"
-import {EditorView, DecorationSet, Decoration, WidgetType, RangeDecorationSpec, PointDecorationSpec} from "../../view/src"
+import {EditorView, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
 export function multipleSelections() {
   return new Plugin({
