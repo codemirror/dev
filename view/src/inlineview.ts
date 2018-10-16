@@ -186,7 +186,7 @@ export class LineContent {
   }
 
   addLineDeco(deco: LineDecoration) {
-    let attrs = deco.attributes
+    let attrs = deco.spec.attributes
     if (attrs) {
       if (!this.attrs) this.attrs = {}
       for (let name in attrs) {
@@ -247,11 +247,11 @@ export class InlineBuilder implements RangeIterator<Decoration> {
 
     let tagName = null, clss = null
     let attrs: {[key: string]: string} | null = null
-    for (let deco of active as RangeDecoration[]) {
-      if (deco.tagName) tagName = deco.tagName
-      if (deco.class) clss = clss ? clss + " " + deco.class : deco.class
-      if (deco.attributes) for (let name in deco.attributes) {
-        let value = deco.attributes[name]
+    for (let {spec} of active as RangeDecoration[]) {
+      if (spec.tagName) tagName = spec.tagName
+      if (spec.class) clss = clss ? clss + " " + spec.class : spec.class
+      if (spec.attributes) for (let name in spec.attributes) {
+        let value = spec.attributes[name]
         if (value == null) continue
         if (name == "class") {
           clss = clss ? clss + " " + value : value

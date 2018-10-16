@@ -10,19 +10,17 @@ export interface RangeDecorationSpec {
   class?: string
   tagName?: string
   collapsed?: boolean | WidgetType<any>
-  data?: any
 }
 
 export interface WidgetDecorationSpec {
+  widget: WidgetType<any>
   side?: number
-  data?: any
 }
 
 export interface LineDecorationSpec {
   attributes?: {[key: string]: string}
   widget?: WidgetType<any>
   side?: number
-  data?: any
 }
 
 export abstract class WidgetType<T> {
@@ -42,10 +40,15 @@ export abstract class WidgetType<T> {
 export type DecorationSet = RangeSet<Decoration>
 export type DecoratedRange = Range<Decoration>
 
-// FIXME store spec for less commonly-accessed field, drop data, pass spec to filter
 export abstract class Decoration implements RangeValue {
   // @internal
-  constructor(readonly bias: number, readonly widget: WidgetType<any> | null, readonly data: any) {}
+  constructor(
+    // @internal
+    readonly bias: number,
+    // @internal
+    readonly widget: WidgetType<any> | null,
+    readonly spec: any) {}
+
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null;
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
@@ -53,9 +56,8 @@ export abstract class Decoration implements RangeValue {
     return new Range(from, to, new RangeDecoration(spec))
   }
 
-  // FIXME move widget into spec again
-  static widget(pos: number, widget: WidgetType<any>, spec?: WidgetDecorationSpec): DecoratedRange {
-    return new Range(pos, pos, new WidgetDecoration(widget, spec))
+  static widget(pos: number, spec: WidgetDecorationSpec): DecoratedRange {
+    return new Range(pos, pos, new WidgetDecoration(spec))
   }
 
   static line(pos: number, spec: LineDecorationSpec): DecoratedRange {
@@ -73,19 +75,12 @@ const BIG_BIAS = 2e9
 
 export class RangeDecoration extends Decoration {
   readonly endBias: number
-  readonly tagName: string | undefined
-  readonly class: string | undefined
-  readonly attributes: {[key: string]: string} | undefined
   readonly collapsed: boolean
 
   constructor(readonly spec: RangeDecorationSpec) {
     super(spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS,
-          spec.collapsed instanceof WidgetType ? spec.collapsed : null,
-          spec.data)
+          spec.collapsed instanceof WidgetType ? spec.collapsed : null, spec)
     this.endBias = spec.inclusiveEnd == true ? BIG_BIAS : -BIG_BIAS
-    this.tagName = spec.tagName
-    this.class = spec.class
-    this.attributes = spec.attributes
     this.collapsed = !!spec.collapsed
   }
 
@@ -102,19 +97,19 @@ export class RangeDecoration extends Decoration {
 
   sameEffect(other: RangeDecoration): boolean {
     return this == other ||
-      this.tagName == other.tagName &&
-      this.class == other.class &&
+      this.spec.tagName == other.spec.tagName &&
+      this.spec.class == other.spec.class &&
       this.collapsed == other.collapsed &&
       widgetsEq(this.widget, other.widget) &&
-      attrsEq(this.attributes, other.attributes)
+      attrsEq(this.spec.attributes, other.spec.attributes)
   }
 }
 
 export class WidgetDecoration extends Decoration {
   widget!: WidgetType<any>
 
-  constructor(widget: WidgetType<any>, readonly spec?: WidgetDecorationSpec) {
-    super(spec && spec.side || 0, widget || null, spec && spec.data)
+  constructor(readonly spec: WidgetDecorationSpec) {
+    super(spec.side || 0, spec.widget || null, spec)
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
@@ -124,13 +119,8 @@ export class WidgetDecoration extends Decoration {
 }
 
 export class LineDecoration extends Decoration {
-  readonly attributes?: {[key: string]: string} | null
-  readonly side: number
-
   constructor(spec: LineDecorationSpec) {
-    super(-BIG_BIAS, spec.widget || null, spec.data)
-    this.attributes = spec.attributes || null
-    this.side = spec.side || 0
+    super(-BIG_BIAS, spec.widget || null, spec)
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
@@ -144,10 +134,12 @@ export class LineDecoration extends Decoration {
 
   sameLineEffect(other: Decoration): boolean {
     return other instanceof LineDecoration &&
-      attrsEq(this.attributes, other.attributes) &&
+      attrsEq(this.spec.attributes, other.spec.attributes) &&
       widgetsEq(this.widget, other.widget) &&
       this.side == other.side
   }
+
+  get side() { return this.spec.side || 0 }
 }
 
 export function attrsEq(a: any, b: any): boolean {

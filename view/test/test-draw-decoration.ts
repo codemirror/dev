@@ -31,7 +31,7 @@ function d(from: number, to: any, spec: any = null) {
 }
 
 function w(pos: number, widget: WidgetType<any>, side: number = 0) {
-  return Decoration.widget(pos, widget, {side})
+  return Decoration.widget(pos, {widget, side})
 }
 
 function l(pos: number, attrs: any) {

@@ -38,7 +38,7 @@ describe("HeightMap", () => {
 
   it("separates lines with decorations on them", () => {
     let map = mk(doc(10, 10, 20, 5),
-                 [Decoration.widget(5, new MyWidget(20)),
+                 [Decoration.widget(5, {widget: new MyWidget(20)}),
                   Decoration.range(25, 46, {collapsed: true})])
     ist(map.length, 48)
     ist(map.toString(), "line(10:5,20) gap(10) line(26:3,-21)")
@@ -46,7 +46,7 @@ describe("HeightMap", () => {
 
   it("ignores irrelevant decorations", () => {
     let map = mk(doc(10, 10, 20, 5),
-                 [Decoration.widget(5, new NoHeightWidget(null)),
+                 [Decoration.widget(5, {widget: new NoHeightWidget(null)}),
                   Decoration.range(25, 46, {class: "ahah"})])
     ist(map.length, 48)
     ist(map.toString(), "gap(48)")
@@ -54,7 +54,7 @@ describe("HeightMap", () => {
 
   it("drops decorations from the tree when they are deleted", () => {
     let text = doc(20)
-    let map = mk(text, [Decoration.widget(5, new MyWidget(20))])
+    let map = mk(text, [Decoration.widget(5, {widget: new MyWidget(20)})])
     ist(map.toString(), "line(20:5,20)")
     map = map.applyChanges([], o(text), [new ChangedRange(5, 5, 5, 5)])
     ist(map.toString(), "line(20)")
@@ -71,11 +71,11 @@ describe("HeightMap", () => {
   it("joins lines", () => {
     let text = doc(10, 10, 10)
     let map = mk(text, [Decoration.range(2, 5, {collapsed: true}),
-                        Decoration.widget(24, new MyWidget(20))])
+                        Decoration.widget(24, {widget: new MyWidget(20)})])
     ist(map.toString(), "line(10:2,-3) gap(10) line(10:2,20)")
     map = map.applyChanges([
       Decoration.set([Decoration.range(2, 5, {collapsed: true}),
-                      Decoration.widget(12, new MyWidget(20))])
+                      Decoration.widget(12, {widget: new MyWidget(20)})])
     ], o(text.replace(10, 22, [""])), [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20:2,-3,12,20)")
   })

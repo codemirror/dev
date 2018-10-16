@@ -39,7 +39,8 @@ class MultipleSelectionView {
     let deco = []
     for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {
       let range = ranges[i]
-      deco.push(range.empty ? Decoration.widget(range.from, new CursorWidget(null)) : Decoration.range(ranges[i].from, ranges[i].to, this.rangeConfig))
+      deco.push(range.empty ? Decoration.widget(range.from, {widget: new CursorWidget(null)})
+                            : Decoration.range(ranges[i].from, ranges[i].to, this.rangeConfig))
     }
     this.decorations = Decoration.set(deco)
   }
