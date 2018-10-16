@@ -253,9 +253,9 @@ describe("EditorView decoration", () => {
     })
 
     it("can handle insertion", () => {
-      let cm = decoEditor("x\ny\nz", [l(2, "a")])
+      let cm = decoEditor("x\ny\nz", [l(2, "a"), l(4, "b")])
       cm.dispatch(cm.state.transaction.replace(2, 2, "hi"))
-      classes(cm, "", "a", "")
+      classes(cm, "", "a", "b")
     })
   })
 })
