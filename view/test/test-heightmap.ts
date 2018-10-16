@@ -30,7 +30,7 @@ describe("HeightMap", () => {
 
   class MyWidget extends WidgetType<number> {
     toDOM() { return document.body }
-    get estimatedHeight() { return this.spec }
+    get estimatedHeight() { return this.value }
   }
   class NoHeightWidget extends WidgetType<null> {
     toDOM() { return document.body }

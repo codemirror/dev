@@ -25,15 +25,14 @@ export interface LineDecorationSpec {
   data?: any
 }
 
-// FIXME call spec value
 export abstract class WidgetType<T> {
-  constructor(readonly spec: T) {}
+  constructor(readonly value: T) {}
   abstract toDOM(): HTMLElement;
-  eq(spec: T): boolean { return this.spec === spec }
+  eq(value: T): boolean { return this.value === value }
 
   /** @internal */
   compare(other: WidgetType<any>): boolean {
-    return this == other || this.constructor == other.constructor && this.eq(other.spec)
+    return this == other || this.constructor == other.constructor && this.eq(other.value)
   }
 
   get estimatedHeight(): number { return -1 }

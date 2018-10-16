@@ -143,9 +143,9 @@ class SpecialCharWidget extends WidgetType<number> {
   constructor(private options: SpecialCharOptions, code: number) { super(code) }
 
   toDOM() {
-    let ph = placeHolder(this.spec) || DEFAULT_PLACEHOLDER
-    let desc = "Control character " + (NAMES[this.spec] || this.spec)
-    let custom = this.options.render && this.options.render(this.spec, desc, ph)
+    let ph = placeHolder(this.value) || DEFAULT_PLACEHOLDER
+    let desc = "Control character " + (NAMES[this.value] || this.value)
+    let custom = this.options.render && this.options.render(this.value, desc, ph)
     if (custom) return custom
     let span = document.createElement("span")
     span.textContent = ph
@@ -163,7 +163,7 @@ class TabWidget extends WidgetType<number> {
     let span = document.createElement("span")
     span.textContent = "\t"
     span.className = "CodeMirror-tab"
-    span.style.width = this.spec + "px"
+    span.style.width = this.value + "px"
     return span
   }
 

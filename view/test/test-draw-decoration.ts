@@ -112,10 +112,10 @@ describe("EditorView decoration", () => {
   })
 
   class WordWidget extends WidgetType<string> {
-    eq(otherSpec: string) { return this.spec.toLowerCase() == otherSpec.toLowerCase() }
+    eq(otherValue: string) { return this.value.toLowerCase() == otherValue.toLowerCase() }
     toDOM() {
       let dom = document.createElement("strong")
-      dom.textContent = this.spec
+      dom.textContent = this.value
       return dom
     }
   }
@@ -262,7 +262,7 @@ describe("EditorView decoration", () => {
   class LineWidget extends WidgetType<string> {
     toDOM() {
       let elt = document.createElement("hr")
-      elt.setAttribute("data-name", this.spec)
+      elt.setAttribute("data-name", this.value)
       return elt
     }
   }
