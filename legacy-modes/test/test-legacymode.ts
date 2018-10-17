@@ -57,10 +57,10 @@ describe("legacyMode", () => {
     ist(decorations.length, 2)
     ist(decorations[0].from, 0)
     ist(decorations[0].to, 1)
-    ist(decorations[0].value.class, "cm-1")
+    ist(decorations[0].value.spec.class, "cm-1")
     ist(decorations[1].from, 1)
     ist(decorations[1].to, 2)
-    ist(decorations[1].value.class, "cm-2")
+    ist(decorations[1].value.spec.class, "cm-2")
 
     modeTest.getDecorations({from: 1, to: 2})
     modeTest.getDecorations({from: 0, to: 1})
