@@ -69,6 +69,9 @@ export abstract class Decoration implements RangeValue {
   }
 
   static none = RangeSet.empty as DecorationSet
+
+  // @internal
+  abstract sameEffect(other: Decoration): boolean
 }
 
 const BIG_BIAS = 2e9
@@ -116,6 +119,10 @@ export class WidgetDecoration extends Decoration {
     pos = mapping.mapPos(pos, this.bias, true)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
+
+  sameEffect(other: Decoration): boolean {
+    return other instanceof WidgetDecoration && widgetsEq(this.widget, other.widget) && this.bias == other.bias
+  }
 }
 
 export class LineDecoration extends Decoration {
@@ -132,7 +139,7 @@ export class LineDecoration extends Decoration {
     return new Range(pos, pos, this)
   }
 
-  sameLineEffect(other: Decoration): boolean {
+  sameEffect(other: Decoration): boolean {
     return other instanceof LineDecoration &&
       attrsEq(this.spec.attributes, other.spec.attributes) &&
       widgetsEq(this.widget, other.widget) &&
@@ -157,15 +164,13 @@ export function widgetsEq(a: WidgetType<any> | null, b: WidgetType<any> | null):
   return a == b || !!(a && b && a.compare(b))
 }
 
-function compareSets<T>(setA: T[], setB: T[], relevant: (val: T) => boolean, same: (a: T, b: T) => boolean): boolean {
-  let countA = 0, countB = 0
-  search: for (let value of setA) if (relevant(value)) {
-    countA++
-    for (let valueB of setB) if (same(value, valueB)) continue search
+function compareSets(setA: Decoration[], setB: Decoration[]): boolean {
+  if (setA.length != setB.length) return false
+  search: for (let value of setA) {
+    for (let valueB of setB) if (value.sameEffect(valueB)) continue search
     return false
   }
-  for (let value of setB) if (relevant(value)) countB++
-  return countA == countB
+  return true
 }
 
 const MIN_RANGE_GAP = 4
@@ -197,11 +202,10 @@ class Changes {
 
 class DecorationComparator implements RangeComparator<Decoration> {
   changes: Changes = new Changes
-  constructor(private doc: Text) {}
+  constructor() {}
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
-    if (!compareSets(activeA as RangeDecoration[], activeB as RangeDecoration[],
-                     () => true, (a, b) => a.sameEffect(b)))
+    if (!compareSets(activeA, activeB))
       addRange(from, to, this.changes.content)
   }
 
@@ -213,19 +217,17 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 
   comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
-    if (!compareSets(pointsA, pointsB, deco => deco instanceof WidgetDecoration, (a, b) => widgetsEq(a.widget, b.widget))) {
+    if (!compareSets(pointsA, pointsB)) {
       addRange(pos, pos, this.changes.content)
-      addRange(pos, pos, this.changes.height)
-    } else if (!compareSets(pointsA, pointsB, deco => deco instanceof LineDecoration,
-                            (a, b) => (a as LineDecoration).sameLineEffect(b)) &&
-               this.doc.lineAt(pos).start == pos) {
-      addRange(pos, pos, this.changes.content)
+      if (pointsA.some(d => !!(d.widget && d.widget.estimatedHeight > -1)) ||
+          pointsB.some(d => !!(d.widget && d.widget.estimatedHeight > -1)))
+        addRange(pos, pos, this.changes.height)
     }
   }
 }
 
 export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, docA: Text): Changes {
-  let comp = new DecorationComparator(docA)
+  let comp = new DecorationComparator()
   a.compare(b, diff, comp, docA.length)
   return comp.changes
 }
