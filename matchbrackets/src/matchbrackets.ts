@@ -19,7 +19,7 @@ function getStyle(decorations: DecorationSet | undefined, at: number): string | 
   let decoration
   while (decoration = iter.next())
     if (decoration.from <= at && at < decoration.to)
-      return (decoration.value as RangeDecoration).class
+      return (decoration.value as RangeDecoration).spec.class
 }
 
 export function findMatchingBracket(doc: Text, decorations: DecorationSet | undefined, where: number, config: Config = {}): {from: number, to: number | null, forward: boolean, match: boolean} | null {
