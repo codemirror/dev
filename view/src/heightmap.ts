@@ -66,6 +66,12 @@ export class HeightOracle {
 
 type LineIterator = (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void
 
+// This object is used by `updateHeight` to make DOM measurements
+// arrive at the right lines. The `heights` array is a sequence of
+// line heights, starting from position `from`. When the lines have
+// line widgets, their height may be followed by a -1 or -2
+// (indicating whether the height is below or above the line) and then
+// a total widget height.
 export class MeasuredHeights {
   public index = 0
   constructor(readonly from: number, readonly heights: number[]) {}
@@ -157,6 +163,29 @@ export abstract class HeightMap {
 const noDeco: number[] = []
 
 class HeightMapLine extends HeightMap {
+  // Decoration information is stored in a somewhat obscure format—the
+  // array of numbers in `deco` encodes all of collapsed ranges,
+  // inline widgets, and widgets above/below the line. It contains a
+  // series of pairs of numbers.
+  //
+  //  - The first number indicates the position of the decoration, or
+  //    -2 for widget height above the line, or -1 for widget height
+  //    below the line (see `lineWidgetHeight` and
+  //    `setLineWidgetHeight`)
+  //
+  //  - The second number is the height of a widget when positive, or
+  //    the number of collapse code points if negative.
+  //
+  // These are the pieces of information that need to be stored about
+  // lines to somewhat effectively estimate their height when they are
+  // not actually in view and thus can not be measured. Widget size
+  // above/below is also necessary in heightAt, to skip it.
+  //
+  // The somewhat awkward format is there to reduce the amount of
+  // space required—you can have a huge number of line heightmap
+  // objects when scrolling through a big document, and most of them
+  // don't need any extra data, and thus can just store a single
+  // pointer to `noDeco`.
   constructor(length: number, height: number, public deco: number[] = noDeco) { super(length, height) }
 
   get size(): number { return 1 }
