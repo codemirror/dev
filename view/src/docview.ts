@@ -5,7 +5,7 @@ import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
 import {EditorState, EditorSelection, Transaction, ChangeSet, ChangedRange} from "../../state/src"
-import {HeightMap, HeightOracle} from "./heightmap"
+import {HeightMap, HeightOracle, MeasuredHeights} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
 
@@ -324,7 +324,7 @@ export class DocView extends ContentView {
     if (this.viewportState.top >= this.viewportState.bottom) return // We're invisible!
 
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
-    if (this.heightOracle.maybeRefresh(lineHeights)) {
+    if (this.heightOracle.mustRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
                                           lineHeight, charWidth, (this.dom).clientWidth / charWidth, lineHeights)
@@ -335,9 +335,8 @@ export class DocView extends ContentView {
     let updated = false
     for (let i = 0;; i++) {
       this.heightOracle.heightChanged = false
-      this.heightMap = this.heightMap.updateHeight(this.heightOracle, 0, refresh,
-                                                   this.visiblePart.from, this.visiblePart.to,
-                                                   lineHeights || this.measureVisibleLineHeights())
+      this.heightMap = this.heightMap.updateHeight(
+        this.heightOracle, 0, refresh, new MeasuredHeights(this.visiblePart.from, lineHeights || this.measureVisibleLineHeights()))
       let covered = this.viewportState.coveredBy(this.text, this.visiblePart, this.heightMap, scrollBias)
       if (covered && !this.heightOracle.heightChanged) break
       updated = true
@@ -387,9 +386,18 @@ export class DocView extends ContentView {
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.visiblePart
     for (let pos = 0, i = 0; pos <= to; i++) {
-      let child = this.children[i]
-      if (pos >= from)
-        result.push(child.length, (child.dom as HTMLElement).getBoundingClientRect().height)
+      let child = this.children[i] as LineView
+      if (pos >= from) {
+        result.push(child.dom.getBoundingClientRect().height)
+        let before = 0, after = 0
+        for (let w of child.widgets) {
+          let h = w.dom!.getBoundingClientRect().height
+          if (w.side > 0) after += h
+          else before += h
+        }
+        if (before) result.push(-2, before)
+        if (after) result.push(-1, after)
+      }
       pos += child.length + 1
     }
     return result

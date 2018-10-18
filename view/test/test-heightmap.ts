@@ -1,4 +1,4 @@
-import {HeightMap, HeightOracle} from "../src/heightmap"
+import {HeightMap, HeightOracle, MeasuredHeights} from "../src/heightmap"
 import {Decoration, WidgetType} from "../src/decoration"
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
@@ -60,6 +60,20 @@ describe("HeightMap", () => {
     ist(map.toString(), "line(20)")
   })
 
+  it("stores information about line widgets", () => {
+    let text = doc(3, 3, 3), oracle = o(text)
+    let map = mk(text, [Decoration.line(0, {widget: new MyWidget(10), side: -1}),
+                        Decoration.line(0, {widget: new MyWidget(5), side: 1}),
+                        Decoration.line(0, {widget: new MyWidget(13), side: -1})])
+    ist(map.toString(), "line(3:-2,23,-1,5) gap(7)")
+    ist(map.heightAt(0, text, -1), 23)
+    ist(map.heightAt(0, text, 1), 23 + oracle.lineHeight)
+    ist(map.heightAt(4, text, -1), 28 + oracle.lineHeight)
+    map = map.updateHeight(oracle, 0, false, new MeasuredHeights(0, [20, -2, 10, 20, -1, 40, 20]))
+    ist(map.toString(), "line(3:-2,10,-1,0) line(3:-1,40) line(3)")
+    ist(map.height, 110)
+  })
+
   it("joins ranges", () => {
     let text = doc(10, 10, 10, 10)
     let map = mk(text, [Decoration.range(16, 27, {collapsed: true})])
@@ -81,22 +95,19 @@ describe("HeightMap", () => {
   })
 
   it("materializes lines for measured heights", () => {
-    let text = doc(10, 10, 10, 10), oracle = (new HeightOracle).setDoc(text)
+    let text = doc(10, 10, 10, 10), oracle = o(text)
     let map: HeightMap = mk(text, [])
-      .updateHeight(oracle, 0, false, 11, 43, [10, 28, 10, 14, 10, 5])
+      .updateHeight(oracle, 0, false, new MeasuredHeights(11, [28, 14, 5]))
     ist(map.toString(), "gap(10) line(10) line(10) line(10)")
     ist(map.height, 61)
   })
 
   it("can update lines across the tree", () => {
-    let text = doc(...new Array(100).fill(10))
-    let oracle = (new HeightOracle).setDoc(text)
-    let heights = []
-    for (let i = 0; i < 100; i++) heights.push(10, 12)
-    let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, heights)
+    let text = doc(...new Array(100).fill(10)), oracle = o(text)
+    let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, new Array(100).fill(12)))
     ist(map.height, 1200)
     ist(map.size, 100)
-    map = map.updateHeight(oracle, 0, false, 55, text.length - 55, new Array(180).fill(10))
+    map = map.updateHeight(oracle, 0, false, new MeasuredHeights(55, new Array(90).fill(10)))
     ist(map.height, 1020)
     ist(map.size, 100)
   })
@@ -107,11 +118,8 @@ describe("HeightMap", () => {
   }
 
   it("balances a big tree", () => {
-    let text = doc(...new Array(100).fill(30))
-    let oracle = (new HeightOracle).setDoc(text)
-    let heights = []
-    for (let i = 0; i < 100; i++) heights.push(30, 15)
-    let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, heights)
+    let text = doc(...new Array(100).fill(30)), oracle = o(text)
+    let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, new Array(100).fill(15)))
     ist(map.height, 1500)
     ist(map.size, 100)
     ist(depth(map), 9, "<")
@@ -122,32 +130,28 @@ describe("HeightMap", () => {
     let len = text.length
     text = text.replace(len, len, "\nfoo".repeat(200).split("\n"))
     map = map.applyChanges([], o(text), [new ChangedRange(len, len, len, len + 800)])
-    heights.length = 0
-    for (let i = 0; i < 200; i++) heights.push(3, 10)
-    map = map.updateHeight(oracle.setDoc(text), 0, false, len + 1, text.length, heights)
+    map = map.updateHeight(oracle.setDoc(text), 0, false, new MeasuredHeights(len + 1, new Array(200).fill(10)))
     ist(map.size, 220)
     ist(depth(map), 12, "<")
   })
 
   it("can handle inserting a line break", () => {
-    let text = doc(3, 3, 3)
-    let oracle = (new HeightOracle).setDoc(text)
-    let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, [3, 10, 3, 10, 3, 10])
+    let text = doc(3, 3, 3), oracle = o(text)
+    let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10]))
     ist(map.size, 3)
-    text = text.replace(3, 3, ["", ""])
-    map = map.applyChanges([], o(text), [new ChangedRange(3, 3, 3, 4)])
-      .updateHeight(oracle, 0, false, 0, text.length, [3, 10, 0, 10, 3, 10, 3, 10])
+    oracle.setDoc(text = text.replace(3, 3, ["", ""]))
+    map = map.applyChanges([], oracle, [new ChangedRange(3, 3, 3, 4)])
+      .updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10, 10]))
     ist(map.size, 4)
     ist(map.height, 40)
   })
 
   it("can handle insertion in the middle of a line", () => {
-    let text = doc(3, 3, 3)
-    let oracle = (new HeightOracle).setDoc(text)
-    let map = mk(text).updateHeight(oracle, 0, false, 0, text.length, [3, 10, 3, 10, 3, 10])
-    text = text.replace(5, 5, ["foo", "bar", "baz", "bug"])
-    map = map.applyChanges([], o(text), [new ChangedRange(5, 5, 5, 20)])
-      .updateHeight(oracle, 0, false, 0, text.length, [3, 10, 4, 10, 3, 10, 3, 10, 5, 10, 3, 10])
+    let text = doc(3, 3, 3), oracle = o(text)
+    let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10]))
+    oracle.setDoc(text = text.replace(5, 5, ["foo", "bar", "baz", "bug"]))
+    map = map.applyChanges([], oracle, [new ChangedRange(5, 5, 5, 20)])
+      .updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10, 10, 10, 10]))
     ist(map.size, 6)
     ist(map.height, 60)
   })

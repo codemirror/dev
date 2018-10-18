@@ -1,12 +1,10 @@
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
-import {DecorationSet, RangeDecoration, Decoration, WidgetDecoration} from "./decoration"
+import {DecorationSet, RangeDecoration, Decoration, LineDecoration} from "./decoration"
 import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
-
-// FIXME handle line widgets
 
 export class HeightOracle {
   doc: Text = Text.of([""])
@@ -33,13 +31,15 @@ export class HeightOracle {
 
   setDoc(doc: Text): this { this.doc = doc; return this }
 
-  maybeRefresh(lineHeights: number[]): boolean {
+  mustRefresh(lineHeights: number[]): boolean {
     let newHeight = false
-    for (let i = 1; i < lineHeights.length; i += 2) {
-      let height = Math.floor(lineHeights[i] * 10) // Round to .1 pixels
-      if (!this.heightSamples[height]) {
+    for (let i = 0; i < lineHeights.length; i++) {
+      let h = lineHeights[i]
+      if (h < 0) {
+        i++
+      } else if (!this.heightSamples[Math.floor(h * 10)]) { // Round to .1 pixels
         newHeight = true
-        this.heightSamples[height] = true
+        this.heightSamples[Math.floor(h * 10)] = true
       }
     }
     return newHeight
@@ -54,13 +54,23 @@ export class HeightOracle {
     this.lineLength = lineLength
     if (changed) {
       this.heightSamples = {}
-      for (let height of knownHeights) this.heightSamples[Math.floor(height * 10)] = true
+      for (let i = 0; i < knownHeights.length; i++) {
+        let h = knownHeights[i]
+        if (h < 0) i++
+        else this.heightSamples[Math.floor(h * 10)] = true
+      }
     }
     return changed
   }
 }
 
 type LineIterator = (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void
+
+export class MeasuredHeights {
+  public index = 0
+  constructor(readonly from: number, readonly heights: number[]) {}
+  get more() { return this.index < this.heights.length }
+}
 
 export abstract class HeightMap {
   constructor(
@@ -76,8 +86,7 @@ export abstract class HeightMap {
   abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
   abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number): void
   abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number): void
-  abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean,
-                        from?: number, to?: number, lines?: number[]): HeightMap
+  abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean, measured?: MeasuredHeights): HeightMap
   abstract toString(): void
   abstract forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator): void
 
@@ -152,7 +161,9 @@ class HeightMapLine extends HeightMap {
 
   get size(): number { return 1 }
 
-  heightAt(pos: number, doc: Text, bias: 1 | -1): number { return bias < 0 ? 0 : this.height }
+  heightAt(pos: number, doc: Text, bias: 1 | -1): number {
+    return bias < 0 ? lineWidgetHeight(this.deco, -2) : this.height - lineWidgetHeight(this.deco, -1)
+  }
 
   posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0) {
     return offset + (bias < 0 ? 0 : this.length)
@@ -205,19 +216,28 @@ class HeightMapLine extends HeightMap {
     return new HeightMapLine(this.length + node.length - (to - from), Math.max(this.height, node.height), deco)
   }
 
-  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false,
-               from?: number, to?: number, lines?: number[]): HeightMap {
-    if (lines) {
-      if (lines.length != 2) throw new Error("Mismatch between height map and line data")
-      this.setHeight(oracle, lines[1])
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
+    if (measured && measured.from <= offset && measured.more) {
+      let height = measured.heights[measured.index++]
+      // If either this line's deco data or the measured heights contain info about 
+      if (this.deco.length && this.deco[0] < 0 || measured.more && measured.heights[measured.index] < 0) {
+        let above = measured.more && measured.heights[measured.index] == -2
+          ? measured.heights[(measured.index += 2) - 1] : 0
+        let below = measured.more && measured.heights[measured.index] == -1
+          ? measured.heights[(measured.index += 2) - 1] : 0
+        this.deco = setLineWidgetHeight(setLineWidgetHeight(this.deco.slice(), -2, above), -1, below)
+        height += above + below
+      }
+      this.setHeight(oracle, height)
     } else if (force || this.outdated) {
-      let len = this.length, minH = 0
+      let len = this.length, minH = 0, add = 0
       for (let i = 1; i < this.deco.length; i += 2) {
         let val = this.deco[i]
         if (val < 0) len += val
+        else if (this.deco[i - 1] < 0) add += val
         else minH = Math.max(val, minH)
       }
-      this.setHeight(oracle, Math.max(oracle.heightForLine(len), minH))
+      this.setHeight(oracle, Math.max(oracle.heightForLine(len), minH) + add)
     }
     this.outdated = false
     return this
@@ -240,7 +260,7 @@ function offsetDeco(deco: number[], from: number, to: number, length: number): n
   let off = length - (to - from)
   for (let i = 0; i < deco.length; i += 2) {
     let pos = deco[i]
-    if (pos < from || pos > to && off == 0) continue
+    if (Math.max(0, pos) < from || pos > to && off == 0) continue
     if (!result) result = deco.slice(0, i)
     if (pos > to) result.push(pos + off, deco[i + 1])
   }
@@ -253,12 +273,36 @@ function insertDeco(deco: number[], newDeco: number[], pos: number): number[] {
   for (let i = 0;; i += 2) {
     let next = i == deco.length ? 2e9 : deco[i]
     if (!inserted && next > pos) {
-      for (let j = 0; j < newDeco.length; j += 2) result.push(newDeco[j] + pos, newDeco[j + 1])
+      for (let j = 0; j < newDeco.length; j += 2)
+        if (pos == 0 || newDeco[j] >= 0) result.push(newDeco[j] + pos, newDeco[j + 1])
       inserted = true
     }
     if (next == 2e9) return result
     result.push(next, deco[i + 1])
   }
+}
+
+function lineWidgetHeight(deco: number[], type: -1 | -2) {
+  for (let i = 0; i < deco.length; i += 2) {
+    let pos = deco[i]
+    if (pos >= 0) break
+    if (pos == type) return deco[i + 1]
+  }
+  return 0
+}
+
+function setLineWidgetHeight(deco: number[], type: -1 | -2, height: number): number[] {
+  let i = 0
+  for (; i < deco.length; i += 2) {
+    let pos = deco[i]
+    if (pos > type) break
+    if (pos == type) {
+      deco[i + 1] = height
+      return deco
+    }
+  }
+  if (height > 0) deco.splice(i, 0, type, height)
+  return deco
 }
 
 class HeightMapGap extends HeightMap {
@@ -271,7 +315,7 @@ class HeightMapGap extends HeightMap {
   heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
     let lines = lastLine - firstLine + 1
-    return (doc.lineAt(pos).number - firstLine + (offset > 0 ? 1 : 0)) * (this.height / lines)
+    return (doc.lineAt(pos).number - firstLine + (bias > 0 ? 1 : 0)) * (this.height / lines)
   }
 
   posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
@@ -320,23 +364,30 @@ class HeightMapGap extends HeightMap {
     }
   }
 
-  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false,
-               from?: number, to?: number, lines?: number[]): HeightMap {
-    if (lines) {
-      let nodes = []
-      if (from! > offset)
-        nodes.push(new HeightMapGap(offset, from! - 1, oracle))
-      for (let i = 0; i < lines.length; i += 2)
-        nodes.push(new HeightMapLine(lines[i], lines[i + 1]))
-      if (to! < offset + this.length)
-        nodes.push(new HeightMapGap(to! + 1, offset + this.length, oracle))
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights): HeightMap {
+    let end = offset + this.length
+    if (measured && measured.from < offset + this.length && measured.more) {
+      let nodes = [], pos = Math.max(offset, measured.from)
+      if (measured.from > offset) nodes.push(new HeightMapGap(offset, measured.from - 1, oracle))
+      while (pos <= end && measured.more) {
+        let height = measured.heights[measured.index++], deco = undefined, wType!: -1 | -2
+        while (measured.more && (wType = measured.heights[measured.index] as (-1 | -2)) < 0) {
+          let wHeight = measured.heights[(measured.index += 2) - 1]
+          height += wHeight
+          deco = setLineWidgetHeight(deco || [], wType, wHeight)
+        }
+        let len = oracle.doc.lineAt(pos).length
+        nodes.push(new HeightMapLine(len, height, deco))
+        pos += len + 1
+      }
+      if (pos < end) nodes.push(new HeightMapGap(pos, end, oracle))
       for (let node of nodes) node.outdated = false
       oracle.heightChanged = true
       return HeightMap.of(nodes)
     } else if (force || this.outdated) {
       this.setHeight(oracle, oracle.heightForGap(offset, offset + this.length))
+      this.outdated = false
     }
-    this.outdated = false
     return this
   }
 
@@ -419,30 +470,18 @@ class HeightMapBranch extends HeightMap {
     return this
   }
 
-  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false,
-               from?: number, to?: number, lines?: number[]): HeightMap {
-    if (lines) {
-      let {left, right} = this, rightOffset = offset + left.length + 1
-      if (to! < rightOffset) {
-        left = left.updateHeight(oracle, offset, force, from, to, lines)
-        if (force) right.updateHeight(oracle, rightOffset, true)
-      } else if (from! >= rightOffset) {
-        right = right.updateHeight(oracle, rightOffset, force, from, to, lines)
-        if (force) left.updateHeight(oracle, offset, true)
-      } else {
-        // FIXME try to reduce the array copying here?
-        let i = 0, pos = from! - 1
-        while (i < lines.length && pos <= rightOffset - 2) { pos += lines[i] + 1; i += 2 }
-        right = right.updateHeight(oracle, rightOffset, force, rightOffset, to, lines.slice(i))
-        lines.length = i
-        left = left.updateHeight(oracle, offset, force, from, rightOffset - 1, lines)
-      }
-      return this.balanced(left, right)
-    } else if (force || this.outdated) {
-      this.left.updateHeight(oracle, offset, force)
-      this.right.updateHeight(oracle, offset + this.left.length + 1, force)
-      this.height = this.left.height + this.right.height
-    }
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights): HeightMap {
+    let {left, right} = this, rightStart = offset + left.length + 1, rebalance: any = null
+    if (measured && measured.from <= offset + left.length && measured.more)
+      rebalance = left = left.updateHeight(oracle, offset, force, measured)
+    else
+      left.updateHeight(oracle, offset, force)
+    if (measured && measured.from <= rightStart + right.length && measured.more)
+      rebalance = right = right.updateHeight(oracle, rightStart, force, measured)
+    else
+      right.updateHeight(oracle, rightStart, force)
+    if (rebalance) return this.balanced(left, right)
+    this.height = this.left.height + this.right.height
     this.outdated = false
     return this
   }
@@ -456,13 +495,6 @@ class HeightMapBranch extends HeightMap {
   }
 }
 
-// FIXME This could probably be optimized. Measure how often it's
-// actually running during regular use. (Current theory is that,
-// because most of the document will simply be an unparsed gap, and
-// collapsed regions/widgets are relatively rare, and the viewport is
-// filled in through updateHeight, it's not going to be calling
-// `lineEndAt`/`lineStartAt` a significant amount of times except in
-// pathological circumstances.)
 class NodeBuilder implements RangeIterator<Decoration> {
   nodes: HeightMap[] = []
   writtenTo: number
@@ -508,7 +540,8 @@ class NodeBuilder implements RangeIterator<Decoration> {
   }
 
   point(deco: Decoration) {
-    this.addDeco(deco.widget!.estimatedHeight)
+    this.addDeco(deco.widget!.estimatedHeight,
+                 deco instanceof LineDecoration ? (deco.side > 0 ? -1 : -2) : undefined)
   }
 
   flushTo(pos: number) {
@@ -518,18 +551,21 @@ class NodeBuilder implements RangeIterator<Decoration> {
     }
   }
 
-  addDeco(val: number) {
+  addDeco(val: number, lineWidget?: -1 | -2) {
     if (!this.curLine) {
       this.lineStart = Math.max(this.writtenTo, this.oracle.doc.lineAt(this.pos).start)
       this.flushTo(this.lineStart - 1)
       this.nodes.push(this.curLine = new HeightMapLine(this.pos - this.lineStart, 0, []))
       this.writtenTo = this.pos
     }
-    this.curLine.deco.push(this.pos - this.lineStart, val)
+    if (lineWidget == null)
+      this.curLine.deco.push(this.pos - this.lineStart, val)
+    else
+      setLineWidgetHeight(this.curLine.deco, lineWidget, val + lineWidgetHeight(this.curLine.deco, lineWidget))
   }
 
   ignoreRange(value: Decoration) { return !(value as RangeDecoration).collapsed }
-  ignorePoint(value: Decoration) { return !(value.widget && value.widget.estimatedHeight > 0 && value instanceof WidgetDecoration) }
+  ignorePoint(value: Decoration) { return !(value.widget && value.widget.estimatedHeight > 0) }
 }
 
 function buildChangedNodes(oracle: HeightOracle, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMap[] {
