@@ -59,5 +59,5 @@ readFile("package.json", "utf8", (err, data) => {
   keymap(baseKeymap),
 ]})
 
-let view = (window as any).view = new EditorView(state, )
+let view = (window as any).view = new EditorView(state)
 document.querySelector("#editor").appendChild(view.dom)

@@ -23,6 +23,8 @@
 .CodeMirror-gutter {
   background: #f5f5f5;
   border-right: 1px solid silver;
+  display: flex; /* Necessary -- prevents margin collapsing */
+  flex-direction: column;
 }
 
 .CodeMirror-gutter-element {

@@ -43,7 +43,7 @@ class GutterView {
     }
     view.dom.insertBefore(this.dom, view.contentDOM)
     this.formatNumber = config.formatNumber || String
-    this.lastLine = new GutterLine(1, 0, this.formatNumber)
+    this.lastLine = new GutterLine(1, 0, 0, 0, this.formatNumber)
     this.lastLine.dom.style.cssText += "visibility: hidden; pointer-events: none"
     this.dom.appendChild(this.lastLine.dom)
     this.updateDOM(view)
@@ -55,7 +55,7 @@ class GutterView {
     // sure the gutter width is stable
     let last = 9
     while (last < view.state.doc.lines) last = last * 10 + 9
-    this.lastLine.update(last, 0, this.formatNumber)
+    this.lastLine.update(last, 0, 0, 0, this.formatNumber)
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter(view)
   }
@@ -68,13 +68,14 @@ class GutterView {
     }
     let i = 0, lineNo = -1
     view.viewport.forEachLine(line => {
+      let above = line.textTop, below = line.height - line.textBottom, height = line.height - above - below
       if (lineNo < 0) lineNo = view.state.doc.lineAt(line.start).number
       if (i == this.lines.length) {
-        let newLine = new GutterLine(lineNo, line.height, this.formatNumber)
+        let newLine = new GutterLine(lineNo, height, above, below, this.formatNumber)
         this.lines.push(newLine)
         this.dom.appendChild(newLine.dom)
       } else {
-        this.lines[i].update(lineNo, line.height, this.formatNumber)
+        this.lines[i].update(lineNo, height, above, below, this.formatNumber)
       }
       lineNo = line.hasCollapsedRanges ? -1 : lineNo + 1
       i++
@@ -92,21 +93,23 @@ class GutterLine {
   dom: HTMLElement
   lineNo: number = -1
   height: number = -1
+  above: number = -1
+  below: number = -1
 
-  constructor(lineNo: number, height: number, formatNo: (lineNo: number) => string) {
+  constructor(lineNo: number, height: number, above: number, below: number, formatNo: (lineNo: number) => string) {
     this.dom = document.createElement("div")
     this.dom.className = "CodeMirror-gutter-element"
-    this.update(lineNo, height, formatNo)
+    this.update(lineNo, height, above, below, formatNo)
   }
 
-  update(lineNo: number, height: number, formatNo: (lineNo: number) => string) {
-    if (this.lineNo != lineNo) {
-      this.lineNo = lineNo
-      this.dom.textContent = formatNo(lineNo)
-    }
-    if (this.height != height) {
-      this.height = height
-      this.dom.style.height = height + "px"
-    }
+  update(lineNo: number, height: number, above: number, below: number, formatNo: (lineNo: number) => string) {
+    if (this.lineNo != lineNo)
+      this.dom.textContent = formatNo(this.lineNo = lineNo)
+    if (this.height != height)
+      this.dom.style.height = (this.height = height) + "px"
+    if (this.above != above)
+      this.dom.style.marginTop = (this.above = above) + "px"
+    if (this.below != below)
+      this.dom.style.marginBottom = (this.below = below) + "px"
   }
 }
