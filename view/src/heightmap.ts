@@ -64,8 +64,6 @@ export class HeightOracle {
   }
 }
 
-type LineIterator = (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void
-
 // This object is used by `updateHeight` to make DOM measurements
 // arrive at the right lines. The `heights` array is a sequence of
 // line heights, starting from position `from`. When the lines have
@@ -78,10 +76,21 @@ export class MeasuredHeights {
   get more() { return this.index < this.heights.length }
 }
 
-export class HeightLine {
+export class LineHeight {
   constructor(readonly start: number, readonly end: number,
-              readonly top: number, readonly bottom: number,
-              readonly textTop: number, readonly textBottom: number) {}
+              readonly top: number, readonly height: number,
+              // @internal
+              readonly line: HeightMapLine | null) {}
+
+  get bottom() { return this.top + this.height }
+  get textTop() { return this.top + (this.line ? lineWidgetHeight(this.line.deco, -2) : 0) }
+  get textBottom() { return this.bottom - (this.line ? lineWidgetHeight(this.line.deco, -1) : 0) }
+  get hasCollapsedRanges() {
+    if (this.line)
+      for (let i = 1; i < this.line.deco.length; i += 2)
+        if (this.line.deco[i] < 0) return true
+    return false
+  }
 }
 
 export abstract class HeightMap {
@@ -94,13 +103,13 @@ export abstract class HeightMap {
   abstract size: number
 
   abstract heightAt(pos: number, doc: Text, bias?: -1 | 1, offset?: number): number
-  abstract lineAt(height: number, doc: Text, offset?: number): HeightLine
+  abstract lineAt(height: number, doc: Text, offset?: number): LineHeight
   abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
   abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number): void
   abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number): void
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean, measured?: MeasuredHeights): HeightMap
   abstract toString(): void
-  abstract forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator): void
+  abstract forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void): void
 
   setHeight(oracle: HeightOracle, height: number) {
     if (this.height != height) {
@@ -201,8 +210,7 @@ class HeightMapLine extends HeightMap {
   }
 
   lineAt(height: number, doc: Text, offset: number = 0) {
-    return new HeightLine(offset, offset + this.length, -height, this.height - height,
-                          lineWidgetHeight(this.deco, -2) - height, this.height - lineWidgetHeight(this.deco, -1) - height)
+    return new LineHeight(offset, offset + this.length, -height, this.height, this)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -281,8 +289,8 @@ class HeightMapLine extends HeightMap {
 
   toString() { return `line(${this.length}${this.deco.length ? ":" + this.deco.join(",") : ""})` }
 
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
-    f(offset, offset + this.length, this)
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
+    f(new LineHeight(offset, offset + this.length, 0, this.height, this))
   }
 
   get hasCollapsedRanges(): boolean {
@@ -359,7 +367,7 @@ class HeightMapGap extends HeightMap {
     let lines = lastLine - firstLine, line = Math.floor(lines * Math.max(0, Math.min(1, height / this.height)))
     let heightPerLine = this.height / (lines + 1), top = heightPerLine * line - height
     let {start, end} = doc.line(firstLine + line)
-    return new HeightLine(start, end, top, top + heightPerLine, top, top + heightPerLine)
+    return new LineHeight(start, end, top, heightPerLine, null)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -431,12 +439,10 @@ class HeightMapGap extends HeightMap {
 
   toString() { return `gap(${this.length})` }
 
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
-    let line = {height: -1, hasCollapsedRanges: false}
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
     for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos < end;) {
       let end = oracle.doc.lineAt(pos).end
-      line.height = oracle.heightForLine(end - pos)
-      f(pos, end, line)
+      f(new LineHeight(pos, end, 0, oracle.heightForLine(end - pos), null))
       pos = end + 1
     }
   }
@@ -526,7 +532,7 @@ class HeightMapBranch extends HeightMap {
 
   toString() { return this.left + " " + this.right }
 
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: LineIterator) {
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
     let rightStart = offset + this.left.length + 1
     if (from < rightStart) this.left.forEachLine(from, to, offset, oracle, f)
     if (to >= rightStart) this.right.forEachLine(from, to, rightStart, oracle, f)

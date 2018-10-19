@@ -5,7 +5,7 @@ import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
 import {EditorState, EditorSelection, Transaction, ChangeSet, ChangedRange} from "../../state/src"
-import {HeightMap, HeightOracle, MeasuredHeights, HeightLine} from "./heightmap"
+import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
 
@@ -232,7 +232,7 @@ export class DocView extends ContentView {
     return this.heightMap.heightAt(pos, this.text, bias) + this.paddingTop
   }
 
-  lineAtHeight(height: number): HeightLine {
+  lineAtHeight(height: number): LineHeight {
     return this.heightMap.lineAt(height - this.paddingTop, this.text)
   }
 
@@ -618,7 +618,7 @@ export class EditorViewport {
   get from() { return this._from }
   get to() { return this._to }
 
-  forEachLine(f: (from: number, to: number, line: {readonly height: number, readonly hasCollapsedRanges: boolean}) => void) {
+  forEachLine(f: (height: LineHeight) => void) {
     this.docView.heightMap.forEachLine(this.from, this.to, 0, this.docView.heightOracle, f)
   }
 }

@@ -5,7 +5,7 @@ import {getRoot, selectionCollapsed, Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
-import {HeightLine} from "./heightmap"
+import {LineHeight} from "./heightmap"
 
 export class EditorView {
   private _state!: EditorState
@@ -135,7 +135,7 @@ export class EditorView {
     return this.docView.heightAt(pos, top ? -1 : 1)
   }
 
-  lineAtHeight(height: number): HeightLine {
+  lineAtHeight(height: number): LineHeight {
     this.docView.forceLayout()
     return this.docView.lineAtHeight(height)
   }
