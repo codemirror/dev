@@ -52,9 +52,8 @@ export function movePos(view: EditorView, start: number,
     if (context && !context.nearViewportEnd(view, dir)) {
       let startCoords = view.docView.coordsAt(start)!
       let goal = getGoalColumn(view, start, startCoords.left)
-      // FIXME skip between-line widgets when implemented
       for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, dist = 5; dist < 50; dist += 10) {
-        let pos = posAtCoords(view, {x: goal.column, y: startY + dist * dir})
+        let pos = posAtCoords(view, {x: goal.column, y: startY + dist * dir}, dir)
         if (pos < 0) break
         if (pos != start) {
           goal.pos = pos
@@ -281,12 +280,22 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
   return {node, offset: 0}
 }
 
-export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}): number {
-  let content = view.contentDOM.getBoundingClientRect()
-  let lineStart = view.posAtHeight(y - content.top, false)
+export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bias: -1 | 1 = -1): number {
+  let content = view.contentDOM.getBoundingClientRect(), heightLine
+  for (;;) {
+    heightLine = view.lineAtHeight(y - content.top)
+    if (heightLine.textTop > 0) {
+      if (bias > 0) { y += heightLine.textTop + 1; break }
+      else y += heightLine.top - 1
+    } else if (heightLine.textBottom < 0) {
+      if (bias < 0) { y += heightLine.textBottom - 1; break }
+      else y += heightLine.bottom + 1
+    } else break
+  }
+  let lineStart = heightLine.start
   // If this is outside of the rendered viewport, we can't determine a position 
   if (lineStart < view.viewport.from)
-    return view.viewport.from == 0 ? 0 : -1 // FIXME lineStart(0) to account for bidi?
+    return view.viewport.from == 0 ? 0 : -1
   if (lineStart > view.viewport.to)
     return view.viewport.to == view.state.doc.length ? view.state.doc.length : -1
   // Clip x to the viewport sides

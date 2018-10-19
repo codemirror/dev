@@ -48,18 +48,18 @@ export class ViewportState {
     // bottom, depending on the bias (the change in viewport position
     // since the last update). It'll hold a number between 0 and 1
     let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VIEWPORT_MARGIN / 2))
-    let viewport = new Viewport(heightMap.posAt(this.top - marginTop * VIEWPORT_MARGIN, doc, -1),
-                                heightMap.posAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, doc, 1))
+    let viewport = new Viewport(heightMap.lineAt(this.top - marginTop * VIEWPORT_MARGIN, doc).start,
+                                heightMap.lineAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, doc).end)
     // If scrollTo is > -1, make sure the viewport includes that position
     if (scrollTo > -1) {
       if (scrollTo < viewport.from) {
         let top = heightMap.heightAt(scrollTo, doc, -1)
-        viewport = new Viewport(heightMap.posAt(top - VIEWPORT_MARGIN / 2, doc, -1),
-                                heightMap.posAt(top + (this.bottom - this.top) + VIEWPORT_MARGIN / 2, doc, 1))
+        viewport = new Viewport(heightMap.lineAt(top - VIEWPORT_MARGIN / 2, doc).start,
+                                heightMap.lineAt(top + (this.bottom - this.top) + VIEWPORT_MARGIN / 2, doc).end)
       } else if (scrollTo > viewport.to) {
         let bottom = heightMap.heightAt(scrollTo, doc, 1)
-        viewport = new Viewport(heightMap.posAt(bottom - (this.bottom - this.top) - VIEWPORT_MARGIN / 2, doc, -1),
-                                heightMap.posAt(bottom + VIEWPORT_MARGIN / 2, doc, 1))
+        viewport = new Viewport(heightMap.lineAt(bottom - (this.bottom - this.top) - VIEWPORT_MARGIN / 2, doc).start,
+                                heightMap.lineAt(bottom + VIEWPORT_MARGIN / 2, doc).end)
       }
     }
     return viewport

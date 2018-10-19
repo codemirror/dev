@@ -78,6 +78,12 @@ export class MeasuredHeights {
   get more() { return this.index < this.heights.length }
 }
 
+export class HeightLine {
+  constructor(readonly start: number, readonly end: number,
+              readonly top: number, readonly bottom: number,
+              readonly textTop: number, readonly textBottom: number) {}
+}
+
 export abstract class HeightMap {
   constructor(
     public length: number, // The number of characters covered
@@ -87,8 +93,8 @@ export abstract class HeightMap {
 
   abstract size: number
 
-  abstract heightAt(pos: number, doc: Text, bias?: 1 | -1, offset?: number): number
-  abstract posAt(height: number, doc: Text, bias?: 1 | -1, offset?: number): number
+  abstract heightAt(pos: number, doc: Text, bias?: -1 | 1, offset?: number): number
+  abstract lineAt(height: number, doc: Text, offset?: number): HeightLine
   abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
   abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number): void
   abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number): void
@@ -194,8 +200,9 @@ class HeightMapLine extends HeightMap {
     return bias < 0 ? lineWidgetHeight(this.deco, -2) : this.height - lineWidgetHeight(this.deco, -1)
   }
 
-  posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0) {
-    return offset + (bias < 0 ? 0 : this.length)
+  lineAt(height: number, doc: Text, offset: number = 0) {
+    return new HeightLine(offset, offset + this.length, -height, this.height - height,
+                          lineWidgetHeight(this.deco, -2) - height, this.height - lineWidgetHeight(this.deco, -1) - height)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -347,10 +354,12 @@ class HeightMapGap extends HeightMap {
     return (doc.lineAt(pos).number - firstLine + (bias > 0 ? 1 : 0)) * (this.height / lines)
   }
 
-  posAt(height: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
+  lineAt(height: number, doc: Text, offset: number = 0) {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
-    let line = firstLine + Math.floor((lastLine - firstLine) * Math.max(0, Math.min(1, height / this.height)))
-    return bias < 0 ? doc.line(line).start : doc.line(line).end
+    let lines = lastLine - firstLine, line = Math.floor(lines * Math.max(0, Math.min(1, height / this.height)))
+    let heightPerLine = this.height / (lines + 1), top = heightPerLine * line - height
+    let {start, end} = doc.line(firstLine + line)
+    return new HeightLine(start, end, top, top + heightPerLine, top, top + heightPerLine)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -447,10 +456,10 @@ class HeightMapBranch extends HeightMap {
       : this.left.height + this.right.heightAt(pos, doc, bias, rightStart)
   }
 
-  posAt(height: number, doc: Text, bias: -1 | 1, offset: number = 0): number {
+  lineAt(height: number, doc: Text, offset: number = 0) {
     let right = height - this.left.height
-    return right < 0 ? this.left.posAt(height, doc, bias, offset)
-      : this.right.posAt(right, doc, bias, offset + this.left.length + 1)
+    if (right < 0) return this.left.lineAt(height, doc, offset)
+    return this.right.lineAt(right, doc, offset + this.left.length + 1)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {

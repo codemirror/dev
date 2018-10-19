@@ -5,7 +5,7 @@ import {Viewport, ViewportState} from "./viewport"
 import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
 import {EditorState, EditorSelection, Transaction, ChangeSet, ChangedRange} from "../../state/src"
-import {HeightMap, HeightOracle, MeasuredHeights} from "./heightmap"
+import {HeightMap, HeightOracle, MeasuredHeights, HeightLine} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
 
@@ -232,8 +232,8 @@ export class DocView extends ContentView {
     return this.heightMap.heightAt(pos, this.text, bias) + this.paddingTop
   }
 
-  posAtHeight(height: number, bias: 1 | -1) {
-    return this.heightMap.posAt(height - this.paddingTop, this.text, bias)
+  lineAtHeight(height: number): HeightLine {
+    return this.heightMap.lineAt(height - this.paddingTop, this.text)
   }
 
   // Compute the new viewport and set of decorations, while giving

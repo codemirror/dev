@@ -14,13 +14,22 @@ class OWidget extends WidgetType<void> {
 }
 
 const oWidgets = new Plugin({
-  view: (view: EditorView) => {
+  view(view: EditorView) {
     let doc = view.state.doc.toString(), deco = []
     for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
       deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
     return {decorations: Decoration.set(deco)}
   }
 })
+
+class BigWidget extends WidgetType<void> {
+  toDOM() {
+    let node = document.createElement("div")
+    node.style.cssText = "background: yellow; height: 200px"
+    return node
+  }
+  get estimatedHeight() { return 200 }
+}
 
 describe("EditorView.movePos", () => {
   it("does the right thing for character motion when focused", () => {
@@ -103,6 +112,22 @@ describe("EditorView.movePos", () => {
     ist(cm.movePos(8, "backward", "line"), 4)
     ist(cm.movePos(9, "backward", "line"), 5)
     ist(cm.movePos(10, "backward", "line"), 6)
+  })
+
+  it("can cross large line widgets during line motion", () => {
+    let cm = tempEditor("one\ntwo", [new Plugin({
+      view() { return {decorations: Decoration.set([
+        Decoration.line(0, {widget: new BigWidget(undefined), side: 1}),
+        Decoration.line(4, {widget: new BigWidget(undefined), side: -1})
+      ])} }
+    })])
+    ist(cm.contentDOM.offsetHeight, 400, ">")
+    ist(cm.movePos(0, "forward", "line"), 4)
+    ist(cm.movePos(2, "forward", "line"), 6)
+    ist(cm.movePos(3, "forward", "line"), 7)
+    ist(cm.movePos(4, "backward", "line"), 0)
+    ist(cm.movePos(5, "backward", "line"), 1)
+    ist(cm.movePos(7, "backward", "line"), 3)
   })
 
   function testLineBoundaryMotion(focus: boolean) {
