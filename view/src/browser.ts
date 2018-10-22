@@ -19,6 +19,7 @@ export default {
   chrome: !!chrome,
   chrome_version: chrome ? +chrome[1] : 0,
   ios: !ie && /AppleWebKit/.test(nav.userAgent) && /Mobile\/\w+/.test(nav.userAgent),
+  android: /Android\b/.test(nav.userAgent),
   webkit,
   safari: /Apple Computer/.test(nav.vendor),
   webkit_version: webkit ? +(/\bAppleWebKit\/(\d+)/.exec(navigator.userAgent) || [0, 0])[1] : 0

@@ -1,5 +1,6 @@
 import {EditorView} from "./editorview"
 import {getRoot} from "./dom"
+import browser from "./browser"
 import {EditorSelection} from "../../state/src"
 
 const LINE_SEP = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
@@ -25,8 +26,20 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   if (!diff && typeOver && !oldSel.empty && newSelection && newSelection.primary.empty)
     diff = {from: oldSel.from - from, toA: oldSel.to - from, toB: oldSel.to - from}
   if (diff) {
-    let start = from + diff.from, end = from + diff.toA, sel = view.state.selection.primary
-    let tr = view.state.transaction
+    let start = from + diff.from, end = from + diff.toA, sel = view.state.selection.primary, startState = view.state
+    // Android browsers don't fire reasonable key events for enter,
+    // backspace, or delete. So this detects changes that look like
+    // they're caused by those keys, and reinterprets them as key
+    // events.
+    if (browser.android) {
+      if ((start == sel.from && end == sel.to && reader.text.slice(diff.from, diff.toB) == LINE_SEP && dispatchKey(view, "Enter", 10)) ||
+          (start == sel.from - 1 && end == sel.to && diff.from == diff.toB && dispatchKey(view, "Backspace", 8)) ||
+          (start == sel.from && end == sel.to + 1 && diff.from == diff.toB && dispatchKey(view, "Delete", 46))) {
+        if (view.state == startState) view.updateState([], view.state) // Force redraw if necessary
+        return
+      }
+    }
+    let tr = startState.transaction
     if (start >= sel.from && end <= sel.to && end - start >= (sel.to - sel.from) / 3) {
       tr = tr.replaceSelection(reader.text.slice(sel.from - from, sel.to - diff.toA + diff.toB - from).split(LINE_SEP))
     } else {
@@ -34,8 +47,6 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       if (newSelection && !tr.selection.primary.eq(newSelection.primary))
         tr = tr.setSelection(tr.selection.replaceRange(newSelection.primary))
     }
-    // FIXME maybe also try to detect (Android) enter here and call
-    // the key handler
     view.dispatch(tr.scrollIntoView())
   } else if (newSelection && !newSelection.primary.eq(oldSel)) {
     view.dispatch(view.state.transaction.setSelection(newSelection).scrollIntoView())
@@ -142,4 +153,13 @@ function selectionFromPoints(points: DOMPoint[], base: number): EditorSelection 
   if (points.length == 0) return null
   let anchor = points[0].pos, head = points.length == 2 ? points[1].pos : anchor
   return anchor > -1 && head > -1 ? EditorSelection.single(anchor + base, head + base) : null
+}
+
+function dispatchKey(view: EditorView, name: string, code: number): boolean {
+  let options = {key: name, code: name, keyCode: code, which: code, cancelable: true}
+  let down = new KeyboardEvent("keydown", options)
+  view.contentDOM.dispatchEvent(down)
+  let up = new KeyboardEvent("keyup", options)
+  view.contentDOM.dispatchEvent(up)
+  return down.defaultPrevented || up.defaultPrevented
 }
