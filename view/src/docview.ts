@@ -467,6 +467,12 @@ class DOMSelection {
   }
 }
 
+// Browsers appear to reserve a fixed amount of bits for height
+// styles, and ignore or clip heights above that. For Chrome and
+// Firefox, this is in the 20 million range, so we try to stay below
+// that.
+const MAX_NODE_HEIGHT = 1e7
+
 class GapView extends ContentView {
   length: number = 0
   height: number = 0
@@ -488,9 +494,18 @@ class GapView extends ContentView {
   }
 
   sync() {
-    // FIXME on Firefox heights over 17895697 are ignored. Work around that?
     if (this.dirty) {
-      this.dom.style.height = this.height + "px"
+      if (this.height < MAX_NODE_HEIGHT) {
+        this.dom.style.height = this.height + "px"
+        while (this.dom.firstChild) (this.dom.firstChild as HTMLElement).remove()
+      } else {
+        this.dom.style.height = ""
+        while (this.dom.firstChild) (this.dom.firstChild as HTMLElement).remove()
+        for (let remaining = this.height; remaining > 0; remaining -= MAX_NODE_HEIGHT) {
+          let elt = this.dom.appendChild(document.createElement("div"))
+          elt.style.height = Math.min(remaining, MAX_NODE_HEIGHT) + "px"
+        }
+      }
       this.dirty = dirty.not
     }
   }
