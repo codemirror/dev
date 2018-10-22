@@ -412,7 +412,7 @@ class HeightMapGap extends HeightMap {
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights): HeightMap {
     let end = offset + this.length
-    if (measured && measured.from < offset + this.length && measured.more) {
+    if (measured && measured.from <= offset + this.length && measured.more) {
       let nodes = [], pos = Math.max(offset, measured.from)
       if (measured.from > offset) nodes.push(new HeightMapGap(offset, measured.from - 1, oracle))
       while (pos <= end && measured.more) {
@@ -440,7 +440,7 @@ class HeightMapGap extends HeightMap {
   toString() { return `gap(${this.length})` }
 
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
-    for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos < end;) {
+    for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos <= end;) {
       let end = oracle.doc.lineAt(pos).end
       f(new LineHeight(pos, end, 0, oracle.heightForLine(end - pos), null))
       pos = end + 1
