@@ -285,12 +285,13 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   for (;;) {
     heightLine = view.lineAtHeight(y - content.top)
     if (heightLine.textTop > 0) {
-      if (bias > 0) { y += heightLine.textTop + 1; break }
-      else y += heightLine.top - 1
+      if (bias > 0) y += heightLine.textTop + 1
+      else if (heightLine.start > 0) { y += heightLine.top - 1; continue }
     } else if (heightLine.textBottom < 0) {
-      if (bias < 0) { y += heightLine.textBottom - 1; break }
-      else y += heightLine.bottom + 1
-    } else break
+      if (bias < 0) y += heightLine.textBottom - 1
+      else if (heightLine.end < view.state.doc.length) { y += heightLine.bottom + 1; continue }
+    }
+    break
   }
   let lineStart = heightLine.start
   // If this is outside of the rendered viewport, we can't determine a position 
