@@ -25,6 +25,17 @@ describe("EditorSelection", () => {
     ist(sel.ranges.map(r => r.anchor + "/" + r.head).join(","), "0/6,6/7,7/8,9/13,13/14")
   })
 
+  it("merges adjacent point ranges when normalizing", () => {
+    let sel = EditorSelection.create([
+      new SelectionRange(10, 12),
+      new SelectionRange(12, 12),
+      new SelectionRange(12, 12),
+      new SelectionRange(10, 10),
+      new SelectionRange(8, 10)
+    ])
+    ist(sel.ranges.map(r => r.anchor + "/" + r.head).join(","), "8/10,10/12")
+  })
+
   it("preserves the direction of the last range when merging ranges", () => {
     let sel = EditorSelection.create([new SelectionRange(0, 2), new SelectionRange(10, 1)])
     ist(sel.ranges.map(r => r.anchor + "/" + r.head).join(","), "10/0")

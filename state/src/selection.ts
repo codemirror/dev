@@ -79,7 +79,7 @@ export class EditorSelection {
   static create(ranges: ReadonlyArray<SelectionRange>, primaryIndex: number = 0) {
     for (let pos = 0, i = 0; i < ranges.length; i++) {
       let range = ranges[i]
-      if (range.from < pos) return normalized(ranges.slice(), primaryIndex)
+      if (range.empty ? range.from <= pos : range.from < pos) return normalized(ranges.slice(), primaryIndex)
       pos = range.to
     }
     return new EditorSelection(ranges, primaryIndex)
@@ -94,7 +94,7 @@ function normalized(ranges: SelectionRange[], primaryIndex: number = 0): EditorS
   primaryIndex = ranges.indexOf(primary)
   for (let i = 1; i < ranges.length; i++) {
     let range = ranges[i], prev = ranges[i - 1]
-    if (range.from < prev.to) {
+    if (range.empty ? range.from <= prev.to : range.from < prev.to) {
       let from = prev.from, to = Math.max(range.to, prev.to)
       if (i <= primaryIndex) primaryIndex--
       ranges.splice(--i, 2, range.anchor > range.head ? new SelectionRange(to, from) : new SelectionRange(from, to))
