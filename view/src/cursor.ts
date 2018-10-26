@@ -3,7 +3,7 @@ import {LineView} from "./lineview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
 import {SelectionRange} from "../../state/src"
-import {getRoot, isEquivalentPosition, clientRectsFor} from "./dom"
+import {isEquivalentPosition, clientRectsFor, getRoot} from "./dom"
 import browser from "./browser"
 
 declare global {
@@ -16,7 +16,7 @@ export function movePos(view: EditorView, start: number,
                         direction: "forward" | "backward" | "left" | "right",
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
                         action: "move" | "extend"): number {
-  let sel = getRoot(view.contentDOM).getSelection()!
+  let sel = view.root.getSelection()!
   let context = LineContext.get(view, start)
   let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
   // Can only query native behavior when Selection.modify is
@@ -26,7 +26,7 @@ export function movePos(view: EditorView, start: number,
   if (sel.modify && context && !context.nearViewportEnd(view) && view.hasFocus() &&
       granularity != "word" &&
       !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
-    return view.docView.observer.withoutSelectionListening(() => {
+    return view.docView.observer.ignore(() => {
       let prepared = context!.prepareForQuery(view, start)
       let startDOM = view.docView.domFromPos(start)!
       let equiv = (!browser.chrome || prepared.lines.length == 0) &&
@@ -169,46 +169,41 @@ export class LineContext {
   // FIXME limit the amount of work in character motion in non-bidi
   // context? or not worth it?
   prepareForQuery(view: EditorView, pos: number) {
-    // FIXME only call withoutListening when necessary?
-    return view.docView.observer.withoutListening(() => {
-      let linesToSync: LineView[] = [], atWidget = false
-      function maybeHide(view: InlineView) {
-        if (!(view instanceof TextView)) atWidget = true
-        if (view.length > 0) return false
-        ;(view.dom as any).remove()
-        if (linesToSync.indexOf(view.parent as LineView) < 0) linesToSync.push(view.parent as LineView)
-        return true
-      }
-      let {i, off} = this.line.childPos(pos - this.start)
-      if (off == 0) {
-        for (let j = i; j < this.line.children.length; j++) if (!maybeHide(this.line.children[j])) break
-        for (let j = i; j > 0; j--) if (!maybeHide(this.line.children[j - 1])) break
-      }
-      function addForLine(line: LineView, omit: number = -1) {
-        if (line.children.length == 0) return
-        for (let i = 0, off = 0; i <= line.children.length; i++) {
-          let next = i == line.children.length ? null : line.children[i]
-          if ((!next || !(next instanceof TextView)) && off != omit &&
-              (i == 0 || !(line.children[i - 1] instanceof TextView))) {
-            line.dom!.insertBefore(document.createTextNode("\u200b"), next ? next.dom : null)
-            if (linesToSync.indexOf(line) < 0) linesToSync.push(line)
-          }
-          if (next) off += next.length
+    let linesToSync: LineView[] = [], atWidget = false
+    function maybeHide(view: InlineView) {
+      if (!(view instanceof TextView)) atWidget = true
+      if (view.length > 0) return false
+      ;(view.dom as any).remove()
+      if (linesToSync.indexOf(view.parent as LineView) < 0) linesToSync.push(view.parent as LineView)
+      return true
+    }
+    let {i, off} = this.line.childPos(pos - this.start)
+    if (off == 0) {
+      for (let j = i; j < this.line.children.length; j++) if (!maybeHide(this.line.children[j])) break
+      for (let j = i; j > 0; j--) if (!maybeHide(this.line.children[j - 1])) break
+    }
+    function addForLine(line: LineView, omit: number = -1) {
+      if (line.children.length == 0) return
+      for (let i = 0, off = 0; i <= line.children.length; i++) {
+        let next = i == line.children.length ? null : line.children[i]
+        if ((!next || !(next instanceof TextView)) && off != omit &&
+            (i == 0 || !(line.children[i - 1] instanceof TextView))) {
+          line.dom!.insertBefore(document.createTextNode("\u200b"), next ? next.dom : null)
+          if (linesToSync.indexOf(line) < 0) linesToSync.push(line)
         }
+        if (next) off += next.length
       }
-      if (this.index > 0)
-        addForLine(this.line.parent!.children[this.index - 1] as LineView)
-      addForLine(this.line, pos - this.start)
-      if (this.index < this.line.parent!.children.length - 1)
-        addForLine(this.line.parent!.children[this.index + 1] as LineView)
-      return {lines: linesToSync, atWidget}
-    })
+    }
+    if (this.index > 0)
+      addForLine(this.line.parent!.children[this.index - 1] as LineView)
+    addForLine(this.line, pos - this.start)
+    if (this.index < this.line.parent!.children.length - 1)
+      addForLine(this.line.parent!.children[this.index + 1] as LineView)
+    return {lines: linesToSync, atWidget}
   }
 
   undoQueryPreparation(view: EditorView, toSync: {lines: LineView[]}) {
-    if (toSync.lines.length) view.docView.observer.withoutListening(() => {
-      for (let line of toSync.lines) line.syncDOMChildren()
-    })
+    for (let line of toSync.lines) line.syncDOMChildren()
   }
 }
 
@@ -307,16 +302,17 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   // using caret(Position|Range)FromPoint as a shortcut
   let node: Node | undefined, offset: number = -1
   if (element && view.contentDOM.contains(element) && !(view.docView.nearest(element) instanceof WidgetView)) {
-    if (root.caretPositionFromPoint) {
-      let pos = root.caretPositionFromPoint(x, y)
+    // TypeScript doesn't know these methods exist on DocumentOrShadowRoot
+    if ((root as any).caretPositionFromPoint) {
+      let pos = (root as any).caretPositionFromPoint(x, y)
       if (pos) ({offsetNode: node, offset} = pos)
-    } else if (root.caretRangeFromPoint) {
-      let range = root.caretRangeFromPoint(x, y)
+    } else if ((root as any).caretRangeFromPoint) {
+      let range = (root as any).caretRangeFromPoint(x, y)
       if (range) ({startContainer: node, startOffset: offset} = range)
     }
   }
 
-  // No luck, do our own (potentially expensive) expensive search
+  // No luck, do our own (potentially expensive) search
   if (!node) {
     let {line} = LineContext.get(view, lineStart)!
     ;({node, offset} = domPosAtCoords(line.dom, x, y))

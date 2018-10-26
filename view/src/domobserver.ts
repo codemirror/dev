@@ -1,7 +1,7 @@
 import browser from "./browser"
 import {ContentView} from "./contentview"
 import {DocView} from "./docview"
-import {hasSelection, getRoot} from "./dom"
+import {hasSelection, DOMSelection, getRoot} from "./dom"
 
 const observeOptions = {
   childList: true,
@@ -15,23 +15,27 @@ const observeOptions = {
 const useCharData = browser.ie && browser.ie_version <= 11
 
 export class DOMObserver {
+  dom: HTMLElement
+
   observer: MutationObserver
+  active: boolean = false
+  ignoreSelection: DOMSelection = new DOMSelection
+
+  onSelectionChange: any
   onCharData: any
+
   charDataQueue: MutationRecord[] = []
   charDataTimeout: any = null
+
   scrollTargets: HTMLElement[] = []
   intersection: IntersectionObserver | null = null
   intersecting: boolean = true
-  active: boolean = false
-  selectionActive: boolean = true
-  dom: HTMLElement
 
   constructor(private docView: DocView,
-              private onDOMChange: (from: number, to: number, typeOver: boolean) => void,
-              private onSelectionChange: () => void,
+              private onChange: (from: number, to: number, typeOver: boolean) => boolean,
               private onScrollChanged: () => void) {
     this.dom = docView.dom
-    this.observer = new MutationObserver(mutations => this.applyMutations(mutations))
+    this.observer = new MutationObserver(mutations => this.flush(mutations))
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {
         this.charDataQueue.push({target: event.target,
@@ -39,8 +43,11 @@ export class DOMObserver {
                                  oldValue: event.prevValue} as MutationRecord)
         if (this.charDataTimeout == null) this.charDataTimeout = setTimeout(() => this.flush(), 20)
       }
-    this.readSelection = this.readSelection.bind(this)
-    this.listenForSelectionChanges()
+    this.onSelectionChange = () => {
+      if (getRoot(this.dom).activeElement == this.dom) this.flush()
+    }
+    this.start()
+
     this.onScroll = this.onScroll.bind(this)
     window.addEventListener("scroll", this.onScroll)
     if (typeof IntersectionObserver == "function") {
@@ -53,27 +60,11 @@ export class DOMObserver {
       this.intersection.observe(this.dom)
     }
     this.listenForScroll()
-    this.start()
-  }
-
-  listenForSelectionChanges() {
-    let listening = false
-    this.dom.addEventListener("focus", () => {
-      if (listening) return
-      this.dom.ownerDocument!.addEventListener("selectionchange", this.readSelection)
-      listening = true
-      if (hasSelection(this.dom)) this.readSelection()
-    })
-    this.dom.addEventListener("blur", () => {
-      if (!listening) return
-      this.dom.ownerDocument!.removeEventListener("selectionchange", this.readSelection)
-      listening = false
-    })
   }
 
   onScroll() {
     if (this.intersecting) {
-      this.readSelection()
+      this.flush()
       this.onScrollChanged()
     }
   }
@@ -92,34 +83,29 @@ export class DOMObserver {
         break
       }
     }
-    if (i < this.scrollTargets.length) changed = this.scrollTargets.slice(0, i)
+    if (i < this.scrollTargets.length && !changed) changed = this.scrollTargets.slice(0, i)
     if (changed) {
       for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
       for (let dom of this.scrollTargets = changed) dom.addEventListener("scroll", this.onScroll)
     }
   }
 
-  withoutListening<T>(f: () => T): T {
+  ignore<T>(f: () => T): T {
+    if (!this.active) return f()
     try {
       this.stop()
       return f()
     } finally {
       this.start()
-    }
-  }
-
-  withoutSelectionListening<T>(f: () => T): T {
-    try {
-      this.selectionActive = false
-      return f()
-    } finally {
-      this.selectionActive = true
+      this.clear()
     }
   }
 
   start() {
     if (this.active) return
     this.observer.observe(this.dom, observeOptions)
+    // FIXME is this shadow-root safe?
+    this.dom.ownerDocument!.addEventListener("selectionchange", this.onSelectionChange)
     if (useCharData)
       this.dom.addEventListener("DOMCharacterDataModified", this.onCharData)
     this.active = true
@@ -128,33 +114,40 @@ export class DOMObserver {
   stop() {
     if (!this.active) return
     this.active = false
-    // FIXME we're throwing away DOM events when flushing like this,
-    // to avoid recursively calling `setState` when setting a new
-    // state, but that could in some circumstances drop information
-    this.observer.takeRecords()
-    this.charDataQueue.length = 0
     this.observer.disconnect()
+    this.dom.ownerDocument!.removeEventListener("selectionchange", this.onSelectionChange)
     if (useCharData)
       this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
-  getMutations() {
-    let records = this.observer.takeRecords()
-    if (this.charDataQueue.length) {
+  takeCharRecords(): MutationRecord[] {
+    let result = this.charDataQueue
+    if (result.length) {
+      this.charDataQueue = []
       clearTimeout(this.charDataTimeout)
       this.charDataTimeout = null
-      records = records.concat(this.charDataQueue)
-      this.charDataQueue.length = 0
     }
-    return records
+    return result
   }
 
-  flush(): boolean {
-    return this.applyMutations(this.getMutations())
+  clearSelection() {
+    this.ignoreSelection.set(getRoot(this.dom).getSelection()!)
   }
 
-  applyMutations(records: MutationRecord[]): boolean {
-    if (records.length == 0) return false
+  // Throw away any pending changes
+  clear() {
+    this.observer.takeRecords()
+    this.takeCharRecords()
+    this.clearSelection()
+  }
+
+  // Apply pending changes, if any
+  flush(records: MutationRecord[] = this.observer.takeRecords()) {
+    if (this.charDataQueue.length)
+      records = records.concat(this.takeCharRecords())
+    let newSel = !this.ignoreSelection.eq(getRoot(this.dom).getSelection()!) &&
+      hasSelection(this.dom)
+    if (records.length == 0 && !newSel) return
 
     let from = -1, to = -1, typeOver = false
     for (let record of records) {
@@ -169,10 +162,12 @@ export class DOMObserver {
       }
     }
 
-    let apply = from > -1 && this.active
-    if (apply) this.onDOMChange(from, to, typeOver)
-    if (this.docView.dirty) this.docView.sync()
-    return apply
+    let apply = from > -1 || newSel
+    if (!apply || !this.onChange(from, to, typeOver)) {
+      if (this.docView.dirty) this.ignore(() => this.docView.sync())
+      this.docView.updateSelection()
+    }
+    this.clearSelection()
   }
 
   readMutation(rec: MutationRecord): {from: number, to: number, typeOver: boolean} | null {
@@ -190,17 +185,9 @@ export class DOMObserver {
     }
   }
 
-  readSelection() {
-    let root = getRoot(this.dom)
-    if (!this.active || !this.selectionActive || root.activeElement != this.dom || !hasSelection(this.dom) ||
-        this.docView.drawnSelection.eq(root.getSelection()!)) return
-    if (!this.flush()) this.onSelectionChange()
-  }
-
   destroy() {
     this.stop()
     if (this.intersection) this.intersection.disconnect()
-    this.dom.ownerDocument!.removeEventListener("selectionchange", this.readSelection)
     for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
     window.removeEventListener("scroll", this.onScroll)
   }

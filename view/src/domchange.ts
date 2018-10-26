@@ -1,58 +1,82 @@
 import {EditorView} from "./editorview"
-import {getRoot} from "./dom"
+import {getRoot, selectionCollapsed} from "./dom"
 import browser from "./browser"
-import {EditorSelection} from "../../state/src"
+import {EditorSelection, Change, MetaSlot} from "../../state/src"
 
 const LINE_SEP = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
-export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
-  let bounds = view.docView.domBoundsAround(start, end, 0)
-  if (!bounds) { view.updateState([], view.state); return }
-  let {from, to} = bounds
-  let selPoints = selectionPoints(view.contentDOM), reader = new DOMReader(selPoints)
-  reader.readRange(bounds.startDOM, bounds.endDOM)
-  let newSelection = selectionFromPoints(selPoints, from)
+export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean): boolean {
+  let change, newSel
+  let sel = view.state.selection.primary, bounds
+  if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
+    let {from, to} = bounds
+    let selPoints = selectionPoints(view.contentDOM), reader = new DOMReader(selPoints)
+    reader.readRange(bounds.startDOM, bounds.endDOM)
+    newSel = selectionFromPoints(selPoints, from)
 
-  let oldSel = view.state.selection.primary, preferredPos = oldSel.from, preferredSide = null
-  // Prefer anchoring to end when Backspace is pressed
-  if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100) {
-    preferredPos = oldSel.to
-    preferredSide = "end"
+    let preferredPos = sel.from, preferredSide = null
+    // Prefer anchoring to end when Backspace is pressed
+    if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100) {
+      preferredPos = sel.to
+      preferredSide = "end"
+    }
+    let diff = findDiff(view.state.doc.slice(from, to, LINE_SEP), reader.text,
+                        preferredPos - from, preferredSide)
+    if (diff) change = new Change(from + diff.from, from + diff.toA, 
+                                  reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
+  } else if (view.hasFocus()) {
+    let domSel = view.root.getSelection()!
+    let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
+    let anchor = selectionCollapsed(domSel) ? head :
+      view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
+    if (head != sel.head || anchor != sel.anchor)
+      newSel = EditorSelection.single(anchor, head)
   }
-  view.inputState.lastKeyCode = 0
 
-  let diff = findDiff(view.state.doc.slice(from, to, LINE_SEP), reader.text, preferredPos - from, preferredSide)
+  if (!change && !newSel) return false
+
   // Heuristic to notice typing over a selected character
-  if (!diff && typeOver && !oldSel.empty && newSelection && newSelection.primary.empty)
-    diff = {from: oldSel.from - from, toA: oldSel.to - from, toB: oldSel.to - from}
-  if (diff) {
-    let start = from + diff.from, end = from + diff.toA, sel = view.state.selection.primary, startState = view.state
+  if (!change && typeOver && !sel.empty && newSel && newSel.primary.empty)
+    change = new Change(sel.from, sel.to, view.state.doc.sliceLines(sel.from, sel.to))
+
+  if (change) {
+    let startState = view.state
     // Android browsers don't fire reasonable key events for enter,
     // backspace, or delete. So this detects changes that look like
     // they're caused by those keys, and reinterprets them as key
     // events.
-    if (browser.android) {
-      if ((start == sel.from && end == sel.to && reader.text.slice(diff.from, diff.toB) == LINE_SEP && dispatchKey(view, "Enter", 10)) ||
-          (start == sel.from - 1 && end == sel.to && diff.from == diff.toB && dispatchKey(view, "Backspace", 8)) ||
-          (start == sel.from && end == sel.to + 1 && diff.from == diff.toB && dispatchKey(view, "Delete", 46))) {
-        if (view.state == startState) view.updateState([], view.state) // Force redraw if necessary
-        return
-      }
-    }
+    if (browser.android &&
+        ((change.from == sel.from && change.to == sel.to &&
+          change.length == 1 && change.text.length == 2 &&
+          dispatchKey(view, "Enter", 10)) ||
+         (change.from == sel.from - 1 && change.to == sel.to && change.length == 0 &&
+          dispatchKey(view, "Backspace", 8)) ||
+         (change.from == sel.from && change.to == sel.to + 1 && change.length == 0 &&
+          dispatchKey(view, "Delete", 46))))
+      return view.state != startState
+
     let tr = startState.transaction
-    if (start >= sel.from && end <= sel.to && end - start >= (sel.to - sel.from) / 3) {
-      tr = tr.replaceSelection(reader.text.slice(sel.from - from, sel.to - diff.toA + diff.toB - from).split(LINE_SEP))
+    if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
+      let before = sel.from < change.from ? startState.doc.slice(sel.from, change.from, LINE_SEP) : ""
+      let after = sel.to > change.to ? startState.doc.slice(change.to, sel.to, LINE_SEP) : ""
+      tr = tr.replaceSelection((before + change.text.join(LINE_SEP) + after).split(LINE_SEP))
     } else {
-      tr = tr.replace(start, end, reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
-      if (newSelection && !tr.selection.primary.eq(newSelection.primary))
-        tr = tr.setSelection(tr.selection.replaceRange(newSelection.primary))
+      tr = tr.change(change)
+      if (newSel && !tr.selection.primary.eq(newSel.primary))
+        tr = tr.setSelection(tr.selection.replaceRange(newSel.primary))
     }
     view.dispatch(tr.scrollIntoView())
-  } else if (newSelection && !newSelection.primary.eq(oldSel)) {
-    view.dispatch(view.state.transaction.setSelection(newSelection).scrollIntoView())
-  } else {
-    view.updateState([], view.state)
+    return true
+  } else if (newSel && !newSel.primary.eq(sel)) {
+    let tr = view.state.transaction.setSelection(newSel)
+    if (view.inputState.lastSelectionTime > Date.now() - 50) {
+      if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()
+      else tr = tr.setMeta(MetaSlot.userEvent, view.inputState.lastSelectionOrigin)
+    }
+    view.dispatch(tr)
+    return true
   }
+  return false
 }
 
 function findDiff(a: string, b: string, preferredPos: number, preferredSide: string | null)
@@ -138,7 +162,7 @@ class DOMPoint {
 }
 
 function selectionPoints(dom: HTMLElement): DOMPoint[] {
-  let root = getRoot(dom), result: DOMPoint[] = []
+  let result: DOMPoint[] = [], root = getRoot(dom)
   if (root.activeElement != dom) return result
   let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()!
   if (anchorNode) {

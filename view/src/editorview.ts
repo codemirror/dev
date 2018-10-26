@@ -1,7 +1,7 @@
-import {EditorState, Transaction, EditorSelection, MetaSlot} from "../../state/src"
+import {EditorState, Transaction, MetaSlot} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
-import {getRoot, selectionCollapsed, Rect} from "./dom"
+import {getRoot, Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
@@ -46,7 +46,6 @@ export class EditorView {
 
     this.docView = new DocView(this.contentDOM, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-      onSelectionChange: () => applySelectionChange(this),
       onUpdateState: (prevState: EditorState, transactions: Transaction[]) => {
         for (let pluginView of this.pluginViews)
           if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
@@ -173,6 +172,10 @@ export class EditorView {
     this.inputState.startMouseSelection(this, event, update)
   }
 
+  get root(): DocumentOrShadowRoot {
+    return getRoot(this.dom)
+  }
+
   hasFocus(): boolean {
     return getRoot(this.dom).activeElement == this.contentDOM
   }
@@ -197,26 +200,6 @@ export interface PluginView {
   // This should return a stable value, not compute something on the fly
   decorations?: DecorationSet
   destroy?: () => void
-}
-
-function selectionFromDOM(view: EditorView) {
-  let domSel = getRoot(view.contentDOM).getSelection()!
-  let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
-  let anchor = selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
-  return EditorSelection.single(anchor, head)
-}
-
-function applySelectionChange(view: EditorView) {
-  let selection = selectionFromDOM(view)
-  if (!view.state.selection.primary.eq(selection.primary)) {
-    let tr = view.state.transaction.setSelection(selection)
-    if (view.inputState.lastSelectionTime > Date.now() - 50) {
-      if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()
-      else tr = tr.setMeta(MetaSlot.userEvent, view.inputState.lastSelectionOrigin)
-    }
-    view.dispatch(tr)
-  }
-  view.inputState.lastSelectionTime = 0
 }
 
 function setTabSize(elt: HTMLElement, size: number) {

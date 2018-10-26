@@ -1,7 +1,6 @@
 import {MetaSlot, EditorSelection, SelectionRange, Transaction, ChangeSet} from "../../state/src"
 import {EditorView} from "./editorview"
 import browser from "./browser"
-import {getRoot} from "./dom"
 import {LineContext} from "./cursor"
 
 // This will also be where dragging info and such goes
@@ -65,7 +64,9 @@ export class InputState {
   }
 
   update(transactions: Transaction[]) {
-    if (this.mouseSelection) this.mouseSelection.map(transactions.reduce((set, tr) => set.appendSet(tr.changes), ChangeSet.empty))
+    if (this.mouseSelection)
+      this.mouseSelection.map(transactions.reduce((set, tr) => set.appendSet(tr.changes), ChangeSet.empty))
+    this.lastKeyCode = this.lastSelectionTime = 0
   }
 
   destroy() {
@@ -169,7 +170,7 @@ function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) 
   if (pos > primary.from && pos < primary.to) return true
   // On boundary clicks, check whether the coordinates are inside the
   // selection's client rectangles
-  let sel = getRoot(view.contentDOM).getSelection()!
+  let sel = view.root.getSelection()!
   if (sel.rangeCount == 0) return true
   let rects = sel.getRangeAt(0).getClientRects()
   for (let i = 0; i < rects.length; i++) {
@@ -290,7 +291,7 @@ handlers.dragstart = (view, event: DragEvent) => {
 // FIXME drop support
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
-  view.docView.observer.readSelection()
+  view.docView.observer.flush()
   let data = brokenClipboardAPI ? null : event.clipboardData
   let text = data && data.getData("text/plain")
   if (text) {

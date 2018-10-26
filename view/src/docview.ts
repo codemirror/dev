@@ -20,7 +20,6 @@ export class DocView extends ContentView {
   text: Text = Text.of([""])
   decorations: A<DecorationSet> = []
   selection: EditorSelection = EditorSelection.default
-  drawnSelection: DOMSelection = new DOMSelection
   selectionDirty: any = null
 
   observer: DOMObserver
@@ -45,8 +44,7 @@ export class DocView extends ContentView {
 
   constructor(dom: HTMLElement, private callbacks: {
     // FIXME These suggest that the strict separation between docview and editorview isn't really working
-    onDOMChange: (from: number, to: number, typeOver: boolean) => void,
-    onSelectionChange: () => void,
+    onDOMChange: (from: number, to: number, typeOver: boolean) => boolean,
     onUpdateState: (prevState: EditorState, transactions: Transaction[]) => void,
     onUpdateDOM: () => void,
     onUpdateViewport: () => void,
@@ -56,7 +54,7 @@ export class DocView extends ContentView {
     this.dirty = dirty.node
 
     this.viewportState = new ViewportState
-    this.observer = new DOMObserver(this, callbacks.onDOMChange, callbacks.onSelectionChange, () => this.checkLayout())
+    this.observer = new DOMObserver(this, callbacks.onDOMChange, () => this.checkLayout())
     this.publicViewport = new EditorViewport(this, 0, 0)
   }
 
@@ -79,10 +77,11 @@ export class DocView extends ContentView {
     this.heightMap = this.heightMap.applyChanges([], this.heightOracle.setDoc(state.doc), changedRanges)
 
     let {viewport, contentChanges} = this.computeViewport(changedRanges, prevState, transactions, 0, scrollIntoView)
+
     if (this.dirty == dirty.not && contentChanges.length == 0 &&
         this.selection.primary.from >= this.visiblePart.from &&
         this.selection.primary.to <= this.visiblePart.to) {
-      this.observer.withoutSelectionListening(() => this.updateSelection())
+      this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {
       this.updateInner(contentChanges, oldLength, viewport)
@@ -144,7 +143,7 @@ export class DocView extends ContentView {
     }
 
     this.viewports = viewports
-    this.observer.withoutListening(() => {
+    this.observer.ignore(() => {
       // Lock the height during redrawing, since Chrome sometimes
       // messes with the scroll position during DOM mutation (though
       // no relayout is triggered and I cannot imagine how it can
@@ -206,26 +205,25 @@ export class DocView extends ContentView {
     let domSel = root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
     if (isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
-        isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {
-      this.drawnSelection.set(domSel)
+        isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset))
       return
-    }
 
-    // Selection.extend can be used to create an 'inverted' selection
-    // (one where the focus is before the anchor), but not all
-    // browsers support it yet.
-    if (domSel.extend) {
-      domSel.collapse(anchor.node, anchor.offset)
-      if (!primary.empty) domSel.extend(head.node, head.offset)
-    } else {
-      let range = document.createRange()
-      if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
-      range.setEnd(head.node, head.offset)
-      range.setStart(anchor.node, anchor.offset)
-      domSel.removeAllRanges()
-      domSel.addRange(range)
-    }
-    this.drawnSelection.set(domSel)
+    this.observer.ignore(() => {
+      // Selection.extend can be used to create an 'inverted' selection
+      // (one where the focus is before the anchor), but not all
+      // browsers support it yet.
+      if (domSel.extend) {
+        domSel.collapse(anchor.node, anchor.offset)
+        if (!primary.empty) domSel.extend(head.node, head.offset)
+      } else {
+        let range = document.createRange()
+        if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
+        range.setEnd(head.node, head.offset)
+        range.setStart(anchor.node, anchor.offset)
+        domSel.removeAllRanges()
+        domSel.addRange(range)
+      }
+    })
   }
 
   heightAt(pos: number, bias: 1 | -1) {
@@ -299,7 +297,7 @@ export class DocView extends ContentView {
   }
 
   focus() {
-    this.observer.withoutSelectionListening(() => this.updateSelection(true))
+    this.updateSelection(true)
   }
 
   cancelLayoutCheck() {
@@ -420,7 +418,7 @@ export class DocView extends ContentView {
     let dummy = document.createElement("div"), lineHeight!: number, charWidth!: number
     dummy.style.cssText = "contain: strict"
     dummy.textContent = "abc def ghi jkl mno pqr stu"
-    this.observer.withoutListening(() => {
+    this.observer.ignore(() => {
       this.dom.appendChild(dummy)
       let rect = clientRectsFor(dummy.firstChild!)[0]
       lineHeight = dummy.getBoundingClientRect().height
@@ -443,29 +441,13 @@ export class DocView extends ContentView {
   }
 
   setSelectionDirty() {
+    this.observer.clearSelection()
     if (this.selectionDirty == null)
       this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
   }
 }
 
 const noChildren: ContentView[] = []
-
-class DOMSelection {
-  anchorNode: Node | null = null
-  anchorOffset: number = 0
-  focusNode: Node | null = null
-  focusOffset: number = 0
-
-  eq(domSel: Selection): boolean {
-    return this.anchorNode == domSel.anchorNode && this.anchorOffset == domSel.anchorOffset &&
-      this.focusNode == domSel.focusNode && this.focusOffset == domSel.focusOffset
-  }
-
-  set(domSel: Selection) {
-    this.anchorNode = domSel.anchorNode; this.anchorOffset = domSel.anchorOffset
-    this.focusNode = domSel.focusNode; this.focusOffset = domSel.focusOffset
-  }
-}
 
 // Browsers appear to reserve a fixed amount of bits for height
 // styles, and ignore or clip heights above that. For Chrome and

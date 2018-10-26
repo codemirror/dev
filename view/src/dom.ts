@@ -1,8 +1,11 @@
 import browser from "./browser"
 
-export let getRoot: (dom: HTMLElement) => Document = typeof document == "undefined" || (document as any).getRootNode
-  ? (dom: HTMLElement) => (dom as any).getRootNode()
-  : () => document
+export let getRoot: (dom: HTMLElement) => DocumentOrShadowRoot =
+  typeof document == "undefined" || (document as any).getRootNode ?
+  (dom: HTMLElement) => {
+    let root = (dom as any).getRootNode()
+    return root.nodeType == 9 || root.nodeType == 11 ? root : document
+  } : () => document
 
 // Work around Chrome issue https://bugs.chromium.org/p/chromium/issues/detail?id=447523
 // (isCollapsed inappropriately returns true in shadow dom)
@@ -130,5 +133,22 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
     } else {
       break
     }
+  }
+}
+
+export class DOMSelection {
+  anchorNode: Node | null = null
+  anchorOffset: number = 0
+  focusNode: Node | null = null
+  focusOffset: number = 0
+
+  eq(domSel: Selection): boolean {
+    return this.anchorNode == domSel.anchorNode && this.anchorOffset == domSel.anchorOffset &&
+      this.focusNode == domSel.focusNode && this.focusOffset == domSel.focusOffset
+  }
+
+  set(domSel: Selection) {
+    this.anchorNode = domSel.anchorNode; this.anchorOffset = domSel.anchorOffset
+    this.focusNode = domSel.focusNode; this.focusOffset = domSel.focusOffset
   }
 }
