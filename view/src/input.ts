@@ -1,4 +1,4 @@
-import {MetaSlot, EditorSelection, SelectionRange, Transaction, ChangeSet} from "../../state/src"
+import {MetaSlot, EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
 import {EditorView} from "./editorview"
 import browser from "./browser"
 import {LineContext} from "./cursor"
@@ -74,18 +74,13 @@ export class InputState {
   }    
 }
 
-const enum Dragging {
-  MAYBE, // The click started in the selection, might turn into a drag
-  YES, NO
-}
-
 export type MouseSelectionUpdate = (view: EditorView, startSelection: EditorSelection,
                                     startPos: number, startBias: -1 | 1,
                                     curPos: number, curBias: -1 | 1,
                                     extend: boolean, multiple: boolean) => EditorSelection
 
 class MouseSelection {
-  dragging: Dragging
+  dragging: null | false | SelectionRange
   startSelection: EditorSelection
   startPos: number
   startBias: -1 | 1
@@ -93,8 +88,10 @@ class MouseSelection {
   curBias: -1 | 1
   extend: boolean
   multiple: boolean
+  dragMove: boolean
 
-  constructor(private inputState: InputState, private view: EditorView, event: MouseEvent, private update: MouseSelectionUpdate) {
+  constructor(private inputState: InputState, private view: EditorView, event: MouseEvent,
+              private update: MouseSelectionUpdate) {
     let doc = view.contentDOM.ownerDocument!
     doc.addEventListener("mousemove", this.move = this.move.bind(this))
     doc.addEventListener("mouseup", this.up = this.up.bind(this))
@@ -102,15 +99,16 @@ class MouseSelection {
     // FIXME make these configurable somehow
     this.extend = event.shiftKey
     this.multiple = view.state.multipleSelections && (browser.mac ? event.metaKey : event.ctrlKey)
+    this.dragMove = !(browser.mac ? event.altKey : event.ctrlKey)
 
     this.startSelection = view.state.selection
     let {pos, bias} = this.queryPos(event)
     this.startPos = this.curPos = pos
     this.startBias = this.curBias = bias
-    this.dragging = isInPrimarySelection(view, this.startPos, event) ? Dragging.MAYBE : Dragging.NO
+    this.dragging = isInPrimarySelection(view, this.startPos, event) ? null : false
     // When clicking outside of the selection, immediately apply the
     // effect of starting the selection
-    if (this.dragging == Dragging.NO) {
+    if (this.dragging === false) {
       event.preventDefault()
       this.select()
     }
@@ -128,7 +126,7 @@ class MouseSelection {
 
   move(event: MouseEvent) {
     if (event.buttons == 0) return this.destroy()
-    if (this.dragging != Dragging.NO) return
+    if (this.dragging !== false) return
     let {pos, bias} = this.queryPos(event)
     if (pos == this.curPos && bias == this.curBias) return
     this.curPos = pos; this.curBias = bias
@@ -136,7 +134,7 @@ class MouseSelection {
   }
 
   up(event: MouseEvent) {
-    if (this.dragging == Dragging.MAYBE) this.select()
+    if (this.dragging == null) this.select()
     this.destroy()
   }
 
@@ -151,7 +149,8 @@ class MouseSelection {
     let selection = this.update(this.view, this.startSelection, this.startPos, this.startBias,
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
-      this.view.dispatch(this.view.state.transaction.setSelection(selection).setMeta(MetaSlot.userEvent, "pointer"))
+      this.view.dispatch(this.view.state.transaction.setSelection(selection)
+                         .setMeta(MetaSlot.userEvent, "pointer"))
   }
 
   map(changes: ChangeSet) {
@@ -160,6 +159,7 @@ class MouseSelection {
       this.startPos = changes.mapPos(this.startPos)
       this.curPos = changes.mapPos(this.curPos)
     }
+    if (this.dragging) this.dragging = this.dragging.map(changes)
   }
 }
 
@@ -280,15 +280,38 @@ function updateMouseSelection(type: number): MouseSelectionUpdate {
 }
 
 handlers.dragstart = (view, event: DragEvent) => {
-  let mouseSelection = view.inputState.mouseSelection
-  if (mouseSelection) mouseSelection.dragging = Dragging.YES
-
   let {doc, selection: {primary}} = view.state
-  event.dataTransfer!.setData("Text", doc.slice(primary.from, primary.to))
-  event.dataTransfer!.effectAllowed = "copyMove";
+  let {mouseSelection} = view.inputState
+  if (mouseSelection) mouseSelection.dragging = primary
+
+  if (event.dataTransfer) {
+    event.dataTransfer.setData("Text", doc.slice(primary.from, primary.to))
+    event.dataTransfer.effectAllowed = "copyMove"
+  }
 }
 
-// FIXME drop support
+handlers.drop = (view, event: DragEvent) => {
+  if (!event.dataTransfer) return
+
+  let dropPos = view.posAtCoords({x: event.clientX, y: event.clientY})
+  let text = event.dataTransfer.getData("Text")
+  if (dropPos < 0 || !text) return
+
+  event.preventDefault()
+
+  let tr = view.state.transaction
+  let {mouseSelection} = view.inputState
+  if (mouseSelection && mouseSelection.dragging && mouseSelection.dragMove) {
+    tr = tr.replace(mouseSelection.dragging.from, mouseSelection.dragging.to, "")
+    dropPos = tr.changes.mapPos(dropPos)
+  }
+  let change = new Change(dropPos, dropPos, view.state.splitLines(text))
+  tr = tr.change(change)
+    .setSelection(EditorSelection.single(dropPos, dropPos + change.length))
+    .setMeta(MetaSlot.userEvent, "drop")
+  view.focus()
+  view.dispatch(tr)
+}
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
   view.docView.observer.flush()
