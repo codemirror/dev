@@ -1,6 +1,6 @@
 let [nav, doc]: [any, any] = typeof navigator != "undefined"
   ? [navigator, document]
-  : [{userAgent: "", vendor: "", platform: ""}, {}]
+  : [{userAgent: "", vendor: "", platform: ""}, {documentElement: {style: {}}}]
 
 const ie_edge = /Edge\/(\d+)/.exec(nav.userAgent)
 const ie_upto10 = /MSIE \d/.test(nav.userAgent)
