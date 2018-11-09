@@ -46,7 +46,10 @@ export class EditorState {
   /** @internal */
   constructor(private readonly config: Configuration,
               readonly doc: Text,
-              readonly selection: EditorSelection = EditorSelection.default) {}
+              readonly selection: EditorSelection = EditorSelection.default) {
+    for (let range of selection.ranges)
+      if (range.to > doc.length) throw new RangeError("Selection points outside of document")
+  }
 
   getField<T>(field: StateField<T>): T | undefined {
     return (this as any)[field.key]
@@ -68,8 +71,6 @@ export class EditorState {
     if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
     // FIXME changing the line separator might involve rearranging line endings (?)
     if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
-    for (let range of tr.selection.ranges)
-      if (range.to > tr.doc.length) throw new RangeError("Selection points outside of document")
     let newState = new EditorState($conf, tr.doc, tr.selection)
     for (let field of $conf.fields)
       (newState as any)[field.key] = field.apply(tr, (this as any)[field.key], newState)
