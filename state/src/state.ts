@@ -66,6 +66,7 @@ export class EditorState {
     let $conf = this.config
     let tabSize = tr.getMeta(MetaSlot.changeTabSize), lineSep = tr.getMeta(MetaSlot.changeLineSeparator)
     if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
+    // FIXME changing the line separator might involve rearranging line endings (?)
     if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
     let newState = new EditorState($conf, tr.doc, tr.selection)
     for (let field of $conf.fields)

@@ -2,6 +2,7 @@ import {ContentView, ChildCursor, dirty} from "./contentview"
 import {LineView} from "./lineview"
 import {InlineBuilder, LineContent} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
+import browser from "./browser"
 import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
 import {EditorState, EditorSelection, Transaction, ChangeSet, ChangedRange} from "../../state/src"
@@ -23,6 +24,7 @@ export class DocView extends ContentView {
   selectionDirty: any = null
 
   observer: DOMObserver
+  forceSelectionUpdate: boolean = false
 
   viewportState: ViewportState
   heightMap: HeightMap = HeightMap.empty()
@@ -190,6 +192,12 @@ export class DocView extends ContentView {
         insert.push(new LineView(this, lines[j], j < lines.length - 1 ? undefined : tail))
       this.replaceChildren(fromI + 1, toI + 1, insert)
     }
+    // When the DOM nodes around the selection are moved to another
+    // parent, Chrome sometimes reports a different selection through
+    // getSelection than the one that it actually shows to the user.
+    // This forces a selection update when lines are joined to work
+    // around that. Issue #54
+    if (fromI != toI && browser.chrome) this.forceSelectionUpdate = true
   }
 
   // Sync the DOM selection to this.selection
@@ -204,9 +212,12 @@ export class DocView extends ContentView {
 
     let domSel = root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
-    if (isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
+    if (!this.forceSelectionUpdate &&
+        isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
         isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset))
       return
+
+    this.forceSelectionUpdate = false
 
     this.observer.ignore(() => {
       // Selection.extend can be used to create an 'inverted' selection
