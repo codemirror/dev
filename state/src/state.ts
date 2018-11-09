@@ -68,6 +68,8 @@ export class EditorState {
     if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
     // FIXME changing the line separator might involve rearranging line endings (?)
     if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
+    for (let range of tr.selection.ranges)
+      if (range.to > tr.doc.length) throw new RangeError("Selection points outside of document")
     let newState = new EditorState($conf, tr.doc, tr.selection)
     for (let field of $conf.fields)
       (newState as any)[field.key] = field.apply(tr, (this as any)[field.key], newState)
