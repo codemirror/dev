@@ -88,6 +88,30 @@ export class EditorState {
   joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.config.lineSeparator || undefined) }
   splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
 
+  // FIXME plugin state serialization
+
+  toJSON(): any {
+    return {
+      doc: this.joinLines(this.doc.sliceLines(0, this.doc.length)),
+      selection: this.selection.toJSON(),
+      lineSeparator: this.config.lineSeparator,
+      tabSize: this.tabSize
+    }
+  }
+
+  static fromJSON(json: any, config: EditorStateConfig = {}): EditorState {
+    if (!json || (json.lineSeparator && typeof json.lineSeparator != "string") ||
+        typeof json.tabSize != "number" || typeof json.doc != "string")
+      throw new RangeError("Invalid JSON representation for EditorState")
+    return EditorState.create({
+      doc: json.doc,
+      selection: EditorSelection.fromJSON(json.selection),
+      plugins: config.plugins,
+      tabSize: config.tabSize,
+      lineSeparator: config.lineSeparator
+    })
+  }
+
   static create(config: EditorStateConfig = {}): EditorState {
     let $config = Configuration.create(config)
     let doc = config.doc instanceof Text ? config.doc : Text.of(config.doc || "", config.lineSeparator || undefined)

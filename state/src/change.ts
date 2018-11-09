@@ -19,6 +19,14 @@ export class ChangeDesc implements Mapping {
     pos = from + (bias <= 0 ? 0 : length)
     return trackDel ? -pos - 1 : pos
   }
+
+  toJSON(): any { return this }
+
+  static fromJSON(json: any) {
+    if (!json || typeof json.from != "number" || typeof json.to != "number" || typeof json.length != "number")
+      throw new RangeError("Invalid JSON representation for ChangeDesc")
+    return new ChangeDesc(json.from, json.to, json.length)
+  }
 }
 
 export class Change extends ChangeDesc {
@@ -40,6 +48,17 @@ export class Change extends ChangeDesc {
   }
 
   get desc() { return new ChangeDesc(this.from, this.to, this.length) }
+
+  toJSON(): any {
+    return {from: this.from, to: this.to, text: this.text}
+  }
+
+  static fromJSON(json: any) {
+    if (!json || typeof json.from != "number" || typeof json.to != "number" ||
+        !Array.isArray(json.text) || json.text.some((val: any) => typeof val != "string"))
+      throw new RangeError("Invalid JSON representation for Change")
+    return new Change(json.from, json.to, json.text)
+  }
 }
 
 function textLength(text: ReadonlyArray<string>) {
@@ -149,6 +168,24 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   get desc(): ChangeSet<ChangeDesc> {
     if (this.changes.length == 0 || this.changes[0] instanceof ChangeDesc) return this
     return new ChangeSet(this.changes.map(ch => (ch as any).desc), this.mirror)
+  }
+
+  toJSON(): any {
+    let changes = this.changes.map(change => change.toJSON())
+    return this.mirror.length == 0 ? changes : {mirror: this.mirror, changes}
+  }
+
+  static fromJSON<C extends ChangeDesc>(ChangeType: {fromJSON: (json: any) => C}, json: any): ChangeSet<C> {
+    let mirror, changes
+    if (Array.isArray(json)) {
+      mirror = empty
+      changes = json
+    } else if (!json || !Array.isArray(json.mirror) || !Array.isArray(json.changes)) {
+      throw new RangeError("Invalid JSON representation for ChangeSet")
+    } else {
+      ;({mirror, changes} = json)
+    }
+    return new ChangeSet(changes.map((ch: any) => ChangeType.fromJSON(ch)), mirror)
   }
 }
 

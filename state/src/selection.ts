@@ -25,6 +25,14 @@ export class SelectionRange {
     return this.anchor == other.anchor && this.head == other.head
   }
 
+  toJSON(): any { return this }
+
+  static fromJSON(json: any): SelectionRange {
+    if (!json || typeof json.anchor != "number" || typeof json.head != "number")
+      throw new RangeError("Invalid JSON representation for SelectionRange")
+    return new SelectionRange(json.anchor, json.head)
+  }
+
   static groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
     // FIXME at some point, take language-specific identifier characters into account
     let line = state.doc.lineAt(pos), linePos = pos - line.start
@@ -70,6 +78,20 @@ export class EditorSelection {
     let ranges = this.ranges.slice()
     ranges[which] = range
     return EditorSelection.create(ranges, this.primaryIndex)
+  }
+
+  toJSON(): any {
+    return this.ranges.length == 1 ? this.ranges[0].toJSON() :
+      {ranges: this.ranges.map(r => r.toJSON()), primaryIndex: this.primaryIndex}
+  }
+
+  static fromJSON(json: any): EditorSelection {
+    if (json && Array.isArray(json.ranges)) {
+      if (typeof json.primaryIndex != "number" || json.primaryIndex >= json.ranges.length)
+        throw new RangeError("Invalid JSON representation for EditorSelection")
+      return new EditorSelection(json.ranges.map((r: any) => SelectionRange.fromJSON(r)), json.primaryIndex)
+    }
+    return new EditorSelection([SelectionRange.fromJSON(json)])
   }
 
   static single(anchor: number, head: number = anchor) {
