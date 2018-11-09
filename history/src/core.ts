@@ -27,7 +27,7 @@ function addChanges(branch: Branch, changes: ChangeSet, inverted: ChangeSet | nu
   if (branch.length) {
     const lastItem = branch[branch.length - 1]
     if (lastItem.selection && lastItem.isChange == Boolean(inverted) && mayMerge(lastItem))
-      return inverted ? updateBranch(branch, branch.length - 1, maxLen, new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), selectionBefore)) : branch
+      return inverted ? updateBranch(branch, branch.length - 1, maxLen, new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), lastItem.selection)) : branch
   }
   return updateBranch(branch, branch.length, maxLen, new Item(changes.desc, inverted, selectionBefore))
 }

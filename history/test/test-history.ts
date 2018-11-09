@@ -217,6 +217,15 @@ describe("history", () => {
     ist(state.selection.eq(selection2))
   })
 
+  it("restores the selection before the first change in an item (#46)", () => {
+    let state = mkState()
+    state = state.transaction.replace(0, 0, "a").setSelection(EditorSelection.single(1)).apply()
+    state = state.transaction.replace(1, 1, "b").setSelection(EditorSelection.single(2)).apply()
+    state = command(state, undo)
+    ist(state.doc.toString(), "")
+    ist(state.selection.primary.anchor, 0)
+  })
+
   it("doesn't merge document changes if there's a selection change in between", () => {
     let state = mkState()
     state = type(state, "hi")
