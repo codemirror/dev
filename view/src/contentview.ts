@@ -11,11 +11,12 @@ const none: any[] = []
 export abstract class ContentView {
   constructor(public parent: ContentView | null, public dom: Node | null) {
     if (dom) dom.cmView = this
+    if (parent) this.markParentsDirty()
   }
 
-  abstract length: number;
-  abstract children: ContentView[];
-  dirty: number = dirty.not;
+  abstract length: number
+  abstract children: ContentView[]
+  dirty: number = dirty.node
 
   get childGap() { return 0 }
   get overrideDOMText(): ReadonlyArray<string> | null { return null }
@@ -128,8 +129,10 @@ export abstract class ContentView {
   }
 
   setParent(parent: ContentView) {
-    this.parent = parent
-    if (this.dirty) this.markParentsDirty()
+    if (this.parent != parent) {
+      this.parent = parent
+      if (this.dirty) this.markParentsDirty()
+    }
   }
 
   replaceChildren(from: number, to: number, children: ContentView[] = none) {

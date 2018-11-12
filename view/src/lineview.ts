@@ -17,7 +17,6 @@ export class LineView extends ContentView {
     this.length = 0
     this.children = []
     if (content) this.update(0, 0, content, tail)
-    this.markDirty()
   }
 
   setDeco(content: LineContent) {
@@ -101,7 +100,7 @@ export class LineView extends ContentView {
 
     // And if anything remains, splice the child array to insert the new elts
     if (elts.length || fromI != toI) {
-      for (let view of elts) view.finish(this)
+      for (let view of elts) view.setParent(this)
       this.replaceChildren(fromI, toI, elts)
     }
   }

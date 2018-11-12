@@ -11,7 +11,6 @@ const none: any[] = []
 export abstract class InlineView extends ContentView {
   abstract merge(other: InlineView, from?: number, to?: number): boolean
   get children() { return none }
-  finish(parent: ContentView) {}
   cut(from: number, to?: number) {}
   abstract slice(from: number, to?: number): InlineView
   getSide() { return 0 }
@@ -41,21 +40,21 @@ export class TextView extends InlineView {
     this.class = clss
   }
 
-  finish(parent: ContentView) {
-    this.setParent(parent)
-    if (this.dom) return
-    this.textDOM = document.createTextNode(this.text)
-    let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
-    if (tagName) {
-      this.dom = document.createElement(tagName)
-      this.dom.appendChild(this.textDOM)
-      if (this.class) (this.dom as HTMLElement).className = this.class
-      if (this.attrs) for (let name in this.attrs) (this.dom as HTMLElement).setAttribute(name, this.attrs[name])
-    } else {
-      this.dom = this.textDOM
+  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
+    if (!this.dom) {
+      this.textDOM = document.createTextNode(this.text)
+      let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
+      if (tagName) {
+        this.dom = document.createElement(tagName)
+        this.dom.appendChild(this.textDOM)
+        if (this.class) (this.dom as HTMLElement).className = this.class
+        if (this.attrs) for (let name in this.attrs) (this.dom as HTMLElement).setAttribute(name, this.attrs[name])
+      } else {
+        this.dom = this.textDOM
+      }
+      this.dom.cmView = this
     }
-    this.markDirty()
-    this.dom.cmView = this
+    return super.syncInto(parent, pos)
   }
 
   get length() { return this.text.length }
@@ -128,14 +127,13 @@ export class WidgetView extends InlineView {
     super(null, null)
   }
 
-  finish(parent: ContentView) {
-    this.setParent(parent)
+  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
     if (!this.dom) {
       this.dom = this.widget ? this.widget.toDOM() : document.createElement("span")
       this.dom.contentEditable = "false"
       this.dom.cmView = this
     }
-    this.markDirty()
+    return super.syncInto(parent, pos)
   }
 
   cut(from: number, to: number = this.length) { this.length -= to - from }
