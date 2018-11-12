@@ -42,8 +42,9 @@ export class TextView extends InlineView {
 
   syncInto(parent: HTMLElement, pos: Node | null): Node | null {
     if (!this.dom) {
-      this.textDOM = document.createTextNode(this.text)
       let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
+      if (!tagName && pos && pos.nodeType == 3 && !nodeAlreadyInTree(this, pos)) this.textDOM = pos
+      else this.textDOM = document.createTextNode(this.text)
       if (tagName) {
         this.dom = document.createElement(tagName)
         this.dom.appendChild(this.textDOM)
@@ -303,4 +304,9 @@ export class InlineBuilder implements RangeIterator<Decoration> {
     RangeSet.iterateSpans(decorations, from, to, builder)
     return builder.lines
   }
+}
+
+function nodeAlreadyInTree(view: ContentView, node: Node): boolean {
+  let v = node.cmView
+  return v ? v.root == view.root : false
 }

@@ -135,6 +135,14 @@ export abstract class ContentView {
     }
   }
 
+  get root(): ContentView {
+    for (let v: ContentView = this;;) {
+      let parent = v.parent
+      if (!parent) return v
+      v = parent
+    }
+  }
+
   replaceChildren(from: number, to: number, children: ContentView[] = none) {
     this.children.splice(from, to - from, ...children)
     this.markDirty()

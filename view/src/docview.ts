@@ -372,10 +372,7 @@ export class DocView extends ContentView {
   nearest(dom: Node): ContentView | null {
     for (let cur: Node | null = dom; cur;) {
       let domView = cur.cmView
-      if (domView) {
-        for (let v: ContentView | null = domView; v; v = v.parent)
-          if (v == this) return domView
-      }
+      if (domView && domView.root == this) return domView
       cur = cur.parentNode
     }
     return null
