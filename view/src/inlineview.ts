@@ -9,10 +9,10 @@ import browser from "./browser"
 const none: any[] = []
 
 export abstract class InlineView extends ContentView {
-  abstract merge(other: InlineView, from?: number, to?: number): boolean
+  merge(other: InlineView, from?: number, to?: number) { return false }
   get children() { return none }
-  cut(from: number, to?: number) {}
-  abstract slice(from: number, to?: number): InlineView
+  cut(from: number, to?: number) { throw "Not implemented" }
+  slice(from: number, to?: number): InlineView { throw "Not implemented" }
   getSide() { return 0 }
 
   static appendInline(a: InlineView[], b: InlineView[]): InlineView[] {
@@ -118,6 +118,13 @@ export class TextView extends InlineView {
       return {left: x, right: x, top: rect.top, bottom: rect.bottom}
     }
   }
+
+  toCompositionView() {
+    let parent = this.parent!, view = new CompositionView(parent, this.dom!, this.length)
+    this.markParentsDirty()
+    let parentIndex = parent.children.indexOf(this)
+    return parent.children[parentIndex] = view
+  }
 }
 
 // Also used for collapsed ranges that don't have a placeholder widget!
@@ -171,6 +178,14 @@ export class WidgetView extends InlineView {
     }
     return null
   }
+}
+
+export class CompositionView extends InlineView {
+  constructor(parent: ContentView, dom: Node, public length: number) {
+    super(parent, dom)
+  }
+
+  // FIXME length maintenance
 }
 
 export class LineContent {

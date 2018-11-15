@@ -1,6 +1,6 @@
 import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView, LineContent} from "./inlineview"
+import {InlineView, TextView, LineContent, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
 import {attrsEq, WidgetType} from "./decoration"
 
@@ -194,6 +194,12 @@ export class LineView extends ContentView {
       if (widget.dom!.contains(event.target as Node))
         return widget.widget.ignoreEvent(event)
     return true
+  }
+
+  createCompositionViewAt(index: number, dom: Node): CompositionView {
+    let view = new CompositionView(this, dom, 0)
+    this.replaceChildren(index, index, [view])
+    return view
   }
 }
 

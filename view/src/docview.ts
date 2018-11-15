@@ -1,6 +1,6 @@
 import {ContentView, ChildCursor, dirty} from "./contentview"
 import {LineView} from "./lineview"
-import {InlineBuilder, LineContent} from "./inlineview"
+import {InlineBuilder, LineContent, TextView, CompositionView} from "./inlineview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
 import {Text} from "../../doc/src"
@@ -35,8 +35,10 @@ export class DocView extends ContentView {
   // A document position that has to be scrolled into view at the next layout check
   scrollIntoView: number = -1
 
-  paddingTop: number = 0;
-  paddingBottom: number = 0;
+  composition: CompositionView | null = null
+
+  paddingTop: number = 0
+  paddingBottom: number = 0
 
   dom!: HTMLElement
 
@@ -64,7 +66,8 @@ export class DocView extends ContentView {
   // used as a hint to compute a new viewport that includes that
   // position, if we know the editor is going to scroll that position
   // into view.
-  update(state: EditorState, prevState: EditorState | null = null, transactions: Transaction[] = [], scrollIntoView: number = -1) {
+  update(state: EditorState, prevState: EditorState | null = null,
+         transactions: Transaction[] = [], scrollIntoView: number = -1) {
     // FIXME need some way to stabilize viewport—if a change causes the
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
@@ -452,6 +455,48 @@ export class DocView extends ContentView {
     this.observer.clearSelection()
     if (this.selectionDirty == null)
       this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
+  }
+
+  startComposition() {
+    if (!this.composition) this.observer.startComposition()
+  }
+
+  endComposition() {
+    this.observer.clearComposition()
+    if (this.composition) {
+      if (this.composition.root == this) {
+        let from = this.composition.posAtStart, to = from + this.composition.length
+        this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
+      }
+      this.composition = null
+    }
+  }
+
+  createCompositionNode() {
+    let {focusNode, focusOffset} = getRoot(this.dom).getSelection()!
+    if (!focusNode) return
+    let view = this.nearest(focusNode)
+    if (view instanceof TextView) {
+      this.composition = view.toCompositionView()
+    } else if (view instanceof LineView) {
+      if (focusNode == view.dom) {
+        let prevView = focusNode.childNodes[focusOffset - 1]
+        if (prevView instanceof TextView)
+          this.composition = prevView.toCompositionView()
+      } else {
+        let subtree: Node = focusNode!
+        while (subtree.parentNode != view.dom) subtree = subtree.parentNode!
+        let prev = subtree.previousSibling, index = 0
+        while (prev) {
+          let found = view.children.indexOf(prev.cmView as any)
+          if (found > -1) { index = found + 1; break }
+          prev = prev.previousSibling
+        }
+        this.composition = view.createCompositionViewAt(index, subtree)
+      }
+    }
+    if (!this.composition)
+      console.log("Failed to create a composition node at", focusNode, focusOffset)
   }
 }
 

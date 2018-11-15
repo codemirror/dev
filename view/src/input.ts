@@ -370,3 +370,11 @@ handlers.blur = view => {
 handlers.beforeprint = view => {
   view.docView.checkLayout(true)
 }
+
+handlers.compositionstart = handlers.compositionupdate = view => {
+  view.docView.startComposition()
+}
+
+handlers.compositionend = view => {
+  view.docView.endComposition()
+}
