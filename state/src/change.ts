@@ -205,7 +205,7 @@ export class ChangedRange {
                             Math.min(this.fromB, other.fromB), Math.max(this.toB, other.toB))
   }
 
-  addToSet(set: ChangedRange[]) {
+  addToSet(set: ChangedRange[]): ChangedRange[] {
     let i = set.length, me: ChangedRange = this
     for (; i > 0; i--) {
       let range = set[i - 1]
@@ -215,5 +215,24 @@ export class ChangedRange {
       set.splice(i - 1, 1)
     }
     set.splice(i, 0, me)
+    return set
   }
+
+  subtractFromSet(set: ChangedRange[]): ChangedRange[] {
+    for (let i = 0; i < set.length; i++) {
+      let range = set[i]
+      if (range.fromA >= this.toA && range.fromB >= this.toB) break
+      if (range.toA <= this.fromA && range.toB <= this.fromB) continue
+      let replace = []
+      if (range.fromA < this.fromA || range.fromB < this.fromB)
+        replace.push(new ChangedRange(range.fromA, this.fromA, range.fromB, this.fromB))
+      if (range.toA > this.toA || range.toB > this.toB)
+        replace.push(new ChangedRange(this.toA, range.toA, range.toB, this.toB))
+      set.splice(i, 1, ...replace)
+      i = i + replace.length - 1
+    }
+    return set
+  }
+
+  get lenDiff() { return (this.toB - this.fromB) - (this.toA - this.fromA) }
 }

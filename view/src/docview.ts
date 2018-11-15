@@ -112,6 +112,28 @@ export class DocView extends ContentView {
 
     let decoSets = this.decorations.filter(d => d.size > 0)
 
+    let compositionRange = null
+    if (this.composition) {
+      let from = this.composition.posAtStart, to = from + this.composition.length
+      let lineFrom = this.composition.parent!.posAtStart
+      if (changes.length == 0 || changes.length == 1 &&
+          changes[0].fromA >= from && changes[0].toA <= to) {
+        // The change falls entirely inside the composition
+        compositionRange = new ChangedRange(from, to, from, to + (changes.length ? changes[0].lenDiff : 0))
+      } else if (changes.every(ch => ch.fromA >= to || ch.toA < lineFrom ||
+                               (ch.toA <= from && this.text.lineAt(ch.fromB).end > ch.toB))) {
+        // Entirely outside, and not introducing a line break directly before
+        let newFrom = mapThroughChanges(from, 1, changes)
+        compositionRange = new ChangedRange(from, to, newFrom, newFrom + (to - from))
+      } else {
+        // Overlaps with the composition, must make sure it is
+        // overwritten so that we get rid of the node
+        changes = new ChangedRange(from, to, mapThroughChanges(from, -1, changes),
+                                   mapThroughChanges(to, 1, changes)).addToSet(changes.slice())
+        this.composition = null
+      }
+    }
+
     let cursor = new ChildCursor(this.children, oldLength, 1)
     let posB = this.text.length
     for (let i = viewports.length - 1;; i--) {
@@ -143,7 +165,7 @@ export class DocView extends ContentView {
       } else {
         cursor.findPos(matching.from)
       }
-      this.updatePart(cursor.i, endI, matching, viewport, changes, decoSets)
+      this.updatePart(cursor.i, endI, matching, viewport, changes, decoSets, compositionRange)
       posB = viewport.from - 1
     }
 
@@ -158,18 +180,32 @@ export class DocView extends ContentView {
       this.updateSelection()
       this.dom.style.height = ""
     })
+
+    if (this.composition && this.composition.root != this) this.composition = null
   }
 
   // Update a single viewport in the DOM
   private updatePart(startI: number, endI: number, oldPort: Viewport, newPort: Viewport,
-                     changes: A<ChangedRange>, decoSets: A<DecorationSet>) {
+                     changes: A<ChangedRange>, decoSets: A<DecorationSet>,
+                     compositionRange: ChangedRange | null) {
     let plan = clipPlan(changes, oldPort, newPort)
+    if (compositionRange) plan = compositionRange.subtractFromSet(plan.slice())
     let cur = new ChildCursor(this.children, oldPort.to, 1, endI)
-    for (let i = plan.length - 1; i >= 0; i--) {
+    for (let i = plan.length - 1, pos = newPort.to;; i--) {
+      // The composition node must have its length updated at the
+      // proper time, so that the updates around it find the proper
+      // positions. (FIXME does it really?)
+      if (compositionRange) {
+        let next = i < 0 ? newPort.from : plan[i].toB
+        if (compositionRange.toB > next && compositionRange.fromB < pos)
+          this.composition!.updateLength(compositionRange.toB - compositionRange.fromB)
+      }
+      if (i < 0) break
       let {fromA, toA, fromB, toB} = plan[i]
       let {i: toI, off: toOff} = cur.findPos(toA)
       let {i: fromI, off: fromOff} = cur.findPos(fromA)
       this.updatePartRange(fromI, fromOff, toI, toOff, InlineBuilder.build(this.text, fromB, toB, decoSets))
+      pos = fromB
     }
   }
 
@@ -251,8 +287,8 @@ export class DocView extends ContentView {
   // Compute the new viewport and set of decorations, while giving
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
-  computeViewport(contentChanges: A<ChangedRange> = [], prevState: EditorState | null, transactions: Transaction[] | null,
-                  bias: number, scrollIntoView: number): {
+  computeViewport(contentChanges: A<ChangedRange> = [], prevState: EditorState | null,
+                  transactions: Transaction[] | null, bias: number, scrollIntoView: number): {
     // Passing transactions != null means at least one iteration is necessary
     viewport: Viewport,
     contentChanges: A<ChangedRange>
@@ -265,8 +301,8 @@ export class DocView extends ContentView {
     }
   }
 
-  computeViewportInner(contentChanges: A<ChangedRange> = [], prevState: EditorState | null, transactions: Transaction[] | null,
-                       bias: number, scrollIntoView: number): {
+  computeViewportInner(contentChanges: A<ChangedRange> = [], prevState: EditorState | null,
+                       transactions: Transaction[] | null, bias: number, scrollIntoView: number): {
     // Passing transactions != null means at least one iteration is necessary
     viewport: Viewport,
     contentChanges: A<ChangedRange>
@@ -394,7 +430,7 @@ export class DocView extends ContentView {
 
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.visiblePart
-    for (let pos = 0, i = 0; pos <= to; i++) {
+    for (let pos = 0, i = 0; pos <= to && i < this.children.length; i++) {
       let child = this.children[i] as LineView
       if (pos >= from) {
         result.push(child.dom.getBoundingClientRect().height)
@@ -461,14 +497,16 @@ export class DocView extends ContentView {
     if (!this.composition) this.observer.startComposition()
   }
 
+  // FIXME make this async to deal with rapid-fire Android-style compositions?
   endComposition() {
     this.observer.clearComposition()
-    if (this.composition) {
-      if (this.composition.root == this) {
-        let from = this.composition.posAtStart, to = from + this.composition.length
+    let composition = this.composition
+    if (composition) {
+      this.composition = null
+      if (composition.root == this) {
+        let from = composition.posAtStart, to = from + composition.length
         this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
       }
-      this.composition = null
     }
   }
 
@@ -495,8 +533,6 @@ export class DocView extends ContentView {
         this.composition = view.createCompositionViewAt(index, subtree)
       }
     }
-    if (!this.composition)
-      console.log("Failed to create a composition node at", focusNode, focusOffset)
   }
 }
 
@@ -642,6 +678,10 @@ function mapThroughChanges(pos: number, bias: number, changes: A<ChangedRange>):
   return pos + off
 }
 
+// Given an old and new set of viewports, find the parts of the new
+// viewports that also appeared in the old, to avoid redrawing those.
+// Returns an array of sub-viewports that has the same length as the
+// list of new viewports.
 function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>, changes: A<ChangedRange>): Viewport[] {
   let prevI = 0, result: Viewport[] = []
   outer: for (let viewport of viewports) {

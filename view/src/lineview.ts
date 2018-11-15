@@ -98,6 +98,12 @@ export class LineView extends ContentView {
       fromI++
     }
 
+    if (fromI < toI && (this.parent as DocView).composition) {
+      // If there's a zero-length composition on the edge of the update, don't overwrite it
+      if (this.children[toI - 1] instanceof CompositionView && this.children[toI - 1].length == 0) toI--
+      else if (this.children[fromI] instanceof CompositionView && this.children[fromI].length == 0) fromI++
+    }
+
     // And if anything remains, splice the child array to insert the new elts
     if (elts.length || fromI != toI) {
       for (let view of elts) view.setParent(this)

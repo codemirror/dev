@@ -1,6 +1,6 @@
 import {ContentView, dirty} from "./contentview"
 import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration} from "./decoration"
-import {LineWidget} from "./lineview"
+import {LineWidget, LineView} from "./lineview"
 import {Text, TextIterator} from "../../doc/src"
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {Rect} from "./dom"
@@ -185,7 +185,10 @@ export class CompositionView extends InlineView {
     super(parent, dom)
   }
 
-  // FIXME length maintenance
+  updateLength(newLen: number) {
+    if (this.parent) (this.parent as LineView).length += newLen - this.length
+    this.length = newLen
+  }
 }
 
 export class LineContent {

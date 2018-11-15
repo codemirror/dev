@@ -141,7 +141,7 @@ export abstract class HeightMap {
       let range = changes[i]
       let nodes = buildChangedNodes(oracle, decorations, range.fromB, range.toB)
       me = me.replace(range.fromA + off, range.toA + off, nodes, oracle, range.fromB, range.toB)
-      off += (range.toB - range.fromB) - (range.toA - range.fromA)
+      off += range.lenDiff
     }
     return me
   }
