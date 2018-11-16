@@ -1,4 +1,5 @@
 /node_modules
+package-lock.json
 /demo/demo_built*
 /view/test/test_built*
 /.rpt2_cache
