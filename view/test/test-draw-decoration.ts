@@ -179,11 +179,10 @@ describe("EditorView decoration", () => {
     })
 
     it("places the cursor based on side", () => {
-      requireFocus()
-      let cm = decoEditor("abc", [w(2, new WordWidget("A"), -1),
-                                  w(2, new WordWidget("B"), 1)])
+      let cm = requireFocus(
+        decoEditor("abc", [w(2, new WordWidget("A"), -1),
+                           w(2, new WordWidget("B"), 1)]))
       cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(2)))
-      cm.focus()
       let domSel = document.getSelection()!
       ist(domSel.focusNode.childNodes[domSel.focusOffset - 1].textContent, "A")
       ist(domSel.focusNode.childNodes[domSel.focusOffset].textContent, "B")

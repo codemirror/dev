@@ -13,8 +13,7 @@ function setDOMSel(node: Node, offset: number) {
 
 describe("EditorView selection", () => {
   it("can read the DOM selection", () => {
-    requireFocus()
-    let cm = tempEditor("one\n\nthree")
+    let cm = requireFocus(tempEditor("one\n\nthree"))
 
     function test(node: Node, offset: number, expected: number) {
       setDOMSel(node, offset)
@@ -37,9 +36,7 @@ describe("EditorView selection", () => {
   })
 
   it("syncs the DOM selection with the editor selection", () => {
-    requireFocus()
-
-    let cm = tempEditor("abc\n\ndef")
+    let cm = requireFocus(tempEditor("abc\n\ndef"))
     function test(pos: number, node: Node, offset: number) {
       cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(pos)))
       ist(window.getSelection()!.focusNode, node)
@@ -47,7 +44,6 @@ describe("EditorView selection", () => {
     }
     let abc = cm.contentDOM.firstChild!.firstChild!
     let def = cm.contentDOM.lastChild!.firstChild!
-    cm.focus()
     test(0, abc.parentNode!, 0)
     test(1, abc, 1)
     test(2, abc, 2)

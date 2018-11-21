@@ -132,8 +132,8 @@ export class LineView extends ContentView {
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
     if (off) {
-      let child = this.children[i]
-      if (child instanceof TextView) return {node: child.textDOM!, offset: off}
+      let textDOM: Node | null = (this.children[i] as any).textDOM
+      if (textDOM) return {node: textDOM, offset: off}
     }
     while (i > 0 && (this.children[i - 1].getSide() > 0 || this.children[i - 1].dom!.parentNode != this.dom)) i--
     return {node: this.dom, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
@@ -202,8 +202,16 @@ export class LineView extends ContentView {
     return true
   }
 
-  createCompositionViewAt(index: number, dom: Node): CompositionView {
-    let view = new CompositionView(this, dom, 0)
+  createCompositionViewAround(textNode: Node): CompositionView {
+    let dom = textNode
+    while (dom.parentNode != this.dom) dom = dom.parentNode!
+    let prev = dom.previousSibling, index = 0
+    while (prev) {
+      let found = this.children.indexOf(prev.cmView as any)
+      if (found > -1) { index = found + 1; break }
+      prev = prev.previousSibling
+    }
+    let view = new CompositionView(this, dom, textNode, 0)
     this.replaceChildren(index, index, [view])
     return view
   }

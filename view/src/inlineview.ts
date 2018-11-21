@@ -101,29 +101,31 @@ export class TextView extends InlineView {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
   }
 
-  coordsAt(pos: number): Rect {
-    let range = document.createRange()
-    if (browser.chrome || browser.gecko) {
-      // These browsers reliably return valid rectangles for empty ranges
-      range.setEnd(this.textDOM!, pos)
-      range.setStart(this.textDOM!, pos)
-      return range.getBoundingClientRect()
-    } else {
-      // Otherwise, get the rectangle around a character and take one side
-      let extend = pos == 0 ? 1 : -1
-      range.setEnd(this.textDOM!, pos + (extend > 0 ? 1 : 0))
-      range.setStart(this.textDOM!, pos - (extend < 0 ? 1 : 0))
-      let rect = range.getBoundingClientRect()
-      let x = extend < 0 ? rect.right : rect.left
-      return {left: x, right: x, top: rect.top, bottom: rect.bottom}
-    }
-  }
+  coordsAt(pos: number): Rect { return textCoords(this.textDOM!, pos) }
 
   toCompositionView() {
-    let parent = this.parent!, view = new CompositionView(parent, this.dom!, this.length)
+    let parent = this.parent!, view = new CompositionView(parent, this.dom!, this.textDOM!, this.length)
     this.markParentsDirty()
     let parentIndex = parent.children.indexOf(this)
     return parent.children[parentIndex] = view
+  }
+}
+
+function textCoords(text: Node, pos: number): Rect {
+  let range = document.createRange()
+  if (browser.chrome || browser.gecko) {
+    // These browsers reliably return valid rectangles for empty ranges
+    range.setEnd(text, pos)
+    range.setStart(text, pos)
+    return range.getBoundingClientRect()
+  } else {
+    // Otherwise, get the rectangle around a character and take one side
+    let extend = pos == 0 ? 1 : -1
+    range.setEnd(text, pos + (extend > 0 ? 1 : 0))
+    range.setStart(text, pos - (extend < 0 ? 1 : 0))
+    let rect = range.getBoundingClientRect()
+    let x = extend < 0 ? rect.right : rect.left
+    return {left: x, right: x, top: rect.top, bottom: rect.bottom}
   }
 }
 
@@ -181,7 +183,7 @@ export class WidgetView extends InlineView {
 }
 
 export class CompositionView extends InlineView {
-  constructor(parent: ContentView, dom: Node, public length: number) {
+  constructor(parent: ContentView, dom: Node, public textDOM: Node, public length: number) {
     super(parent, dom)
   }
 
@@ -189,6 +191,20 @@ export class CompositionView extends InlineView {
     if (this.parent) (this.parent as LineView).length += newLen - this.length
     this.length = newLen
   }
+
+  sync() {}
+
+  localPosFromDOM(node: Node, offset: number): number {
+    return node == this.textDOM ? offset : offset ? this.length : 0
+  }
+
+  domFromPos(pos: number) { return {node: this.textDOM!, offset: pos} }
+
+  domBoundsAround(from: number, to: number, offset: number) {
+    return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
+  }
+
+  coordsAt(pos: number): Rect { return textCoords(this.textDOM, pos) }
 }
 
 export class LineContent {

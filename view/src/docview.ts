@@ -8,7 +8,7 @@ import {DOMObserver} from "./domobserver"
 import {EditorState, EditorSelection, Transaction, ChangeSet, ChangedRange} from "../../state/src"
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
-import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView} from "./dom"
+import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 
 type A<T> = ReadonlyArray<T>
 
@@ -119,6 +119,7 @@ export class DocView extends ContentView {
       if (changes.length == 0 || changes.length == 1 &&
           changes[0].fromA >= from && changes[0].toA <= to) {
         // The change falls entirely inside the composition
+        // FIXME verify that this was a DOM change—if it's external, we should use the bottom case instead
         compositionRange = new ChangedRange(from, to, from, to + (changes.length ? changes[0].lenDiff : 0))
       } else if (changes.every(ch => ch.fromA >= to || ch.toA < lineFrom ||
                                (ch.toA <= from && this.text.lineAt(ch.fromB).end > ch.toB))) {
@@ -194,8 +195,9 @@ export class DocView extends ContentView {
     for (let i = plan.length - 1, pos = newPort.to;; i--) {
       // The composition node must have its length updated at the
       // proper time, so that the updates around it find the proper
-      // positions. (FIXME does it really?)
+      // positions.
       if (compositionRange) {
+        // FIXME properly deal with zero-size composition nodes on the start/end of updates
         let next = i < 0 ? newPort.from : plan[i].toB
         if (compositionRange.toB > next && compositionRange.fromB < pos)
           this.composition!.updateLength(compositionRange.toB - compositionRange.fromB)
@@ -494,6 +496,8 @@ export class DocView extends ContentView {
   }
 
   startComposition() {
+    // FIXME schedule a timeout that ends the composition (or at least
+    // our view of it) after a given inactive time?
     if (!this.composition) this.observer.startComposition()
   }
 
@@ -505,7 +509,9 @@ export class DocView extends ContentView {
       this.composition = null
       if (composition.root == this) {
         let from = composition.posAtStart, to = from + composition.length
-        this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
+        this.observer.ignore(() => {
+          this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
+        })
       }
     }
   }
@@ -513,26 +519,23 @@ export class DocView extends ContentView {
   createCompositionNode() {
     let {focusNode, focusOffset} = getRoot(this.dom).getSelection()!
     if (!focusNode) return
-    let view = this.nearest(focusNode)
-    if (view instanceof TextView) {
-      this.composition = view.toCompositionView()
-    } else if (view instanceof LineView) {
-      if (focusNode == view.dom) {
-        let prevView = focusNode.childNodes[focusOffset - 1]
-        if (prevView instanceof TextView)
-          this.composition = prevView.toCompositionView()
+    // Enter adjacent nodes when necessary
+    while (focusNode.nodeType == 1) {
+      if (focusOffset > 0) {
+        focusNode = focusNode.childNodes[focusOffset - 1]
+        focusOffset = maxOffset(focusNode)
+      } else if (focusOffset < focusNode.childNodes.length) {
+        focusNode = focusNode.childNodes[focusOffset]
+        focusOffset = 0
       } else {
-        let subtree: Node = focusNode!
-        while (subtree.parentNode != view.dom) subtree = subtree.parentNode!
-        let prev = subtree.previousSibling, index = 0
-        while (prev) {
-          let found = view.children.indexOf(prev.cmView as any)
-          if (found > -1) { index = found + 1; break }
-          prev = prev.previousSibling
-        }
-        this.composition = view.createCompositionViewAt(index, subtree)
+        break
       }
     }
+    let view = this.nearest(focusNode)
+    if (view instanceof TextView)
+      this.composition = view.toCompositionView()
+    else if (focusNode.nodeType == 3 && view instanceof LineView)
+      this.composition = view.createCompositionViewAround(focusNode)
   }
 }
 
