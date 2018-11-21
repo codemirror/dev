@@ -12,6 +12,8 @@ import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOf
 
 type A<T> = ReadonlyArray<T>
 
+const enum Composing { no, starting, yes, ending }
+
 export class DocView extends ContentView {
   children: ContentView[] = [new LineView(this)]
   visiblePart: Viewport = Viewport.empty
@@ -35,7 +37,9 @@ export class DocView extends ContentView {
   // A document position that has to be scrolled into view at the next layout check
   scrollIntoView: number = -1
 
+  composing: Composing = Composing.no
   composition: CompositionView | null = null
+  composeTimeout: any = -1
 
   paddingTop: number = 0
   paddingBottom: number = 0
@@ -100,6 +104,7 @@ export class DocView extends ContentView {
   // Used both by update and checkLayout do perform the actual DOM
   // update
   private updateInner(changes: A<ChangedRange>, oldLength: number, visible: Viewport) {
+    this.commitComposition()
     this.visiblePart = visible
     let viewports: Viewport[] = [visible]
     let {head, anchor} = this.selection.primary
@@ -238,7 +243,7 @@ export class DocView extends ContentView {
     // getSelection than the one that it actually shows to the user.
     // This forces a selection update when lines are joined to work
     // around that. Issue #54
-    if (fromI != toI && browser.chrome) this.forceSelectionUpdate = true
+    if (fromI != toI && browser.chrome && !this.composition) this.forceSelectionUpdate = true
   }
 
   // Sync the DOM selection to this.selection
@@ -496,46 +501,73 @@ export class DocView extends ContentView {
   }
 
   startComposition() {
+    if (this.composing == Composing.no) {
+      this.composing = Composing.starting
+      this.composeTimeout = setTimeout(() => this.enterComposition(), 20)
+    } else if (this.composing == Composing.ending) {
+      clearTimeout(this.composeTimeout)
+      this.composing = Composing.yes
+    }
+  }
+
+  endComposition() {
+    if (this.composing == Composing.yes) {
+      this.composing = Composing.ending
+      this.composeTimeout = setTimeout(() => this.exitComposition(), 20)
+    } else if (this.composing == Composing.starting) {
+      clearTimeout(this.composeTimeout)
+      this.composing = Composing.no
+    }
+  }
+
+  commitComposition() {
+    if (this.composing == Composing.starting) {
+      clearTimeout(this.composeTimeout)
+      this.enterComposition()
+    } else if (this.composing == Composing.ending) {
+      clearTimeout(this.composeTimeout)
+      this.exitComposition()
+    }
+  }
+
+  enterComposition() {
     // FIXME schedule a timeout that ends the composition (or at least
     // our view of it) after a given inactive time?
-    if (!this.composition) this.observer.startComposition()
-  }
-
-  // FIXME make this async to deal with rapid-fire Android-style compositions?
-  endComposition() {
-    this.observer.clearComposition()
-    let composition = this.composition
-    if (composition) {
-      this.composition = null
-      if (composition.root == this) {
-        let from = composition.posAtStart, to = from + composition.length
-        this.observer.ignore(() => {
-          this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
-        })
-      }
-    }
-  }
-
-  createCompositionNode() {
     let {focusNode, focusOffset} = getRoot(this.dom).getSelection()!
-    if (!focusNode) return
-    // Enter adjacent nodes when necessary
-    while (focusNode.nodeType == 1) {
-      if (focusOffset > 0) {
-        focusNode = focusNode.childNodes[focusOffset - 1]
-        focusOffset = maxOffset(focusNode)
-      } else if (focusOffset < focusNode.childNodes.length) {
-        focusNode = focusNode.childNodes[focusOffset]
-        focusOffset = 0
-      } else {
-        break
+    if (focusNode) {
+      // Enter adjacent nodes when necessary, looking for a text node
+      while (focusNode.nodeType == 1) {
+        if (focusOffset > 0) {
+          focusNode = focusNode.childNodes[focusOffset - 1]
+          focusOffset = maxOffset(focusNode)
+        } else if (focusOffset < focusNode.childNodes.length) {
+          focusNode = focusNode.childNodes[focusOffset]
+          focusOffset = 0
+        } else {
+          break
+        }
       }
+      let view = this.nearest(focusNode)
+      if (view instanceof TextView)
+        this.composition = view.toCompositionView()
+      else if (focusNode.nodeType == 3 && view instanceof LineView)
+        this.composition = view.createCompositionViewAround(focusNode)
     }
-    let view = this.nearest(focusNode)
-    if (view instanceof TextView)
-      this.composition = view.toCompositionView()
-    else if (focusNode.nodeType == 3 && view instanceof LineView)
-      this.composition = view.createCompositionViewAround(focusNode)
+    this.composing = this.composition ? Composing.yes : Composing.no
+  }
+
+  // FIXME distinguish between stand-alone exit and exit as part of an
+  // update
+  exitComposition() {
+    let composition = this.composition
+    this.composition = null
+    this.composing = Composing.no
+    if (composition && composition.root == this) {
+      let from = composition.posAtStart, to = from + composition.length
+      this.observer.ignore(() => {
+        this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
+      })
+    }
   }
 }
 

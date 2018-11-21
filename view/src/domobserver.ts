@@ -26,7 +26,6 @@ export class DOMObserver {
 
   charDataQueue: MutationRecord[] = []
   charDataTimeout: any = null
-  startingCompositionTimeout: any = null
 
   scrollTargets: HTMLElement[] = []
   intersection: IntersectionObserver | null = null
@@ -144,10 +143,6 @@ export class DOMObserver {
 
   // Apply pending changes, if any
   flush(records: MutationRecord[] = this.observer.takeRecords()) {
-    if (this.startingCompositionTimeout != null) {
-      this.clearComposition()
-      this.docView.createCompositionNode()
-    }
     if (this.charDataQueue.length)
       records = records.concat(this.takeCharRecords())
     let newSel = !this.ignoreSelection.eq(getRoot(this.dom).getSelection()!) &&
@@ -187,21 +182,6 @@ export class DOMObserver {
               to: childAfter ? cView.posBefore(childAfter) : cView.posAtEnd, typeOver: false}
     } else { // "characterData"
       return {from: cView.posAtStart, to: cView.posAtEnd, typeOver: rec.target.nodeValue == rec.oldValue}
-    }
-  }
-
-  startComposition() {
-    if (this.startingCompositionTimeout == null)
-      this.startingCompositionTimeout = setTimeout(() => {
-        this.docView.createCompositionNode()
-        this.clearComposition()
-      }, 20)
-  }
-
-  clearComposition() {
-    if (this.startingCompositionTimeout != null) {
-      clearTimeout(this.startingCompositionTimeout)
-      this.startingCompositionTimeout = null
     }
   }
 

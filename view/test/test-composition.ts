@@ -13,24 +13,24 @@ function up(node: Text, text: string, from = node.nodeValue!.length, to = from) 
   return node
 }
 
-function compose(cm: EditorView, start: () => Text, f: ((node: Text) => void) | ((node: Text) => void)[]) {
+function compose(cm: EditorView, start: () => Text, f: ((node: Text) => void)[], end?: (node: Text) => void) {
   event(cm, "compositionstart")
   let node = start()
   let sel = document.getSelection()!
-  if (!Array.isArray(f)) f = [f]
   for (let step of f) {
     step(node)
     let {focusNode, focusOffset} = sel
     cm.docView.observer.flush()
     ist(node.parentNode && cm.contentDOM.contains(node.parentNode))
-    console.log("focus", sel.focusNode, sel.focusOffset, "from", focusNode, focusOffset)
-    console.log("at which point", cm.docView.composition, hasCompositionNode(cm.docView))
     ist(sel.focusNode, focusNode)
     ist(sel.focusOffset, focusOffset)
     ist(cm.docView.composition)
     ist(hasCompositionNode(cm.docView))
   }
   event(cm, "compositionend")
+  if (end) end(node)
+  cm.docView.observer.flush()
+  cm.docView.commitComposition()
   ist(!cm.docView.composition)
   ist(!hasCompositionNode(cm.docView))
 }
@@ -72,14 +72,19 @@ describe("Composition", () => {
     let cm = requireFocus(tempEditor("abcdef"))
     compose(cm, () => cm.domAtPos(2)!.node as Text, [
       n => up(n, "x", 3),
-      n => up(n, "y", 4),
-      n => {
-        let line = n.parentNode.appendChild(document.createElement("div"))
-        line.textContent = "def"
-        n.nodeValue = "abcxy"
-        document.getSelection().collapse(line, 0)
-      }
-    ])
+      n => up(n, "y", 4)
+    ], n => {
+      let line = n.parentNode.appendChild(document.createElement("div"))
+      line.textContent = "def"
+      n.nodeValue = "abcxy"
+      document.getSelection()!.collapse(line, 0)
+    })
     ist(cm.state.doc.toString(), "abcxy\ndef")
   })
+
+  // FIXME test widgets next to compositions
+
+  // FIXME test changes that override compositions
+
+  // FIXME test decorations/highlighting around compositions
 })
