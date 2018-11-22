@@ -235,4 +235,14 @@ export class ChangedRange {
   }
 
   get lenDiff() { return (this.toB - this.fromB) - (this.toA - this.fromA) }
+
+  static mapPos(pos: number, bias: number, changes: ReadonlyArray<ChangedRange>): number {
+    let off = 0
+    for (let range of changes) {
+      if (pos < range.fromA) return pos + off
+      if (pos <= range.toA) return bias < 0 ? range.fromA : range.toA
+      off = range.toB - range.toA
+    }
+    return pos + off
+  }
 }

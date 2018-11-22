@@ -155,6 +155,12 @@ export abstract class ContentView {
   childPos(pos: number, bias: number = 1): {i: number, off: number} {
     return new ChildCursor(this.children, this.length, this.childGap).findPos(pos, bias)
   }
+
+  toString() {
+    return this.constructor.name.replace("View", "") +
+      (this.children.length ? "(" + this.children.join() + ")" :
+       this.length ? "[" + ((this as any).text || this.length) + "]" : "")
+  }
 }
 
 // Remove a DOM node and return its next sibling.

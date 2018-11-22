@@ -1,12 +1,13 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorView} from "../src"
+import {EditorView, Decoration, DecorationSet, WidgetType} from "../src"
+import {Plugin, EditorState, Transaction} from "../../state/src"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
   cm.contentDOM.dispatchEvent(new CompositionEvent(type))
 }
 
-function up(node: Text, text: string, from = node.nodeValue!.length, to = from) {
+function up(node: Text, text: string = "", from = node.nodeValue!.length, to = from) {
   let val = node.nodeValue!
   node.nodeValue = val.slice(0, from) + text + val.slice(to)
   document.getSelection()!.collapse(node, from + text.length)
@@ -15,10 +16,10 @@ function up(node: Text, text: string, from = node.nodeValue!.length, to = from) 
 
 function compose(cm: EditorView, start: () => Text, f: ((node: Text) => void)[], end?: (node: Text) => void) {
   event(cm, "compositionstart")
-  let node = start()
-  let sel = document.getSelection()!
-  for (let step of f) {
-    step(node)
+  let node!: Text, sel = document.getSelection()!
+  for (let i = -1; i < f.length; i++) {
+    if (i < 0) node = start()
+    else f[i](node)
     let {focusNode, focusOffset} = sel
     cm.docView.observer.flush()
     ist(node.parentNode && cm.contentDOM.contains(node.parentNode))
@@ -30,7 +31,7 @@ function compose(cm: EditorView, start: () => Text, f: ((node: Text) => void)[],
   event(cm, "compositionend")
   if (end) end(node)
   cm.docView.observer.flush()
-  cm.docView.commitComposition()
+  if (cm.docView.composing != 0) cm.docView.exitComposition() // FIXME too much internals!
   ist(!cm.docView.composition)
   ist(!hasCompositionNode(cm.docView))
 }
@@ -39,28 +40,80 @@ function hasCompositionNode(view: any) {
   return view.constructor.name == "CompositionView" || view.children.some(hasCompositionNode)
 }
 
+function wordDeco(state: EditorState): DecorationSet {
+  let re = /\w+/g, m, deco = [], text = state.doc.toString()
+  while (m = re.exec(text))
+    deco.push(Decoration.range(m.index, m.index + m[0].length, {class: "word"}))
+  return Decoration.set(deco)
+}
+
+const wordHighlighter = new Plugin({
+  view(v: EditorView) {
+    return {
+      decorations: wordDeco(v.state),
+      updateState() { this.decorations = wordDeco(v.state) }
+    }
+  }
+})
+
+function widgets(positions: number[], sides: number[]) {
+  let xWidget = new class extends WidgetType<null> {
+    toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
+  }(null)
+  return new Plugin({
+    view(v: EditorView) {
+      return {
+        decorations: Decoration.set(
+          positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))),
+        updateState(_v: any, _p: any, transactions: Transaction[]) {
+          this.decorations = transactions.reduce((d, tr) => d.map(tr.changes), this.decorations)
+        }
+      }
+    }
+  })
+}
+
 describe("Composition", () => {
   it("supports composition on an empty line", () => {
     let cm = requireFocus(tempEditor("foo\n\nbar"))
-    compose(cm, () => cm.domAtPos(4)!.node.appendChild(document.createTextNode("a")), [
+    compose(cm, () => up(cm.domAtPos(4)!.node.appendChild(document.createTextNode("a"))), [
       n => up(n, "b"),
       n => up(n, "c")
     ])
     ist(cm.state.doc.toString(), "foo\nabc\nbar")
   })
 
-  it("supports composition at the end of a line", () => {
+  it("supports composition at end of line", () => {
     let cm = requireFocus(tempEditor("foo"))
-    compose(cm, () => cm.domAtPos(2)!.node as Text, [
+    compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
       n => up(n, "!"),
       n => up(n, "?")
     ])
     ist(cm.state.doc.toString(), "foo!?")
   })
 
+  it("supports composition at end of line in a new node", () => {
+    let cm = requireFocus(tempEditor("foo"))
+    compose(cm, () => up(cm.domAtPos(0)!.node.appendChild(document.createTextNode("!"))), [
+      n => up(n, "?")
+    ])
+    ist(cm.state.doc.toString(), "foo!?")
+  })
+
+  it("supports composition at start of line in a new node", () => {
+    let cm = requireFocus(tempEditor("foo"))
+    compose(cm, () => {
+      let l0 = cm.domAtPos(0)!.node
+      return up(l0.insertBefore(document.createTextNode("!"), l0.firstChild))
+    }, [
+      n => up(n, "?")
+    ])
+    ist(cm.state.doc.toString(), "!?foo")
+  })
+
   it("supports composition inside existing text", () => {
     let cm = requireFocus(tempEditor("foo"))
-    compose(cm, () => cm.domAtPos(2)!.node as Text, [
+    compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
       n => up(n, "x", 1),
       n => up(n, "y", 2),
       n => up(n, "z", 3)
@@ -70,11 +123,11 @@ describe("Composition", () => {
 
   it("can deal with Android-style newline-after-composition", () => {
     let cm = requireFocus(tempEditor("abcdef"))
-    compose(cm, () => cm.domAtPos(2)!.node as Text, [
+    compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
       n => up(n, "x", 3),
       n => up(n, "y", 4)
     ], n => {
-      let line = n.parentNode.appendChild(document.createElement("div"))
+      let line = n.parentNode!.appendChild(document.createElement("div"))
       line.textContent = "def"
       n.nodeValue = "abcxy"
       document.getSelection()!.collapse(line, 0)
@@ -82,9 +135,61 @@ describe("Composition", () => {
     ist(cm.state.doc.toString(), "abcxy\ndef")
   })
 
+  it("handles replacement of existing words", () => {
+    let cm = requireFocus(tempEditor("one two three"))
+    compose(cm, () => up(cm.domAtPos(1)!.node as Text, "five", 4, 7), [
+      n => up(n, "seven", 4, 8),
+      n => up(n, "zero", 4, 9)
+    ])
+    ist(cm.state.doc.toString(), "one zero three")
+  })
+
+  it("doesn't get interrupted by changes in decorations", () => {
+    let cm = requireFocus(tempEditor("foo ...", [wordHighlighter]))
+    compose(cm, () => up(cm.domAtPos(5)!.node as Text), [
+      n => up(n, "hi", 1, 4)
+    ])
+    ist(cm.state.doc.toString(), "foo hi")
+  })
+
+  it("works inside highlighted text", () => {
+    let cm = requireFocus(tempEditor("one two", [wordHighlighter]))
+    compose(cm, () => up(cm.domAtPos(1)!.node as Text, "x"), [
+      n => up(n, "y"),
+      n => up(n, ".")
+    ])
+    ist(cm.state.doc.toString(), "onexy. two")
+  })
+
+  it("can handle compositions spanning multiple tokens", () => {
+    let cm = requireFocus(tempEditor("one two", [wordHighlighter]))
+    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "a"), [
+      n => up(n, "b"),
+      n => up(n, "c")
+    ], n => {
+      ;(n.parentNode!.previousSibling! as ChildNode).remove()
+      ;(n.parentNode!.previousSibling! as ChildNode).remove()
+      return up(n, "xyzone ", 0)
+    })
+    ist(cm.state.doc.toString(), "xyzone twoabc")
+  })
+
+  it("doesn't overwrite widgets next to the composition", () => {
+    let cm = requireFocus(tempEditor("", [widgets([0, 0], [-1, 1])]))
+    compose(cm, () => {
+      let l0 = cm.domAtPos(0)!.node
+      return up(l0.insertBefore(document.createTextNode("a"), l0.lastChild))
+    }, [n => up(n, "b", 0, 1)], () => {
+      ist(cm.contentDOM.querySelectorAll("var").length, 2)
+    })
+    ist(cm.state.doc.toString(), "b")
+  })
+
   // FIXME test widgets next to compositions
 
   // FIXME test changes that override compositions
 
-  // FIXME test decorations/highlighting around compositions
+  // FIXME test compositions rapidly following each other
+
+  // FIXME look into corner cases that could crash this
 })

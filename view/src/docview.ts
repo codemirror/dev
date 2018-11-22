@@ -82,10 +82,12 @@ export class DocView extends ContentView {
     let changedRanges = !prevState
       ? [new ChangedRange(0, oldLength, 0, state.doc.length)]
       : (transactions.length == 1 ? transactions[0].changes :
-         transactions.reduce((changes: ChangeSet, tr: Transaction) => changes.appendSet(tr.changes), ChangeSet.empty)).changedRanges()
+         transactions.reduce((changes: ChangeSet, tr: Transaction) =>
+                             changes.appendSet(tr.changes), ChangeSet.empty)).changedRanges()
     this.heightMap = this.heightMap.applyChanges([], this.heightOracle.setDoc(state.doc), changedRanges)
 
-    let {viewport, contentChanges} = this.computeViewport(changedRanges, prevState, transactions, 0, scrollIntoView)
+    let {viewport, contentChanges} = this.computeViewport(changedRanges, prevState, transactions,
+                                                          0, scrollIntoView)
 
     if (this.dirty == dirty.not && contentChanges.length == 0 &&
         this.selection.primary.from >= this.visiblePart.from &&
@@ -104,7 +106,7 @@ export class DocView extends ContentView {
   // Used both by update and checkLayout do perform the actual DOM
   // update
   private updateInner(changes: A<ChangedRange>, oldLength: number, visible: Viewport) {
-    this.commitComposition()
+    changes = this.commitComposition(changes)
     this.visiblePart = visible
     let viewports: Viewport[] = [visible]
     let {head, anchor} = this.selection.primary
@@ -129,13 +131,13 @@ export class DocView extends ContentView {
       } else if (changes.every(ch => ch.fromA >= to || ch.toA < lineFrom ||
                                (ch.toA <= from && this.text.lineAt(ch.fromB).end > ch.toB))) {
         // Entirely outside, and not introducing a line break directly before
-        let newFrom = mapThroughChanges(from, 1, changes)
+        let newFrom = ChangedRange.mapPos(from, 1, changes)
         compositionRange = new ChangedRange(from, to, newFrom, newFrom + (to - from))
       } else {
         // Overlaps with the composition, must make sure it is
         // overwritten so that we get rid of the node
-        changes = new ChangedRange(from, to, mapThroughChanges(from, -1, changes),
-                                   mapThroughChanges(to, 1, changes)).addToSet(changes.slice())
+        changes = new ChangedRange(from, to, ChangedRange.mapPos(from, -1, changes),
+                                   ChangedRange.mapPos(to, 1, changes)).addToSet(changes.slice())
         this.composition = null
       }
     }
@@ -165,7 +167,7 @@ export class DocView extends ContentView {
 
       let viewport = viewports[i], matching = matchingRanges[i]
       endI = cursor.i
-      if (matching.from == matching.to) {
+      if (matching.from == matching.to && this.viewports.indexOf(matching) == -1) {
         this.replaceChildren(cursor.i, endI, [new LineView(this)])
         endI = cursor.i + 1
       } else {
@@ -338,7 +340,8 @@ export class DocView extends ContentView {
       if (!stateChange && sameArray(decorations, this.decorations))
         return {viewport, contentChanges}
       // Compare the decorations (between document changes)
-      let {content, height} = decoChanges(stateChange ? contentChanges : [], decorations, this.decorations, prevDoc)
+      let {content, height} = decoChanges(stateChange ? contentChanges : [], decorations,
+                                          this.decorations, prevDoc)
       this.decorations = decorations
       // Update the heightmap with these changes. If this is the first
       // iteration and the document changed, also include decorations
@@ -520,14 +523,15 @@ export class DocView extends ContentView {
     }
   }
 
-  commitComposition() {
+  commitComposition(changes: A<ChangedRange>): A<ChangedRange> {
     if (this.composing == Composing.starting) {
       clearTimeout(this.composeTimeout)
       this.enterComposition()
     } else if (this.composing == Composing.ending) {
       clearTimeout(this.composeTimeout)
-      this.exitComposition()
+      changes = this.clearComposition(changes)
     }
+    return changes
   }
 
   enterComposition() {
@@ -556,18 +560,27 @@ export class DocView extends ContentView {
     this.composing = this.composition ? Composing.yes : Composing.no
   }
 
-  // FIXME distinguish between stand-alone exit and exit as part of an
-  // update
-  exitComposition() {
+  // Remove this.composition, if present, and set this.composing to
+  // no. Return a range that covers the composition's extent (which'll
+  // have to be redrawn to turn it into regular view nodes) when a
+  // composition was removed.
+  clearComposition(changes: A<ChangedRange>): A<ChangedRange> {
     let composition = this.composition
     this.composition = null
     this.composing = Composing.no
     if (composition && composition.root == this) {
       let from = composition.posAtStart, to = from + composition.length
-      this.observer.ignore(() => {
-        this.updateInner([new ChangedRange(from, to, from, to)], this.text.length, this.visiblePart)
-      })
+      changes = new ChangedRange(from, to, ChangedRange.mapPos(from, -1, changes),
+                                 ChangedRange.mapPos(to, 1, changes)).addToSet(changes.slice())
     }
+    return changes
+  }
+
+  exitComposition() {
+    let ranges = this.clearComposition([])
+    if (ranges.length) this.observer.ignore(() => {
+      this.updateInner(ranges, this.text.length, this.visiblePart)
+    })
   }
 }
 
@@ -703,27 +716,18 @@ function clipPlan(plan: A<ChangedRange>, viewportA: Viewport, viewportB: Viewpor
   return result
 }
 
-function mapThroughChanges(pos: number, bias: number, changes: A<ChangedRange>): number {
-  let off = 0
-  for (let range of changes) {
-    if (pos < range.fromA) return pos + off
-    if (pos <= range.toA) return bias < 0 ? range.fromA : range.toA
-    off = range.toB - range.toA
-  }
-  return pos + off
-}
-
 // Given an old and new set of viewports, find the parts of the new
 // viewports that also appeared in the old, to avoid redrawing those.
 // Returns an array of sub-viewports that has the same length as the
 // list of new viewports.
-function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>, changes: A<ChangedRange>): Viewport[] {
+function findMatchingRanges(viewports: A<Viewport>, prevViewports: A<Viewport>,
+                            changes: A<ChangedRange>): Viewport[] {
   let prevI = 0, result: Viewport[] = []
   outer: for (let viewport of viewports) {
     for (let j = prevI; j < prevViewports.length; j++) {
       let prev = prevViewports[j]
-      if (mapThroughChanges(prev.from, 1, changes) < viewport.to &&
-          mapThroughChanges(prev.to, -1, changes) > viewport.from) {
+      if (ChangedRange.mapPos(prev.from, 1, changes) < viewport.to &&
+          ChangedRange.mapPos(prev.to, -1, changes) > viewport.from) {
         result.push(prev)
         prevI = j + 1
         continue outer
