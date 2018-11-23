@@ -187,6 +187,12 @@ describe("EditorView decoration", () => {
       ist(domSel.focusNode.childNodes[domSel.focusOffset - 1].textContent, "A")
       ist(domSel.focusNode.childNodes[domSel.focusOffset].textContent, "B")
     })
+
+    it("can update widgets in an empty document", () => {
+      let cm = decoEditor("", [w(0, new WordWidget("A"))])
+      cm.dispatch(cm.state.transaction.setMeta(addSlot, [w(0, new WordWidget("B"))]))
+      ist(cm.contentDOM.querySelectorAll("strong").length, 2)
+    })
   })
 
   describe("collapsed", () => {

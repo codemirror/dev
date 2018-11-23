@@ -279,7 +279,7 @@ export class RangeSet<T extends RangeValue> {
       oldPos = range.toA
       newPos = range.toB
     }
-    if (oldPos < this.length || newPos < other.length)
+    if (oldPos < this.length || newPos < other.length || textDiff.length == 0)
       new RangeSetComparison<T>(this, oldPos, other, newPos, newPos + (oldLen - oldPos), comparator).run()
   }
 
