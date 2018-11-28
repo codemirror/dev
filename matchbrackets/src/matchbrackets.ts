@@ -93,7 +93,8 @@ export function matchBrackets(config: Config = {}) {
       return {
         get decorations() { return decorations },
         updateState(v: EditorView) {
-          const refDecos = idx == undefined ? undefined : v.pluginViews[idx].decorations
+          // FIXME cast is muffling a justified TypeScript error
+          const refDecos = idx == undefined ? undefined : (v as any).pluginViews[idx].decorations
           decorations = doMatchBrackets(v.state, refDecos, config)
         }
       }
