@@ -9,14 +9,11 @@ export const enum dirty { not = 0, child = 1, node = 2 }
 const none: any[] = []
 
 export abstract class ContentView {
-  constructor(public parent: ContentView | null, public dom: Node | null) {
-    if (dom) dom.cmView = this
-    if (parent) this.markParentsDirty()
-  }
-
+  parent: ContentView | null = null
+  dom: Node | null = null
+  dirty: number = dirty.node
   abstract length: number
   abstract children: ContentView[]
-  dirty: number = dirty.node
 
   get childGap() { return 0 }
   get overrideDOMText(): ReadonlyArray<string> | null { return null }
@@ -65,7 +62,8 @@ export abstract class ContentView {
     if (this.dirty & dirty.node)
       this.syncDOMChildren()
     if (this.dirty & dirty.child)
-      for (let child of this.children) if (child.dirty) child.sync()
+      for (let child of this.children)
+        if (child.dirty) child.sync()
     this.dirty = dirty.not
   }
 
@@ -135,6 +133,11 @@ export abstract class ContentView {
     }
   }
 
+  setDOM(dom: Node) {
+    this.dom = dom
+    dom.cmView = this
+  }
+
   get root(): ContentView {
     for (let v: ContentView = this;;) {
       let parent = v.parent
@@ -144,9 +147,10 @@ export abstract class ContentView {
   }
 
   replaceChildren(from: number, to: number, children: ContentView[] = none) {
+    this.markDirty()
     for (let i = from; i < to; i++) this.children[i].parent = null
     this.children.splice(from, to - from, ...children)
-    this.markDirty()
+    for (let i = 0; i < children.length; i++) children[i].setParent(this)
   }
 
   ignoreMutation(rec: MutationRecord): boolean { return false }
@@ -157,9 +161,9 @@ export abstract class ContentView {
   }
 
   toString() {
-    return this.constructor.name.replace("View", "") +
-      (this.children.length ? "(" + this.children.join() + ")" :
-       this.length ? "[" + ((this as any).text || this.length) + "]" : "")
+    let name = this.constructor.name.replace("View", "")
+    return name + (this.children.length ? "(" + this.children.join() + ")" :
+                   this.length ? "[" + (name == "Text" ? (this as any).text : this.length) + "]" : "")
   }
 }
 

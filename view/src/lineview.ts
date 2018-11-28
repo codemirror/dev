@@ -1,52 +1,23 @@
 import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView, LineContent, CompositionView} from "./inlineview"
+import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {attrsEq, WidgetType} from "./decoration"
+import {attrsEq, WidgetType, LineDecoration} from "./decoration"
 
 export class LineView extends ContentView {
-  children: InlineView[]
+  children: InlineView[] = []
   widgets: LineWidget[] = none
-  length: number
-  dom!: HTMLElement
+  length: number = 0
+  dom!: HTMLElement | null
   prevAttrs: {[name: string]: string} | null | undefined = undefined
   attrs: {[name: string]: string} | null = null
 
-  constructor(parent: DocView, content?: LineContent, tail?: InlineView[]) {
-    super(parent, document.createElement("div"))
-    this.length = 0
-    this.children = []
-    if (content) this.update(0, 0, content, tail)
-  }
+  // Consumes source
+  merge(from: number, to: number = this.length, source: LineView, takeDeco: boolean) {
+    if (takeDeco) this.setDeco(source)
+    if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
 
-  setDeco(content: LineContent) {
-    if (!attrsEq(this.attrs, content.attrs)) {
-      this.prevAttrs = this.attrs
-      this.attrs = content.attrs
-      this.markDirty()
-    }
-    // Reconcile the new widgets with the existing ones
-    for (let i = 0, j = 0;;) {
-      let a = i == this.widgets.length ? null : this.widgets[i]
-      let b = j == content.widgets.length ? null : content.widgets[j]
-      if (!a && !b) break
-      if (a && b && a.eq(b)) {
-        i++; j++
-      } else if (!a || (b && b.side <= a.side)) {
-        if (this.widgets == none) this.widgets = []
-        this.widgets.splice(i++, 0, b!.finish())
-        this.parent!.markDirty()
-        j++
-      } else {
-        this.widgets.splice(i, 1)
-        this.parent!.markDirty()
-      }
-    }
-  }
-
-  update(from: number, to: number = this.length, content: LineContent, tail?: InlineView[]) {
-    if (from == 0) this.setDeco(content)
-    let elts = tail ? InlineView.appendInline(content.elements, tail) : content.elements
+    let elts = source.children
     let cur = new ChildCursor(this.children, this.length)
     let {i: toI, off: toOff} = cur.findPos(to, 1)
     let {i: fromI, off: fromOff} = cur.findPos(from, -1)
@@ -105,28 +76,86 @@ export class LineView extends ContentView {
     }
 
     // And if anything remains, splice the child array to insert the new elts
-    if (elts.length || fromI != toI) {
-      for (let view of elts) view.setParent(this)
-      this.replaceChildren(fromI, toI, elts)
+    if (elts.length || fromI != toI) this.replaceChildren(fromI, toI, elts)
+  }
+
+  split(at: number) {
+    let end = new LineView
+    if (this.length == 0) return end
+    let {i, off} = new ChildCursor(this.children, this.length).findPos(at)
+    if (off) {
+      end.append(this.children[i].slice(off))
+      this.children[i].cut(off)
+      i++
+    }
+    for (let j = i; j < this.children.length; j++) end.append(this.children[j])
+    this.children.length = i
+    this.markDirty()
+    this.length = at
+    return end
+  }
+
+  transferDOM(other: LineView) {
+    if (!this.dom) return
+    other.setDOM(this.dom)
+    other.prevAttrs = this.prevAttrs === undefined ? this.attrs : this.prevAttrs
+    this.dom = null
+  }
+
+  setDeco(source: LineView) {
+    if (!attrsEq(this.attrs, source.attrs)) {
+      if (this.dom) {
+        this.prevAttrs = this.attrs
+        this.markDirty()
+      }
+      this.attrs = source.attrs
+    }
+    // Reconcile the new widgets with the existing ones
+    for (let i = 0, j = 0;;) {
+      let a = i == this.widgets.length ? null : this.widgets[i]
+      let b = j == source.widgets.length ? null : source.widgets[j]
+      if (!a && !b) break
+      if (a && b && a.eq(b)) {
+        i++; j++
+      } else if (!a || (b && b.side <= a.side)) {
+        if (this.widgets == none) this.widgets = []
+        this.widgets.splice(i++, 0, b!.finish())
+        this.parent!.markDirty()
+        j++
+      } else {
+        this.widgets.splice(i, 1)
+        this.parent!.markDirty()
+      }
     }
   }
 
-  detachTail(from: number): InlineView[] {
-    let result: InlineView[] = []
-    if (this.length == 0) return result
-    let {i, off} = new ChildCursor(this.children, this.length).findPos(from)
-    if (off > 0) {
-      let child = this.children[i]
-      result.push(child.slice(off))
-      child.cut(off)
-      i++
+  // Only called when building a line view in ContentBuilder
+  append(child: InlineView) {
+    this.children.push(child)
+    child.setParent(this)
+    this.length += child.length
+  }
+
+  // Only called when building a line view in ContentBuilder
+  addLineDeco(deco: LineDecoration) {
+    let attrs = deco.spec.attributes
+    if (attrs) {
+      if (!this.attrs) this.attrs = {}
+      for (let name in attrs) {
+        if (name == "class" && Object.prototype.hasOwnProperty.call(this.attrs, "class"))
+          this.attrs.class += " " + attrs.class
+        else if (name == "style" && Object.prototype.hasOwnProperty.call(this.attrs, "style"))
+          this.attrs.style += ";" + attrs.style
+        else
+          this.attrs[name] = attrs[name]
+      }
     }
-    if (i < this.children.length) {
-      for (let j = i; j < this.children.length; j++) result.push(this.children[j])
-      this.replaceChildren(i, this.children.length)
+    if (deco.widget) {
+      if (this.widgets == none) this.widgets = []
+      let pos = 0
+      while (pos < this.widgets.length && this.widgets[pos].side <= deco.side) pos++
+      this.widgets.splice(pos, 0, new LineWidget(deco.widget, deco.side))
     }
-    this.length = from
-    return result
   }
 
   domFromPos(pos: number): {node: Node, offset: number} {
@@ -136,10 +165,15 @@ export class LineView extends ContentView {
       if (textDOM) return {node: textDOM, offset: off}
     }
     while (i > 0 && (this.children[i - 1].getSide() > 0 || this.children[i - 1].dom!.parentNode != this.dom)) i--
-    return {node: this.dom, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
+    return {node: this.dom!, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
   }
 
   syncInto(parent: HTMLElement, pos: Node | null): Node | null {
+    if (!this.dom) {
+      this.setDOM(document.createElement("div"))
+      if (this.attrs) this.prevAttrs = null
+      for (let w of this.widgets) if (!w.dom) w.finish()
+    }
     for (let i = 0, main = false;; i++) {
       let widget = i == this.widgets.length ? null : this.widgets[i]
       if (!main && (!widget || widget.side > 0)) {
@@ -158,15 +192,15 @@ export class LineView extends ContentView {
   sync() {
     super.sync()
     if (this.prevAttrs !== undefined) {
-      removeAttrs(this.dom, this.prevAttrs)
-      setAttrs(this.dom, this.attrs)
+      removeAttrs(this.dom!, this.prevAttrs)
+      setAttrs(this.dom!, this.attrs)
       this.prevAttrs = undefined
     }
-    let last = this.dom.lastChild
+    let last = this.dom!.lastChild
     if (!last || last.nodeName == "BR") {
       let hack = document.createElement("BR")
       hack.cmIgnore = true
-      this.dom.appendChild(hack)
+      this.dom!.appendChild(hack)
     }
   }
 
@@ -179,23 +213,23 @@ export class LineView extends ContentView {
       if (rects.length != 1) return null
       totalWidth += rects[0].width
     }
-    return {lineHeight: this.dom.getBoundingClientRect().height,
+    return {lineHeight: this.dom!.getBoundingClientRect().height,
             charWidth: totalWidth / this.length}
   }
 
   coordsAt(pos: number): Rect | null {
-    if (this.length == 0) return (this.dom.lastChild as HTMLElement).getBoundingClientRect()
+    if (this.length == 0) return (this.dom!.lastChild as HTMLElement).getBoundingClientRect()
     return super.coordsAt(pos)
   }
 
   // Ignore mutations in line widgets
   ignoreMutation(rec: MutationRecord): boolean {
-    return !this.dom.contains(rec.target.nodeType == 1 ? rec.target : rec.target.parentNode!)
+    return !this.dom!.contains(rec.target.nodeType == 1 ? rec.target : rec.target.parentNode!)
   }
 
   // Find the appropriate widget, and ask it whether an event needs to be ignored
   ignoreEvent(event: Event): boolean {
-    if (this.widgets.length == 0 || this.dom.contains(event.target as Node)) return false
+    if (this.widgets.length == 0 || this.dom!.contains(event.target as Node)) return false
     for (let widget of this.widgets)
       if (widget.dom!.contains(event.target as Node))
         return widget.widget.ignoreEvent(event)
@@ -211,7 +245,7 @@ export class LineView extends ContentView {
       if (found > -1) { index = found + 1; break }
       prev = prev.previousSibling
     }
-    let view = new CompositionView(this, dom, textNode, 0)
+    let view = new CompositionView(dom, textNode, 0)
     this.replaceChildren(index, index, [view])
     return view
   }

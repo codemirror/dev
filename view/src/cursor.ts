@@ -315,7 +315,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   // No luck, do our own (potentially expensive) search
   if (!node) {
     let {line} = LineContext.get(view, lineStart)!
-    ;({node, offset} = domPosAtCoords(line.dom, x, y))
+    ;({node, offset} = domPosAtCoords(line.dom!, x, y))
   }
   return view.docView.posFromDOM(node, offset)
 }

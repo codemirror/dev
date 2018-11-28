@@ -234,6 +234,7 @@ describe("EditorView decoration", () => {
 
     it("updates when line attributes are added", () => {
       let cm = decoEditor("foo\nbar", [l(0, "a")])
+      console.log("----")
       cm.dispatch(cm.state.transaction.setMeta(addSlot, [l(0, "b"), l(4, "c")]))
       classes(cm, "a b", "c")
     })
@@ -241,7 +242,8 @@ describe("EditorView decoration", () => {
     it("updates when line attributes are removed", () => {
       let ds = [l(0, "a"), l(0, "b"), l(4, "c")]
       let cm = decoEditor("foo\nbar", ds)
-      cm.dispatch(cm.state.transaction.setMeta(filterSlot, (_f: number, _t: number, deco: Decoration) => !ds.slice(1).some(r => r.value == deco)))
+      cm.dispatch(cm.state.transaction.setMeta(
+        filterSlot, (_f: number, _t: number, deco: Decoration) => !ds.slice(1).some(r => r.value == deco)))
       classes(cm, "a", "")
     })
 

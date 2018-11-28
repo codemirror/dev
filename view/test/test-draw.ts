@@ -47,6 +47,12 @@ describe("EditorView drawing", () => {
     ist(domText(cm), doc)
   })
 
+  it("can split a line", () => {
+    let cm = tempEditor("abc\ndef\nghi")
+    cm.dispatch(cm.state.transaction.replace(4, 4, "xyz\nk"))
+    ist(domText(cm), "abc\nxyz\nkdef\nghi")
+  })
+
   it("redraws lazily", () => {
     let cm = tempEditor("one\ntwo\nthree")
     let line0 = cm.domAtPos(0)!.node, line1 = line0.nextSibling!, line2 = line1.nextSibling!

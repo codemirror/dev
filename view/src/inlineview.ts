@@ -1,8 +1,7 @@
 import {ContentView, dirty} from "./contentview"
-import {WidgetType, attrsEq, DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration} from "./decoration"
-import {LineWidget, LineView} from "./lineview"
-import {Text, TextIterator} from "../../doc/src"
-import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
+import {WidgetType, attrsEq} from "./decoration"
+import {LineView} from "./lineview"
+import {Text} from "../../doc/src"
 import {Rect} from "./dom"
 import browser from "./browser"
 
@@ -36,7 +35,7 @@ export class TextView extends InlineView {
               public tagName: string | null,
               clss: string | null,
               public attrs: {[key: string]: string} | null) {
-    super(null, null)
+    super()
     this.class = clss
   }
 
@@ -46,14 +45,14 @@ export class TextView extends InlineView {
       if (!tagName && pos && pos.nodeType == 3 && !nodeAlreadyInTree(this, pos)) this.textDOM = pos
       else this.textDOM = document.createTextNode(this.text)
       if (tagName) {
-        this.dom = document.createElement(tagName)
-        this.dom.appendChild(this.textDOM)
-        if (this.class) (this.dom as HTMLElement).className = this.class
-        if (this.attrs) for (let name in this.attrs) (this.dom as HTMLElement).setAttribute(name, this.attrs[name])
+        let dom = document.createElement(tagName)
+        dom.appendChild(this.textDOM)
+        if (this.class) dom.className = this.class
+        if (this.attrs) for (let name in this.attrs) dom.setAttribute(name, this.attrs[name])
+        this.setDOM(dom)
       } else {
-        this.dom = this.textDOM
+        this.setDOM(this.textDOM)
       }
-      this.dom.cmView = this
     }
     return super.syncInto(parent, pos)
   }
@@ -104,10 +103,11 @@ export class TextView extends InlineView {
   coordsAt(pos: number): Rect { return textCoords(this.textDOM!, pos) }
 
   toCompositionView() {
-    let parent = this.parent!, view = new CompositionView(parent, this.dom!, this.textDOM!, this.length)
+    let parent = this.parent!, view = new CompositionView(this.dom!, this.textDOM!, this.length)
     this.markParentsDirty()
     let parentIndex = parent.children.indexOf(this)
     return parent.children[parentIndex] = view
+    view.setParent(parent)
   }
 }
 
@@ -134,14 +134,13 @@ export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
   constructor(public length: number, readonly widget: WidgetType<any> | null, readonly side: number) {
-    super(null, null)
+    super()
   }
 
   syncInto(parent: HTMLElement, pos: Node | null): Node | null {
     if (!this.dom) {
-      this.dom = this.widget ? this.widget.toDOM() : document.createElement("span")
-      this.dom.contentEditable = "false"
-      this.dom.cmView = this
+      this.setDOM(this.widget ? this.widget.toDOM() : document.createElement("span"))
+      this.dom!.contentEditable = "false"
     }
     return super.syncInto(parent, pos)
   }
@@ -183,8 +182,9 @@ export class WidgetView extends InlineView {
 }
 
 export class CompositionView extends InlineView {
-  constructor(parent: ContentView, dom: Node, public textDOM: Node, public length: number) {
-    super(parent, dom)
+  constructor(dom: Node, public textDOM: Node, public length: number) {
+    super()
+    this.setDOM(dom)
   }
 
   updateLength(newLen: number) {
@@ -205,139 +205,6 @@ export class CompositionView extends InlineView {
   }
 
   coordsAt(pos: number): Rect { return textCoords(this.textDOM, pos) }
-}
-
-export class LineContent {
-  elements: InlineView[] = []
-  attrs: null | {[attr: string]: string} = null
-  widgets: LineWidget[] = none
-  constructor(public atStart: boolean = true) {}
-
-  add(inline: InlineView) {
-    this.elements.push(inline)
-    if (this.atStart && inline instanceof TextView) this.atStart = false
-  }
-
-  addLineDeco(deco: LineDecoration) {
-    let attrs = deco.spec.attributes
-    if (attrs) {
-      if (!this.attrs) this.attrs = {}
-      for (let name in attrs) {
-        if (name == "class" && Object.prototype.hasOwnProperty.call(this.attrs, "class"))
-          this.attrs.class += " " + attrs.class
-        else if (name == "style" && Object.prototype.hasOwnProperty.call(this.attrs, "style"))
-          this.attrs.style += ";" + attrs.style
-        else
-          this.attrs[name] = attrs[name]
-      }
-    }
-    if (deco.widget) {
-      if (this.widgets == none) this.widgets = []
-      let pos = 0
-      while (pos < this.widgets.length && this.widgets[pos].side <= deco.side) pos++
-      this.widgets.splice(pos, 0, new LineWidget(deco.widget, deco.side))
-    }
-  }
-}
-
-export class InlineBuilder implements RangeIterator<Decoration> {
-  lines: LineContent[]
-  cursor: TextIterator
-  text: string = ""
-  skip: number
-  textOff: number = 0
-
-  constructor(text: Text, public pos: number) {
-    this.cursor = text.iter()
-    this.skip = pos
-    this.lines = [new LineContent(text.lineAt(pos).start == pos)]
-  }
-
-  buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null, ranges: Decoration[]) {
-    while (length > 0) {
-      if (this.textOff == this.text.length) {
-        let {value, lineBreak, done} = this.cursor.next(this.skip)
-        this.skip = 0
-        if (done) throw new Error("Ran out of text content when drawing inline views")
-        if (lineBreak) {
-          this.lines.push(new LineContent)
-          length--
-          continue
-        } else {
-          this.text = value
-          this.textOff = 0
-        }
-      }
-      let take = Math.min(this.text.length - this.textOff, length)
-      this.curLine.add(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
-      length -= take
-      this.textOff += take
-    }
-  }
-
-  advance(pos: number, active: Decoration[]) {
-    if (pos <= this.pos) return
-
-    let tagName = null, clss = null
-    let attrs: {[key: string]: string} | null = null
-    for (let {spec} of active as RangeDecoration[]) {
-      if (spec.tagName) tagName = spec.tagName
-      if (spec.class) clss = clss ? clss + " " + spec.class : spec.class
-      if (spec.attributes) for (let name in spec.attributes) {
-        let value = spec.attributes[name]
-        if (value == null) continue
-        if (name == "class") {
-          clss = clss ? clss + " " + value : value
-        } else {
-          if (!attrs) attrs = {}
-          if (name == "style" && attrs.style) value = attrs.style + ";" + value
-          attrs[name] = value
-        }
-      }
-    }
-
-    this.buildText(pos - this.pos, tagName, clss, attrs, active)
-    this.pos = pos
-  }
-
-  advanceCollapsed(pos: number, deco: Decoration) {
-    if (pos <= this.pos) return
-
-    let line = this.curLine
-    let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
-    if (!line.elements.length || !line.elements[line.elements.length - 1].merge(widgetView))
-      line.add(widgetView)
-
-    // Advance the iterator past the collapsed content
-    let length = pos - this.pos
-    if (this.textOff + length <= this.text.length) {
-      this.textOff += length
-    } else {
-      this.skip += length - (this.text.length - this.textOff)
-      this.text = ""
-      this.textOff = 0
-    }
-
-    this.pos = pos
-  }
-
-  point(deco: Decoration) {
-    if (deco instanceof WidgetDecoration)
-      this.curLine.add(new WidgetView(0, deco.widget, deco.bias))
-    else if (this.curLine.atStart)
-      this.curLine.addLineDeco(deco as LineDecoration)
-  }
-
-  get curLine() { return this.lines[this.lines.length - 1] }
-
-  ignoreRange(deco: RangeDecoration): boolean { return false }
-  ignorePoint(deco: Decoration): boolean { return false }
-
-  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineContent[] {
-    let builder = new InlineBuilder(text, from)
-    RangeSet.iterateSpans(decorations, from, to, builder)
-    return builder.lines
-  }
 }
 
 function nodeAlreadyInTree(view: ContentView, node: Node): boolean {
