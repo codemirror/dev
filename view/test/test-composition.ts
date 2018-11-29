@@ -14,22 +14,29 @@ function up(node: Text, text: string = "", from = node.nodeValue!.length, to = f
   return node
 }
 
-function compose(cm: EditorView, start: () => Text, f: ((node: Text) => void)[], end?: (node: Text) => void) {
+function compose(cm: EditorView, start: () => Text,
+                 update: ((node: Text) => void)[],
+                 options: {end?: (node: Text) => void, cancel?: boolean} = {}) {
   event(cm, "compositionstart")
   let node!: Text, sel = document.getSelection()!
-  for (let i = -1; i < f.length; i++) {
+  for (let i = -1; i < update.length; i++) {
     if (i < 0) node = start()
-    else f[i](node)
+    else update[i](node)
     let {focusNode, focusOffset} = sel
     cm.docView.observer.flush()
-    ist(node.parentNode && cm.contentDOM.contains(node.parentNode))
-    ist(sel.focusNode, focusNode)
-    ist(sel.focusOffset, focusOffset)
-    ist(cm.docView.composition)
-    ist(hasCompositionNode(cm.docView))
+    if (options.cancel && i == update.length - 1) {
+      ist(!cm.docView.composition)
+      ist(!hasCompositionNode(cm.docView))
+    } else {
+      ist(node.parentNode && cm.contentDOM.contains(node.parentNode))
+      ist(sel.focusNode, focusNode)
+      ist(sel.focusOffset, focusOffset)
+      ist(cm.docView.composition)
+      ist(hasCompositionNode(cm.docView))
+    }
   }
   event(cm, "compositionend")
-  if (end) end(node)
+  if (options.end) options.end(node)
   cm.docView.observer.flush()
   if (cm.docView.composing != 0) cm.docView.exitComposition() // FIXME too much internals!
   ist(!cm.docView.composition)
@@ -126,12 +133,12 @@ describe("Composition", () => {
     compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
       n => up(n, "x", 3),
       n => up(n, "y", 4)
-    ], n => {
+    ], {end: n => {
       let line = n.parentNode!.appendChild(document.createElement("div"))
       line.textContent = "def"
       n.nodeValue = "abcxy"
       document.getSelection()!.collapse(line, 0)
-    })
+    }})
     ist(cm.state.doc.toString(), "abcxy\ndef")
   })
 
@@ -166,11 +173,11 @@ describe("Composition", () => {
     compose(cm, () => up(cm.domAtPos(5)!.node as Text, "a"), [
       n => up(n, "b"),
       n => up(n, "c")
-    ], n => {
+    ], {end: n => {
       ;(n.parentNode!.previousSibling! as ChildNode).remove()
       ;(n.parentNode!.previousSibling! as ChildNode).remove()
       return up(n, "xyzone ", 0)
-    })
+    }})
     ist(cm.state.doc.toString(), "xyzone twoabc")
   })
 
@@ -179,17 +186,45 @@ describe("Composition", () => {
     compose(cm, () => {
       let l0 = cm.domAtPos(0)!.node
       return up(l0.insertBefore(document.createTextNode("a"), l0.lastChild))
-    }, [n => up(n, "b", 0, 1)], () => {
+    }, [n => up(n, "b", 0, 1)], {end: () => {
       ist(cm.contentDOM.querySelectorAll("var").length, 2)
-    })
+    }})
     ist(cm.state.doc.toString(), "b")
   })
 
-  // FIXME test widgets next to compositions
+  it("cancels composition when a change fully overlaps with it", () => {
+    let cm = requireFocus(tempEditor("one\ntwo\nthree"))
+    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x"), [
+      () => cm.dispatch(cm.state.transaction.replace(2, 10, "---"))
+    ], {cancel: true})
+    ist(cm.state.doc.toString(), "on---hree")
+  })
 
-  // FIXME test changes that override compositions
+  it("cancels composition when a change partially overlaps with it", () => {
+    let cm = requireFocus(tempEditor("one\ntwo\nthree"))
+    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
+      () => cm.dispatch(cm.state.transaction.replace(5, 12, "---"))
+    ], {cancel: true})
+    ist(cm.state.doc.toString(), "one\nx---ee")
+  })
+
+  it("cancels composition when a change happens inside of it", () => {
+    let cm = requireFocus(tempEditor("one\ntwo\nthree"))
+    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
+      () => cm.dispatch(cm.state.transaction.replace(5, 6, "!"))
+    ], {cancel: true})
+    ist(cm.state.doc.toString(), "one\nx!wo\nthree")
+  })
+
+  it("doesn't cancel composition when a change happens elsewhere", () => {
+    let cm = requireFocus(tempEditor("one\ntwo\nthree"))
+    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
+      n => up(n, "y", 1),
+      () => cm.dispatch(cm.state.transaction.replace(1, 2, "!")),
+      n => up(n, "z", 2)
+    ])
+    ist(cm.state.doc.toString(), "o!e\nxyztwo\nthree")
+  })
 
   // FIXME test compositions rapidly following each other
-
-  // FIXME look into corner cases that could crash this
 })

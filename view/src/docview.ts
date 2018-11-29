@@ -131,22 +131,23 @@ export class DocView extends ContentView {
     let compositionRange = null
     if (this.composition && this.composition.root == this) {
       let from = this.composition.posAtStart, to = from + this.composition.length
+      let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
       let lineFrom = this.composition.parent!.posAtStart
       if (changes.length == 0 || changes.length == 1 &&
-          changes[0].fromA >= from && changes[0].toA <= to) {
-        // The change falls entirely inside the composition
-        // FIXME verify that this was a DOM change—if it's external, we should use the bottom case instead
+          changes[0].fromA >= from && changes[0].toA <= to &&
+          this.composition.textDOM.nodeValue == this.text.slice(newFrom, newTo)) {
+        // No change, or the change falls entirely inside the
+        // composition and the new text corresponds to what the
+        // composition DOM contains
         compositionRange = new ChangedRange(from, to, from, to + (changes.length ? changes[0].lenDiff : 0))
       } else if (changes.every(ch => ch.fromA >= to || ch.toA < lineFrom ||
                                (ch.toA <= from && this.text.lineAt(ch.fromB).end > ch.toB))) {
         // Entirely outside, and not introducing a line break directly before
-        let newFrom = ChangedRange.mapPos(from, 1, changes)
         compositionRange = new ChangedRange(from, to, newFrom, newFrom + (to - from))
       } else {
         // Overlaps with the composition, must make sure it is
         // overwritten so that we get rid of the node
-        changes = new ChangedRange(from, to, ChangedRange.mapPos(from, -1, changes),
-                                   ChangedRange.mapPos(to, 1, changes)).addToSet(changes.slice())
+        changes = new ChangedRange(from, to, newFrom, newTo).addToSet(changes.slice())
         this.composition = null
       }
     }

@@ -240,7 +240,7 @@ export class ChangedRange {
     let off = 0
     for (let range of changes) {
       if (pos < range.fromA) return pos + off
-      if (pos <= range.toA) return bias < 0 ? range.fromA : range.toA
+      if (pos <= range.toA) return bias < 0 ? range.fromB : range.toB
       off = range.toB - range.toA
     }
     return pos + off
