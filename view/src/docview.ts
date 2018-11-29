@@ -521,12 +521,16 @@ export class DocView extends ContentView {
   }
 
   startComposition() {
+    if (this.composing == Composing.ending) {
+      this.observer.flush()
+      if (this.composing == Composing.ending) {
+        clearTimeout(this.composeTimeout)
+        this.exitComposition()
+      }
+    }
     if (this.composing == Composing.no) {
       this.composing = Composing.starting
       this.composeTimeout = setTimeout(() => this.enterComposition(), 20)
-    } else if (this.composing == Composing.ending) {
-      clearTimeout(this.composeTimeout)
-      this.composing = Composing.yes
     }
   }
 

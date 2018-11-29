@@ -226,5 +226,23 @@ describe("Composition", () => {
     ist(cm.state.doc.toString(), "o!e\nxyztwo\nthree")
   })
 
-  // FIXME test compositions rapidly following each other
+  it("handles compositions rapidly following each other", () => {
+    let cm = requireFocus(tempEditor("one\ntwo"))
+    event(cm, "compositionstart")
+    let one = cm.domAtPos(1)!.node as Text
+    up(one, "!")
+    cm.docView.observer.flush()
+    event(cm, "compositionend")
+    one.nodeValue = "one!!"
+    event(cm, "compositionstart")
+    let two = cm.domAtPos(7)!.node as Text
+    up(two, ".")
+    cm.docView.observer.flush()
+    ist(hasCompositionNode(cm.docView))
+    ist(cm.docView.composition)
+    up(two, ".")
+    event(cm, "compositionend")
+    cm.docView.observer.flush()
+    ist(cm.state.doc.toString(), "one!!\ntwo..")
+  })
 })
