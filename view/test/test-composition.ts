@@ -234,13 +234,15 @@ describe("Composition", () => {
     cm.docView.observer.flush()
     event(cm, "compositionend")
     one.nodeValue = "one!!"
-    event(cm, "compositionstart")
     let two = cm.domAtPos(7)!.node as Text
     up(two, ".")
+    event(cm, "compositionstart")
+    up(two, ".")
     cm.docView.observer.flush()
+    ist(getSelection().focusNode, two)
+    ist(getSelection().focusOffset, 5)
     ist(hasCompositionNode(cm.docView))
     ist(cm.docView.composition)
-    up(two, ".")
     event(cm, "compositionend")
     cm.docView.observer.flush()
     ist(cm.state.doc.toString(), "one!!\ntwo..")
