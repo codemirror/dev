@@ -1,5 +1,5 @@
 import {ContentView, dirty} from "./contentview"
-import {WidgetType, attrsEq} from "./decoration"
+import {WidgetType, attrsEq, widgetsEq} from "./decoration"
 import {LineView} from "./lineview"
 import {Text} from "../../doc/src"
 import {Rect} from "./dom"
@@ -9,6 +9,7 @@ const none: any[] = []
 
 export abstract class InlineView extends ContentView {
   merge(other: InlineView, from?: number, to?: number) { return false }
+  match(other: InlineView) { return false }
   get children() { return none }
   abstract cut(from: number, to?: number): void
   abstract slice(from: number, to?: number): InlineView
@@ -157,6 +158,11 @@ export class WidgetView extends InlineView {
     if (!(other instanceof WidgetView) || this.widget || other.widget) return false
     this.length = from + other.length + (this.length - to)
     return true
+  }
+
+  match(other: InlineView): boolean {
+    return other.length == this.length && other instanceof WidgetView &&
+      widgetsEq(this.widget, other.widget)
   }
 
   ignoreMutation(): boolean { return true }

@@ -60,11 +60,11 @@ export class LineView extends ContentView {
 
     // Then try to merge any mergeable nodes at the start and end of
     // the changed range
-    while (fromI < toI && elts.length && this.children[toI - 1].merge(elts[elts.length - 1])) {
+    while (fromI < toI && elts.length && this.children[toI - 1].match(elts[elts.length - 1])) {
       elts.pop()
       toI--
     }
-    while (fromI < toI && elts.length && this.children[fromI].merge(elts[0])) {
+    while (fromI < toI && elts.length && this.children[fromI].match(elts[0])) {
       elts.shift()
       fromI++
     }
