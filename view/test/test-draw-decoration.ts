@@ -188,6 +188,13 @@ describe("EditorView decoration", () => {
       ist(domSel.focusNode.childNodes[domSel.focusOffset].textContent, "B")
     })
 
+    it("preserves widgets alongside edits regardless of side", () => {
+      let cm = decoEditor("abc", [w(1, new WordWidget("x"), -1), w(1, new WordWidget("y"), 1),
+                                  w(2, new WordWidget("z"), -1), w(2, new WordWidget("q"), 1)])
+      cm.dispatch(cm.state.transaction.replace(1, 2, "B"))
+      ist(cm.contentDOM.textContent, "axyBzqc")
+    })
+
     it("can update widgets in an empty document", () => {
       let cm = decoEditor("", [w(0, new WordWidget("A"))])
       cm.dispatch(cm.state.transaction.setMeta(addSlot, [w(0, new WordWidget("B"))]))
@@ -234,7 +241,6 @@ describe("EditorView decoration", () => {
 
     it("updates when line attributes are added", () => {
       let cm = decoEditor("foo\nbar", [l(0, "a")])
-      console.log("----")
       cm.dispatch(cm.state.transaction.setMeta(addSlot, [l(0, "b"), l(4, "c")]))
       classes(cm, "a b", "c")
     })

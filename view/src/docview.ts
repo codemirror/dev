@@ -129,7 +129,7 @@ export class DocView extends ContentView {
     viewports.sort((a, b) => a.from - b.from)
 
     let compositionRange = null
-    if (this.composition) {
+    if (this.composition && this.composition.root == this) {
       let from = this.composition.posAtStart, to = from + this.composition.length
       let lineFrom = this.composition.parent!.posAtStart
       if (changes.length == 0 || changes.length == 1 &&
@@ -171,6 +171,7 @@ export class DocView extends ContentView {
   private updateParts(changes: A<ChangedRange>, viewports: A<Viewport>, compositionRange: ChangedRange | null,
                       oldLength: number) {
     let unchanged = unchangedText(this.viewports, viewports, changes, this.length)
+    if (compositionRange) compositionRange.addToSet(unchanged)
     let cursor = new ChildCursor(this.children, oldLength, 1)
     for (let i = unchanged.length - 1, endB = this.length, endA = oldLength;; i--) {
       let next = i < 0 ? null : unchanged[i]
@@ -194,9 +195,16 @@ export class DocView extends ContentView {
         // view, reuse that to avoid a needless DOM reset.
         if (fromOff == -1 && this.children[fromI] instanceof LineView && content[0] instanceof LineView)
           fromOff = 0
+        if (toOff == -1 && toI > 0 && this.children[toI - 1] instanceof LineView &&
+            content[content.length - 1] instanceof LineView)
+          toOff = this.children[--toI].length
         this.replaceRange(fromI, fromOff, toI, toOff, content)
       }
       if (!next) break
+      if (compositionRange && compositionRange.fromA <= next.toA && compositionRange.toA >= next.fromA) {
+        cursor.findPos(startA) // Must move cursor past the stuff we modify
+        this.composition!.updateLength(compositionRange.toB - compositionRange.fromB)
+      }
       endA = next.fromA; endB = next.fromB
     }
   }

@@ -83,7 +83,7 @@ describe("Composition", () => {
     ist(cm.state.doc.toString(), "foo\nabc\nbar")
   })
 
-  it("supports composition at end of line", () => {
+  it("supports composition at end of line in existing node", () => {
     let cm = requireFocus(tempEditor("foo"))
     compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
       n => up(n, "!"),

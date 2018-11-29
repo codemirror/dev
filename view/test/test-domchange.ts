@@ -123,7 +123,6 @@ describe("DOM changes", () => {
       decorations: Decoration.set(Decoration.range(1, 3, {collapsed: true})),
       updateState() { (this as any).decorations = null }
     })})])
-    console.log(cm.contentDOM.innerHTML, cm.docView + "")
     cm.domAtPos(0)!.node.firstChild!.textContent = "x"
     flush(cm)
     ist(cm.state.doc.toString(), "xbcd")

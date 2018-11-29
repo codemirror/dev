@@ -10,8 +10,8 @@ const none: any[] = []
 export abstract class InlineView extends ContentView {
   merge(other: InlineView, from?: number, to?: number) { return false }
   get children() { return none }
-  cut(from: number, to?: number) { throw "Not implemented" }
-  slice(from: number, to?: number): InlineView { throw "Not implemented" }
+  abstract cut(from: number, to?: number): void
+  abstract slice(from: number, to?: number): InlineView
   getSide() { return 0 }
 
   static appendInline(a: InlineView[], b: InlineView[]): InlineView[] {
@@ -106,8 +106,9 @@ export class TextView extends InlineView {
     let parent = this.parent!, view = new CompositionView(this.dom!, this.textDOM!, this.length)
     this.markParentsDirty()
     let parentIndex = parent.children.indexOf(this)
-    return parent.children[parentIndex] = view
+    parent.children[parentIndex] = view
     view.setParent(parent)
+    return view
   }
 }
 
@@ -190,6 +191,15 @@ export class CompositionView extends InlineView {
   updateLength(newLen: number) {
     if (this.parent) (this.parent as LineView).length += newLen - this.length
     this.length = newLen
+  }
+
+  cut(from: number, to: number = this.length) {
+    if (from != to || from > 0 && from < this.length)
+      throw new Error("bug: Cutting a composition node")
+  }
+
+  slice(from: number, to: number = this.length): InlineView {
+    throw new Error("bug: Called slice on a composition node")
   }
 
   sync() {}
