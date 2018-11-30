@@ -132,7 +132,6 @@ export class DocView extends ContentView {
     if (this.composition && this.composition.root == this) {
       let from = this.composition.posAtStart, to = from + this.composition.length
       let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
-      let lineFrom = this.composition.parent!.posAtStart
       if (changes.length == 0 || changes.length == 1 &&
           changes[0].fromA >= from && changes[0].toA <= to &&
           this.composition.textDOM.nodeValue == this.text.slice(newFrom, newTo)) {
@@ -140,9 +139,8 @@ export class DocView extends ContentView {
         // composition and the new text corresponds to what the
         // composition DOM contains
         compositionRange = new ChangedRange(from, to, from, to + (changes.length ? changes[0].lenDiff : 0))
-      } else if (changes.every(ch => ch.fromA >= to || ch.toA < lineFrom ||
-                               (ch.toA <= from && this.text.lineAt(ch.fromB).end > ch.toB))) {
-        // Entirely outside, and not introducing a line break directly before
+      } else if (changes.every(ch => ch.fromA >= to || ch.toA <= from)) {
+        // Entirely outside
         compositionRange = new ChangedRange(from, to, newFrom, newFrom + (to - from))
       } else {
         // Overlaps with the composition, must make sure it is
@@ -171,42 +169,45 @@ export class DocView extends ContentView {
 
   private updateParts(changes: A<ChangedRange>, viewports: A<Viewport>, compositionRange: ChangedRange | null,
                       oldLength: number) {
-    let unchanged = unchangedText(this.viewports, viewports, changes, this.length)
-    if (compositionRange) compositionRange.addToSet(unchanged)
+    let redraw = rangesToUpdate(this.viewports, viewports, changes, this.length)
+    if (compositionRange) compositionRange.subtractFromSet(redraw)
     let cursor = new ChildCursor(this.children, oldLength, 1)
-    for (let i = unchanged.length - 1, endB = this.length, endA = oldLength;; i--) {
-      let next = i < 0 ? null : unchanged[i]
-      let startA = next ? next.toA : 0, startB = next ? next.toB : 0
-      if (startA < endA || startB < endB || changes.some(ch => startB <= ch.toB && endB >= ch.fromB)) {
-        let fromI, fromOff, toI: number, toOff
-        if (i == unchanged.length - 1) { toI = this.children.length; toOff = -1 }
-        else ({i: toI, off: toOff} = cursor.findPos(endA))
-        if (i < 0) { fromI = 0; fromOff = -1 }
-        else ({i: fromI, off: fromOff} = cursor.findPos(startA))
-        let searchGap = fromI, content = this.contentBetween(startB, endB, viewports, (from, to) => {
-          let height = this.heightAt(to, 1) - this.heightAt(from, -1)
-          while (searchGap < toI) {
-            let ch = this.children[searchGap++]
-            if (ch instanceof GapView) return ch.update(to - from, height)
-          }
-          return new GapView(to - from, height)
-        })
-        // If the range starts at the start of the document but both
-        // the current content and the new content start with a line
-        // view, reuse that to avoid a needless DOM reset.
-        if (fromOff == -1 && this.children[fromI] instanceof LineView && content[0] instanceof LineView)
-          fromOff = 0
-        if (toOff == -1 && toI > 0 && this.children[toI - 1] instanceof LineView &&
-            content[content.length - 1] instanceof LineView)
-          toOff = this.children[--toI].length
-        this.replaceRange(fromI, fromOff, toI, toOff, content)
-      }
-      if (!next) break
-      if (compositionRange && compositionRange.fromA <= next.toA && compositionRange.toA >= next.fromA) {
-        cursor.findPos(startA) // Must move cursor past the stuff we modify
+    for (let i = redraw.length - 1, posA = this.length;; i--) {
+      let next = i < 0 ? null : redraw[i], nextA = next ? next.toA : 0
+      if (compositionRange && compositionRange.fromA <= posA && compositionRange.toA >= nextA) {
+        cursor.findPos(nextA) // Must move cursor past the stuff we modify
         this.composition!.updateLength(compositionRange.toB - compositionRange.fromB)
       }
-      endA = next.fromA; endB = next.fromB
+      if (!next) break
+      let {fromA, toA, fromB, toB} = next
+      posA = fromA
+      if (fromA == toA && fromB == toB && !changes.some(ch => fromB <= ch.toB && toB >= ch.fromB))
+        continue
+      
+      let fromI, fromOff, toI: number, toOff
+      if (toA == oldLength) { toI = this.children.length; toOff = -1 }
+      else ({i: toI, off: toOff} = cursor.findPos(toA))
+      if (fromA == 0) { fromI = 0; fromOff = -1 }
+      else ({i: fromI, off: fromOff} = cursor.findPos(fromA))
+      let searchGap = fromI, content = this.contentBetween(fromB, toB, viewports, (from, to) => {
+        let height = this.heightAt(to, 1) - this.heightAt(from, -1)
+        while (searchGap < toI) {
+          let ch = this.children[searchGap++]
+          if (ch instanceof GapView) return ch.update(to - from, height)
+        }
+        return new GapView(to - from, height)
+      })
+      // If the range starts at the start of the document but both
+      // the current content and the new content start with a line
+      // view, reuse that to avoid a needless DOM reset.
+      if (fromOff == -1 && this.children[fromI] instanceof LineView && content[0] instanceof LineView)
+        fromOff = 0
+      if (toOff == -1 && toI > 0 && this.children[toI - 1] instanceof LineView &&
+          content[content.length - 1] instanceof LineView)
+        toOff = this.children[--toI].length
+      if (compositionRange && toOff > -1 && this.composition!.parent == this.children[toI])
+        (this.children[toI] as LineView).transferDOM(content[content.length - 1] as LineView)
+      this.replaceRange(fromI, fromOff, toI, toOff, content)
     }
   }
 
@@ -708,9 +709,10 @@ function nextRange(viewports: A<Viewport>, pos: number): [boolean, number] {
   return [false, 2e9]
 }
 
-// Returned ChangedRange objects are actually _unchanged_ ranges
-function unchangedText(vpA: A<Viewport>, vpB: A<Viewport>, changes: A<ChangedRange>,
-                       lenB: number): ChangedRange[]  {
+// Grows a set of ranges to include anything that wasn't drawn (as
+// lines) in both the old and new viewports.
+function rangesToUpdate(vpA: A<Viewport>, vpB: A<Viewport>, changes: A<ChangedRange>,
+                        lenB: number): ChangedRange[]  {
   for (let i = 0, posA = 0, posB = 0, found: ChangedRange[] = [];; i++) {
     let change = i < changes.length ? changes[i] : null
     let nextB = change ? change.fromB : lenB
@@ -718,11 +720,12 @@ function unchangedText(vpA: A<Viewport>, vpB: A<Viewport>, changes: A<ChangedRan
     while (posB < nextB) {
       let [insideA, toA] = nextRange(vpA, posA), [insideB, toB] = nextRange(vpB, posB)
       let newB = Math.min(nextB, posB + (toA - posA), toB), newA = posA + (newB - posB)
-      if (insideA && insideB) found.push(new ChangedRange(posA, newA, posB, newB))
+      if (!insideA || !insideB) new ChangedRange(posA, newA, posB, newB).addToSet(found)
       posA = newA; posB = newB
     }
 
     if (!change) return found
+    change.addToSet(found)
     posA = change.toA; posB = change.toB
   }
 }

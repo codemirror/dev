@@ -239,8 +239,11 @@ export class ChangedRange {
   static mapPos(pos: number, bias: number, changes: ReadonlyArray<ChangedRange>): number {
     let off = 0
     for (let range of changes) {
-      if (pos < range.fromA) return pos + off
-      if (pos <= range.toA) return bias < 0 ? range.fromB : range.toB
+      if (pos < range.fromA) break
+      if (pos <= range.toA) {
+        let side = range.toA == range.fromA ? bias : pos == range.fromA ? -1 : pos == range.toA ? 1 : bias
+        return side < 0 ? range.fromB : range.toB
+      }
       off = range.toB - range.toA
     }
     return pos + off
