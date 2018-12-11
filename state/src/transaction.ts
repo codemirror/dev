@@ -1,7 +1,6 @@
 import {Text} from "../../doc/src"
-import {EditorState} from "./state"
+import {EditorState, unique} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
-import {unique} from "./plugin"
 import {Change, ChangeSet} from "./change"
 
 const empty: ReadonlyArray<any> = []

@@ -1,3 +1,5 @@
+import {EditorState, StateField} from "./state"
+
 export enum Priority { fallback = -1, base = 0, extend = 1, override = 2 }
 
 interface ResolveResult<Value> {
@@ -29,16 +31,20 @@ export class Behavior<Spec, Value = Spec[]> {
     return this.dependencies.some(dep => dep == behavior || dep.dependsOn(behavior))
   }
 
-  get(set: BehaviorSet): Value | undefined {
+  getFromSet(set: BehaviorSet): Value | undefined {
     let found = set.behaviors.indexOf(this as any)
     return found > -1 ? set.values[found] as Value : undefined
   }
 
+  get(state: EditorState): Value | undefined {
+    return this.getFromSet(state.config.behaviors)
+  }
+
   some<Result>(
-    set: BehaviorSet,
+    state: EditorState,
     f: (value: Value extends (infer ElementType)[] ? ElementType : never) => Result
   ): Result | undefined {
-    let found = undefined, value = this.get(set)
+    let found = undefined, value = this.get(state)
     if (value === undefined) return found
     if (!Array.isArray(value)) throw new RangeError("Can't call some on a non-array behavior")
     for (let elt of value) {
@@ -47,6 +53,10 @@ export class Behavior<Spec, Value = Spec[]> {
     }
     return found
   }
+
+  static stateField = Behavior.simple<StateField<any>>("stateField")
+  static multipleSelections = Behavior.define<boolean, boolean>(
+    "multipleSelections", values => ({value: values.indexOf(true) > -1}))
 }
 
 export class BehaviorSpec<Spec, Value = Spec[]> {
@@ -59,7 +69,7 @@ export class BehaviorSet {
   behaviors: Behavior<any>[] = []
   values: any[] = []
 
-  static resolve(behaviors: BehaviorSpec<any>[]): BehaviorSet {
+  static resolve(behaviors: ReadonlyArray<BehaviorSpec<any>>): BehaviorSet {
     let set = new BehaviorSet
     let pending = behaviors.slice()
     // This does a crude topological ordering to resolve behaviors

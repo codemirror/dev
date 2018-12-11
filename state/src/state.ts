@@ -1,67 +1,57 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
-import {Plugin, StateField} from "./plugin"
+import {BehaviorSet, Behavior, BehaviorSpec} from "./behavior"
 import {Transaction, MetaSlot} from "./transaction"
 
 class Configuration {
   constructor(
-    readonly plugins: ReadonlyArray<Plugin>,
+    readonly behaviors: BehaviorSet,
     readonly fields: ReadonlyArray<StateField<any>>,
     readonly multipleSelections: boolean,
     readonly tabSize: number,
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let plugins = config.plugins || [], fields = [], multiple = !!config.multipleSelections
-    for (let plugin of plugins) {
-      if (plugin.spec.multipleSelections) multiple = true
-      let field = plugin.stateField
-      if (!field) continue
-      if (fields.indexOf(field) > -1)
-        throw new Error(`A state field (${field.key}) can only be added to a state once`)
-      fields.push(field)
-    }
-    return new Configuration(plugins, fields, multiple, config.tabSize || 4, config.lineSeparator || null)
+    let behaviors = BehaviorSet.resolve(config.behaviors || [])
+    return new Configuration(
+      behaviors,
+      Behavior.stateField.getFromSet(behaviors) || [],
+      !!Behavior.multipleSelections.getFromSet(behaviors),
+      config.tabSize || 4,
+      config.lineSeparator || null)
   }
 
   updateTabSize(tabSize: number) {
-    return new Configuration(this.plugins, this.fields, this.multipleSelections, tabSize, this.lineSeparator)
+    return new Configuration(this.behaviors, this.fields, this.multipleSelections, tabSize, this.lineSeparator)
   }
 
   updateLineSeparator(lineSep: string | null) {
-    return new Configuration(this.plugins, this.fields, this.multipleSelections, this.tabSize, lineSep)
+    return new Configuration(this.behaviors, this.fields, this.multipleSelections, this.tabSize, lineSep)
   }
 }
 
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  plugins?: ReadonlyArray<Plugin>
+  behaviors?: ReadonlyArray<BehaviorSpec<any>>
   tabSize?: number
   lineSeparator?: string | null
-  multipleSelections?: boolean
 }
 
 export class EditorState {
   /** @internal */
-  constructor(private readonly config: Configuration,
+  constructor(/* @internal */ readonly config: Configuration,
+              private readonly fields: ReadonlyArray<any>,
               readonly doc: Text,
-              readonly selection: EditorSelection = EditorSelection.default) {
+              readonly selection: EditorSelection) {
     for (let range of selection.ranges)
       if (range.to > doc.length) throw new RangeError("Selection points outside of document")
   }
 
-  getField<T>(field: StateField<T>): T | undefined {
-    return (this as any)[field.key]
-  }
-
-  get plugins(): ReadonlyArray<Plugin> { return this.config.plugins }
-
-  getPluginWithField(field: StateField<any>): Plugin {
-    for (const plugin of this.config.plugins) {
-      if (plugin.stateField == field) return plugin
-    }
-    throw new Error("Plugin for field not configured")
+  getField<T>(field: StateField<T>): T {
+    let index = this.config.fields.indexOf(field)
+    if (index < 0) throw new RangeError("Field " + field.name + " is not present in this state")
+    return this.fields[index]
   }
 
   /** @internal */
@@ -71,9 +61,10 @@ export class EditorState {
     if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
     // FIXME changing the line separator might involve rearranging line endings (?)
     if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
-    let newState = new EditorState($conf, tr.doc, tr.selection)
-    for (let field of $conf.fields)
-      (newState as any)[field.key] = field.apply(tr, (this as any)[field.key], newState)
+    let fields: any[] = []
+    let newState = new EditorState($conf, fields, tr.doc, tr.selection)
+    for (let i = 0; i < this.fields.length; i++)
+      fields[i] = $conf.fields[i].apply(tr, this.fields[i], newState)
     return newState
   }
 
@@ -106,7 +97,7 @@ export class EditorState {
     return EditorState.create({
       doc: json.doc,
       selection: EditorSelection.fromJSON(json.selection),
-      plugins: config.plugins,
+      behaviors: config.behaviors,
       tabSize: config.tabSize,
       lineSeparator: config.lineSeparator
     })
@@ -114,11 +105,38 @@ export class EditorState {
 
   static create(config: EditorStateConfig = {}): EditorState {
     let $config = Configuration.create(config)
-    let doc = config.doc instanceof Text ? config.doc : Text.of(config.doc || "", config.lineSeparator || undefined)
+    let doc = config.doc instanceof Text ? config.doc
+      : Text.of(config.doc || "", config.lineSeparator || undefined)
     let selection = config.selection || EditorSelection.default
     if (!$config.multipleSelections) selection = selection.asSingle()
-    let state = new EditorState($config, doc, selection)
-    for (let field of $config.fields) (state as any)[field.key] = field.init(state)
+    let fields: any[] = []
+    let state = new EditorState($config, fields, doc, selection)
+    for (let field of $config.fields) fields.push(field.init(state))
     return state
+  }
+}
+
+export class StateField<T> {
+  readonly init: (state: EditorState) => T
+  readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
+  readonly name: string
+
+  constructor({init, apply, name = "stateField"}: {
+    init: (state: EditorState) => T,
+    apply: (tr: Transaction, value: T, newState: EditorState) => T,
+    name?: string
+  }) {
+    this.init = init
+    this.apply = apply
+    this.name = unique(name, fieldNames)
+  }
+}
+
+const fieldNames = Object.create(null)
+
+export function unique(prefix: string, names: {[key: string]: string}): string {
+  for (let i = 0;; i++) {
+    let name = prefix + (i ? "_" + i : "")
+    if (!(name in names)) return names[name] = name
   }
 }
