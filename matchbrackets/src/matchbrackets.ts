@@ -1,9 +1,16 @@
 import {Text} from "../../doc/src"
-import {EditorState, Plugin} from "../../state/src"
+import {EditorState, Behavior} from "../../state/src"
 import {EditorView} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
-const matching: {[key: string]: string | undefined} = {"(": ")>", ")": "(<", "[": "]>", "]": "[<", "{": "}>", "}": "{<"}
+const matching: {[key: string]: string | undefined} = {
+  "(": ")>",
+  ")": "(<",
+  "[": "]>",
+  "]": "[<",
+  "{": "}>",
+  "}": "{<"
+}
 
 export type Config = {
   afterCursor?: boolean,
@@ -22,7 +29,10 @@ function getStyle(decorations: DecorationSet | undefined, at: number): string | 
       return (decoration.value as RangeDecoration).spec.class
 }
 
-export function findMatchingBracket(doc: Text, decorations: DecorationSet | undefined, where: number, config: Config = {}): {from: number, to: number | null, forward: boolean, match: boolean} | null {
+export function findMatchingBracket(
+  doc: Text, decorations: DecorationSet | undefined,
+  where: number, config: Config = {}
+) : {from: number, to: number | null, forward: boolean, match: boolean} | null {
   let pos = where - 1
   // A cursor is defined as between two characters, but in in vim command mode
   // (i.e. not insert mode), the cursor is visually represented as a
@@ -48,7 +58,8 @@ export function findMatchingBracket(doc: Text, decorations: DecorationSet | unde
 //
 // Returns false when no bracket was found, null when it reached
 // maxScanDistance and gave up
-export function scanForBracket(doc: Text, decorations: DecorationSet | undefined, where: number, dir: -1 | 1, style: string | null, config: Config) {
+export function scanForBracket(doc: Text, decorations: DecorationSet | undefined,
+                               where: number, dir: -1 | 1, style: string | null, config: Config) {
   const maxScanDistance = config.maxScanDistance || 10000
   const re = config.bracketRegex || /[(){}[\]]/
   const stack = []
@@ -85,19 +96,27 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
   return Decoration.set(decorations)
 }
 
-export function matchBrackets(config: Config = {}) {
-  return new Plugin({
-    view(v: EditorView) {
-      const idx = config.decorationsPlugin && v.state.plugins.filter(p => p.view).indexOf(config.decorationsPlugin)
+export const matchBrackets = Behavior.define<Config, Config>({
+  combine(configs) {
+    let config: Config = {}
+    for (let c of configs) for (let prop in c) {
+      if ((config as any)[prop] != undefined)
+        throw new Error(`Conflicting configuation for ${prop} in matchBrackets`)
+      ;(config as any)[prop] = (c as any)[prop]
+    }
+    return config
+  },
+  behavior(config) {
+    return [Behavior.viewPlugin.use((v: EditorView) => {
       let decorations = Decoration.none
       return {
         get decorations() { return decorations },
         updateState(v: EditorView) {
-          // FIXME cast is muffling a justified TypeScript error
-          const refDecos = idx == undefined ? undefined : (v as any).pluginViews[idx].decorations
-          decorations = doMatchBrackets(v.state, refDecos, config)
+          // FIXME make this use a behavior exported by the highlighter
+          decorations = doMatchBrackets(v.state, undefined, config)
         }
       }
-    }
-  })
-}
+    })]
+  },
+  default: {}
+})
