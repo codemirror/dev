@@ -1,4 +1,4 @@
-import {EditorSelection, SelectionRange, MetaSlot} from "../../state/src"
+import {EditorState, EditorSelection, SelectionRange, MetaSlot, Behavior} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
@@ -86,6 +86,58 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
 export const deleteCharBackward: Command = view => deleteText(view, "backward")
 export const deleteCharForward: Command = view => deleteText(view, "forward")
 
+// FIXME support indenting by tab, configurable indent units
+
+function space(n: number) {
+  let result = ""
+  for (let i = 0; i < n; i++) result += " "
+  return result
+}
+
+function getIndentation(state: EditorState, pos: number): number {
+  for (let f of Behavior.indentation.get(state)) {
+    let result = f(state, pos)
+    if (result > -1) return result
+  }
+  return -1
+}
+
+export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
+  let indentation = state.selection.ranges.map(r => getIndentation(state, r.from)), i = 0
+  dispatch(state.transaction.reduceRanges((tr, range) => {
+    let indent = indentation[i++]
+    return {transaction: tr.replace(range.from, range.to, ["", space(indent)]),
+            range: new SelectionRange(range.from + indent + 1)}
+  }).scrollIntoView())
+  return true
+}
+
+export function indentSelection({state, dispatch}: EditorView): boolean {
+  let lastLine = -1, positions = []
+  for (let range of state.selection.ranges) {
+    for (let {start, end} = state.doc.lineAt(range.from);;) {
+      if (start != lastLine) {
+        lastLine = start
+        let indent = getIndentation(state, start), current
+        if (indent > -1 &&
+            indent != (current = /^\s*/.exec(state.doc.slice(start, Math.min(end, start + 100)))![0].length))
+          positions.push({pos: start, current, indent})
+      }
+      if (end + 1 > range.to) break
+      ;({start, end} = state.doc.lineAt(end + 1))
+    }
+  }
+  if (positions.length > 0) {
+    let tr = state.transaction
+    for (let {pos, current, indent} of positions) {
+      let start = tr.changes.mapPos(pos)
+      tr = tr.replace(start, start + current, space(indent))
+    }
+    dispatch(tr)
+  }
+  return true
+}
+
 export const pcBaseKeymap: {[key: string]: Command} = {
   "ArrowLeft": moveCharLeft,
   "ArrowRight": moveCharRight,
@@ -107,7 +159,8 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "Mod-End": selectDocEnd,
   "Mod-a": selectAll,
   "Backspace": deleteCharBackward,
-  "Delete": deleteCharForward
+  "Delete": deleteCharForward,
+  "Enter": insertNewlineAndIndent
 }
 
 export const macBaseKeymap: {[key: string]: Command} = {
