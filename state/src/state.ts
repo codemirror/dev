@@ -1,22 +1,23 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
-import {BehaviorSet, Behavior, BehaviorSpec} from "./behavior"
+import {BehaviorStore, Behavior, BehaviorSpec} from "./behavior"
 import {Transaction, MetaSlot} from "./transaction"
+import {unique} from "./unique"
 
 class Configuration {
   constructor(
-    readonly behaviors: BehaviorSet,
+    readonly behaviors: BehaviorStore,
     readonly fields: ReadonlyArray<StateField<any>>,
     readonly multipleSelections: boolean,
     readonly tabSize: number,
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let behaviors = BehaviorSet.resolve(config.behaviors || [])
+    let behaviors = BehaviorStore.resolve(config.behaviors || [])
     return new Configuration(
       behaviors,
-      Behavior.stateField.getFromSet(behaviors) || [],
-      !!Behavior.multipleSelections.getFromSet(behaviors),
+      behaviors.get(Behavior.stateField) || [],
+      !!behaviors.get(Behavior.multipleSelections),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
@@ -33,7 +34,7 @@ class Configuration {
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  behaviors?: ReadonlyArray<BehaviorSpec<any>>
+  behaviors?: ReadonlyArray<BehaviorSpec>
   tabSize?: number
   lineSeparator?: string | null
 }
@@ -133,10 +134,3 @@ export class StateField<T> {
 }
 
 const fieldNames = Object.create(null)
-
-export function unique(prefix: string, names: {[key: string]: string}): string {
-  for (let i = 0;; i++) {
-    let name = prefix + (i ? "_" + i : "")
-    if (!(name in names)) return names[name] = name
-  }
-}
