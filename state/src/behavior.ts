@@ -14,23 +14,19 @@ export class Behavior<Spec, Value> {
   private knownSub: Behavior<any, any>[] = []
 
   // @internal
-  constructor(public name: string,
-              /* @internal */ public compute: ((specs: A<Spec>) => Value) | null,
+  constructor(/* @internal */ public compute: ((specs: A<Spec>) => Value) | null,
               /* @internal */ public behavior: (value: any) => A<BehaviorSpec>) {}
 
-  toString() { return "[behavior " + name + "]" }
-
-  static define<Spec, Value>(name: string,
-                             compute: (specs: A<Spec>) => Value,
+  static define<Spec, Value>(compute: (specs: A<Spec>) => Value,
                              behavior: (value: any) => A<BehaviorSpec> = noBehavior) {
-    return new Behavior<Spec, Value>(name, compute, behavior)
+    return new Behavior<Spec, Value>(compute, behavior)
   }
 
-  static defineSet<Spec>(name: string, behavior: (spec: Spec) => A<BehaviorSpec> = noBehavior) {
-    return new SetBehavior<Spec>(name, null, behavior)
+  static defineSet<Spec>(behavior: (spec: Spec) => A<BehaviorSpec> = noBehavior) {
+    return new SetBehavior<Spec>(null, behavior)
   }
 
-  create(spec: Spec, priority: Priority = noPriority): BehaviorSpec {
+  use(spec: Spec, priority: Priority = noPriority): BehaviorSpec {
     return new BehaviorSpec(this, spec, priority)
   }
 
@@ -40,8 +36,7 @@ export class Behavior<Spec, Value> {
 
   static stateField: SetBehavior<StateField<any>>
 
-  static multipleSelections = Behavior.define<boolean, boolean>(
-    "multipleSelections", values => values.indexOf(true) > -1)
+  static multipleSelections = Behavior.define<boolean, boolean>(values => values.indexOf(true) > -1)
 
   // FIXME move to view?
   static viewPlugin: SetBehavior<(view: any) => any>
@@ -77,8 +72,8 @@ export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
   }
 }
 
-Behavior.stateField = Behavior.defineSet<StateField<any>>("stateField")
-Behavior.viewPlugin = Behavior.defineSet<(view: any) => any>("viewPlugin")
+Behavior.stateField = Behavior.defineSet<StateField<any>>()
+Behavior.viewPlugin = Behavior.defineSet<(view: any) => any>()
 
 export class BehaviorSpec {
   constructor(public type: Behavior<any, any>,
@@ -127,7 +122,7 @@ function findTopType(behaviors: BehaviorSpec[]): Behavior<any, any> {
   for (let behavior of behaviors)
     if (!behaviors.some(b => b.type.hasSubBehavior(behavior.type)))
       return behavior.type
-  throw new RangeError("Cyclic sub-behavior in " + behaviors[0].type.name)
+  throw new RangeError("Sub-behavior cycle in behaviors")
 }
 
 function takeType<Spec, Value>(behaviors: BehaviorSpec[],
@@ -135,7 +130,7 @@ function takeType<Spec, Value>(behaviors: BehaviorSpec[],
   let specs: BehaviorSpec[] = []
   for (let spec of behaviors) if (spec.type == type) {
     let i = 0
-    while (i < specs.length && specs[i].priority < spec.priority) i++
+    while (i < specs.length && specs[i].priority >= spec.priority) i++
     specs.splice(i, 0, spec)
   }
   if (type.compute) {
