@@ -10,9 +10,6 @@ describe("EditorState behavior", () => {
     let state = mk(a.use(10), a.use(20), b.use("x"), b.use("y"))
     ist(a.get(state), 30)
     ist(b.get(state).join(), "x,y")
-    let seen: string[] = []
-    ist(b.some(state, s => { seen.push(s); return s == "y" ? "OK" : undefined }), "OK")
-    ist(seen.join(), "x,y")
   })
 
   it("includes sub-behaviors", () => {
