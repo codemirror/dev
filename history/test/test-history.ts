@@ -1,9 +1,13 @@
 const ist = require("ist")
 
-import {EditorState, EditorSelection, SelectionRange, Transaction, MetaSlot} from "../../state/src"
-import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth, undoSelection} from "../src/history"
+import {EditorState, EditorSelection, SelectionRange, Transaction, MetaSlot, Behavior} from "../../state/src"
+import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
+        undoSelection} from "../src/history"
 
-const mkState = (config?: any, doc?: string) => EditorState.create({plugins: [history(config)], doc, multipleSelections: true})
+const mkState = (config?: any, doc?: string) => EditorState.create({
+  behavior: [history.use(config), Behavior.multipleSelections.use()],
+  doc
+})
 
 const type = (state: EditorState, text: string, at = state.doc.length) => state.transaction.replace(at, at, text).apply()
 const timedType = (state: EditorState, text: string, atTime: number) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()

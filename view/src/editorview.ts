@@ -1,4 +1,4 @@
-import {EditorState, Transaction, MetaSlot} from "../../state/src"
+import {EditorState, Behavior, Transaction, MetaSlot} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {getRoot, Rect} from "./dom"
@@ -111,8 +111,7 @@ export class EditorView {
   private createPluginViews(plugins: PluginView[]) {
     this.destroyPluginViews()
     for (let plugin of plugins) this.pluginViews.push(plugin)
-    for (let plugin of this.state.plugins) if (plugin.view)
-      this.pluginViews.push(plugin.view(this))
+    Behavior.viewPlugin.some(this.state, p => { this.pluginViews.push(p(this)) })
   }
 
   private destroyPluginViews() {

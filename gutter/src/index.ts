@@ -1,4 +1,4 @@
-import {Plugin} from "../../state/src"
+import {Behavior} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 // FIXME Think about how the gutter width changing could cause
@@ -10,18 +10,18 @@ import {EditorView} from "../../view/src"
 // FIXME at some point, add support for custom gutter space and
 // per-line markers
 
-// FIXME seriously slow on Firefox, quite fast on Chrome
+// FIXME seriously slow on Firefox when devtools are open
 
 export interface GutterConfig {
   fixed?: boolean,
   formatNumber?: (lineNo: number) => string
 }
 
-export function gutter(config: GutterConfig = {}) {
-  return new Plugin({
-    view(view: EditorView) { return new GutterView(view, config) }
-  })
-}
+export const gutter = Behavior.define({
+  combine(configs) { return Behavior.combineConfigs(configs) },
+  behavior(config) { return [Behavior.viewPlugin.use(view => new GutterView(view, config))] },
+  default: {}
+})
 
 class GutterView {
   dom: HTMLElement

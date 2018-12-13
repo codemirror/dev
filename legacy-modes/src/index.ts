@@ -1,6 +1,6 @@
 import {EditorView, ViewUpdate} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
-import {EditorState, Plugin, StateField, Transaction} from "../../state/src"
+import {EditorState, Behavior, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
 
 import {StringStreamCursor} from "./stringstreamcursor"
@@ -144,48 +144,50 @@ class StateCache<S> {
 
 type Config = {
   sleepTime?: number,
-  maxWorkTime?: number
+  maxWorkTime?: number,
+  mode: Mode<any>
 }
 
-export function legacyMode<S>(mode: Mode<S>, config: Config = {}) {
-  const {sleepTime = 100, maxWorkTime = 100} = config
-  const field = new StateField<StateCache<S>>({
-    init(state: EditorState) { return new StateCache([], 0, null) },
-    apply(tr, cache) { return cache.apply(tr) },
-    debugName: "mode"
-  })
+export const legacyMode = Behavior.defineSet<Config>({
+  behavior(config) {
+    let field = new StateField<StateCache<any>>({
+      init(state: EditorState) { return new StateCache([], 0, null) },
+      apply(tr, cache) { return cache.apply(tr) },
+      name: "mode"
+    })
+    return [
+      Behavior.stateField.use(field),
+      Behavior.viewPlugin.use(viewPlugin(field, config)),
+      Behavior.indentation.use((state: EditorState, pos: number): number => {
+        if (!config.mode.indent) return -1
+        let modeState = state.getField(field).getState(state, pos, config.mode)
+        let line = state.doc.lineAt(pos)
+        return config.mode.indent(modeState, line.slice(0, Math.min(line.length, 100)).match(/^\s*(.*)/)![1])
+      })
+      // FIXME add a token-retrieving behavior
+    ]
+  }
+})
 
-  let plugin = new Plugin({
-    state: field,
-    view(v: EditorView) {
-      let decorations = Decoration.none, from = -1, to = -1
-      function update(v: EditorView, force: boolean) {
-        let vp = v.viewport
-        if (force || vp.from < from || vp.to > to) {
-          ;({from, to} = vp)
-          const stateCache = v.state.getField(field)!
-          decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
-          stateCache.advanceFrontier(v.state, from, mode, sleepTime, maxWorkTime).then(() => {
-            update(v, true)
-            v.updateState([], v.state)
-          }, () => {})
-        }
-      }
-      return {
-        get decorations() { return decorations },
-        update: (v: EditorView, u: ViewUpdate) => update(v, u.transactions.some(tr => tr.docChanged))
+function viewPlugin(field: StateField<StateCache<any>>, config: Config) {
+  const {sleepTime = 100, maxWorkTime = 100, mode} = config
+  return (v: EditorView) => {
+    let decorations = Decoration.none, from = -1, to = -1
+    function update(v: EditorView, force: boolean) {
+      let vp = v.viewport
+      if (force || vp.from < from || vp.to > to) {
+        ;({from, to} = vp)
+        const stateCache = v.state.getField(field)!
+        decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
+        stateCache.advanceFrontier(v.state, from, mode, sleepTime, maxWorkTime).then(() => {
+          update(v, true)
+          v.updateState([], v.state)
+        }, () => {})
       }
     }
-  })
-
-  // FIXME Short-term hack—it'd be nice to have a better mechanism for this,
-  // not sure yet what it'd look like
-  ;(plugin as any).indentation = function(state: EditorState, pos: number): number {
-    if (!mode.indent) return -1
-    let modeState = state.getField(field)!.getState(state, pos, mode)
-    let line = state.doc.lineAt(pos)
-    return mode.indent(modeState, line.slice(0, Math.min(line.length, 100)).match(/^\s*(.*)/)![1])
+    return {
+      get decorations() { return decorations },
+      update: (v: EditorView, u: ViewUpdate) => update(v, u.transactions.some(tr => tr.docChanged))
+    }
   }
-
-  return plugin
 }

@@ -1,61 +1,77 @@
-import {EditorState, Transaction, StateField, MetaSlot, Plugin} from "../../state/src"
+import {EditorState, Transaction, StateField, MetaSlot, Behavior} from "../../state/src"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
 export const closeHistorySlot = new MetaSlot<boolean>("historyClose")
 
-const historyField = new StateField({
-  init(editorState: EditorState): HistoryState {
-    return HistoryState.empty
-  },
+function historyField(minDepth: number, newGroupDelay: number) {
+  return new StateField({
+    init(editorState: EditorState): HistoryState {
+      return HistoryState.empty
+    },
 
-  apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
-    const fromMeta = tr.getMeta(historyStateSlot)
-    if (fromMeta) return fromMeta
-    if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
-    if (!tr.changes.length && !tr.selectionSet) return state
+    apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
+      const fromMeta = tr.getMeta(historyStateSlot)
+      if (fromMeta) return fromMeta
+      if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
+      if (!tr.changes.length && !tr.selectionSet) return state
 
-    const {newGroupDelay, minDepth} = editorState.getPluginWithField(historyField).config
-    if (tr.getMeta(MetaSlot.addToHistory) !== false)
-      return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null, tr.startState.selection,
-                              tr.getMeta(MetaSlot.time)!, tr.getMeta(MetaSlot.userEvent), newGroupDelay, minDepth)
-    return state.addMapping(tr.changes.desc, minDepth)
-  },
+      if (tr.getMeta(MetaSlot.addToHistory) !== false)
+        return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
+                                tr.startState.selection, tr.getMeta(MetaSlot.time)!,
+                                tr.getMeta(MetaSlot.userEvent), newGroupDelay, minDepth)
+      return state.addMapping(tr.changes.desc, minDepth)
+    },
 
-  debugName: "historyState"
-})
-
-export function history({minDepth = 100, newGroupDelay = 500}: {minDepth?: number, newGroupDelay?: number} = {}): Plugin {
-  return new Plugin({
-    state: historyField,
-    config: {minDepth, newGroupDelay}
+    name: "historyState"
   })
 }
 
-function historyCmd(target: PopTarget, only: ItemFilter, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
-  const historyState: HistoryState | undefined = state.getField(historyField)
-  if (!historyState || !historyState.canPop(target, only)) return false
-  const {minDepth} = state.getPluginWithField(historyField).config
-  const {transaction, state: newState} = historyState.pop(target, only, state.transaction, minDepth)
-  dispatch(transaction.setMeta(historyStateSlot, newState))
-  return true
+export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
+
+class HistoryBehavior {
+  field: StateField<HistoryState>
+
+  constructor(public config: HistoryConfig) {
+    this.field = historyField(config.minDepth!, config.newGroupDelay!)
+  }
+
+  cmd(target: PopTarget, only: ItemFilter, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
+    let historyState = state.getField(this.field)
+    if (!historyState.canPop(target, only)) return false
+    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, this.config.minDepth!)
+    dispatch(transaction.setMeta(historyStateSlot, newState))
+    return true
+  }
+
+  depth(target: PopTarget, only: ItemFilter, state: EditorState): number {
+    return state.getField(this.field).eventCount(target, only)
+  }
 }
 
-export function undo({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
-  return historyCmd(PopTarget.Done, ItemFilter.OnlyChanges, state, dispatch)
+export const history = Behavior.define<HistoryConfig, HistoryBehavior>({
+  combine(configs) {
+    return new HistoryBehavior(Behavior.combineConfigs(configs, {minDepth: Math.max}, {
+      minDepth: 100,
+      newGroupDelay: 500
+    }))
+  },
+  behavior: historyBehavior => [Behavior.stateField.use(historyBehavior.field)],
+  default: {}
+})
+
+function cmd(target: PopTarget, only: ItemFilter) {
+  return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
+    let behavior = history.get(state)
+    if (!behavior) return false
+    return behavior.cmd(target, only, state, dispatch)
+  }
 }
 
-export function redo({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
-  return historyCmd(PopTarget.Undone, ItemFilter.OnlyChanges, state, dispatch)
-}
-
-export function undoSelection({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
-  return historyCmd(PopTarget.Done, ItemFilter.Any, state, dispatch)
-}
-
-export function redoSelection({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}): boolean {
-  return historyCmd(PopTarget.Undone, ItemFilter.Any, state, dispatch)
-}
+export const undo = cmd(PopTarget.Done, ItemFilter.OnlyChanges)
+export const redo = cmd(PopTarget.Undone, ItemFilter.OnlyChanges)
+export const undoSelection = cmd(PopTarget.Done, ItemFilter.Any)
+export const redoSelection = cmd(PopTarget.Undone, ItemFilter.Any)
 
 // Set a flag on the given transaction that will prevent further steps
 // from being appended to an existing history event (so that they
@@ -64,26 +80,18 @@ export function closeHistory(tr: Transaction): Transaction {
   return tr.setMeta(closeHistorySlot, true)
 }
 
+function depth(target: PopTarget, only: ItemFilter) {
+  return function(state: EditorState): number {
+    let behavior = history.get(state)
+    return behavior ? behavior.depth(target, only, state) : 0
+  }
+}
+
 // The amount of undoable change events available in a given state.
-export function undoDepth(state: EditorState): number {
-  let hist = state.getField(historyField)
-  return hist ? hist.eventCount(PopTarget.Done, ItemFilter.OnlyChanges) : 0
-}
-
+export const undoDepth = depth(PopTarget.Done, ItemFilter.OnlyChanges)
 // The amount of redoable change events available in a given state.
-export function redoDepth(state: EditorState): number {
-  let hist = state.getField(historyField)
-  return hist ? hist.eventCount(PopTarget.Undone, ItemFilter.OnlyChanges) : 0
-}
-
+export const redoDepth = depth(PopTarget.Undone, ItemFilter.OnlyChanges)
 // The amount of undoable events available in a given state.
-export function undoSelectionDepth(state: EditorState): number {
-  let hist = state.getField(historyField)
-  return hist ? hist.eventCount(PopTarget.Done, ItemFilter.Any) : 0
-}
-
+export const redoSelectionDepth = depth(PopTarget.Done, ItemFilter.Any)
 // The amount of redoable events available in a given state.
-export function redoSelectionDepth(state: EditorState): number {
-  let hist = state.getField(historyField)
-  return hist ? hist.eventCount(PopTarget.Undone, ItemFilter.Any) : 0
-}
+export const undoSelectionDepth = depth(PopTarget.Undone, ItemFilter.Any)

@@ -1,9 +1,10 @@
 import {base, keyName} from "w3c-keyname"
 
-import {Plugin} from "../../state/src"
+import {Behavior} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
+export type Keymap = {[key: string]: Command}
 
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false
 
@@ -28,7 +29,7 @@ function normalizeKeyName(name: string): string {
   return result
 }
 
-function normalize(map: {[key: string]: Command}): {[key: string]: Command} {
+function normalize(map: Keymap): Keymap {
   const copy = Object.create(null)
   for (const prop in map) copy[normalizeKeyName(prop)] = map[prop]
   return copy
@@ -42,19 +43,15 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
   return name
 }
 
-// :: (Object) → Plugin
-// Create a keymap plugin for the given set of bindings.
+// Behavior for defining keymaps
 //
-// Bindings should map key names to [command](#commands)-style
-// functions, which will be called with `(EditorState, dispatch,
-// EditorView)` arguments, and should return true when they've handled
-// the key. Note that the view argument isn't part of the command
-// protocol, but can be used as an escape hatch if a binding needs to
-// directly interact with the UI.
+// Specs are objects that map key names to command-style functions,
+// which will be called with an editor view and should return true
+// when they've handled the key.
 //
-// Key names may be strings like `"Shift-Ctrl-Enter"`—a key
-// identifier prefixed with zero or more modifiers. Key identifiers
-// are based on the strings that can appear in
+// Key names may be strings like `"Shift-Ctrl-Enter"`—a key identifier
+// prefixed with zero or more modifiers. Key identifiers are based on
+// the strings that can appear in
 // [`KeyEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
 // Use lowercase letters to refer to letter keys (or uppercase letters
 // if you want shift to be held). You may use `"Space"` as an alias
@@ -62,31 +59,21 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 //
 // Modifiers can be given in any order. `Shift-` (or `s-`), `Alt-` (or
 // `a-`), `Ctrl-` (or `c-` or `Control-`) and `Cmd-` (or `m-` or
-// `Meta-`) are recognized. For characters that are created by holding
-// shift, the `Shift-` prefix is implied, and should not be added
-// explicitly.
+// `Meta-`) are recognized.
 //
 // You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
 // other platforms.
 //
-// You can add multiple keymap plugins to an editor. The order in
-// which they appear determines their precedence (the ones early in
-// the array get to dispatch first).
-export function keymap(bindings: {[key: string]: Command}): Plugin {
-  let keydown = keydownHandler(bindings)
-  return new Plugin({
-    view() {
-      return {handleDOMEvents: {keydown}}
-    }
-  })
-}
+// You can add multiple keymap behaviors to an editor. Their
+// priorities determine their precedence (the ones specified early or
+// with high priority get to dispatch first).
+export const keymap = Behavior.defineSet<Keymap>({
+  behavior: map => [Behavior.viewPlugin.use(() => ({
+    handleDOMEvents: {keydown: keydownHandler(normalize(map))}
+  }))]
+})
 
-// :: (Object) → (view: EditorView, event: dom.Event) → bool
-// Given a set of bindings (using the same format as
-// [`keymap`](#keymap.keymap), return a [keydown
-// handler](#view.EditorProps.handleKeyDown) handles them.
-export function keydownHandler(bindings: {[key: string]: Command}): (view: EditorView, event: KeyboardEvent) => boolean {
-  const map = normalize(bindings)
+function keydownHandler(map: Keymap): (view: EditorView, event: KeyboardEvent) => boolean {
   return function(view, event) {
     const name = keyName(event), isChar = name.length == 1 && name != " "
     const direct = map[modifiers(name, event, !isChar)]

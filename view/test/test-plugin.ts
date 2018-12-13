@@ -1,12 +1,12 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection, Plugin} from "../../state/src"
+import {EditorSelection, Behavior} from "../../state/src"
 import {EditorView, ViewUpdate} from "../src/"
 import ist from "ist"
 
 describe("EditorView plugins", () => {
   it("calls update on transactions", () => {
     let called = 0
-    let cm = tempEditor("one\ntwo", [new Plugin({view: (view: EditorView) => {
+    let cm = tempEditor("one\ntwo", [Behavior.viewPlugin.use((view: EditorView) => {
       let doc = view.state.doc.toString()
       ist(doc, "one\ntwo")
       return {
@@ -16,7 +16,7 @@ describe("EditorView plugins", () => {
           if (update.transactions.length == 1) called++
         }
       }
-    }})])
+    })])
     cm.dispatch(cm.state.transaction.replace(0, 1, "O"))
     cm.dispatch(cm.state.transaction.replace(4, 5, "T"))
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1)))
@@ -25,13 +25,13 @@ describe("EditorView plugins", () => {
 
   it("calls update when the viewport changes", () => {
     let ports: number[][] = []
-    let cm = tempEditor("x\n".repeat(500), [new Plugin({view: () => {
+    let cm = tempEditor("x\n".repeat(500), [Behavior.viewPlugin.use(() => {
       return {
         update(view: EditorView) {
           ports.push([view.viewport.from, view.viewport.to])
         }
       }
-    }})])
+    })])
     ist(ports.length, 1)
     ist(ports[0][0], 0)
     cm.dom.style.height = "300px"
@@ -48,11 +48,11 @@ describe("EditorView plugins", () => {
 
   it("calls updateDOM when the DOM is changed", () => {
     let updates = 0
-    let cm = tempEditor("xyz", [new Plugin({view: () => {
+    let cm = tempEditor("xyz", [Behavior.viewPlugin.use(() => {
       return {
         updateDOM() { updates++ }
       }
-    }})])
+    })])
     ist(updates, 1)
     cm.dispatch(cm.state.transaction.replace(1, 2, "u"))
     ist(updates, 2)
