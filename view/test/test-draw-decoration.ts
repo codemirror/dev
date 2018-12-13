@@ -1,6 +1,6 @@
 import {EditorView, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
-import {StateField, MetaSlot, Plugin, EditorSelection} from "../../state/src"
+import {StateField, MetaSlot, Behavior, EditorSelection} from "../../state/src"
 import ist from "ist"
 
 const filterSlot = new MetaSlot<(from: number, to: number, spec: any) => boolean>("filterDeco")
@@ -16,14 +16,12 @@ function decos(startState: DecorationSet = Decoration.none) {
       return value
     }
   })
-  return new Plugin({
-    state: field,
-    view(editorView: EditorView) {
-      return {
-        get decorations() { return editorView.state.getField(field) }
-      }
-    }
-  })
+  return [
+    Behavior.viewPlugin.use(view => ({
+      get decorations() { return view.state.getField(field) }
+    })),
+    Behavior.stateField.use(field)
+  ]
 }
 
 function d(from: number, to: any, spec: any = null) {
@@ -39,7 +37,7 @@ function l(pos: number, attrs: any) {
 }
 
 function decoEditor(doc: string, decorations: any = []) {
-  return tempEditor(doc, [decos(Decoration.set(decorations))])
+  return tempEditor(doc, decos(Decoration.set(decorations)))
 }
 
 describe("EditorView decoration", () => {
