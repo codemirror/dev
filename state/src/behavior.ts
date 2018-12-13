@@ -97,14 +97,6 @@ export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
   get(state: EditorState): A<Spec> {
     return state.config.behavior.get(this) || none
   }
-
-  some<Result>(state: EditorState, f: (value: Spec) => Result): Result | undefined {
-    for (let elt of this.get(state)) {
-      let found = f(elt)
-      if (found !== undefined) return found
-    }
-    return undefined
-  }
 }
 
 Behavior.stateField = Behavior.defineSet()

@@ -115,7 +115,7 @@ export class EditorView {
   private createPluginViews(plugins: PluginView[]) {
     this.destroyPluginViews()
     for (let plugin of plugins) this.pluginViews.push(plugin)
-    Behavior.viewPlugin.some(this.state, p => { this.pluginViews.push(p(this)) })
+    for (let p of Behavior.viewPlugin.get(this.state)) this.pluginViews.push(p(this))
   }
 
   private destroyPluginViews() {
