@@ -5,7 +5,7 @@ const ist = require("ist")
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
-  let state = EditorState.create({behaviors: [keymap.create(map)]})
+  let state = EditorState.create({behavior: [keymap.use(map)]})
   return Behavior.viewPlugin.get(state)[0](fakeView)
 }
 

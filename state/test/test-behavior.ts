@@ -1,7 +1,7 @@
 const ist = require("ist")
 import {Behavior, BehaviorSpec, Priority, EditorState} from "../src"
 
-function mk(...behaviors: BehaviorSpec[]) { return EditorState.create({behaviors}) }
+function mk(...behavior: BehaviorSpec[]) { return EditorState.create({behavior}) }
 
 describe("EditorState behavior", () => {
   it("allows querying of behaviors", () => {

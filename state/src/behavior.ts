@@ -31,7 +31,7 @@ export class Behavior<Spec, Value> {
   }
 
   get(state: EditorState): Value | undefined {
-    return state.config.behaviors.get(this)
+    return state.config.behavior.get(this)
   }
 
   static stateField: SetBehavior<StateField<any>>
@@ -60,7 +60,7 @@ export class Behavior<Spec, Value> {
 
 export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
   get(state: EditorState): A<Spec> {
-    return state.config.behaviors.get(this) || none
+    return state.config.behavior.get(this) || none
   }
 
   some<Result>(state: EditorState, f: (value: Spec) => Result): Result | undefined {

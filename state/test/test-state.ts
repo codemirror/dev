@@ -17,7 +17,7 @@ describe("EditorState", () => {
 
   it("maps selection through changes", () => {
     let state = EditorState.create({doc: "abcdefgh",
-                                    behaviors: [Behavior.multipleSelections.use(true)],
+                                    behavior: [Behavior.multipleSelections.use(true)],
                                     selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
     let newState = state.transaction.replaceSelection("Q").apply()
     ist(newState.doc.toString(), "QabcdQefghQ")
