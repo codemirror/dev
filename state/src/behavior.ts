@@ -10,23 +10,33 @@ const none: A<any> = []
 
 function noBehavior(): A<BehaviorSpec> { return none }
 
+const noDefault: any = {}
+
 export class Behavior<Spec, Value> {
   private knownSub: Behavior<any, any>[] = []
 
   // @internal
-  constructor(/* @internal */ public compute: ((specs: A<Spec>) => Value) | null,
-              /* @internal */ public behavior: (value: any) => A<BehaviorSpec>) {}
+  constructor(/* @internal */ public combine: ((specs: A<Spec>) => Value) | null,
+              /* @internal */ public behavior: (value: any) => A<BehaviorSpec>,
+              private default_: Spec) {}
 
-  static define<Spec, Value>(compute: (specs: A<Spec>) => Value,
-                             behavior: (value: any) => A<BehaviorSpec> = noBehavior) {
-    return new Behavior<Spec, Value>(compute, behavior)
+  static define<Spec, Value>({combine, behavior = noBehavior, default: default_ = noDefault}: {
+    combine: (specs: A<Spec>) => Value,
+    behavior?: (value: any) => A<BehaviorSpec>,
+    default?: Spec
+  }) {
+    return new Behavior<Spec, Value>(combine, behavior, default_)
   }
 
-  static defineSet<Spec>(behavior: (spec: Spec) => A<BehaviorSpec> = noBehavior) {
-    return new SetBehavior<Spec>(null, behavior)
+  static defineSet<Spec>({behavior = noBehavior, default: default_ = noDefault}: {
+    behavior?: (spec: Spec) => A<BehaviorSpec>,
+    default?: Spec
+  } = {}) {
+    return new SetBehavior<Spec>(null, behavior, default_)
   }
 
-  use(spec: Spec, priority: Priority = noPriority): BehaviorSpec {
+  use(spec: Spec = this.default_, priority: Priority = noPriority): BehaviorSpec {
+    if (spec == noDefault) throw new RangeError("This behavior has no default spec")
     return new BehaviorSpec(this, spec, priority)
   }
 
@@ -36,7 +46,10 @@ export class Behavior<Spec, Value> {
 
   static stateField: SetBehavior<StateField<any>>
 
-  static multipleSelections = Behavior.define<boolean, boolean>(values => values.indexOf(true) > -1)
+  static multipleSelections = Behavior.define<boolean, boolean>({
+    combine: values => values.indexOf(true) > -1,
+    default: true
+  })
 
   // FIXME move to view?
   static viewPlugin: SetBehavior<(view: any) => any>
@@ -133,8 +146,8 @@ function takeType<Spec, Value>(behaviors: BehaviorSpec[],
     while (i < specs.length && specs[i].priority >= spec.priority) i++
     specs.splice(i, 0, spec)
   }
-  if (type.compute) {
-    let value = type.compute(specs.map(s => s.spec)), first = true
+  if (type.combine) {
+    let value = type.combine(specs.map(s => s.spec)), first = true
     for (let i = 0; i < behaviors.length; i++) if (behaviors[i].type == type) {
       let sub = first ? type.getBehavior(value, behaviors[i].priority) : none
       behaviors.splice(i, 1, ...sub)

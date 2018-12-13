@@ -5,7 +5,7 @@ function mk(...behavior: BehaviorSpec[]) { return EditorState.create({behavior})
 
 describe("EditorState behavior", () => {
   it("allows querying of behaviors", () => {
-    let a = Behavior.define<number, number>(ns => ns.reduce((a, b) => a + b))
+    let a = Behavior.define<number, number>({combine: ns => ns.reduce((a, b) => a + b)})
     let b = Behavior.defineSet<string>()
     let state = mk(a.use(10), a.use(20), b.use("x"), b.use("y"))
     ist(a.get(state), 30)
@@ -17,14 +17,15 @@ describe("EditorState behavior", () => {
 
   it("includes sub-behaviors", () => {
     let a = Behavior.defineSet<number>()
-    let b = Behavior.defineSet<string>(str => [a.use(+str)])
+    let b = Behavior.defineSet<string>({behavior: str => [a.use(+str)]})
     let state = mk(b.use("5"), b.use("10"), a.use(20), b.use("40"))
     ist(a.get(state).join(), "5,10,20,40")
   })
 
   it("only includes sub-behaviors of non-set behavior once", () => {
     let a = Behavior.defineSet<number>()
-    let b = Behavior.define<number, number>(ns => ns.reduce((a, b) => a + b), n => [a.use(n)])
+    let b = Behavior.define<number, number>({combine: ns => ns.reduce((a, b) => a + b),
+                                             behavior: n => [a.use(n)]})
     let state = mk(a.use(1), b.use(2), a.use(4), b.use(8))
     ist(a.get(state).join(), "1,10,4")
   })
@@ -45,8 +46,19 @@ describe("EditorState behavior", () => {
 
   it("lets sub-behaviors inherit their parent's priority", () => {
     let a = Behavior.defineSet<number>()
-    let b = Behavior.defineSet<number>(n => [a.use(n)])
+    let b = Behavior.defineSet<number>({behavior: n => [a.use(n)]})
     let state = mk(a.use(1), b.use(2, Priority.override), b.use(4))
     ist(a.get(state).join(), "2,1,4")
+  })
+
+  it("uses default specs", () => {
+    let a = Behavior.defineSet<string>({default: "D"})
+    let state = mk(a.use(), a.use("X"))
+    ist(a.get(state).join(), "D,X")
+  })
+
+  it("only allows omitting use argument when there's a default", () => {
+    let a = Behavior.defineSet<string>()
+    ist.throws(() => a.use())
   })
 })

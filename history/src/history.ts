@@ -49,10 +49,14 @@ class HistoryBehavior {
   }
 }
 
-export const history = Behavior.define<HistoryConfig, HistoryBehavior>(
-  configs => new HistoryBehavior(configs.reduce((d, c) => Math.max(d, c.minDepth || 0), 0) || 100,
-                                 configs.reduce((d, c) => Math.max(d, c.newGroupDelay || 0), 0) || 500),
-  historyBehavior => [Behavior.stateField.use(historyBehavior.field)])
+export const history = Behavior.define<HistoryConfig, HistoryBehavior>({
+  combine(configs) {
+    return new HistoryBehavior(configs.reduce((d, c) => Math.max(d, c.minDepth || 0), 0) || 100,
+                               configs.reduce((d, c) => Math.max(d, c.newGroupDelay || 0), 0) || 500)
+  },
+  behavior: historyBehavior => [Behavior.stateField.use(historyBehavior.field)],
+  default: {}
+})
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {

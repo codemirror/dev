@@ -67,8 +67,8 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 // You can add multiple keymap behaviors to an editor. Their
 // priorities determine their precedence (the ones specified early or
 // with high priority get to dispatch first).
-export const keymap = Behavior.defineSet<Keymap>(map => {
-  return [Behavior.viewPlugin.use(() => ({
+export const keymap = Behavior.defineSet<Keymap>({
+  behavior: map => [Behavior.viewPlugin.use(() => ({
     handleDOMEvents: {keydown: keydownHandler(normalize(map))}
   }))]
 })
