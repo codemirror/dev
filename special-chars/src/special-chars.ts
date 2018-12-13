@@ -1,5 +1,5 @@
 import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewUpdate} from "../../view/src"
-import {ChangeSet, ChangedRange, Plugin} from "../../state/src"
+import {ChangeSet, ChangedRange, Behavior} from "../../state/src"
 import {countColumn} from "../../doc/src"
 
 export interface SpecialCharOptions {
@@ -8,13 +8,17 @@ export interface SpecialCharOptions {
   addSpecialChars?: RegExp
 }
 
-export function specialChars(options: SpecialCharOptions = {}): Plugin {
-  return new Plugin({
-    view(view: EditorView) {
-      return new SpecialCharHighlighter(view, options)
-    }
-  })
-}
+
+export const specialChars = Behavior.define<SpecialCharOptions>({
+  combine(configs) {
+    // FIXME make configurations compose properly
+    return Behavior.combineConfigs(configs)
+  },
+  behavior(config) {
+    return [Behavior.viewPlugin.use(view => new SpecialCharHighlighter(view, config))]
+  },
+  default: {}
+})
 
 const JOIN_GAP = 10
 
@@ -104,7 +108,6 @@ class SpecialCharHighlighter {
   }
 }
 
-// FIXME configurable
 const SPECIALS = /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff]/gu
 
 const NAMES: {[key: number]: string} = {

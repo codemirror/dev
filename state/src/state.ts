@@ -6,35 +6,35 @@ import {unique} from "./unique"
 
 class Configuration {
   constructor(
-    readonly behaviors: BehaviorStore,
+    readonly behavior: BehaviorStore,
     readonly fields: ReadonlyArray<StateField<any>>,
     readonly multipleSelections: boolean,
     readonly tabSize: number,
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let behaviors = BehaviorStore.resolve(config.behaviors || [])
+    let behavior = BehaviorStore.resolve(config.behavior || [])
     return new Configuration(
-      behaviors,
-      behaviors.get(Behavior.stateField) || [],
-      !!behaviors.get(Behavior.multipleSelections),
+      behavior,
+      behavior.get(Behavior.stateField) || [],
+      !!behavior.get(Behavior.multipleSelections),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
 
   updateTabSize(tabSize: number) {
-    return new Configuration(this.behaviors, this.fields, this.multipleSelections, tabSize, this.lineSeparator)
+    return new Configuration(this.behavior, this.fields, this.multipleSelections, tabSize, this.lineSeparator)
   }
 
   updateLineSeparator(lineSep: string | null) {
-    return new Configuration(this.behaviors, this.fields, this.multipleSelections, this.tabSize, lineSep)
+    return new Configuration(this.behavior, this.fields, this.multipleSelections, this.tabSize, lineSep)
   }
 }
 
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  behaviors?: ReadonlyArray<BehaviorSpec>
+  behavior?: ReadonlyArray<BehaviorSpec>
   tabSize?: number
   lineSeparator?: string | null
 }
@@ -98,7 +98,7 @@ export class EditorState {
     return EditorState.create({
       doc: json.doc,
       selection: EditorSelection.fromJSON(json.selection),
-      behaviors: config.behaviors,
+      behavior: config.behavior,
       tabSize: config.tabSize,
       lineSeparator: config.lineSeparator
     })

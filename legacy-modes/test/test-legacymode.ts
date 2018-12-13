@@ -1,4 +1,4 @@
-import {EditorState, Transaction} from "../../state/src"
+import {EditorState, Behavior, Transaction} from "../../state/src"
 import {RangeDecoration} from "../../view/src/decoration"
 import {Range} from "../../rangeset/src/rangeset"
 
@@ -22,12 +22,12 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
       return String(++state.pos)
     }
   }
-  const plugin = legacyMode(mode, {sleepTime: 0})
-  const view: {state: EditorState, viewport?: Viewport, updateState: () => void} = {
-    state: EditorState.create({doc, plugins: [plugin]}),
-    updateState: onDecorationUpdate
+  const behavior = legacyMode.use({mode, sleepTime: 0})
+  const view: {state: EditorState, viewport?: Viewport, decorationUpdate: () => void} = {
+    state: EditorState.create({doc, behavior: [behavior]}),
+    decorationUpdate: onDecorationUpdate
   }
-  const viewPlugin = plugin.view(view)
+  const viewPlugin = Behavior.viewPlugin.get(view.state)[0](view)
 
   return {
     calls,

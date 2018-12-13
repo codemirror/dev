@@ -1,12 +1,16 @@
-import {Plugin, EditorState} from "../../state/src"
+import {EditorState, Behavior} from "../../state/src"
 import {EditorView, ViewUpdate, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
-export function multipleSelections() {
-  return new Plugin({
-    multipleSelections: true,
-    view: (view: EditorView) => new MultipleSelectionView(view)
-  })
-}
+export interface Config {}
+
+export const multipleSelections = Behavior.define<Config>({
+  combine(configs) { return configs[0] },
+  behavior(config) {
+    return [Behavior.multipleSelections.use(),
+            Behavior.viewPlugin.use(view => new MultipleSelectionView(view))]
+  },
+  default: {}
+})
 
 class CursorWidget extends WidgetType<null> {
   toDOM() {
