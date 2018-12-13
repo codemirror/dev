@@ -1,11 +1,17 @@
-import {keymap} from "../src/keymap"
+import {keymap, Keymap} from "../src/keymap"
+import {EditorState, Behavior} from "../../state/src"
 const ist = require("ist")
 
 const fakeView = {state: {}, dispatch: () => {}}
 
-function dispatch(map: any, key: string, mods?: any) {
+function mk(map: Keymap) {
+  let state = EditorState.create({behaviors: [keymap.create(map)]})
+  return Behavior.viewPlugin.get(state)[0](fakeView)
+}
+
+function dispatch(plugin: any, key: string, mods?: any) {
   let event: Partial<KeyboardEvent> = Object.assign({}, mods, {key})
-  map.view().handleDOMEvents.keydown(fakeView, event)
+  plugin.handleDOMEvents.keydown(fakeView, event)
 }
 
 function counter() {
@@ -16,14 +22,14 @@ function counter() {
 describe("keymap", () => {
   it("calls the correct handler", () => {
     let a = counter(), b = counter()
-    dispatch(keymap({KeyA: a, KeyB: b}), "KeyA")
+    dispatch(mk({KeyA: a, KeyB: b}), "KeyA")
     ist(a.count, 1)
     ist(b.count, 0)
   })
 
   it("distinguishes between modifiers", () => {
     let s = counter(), c_s = counter(), s_c_s = counter(), a_s = counter()
-    let map = keymap({"Space": s, "Control-Space": c_s, "s-c-Space": s_c_s, "alt-Space": a_s})
+    let map = mk({"Space": s, "Control-Space": c_s, "s-c-Space": s_c_s, "alt-Space": a_s})
     dispatch(map, " ", {ctrlKey: true})
     dispatch(map, " ", {ctrlKey: true, shiftKey: true})
     ist(s.count, 0)
@@ -34,7 +40,7 @@ describe("keymap", () => {
 
   it("passes the state, dispatch, and view", () => {
     let called = false
-    dispatch(keymap({X: (view) => {
+    dispatch(mk({X: (view) => {
       ist(view, fakeView)
       return called = true
     }}), "X")
@@ -43,15 +49,15 @@ describe("keymap", () => {
 
   it("tries both shifted key and base with shift modifier", () => {
     let percent = counter(), shift5 = counter()
-    dispatch(keymap({"%": percent}), "%", {shiftKey: true, keyCode: 53})
+    dispatch(mk({"%": percent}), "%", {shiftKey: true, keyCode: 53})
     ist(percent.count, 1)
-    dispatch(keymap({"Shift-5": shift5}), "%", {shiftKey: true, keyCode: 53})
+    dispatch(mk({"Shift-5": shift5}), "%", {shiftKey: true, keyCode: 53})
     ist(shift5.count, 1)
   })
 
   it("tries keyCode when modifier active", () => {
     let count = counter()
-    dispatch(keymap({"Shift-Alt-3": count}), "×", {shiftKey: true, altKey: true, keyCode: 51})
+    dispatch(mk({"Shift-Alt-3": count}), "×", {shiftKey: true, altKey: true, keyCode: 51})
     ist(count.count, 1)
   })
 })
