@@ -1,77 +1,107 @@
 import {EditorState, StateField} from "./state"
 
+type A<T> = ReadonlyArray<T>
+
 export enum Priority { fallback = -1, base = 0, extend = 1, override = 2 }
 
-interface ResolveResult<Value> {
-  value: Value,
-  dependencies?: BehaviorSpec<any>[]
-}
+const noPriority = -2e9 as Priority
 
-export class Behavior<Spec, Value = Spec[]> {
-  private constructor(public name: string,
-                      public resolve: (specs: Spec[]) => ResolveResult<Value>,
-                      public dependencies: Behavior<any>[]) {}
+const none: A<any> = []
 
-  static simple<Value>(name: string) {
-    return new Behavior<Value, Value[]>(name, x => ({value: x, dependencies: []}), [])
-  }
+function noBehavior(): A<BehaviorSpec> { return none }
+
+export class Behavior<Spec, Value> {
+  private knownSub: Behavior<any, any>[] = []
+
+  // @internal
+  constructor(public name: string,
+              /* @internal */ public compute: ((specs: A<Spec>) => Value) | null,
+              /* @internal */ public behavior: (value: any) => A<BehaviorSpec>) {}
+
+  toString() { return "[behavior " + name + "]" }
 
   static define<Spec, Value>(name: string,
-                             resolve: (specs: Spec[]) => ResolveResult<Value>,
-                             dependencies: Behavior<any>[] = []) {
-    return new Behavior<Spec, Value>(name, resolve, dependencies)
+                             compute: (specs: A<Spec>) => Value,
+                             behavior: (value: any) => A<BehaviorSpec> = noBehavior) {
+    return new Behavior<Spec, Value>(name, compute, behavior)
   }
 
-  create(spec: Spec, priority: Priority = Priority.base): BehaviorSpec<Spec, Value> {
+  static defineSet<Spec>(name: string, behavior: (spec: Spec) => A<BehaviorSpec> = noBehavior) {
+    return new SetBehavior<Spec>(name, null, behavior)
+  }
+
+  create(spec: Spec, priority: Priority = noPriority): BehaviorSpec {
     return new BehaviorSpec(this, spec, priority)
   }
 
-  // @internal
-  dependsOn(behavior: Behavior<any>): boolean {
-    return this.dependencies.some(dep => dep == behavior || dep.dependsOn(behavior))
-  }
-
-  getFromSet(set: BehaviorSet): Value | undefined {
-    let found = set.behaviors.indexOf(this as any)
-    return found > -1 ? set.values[found] as Value : undefined
-  }
-
   get(state: EditorState): Value | undefined {
-    return this.getFromSet(state.config.behaviors)
+    return state.config.behaviors.get(this)
   }
 
-  some<Result>(
-    state: EditorState,
-    f: (value: Value extends (infer ElementType)[] ? ElementType : never) => Result
-  ): Result | undefined {
-    let found = undefined, value = this.get(state)
-    if (value === undefined) return found
-    if (!Array.isArray(value)) throw new RangeError("Can't call some on a non-array behavior")
-    for (let elt of value) {
-      found = f(elt)
-      if (found !== undefined) break
-    }
-    return found
-  }
+  static stateField: SetBehavior<StateField<any>>
 
-  static stateField = Behavior.simple<StateField<any>>("stateField")
   static multipleSelections = Behavior.define<boolean, boolean>(
-    "multipleSelections", values => ({value: values.indexOf(true) > -1}))
+    "multipleSelections", values => values.indexOf(true) > -1)
+
+  // FIXME move to view?
+  static viewPlugin: SetBehavior<(view: any) => any>
+
+  // @internal
+  hasSubBehavior(behavior: Behavior<any, any>): boolean {
+    for (let sub of this.knownSub)
+      if (sub == behavior || sub.hasSubBehavior(behavior)) return true
+    return false
+  }
+
+  // @internal
+  getBehavior(input: any, priority: Priority): A<BehaviorSpec> {
+    let sub = this.behavior(input)
+    for (let b of sub)
+      if (this.knownSub.indexOf(b.type) < 0)
+        this.knownSub.push(b.type)
+    return sub.map(b => b.fillPriority(priority))
+  }
 }
 
-export class BehaviorSpec<Spec, Value = Spec[]> {
-  constructor(public type: Behavior<Spec, Value>,
-              public spec: Spec,
+export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
+  get(state: EditorState): A<Spec> {
+    return state.config.behaviors.get(this) || none
+  }
+
+  some<Result>(state: EditorState, f: (value: Spec) => Result): Result | undefined {
+    for (let elt of this.get(state)) {
+      let found = f(elt)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+}
+
+Behavior.stateField = Behavior.defineSet<StateField<any>>("stateField")
+Behavior.viewPlugin = Behavior.defineSet<(view: any) => any>("viewPlugin")
+
+export class BehaviorSpec {
+  constructor(public type: Behavior<any, any>,
+              public spec: any,
               public priority: Priority) {}
+
+  fillPriority(priority: Priority) {
+    return this.priority == noPriority ? new BehaviorSpec(this.type, this.spec, priority) : this
+  }
 }
 
-export class BehaviorSet {
-  behaviors: Behavior<any>[] = []
+export class BehaviorStore {
+  behaviors: Behavior<any, any>[] = []
   values: any[] = []
 
-  static resolve(behaviors: ReadonlyArray<BehaviorSpec<any>>): BehaviorSet {
-    let set = new BehaviorSet
-    let pending = behaviors.slice()
+  get<Value>(behavior: Behavior<any, Value>): Value | undefined {
+    let found = this.behaviors.indexOf(behavior)
+    return found < 0 ? undefined : this.values[found] as Value
+  }
+
+  static resolve(behaviors: A<BehaviorSpec>): BehaviorStore {
+    let set = new BehaviorStore
+    let pending: BehaviorSpec[] = behaviors.slice().map(spec => spec.fillPriority(Priority.base))
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -80,32 +110,49 @@ export class BehaviorSet {
     // resolve them.
     while (pending.length > 0) {
       let top = findTopType(pending)
-      let result = takeType(pending, top)
+      // Prematurely evaluated a behavior type because of missing
+      // sub-behavior information -- start over, in the assumption
+      // that newly gathered information will make the next attempt
+      // more successful.
+      if (set.behaviors.indexOf(top) > -1) return this.resolve(behaviors)
+      let value = takeType(pending, top)
       set.behaviors.push(top)
-      set.values.push(result.value)
-      if (result.dependencies) for (let spec of result.dependencies) pending.push(spec)
+      set.values.push(value)
     }
     return set
   }
 }
 
-function findTopType(behaviors: BehaviorSpec<any>[]): Behavior<any> {
+function findTopType(behaviors: BehaviorSpec[]): Behavior<any, any> {
   for (let behavior of behaviors)
-    if (!behaviors.some(b => b.type.dependsOn(behavior.type)))
+    if (!behaviors.some(b => b.type.hasSubBehavior(behavior.type)))
       return behavior.type
-  throw new RangeError("Cyclic dependency in behavior " + behaviors[0].type.name)
+  throw new RangeError("Cyclic sub-behavior in " + behaviors[0].type.name)
 }
 
-function takeType<Spec, Value>(behaviors: BehaviorSpec<any>[], type: Behavior<Spec, Value>): ResolveResult<Value> {
-  let specs: BehaviorSpec<Spec, Value>[] = []
-  for (let i = 0; i < behaviors.length; i++) {
-    let behavior = behaviors[i] as any as BehaviorSpec<Spec, Value>
-    if (behavior.type == type) {
-      behaviors.splice(i--, 1)
-      let j = 0
-      while (j < specs.length && specs[j].priority < behavior.priority) j++
-      specs.splice(j, 0, behavior)
-    }
+function takeType<Spec, Value>(behaviors: BehaviorSpec[],
+                               type: Behavior<Spec, Value>): Value {
+  let specs: BehaviorSpec[] = []
+  for (let spec of behaviors) if (spec.type == type) {
+    let i = 0
+    while (i < specs.length && specs[i].priority < spec.priority) i++
+    specs.splice(i, 0, spec)
   }
-  return type.resolve(specs.map(s => s.spec))
+  if (type.compute) {
+    let value = type.compute(specs.map(s => s.spec)), first = true
+    for (let i = 0; i < behaviors.length; i++) if (behaviors[i].type == type) {
+      let sub = first ? type.getBehavior(value, behaviors[i].priority) : none
+      behaviors.splice(i, 1, ...sub)
+      first = false
+      i += sub.length - 1
+    }
+    return value
+  } else {
+    for (let i = 0; i < behaviors.length; i++) if (behaviors[i].type == type) {
+      let sub = type.getBehavior(behaviors[i].spec, behaviors[i].priority)
+      behaviors.splice(i, 1, ...sub)
+      i += sub.length - 1
+    }
+    return specs.map(s => s.spec) as any as Value
+  }
 }
