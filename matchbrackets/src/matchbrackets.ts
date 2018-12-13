@@ -98,13 +98,7 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
 
 export const matchBrackets = Behavior.define<Config>({
   combine(configs) {
-    let config: Config = {}
-    for (let c of configs) for (let prop in c) {
-      if ((config as any)[prop] != undefined)
-        throw new Error(`Conflicting configuation for ${prop} in matchBrackets`)
-      ;(config as any)[prop] = (c as any)[prop]
-    }
-    return config
+    return Behavior.combineConfigs(configs)
   },
   behavior(config) {
     return [Behavior.viewPlugin.use((v: EditorView) => {

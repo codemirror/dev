@@ -32,14 +32,14 @@ export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
 class HistoryBehavior {
   field: StateField<HistoryState>
 
-  constructor(public minDepth: number, public newGroupDelay: number) {
-    this.field = historyField(minDepth, newGroupDelay)
+  constructor(public config: HistoryConfig) {
+    this.field = historyField(config.minDepth!, config.newGroupDelay!)
   }
 
   cmd(target: PopTarget, only: ItemFilter, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
     let historyState = state.getField(this.field)
     if (!historyState.canPop(target, only)) return false
-    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, this.minDepth)
+    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, this.config.minDepth!)
     dispatch(transaction.setMeta(historyStateSlot, newState))
     return true
   }
@@ -51,8 +51,10 @@ class HistoryBehavior {
 
 export const history = Behavior.define<HistoryConfig, HistoryBehavior>({
   combine(configs) {
-    return new HistoryBehavior(configs.reduce((d, c) => Math.max(d, c.minDepth || 0), 0) || 100,
-                               configs.reduce((d, c) => Math.max(d, c.newGroupDelay || 0), 0) || 500)
+    return new HistoryBehavior(Behavior.combineConfigs(configs, {minDepth: Math.max}, {
+      minDepth: 100,
+      newGroupDelay: 500
+    }))
   },
   behavior: historyBehavior => [Behavior.stateField.use(historyBehavior.field)],
   default: {}

@@ -8,12 +8,11 @@ export interface SpecialCharOptions {
   addSpecialChars?: RegExp
 }
 
-// FIXME make configurations compose
 
-export const specialChars = Behavior.define({
+export const specialChars = Behavior.define<SpecialCharOptions>({
   combine(configs) {
-    if (configs.length != 1) throw new Error("Only one config allowed for specialChars")
-    return configs[0]
+    // FIXME make configurations compose properly
+    return Behavior.combineConfigs(configs)
   },
   behavior(config) {
     return [Behavior.viewPlugin.use(view => new SpecialCharHighlighter(view, config))]

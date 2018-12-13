@@ -71,6 +71,26 @@ export class Behavior<Spec, Value = Spec> {
         this.knownSub.push(b.type)
     return sub.map(b => b.fillPriority(priority))
   }
+
+  // Utility function for combining behaviors to fill in a config
+  // object from an array of provided configs. Will, by default, error
+  // when a field gets two values that aren't ===-equal, but you can
+  // provide combine functions per field to do something else.
+  static combineConfigs<Config>(configs: A<Config>,
+                                combine: {[key: string]: (first: any, second: any) => any} = {},
+                                defaults?: Config): Config {
+    let result: any = {}
+    for (let config of configs) for (let key of Object.keys(config)) {
+      let value = (config as any)[key], current = result[key]
+      if (current === undefined) result[key] = value
+      else if (current === value || value === undefined) {} // No conflict
+      else if (Object.hasOwnProperty.call(combine, key)) result[key] = combine[key](current, value)
+      else throw new Error("Config merge conflict for field " + key)
+    }
+    if (defaults) for (let key in defaults)
+      if (result[key] === undefined) result[key] = (defaults as any)[key]
+    return result
+  }
 }
 
 export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
