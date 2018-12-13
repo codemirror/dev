@@ -96,7 +96,7 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
   return Decoration.set(decorations)
 }
 
-export const matchBrackets = Behavior.define<Config, Config>({
+export const matchBrackets = Behavior.define<Config>({
   combine(configs) {
     let config: Config = {}
     for (let c of configs) for (let prop in c) {

@@ -12,15 +12,15 @@ function noBehavior(): A<BehaviorSpec> { return none }
 
 const noDefault: any = {}
 
-export class Behavior<Spec, Value> {
-  private knownSub: Behavior<any, any>[] = []
+export class Behavior<Spec, Value = Spec> {
+  private knownSub: Behavior<any>[] = []
 
   // @internal
   constructor(/* @internal */ public combine: ((specs: A<Spec>) => Value) | null,
               /* @internal */ public behavior: (value: any) => A<BehaviorSpec>,
               private default_: Spec) {}
 
-  static define<Spec, Value>({combine, behavior = noBehavior, default: default_ = noDefault}: {
+  static define<Spec, Value = Spec>({combine, behavior = noBehavior, default: default_ = noDefault}: {
     combine: (specs: A<Spec>) => Value,
     behavior?: (value: any) => A<BehaviorSpec>,
     default?: Spec
@@ -54,8 +54,10 @@ export class Behavior<Spec, Value> {
   // FIXME move to view?
   static viewPlugin: SetBehavior<(view: any) => any>
 
+  static indentation: SetBehavior<(state: EditorState, pos: number) => number>
+
   // @internal
-  hasSubBehavior(behavior: Behavior<any, any>): boolean {
+  hasSubBehavior(behavior: Behavior<any>): boolean {
     for (let sub of this.knownSub)
       if (sub == behavior || sub.hasSubBehavior(behavior)) return true
     return false
@@ -85,11 +87,12 @@ export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
   }
 }
 
-Behavior.stateField = Behavior.defineSet<StateField<any>>()
-Behavior.viewPlugin = Behavior.defineSet<(view: any) => any>()
+Behavior.stateField = Behavior.defineSet()
+Behavior.viewPlugin = Behavior.defineSet()
+Behavior.indentation = Behavior.defineSet()
 
 export class BehaviorSpec {
-  constructor(public type: Behavior<any, any>,
+  constructor(public type: Behavior<any>,
               public spec: any,
               public priority: Priority) {}
 
@@ -99,7 +102,7 @@ export class BehaviorSpec {
 }
 
 export class BehaviorStore {
-  behaviors: Behavior<any, any>[] = []
+  behaviors: Behavior<any>[] = []
   values: any[] = []
 
   get<Value>(behavior: Behavior<any, Value>): Value | undefined {
@@ -131,7 +134,7 @@ export class BehaviorStore {
   }
 }
 
-function findTopType(behaviors: BehaviorSpec[]): Behavior<any, any> {
+function findTopType(behaviors: BehaviorSpec[]): Behavior<any> {
   for (let behavior of behaviors)
     if (!behaviors.some(b => b.type.hasSubBehavior(behavior.type)))
       return behavior.type
