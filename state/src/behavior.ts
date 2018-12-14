@@ -35,7 +35,7 @@ export class Behavior<Spec, Value = Spec> {
     return new SetBehavior<Spec>(null, behavior, default_)
   }
 
-  use(spec: Spec = this.default_, priority: Priority = noPriority): BehaviorSpec {
+  use(spec: Spec = this.default_, priority: Priority = noPriority): BehaviorSpec<Spec> {
     if (spec == noDefault) throw new RangeError("This behavior has no default spec")
     return new BehaviorSpec(this, spec, priority)
   }
@@ -103,12 +103,12 @@ Behavior.stateField = Behavior.defineSet()
 Behavior.viewPlugin = Behavior.defineSet()
 Behavior.indentation = Behavior.defineSet()
 
-export class BehaviorSpec {
-  constructor(public type: Behavior<any>,
-              public spec: any,
+export class BehaviorSpec<Spec = any> {
+  constructor(public type: Behavior<Spec, any>,
+              public spec: Spec,
               public priority: Priority) {}
 
-  fillPriority(priority: Priority) {
+  fillPriority(priority: Priority): BehaviorSpec<Spec> {
     return this.priority == noPriority ? new BehaviorSpec(this.type, this.spec, priority) : this
   }
 }
@@ -155,7 +155,7 @@ function findTopType(behaviors: BehaviorSpec[]): Behavior<any> {
 
 function takeType<Spec, Value>(behaviors: BehaviorSpec[],
                                type: Behavior<Spec, Value>): Value {
-  let specs: BehaviorSpec[] = []
+  let specs: BehaviorSpec<Spec>[] = []
   for (let spec of behaviors) if (spec.type == type) {
     let i = 0
     while (i < specs.length && specs[i].priority >= spec.priority) i++
