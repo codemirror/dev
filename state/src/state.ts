@@ -1,6 +1,6 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
-import {BehaviorStore, Behavior, BehaviorSpec} from "./behavior"
+import {BehaviorStore, Behavior, BehaviorUse} from "./behavior"
 import {Transaction, MetaSlot} from "./transaction"
 import {unique} from "./unique"
 
@@ -34,7 +34,7 @@ class Configuration {
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  behavior?: ReadonlyArray<BehaviorSpec>
+  behavior?: ReadonlyArray<BehaviorUse>
   tabSize?: number
   lineSeparator?: string | null
 }

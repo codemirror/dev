@@ -8,7 +8,7 @@ const noPriority = -2e9 as Priority
 
 const none: A<any> = []
 
-function noBehavior(): A<BehaviorSpec> { return none }
+function noBehavior(): A<BehaviorUse> { return none }
 
 const noDefault: any = {}
 
@@ -17,27 +17,27 @@ export class Behavior<Spec, Value = Spec> {
 
   // @internal
   constructor(/* @internal */ public combine: ((specs: A<Spec>) => Value) | null,
-              /* @internal */ public behavior: (value: any) => A<BehaviorSpec>,
+              /* @internal */ public behavior: (value: any) => A<BehaviorUse>,
               private default_: Spec) {}
 
   static define<Spec, Value = Spec>({combine, behavior = noBehavior, default: default_ = noDefault}: {
     combine: (specs: A<Spec>) => Value,
-    behavior?: (value: any) => A<BehaviorSpec>,
+    behavior?: (value: any) => A<BehaviorUse>,
     default?: Spec
   }) {
     return new Behavior<Spec, Value>(combine, behavior, default_)
   }
 
   static defineSet<Spec>({behavior = noBehavior, default: default_ = noDefault}: {
-    behavior?: (spec: Spec) => A<BehaviorSpec>,
+    behavior?: (spec: Spec) => A<BehaviorUse>,
     default?: Spec
   } = {}) {
     return new SetBehavior<Spec>(null, behavior, default_)
   }
 
-  use(spec: Spec = this.default_, priority: Priority = noPriority): BehaviorSpec<Spec> {
+  use(spec: Spec = this.default_, priority: Priority = noPriority): BehaviorUse<Spec> {
     if (spec == noDefault) throw new RangeError("This behavior has no default spec")
-    return new BehaviorSpec(this, spec, priority)
+    return new BehaviorUse(this, spec, priority)
   }
 
   get(state: EditorState): Value | undefined {
@@ -64,7 +64,7 @@ export class Behavior<Spec, Value = Spec> {
   }
 
   // @internal
-  getBehavior(input: any, priority: Priority): A<BehaviorSpec> {
+  getBehavior(input: any, priority: Priority): A<BehaviorUse> {
     let sub = this.behavior(input)
     for (let b of sub)
       if (this.knownSub.indexOf(b.type) < 0)
@@ -103,13 +103,13 @@ Behavior.stateField = Behavior.defineSet()
 Behavior.viewPlugin = Behavior.defineSet()
 Behavior.indentation = Behavior.defineSet()
 
-export class BehaviorSpec<Spec = any> {
+export class BehaviorUse<Spec = any> {
   constructor(public type: Behavior<Spec, any>,
               public spec: Spec,
               public priority: Priority) {}
 
-  fillPriority(priority: Priority): BehaviorSpec<Spec> {
-    return this.priority == noPriority ? new BehaviorSpec(this.type, this.spec, priority) : this
+  fillPriority(priority: Priority): BehaviorUse<Spec> {
+    return this.priority == noPriority ? new BehaviorUse(this.type, this.spec, priority) : this
   }
 }
 
@@ -122,9 +122,9 @@ export class BehaviorStore {
     return found < 0 ? undefined : this.values[found] as Value
   }
 
-  static resolve(behaviors: A<BehaviorSpec>): BehaviorStore {
+  static resolve(behaviors: A<BehaviorUse>): BehaviorStore {
     let set = new BehaviorStore
-    let pending: BehaviorSpec[] = behaviors.slice().map(spec => spec.fillPriority(Priority.base))
+    let pending: BehaviorUse[] = behaviors.slice().map(spec => spec.fillPriority(Priority.base))
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -146,16 +146,16 @@ export class BehaviorStore {
   }
 }
 
-function findTopType(behaviors: BehaviorSpec[]): Behavior<any> {
+function findTopType(behaviors: BehaviorUse[]): Behavior<any> {
   for (let behavior of behaviors)
     if (!behaviors.some(b => b.type.hasSubBehavior(behavior.type)))
       return behavior.type
   throw new RangeError("Sub-behavior cycle in behaviors")
 }
 
-function takeType<Spec, Value>(behaviors: BehaviorSpec[],
+function takeType<Spec, Value>(behaviors: BehaviorUse[],
                                type: Behavior<Spec, Value>): Value {
-  let specs: BehaviorSpec<Spec>[] = []
+  let specs: BehaviorUse<Spec>[] = []
   for (let spec of behaviors) if (spec.type == type) {
     let i = 0
     while (i < specs.length && specs[i].priority >= spec.priority) i++
