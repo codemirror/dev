@@ -1,12 +1,12 @@
 import {EditorView} from "../src"
-import {EditorState, BehaviorSpec} from "../../state/src"
+import {EditorState, BehaviorUse} from "../../state/src"
 
 const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElement
 
 let tempView: EditorView | null = null
 let hide: any = null
 
-export function tempEditor(doc = "", behavior: BehaviorSpec[] = []): EditorView {
+export function tempEditor(doc = "", behavior: ReadonlyArray<BehaviorUse> = []): EditorView {
   if (tempView) {
     tempView.destroy()
     tempView = null
