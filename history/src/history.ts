@@ -62,9 +62,8 @@ export const history = Behavior.define<HistoryConfig, HistoryBehavior>({
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let behavior = history.get(state)
-    if (!behavior) return false
-    return behavior.cmd(target, only, state, dispatch)
+    if (!history.available(state)) return false
+    return history.get(state).cmd(target, only, state, dispatch)
   }
 }
 
@@ -82,8 +81,8 @@ export function closeHistory(tr: Transaction): Transaction {
 
 function depth(target: PopTarget, only: ItemFilter) {
   return function(state: EditorState): number {
-    let behavior = history.get(state)
-    return behavior ? behavior.depth(target, only, state) : 0
+    if (!history.available(state)) return 0
+    return history.get(state).depth(target, only, state)
   }
 }
 

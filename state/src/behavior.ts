@@ -32,7 +32,7 @@ export class Behavior<Spec, Value = Spec> {
     behavior?: (spec: Spec) => A<BehaviorUse>,
     default?: Spec
   } = {}) {
-    return new SetBehavior<Spec>(null, behavior, default_)
+    return new Behavior<Spec, Spec[]>(null, behavior, default_)
   }
 
   use(spec: Spec = this.default_, priority: Priority = noPriority): BehaviorUse<Spec> {
@@ -40,11 +40,20 @@ export class Behavior<Spec, Value = Spec> {
     return new BehaviorUse(this, spec, priority)
   }
 
-  get(state: EditorState): Value | undefined {
-    return state.config.behavior.get(this)
+  get(state: EditorState): Value {
+    let found = state.config.behavior.behaviors.indexOf(this)
+    if (found < 0) {
+      if (!this.combine) return none as any as Value
+      throw new Error("Behavior is not present on this state")
+    }
+    return state.config.behavior.values[found]
   }
 
-  static stateField: SetBehavior<StateField<any>>
+  available(state: EditorState): boolean {
+    return state.config.behavior.behaviors.indexOf(this) > -1
+  }
+
+  static stateField = Behavior.defineSet<StateField<any>>()
 
   static multipleSelections = Behavior.define<boolean, boolean>({
     combine: values => values.indexOf(true) > -1,
@@ -52,9 +61,9 @@ export class Behavior<Spec, Value = Spec> {
   })
 
   // FIXME move to view?
-  static viewPlugin: SetBehavior<(view: any) => any>
+  static viewPlugin = Behavior.defineSet<(view: any) => any>()
 
-  static indentation: SetBehavior<(state: EditorState, pos: number) => number>
+  static indentation = Behavior.defineSet<(state: EditorState, pos: number) => number>()
 
   // @internal
   hasSubBehavior(behavior: Behavior<any>): boolean {
@@ -93,16 +102,6 @@ export class Behavior<Spec, Value = Spec> {
   }
 }
 
-export class SetBehavior<Spec> extends Behavior<Spec, A<Spec>> {
-  get(state: EditorState): A<Spec> {
-    return state.config.behavior.get(this) || none
-  }
-}
-
-Behavior.stateField = Behavior.defineSet()
-Behavior.viewPlugin = Behavior.defineSet()
-Behavior.indentation = Behavior.defineSet()
-
 export class BehaviorUse<Spec = any> {
   constructor(public type: Behavior<Spec, any>,
               public spec: Spec,
@@ -117,9 +116,9 @@ export class BehaviorStore {
   behaviors: Behavior<any>[] = []
   values: any[] = []
 
-  get<Value>(behavior: Behavior<any, Value>): Value | undefined {
+  get<Value>(behavior: Behavior<any, Value>, deflt: Value): Value {
     let found = this.behaviors.indexOf(behavior)
-    return found < 0 ? undefined : this.values[found] as Value
+    return found < 0 ? deflt : this.values[found] as Value
   }
 
   static resolve(behaviors: A<BehaviorUse>): BehaviorStore {

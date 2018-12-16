@@ -16,8 +16,8 @@ class Configuration {
     let behavior = BehaviorStore.resolve(config.behavior || [])
     return new Configuration(
       behavior,
-      behavior.get(Behavior.stateField) || [],
-      !!behavior.get(Behavior.multipleSelections),
+      behavior.get(Behavior.stateField, []),
+      behavior.get(Behavior.multipleSelections, false),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
