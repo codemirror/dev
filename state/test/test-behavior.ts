@@ -33,6 +33,13 @@ describe("EditorState behavior", () => {
     ist(JSON.stringify(a.get(state)), "[]")
   })
 
+  it("raises an error for absent non-set behavior", () => {
+    let a = Behavior.define<number, number>({combine: x => x[0]})
+    let state = mk()
+    ist(!a.available(state))
+    ist.throws(() => a.get(state))
+  })
+
   it("sorts behaviors by priority", () => {
     let a = Behavior.defineSet<string>()
     let state = mk(a.use("a"), a.use("b"), a.use("c", Priority.extend),
