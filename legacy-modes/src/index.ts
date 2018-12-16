@@ -1,4 +1,4 @@
-import {EditorView, ViewUpdate} from "../../view/src"
+import {EditorView, ViewUpdate, viewPlugin} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, Behavior, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
@@ -157,7 +157,7 @@ export const legacyMode = Behavior.defineSet<Config>({
     })
     return [
       Behavior.stateField.use(field),
-      Behavior.viewPlugin.use(viewPlugin(field, config)),
+      viewPlugin.use(getViewPlugin(field, config)),
       Behavior.indentation.use((state: EditorState, pos: number): number => {
         if (!config.mode.indent) return -1
         let modeState = state.getField(field).getState(state, pos, config.mode)
@@ -169,7 +169,7 @@ export const legacyMode = Behavior.defineSet<Config>({
   }
 })
 
-function viewPlugin(field: StateField<StateCache<any>>, config: Config) {
+function getViewPlugin(field: StateField<StateCache<any>>, config: Config) {
   const {sleepTime = 100, maxWorkTime = 100, mode} = config
   return (v: EditorView) => {
     let decorations = Decoration.none, from = -1, to = -1

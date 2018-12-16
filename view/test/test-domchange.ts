@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection, Behavior} from "../../state/src"
-import {Decoration, EditorView, ViewUpdate} from "../src"
+import {EditorSelection} from "../../state/src"
+import {Decoration, EditorView, ViewUpdate, viewPlugin} from "../src"
 import ist from "ist"
 
 function flush(cm: EditorView) {
@@ -119,7 +119,7 @@ describe("DOM changes", () => {
   })
 
   it("doesn't drop collapsed text", () => {
-    let cm = tempEditor("abcd", [Behavior.viewPlugin.use(() => ({
+    let cm = tempEditor("abcd", [viewPlugin.use(() => ({
       decorations: Decoration.set(Decoration.range(1, 3, {collapsed: true})),
       update(v: EditorView, u: ViewUpdate) { if (u.transactions.length) (this as any).decorations = null }
     }))])

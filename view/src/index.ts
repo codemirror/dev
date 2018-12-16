@@ -1,4 +1,4 @@
-export {EditorView, ViewUpdate, PluginView} from "./editorview"
+export {EditorView, ViewUpdate, viewPlugin, PluginView} from "./editorview"
 export {EditorViewport} from "./docview"
 export {Decoration, DecorationSet, DecoratedRange, WidgetType,
         RangeDecorationSpec, WidgetDecorationSpec, LineDecorationSpec} from "./decoration"

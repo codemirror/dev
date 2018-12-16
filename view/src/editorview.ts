@@ -1,4 +1,4 @@
-import {EditorState, Behavior, Transaction, MetaSlot} from "../../state/src"
+import {EditorState, Transaction, MetaSlot, Behavior} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {getRoot, Rect} from "./dom"
@@ -6,6 +6,8 @@ import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
+
+export const viewPlugin = Behavior.defineSet<(view: EditorView) => PluginView>()
 
 export class EditorView {
   private _state!: EditorState
@@ -111,7 +113,7 @@ export class EditorView {
   private createPluginViews(plugins: PluginView[]) {
     this.destroyPluginViews()
     for (let plugin of plugins) this.pluginViews.push(plugin)
-    for (let p of Behavior.viewPlugin.get(this.state)) this.pluginViews.push(p(this))
+    for (let p of viewPlugin.get(this.state)) this.pluginViews.push(p(this))
   }
 
   private destroyPluginViews() {
