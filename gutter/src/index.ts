@@ -1,5 +1,5 @@
 import {Behavior, combineConfig} from "../../state/src"
-import {EditorView} from "../../view/src"
+import {EditorView, viewPlugin} from "../../view/src"
 
 // FIXME Think about how the gutter width changing could cause
 // problems when line wrapping is on by changing a line's height
@@ -19,7 +19,7 @@ export interface GutterConfig {
 
 export const gutter = Behavior.define({
   combine(configs) { return combineConfig(configs) },
-  behavior(config) { return [Behavior.viewPlugin.use(view => new GutterView(view, config))] },
+  behavior(config) { return [viewPlugin.use(view => new GutterView(view, config))] },
   default: {}
 })
 

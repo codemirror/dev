@@ -1,6 +1,6 @@
 import {Text} from "../../doc/src"
 import {EditorState, Behavior, combineConfig} from "../../state/src"
-import {EditorView, ViewUpdate} from "../../view/src/"
+import {EditorView, ViewUpdate, viewPlugin} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
 const matching: {[key: string]: string | undefined} = {
@@ -101,15 +101,14 @@ export const matchBrackets = Behavior.define<Config>({
     return combineConfig(configs)
   },
   behavior(config) {
-    return [Behavior.viewPlugin.use((v: EditorView) => {
+    return [viewPlugin.use((v: EditorView) => {
       let decorations = Decoration.none
       return {
         get decorations() { return decorations },
         update(v: EditorView, update: ViewUpdate) {
           if (!update.transactions.length) return
           // FIXME cast is muffling a justified TypeScript error
-          const refDecos = idx == undefined ? undefined : (v as any).pluginViews[idx].decorations
-          decorations = doMatchBrackets(v.state, refDecos, config)
+          decorations = doMatchBrackets(v.state, undefined, config)
         }
       }
     })]
