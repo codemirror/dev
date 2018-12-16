@@ -1,4 +1,4 @@
-import {EditorState, Transaction, StateField, MetaSlot, Behavior} from "../../state/src"
+import {EditorState, Transaction, StateField, MetaSlot, Behavior, combineConfig} from "../../state/src"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
@@ -51,7 +51,7 @@ class HistoryBehavior {
 
 export const history = Behavior.define<HistoryConfig, HistoryBehavior>({
   combine(configs) {
-    return new HistoryBehavior(Behavior.combineConfigs(configs, {minDepth: Math.max}, {
+    return new HistoryBehavior(combineConfig(configs, {minDepth: Math.max}, {
       minDepth: 100,
       newGroupDelay: 500
     }))
