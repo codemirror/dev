@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src"
-import {EditorState, Behavior} from "../../state/src"
+import {EditorState, Behavior, combineConfig} from "../../state/src"
 import {EditorView} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
@@ -98,7 +98,7 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
 
 export const matchBrackets = Behavior.define<Config>({
   combine(configs) {
-    return Behavior.combineConfigs(configs)
+    return combineConfig(configs)
   },
   behavior(config) {
     return [Behavior.viewPlugin.use((v: EditorView) => {
