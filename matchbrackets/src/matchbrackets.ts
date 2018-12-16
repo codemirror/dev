@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src"
-import {EditorState, Behavior} from "../../state/src"
+import {EditorState, Behavior, combineConfig} from "../../state/src"
 import {EditorView, ViewUpdate} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
@@ -98,24 +98,18 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
 
 export const matchBrackets = Behavior.define<Config>({
   combine(configs) {
-    return Behavior.combineConfigs(configs)
+    return combineConfig(configs)
   },
   behavior(config) {
     return [Behavior.viewPlugin.use((v: EditorView) => {
       let decorations = Decoration.none
       return {
         get decorations() { return decorations },
-<<<<<<< HEAD
         update(v: EditorView, update: ViewUpdate) {
           if (!update.transactions.length) return
           // FIXME cast is muffling a justified TypeScript error
           const refDecos = idx == undefined ? undefined : (v as any).pluginViews[idx].decorations
           decorations = doMatchBrackets(v.state, refDecos, config)
-=======
-        updateState(v: EditorView) {
-          // FIXME make this use a behavior exported by the highlighter
-          decorations = doMatchBrackets(v.state, undefined, config)
->>>>>>> Port matchbrackets to behaviors
         }
       }
     })]
