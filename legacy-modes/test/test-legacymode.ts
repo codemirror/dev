@@ -1,4 +1,5 @@
-import {EditorState, Behavior, Transaction} from "../../state/src"
+import {EditorState, Transaction} from "../../state/src"
+import {viewPlugin} from "../../view/src"
 import {RangeDecoration} from "../../view/src/decoration"
 import {Range} from "../../rangeset/src/rangeset"
 
@@ -27,15 +28,15 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     state: EditorState.create({doc, behavior: [behavior]}),
     decorationUpdate: onDecorationUpdate
   }
-  const viewPlugin = Behavior.viewPlugin.get(view.state)[0](view)
+  const plugin = viewPlugin.get(view.state)[0](view as any)
 
   return {
     calls,
     getDecorations(vp: Viewport) {
       view.viewport = vp
-      viewPlugin.updateViewport(view)
+      plugin.updateViewport!(view as any)
       const decorations: Range<RangeDecoration>[] = []
-      viewPlugin.decorations.collect(decorations)
+      plugin.decorations!.collect(decorations, 0)
       return decorations
     },
     get transaction() {
@@ -44,7 +45,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     apply(transaction: Transaction, {from, to}: Viewport) {
       view.state = transaction.apply()
       view.viewport = {from, to}
-      viewPlugin.updateState(view, view.state, [transaction])
+      plugin.updateState!(view as any, view.state, [transaction])
     }
   }
 }

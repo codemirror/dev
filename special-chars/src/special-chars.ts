@@ -1,4 +1,4 @@
-import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView} from "../../view/src"
+import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, viewPlugin} from "../../view/src"
 import {Transaction, ChangeSet, ChangedRange, Behavior, combineConfig} from "../../state/src"
 import {countColumn} from "../../doc/src"
 
@@ -15,7 +15,7 @@ export const specialChars = Behavior.define<SpecialCharOptions>({
     return combineConfig(configs)
   },
   behavior(config) {
-    return [Behavior.viewPlugin.use(view => new SpecialCharHighlighter(view, config))]
+    return [viewPlugin.use(view => new SpecialCharHighlighter(view, config))]
   },
   default: {}
 })

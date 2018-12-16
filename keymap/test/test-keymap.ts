@@ -1,12 +1,13 @@
 import {keymap, Keymap} from "../src/keymap"
-import {EditorState, Behavior} from "../../state/src"
+import {EditorState} from "../../state/src"
+import {viewPlugin} from "../../view/src"
 const ist = require("ist")
 
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
   let state = EditorState.create({behavior: [keymap.use(map)]})
-  return Behavior.viewPlugin.get(state)[0](fakeView)
+  return viewPlugin.get(state)[0](fakeView as any)
 }
 
 function dispatch(plugin: any, key: string, mods?: any) {

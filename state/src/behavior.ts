@@ -60,9 +60,6 @@ export class Behavior<Spec, Value = Spec> {
     default: true
   })
 
-  // FIXME move to view?
-  static viewPlugin = Behavior.defineSet<(view: any) => any>()
-
   static indentation = Behavior.defineSet<(state: EditorState, pos: number) => number>()
 
   // @internal

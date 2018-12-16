@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorView, Decoration, DecorationSet, WidgetType} from "../src"
-import {Behavior, EditorState, Transaction} from "../../state/src"
+import {EditorView, viewPlugin, Decoration, DecorationSet, WidgetType} from "../src"
+import {EditorState, Transaction} from "../../state/src"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
@@ -54,7 +54,7 @@ function wordDeco(state: EditorState): DecorationSet {
   return Decoration.set(deco)
 }
 
-const wordHighlighter = Behavior.viewPlugin.use((v: EditorView) => ({
+const wordHighlighter = viewPlugin.use((v: EditorView) => ({
   decorations: wordDeco(v.state),
   updateState() { this.decorations = wordDeco(v.state) }
 }))
@@ -63,11 +63,11 @@ function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  return Behavior.viewPlugin.use(v => ({
+  return viewPlugin.use(v => ({
     decorations: Decoration.set(
       positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))),
     updateState(_v: any, _p: any, transactions: Transaction[]) {
-      this.decorations = transactions.reduce((d, tr) => d.map(tr.changes), this.decorations)
+      this.decorations = transactions.reduce((d, tr) => d.map(tr.changes), this.decorations!)
     }
   }))
 }
