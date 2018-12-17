@@ -1,6 +1,6 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
-import {BehaviorStore, Behavior, BehaviorUse} from "./behavior"
+import {BehaviorStore, Behavior, Extender} from "./extension"
 import {Transaction, MetaSlot} from "./transaction"
 import {unique} from "./unique"
 
@@ -13,11 +13,11 @@ class Configuration {
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let behavior = BehaviorStore.resolve(config.behavior || [])
+    let behavior = BehaviorStore.resolve(config.extensions || [])
     return new Configuration(
       behavior,
-      behavior.get(Behavior.stateField, []),
-      behavior.get(Behavior.multipleSelections, false),
+      behavior.get(Behavior.stateField),
+      behavior.get(Behavior.allowMultipleSelections).some(x => x),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
@@ -34,7 +34,7 @@ class Configuration {
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  behavior?: ReadonlyArray<BehaviorUse>
+  extensions?: ReadonlyArray<Extender>
   tabSize?: number
   lineSeparator?: string | null
 }
@@ -98,7 +98,7 @@ export class EditorState {
     return EditorState.create({
       doc: json.doc,
       selection: EditorSelection.fromJSON(json.selection),
-      behavior: config.behavior,
+      extensions: config.extensions,
       tabSize: config.tabSize,
       lineSeparator: config.lineSeparator
     })
