@@ -16,9 +16,11 @@ const none = [] as any
 // or configuring the way it behaves (see
 // `Behavior.allowMultipleSelections`).
 export class Behavior<Value> {
-  public unique: boolean
-  
-  constructor({unique = false}: {unique?: boolean} = {}) { this.unique = unique }
+  private constructor(public unique: boolean) {}
+
+  static define<Value>({unique = false}: {unique?: boolean} = {}) {
+    return new Behavior<Value>(unique)
+  }
 
   use(value: Value, priority: Priority = noPriority): Extender {
     return new Extender(null, this, value, priority)
@@ -34,11 +36,11 @@ export class Behavior<Value> {
     return all.length == 0 ? defaultValue : all[1]
   }
 
-  static stateField = new Behavior<StateField<any>>()
+  static stateField = Behavior.define<StateField<any>>()
 
-  static allowMultipleSelections = new Behavior<boolean>()
+  static allowMultipleSelections = Behavior.define<boolean>()
 
-  static indentation = new Behavior<(state: EditorState, pos: number) => number>()
+  static indentation = Behavior.define<(state: EditorState, pos: number) => number>()
 }
 
 // An extension is a piece of functionality that can be added to a
@@ -175,12 +177,12 @@ export class BehaviorStore {
     for (let ext of pending) {
       let behavior = ext.behavior!
       if (store.behaviors.indexOf(behavior) > -1) continue // Already collected
-      let values: any[] = []
+      let values: Extender[] = []
       for (let e of pending) if (e.behavior == behavior) e.collect(values)
       if (behavior.unique && values.length != 1)
         throw new RangeError("Multiple instances of a unique behavior found")
       store.behaviors.push(behavior)
-      store.values.push(values)
+      store.values.push(values.map(v => v.value))
     }
     return store
   }
