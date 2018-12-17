@@ -2,6 +2,7 @@ import {EditorState, StateField} from "./state"
 
 type A<T> = ReadonlyArray<T>
 
+// Priorities for overriding the ordering of extensions and behaviors.
 export enum Priority { fallback = -1, base = 0, extend = 1, override = 2 }
 
 const noPriority = -2 as Priority
@@ -26,10 +27,13 @@ export class Behavior<Value> {
     return new Extender(null, this, value, priority)
   }
 
+  // The the values for this behavior.
   get(state: EditorState): Value[] {
     return state.config.behavior.get(this)
   }
 
+  // Get the value of a unique behavior, or a default value when it
+  // isn't available in this state.
   getSingle<Default = undefined>(state: EditorState, defaultValue: Default): Value | Default {
     if (!this.unique) throw new Error("Can only call getSingle on a Behavior with unique=true")
     let all = this.get(state)
@@ -78,11 +82,11 @@ export class Extension<Spec> {
   // bother users with specifying them in advance. If dependency
   // resolution goes wrong because of missing information here, it is
   // simply started over.
-  private knownSub: Extension<any>[] = []
+  private knownSubs: Extension<any>[] = []
 
   // @internal
   hasSub(extension: Extension<any>): boolean {
-    for (let sub of this.knownSub)
+    for (let sub of this.knownSubs)
       if (sub == extension || sub.hasSub(extension)) return true
     return false
   }
@@ -117,26 +121,43 @@ export class Extension<Spec> {
     }
   }
 
+  // Process a set of sub-extensions, making sure they are registered
+  // in `this.knownSubs` and filling in any non-specified priorities.
   private subs(extenders: A<Extender>, priority: Priority) {
     for (let ext of extenders)
-      if (ext.extension && this.knownSub.indexOf(ext.extension) < 0)
-        this.knownSub.push(ext.extension)
+      if (ext.extension && this.knownSubs.indexOf(ext.extension) < 0)
+        this.knownSubs.push(ext.extension)
     return extenders.map(e => e.fillPriority(priority))
   }
 }
 
+// An extender specifies a behavior or extension that should be
+// present in a state. They are both passed directly to
+// `EditorState.create` though the extensions option and returned by
+// extensions.
 export class Extender {
   // @internal
-  constructor(/* @internal */ public extension: Extension<any> | null,
-              /* @internal */ public behavior: Behavior<any> | null,
-              /* @internal */ public value: any,
-              /* @internal */ public priority: Priority) {}
+  constructor(
+    // Non-null if this is an instance of an extension.
+    // Exactly one of this or behavior will be non-null in any given
+    // instance. @internal
+    public extension: Extension<any> | null,
+    // Non-null if this is an instance of a behavior. @internal
+    public behavior: Behavior<any> | null,
+    // The extension spec or behavior value. @internal
+    public value: any,
+    // The priority assigned to this extender. @internal
+    public priority: Priority
+  ) {}
 
   // @internal
   fillPriority(priority: Priority): Extender {
     return this.priority == noPriority ? new Extender(this.extension, this.behavior, this.value, priority) : this
   }
 
+  // Insert this extender in an array of extenders so that it appears
+  // after any already-present extenders with the same or lower
+  // priority, but before any extenders with higher priority.
   // @internal
   collect(array: Extender[]) {
     let i = 0
@@ -145,6 +166,8 @@ export class Extender {
   }
 }
 
+// An instance of this is part of EditorState and stores the behaviors
+// provided for the state.
 export class BehaviorStore {
   behaviors: Behavior<any>[] = []
   values: any[][] = []
@@ -154,8 +177,10 @@ export class BehaviorStore {
     return found < 0 ? none : this.values[found]
   }
 
+  // Resolve an array of extenders by expanding all extensions until
+  // only behaviors are left, and then collecting the behaviors into
+  // arrays of values, preserving priority ordering throughout.
   static resolve(extenders: A<Extender>): BehaviorStore {
-    let store = new BehaviorStore
     let pending: Extender[] = extenders.slice().map(ext => ext.fillPriority(Priority.base))
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
@@ -174,6 +199,8 @@ export class BehaviorStore {
       resolved.push(top)
       top.resolve(pending)
     }
+    // Collect the behavior values.
+    let store = new BehaviorStore
     for (let ext of pending) {
       let behavior = ext.behavior!
       if (store.behaviors.indexOf(behavior) > -1) continue // Already collected
@@ -188,6 +215,9 @@ export class BehaviorStore {
   }
 }
 
+// Find the extension type that must be resolved next, meaning it is
+// not a (transitive) sub-extension of any other extensions that are
+// still in extenders.
 function findTopExtensionType(extenders: Extender[]): Extension<any> | null {
   let foundExtension = false
   for (let ext of extenders) if (ext.extension) {
