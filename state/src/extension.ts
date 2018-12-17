@@ -33,7 +33,7 @@ export class Behavior<Value> {
   getSingle<Default = undefined>(state: EditorState, defaultValue: Default): Value | Default {
     if (!this.unique) throw new Error("Can only call getSingle on a Behavior with unique=true")
     let all = this.get(state)
-    return all.length == 0 ? defaultValue : all[1]
+    return all.length == 0 ? defaultValue : all[0]
   }
 
   static stateField = Behavior.define<StateField<any>>()

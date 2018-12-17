@@ -7,7 +7,7 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
 
-export const viewPlugin = Behavior.defineSet<(view: EditorView) => PluginView>()
+export const viewPlugin = Behavior.define<(view: EditorView) => PluginView>()
 
 export class EditorView {
   private _state!: EditorState

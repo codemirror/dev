@@ -1,18 +1,18 @@
 import {EditorView} from "../src"
-import {EditorState, BehaviorUse} from "../../state/src"
+import {EditorState, Extender} from "../../state/src"
 
 const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElement
 
 let tempView: EditorView | null = null
 let hide: any = null
 
-export function tempEditor(doc = "", behavior: ReadonlyArray<BehaviorUse> = []): EditorView {
+export function tempEditor(doc = "", extensions: ReadonlyArray<Extender> = []): EditorView {
   if (tempView) {
     tempView.destroy()
     tempView = null
   }
 
-  tempView = new EditorView(EditorState.create({doc, behavior}))
+  tempView = new EditorView(EditorState.create({doc, extensions}))
   workspace.appendChild(tempView.dom)
   workspace.style.pointerEvents = ""
   if (hide == null) hide = setTimeout(() => {
