@@ -18,7 +18,7 @@ const {readFile} = require("fs");
 
 readFile("package.json", "utf8", (err, data) => {
   console.log(data);
-});`, behavior: [
+});`, extensions: [
   gutter.use(),
   history.use(),
   specialChars.use(),

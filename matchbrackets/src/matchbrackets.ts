@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src"
-import {EditorState, Behavior, combineConfig} from "../../state/src"
+import {EditorState, Extension, combineConfig} from "../../state/src"
 import {EditorView, ViewUpdate, viewPlugin} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
@@ -96,22 +96,17 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
   return Decoration.set(decorations)
 }
 
-export const matchBrackets = Behavior.define<Config>({
-  combine(configs) {
-    return combineConfig(configs)
-  },
-  behavior(config) {
-    return [viewPlugin.use((v: EditorView) => {
-      let decorations = Decoration.none
-      return {
-        get decorations() { return decorations },
-        update(v: EditorView, update: ViewUpdate) {
-          if (!update.transactions.length) return
-          // FIXME cast is muffling a justified TypeScript error
-          decorations = doMatchBrackets(v.state, undefined, config)
-        }
+export const matchBrackets = Extension.defineUnique<Config>(configs => {
+  let config = combineConfig(configs)
+  return [viewPlugin.use((v: EditorView) => {
+    let decorations = Decoration.none
+    return {
+      get decorations() { return decorations },
+      update(v: EditorView, update: ViewUpdate) {
+        if (!update.transactions.length) return
+        // FIXME make this use a behavior exported by the highlighter
+        decorations = doMatchBrackets(v.state, undefined, config)
       }
-    })]
-  },
-  default: {}
-})
+    }
+  })]
+}, {})

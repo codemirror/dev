@@ -23,9 +23,9 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
       return String(++state.pos)
     }
   }
-  const behavior = legacyMode.use({mode, sleepTime: 0})
+  const extension = legacyMode.use({mode, sleepTime: 0})
   const view: {state: EditorState, viewport?: Viewport, updateState: () => void} = {
-    state: EditorState.create({doc, behavior: [behavior]}),
+    state: EditorState.create({doc, extensions: [extension]}),
     updateState: onDecorationUpdate
   }
   let plugin = viewPlugin.get(view.state)[0](view as any)

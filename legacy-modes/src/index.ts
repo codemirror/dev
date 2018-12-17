@@ -1,6 +1,6 @@
 import {EditorView, ViewUpdate, viewPlugin} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
-import {EditorState, Behavior, StateField, Transaction} from "../../state/src"
+import {EditorState, Behavior, Extension, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
 
 import {StringStreamCursor} from "./stringstreamcursor"
@@ -148,25 +148,23 @@ type Config = {
   mode: Mode<any>
 }
 
-export const legacyMode = Behavior.defineSet<Config>({
-  behavior(config) {
-    let field = new StateField<StateCache<any>>({
-      init(state: EditorState) { return new StateCache([], 0, null) },
-      apply(tr, cache) { return cache.apply(tr) },
-      name: "mode"
+export const legacyMode = Extension.define<Config>(config => {
+  let field = new StateField<StateCache<any>>({
+    init(state: EditorState) { return new StateCache([], 0, null) },
+    apply(tr, cache) { return cache.apply(tr) },
+    name: "mode"
+  })
+  return [
+    Behavior.stateField.use(field),
+    viewPlugin.use(getViewPlugin(field, config)),
+    Behavior.indentation.use((state: EditorState, pos: number): number => {
+      if (!config.mode.indent) return -1
+      let modeState = state.getField(field).getState(state, pos, config.mode)
+      let line = state.doc.lineAt(pos)
+      return config.mode.indent(modeState, line.slice(0, Math.min(line.length, 100)).match(/^\s*(.*)/)![1])
     })
-    return [
-      Behavior.stateField.use(field),
-      viewPlugin.use(getViewPlugin(field, config)),
-      Behavior.indentation.use((state: EditorState, pos: number): number => {
-        if (!config.mode.indent) return -1
-        let modeState = state.getField(field).getState(state, pos, config.mode)
-        let line = state.doc.lineAt(pos)
-        return config.mode.indent(modeState, line.slice(0, Math.min(line.length, 100)).match(/^\s*(.*)/)![1])
-      })
-      // FIXME add a token-retrieving behavior
-    ]
-  }
+    // FIXME add a token-retrieving behavior
+  ]
 })
 
 function getViewPlugin(field: StateField<StateCache<any>>, config: Config) {
