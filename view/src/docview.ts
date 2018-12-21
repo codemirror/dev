@@ -132,6 +132,11 @@ export class DocView extends ContentView {
     viewports.sort((a, b) => a.from - b.from)
 
     let compositionRange = null
+    // FIXME changes also contains decoration changes, so this could
+    // interrupt compositions due to styling updates (such as highlighting)
+    // FIXME we do want to interrupt compositions when they overlap
+    // with collapsed decorations (not doing so will break rendering
+    // code further down, since the decorations aren't drawn in one piece)
     if (this.composition && this.composition.root == this) {
       let from = this.composition.posAtStart, to = from + this.composition.length
       let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
