@@ -27,8 +27,6 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "@types/mocha": "^5.2.0",
-    "@types/selenium-webdriver": "^3.0.10",
     "ist": "^1.1.1",
     "mocha": "^5.1.1",
     "rollup": "^0.66.0",
@@ -41,6 +39,8 @@
   },
   "devDependencies": {
     "benchtable": "^0.1.0",
-    "rollup-plugin-node-resolve": "^3.4.0"
+    "rollup-plugin-node-resolve": "^3.4.0",
+    "@types/mocha": "^5.2.0",
+    "@types/selenium-webdriver": "^3.0.10"
   }
 }
