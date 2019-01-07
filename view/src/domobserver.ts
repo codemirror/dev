@@ -1,7 +1,7 @@
 import browser from "./browser"
 import {ContentView} from "./contentview"
 import {DocView} from "./docview"
-import {hasSelection, DOMSelection, getRoot} from "./dom"
+import {hasSelection, DOMSelection} from "./dom"
 
 const observeOptions = {
   childList: true,
@@ -44,7 +44,7 @@ export class DOMObserver {
         if (this.charDataTimeout == null) this.charDataTimeout = setTimeout(() => this.flush(), 20)
       }
     this.onSelectionChange = () => {
-      if (getRoot(this.dom).activeElement == this.dom) this.flush()
+      if (this.docView.root.activeElement == this.dom) this.flush()
     }
     this.start()
 
@@ -131,7 +131,7 @@ export class DOMObserver {
   }
 
   clearSelection() {
-    this.ignoreSelection.set(getRoot(this.dom).getSelection()!)
+    this.ignoreSelection.set(this.docView.root.getSelection()!)
   }
 
   // Throw away any pending changes
@@ -145,8 +145,8 @@ export class DOMObserver {
   flush(records: MutationRecord[] = this.observer.takeRecords()) {
     if (this.charDataQueue.length)
       records = records.concat(this.takeCharRecords())
-    let newSel = !this.ignoreSelection.eq(getRoot(this.dom).getSelection()!) &&
-      hasSelection(this.dom)
+    let selection = this.docView.root.getSelection()!
+    let newSel = !this.ignoreSelection.eq(selection) && hasSelection(this.dom, selection)
     if (records.length == 0 && !newSel) return
 
     let from = -1, to = -1, typeOver = false

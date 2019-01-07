@@ -1,5 +1,5 @@
 import {EditorView} from "./editorview"
-import {getRoot, selectionCollapsed} from "./dom"
+import {selectionCollapsed} from "./dom"
 import browser from "./browser"
 import {EditorSelection, Change, MetaSlot} from "../../state/src"
 
@@ -10,7 +10,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   let sel = view.state.selection.primary, bounds
   if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
     let {from, to} = bounds
-    let selPoints = selectionPoints(view.contentDOM), reader = new DOMReader(selPoints)
+    let selPoints = selectionPoints(view.contentDOM, view.root), reader = new DOMReader(selPoints)
     reader.readRange(bounds.startDOM, bounds.endDOM)
     newSel = selectionFromPoints(selPoints, from)
 
@@ -161,8 +161,8 @@ class DOMPoint {
   constructor(readonly node: Node, readonly offset: number) {}
 }
 
-function selectionPoints(dom: HTMLElement): DOMPoint[] {
-  let result: DOMPoint[] = [], root = getRoot(dom)
+function selectionPoints(dom: HTMLElement, root: DocumentOrShadowRoot): DOMPoint[] {
+  let result: DOMPoint[] = []
   if (root.activeElement != dom) return result
   let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()!
   if (anchorNode) {

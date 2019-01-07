@@ -37,7 +37,7 @@ export class InputState {
       view.inputState.lastKeyCode = event.keyCode
       view.inputState.lastKeyTime = Date.now()
     })
-    if (document.activeElement == view.contentDOM) view.dom.classList.add("CodeMirror-focused")
+    if (view.root.activeElement == view.contentDOM) view.dom.classList.add("codemirror-focused")
 
     this.customHandlers = customHandlers(view)
     for (let type in this.customHandlers) {
@@ -360,11 +360,11 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
 }
 
 handlers.focus = view => {
-  view.dom.classList.add("CodeMirror-focused")
+  view.dom.classList.add("codemirror-focused")
 }
 
 handlers.blur = view => {
-  view.dom.classList.remove("CodeMirror-focused")
+  view.dom.classList.remove("codemirror-focused")
 }
 
 handlers.beforeprint = view => {

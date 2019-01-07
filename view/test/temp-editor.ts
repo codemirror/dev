@@ -13,7 +13,7 @@ export function tempEditor(doc = "", extensions: ReadonlyArray<Extension> = []):
     tempView = null
   }
 
-  tempView = new EditorView(EditorState.create({doc, extensions}))
+  tempView = new EditorView({state: EditorState.create({doc, extensions})})
   workspace.appendChild(tempView.dom)
   workspace.style.pointerEvents = ""
   if (hide == null) hide = setTimeout(() => {

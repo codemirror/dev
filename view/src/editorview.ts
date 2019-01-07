@@ -1,8 +1,9 @@
 import {EditorState, Transaction, MetaSlot} from "../../state/src"
 import {Extension, BehaviorStore} from "../../extension/src/extension"
 import {DocView, EditorViewport, ViewUpdate} from "./docview"
+import {StyleModule} from "style-mod"
 import {InputState, MouseSelectionUpdate} from "./input"
-import {getRoot, Rect} from "./dom"
+import {Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
@@ -38,7 +39,7 @@ export class ViewExtension extends Extension {
 
   static domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
 
-  static dispatch = ViewExtension.defineBehavior<(view: EditorView, tr: Transaction) => boolean>()
+  static styleModules = ViewExtension.defineBehavior<StyleModule>()
 }
 
 // FIXME does it make sense to isolate these from the actual view
@@ -96,9 +97,19 @@ function viewStateWithSlots<State>(spec: ViewStateSpec<State>, slots: ViewSlot<a
   )
 }
 
+export interface EditorConfig {
+  state: EditorState,
+  extensions?: ViewExtension[],
+  root?: Document | ShadowRoot,
+  dispatch?: (tr: Transaction) => void
+}
+
 export class EditorView {
   private _state!: EditorState
   get state(): EditorState { return this._state }
+
+  dispatch: (tr: Transaction) => void
+  root: DocumentOrShadowRoot
 
   readonly dom: HTMLElement
   readonly contentDOM: HTMLElement
@@ -117,19 +128,20 @@ export class EditorView {
 
   private updatingState: boolean = false
 
-  constructor(state: EditorState, extensions: ViewExtension[] = []) {
-    this.contentDOM = document.createElement("pre")
-    this.contentDOM.className = "CodeMirror-content"
-    this.contentDOM.style.cssText = contentCSS
+  constructor(config: EditorConfig) {
+    this.contentDOM = document.createElement("div")
+    this.contentDOM.className = "codemirror-content " + styles.content
     this.contentDOM.setAttribute("contenteditable", "true")
-    this.contentDOM.setAttribute("spellcheck", "false")
+    this.contentDOM.setAttribute("spellcheck", "false") // FIXME configurable
 
     this.dom = document.createElement("div")
-    this.dom.style.cssText = editorCSS
-    this.dom.className = "CodeMirror"
+    this.dom.className = "codemirror " + styles.wrapper
     this.dom.appendChild(this.contentDOM)
 
-    this.docView = new DocView(this.contentDOM, {
+    this.dispatch = config.dispatch || ((tr: Transaction) => this.updateState([tr], tr.apply()))
+    this.root = (config.root || document) as DocumentOrShadowRoot
+
+    this.docView = new DocView(this.contentDOM, this.root, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
       onViewUpdate: (update: ViewUpdate) => {
         let specs = this.behavior.get(viewState)
@@ -142,7 +154,7 @@ export class EditorView {
       getDecorations: () => getDecoratations(this)
     })
     this.viewport = this.docView.publicViewport
-    this.setState(state, extensions)
+    this.setState(config.state, config.extensions)
   }
 
   setState(state: EditorState, extensions: ViewExtension[] = []) {
@@ -151,6 +163,8 @@ export class EditorView {
     this.withUpdating(() => {
       setTabSize(this.contentDOM, state.tabSize)
       this.behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
+      StyleModule.mount(this.root, styles)
+      for (let s of this.behavior.get(ViewExtension.styleModules)) StyleModule.mount(this.root, s)
       if (this.behavior.foreign.length)
         throw new Error("Non-ViewExtension extensions found when setting view state")
       this.extState = this.behavior.get(viewState).map(spec => spec.create(this))
@@ -180,12 +194,6 @@ export class EditorView {
     this.updatingState = true
     try { f() }
     finally { this.updatingState = false }
-  }
-
-  dispatch(tr: Transaction) {
-    let handlers = this.behavior.get(ViewExtension.dispatch)
-    for (let handler of handlers) if (handler(this, tr)) return
-    this.updateState([tr], tr.apply())
   }
 
   extensionState<State>(spec: ViewStateSpec<State>): State | undefined {
@@ -233,12 +241,8 @@ export class EditorView {
     this.inputState.startMouseSelection(this, event, update)
   }
 
-  get root(): DocumentOrShadowRoot {
-    return getRoot(this.dom)
-  }
-
   hasFocus(): boolean {
-    return getRoot(this.dom).activeElement == this.contentDOM
+    return this.root.activeElement == this.contentDOM
   }
 
   focus() {
@@ -257,12 +261,37 @@ function setTabSize(elt: HTMLElement, size: number) {
   (elt.style as any).tabSize = (elt.style as any).MozTabSize = size
 }
 
-const editorCSS = `
-position: relative;
-display: flex;
-align-items: flex-start;`
+const styles = new StyleModule({
+  wrapper: {
+    position: "relative !important",
+    display: "flex !important",
+    alignItems: "flex-start !important",
+    fontFamily: "monospace",
+    lineHeight: 1.4,
 
-const contentCSS = `
-margin: 0;
-flex-grow: 2;
-min-height: 100%;`
+    "&.focused": {
+      // FIXME it would be great if we could directly use the browser's
+      // default focus outline, but it appears we can't, so this tries to
+      // approximate that
+      outline_fallback: "1px dotted #212121",
+      outline: "5px auto -webkit-focus-ring-color"
+    }
+  },
+
+  content: {
+    margin: 0,
+    flexGrow: 2,
+    minHeight: "100%",
+    display: "block",
+    whiteSpace: "pre",
+    boxSizing: "border-box",
+
+    padding: "4px 2px 4px 4px",
+    outline: "none",
+    caretColor: "black",
+
+    "& codemirror-line": {
+      display: "block"
+    }
+  }
+}, {priority: 0})

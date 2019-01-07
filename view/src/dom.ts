@@ -1,12 +1,5 @@
 import browser from "./browser"
 
-export let getRoot: (dom: HTMLElement) => DocumentOrShadowRoot =
-  typeof document == "undefined" || (document as any).getRootNode ?
-  (dom: HTMLElement) => {
-    let root = (dom as any).getRootNode()
-    return root.nodeType == 9 || root.nodeType == 11 ? root : document
-  } : () => document
-
 // Work around Chrome issue https://bugs.chromium.org/p/chromium/issues/detail?id=447523
 // (isCollapsed inappropriately returns true in shadow dom)
 export function selectionCollapsed(domSel: Selection) {
@@ -16,14 +9,13 @@ export function selectionCollapsed(domSel: Selection) {
   return collapsed
 }
 
-export function hasSelection(dom: HTMLElement): boolean {
-  let sel = getRoot(dom).getSelection()!
-  if (!sel.anchorNode) return false
+export function hasSelection(dom: HTMLElement, selection: Selection): boolean {
+  if (!selection.anchorNode) return false
   try {
     // Firefox will raise 'permission denied' errors when accessing
     // properties of `sel.anchorNode` when it's in a generated CSS
     // element.
-    return dom.contains(sel.anchorNode.nodeType == 3 ? sel.anchorNode.parentNode! : sel.anchorNode)
+    return dom.contains(selection.anchorNode.nodeType == 3 ? selection.anchorNode.parentNode! : selection.anchorNode)
   } catch(_) {
     return false
   }
@@ -61,7 +53,7 @@ function scanFor(node: Node, off: number, targetNode: Node, targetOff: number, d
   for (;;) {
     if (node == targetNode && off == targetOff) return true
     if (off == (dir < 0 ? 0 : maxOffset(node))) {
-      if (node.nodeName == "DIV" || node.nodeName == "PRE") return false
+      if (node.nodeName == "DIV") return false
       let parent = node.parentNode
       if (!parent || parent.nodeType != 1) return false
       off = domIndex(node) + (dir < 0 ? 0 : 1)

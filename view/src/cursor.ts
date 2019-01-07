@@ -3,7 +3,7 @@ import {LineView} from "./lineview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
 import {SelectionRange} from "../../state/src"
-import {isEquivalentPosition, clientRectsFor, getRoot} from "./dom"
+import {isEquivalentPosition, clientRectsFor} from "./dom"
 import browser from "./browser"
 
 declare global {
@@ -296,7 +296,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
     return view.viewport.to == view.state.doc.length ? view.state.doc.length : -1
   // Clip x to the viewport sides
   x = Math.max(content.left + 1, Math.min(content.right - 1, x))
-  let root = getRoot(view.contentDOM), element = root.elementFromPoint(x, y)
+  let root = view.root, element = root.elementFromPoint(x, y)
 
   // There's visible editor content under the point, so we can try
   // using caret(Position|Range)FromPoint as a shortcut

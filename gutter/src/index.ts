@@ -1,5 +1,6 @@
 import {combineConfig} from "../../extension/src/extension"
 import {EditorView, ViewExtension, DOMEffect} from "../../view/src"
+import {StyleModule} from "style-mod"
 
 // FIXME Think about how the gutter width changing could cause
 // problems when line wrapping is on by changing a line's height
@@ -25,7 +26,10 @@ export const gutter = ViewExtension.unique<GutterConfig>(configs => {
     fixed: true,
     formatNumber: String
   })
-  return ViewExtension.domEffect(view => new GutterView(view, config))
+  return ViewExtension.all(
+    ViewExtension.domEffect(view => new GutterView(view, config)),
+    ViewExtension.styleModules(styles)
+  )
 }, {})
 
 class GutterView implements DOMEffect {
@@ -37,7 +41,7 @@ class GutterView implements DOMEffect {
 
   constructor(public view: EditorView, config: CompleteGutterConfig) {
     this.dom = document.createElement("div")
-    this.dom.className = "CodeMirror-gutter"
+    this.dom.className = "codemirror-gutter " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")
     this.dom.style.cssText = `left: 0; box-sizing: border-box; height: 100%; overflow: hidden; flex-shrink: 0;`
     if (config.fixed) {
@@ -92,18 +96,20 @@ class GutterView implements DOMEffect {
   destroy() {
     this.dom.remove()
   }
+
+  get styles() { return styles }
 }
 
 class GutterLine {
   dom: HTMLElement
   lineNo: number = -1
   height: number = -1
-  above: number = -1
-  below: number = -1
+  above: number = 0
+  below: number = 0
 
   constructor(lineNo: number, height: number, above: number, below: number, formatNo: (lineNo: number) => string) {
     this.dom = document.createElement("div")
-    this.dom.className = "CodeMirror-gutter-element"
+    this.dom.className = "codemirror-gutter-element"
     this.update(lineNo, height, above, below, formatNo)
   }
 
@@ -113,8 +119,27 @@ class GutterLine {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
-      this.dom.style.marginTop = (this.above = above) + "px"
+      this.dom.style.marginTop = (this.above = above) ? above + "px" : ""
     if (this.below != below)
-      this.dom.style.marginBottom = (this.below = below) + "px"
+      this.dom.style.marginBottom = (this.below = below) ? below + "px" : ""
   }
 }
+
+const styles = new StyleModule({
+  gutter: {
+    background: "#f5f5f5",
+    borderRight: "1px solid silver",
+    display: "flex !important", // Necessary -- prevents margin collapsing
+    flexDirection: "column",
+
+    "& > .codemirror-gutter-element": {
+      boxSizing: "border-box",
+      // FIXME these are line number specific
+      padding: "0 3px 0 5px",
+      minWidth: "20px",
+      textAlign: "right",
+      color: "#999",
+      whiteSpace: "nowrap"
+    }
+  }
+})

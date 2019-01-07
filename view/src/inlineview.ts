@@ -225,5 +225,5 @@ export class CompositionView extends InlineView {
 
 function nodeAlreadyInTree(view: ContentView, node: Node): boolean {
   let v = node.cmView
-  return v ? v.root == view.root : false
+  return v ? v.rootView == view.rootView : false
 }

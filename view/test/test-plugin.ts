@@ -43,10 +43,10 @@ describe("EditorView extension", () => {
     let cm = tempEditor("xyz", [ViewExtension.domEffect(() => ({
       update() { updates++ }
     }))])
-    ist(updates, 1)
+    ist(updates, 0)
     cm.dispatch(cm.state.transaction.replace(1, 2, "u"))
-    ist(updates, 2)
+    ist(updates, 1)
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(3)))
-    ist(updates, 2)
+    ist(updates, 1)
   })
 })

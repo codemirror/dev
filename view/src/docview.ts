@@ -9,7 +9,7 @@ import {DOMObserver} from "./domobserver"
 import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
-import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
+import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 
 type A<T> = ReadonlyArray<T>
 
@@ -50,7 +50,7 @@ export class DocView extends ContentView {
 
   get childGap() { return 1 }
 
-  constructor(dom: HTMLElement, private callbacks: {
+  constructor(dom: HTMLElement, public root: DocumentOrShadowRoot, private callbacks: {
     // FIXME These suggest that the strict separation between docview and editorview isn't really working
     onDOMChange: (from: number, to: number, typeOver: boolean) => boolean,
     onViewUpdate: (update: ViewUpdate) => void,
@@ -137,7 +137,7 @@ export class DocView extends ContentView {
     // FIXME we do want to interrupt compositions when they overlap
     // with collapsed decorations (not doing so will break rendering
     // code further down, since the decorations aren't drawn in one piece)
-    if (this.composition && this.composition.root == this) {
+    if (this.composition && this.composition.rootView == this) {
       let from = this.composition.posAtStart, to = from + this.composition.length
       let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
       if (changes.length == 0 || changes.length == 1 &&
@@ -172,7 +172,7 @@ export class DocView extends ContentView {
       this.dom.style.height = ""
     })
 
-    if (this.composition && this.composition.root != this) this.composition = null
+    if (this.composition && this.composition.rootView != this) this.composition = null
   }
 
   private updateParts(changes: A<ChangedRange>, viewports: A<Viewport>, compositionRange: ChangedRange | null,
@@ -276,14 +276,13 @@ export class DocView extends ContentView {
   // Sync the DOM selection to this.state.selection
   updateSelection(takeFocus: boolean = false) {
     this.clearSelectionDirty()
-    let root = getRoot(this.dom)
-    if (!takeFocus && root.activeElement != this.dom) return
+    if (!takeFocus && this.root.activeElement != this.dom) return
 
     let primary = this.state.selection.primary
     let anchor = this.domFromPos(primary.anchor)!
     let head = this.domFromPos(primary.head)!
 
-    let domSel = root.getSelection()!
+    let domSel = this.root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
     if (!this.forceSelectionUpdate &&
         isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
@@ -440,7 +439,7 @@ export class DocView extends ContentView {
   nearest(dom: Node): ContentView | null {
     for (let cur: Node | null = dom; cur;) {
       let domView = cur.cmView
-      if (domView && domView.root == this) return domView
+      if (domView && domView.rootView == this) return domView
       cur = cur.parentNode
     }
     return null
@@ -560,7 +559,7 @@ export class DocView extends ContentView {
   enterComposition() {
     // FIXME schedule a timeout that ends the composition (or at least
     // our view of it) after a given inactive time?
-    let {focusNode, focusOffset} = getRoot(this.dom).getSelection()!
+    let {focusNode, focusOffset} = this.root.getSelection()!
     if (focusNode) {
       // Enter adjacent nodes when necessary, looking for a text node
       while (focusNode.nodeType == 1) {
@@ -591,7 +590,7 @@ export class DocView extends ContentView {
     let composition = this.composition
     this.composition = null
     this.composing = Composing.no
-    if (composition && composition.root == this) {
+    if (composition && composition.rootView == this) {
       let from = composition.posAtStart, to = from + composition.length
       changes = new ChangedRange(from, to, ChangedRange.mapPos(from, -1, changes),
                                  ChangedRange.mapPos(to, 1, changes)).addToSet(changes.slice())

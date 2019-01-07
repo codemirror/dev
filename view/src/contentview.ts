@@ -138,7 +138,7 @@ export abstract class ContentView {
     dom.cmView = this
   }
 
-  get root(): ContentView {
+  get rootView(): ContentView {
     for (let v: ContentView = this;;) {
       let parent = v.parent
       if (!parent) return v

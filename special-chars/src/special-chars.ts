@@ -2,6 +2,7 @@ import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewE
 import {ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
+import {StyleModule} from "style-mod"
 
 interface CompleteSpecialCharConfig {
   render?: (code: number, description: string | null, placeHolder: string) => HTMLElement | null
@@ -109,9 +110,12 @@ class SpecialCharHighlighter {
       pos += cursor.value.length
     }
   }
+
+  get styles() { return style }
 }
 
-const SPECIALS = /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff]/gu
+// FIXME configurable
+const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff]/gu
 
 const NAMES: {[key: number]: string} = {
   0: "null",
@@ -164,10 +168,18 @@ class TabWidget extends WidgetType<number> {
   toDOM() {
     let span = document.createElement("span")
     span.textContent = "\t"
-    span.className = "CodeMirror-tab"
+    span.className = style.tab
     span.style.width = this.value + "px"
     return span
   }
 
   ignoreEvent(): boolean { return false }
 }
+
+const style = new StyleModule({
+  tab: {
+    display: "inline-block",
+    overflow: "hidden",
+    verticalAlign: "bottom"
+  }
+})

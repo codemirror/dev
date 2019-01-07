@@ -172,6 +172,7 @@ export class LineView extends ContentView {
   syncInto(parent: HTMLElement, pos: Node | null): Node | null {
     if (!this.dom) {
       this.setDOM(document.createElement("div"))
+      this.dom!.className = "codemirror-line"
       if (this.attrs) this.prevAttrs = null
       for (let w of this.widgets) if (!w.dom) w.finish()
     }
@@ -193,8 +194,7 @@ export class LineView extends ContentView {
   sync() {
     super.sync()
     if (this.prevAttrs !== undefined) {
-      removeAttrs(this.dom!, this.prevAttrs)
-      setAttrs(this.dom!, this.attrs)
+      updateAttrs(this.dom!, this.prevAttrs, this.attrs)
       this.prevAttrs = undefined
     }
     let last = this.dom!.lastChild
@@ -267,10 +267,9 @@ export class LineWidget {
 
 const none: any[] = []
 
-function setAttrs(dom: HTMLElement, attrs: {[name: string]: string} | null) {
+function updateAttrs(dom: HTMLElement, prev: {[name: string]: string} | null,
+                     attrs: {[name: string]: string} | null) {
+  if (prev) for (let name in prev) dom.removeAttribute(name)
   if (attrs) for (let name in attrs) dom.setAttribute(name, attrs[name])
-}
-
-function removeAttrs(dom: HTMLElement, attrs: {[name: string]: string} | null) {
-  if (attrs) for (let name in attrs) dom.removeAttribute(name)
+  dom.classList.add("codemirror-line")
 }

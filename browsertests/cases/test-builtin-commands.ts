@@ -16,7 +16,7 @@ let cm: null | WebElement = null
 const getCm = async function() {
   if (cm) return cm
   await driver.get(target)
-  cm = driver.findElement(By.className("CodeMirror-content"))
+  cm = driver.findElement(By.className("codemirror-content"))
   await cm.click()
   return cm
 }

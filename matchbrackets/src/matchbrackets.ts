@@ -3,6 +3,7 @@ import {EditorState} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {ViewExtension} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
+import {StyleModule} from "style-mod"
 
 const matching: {[key: string]: string | undefined} = {
   "(": ")>",
@@ -90,7 +91,7 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
     if (!range.empty) continue
     const match = findMatchingBracket(state.doc, referenceDecorations, range.head, config)
     if (!match) continue
-    const style = match.match ? "CodeMirror-matchingbracket" : "CodeMirror-nonmatchingbracket"
+    const style = match.match ? defaultStyles.matching : defaultStyles.nonmatching
     decorations.push(Decoration.range(match.from, match.from + 1, {class: style}))
     if (match.to) decorations.push(Decoration.range(match.to, match.to + 1, {class: style}))
   }
@@ -104,11 +105,20 @@ export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
     maxScanDistance: 10000,
     strict: false
   })
-  return ViewExtension.decorations({
-    create(view) { return Decoration.none },
-    update({state}, {transactions}, deco) {
-      // FIXME make this use a tokenizer behavior exported by the highlighter
-      return transactions.length ? doMatchBrackets(state, undefined, config) : deco
-    }
-  })
+  return ViewExtension.all(
+    ViewExtension.decorations({
+      create(view) { return Decoration.none },
+      update({state}, {transactions}, deco) {
+        // FIXME make this use a tokenizer behavior exported by the highlighter
+        return transactions.length ? doMatchBrackets(state, undefined, config) : deco
+      }
+    }),
+    ViewExtension.styleModules(defaultStyles)
+  )
 }, {})
+
+// FIXME themeability
+const defaultStyles = new StyleModule({
+  matching: {color: "#0b0"},
+  nonmatching: {color: "#a22"}
+})

@@ -1,10 +1,11 @@
 import {EditorState, StateExtension} from "../../state/src"
 import {ViewExtension, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
+import {StyleModule} from "style-mod"
 
 export interface Config {}
 
 export const multipleSelections = StateExtension.unique((configs: Config[]) => {
-  let rangeConfig = {class: "CodeMirror-secondary-selection"} // FIXME configurable?
+  let rangeConfig = {class: styles.secondarySelection} // FIXME configurable?
 
   return StateExtension.all(
     StateExtension.allowMultipleSelections(true),
@@ -15,14 +16,15 @@ export const multipleSelections = StateExtension.unique((configs: Config[]) => {
           ? deco : decorateSelections(state, rangeConfig)
       },
       map: false
-    })
+    }),
+    ViewExtension.styleModules(styles)
   )
 }, {})
 
 class CursorWidget extends WidgetType<null> {
   toDOM() {
     let span = document.createElement("span")
-    span.className = "CodeMirror-secondary-cursor"
+    span.className = styles.secondaryCursor
     return span
   }
 }
@@ -38,3 +40,21 @@ function decorateSelections(state: EditorState, rangeConfig: RangeDecorationSpec
   }
   return Decoration.set(deco)
 }
+
+const styles = new StyleModule({
+  secondarySelection: {
+    backgroundColor_fallback: "#3297FD",
+    color_fallback: "white !important",
+    backgroundColor: "Highlight",
+    color: "HighlightText !important"
+  },
+
+  secondaryCursor: {
+    display: "inline-block",
+    verticalAlign: "text-top",
+    borderLeft: "1px solid #555",
+    width: 0,
+    height: "1.15em",
+    margin: "0 -0.5px -.5em"
+  }
+})
