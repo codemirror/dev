@@ -119,7 +119,7 @@ describe("DOM changes", () => {
   })
 
   it("doesn't drop collapsed text", () => {
-    let cm = tempEditor("abcd", [viewPlugin.use(() => ({
+    let cm = tempEditor("abcd", [viewPlugin(() => ({
       decorations: Decoration.set(Decoration.range(1, 3, {collapsed: true})),
       update(v: EditorView, u: ViewUpdate) { if (u.transactions.length) (this as any).decorations = null }
     }))])

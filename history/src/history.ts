@@ -1,4 +1,4 @@
-import {EditorState, Transaction, StateField, MetaSlot, Behavior, Extension, combineConfig} from "../../state/src"
+import {EditorState, Transaction, StateField, MetaSlot, Behavior, combineConfig} from "../../state/src"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
@@ -47,21 +47,21 @@ class HistoryBehavior {
 
 const historyBehavior = Behavior.define<HistoryBehavior>({unique: true})
 
-export const history = Extension.defineUnique<HistoryConfig>(configs => {
+export const history = Behavior.defineUniqueExtension<HistoryConfig>(configs => {
   let config = combineConfig(configs, {minDepth: Math.max}, {
     minDepth: 100,
     newGroupDelay: 500
   })
   let field = historyField(config.minDepth!, config.newGroupDelay!)
   return [
-    Behavior.stateField.use(field),
-    historyBehavior.use(new HistoryBehavior(field, config))
+    Behavior.stateField(field),
+    historyBehavior(new HistoryBehavior(field, config))
   ]
 }, {})
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let hist = historyBehavior.getSingle(state, undefined)
+    let hist = state.behaviorSingle(historyBehavior, undefined)
     return hist ? hist.cmd(target, only, state, dispatch) : false
   }
 }
@@ -80,7 +80,7 @@ export function closeHistory(tr: Transaction): Transaction {
 
 function depth(target: PopTarget, only: ItemFilter) {
   return function(state: EditorState): number {
-    let hist = historyBehavior.getSingle(state, undefined)
+    let hist = state.behaviorSingle(historyBehavior, undefined)
     return hist ? hist.depth(target, only, state) : 0
   }
 }

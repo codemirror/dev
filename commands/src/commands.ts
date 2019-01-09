@@ -95,7 +95,7 @@ function space(n: number) {
 }
 
 function getIndentation(state: EditorState, pos: number): number {
-  for (let f of Behavior.indentation.get(state)) {
+  for (let f of state.behavior(Behavior.indentation)) {
     let result = f(state, pos)
     if (result > -1) return result
   }

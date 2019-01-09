@@ -1,4 +1,4 @@
-import {Extension, combineConfig} from "../../state/src"
+import {Behavior, combineConfig} from "../../state/src"
 import {EditorView, viewPlugin} from "../../view/src"
 
 // FIXME Think about how the gutter width changing could cause
@@ -17,9 +17,9 @@ export interface GutterConfig {
   formatNumber?: (lineNo: number) => string
 }
 
-export const gutter = Extension.defineUnique(configs => {
+export const gutter = Behavior.defineUniqueExtension(configs => {
   let config = combineConfig(configs)
-  return [viewPlugin.use(view => new GutterView(view, config))]
+  return [viewPlugin(view => new GutterView(view, config))]
 }, {})
 
 class GutterView {

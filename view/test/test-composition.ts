@@ -54,7 +54,7 @@ function wordDeco(state: EditorState): DecorationSet {
   return Decoration.set(deco)
 }
 
-const wordHighlighter = viewPlugin.use((v: EditorView) => ({
+const wordHighlighter = viewPlugin((v: EditorView) => ({
   decorations: wordDeco(v.state),
   update() { this.decorations = wordDeco(v.state) }
 }))
@@ -63,7 +63,7 @@ function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  return viewPlugin.use(v => ({
+  return viewPlugin(v => ({
     decorations: Decoration.set(
       positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))),
     update(_v: any, {transactions}: ViewUpdate) {
