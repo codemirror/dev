@@ -34,7 +34,7 @@
     "rollup-plugin-typescript2": "^0.17.0",
     "selenium-webdriver": "^4.0.0-alpha.1",
     "ts-node": "^7.0.1",
-    "typescript": "^3.0.1",
+    "typescript": "^3.2.2",
     "w3c-keyname": "^2.1.0"
   },
   "devDependencies": {
