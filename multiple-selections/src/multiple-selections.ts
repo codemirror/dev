@@ -1,10 +1,10 @@
-import {EditorState, Behavior} from "../../state/src"
+import {EditorState, StateBehavior} from "../../state/src"
 import {EditorView, ViewUpdate, viewPlugin, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
 export interface Config {}
 
-export const multipleSelections = Behavior.defineUniqueExtension<Config>(configs => {
-  return [Behavior.allowMultipleSelections(true),
+export const multipleSelections = StateBehavior.defineUniqueExtension<Config>(configs => {
+  return [StateBehavior.allowMultipleSelections(true),
           viewPlugin(view => new MultipleSelectionView(view))]
 }, {})
 

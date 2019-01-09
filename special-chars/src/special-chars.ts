@@ -1,5 +1,6 @@
 import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewUpdate, viewPlugin} from "../../view/src"
-import {ChangeSet, ChangedRange, Behavior, combineConfig} from "../../state/src"
+import {ChangeSet, ChangedRange, StateBehavior} from "../../state/src"
+import {combineConfig} from "../../behavior/src/behavior"
 import {countColumn} from "../../doc/src"
 
 export interface SpecialCharOptions {
@@ -9,7 +10,7 @@ export interface SpecialCharOptions {
 }
 
 
-export const specialChars = Behavior.defineUniqueExtension<SpecialCharOptions>(configs => {
+export const specialChars = StateBehavior.defineUniqueExtension<SpecialCharOptions>(configs => {
   // FIXME make configurations compose properly
   let config = combineConfig(configs)
   return [viewPlugin(view => new SpecialCharHighlighter(view, config))]

@@ -1,4 +1,4 @@
-import {EditorState, Transaction, MetaSlot, Behavior} from "../../state/src"
+import {EditorState, Transaction, MetaSlot, StateBehavior} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {getRoot, Rect} from "./dom"
@@ -7,7 +7,7 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
 
-export const viewPlugin = Behavior.define<(view: EditorView) => PluginView>()
+export const viewPlugin = StateBehavior.define<(view: EditorView) => PluginView>()
 
 export class EditorView {
   private _state!: EditorState
