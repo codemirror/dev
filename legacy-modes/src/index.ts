@@ -1,6 +1,6 @@
 import {EditorView, ViewUpdate, viewPlugin} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
-import {EditorState, Behavior, StateField, Transaction} from "../../state/src"
+import {EditorState, StateBehavior, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
 
 import {StringStreamCursor} from "./stringstreamcursor"
@@ -148,16 +148,16 @@ type Config = {
   mode: Mode<any>
 }
 
-export const legacyMode = Behavior.defineExtension<Config>(config => {
+export const legacyMode = StateBehavior.defineExtension<Config>(config => {
   let field = new StateField<StateCache<any>>({
     init(state: EditorState) { return new StateCache([], 0, null) },
     apply(tr, cache) { return cache.apply(tr) },
     name: "mode"
   })
   return [
-    Behavior.stateField(field),
+    StateBehavior.stateField(field),
     viewPlugin(getViewPlugin(field, config)),
-    Behavior.indentation((state: EditorState, pos: number): number => {
+    StateBehavior.indentation((state: EditorState, pos: number): number => {
       if (!config.mode.indent) return -1
       let modeState = state.getField(field).getState(state, pos, config.mode)
       let line = state.doc.lineAt(pos)

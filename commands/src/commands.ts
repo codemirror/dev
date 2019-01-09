@@ -1,4 +1,4 @@
-import {EditorState, EditorSelection, SelectionRange, MetaSlot, Behavior} from "../../state/src"
+import {EditorState, EditorSelection, SelectionRange, MetaSlot, StateBehavior} from "../../state/src"
 import {EditorView} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
@@ -95,7 +95,7 @@ function space(n: number) {
 }
 
 function getIndentation(state: EditorState, pos: number): number {
-  for (let f of state.behavior(Behavior.indentation)) {
+  for (let f of state.behavior(StateBehavior.indentation)) {
     let result = f(state, pos)
     if (result > -1) return result
   }

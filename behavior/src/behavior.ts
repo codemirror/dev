@@ -1,5 +1,3 @@
-import {EditorState, StateField} from "./state"
-
 type A<T> = ReadonlyArray<T>
 
 // Priorities for overriding the ordering of extensions and behaviors.
@@ -7,20 +5,19 @@ export enum Priority { fallback = -1, base = 0, extend = 1, override = 2 }
 
 const noPriority = -2 as Priority
 
-const noDefault = {} as any
-
 const none = [] as any
 
-// A behavior is a type of value that can be associated with an editor
-// state. It is used to configure the state, for example by
-// associating helper functions with it (see `Behavior.indentation`)
-// or configuring the way it behaves (see
-// `Behavior.allowMultipleSelections`).
+// A behavior is a type of value that can be associated with an
+// extendable object. The `Value` type parameter determines the type
+// of value this behavior holds, and the `Target` type parameter
+// describes the kind of value that this extends.
 export interface Behavior<Value, Target> {
   (value: Value, priority?: Priority): Extender<Target>
 }
 
-function defineBehavior<Value, Target>(unique: boolean): Behavior<Value, Target> {
+// Define a new behavior. When `unique` is true, this behavior is
+// intended to exist at most once per target value.
+export function defineBehavior<Value, Target>(unique: boolean = false): Behavior<Value, Target> {
   let behavior = function(value: Value, priority: Priority = noPriority): Extender<Target> {
     return new Extender(null, behavior, value, priority)
   }
@@ -28,51 +25,37 @@ function defineBehavior<Value, Target>(unique: boolean): Behavior<Value, Target>
   return behavior
 }
 
-export const Behavior = {
-  define<Value>({unique = false}: {unique?: boolean} = {}) {
-    return defineBehavior<Value, EditorState>(unique)
-  },
-
-  defineExtension<Spec>(instantiate: (spec: Spec) => A<Extender<EditorState>>, defaultSpec = noDefault) {
-    return defineExtension<Spec, EditorState>(instantiate, null, defaultSpec)
-  },
-
-  defineUniqueExtension<Spec>(instantiate: (specs: A<Spec>) => A<Extender<EditorState>>, defaultSpec: Spec = noDefault) {
-    return defineExtension<Spec, EditorState>(null, instantiate, defaultSpec)
-  },
-
-  stateField: defineBehavior<StateField<any>, EditorState>(false),
-  allowMultipleSelections: defineBehavior<boolean, EditorState>(false),
-  indentation: defineBehavior<(state: EditorState, pos: number) => number, EditorState>(false)
-}
-
-// An extension is a piece of functionality that can be added to a
-// state. It works by pulling in one or more other extensions or
-// behaviors. Extensions are configured by values of the `Spec` type,
-// and come in two variants: unique extensions 'centralize' their
-// behavior, by taking all specs that were given for them in a state,
-// and computing a set of extenders from that. This is appropriate for
-// extensions like the undo history, which should only be activated
-// once per state. Non-unique extensions compute one set of extenders
-// per use, which has the advantage that specs do not have to be
-// merged and each instance has its own position in the ordering of
-// extensions for the state (which can be useful for things like
-// keymaps).
+// An extension represents a piece of additional functionality that
+// pulls in one or more behaviors or other extensions. Extensions are
+// configured by values of the `Spec` type, and come in two variants:
+// unique extensions 'centralize' their behavior, by taking all specs
+// that were given for them in a state, and computing a set of
+// extenders from that. This is appropriate for extensions like that
+// should only be activated once per target value. Non-unique
+// extensions compute one set of extenders per use, which has the
+// advantage that specs do not have to be merged and each instance has
+// its own position in the ordering of extensions.
 export interface Extension<Spec, Target> {
   (spec?: Spec, priority?: Priority): Extender<Target>
 }
 
+// The fields (privately) added to extension objects.
 interface ExtData<Spec, Target> {
   instantiate: ((spec: Spec) => A<Extender<Target>>) | null
   instantiateUnique: ((specs: A<Spec>) => A<Extender<Target>>) | null
+  // Known extensions included from this one. This is filled
+  // dynamically when initializing the extension, to avoid having to
+  // bother users with specifying them in advance. If dependency
+  // resolution goes wrong because of missing information here, it is
+  // simply started over.
   knownSubs: Extension<any, any>[]
 }
 
-function defineExtension<Spec, Target>(instantiate: ((spec: Spec) => A<Extender<Target>>) | null,
-                                       instantiateUnique: ((specs: A<Spec>) => A<Extender<Target>>) | null,
-                                       defaultSpec: Spec): Extension<Spec, Target> {
-  let ext = function(spec: Spec = defaultSpec, priority: Priority = noPriority): Extender<Target> {
-    if (spec == noDefault) throw new RangeError("This extension has no default spec")
+function defineExtensionInner<Spec, Target>(instantiate: ((spec: Spec) => A<Extender<Target>>) | null,
+                                            instantiateUnique: ((specs: A<Spec>) => A<Extender<Target>>) | null,
+                                            defaultSpec: Spec | undefined): Extension<Spec, Target> {
+  let ext = function(spec: Spec | undefined = defaultSpec, priority: Priority = noPriority): Extender<Target> {
+    if (spec === undefined) throw new RangeError("This extension has no default spec")
     return new Extender(ext, null, spec, priority)
   }
   let data = ext as any as ExtData<Spec, Target>
@@ -82,11 +65,16 @@ function defineExtension<Spec, Target>(instantiate: ((spec: Spec) => A<Extender<
   return ext
 }
 
-// Known extensions included from this one. This is filled
-// dynamically when initializing the extension, to avoid having to
-// bother users with specifying them in advance. If dependency
-// resolution goes wrong because of missing information here, it is
-// simply started over.
+export function defineExtension<Spec, Target>(instantiate: (spec: Spec) => A<Extender<Target>>,
+                                              defaultSpec?: Spec): Extension<Spec, Target> {
+  return defineExtensionInner(instantiate, null, defaultSpec)
+}
+
+export function defineUniqueExtension<Spec, Target>(instantiate: (specs: A<Spec>) => A<Extender<Target>>,
+                                                    defaultSpec?: Spec): Extension<Spec, Target> {
+  return defineExtensionInner(null, instantiate, defaultSpec)
+}  
+
 function hasSub(extension: Extension<any, any>, sub: Extension<any, any>): boolean {
   for (let known of (extension as any as ExtData<any, any>).knownSubs)
     if (known == sub || hasSub(known, sub)) return true

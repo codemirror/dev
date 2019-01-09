@@ -1,8 +1,40 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
-import {BehaviorStore, Behavior, Extender} from "./extension"
 import {Transaction, MetaSlot} from "./transaction"
 import {unique} from "./unique"
+import {Behavior, Extension, Extender, defineBehavior, defineExtension, defineUniqueExtension,
+        Priority, BehaviorStore} from "../../behavior/src/behavior"
+
+// A behavior is a type of value that can be associated with an editor
+// state. It is used to configure the state, for example by
+// associating helper functions with it (see
+// `StateBehavior.indentation`) or configuring the way it behaves (see
+// `StateBehavior.allowMultipleSelections`).
+export type StateBehavior<Value> = Behavior<Value, EditorState>
+
+export type StateExtension<Spec> = Extension<Spec, EditorState>
+
+export type StateExtender = Extender<EditorState>
+
+export const StateBehavior = {
+  define<Value>({unique = false}: {unique?: boolean} = {}) {
+    return defineBehavior<Value, EditorState>(unique)
+  },
+
+  defineExtension<Spec>(instantiate: (spec: Spec) => ReadonlyArray<Extender<EditorState>>, defaultSpec?: Spec) {
+    return defineExtension<Spec, EditorState>(instantiate, defaultSpec)
+  },
+
+  defineUniqueExtension<Spec>(instantiate: (specs: ReadonlyArray<Spec>) => ReadonlyArray<Extender<EditorState>>, defaultSpec?: Spec) {
+    return defineUniqueExtension<Spec, EditorState>(instantiate, defaultSpec)
+  },
+
+  Priority: Priority,
+
+  stateField: defineBehavior<StateField<any>, EditorState>(),
+  allowMultipleSelections: defineBehavior<boolean, EditorState>(),
+  indentation: defineBehavior<(state: EditorState, pos: number) => number, EditorState>()
+}
 
 class Configuration {
   constructor(
@@ -16,8 +48,8 @@ class Configuration {
     let behavior = BehaviorStore.resolve(config.extensions || [])
     return new Configuration(
       behavior,
-      behavior.get(Behavior.stateField),
-      behavior.get(Behavior.allowMultipleSelections).some(x => x),
+      behavior.get(StateBehavior.stateField),
+      behavior.get(StateBehavior.allowMultipleSelections).some(x => x),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
@@ -34,7 +66,7 @@ class Configuration {
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  extensions?: ReadonlyArray<Extender<EditorState>>
+  extensions?: ReadonlyArray<StateExtender>
   tabSize?: number
   lineSeparator?: string | null
 }
