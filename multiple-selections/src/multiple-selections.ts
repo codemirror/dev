@@ -1,11 +1,11 @@
-import {EditorState, Behavior, Extension} from "../../state/src"
+import {EditorState, Behavior} from "../../state/src"
 import {EditorView, ViewUpdate, viewPlugin, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
 export interface Config {}
 
-export const multipleSelections = Extension.defineUnique<Config>(configs => {
-  return [Behavior.allowMultipleSelections.use(true),
-          viewPlugin.use(view => new MultipleSelectionView(view))]
+export const multipleSelections = Behavior.defineUniqueExtension<Config>(configs => {
+  return [Behavior.allowMultipleSelections(true),
+          viewPlugin(view => new MultipleSelectionView(view))]
 }, {})
 
 class CursorWidget extends WidgetType<null> {

@@ -6,7 +6,7 @@ import {unique} from "./unique"
 
 class Configuration {
   constructor(
-    readonly behavior: BehaviorStore,
+    readonly behavior: BehaviorStore<EditorState>,
     readonly fields: ReadonlyArray<StateField<any>>,
     readonly multipleSelections: boolean,
     readonly tabSize: number,
@@ -34,7 +34,7 @@ class Configuration {
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  extensions?: ReadonlyArray<Extender>
+  extensions?: ReadonlyArray<Extender<EditorState>>
   tabSize?: number
   lineSeparator?: string | null
 }
@@ -79,6 +79,16 @@ export class EditorState {
 
   joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.config.lineSeparator || undefined) }
   splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
+
+  behavior<Value>(behavior: Behavior<Value, EditorState>): Value[] {
+    return this.config.behavior.get(behavior)
+  }
+
+  behaviorSingle<Value, Default = undefined>(behavior: Behavior<Value, EditorState>, defaultValue: Default): Value | Default {
+    if (!(behavior as any).unique) throw new Error("Can only call behaviorSingle on a Behavior with unique=true")
+    let all = this.behavior(behavior)
+    return all.length == 0 ? defaultValue : all[0]
+  }
 
   // FIXME plugin state serialization
 

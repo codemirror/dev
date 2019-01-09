@@ -13,7 +13,7 @@ class OWidget extends WidgetType<void> {
   }
 }
 
-const oWidgets = viewPlugin.use((view: EditorView) => {
+const oWidgets = viewPlugin((view: EditorView) => {
   let doc = view.state.doc.toString(), deco = []
   for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
     deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
@@ -113,7 +113,7 @@ describe("EditorView.movePos", () => {
   })
 
   it("can cross large line widgets during line motion", () => {
-    let cm = tempEditor("one\ntwo", [viewPlugin.use(() => {
+    let cm = tempEditor("one\ntwo", [viewPlugin(() => {
       return {decorations: Decoration.set([
         Decoration.line(0, {widget: new BigWidget(undefined), side: 1}),
         Decoration.line(4, {widget: new BigWidget(undefined), side: -1})

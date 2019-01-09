@@ -17,10 +17,10 @@ function decos(startState: DecorationSet = Decoration.none) {
     }
   })
   return [
-    viewPlugin.use((view: EditorView) => ({
+    viewPlugin((view: EditorView) => ({
       get decorations() { return view.state.getField(field) }
     })),
-    Behavior.stateField.use(field)
+    Behavior.stateField(field)
   ]
 }
 

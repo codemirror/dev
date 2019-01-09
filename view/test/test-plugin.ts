@@ -6,7 +6,7 @@ import ist from "ist"
 describe("EditorView plugins", () => {
   it("calls update on transactions", () => {
     let called = 0
-    let cm = tempEditor("one\ntwo", [viewPlugin.use((view: EditorView) => {
+    let cm = tempEditor("one\ntwo", [viewPlugin((view: EditorView) => {
       let doc = view.state.doc.toString()
       ist(doc, "one\ntwo")
       return {
@@ -25,7 +25,7 @@ describe("EditorView plugins", () => {
 
   it("calls update when the viewport changes", () => {
     let ports: number[][] = []
-    let cm = tempEditor("x\n".repeat(500), [viewPlugin.use(() => {
+    let cm = tempEditor("x\n".repeat(500), [viewPlugin(() => {
       return {
         update(view: EditorView) {
           ports.push([view.viewport.from, view.viewport.to])
@@ -48,7 +48,7 @@ describe("EditorView plugins", () => {
 
   it("calls updateDOM when the DOM is changed", () => {
     let updates = 0
-    let cm = tempEditor("xyz", [viewPlugin.use(() => {
+    let cm = tempEditor("xyz", [viewPlugin(() => {
       return {
         updateDOM() { updates++ }
       }

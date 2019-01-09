@@ -113,7 +113,7 @@ export class EditorView {
   private createPluginViews(plugins: PluginView[]) {
     this.destroyPluginViews()
     for (let plugin of plugins) this.pluginViews.push(plugin)
-    for (let p of viewPlugin.get(this.state)) this.pluginViews.push(p(this))
+    for (let p of this.state.behavior(viewPlugin)) this.pluginViews.push(p(this))
   }
 
   private destroyPluginViews() {
