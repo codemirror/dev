@@ -23,9 +23,9 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     }
   }
   const plugin = legacyMode(mode, {sleepTime: 0})
-  const view: {state: EditorState, viewport?: Viewport, decorationUpdate: () => void} = {
+  const view: {state: EditorState, viewport?: Viewport, updateState: () => void} = {
     state: EditorState.create({doc, plugins: [plugin]}),
-    decorationUpdate: onDecorationUpdate
+    updateState: onDecorationUpdate
   }
   const viewPlugin = plugin.view(view)
 
@@ -33,7 +33,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     calls,
     getDecorations(vp: Viewport) {
       view.viewport = vp
-      viewPlugin.updateViewport(view)
+      viewPlugin.update(view, {transactions: []})
       const decorations: Range<RangeDecoration>[] = []
       viewPlugin.decorations.collect(decorations)
       return decorations
@@ -44,7 +44,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     apply(transaction: Transaction, {from, to}: Viewport) {
       view.state = transaction.apply()
       view.viewport = {from, to}
-      viewPlugin.updateState(view, view.state, [transaction])
+      viewPlugin.update(view, {transactions: [transaction]})
     }
   }
 }

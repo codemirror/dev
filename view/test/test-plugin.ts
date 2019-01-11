@@ -1,20 +1,19 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection, Plugin, EditorState, Transaction} from "../../state/src"
-import {EditorView} from "../src/"
+import {EditorSelection, Plugin} from "../../state/src"
+import {EditorView, ViewUpdate} from "../src/"
 import ist from "ist"
 
 describe("EditorView plugins", () => {
-  it("calls updateState on transactions", () => {
+  it("calls update on transactions", () => {
     let called = 0
     let cm = tempEditor("one\ntwo", [new Plugin({view: (view: EditorView) => {
       let doc = view.state.doc.toString()
       ist(doc, "one\ntwo")
       return {
-        updateState(view: EditorView, prev: EditorState, trs: Transaction[]) {
-          ist(prev.doc.toString(), doc)
+        update(view: EditorView, update: ViewUpdate) {
+          ist(update.oldState.doc.toString(), doc)
           doc = view.state.doc.toString()
-          called++
-          ist(trs.length, 1)
+          if (update.transactions.length == 1) called++
         }
       }
     }})])
@@ -24,11 +23,11 @@ describe("EditorView plugins", () => {
     ist(called, 3)
   })
 
-  it("calls updateViewport when the viewport changes", () => {
+  it("calls update when the viewport changes", () => {
     let ports: number[][] = []
     let cm = tempEditor("x\n".repeat(500), [new Plugin({view: () => {
       return {
-        updateViewport(view: EditorView) {
+        update(view: EditorView) {
           ports.push([view.viewport.from, view.viewport.to])
         }
       }

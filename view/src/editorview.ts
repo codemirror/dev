@@ -26,8 +26,6 @@ export class EditorView {
 
   private pluginViews: PluginView[] = []
 
-  private scheduledDecoUpdate: number = -1
-
   private updatingState: boolean = false
 
   constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
@@ -46,15 +44,12 @@ export class EditorView {
 
     this.docView = new DocView(this.contentDOM, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-      onUpdateState: (prevState: EditorState, transactions: Transaction[]) => {
+      onViewUpdate: (update: ViewUpdate) => {
         for (let pluginView of this.pluginViews)
-          if (pluginView.updateState) pluginView.updateState(this, prevState, transactions)
+          if (pluginView.update) pluginView.update(this, update)
       },
       onUpdateDOM: () => {
         for (let plugin of this.pluginViews) if (plugin.updateDOM) plugin.updateDOM(this)
-      },
-      onUpdateViewport: () => {
-        for (let plugin of this.pluginViews) if (plugin.updateViewport) plugin.updateViewport(this)
       },
       getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
     })
@@ -68,7 +63,7 @@ export class EditorView {
       setTabSize(this.contentDOM, state.tabSize)
       this.createPluginViews(plugins)
       this.inputState = new InputState(this)
-      this.docView.update(state)
+      this.docView.init(state)
     })
   }
 
@@ -81,7 +76,8 @@ export class EditorView {
       if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
       if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
-      this.docView.update(state, prevState, transactions, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+      this.docView.update(new ViewUpdate(transactions, prevState, state, true),
+                          transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       this.inputState.update(transactions)
     })
   }
@@ -159,14 +155,6 @@ export class EditorView {
   get defaultCharacterWidth() { return this.docView.heightOracle.charWidth }
   get defaultLineHeight() { return this.docView.heightOracle.lineHeight }
 
-  // To be used by plugin views when they update their decorations asynchronously
-  decorationUpdate() {
-    if (this.scheduledDecoUpdate < 0) this.scheduledDecoUpdate = requestAnimationFrame(() => {
-      this.scheduledDecoUpdate = -1
-      this.docView.update(this.state, this.state)
-    })
-  }
-
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
     this.focus()
     this.inputState.startMouseSelection(this, event, update)
@@ -192,10 +180,18 @@ export class EditorView {
   }
 }
 
+export class ViewUpdate {
+  // FIXME more fields (focus, dragging, ...)
+  // FIXME should scrollIntoView be stored in this?
+  constructor(public transactions: ReadonlyArray<Transaction>,
+              public oldState: EditorState,
+              public state: EditorState,
+              public viewportChanged: boolean) {}
+}
+
 export interface PluginView {
-  updateState?: (view: EditorView, prevState: EditorState, transactions: Transaction[]) => void
+  update?: (view: EditorView, update: ViewUpdate) => void
   updateDOM?: (view: EditorView) => void
-  updateViewport?: (view: EditorView) => void
   handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean}
   // This should return a stable value, not compute something on the fly
   decorations?: DecorationSet

@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorView, Decoration, DecorationSet, WidgetType} from "../src"
-import {Plugin, EditorState, Transaction} from "../../state/src"
+import {EditorView, ViewUpdate, Decoration, DecorationSet, WidgetType} from "../src"
+import {Plugin, EditorState} from "../../state/src"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
@@ -58,7 +58,7 @@ const wordHighlighter = new Plugin({
   view(v: EditorView) {
     return {
       decorations: wordDeco(v.state),
-      updateState() { this.decorations = wordDeco(v.state) }
+      update() { this.decorations = wordDeco(v.state) }
     }
   }
 })
@@ -72,7 +72,7 @@ function widgets(positions: number[], sides: number[]) {
       return {
         decorations: Decoration.set(
           positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))),
-        updateState(_v: any, _p: any, transactions: Transaction[]) {
+        update(_v: any, {transactions}: ViewUpdate) {
           this.decorations = transactions.reduce((d, tr) => d.map(tr.changes), this.decorations)
         }
       }

@@ -1,6 +1,6 @@
 import {Text} from "../../doc/src"
 import {EditorState, Plugin} from "../../state/src"
-import {EditorView} from "../../view/src/"
+import {EditorView, ViewUpdate} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
 const matching: {[key: string]: string | undefined} = {"(": ")>", ")": "(<", "[": "]>", "]": "[<", "{": "}>", "}": "{<"}
@@ -92,7 +92,8 @@ export function matchBrackets(config: Config = {}) {
       let decorations = Decoration.none
       return {
         get decorations() { return decorations },
-        updateState(v: EditorView) {
+        update(v: EditorView, update: ViewUpdate) {
+          if (!update.transactions.length) return
           // FIXME cast is muffling a justified TypeScript error
           const refDecos = idx == undefined ? undefined : (v as any).pluginViews[idx].decorations
           decorations = doMatchBrackets(v.state, refDecos, config)

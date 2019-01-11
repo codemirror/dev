@@ -1,4 +1,4 @@
-import {EditorView} from "../../view/src"
+import {EditorView, ViewUpdate} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, Plugin, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
@@ -167,14 +167,13 @@ export function legacyMode<S>(mode: Mode<S>, config: Config = {}) {
           decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
           stateCache.advanceFrontier(v.state, from, mode, sleepTime, maxWorkTime).then(() => {
             update(v, true)
-            v.decorationUpdate()
+            v.updateState([], v.state)
           }, () => {})
         }
       }
       return {
         get decorations() { return decorations },
-        updateViewport: update,
-        updateState: (v: EditorView, p: EditorState, trs: Transaction[]) => update(v, trs.some(tr => tr.docChanged))
+        update: (v: EditorView, u: ViewUpdate) => update(v, u.transactions.some(tr => tr.docChanged))
       }
     }
   })

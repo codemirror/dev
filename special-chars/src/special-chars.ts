@@ -1,5 +1,5 @@
-import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView} from "../../view/src"
-import {Transaction, ChangeSet, ChangedRange, Plugin} from "../../state/src"
+import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewUpdate} from "../../view/src"
+import {ChangeSet, ChangedRange, Plugin} from "../../state/src"
 import {countColumn} from "../../doc/src"
 
 export interface SpecialCharOptions {
@@ -34,7 +34,7 @@ class SpecialCharHighlighter {
       this.specials = new RegExp("\t|" + this.specials.source, "gu")
   }
 
-  updateState(_view: EditorView, _prev: any, transactions: Transaction[]) {
+  update(_view: EditorView, {transactions}: ViewUpdate) {
     let allChanges = transactions.reduce((ch, tr) => ch.appendSet(tr.changes), ChangeSet.empty)
     if (allChanges.length) {
       this.decorations = this.decorations.map(allChanges)
@@ -42,10 +42,6 @@ class SpecialCharHighlighter {
       this.to = allChanges.mapPos(this.to, -1)
       this.closeHoles(allChanges.changedRanges())
     }
-    this.updateForViewport()
-  }
-
-  updateViewport() {
     this.updateForViewport()
   }
 

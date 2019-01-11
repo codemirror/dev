@@ -1,5 +1,5 @@
 import {Plugin, EditorState} from "../../state/src"
-import {EditorView, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
+import {EditorView, ViewUpdate, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
 export function multipleSelections() {
   return new Plugin({
@@ -21,16 +21,16 @@ class MultipleSelectionView {
   rangeConfig: RangeDecorationSpec
 
   constructor(view: EditorView) {
-    this.update(view.state)
+    this.updateInner(view.state)
     this.rangeConfig = {class: "CodeMirror-secondary-selection"} // FIXME configurable?
   }
 
-  updateState(view: EditorView, prevState: EditorState) {
-    if (prevState.doc != view.state.doc || !prevState.selection.eq(view.state.selection))
-      this.update(view.state)
+  update(view: EditorView, update: ViewUpdate) {
+    if (update.oldState.doc != update.state.doc || !update.oldState.selection.eq(update.state.selection))
+      this.updateInner(view.state)
   }
 
-  update(state: EditorState) {
+  updateInner(state: EditorState) {
     let {ranges, primaryIndex} = state.selection
     if (ranges.length == 0) {
       this.decorations = Decoration.none
