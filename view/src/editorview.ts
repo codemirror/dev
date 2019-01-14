@@ -1,4 +1,4 @@
-import {EditorState, Transaction, MetaSlot, StateBehavior} from "../../state/src"
+import {EditorState, Transaction, MetaSlot, StateExtension} from "../../state/src"
 import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {getRoot, Rect} from "./dom"
@@ -7,7 +7,7 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
 
-export const viewPlugin = StateBehavior.define<(view: EditorView) => PluginView>()
+export const viewPlugin = StateExtension.defineBehavior<(view: EditorView) => PluginView>()
 
 export class EditorView {
   private _state!: EditorState
@@ -113,7 +113,7 @@ export class EditorView {
   private createPluginViews(plugins: PluginView[]) {
     this.destroyPluginViews()
     for (let plugin of plugins) this.pluginViews.push(plugin)
-    for (let p of this.state.behavior(viewPlugin)) this.pluginViews.push(p(this))
+    for (let p of this.state.behavior.get(viewPlugin)) this.pluginViews.push(p(this))
   }
 
   private destroyPluginViews() {

@@ -1,12 +1,12 @@
 import {EditorView} from "../src"
-import {EditorState, StateExtender} from "../../state/src"
+import {EditorState, StateExtension} from "../../state/src"
 
 const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElement
 
 let tempView: EditorView | null = null
 let hide: any = null
 
-export function tempEditor(doc = "", extensions: ReadonlyArray<StateExtender> = []): EditorView {
+export function tempEditor(doc = "", extensions: ReadonlyArray<StateExtension> = []): EditorView {
   if (tempView) {
     tempView.destroy()
     tempView = null

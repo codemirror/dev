@@ -7,7 +7,7 @@ const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
   let state = EditorState.create({extensions: [keymap(map)]})
-  return state.behavior(viewPlugin)[0](fakeView as any)
+  return state.behavior.get(viewPlugin)[0](fakeView as any)
 }
 
 function dispatch(plugin: any, key: string, mods?: any) {

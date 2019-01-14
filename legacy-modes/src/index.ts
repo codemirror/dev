@@ -1,6 +1,6 @@
 import {EditorView, ViewUpdate, viewPlugin} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
-import {EditorState, StateBehavior, StateField, Transaction} from "../../state/src"
+import {EditorState, StateExtension, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
 
 import {StringStreamCursor} from "./stringstreamcursor"
@@ -148,24 +148,24 @@ type Config = {
   mode: Mode<any>
 }
 
-export const legacyMode = StateBehavior.defineExtension<Config>(config => {
+export const legacyMode = (config: Config) => {
   let field = new StateField<StateCache<any>>({
     init(state: EditorState) { return new StateCache([], 0, null) },
     apply(tr, cache) { return cache.apply(tr) },
     name: "mode"
   })
-  return [
-    StateBehavior.stateField(field),
+  return StateExtension.all(
+    StateExtension.stateField(field),
     viewPlugin(getViewPlugin(field, config)),
-    StateBehavior.indentation((state: EditorState, pos: number): number => {
+    StateExtension.indentation((state: EditorState, pos: number): number => {
       if (!config.mode.indent) return -1
       let modeState = state.getField(field).getState(state, pos, config.mode)
       let line = state.doc.lineAt(pos)
       return config.mode.indent(modeState, line.slice(0, Math.min(line.length, 100)).match(/^\s*(.*)/)![1])
     })
     // FIXME add a token-retrieving behavior
-  ]
-})
+  )
+}
 
 function getViewPlugin(field: StateField<StateCache<any>>, config: Config) {
   const {sleepTime = 100, maxWorkTime = 100, mode} = config
