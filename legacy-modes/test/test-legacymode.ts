@@ -28,7 +28,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     state: EditorState.create({doc, extensions: [extension]}),
     updateState: onDecorationUpdate
   }
-  const plugin = view.state.behavior(viewPlugin)[0](view as any)
+  const plugin = view.state.behavior.get(viewPlugin)[0](view as any)
 
   return {
     calls,

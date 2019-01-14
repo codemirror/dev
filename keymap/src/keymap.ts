@@ -1,6 +1,4 @@
 import {base, keyName} from "w3c-keyname"
-
-import {StateBehavior} from "../../state/src"
 import {EditorView, viewPlugin} from "../../view/src"
 
 export type Command = (view: EditorView) => boolean
@@ -67,11 +65,9 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 // You can add multiple keymap behaviors to an editor. Their
 // priorities determine their precedence (the ones specified early or
 // with high priority get to dispatch first).
-export const keymap = StateBehavior.defineExtension<Keymap>(map => [
-  viewPlugin(() => ({
-    handleDOMEvents: {keydown: keydownHandler(normalize(map))}
-  }))
-])
+export const keymap = (map: Keymap) => viewPlugin(() => ({
+  handleDOMEvents: {keydown: keydownHandler(normalize(map)) as any} // FIXME find a better type for handleDOMEvents
+}))
 
 function keydownHandler(map: Keymap): (view: EditorView, event: KeyboardEvent) => boolean {
   return function(view, event) {

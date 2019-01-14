@@ -1,6 +1,6 @@
 import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewUpdate, viewPlugin} from "../../view/src"
-import {ChangeSet, ChangedRange, StateBehavior} from "../../state/src"
-import {combineConfig} from "../../behavior/src/behavior"
+import {ChangeSet, ChangedRange, StateExtension} from "../../state/src"
+import {combineConfig} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 
 export interface SpecialCharOptions {
@@ -10,10 +10,10 @@ export interface SpecialCharOptions {
 }
 
 
-export const specialChars = StateBehavior.defineUniqueExtension<SpecialCharOptions>(configs => {
+export const specialChars = StateExtension.unique((configs: SpecialCharOptions[]) => {
   // FIXME make configurations compose properly
   let config = combineConfig(configs)
-  return [viewPlugin(view => new SpecialCharHighlighter(view, config))]
+  return viewPlugin(view => new SpecialCharHighlighter(view, config))
 }, {})
 
 const JOIN_GAP = 10

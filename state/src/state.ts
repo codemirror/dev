@@ -2,54 +2,33 @@ import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction, MetaSlot} from "./transaction"
 import {unique} from "./unique"
-import {Behavior, Extension, Extender, defineBehavior, defineExtension, defineUniqueExtension,
-        Priority, BehaviorStore} from "../../behavior/src/behavior"
+import {Extension, BehaviorStore} from "../../extension/src/extension"
 
 // A behavior is a type of value that can be associated with an editor
 // state. It is used to configure the state, for example by
 // associating helper functions with it (see
-// `StateBehavior.indentation`) or configuring the way it behaves (see
-// `StateBehavior.allowMultipleSelections`).
-export type StateBehavior<Value> = Behavior<Value, EditorState>
-
-export type StateExtension<Spec> = Extension<Spec, EditorState>
-
-export type StateExtender = Extender<EditorState>
-
-export const StateBehavior = {
-  define<Value>({unique = false}: {unique?: boolean} = {}) {
-    return defineBehavior<Value, EditorState>(unique)
-  },
-
-  defineExtension<Spec>(instantiate: (spec: Spec) => ReadonlyArray<Extender<EditorState>>, defaultSpec?: Spec) {
-    return defineExtension<Spec, EditorState>(instantiate, defaultSpec)
-  },
-
-  defineUniqueExtension<Spec>(instantiate: (specs: ReadonlyArray<Spec>) => ReadonlyArray<Extender<EditorState>>, defaultSpec?: Spec) {
-    return defineUniqueExtension<Spec, EditorState>(instantiate, defaultSpec)
-  },
-
-  Priority: Priority,
-
-  stateField: defineBehavior<StateField<any>, EditorState>(),
-  allowMultipleSelections: defineBehavior<boolean, EditorState>(),
-  indentation: defineBehavior<(state: EditorState, pos: number) => number, EditorState>()
+// `StateExtension.indentation`) or configuring the way it behaves
+// (see `StateExtension.allowMultipleSelections`).
+export class StateExtension extends Extension {
+  static stateField = StateExtension.defineBehavior<StateField<any>>()
+  static allowMultipleSelections = StateExtension.defineBehavior<boolean>()
+  static indentation = StateExtension.defineBehavior<(state: EditorState, pos: number) => number>()
 }
 
 class Configuration {
   constructor(
-    readonly behavior: BehaviorStore<EditorState>,
+    readonly behavior: BehaviorStore,
     readonly fields: ReadonlyArray<StateField<any>>,
     readonly multipleSelections: boolean,
     readonly tabSize: number,
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let behavior = BehaviorStore.resolve(config.extensions || [])
+    let behavior = StateExtension.resolve(config.extensions || [])
     return new Configuration(
       behavior,
-      behavior.get(StateBehavior.stateField),
-      behavior.get(StateBehavior.allowMultipleSelections).some(x => x),
+      behavior.get(StateExtension.stateField),
+      behavior.get(StateExtension.allowMultipleSelections).some(x => x),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
@@ -66,7 +45,7 @@ class Configuration {
 export interface EditorStateConfig {
   doc?: string | Text
   selection?: EditorSelection
-  extensions?: ReadonlyArray<StateExtender>
+  extensions?: ReadonlyArray<Extension>
   tabSize?: number
   lineSeparator?: string | null
 }
@@ -112,15 +91,7 @@ export class EditorState {
   joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.config.lineSeparator || undefined) }
   splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
 
-  behavior<Value>(behavior: Behavior<Value, EditorState>): Value[] {
-    return this.config.behavior.get(behavior)
-  }
-
-  behaviorSingle<Value, Default = undefined>(behavior: Behavior<Value, EditorState>, defaultValue: Default): Value | Default {
-    if (!(behavior as any).unique) throw new Error("Can only call behaviorSingle on a Behavior with unique=true")
-    let all = this.behavior(behavior)
-    return all.length == 0 ? defaultValue : all[0]
-  }
+  get behavior() { return this.config.behavior }
 
   // FIXME plugin state serialization
 

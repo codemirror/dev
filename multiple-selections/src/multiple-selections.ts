@@ -1,12 +1,14 @@
-import {EditorState, StateBehavior} from "../../state/src"
+import {EditorState, StateExtension} from "../../state/src"
 import {EditorView, ViewUpdate, viewPlugin, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
 export interface Config {}
 
-export const multipleSelections = StateBehavior.defineUniqueExtension<Config>(configs => {
-  return [StateBehavior.allowMultipleSelections(true),
-          viewPlugin(view => new MultipleSelectionView(view))]
-}, {})
+export const multipleSelections = StateExtension.unique((configs: Config[]) => {
+  return StateExtension.all(
+    StateExtension.allowMultipleSelections(true),
+    viewPlugin(view => new MultipleSelectionView(view))
+  )
+})
 
 class CursorWidget extends WidgetType<null> {
   toDOM() {

@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorState, Change, EditorSelection, SelectionRange, MetaSlot, StateBehavior} from "../src"
+import {EditorState, Change, EditorSelection, SelectionRange, MetaSlot, StateExtension} from "../src"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -17,7 +17,7 @@ describe("EditorState", () => {
 
   it("maps selection through changes", () => {
     let state = EditorState.create({doc: "abcdefgh",
-                                    extensions: [StateBehavior.allowMultipleSelections(true)],
+                                    extensions: [StateExtension.allowMultipleSelections(true)],
                                     selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
     let newState = state.transaction.replaceSelection("Q").apply()
     ist(newState.doc.toString(), "QabcdQefghQ")

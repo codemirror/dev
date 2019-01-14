@@ -1,5 +1,5 @@
-import {EditorState, Transaction, StateField, MetaSlot, StateBehavior} from "../../state/src"
-import {combineConfig} from "../../behavior/src/behavior"
+import {EditorState, Transaction, StateField, MetaSlot, StateExtension} from "../../state/src"
+import {combineConfig} from "../../extension/src/extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
@@ -46,24 +46,24 @@ class HistoryBehavior {
   }
 }
 
-const historyBehavior = StateBehavior.define<HistoryBehavior>({unique: true})
+const historyBehavior = StateExtension.defineBehavior<HistoryBehavior>()
 
-export const history = StateBehavior.defineUniqueExtension<HistoryConfig>(configs => {
+export const history = StateExtension.unique<HistoryConfig>(configs => {
   let config = combineConfig(configs, {minDepth: Math.max}, {
     minDepth: 100,
     newGroupDelay: 500
   })
   let field = historyField(config.minDepth!, config.newGroupDelay!)
-  return [
-    StateBehavior.stateField(field),
+  return StateExtension.all(
+    StateExtension.stateField(field),
     historyBehavior(new HistoryBehavior(field, config))
-  ]
+  )
 }, {})
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let hist = state.behaviorSingle(historyBehavior, undefined)
-    return hist ? hist.cmd(target, only, state, dispatch) : false
+    let hist = state.behavior.get(historyBehavior)
+    return hist.length ? hist[0].cmd(target, only, state, dispatch) : false
   }
 }
 
@@ -81,8 +81,8 @@ export function closeHistory(tr: Transaction): Transaction {
 
 function depth(target: PopTarget, only: ItemFilter) {
   return function(state: EditorState): number {
-    let hist = state.behaviorSingle(historyBehavior, undefined)
-    return hist ? hist.depth(target, only, state) : 0
+    let hist = state.behavior.get(historyBehavior)
+    return hist.length ? hist[0].depth(target, only, state) : 0
   }
 }
 
