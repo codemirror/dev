@@ -3,16 +3,20 @@ import {ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 
-export interface SpecialCharOptions {
+interface CompleteSpecialCharConfig {
   render?: (code: number, description: string | null, placeHolder: string) => HTMLElement | null
-  specialChars?: RegExp
+  specialChars: RegExp
   addSpecialChars?: RegExp
 }
+export type SpecialCharConfig = Partial<CompleteSpecialCharConfig>
 
-
-export const specialChars = ViewExtension.unique((configs: SpecialCharOptions[]) => {
+export const specialChars = ViewExtension.unique((configs: SpecialCharConfig[]) => {
   // FIXME make configurations compose properly
-  let config = combineConfig(configs)
+  let config: CompleteSpecialCharConfig = combineConfig(configs, {
+    render: undefined,
+    specialChars: SPECIALS,
+    addSpecialChars: undefined
+  })
   return ViewExtension.state<SpecialCharHighlighter>({
     create(view) { return new SpecialCharHighlighter(view, config) },
     update(view, update, self) { self.update(update.transactions); return self }
@@ -28,9 +32,9 @@ class SpecialCharHighlighter {
   specials: RegExp
   replaceTabs: boolean
 
-  constructor(readonly view: EditorView, readonly options: SpecialCharOptions) {
+  constructor(readonly view: EditorView, readonly options: CompleteSpecialCharConfig) {
     this.updateForViewport()
-    this.specials = options.specialChars || SPECIALS
+    this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
     let styles = document.body.style as any
     if (this.replaceTabs = (styles.tabSize || styles.MozTabSize) == null)
@@ -138,7 +142,7 @@ function placeHolder(code: number): string | null {
 const DEFAULT_PLACEHOLDER = "\u2022"
 
 class SpecialCharWidget extends WidgetType<number> {
-  constructor(private options: SpecialCharOptions, code: number) { super(code) }
+  constructor(private options: CompleteSpecialCharConfig, code: number) { super(code) }
 
   toDOM() {
     let ph = placeHolder(this.value) || DEFAULT_PLACEHOLDER

@@ -13,13 +13,13 @@ const matching: {[key: string]: string | undefined} = {
   "}": "{<"
 }
 
-export type Config = {
-  afterCursor?: boolean,
-  decorationsPlugin?: Plugin,
-  bracketRegex?: RegExp,
-  maxScanDistance?: number,
-  strict?: boolean,
+interface CompleteConfig {
+  afterCursor: boolean,
+  bracketRegex: RegExp,
+  maxScanDistance: number,
+  strict: boolean,
 }
+export type Config = Partial<CompleteConfig>
 
 function getStyle(decorations: DecorationSet | undefined, at: number): string | void {
   if (!decorations) return
@@ -30,9 +30,9 @@ function getStyle(decorations: DecorationSet | undefined, at: number): string | 
       return (decoration.value as RangeDecoration).spec.class
 }
 
-export function findMatchingBracket(
+function findMatchingBracket(
   doc: Text, decorations: DecorationSet | undefined,
-  where: number, config: Config = {}
+  where: number, config: CompleteConfig
 ) : {from: number, to: number | null, forward: boolean, match: boolean} | null {
   let pos = where - 1
   // A cursor is defined as between two characters, but in in vim command mode
@@ -60,9 +60,9 @@ export function findMatchingBracket(
 // Returns false when no bracket was found, null when it reached
 // maxScanDistance and gave up
 export function scanForBracket(doc: Text, decorations: DecorationSet | undefined,
-                               where: number, dir: -1 | 1, style: string | null, config: Config) {
-  const maxScanDistance = config.maxScanDistance || 10000
-  const re = config.bracketRegex || /[(){}[\]]/
+                               where: number, dir: -1 | 1, style: string | null, config: CompleteConfig) {
+  const maxScanDistance = config.maxScanDistance
+  const re = config.bracketRegex
   const stack = []
   const iter = doc.iterRange(where, dir > 0 ? doc.length : 0)
   for (let distance = 0; !iter.done && distance <= maxScanDistance;) {
@@ -84,7 +84,7 @@ export function scanForBracket(doc: Text, decorations: DecorationSet | undefined
   return iter.done ? false : null
 }
 
-function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet | undefined, config: Config) {
+function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet | undefined, config: CompleteConfig) {
   const decorations = []
   for (const range of state.selection.ranges) {
     if (!range.empty) continue
@@ -98,7 +98,12 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
 }
 
 export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
-  let config = combineConfig(configs)
+  let config = combineConfig(configs, {
+    afterCursor: false,
+    bracketRegex: /[(){}[\]]/,
+    maxScanDistance: 10000,
+    strict: false
+  })
   return ViewExtension.decorations({
     create(view) { return Decoration.none },
     update({state}, {transactions}, deco) {
