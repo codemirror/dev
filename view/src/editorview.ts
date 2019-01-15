@@ -37,6 +37,8 @@ export class ViewExtension extends Extension {
   static handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
   static domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
+
+  static dispatch = ViewExtension.defineBehavior<(view: EditorView, tr: Transaction) => boolean>()
 }
 
 // FIXME does it make sense to isolate these from the actual view
@@ -98,8 +100,6 @@ export class EditorView {
   private _state!: EditorState
   get state(): EditorState { return this._state }
 
-  readonly dispatch: (tr: Transaction) => void
-
   readonly dom: HTMLElement
   readonly contentDOM: HTMLElement
 
@@ -117,9 +117,7 @@ export class EditorView {
 
   private updatingState: boolean = false
 
-  constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...extensions: ViewExtension[]) {
-    this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
-
+  constructor(state: EditorState, extensions: ViewExtension[] = []) {
     this.contentDOM = document.createElement("pre")
     this.contentDOM.className = "CodeMirror-content"
     this.contentDOM.style.cssText = contentCSS
@@ -144,10 +142,10 @@ export class EditorView {
       getDecorations: () => getDecoratations(this)
     })
     this.viewport = this.docView.publicViewport
-    this.setState(state, ...extensions)
+    this.setState(state, extensions)
   }
 
-  setState(state: EditorState, ...extensions: ViewExtension[]) {
+  setState(state: EditorState, extensions: ViewExtension[] = []) {
     for (let effect of this.domEffects) if (effect.destroy) effect.destroy()
     this._state = state
     this.withUpdating(() => {
@@ -182,6 +180,12 @@ export class EditorView {
     this.updatingState = true
     try { f() }
     finally { this.updatingState = false }
+  }
+
+  dispatch(tr: Transaction) {
+    let handlers = this.behavior.get(ViewExtension.dispatch)
+    for (let handler of handlers) if (handler(this, tr)) return
+    this.updateState([tr], tr.apply())
   }
 
   extensionState<State>(spec: ViewStateSpec<State>): State | undefined {
