@@ -5,7 +5,9 @@ import {HistoryState, ItemFilter, PopTarget} from "./core"
 const historyStateSlot = new MetaSlot<HistoryState>("historyState")
 export const closeHistorySlot = new MetaSlot<boolean>("historyClose")
 
-function historyField(minDepth: number, newGroupDelay: number) {
+interface CompleteHistoryConfig {minDepth: number, newGroupDelay: number}
+
+function historyField({minDepth, newGroupDelay}: CompleteHistoryConfig) {
   return new StateField({
     init(editorState: EditorState): HistoryState {
       return HistoryState.empty
@@ -28,20 +30,20 @@ function historyField(minDepth: number, newGroupDelay: number) {
   })
 }
 
-export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
+export type HistoryConfig = Partial<CompleteHistoryConfig>
 
 class HistoryContext {
-  constructor(public field: StateField<HistoryState>, public config: HistoryConfig) {}
+  constructor(public field: StateField<HistoryState>, public config: CompleteHistoryConfig) {}
 }
 
 const historyBehavior = StateExtension.defineBehavior<HistoryContext>()
 
 export const history = StateExtension.unique<HistoryConfig>(configs => {
-  let config = combineConfig(configs, {minDepth: Math.max}, {
+  let config = combineConfig(configs, {
     minDepth: 100,
     newGroupDelay: 500
-  })
-  let field = historyField(config.minDepth!, config.newGroupDelay!)
+  }, {minDepth: Math.max})
+  let field = historyField(config)
   return StateExtension.all(
     StateExtension.stateField(field),
     historyBehavior(new HistoryContext(field, config))
@@ -55,7 +57,7 @@ function cmd(target: PopTarget, only: ItemFilter) {
     let {field, config} = hist[0]
     let historyState = state.getField(field)
     if (!historyState.canPop(target, only)) return false
-    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, config.minDepth!)
+    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, config.minDepth)
     dispatch(transaction.setMeta(historyStateSlot, newState))
     return true
   }

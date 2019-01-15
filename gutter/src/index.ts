@@ -14,13 +14,17 @@ import {EditorView, ViewExtension, DOMEffect} from "../../view/src"
 
 // FIXME this forces a checkLayout right on init, which is wasteful
 
-export interface GutterConfig {
-  fixed?: boolean,
-  formatNumber?: (lineNo: number) => string
+interface CompleteGutterConfig {
+  fixed: boolean,
+  formatNumber: (lineNo: number) => string
 }
+export type GutterConfig = Partial<CompleteGutterConfig>
 
 export const gutter = ViewExtension.unique<GutterConfig>(configs => {
-  let config = combineConfig(configs)
+  let config = combineConfig(configs, {
+    fixed: true,
+    formatNumber: String
+  })
   return ViewExtension.domEffect(view => new GutterView(view, config))
 }, {})
 
@@ -31,19 +35,19 @@ class GutterView implements DOMEffect {
   lastLine: GutterLine
   formatNumber: (lineNo: number) => string
 
-  constructor(public view: EditorView, config: GutterConfig) {
+  constructor(public view: EditorView, config: CompleteGutterConfig) {
     this.dom = document.createElement("div")
     this.dom.className = "CodeMirror-gutter"
     this.dom.setAttribute("aria-hidden", "true")
     this.dom.style.cssText = `left: 0; box-sizing: border-box; height: 100%; overflow: hidden; flex-shrink: 0;`
-    if (config.fixed !== false) {
+    if (config.fixed) {
       // FIXME IE11 fallback, which doesn't support position: sticky,
       // by using position: relative + event handlers that realign the
       // gutter (or just force fixed=false on IE11?)
       this.dom.style.position = "sticky"
     }
     view.dom.insertBefore(this.dom, view.contentDOM)
-    this.formatNumber = config.formatNumber || String
+    this.formatNumber = config.formatNumber
     this.lastLine = new GutterLine(1, 0, 0, 0, this.formatNumber)
     this.lastLine.dom.style.cssText += "visibility: hidden; pointer-events: none"
     this.dom.appendChild(this.lastLine.dom)
