@@ -30,23 +30,11 @@ function historyField(minDepth: number, newGroupDelay: number) {
 
 export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
 
-class HistoryBehavior {
+class HistoryContext {
   constructor(public field: StateField<HistoryState>, public config: HistoryConfig) {}
-
-  cmd(target: PopTarget, only: ItemFilter, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
-    let historyState = state.getField(this.field)
-    if (!historyState.canPop(target, only)) return false
-    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, this.config.minDepth!)
-    dispatch(transaction.setMeta(historyStateSlot, newState))
-    return true
-  }
-
-  depth(target: PopTarget, only: ItemFilter, state: EditorState): number {
-    return state.getField(this.field).eventCount(target, only)
-  }
 }
 
-const historyBehavior = StateExtension.defineBehavior<HistoryBehavior>()
+const historyBehavior = StateExtension.defineBehavior<HistoryContext>()
 
 export const history = StateExtension.unique<HistoryConfig>(configs => {
   let config = combineConfig(configs, {minDepth: Math.max}, {
@@ -56,14 +44,20 @@ export const history = StateExtension.unique<HistoryConfig>(configs => {
   let field = historyField(config.minDepth!, config.newGroupDelay!)
   return StateExtension.all(
     StateExtension.stateField(field),
-    historyBehavior(new HistoryBehavior(field, config))
+    historyBehavior(new HistoryContext(field, config))
   )
 }, {})
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
     let hist = state.behavior.get(historyBehavior)
-    return hist.length ? hist[0].cmd(target, only, state, dispatch) : false
+    if (!hist.length) return false
+    let {field, config} = hist[0]
+    let historyState = state.getField(field)
+    if (!historyState.canPop(target, only)) return false
+    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, config.minDepth!)
+    dispatch(transaction.setMeta(historyStateSlot, newState))
+    return true
   }
 }
 
@@ -82,7 +76,9 @@ export function closeHistory(tr: Transaction): Transaction {
 function depth(target: PopTarget, only: ItemFilter) {
   return function(state: EditorState): number {
     let hist = state.behavior.get(historyBehavior)
-    return hist.length ? hist[0].depth(target, only, state) : 0
+    if (hist.length == 0) return 0
+    let {field} = hist[0]
+    return state.getField(field).eventCount(target, only)
   }
 }
 
