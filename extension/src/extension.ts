@@ -161,19 +161,21 @@ function findTopUnique(extensions: Extension[], type: typeof Extension): UniqueE
   return null
 }
 
+type NonUndefined<T> = T extends undefined ? never : T
+
 // Utility function for combining behaviors to fill in a config
 // object from an array of provided configs. Will, by default, error
 // when a field gets two values that aren't ===-equal, but you can
 // provide combine functions per field to do something else.
 export function combineConfig<Config>(configs: ReadonlyArray<Config>,
-                                      combine: {[key: string]: (first: any, second: any) => any} = {},
+                                      combine: {[P in keyof Config]?: (first: NonUndefined<Config[P]>, second: NonUndefined<Config[P]>) => NonUndefined<Config[P]>} = {},
                                       defaults?: Config): Config {
   let result: any = {}
   for (let config of configs) for (let key of Object.keys(config)) {
     let value = (config as any)[key], current = result[key]
     if (current === undefined) result[key] = value
     else if (current === value || value === undefined) {} // No conflict
-    else if (Object.hasOwnProperty.call(combine, key)) result[key] = combine[key](current, value)
+    else if (Object.hasOwnProperty.call(combine, key)) result[key] = (combine as any)[key](current, value)
     else throw new Error("Config merge conflict for field " + key)
   }
   if (defaults) for (let key in defaults)
