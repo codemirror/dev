@@ -1,36 +1,28 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {EditorView, ViewUpdate, viewPlugin} from "../src/"
+import {EditorView, ViewUpdate, ViewExtension} from "../src/"
 import ist from "ist"
 
-describe("EditorView plugins", () => {
-  it("calls update on transactions", () => {
-    let called = 0
-    let cm = tempEditor("one\ntwo", [viewPlugin((view: EditorView) => {
-      let doc = view.state.doc.toString()
-      ist(doc, "one\ntwo")
-      return {
-        update(view: EditorView, update: ViewUpdate) {
-          ist(update.oldState.doc.toString(), doc)
-          doc = view.state.doc.toString()
-          if (update.transactions.length == 1) called++
-        }
+describe("EditorView extension", () => {
+  it("can maintain state", () => {
+    let spec = {
+      create(view: EditorView) { return [view.state.doc.toString()] },
+      update(view: EditorView, update: ViewUpdate, value: string[]) {
+        return update.transactions.length ? value.concat(view.state.doc.toString()) : value
       }
-    })])
+    }
+    let cm = tempEditor("one\ntwo", [ViewExtension.state(spec)])
     cm.dispatch(cm.state.transaction.replace(0, 1, "O"))
     cm.dispatch(cm.state.transaction.replace(4, 5, "T"))
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1)))
-    ist(called, 3)
+    ist(cm.extensionState(spec)!.join("/"), "one\ntwo/One\ntwo/One\nTwo/One\nTwo")
   })
 
   it("calls update when the viewport changes", () => {
     let ports: number[][] = []
-    let cm = tempEditor("x\n".repeat(500), [viewPlugin(() => {
-      return {
-        update(view: EditorView) {
-          ports.push([view.viewport.from, view.viewport.to])
-        }
-      }
+    let cm = tempEditor("x\n".repeat(500), [ViewExtension.state({
+      create() {},
+      update(view) { ports.push([view.viewport.from, view.viewport.to]) }
     })])
     ist(ports.length, 1)
     ist(ports[0][0], 0)
@@ -46,13 +38,11 @@ describe("EditorView plugins", () => {
     ist(ports.length, 3)
   })
 
-  it("calls updateDOM when the DOM is changed", () => {
+  it("calls update on DOM effects when the DOM is changed", () => {
     let updates = 0
-    let cm = tempEditor("xyz", [viewPlugin(() => {
-      return {
-        updateDOM() { updates++ }
-      }
-    })])
+    let cm = tempEditor("xyz", [ViewExtension.domEffect(() => ({
+      update() { updates++ }
+    }))])
     ist(updates, 1)
     cm.dispatch(cm.state.transaction.replace(1, 2, "u"))
     ist(updates, 2)

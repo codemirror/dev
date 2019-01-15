@@ -53,10 +53,4 @@ describe("EditorState behavior", () => {
     let e = Extension.unique((specs: number[]) => num(0))
     ist.throws(() => e())
   })
-
-  it("complains when adding behavior from the wrong subclass", () => {
-    class XExtension extends Extension {}
-    let b = XExtension.defineBehavior<number>()
-    ist.throws(() => mk(b(10)))
-  })
 })

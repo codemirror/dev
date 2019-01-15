@@ -1,6 +1,5 @@
-import {StateExtension} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
-import {EditorView, viewPlugin} from "../../view/src"
+import {EditorView, ViewExtension, DOMEffect} from "../../view/src"
 
 // FIXME Think about how the gutter width changing could cause
 // problems when line wrapping is on by changing a line's height
@@ -13,24 +12,26 @@ import {EditorView, viewPlugin} from "../../view/src"
 
 // FIXME seriously slow on Firefox when devtools are open
 
+// FIXME this forces a checkLayout right on init, which is wasteful
+
 export interface GutterConfig {
   fixed?: boolean,
   formatNumber?: (lineNo: number) => string
 }
 
-export const gutter = StateExtension.unique<GutterConfig>(configs => {
+export const gutter = ViewExtension.unique<GutterConfig>(configs => {
   let config = combineConfig(configs)
-  return viewPlugin(view => new GutterView(view, config))
+  return ViewExtension.domEffect(view => new GutterView(view, config))
 }, {})
 
-class GutterView {
+class GutterView implements DOMEffect {
   dom: HTMLElement
   spaceAbove: number = 0
   lines: GutterLine[] = []
   lastLine: GutterLine
   formatNumber: (lineNo: number) => string
 
-  constructor(view: EditorView, config: GutterConfig) {
+  constructor(public view: EditorView, config: GutterConfig) {
     this.dom = document.createElement("div")
     this.dom.className = "CodeMirror-gutter"
     this.dom.setAttribute("aria-hidden", "true")
@@ -46,30 +47,30 @@ class GutterView {
     this.lastLine = new GutterLine(1, 0, 0, 0, this.formatNumber)
     this.lastLine.dom.style.cssText += "visibility: hidden; pointer-events: none"
     this.dom.appendChild(this.lastLine.dom)
-    this.updateDOM(view)
+    this.update()
   }
 
-  updateDOM(view: EditorView) {
+  update() {
     // Create the first number consisting of all 9s that is at least
     // as big as the line count, and put that in this.lastLine to make
     // sure the gutter width is stable
     let last = 9
-    while (last < view.state.doc.lines) last = last * 10 + 9
+    while (last < this.view.state.doc.lines) last = last * 10 + 9
     this.lastLine.update(last, 0, 0, 0, this.formatNumber)
     // FIXME would be nice to be able to recognize updates that didn't redraw
-    this.updateGutter(view)
+    this.updateGutter()
   }
 
-  updateGutter(view: EditorView) {
-    let spaceAbove = view.heightAtPos(view.viewport.from, true)
+  updateGutter() {
+    let spaceAbove = this.view.heightAtPos(this.view.viewport.from, true)
     if (spaceAbove != this.spaceAbove) {
       this.spaceAbove = spaceAbove
       this.dom.style.paddingTop = spaceAbove + "px"
     }
     let i = 0, lineNo = -1
-    view.viewport.forEachLine(line => {
+    this.view.viewport.forEachLine(line => {
       let above = line.textTop, below = line.height - line.textBottom, height = line.height - above - below
-      if (lineNo < 0) lineNo = view.state.doc.lineAt(line.start).number
+      if (lineNo < 0) lineNo = this.view.state.doc.lineAt(line.start).number
       if (i == this.lines.length) {
         let newLine = new GutterLine(lineNo, height, above, below, this.formatNumber)
         this.lines.push(newLine)
@@ -81,7 +82,7 @@ class GutterView {
       i++
     })
     while (this.lines.length > i) this.dom.removeChild(this.lines.pop()!.dom)
-    this.dom.style.minHeight = view.contentHeight + "px"
+    this.dom.style.minHeight = this.view.contentHeight + "px"
   }
 
   destroy() {

@@ -1,5 +1,6 @@
-import {EditorState, Transaction, MetaSlot, StateExtension} from "../../state/src"
-import {DocView, EditorViewport} from "./docview"
+import {EditorState, Transaction, MetaSlot} from "../../state/src"
+import {Extension, BehaviorStore} from "../../extension/src/extension"
+import {DocView, EditorViewport, ViewUpdate} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {getRoot, Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
@@ -7,7 +8,91 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
 
-export const viewPlugin = StateExtension.defineBehavior<(view: EditorView) => PluginView>()
+export class ViewExtension extends Extension {
+  static state<State>(spec: ViewStateSpec<State>, slots: ViewSlot<State>[] = []): ViewExtension {
+    if (slots.length == 0) return viewState(spec)
+    return viewStateWithSlots(spec, slots)
+  }
+
+  static decorations(spec: ViewStateSpec<DecorationSet> & {map?: boolean}) {
+    let box = {value: Decoration.none}, map = spec.map !== false
+    return ViewExtension.all(
+      viewState({
+        create(view) {
+          return box.value = spec.create(view)
+        },
+        update(view, update, value) {
+          if (map) for (let tr of update.transactions) value = value.map(tr.changes)
+          return box.value = spec.update(view, update, value)
+        }
+      }),
+      decorationBehavior(box)
+    )
+  }
+
+  static defineSlot = defineViewSlot
+
+  static decorationSlot: <State>(accessor: (state: State) => DecorationSet) => ViewSlot<State> = null as any
+
+  static handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
+
+  static domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
+}
+
+// FIXME does it make sense to isolate these from the actual view
+// (only giving state, viewport etc)?
+export interface ViewStateSpec<T> {
+  create(view: EditorView): T
+  update(view: EditorView, update: ViewUpdate, value: T): T
+}
+
+const viewState = ViewExtension.defineBehavior<ViewStateSpec<any>>()
+
+export type DOMEffect = {
+  update?: () => void
+  destroy?: () => void
+}
+
+function defineViewSlot<T>() {
+  let behavior = ViewExtension.defineBehavior<{value: T}>()
+  return {
+    // @internal
+    behavior,
+    get(view: EditorView): T[] {
+      return view.behavior.get(behavior).map(box => box.value)
+    },
+    slot<State>(accessor: (state: State) => T) {
+      return new ViewSlot(behavior, accessor)
+    }
+  }
+}
+
+export class ViewSlot<State> {
+  constructor(/* @internal */ public behavior: (value: any) => ViewExtension,
+              /* @internal */ public accessor: (state: State) => any) {}
+}
+
+const {behavior: decorationBehavior,
+       get: getDecoratations,
+       slot: decorationSlot} = defineViewSlot<DecorationSet>()
+
+ViewExtension.decorationSlot = decorationSlot
+
+function viewStateWithSlots<State>(spec: ViewStateSpec<State>, slots: ViewSlot<any>[]) {
+  let boxes = slots.map(slot => ({value: null}))
+  function save(value: any) {
+    for (let i = 0; i < slots.length; i++)
+      boxes[i].value = slots[i].accessor(value)
+    return value
+  }
+  return ViewExtension.all(
+    viewState({
+      create(view) { return save(spec.create(view)) },
+      update(view, update, value) { return save(spec.update(view, update, value)) }
+    }),
+    ...slots.map((slot, i) => slot.behavior(boxes[i]))
+  )
+}
 
 export class EditorView {
   private _state!: EditorState
@@ -26,11 +111,13 @@ export class EditorView {
 
   readonly viewport: EditorViewport
 
-  private pluginViews: PluginView[] = []
+  public behavior!: BehaviorStore
+  private extState!: any[]
+  private domEffects: DOMEffect[] = []
 
   private updatingState: boolean = false
 
-  constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
+  constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...extensions: ViewExtension[]) {
     this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
 
     this.contentDOM = document.createElement("pre")
@@ -47,25 +134,31 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
       onViewUpdate: (update: ViewUpdate) => {
-        for (let pluginView of this.pluginViews)
-          if (pluginView.update) pluginView.update(this, update)
+        let specs = this.behavior.get(viewState)
+        for (let i = 0; i < specs.length; i++)
+          this.extState[i] = specs[i].update(this, update, this.extState[i])
       },
       onUpdateDOM: () => {
-        for (let plugin of this.pluginViews) if (plugin.updateDOM) plugin.updateDOM(this)
+        for (let spec of this.domEffects) if (spec.update) spec.update()
       },
-      getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
+      getDecorations: () => getDecoratations(this)
     })
     this.viewport = this.docView.publicViewport
-    this.setState(state, ...plugins)
+    this.setState(state, ...extensions)
   }
 
-  setState(state: EditorState, ...plugins: PluginView[]) {
+  setState(state: EditorState, ...extensions: ViewExtension[]) {
+    for (let effect of this.domEffects) if (effect.destroy) effect.destroy()
     this._state = state
     this.withUpdating(() => {
       setTabSize(this.contentDOM, state.tabSize)
-      this.createPluginViews(plugins)
+      this.behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
+      if (this.behavior.foreign.length)
+        throw new Error("Non-ViewExtension extensions found when setting view state")
+      this.extState = this.behavior.get(viewState).map(spec => spec.create(this))
       this.inputState = new InputState(this)
       this.docView.init(state)
+      this.domEffects = this.behavior.get(ViewExtension.domEffect).map(spec => spec(this))
     })
   }
 
@@ -78,29 +171,10 @@ export class EditorView {
       if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
       if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
-      this.docView.update(new ViewUpdate(transactions, prevState, state, true),
+      this.docView.update(new ViewUpdate(transactions, prevState, state, false),
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       this.inputState.update(transactions)
     })
-  }
-
-  /** @internal */
-  someProp<N extends keyof PluginView, R>(propName: N, f: (value: NonNullable<PluginView[N]>) => R | undefined): R | undefined {
-    let value: R | undefined = undefined
-    for (let pluginView of this.pluginViews) {
-      let prop = pluginView[propName]
-      if (prop != null && (value = f(prop as NonNullable<PluginView[N]>)) != null) break
-    }
-    return value
-  }
-
-  /** @internal */
-  getProp<N extends keyof PluginView>(propName: N): PluginView[N] {
-    for (let pluginView of this.pluginViews) {
-      let prop = pluginView[propName]
-      if (prop != null) return prop
-    }
-    return undefined
   }
 
   private withUpdating(f: () => void) {
@@ -110,16 +184,10 @@ export class EditorView {
     finally { this.updatingState = false }
   }
 
-  private createPluginViews(plugins: PluginView[]) {
-    this.destroyPluginViews()
-    for (let plugin of plugins) this.pluginViews.push(plugin)
-    for (let p of this.state.behavior.get(viewPlugin)) this.pluginViews.push(p(this))
-  }
-
-  private destroyPluginViews() {
-    for (let pluginView of this.pluginViews) if (pluginView.destroy)
-      pluginView.destroy()
-    this.pluginViews.length = 0
+  extensionState<State>(spec: ViewStateSpec<State>): State | undefined {
+    let index = this.behavior.get(viewState).indexOf(spec)
+    if (index < 0) return undefined
+    return this.extState[index]
   }
 
   domAtPos(pos: number): {node: Node, offset: number} | null {
@@ -174,29 +242,11 @@ export class EditorView {
   }
 
   destroy() {
-    this.destroyPluginViews()
+    for (let effect of this.domEffects) if (effect.destroy) effect.destroy()
     this.inputState.destroy()
     this.dom.remove()
     this.docView.destroy()
   }
-}
-
-export class ViewUpdate {
-  // FIXME more fields (focus, dragging, ...)
-  // FIXME should scrollIntoView be stored in this?
-  constructor(public transactions: ReadonlyArray<Transaction>,
-              public oldState: EditorState,
-              public state: EditorState,
-              public viewportChanged: boolean) {}
-}
-
-export interface PluginView {
-  update?: (view: EditorView, update: ViewUpdate) => void
-  updateDOM?: (view: EditorView) => void
-  handleDOMEvents?: {[key: string]: (view: EditorView, event: Event) => boolean}
-  // This should return a stable value, not compute something on the fly
-  decorations?: DecorationSet
-  destroy?: () => void
 }
 
 function setTabSize(elt: HTMLElement, size: number) {

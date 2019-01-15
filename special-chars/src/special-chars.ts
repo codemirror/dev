@@ -1,5 +1,5 @@
-import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewUpdate, viewPlugin} from "../../view/src"
-import {ChangeSet, ChangedRange, StateExtension} from "../../state/src"
+import {Decoration, DecoratedRange, DecorationSet, WidgetType, EditorView, ViewExtension} from "../../view/src"
+import {ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 
@@ -10,10 +10,13 @@ export interface SpecialCharOptions {
 }
 
 
-export const specialChars = StateExtension.unique((configs: SpecialCharOptions[]) => {
+export const specialChars = ViewExtension.unique((configs: SpecialCharOptions[]) => {
   // FIXME make configurations compose properly
   let config = combineConfig(configs)
-  return viewPlugin(view => new SpecialCharHighlighter(view, config))
+  return ViewExtension.state<SpecialCharHighlighter>({
+    create(view) { return new SpecialCharHighlighter(view, config) },
+    update(view, update, self) { self.update(update.transactions); return self }
+  }, [ViewExtension.decorationSlot(highlighter => highlighter.decorations)])
 }, {})
 
 const JOIN_GAP = 10
@@ -34,7 +37,7 @@ class SpecialCharHighlighter {
       this.specials = new RegExp("\t|" + this.specials.source, "gu")
   }
 
-  update(_view: EditorView, {transactions}: ViewUpdate) {
+  update(transactions: ReadonlyArray<Transaction>) {
     let allChanges = transactions.reduce((ch, tr) => ch.appendSet(tr.changes), ChangeSet.empty)
     if (allChanges.length) {
       this.decorations = this.decorations.map(allChanges)

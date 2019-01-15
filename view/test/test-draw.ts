@@ -148,4 +148,7 @@ describe("EditorView drawing", () => {
       ist(domText(cm), doc.slice(cm.viewport.from, cm.viewport.to))
     }
   })
+
+  // FIXME add test that ensures an editor added to the dom after its
+  // initial checkLayout animationframe passed still updates itself.
 })
