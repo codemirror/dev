@@ -1,14 +1,23 @@
 import {EditorState, StateExtension} from "../../state/src"
-import {EditorView, ViewUpdate, viewPlugin, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
+import {ViewExtension, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
 
 export interface Config {}
 
 export const multipleSelections = StateExtension.unique((configs: Config[]) => {
+  let rangeConfig = {class: "CodeMirror-secondary-selection"} // FIXME configurable?
+
   return StateExtension.all(
     StateExtension.allowMultipleSelections(true),
-    viewPlugin(view => new MultipleSelectionView(view))
+    ViewExtension.decorations({
+      create(view) { return decorateSelections(view.state, rangeConfig) },
+      update(_view, {oldState, state}, deco) {
+        return oldState.doc == state.doc && oldState.selection.eq(state.selection)
+          ? deco : decorateSelections(state, rangeConfig)
+      },
+      map: false
+    })
   )
-})
+}, {})
 
 class CursorWidget extends WidgetType<null> {
   toDOM() {
@@ -18,32 +27,14 @@ class CursorWidget extends WidgetType<null> {
   }
 }
 
-class MultipleSelectionView {
-  decorations: DecorationSet = Decoration.none
-  rangeConfig: RangeDecorationSpec
-
-  constructor(view: EditorView) {
-    this.updateInner(view.state)
-    this.rangeConfig = {class: "CodeMirror-secondary-selection"} // FIXME configurable?
+function decorateSelections(state: EditorState, rangeConfig: RangeDecorationSpec): DecorationSet {
+  let {ranges, primaryIndex} = state.selection
+  if (ranges.length == 1) return Decoration.none
+  let deco = []
+  for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {
+    let range = ranges[i]
+    deco.push(range.empty ? Decoration.widget(range.from, {widget: new CursorWidget(null)})
+              : Decoration.range(ranges[i].from, ranges[i].to, rangeConfig))
   }
-
-  update(view: EditorView, update: ViewUpdate) {
-    if (update.oldState.doc != update.state.doc || !update.oldState.selection.eq(update.state.selection))
-      this.updateInner(view.state)
-  }
-
-  updateInner(state: EditorState) {
-    let {ranges, primaryIndex} = state.selection
-    if (ranges.length == 0) {
-      this.decorations = Decoration.none
-      return
-    }
-    let deco = []
-    for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {
-      let range = ranges[i]
-      deco.push(range.empty ? Decoration.widget(range.from, {widget: new CursorWidget(null)})
-                            : Decoration.range(ranges[i].from, ranges[i].to, this.rangeConfig))
-    }
-    this.decorations = Decoration.set(deco)
-  }
+  return Decoration.set(deco)
 }

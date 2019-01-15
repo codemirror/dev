@@ -1,5 +1,5 @@
 import {MetaSlot, EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
-import {EditorView} from "./editorview"
+import {EditorView, ViewExtension} from "./editorview"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 
@@ -192,10 +192,10 @@ function eventBelongsToEditor(view: EditorView, event: Event): boolean {
 
 function customHandlers(view: EditorView) {
   let result = Object.create(null)
-  view.someProp("handleDOMEvents", handlers => {
+  for (let handlers of view.behavior.get(ViewExtension.handleDOMEvents)) {
     for (let eventType in handlers)
       (result[eventType] || (result[eventType] = [])).push(handlers[eventType])
-  })
+  }
   return result
 }
 

@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {Decoration, EditorView, ViewUpdate, viewPlugin} from "../src"
+import {Decoration, EditorView, ViewExtension} from "../src"
 import ist from "ist"
 
 function flush(cm: EditorView) {
@@ -119,10 +119,10 @@ describe("DOM changes", () => {
   })
 
   it("doesn't drop collapsed text", () => {
-    let cm = tempEditor("abcd", [viewPlugin(() => ({
-      decorations: Decoration.set(Decoration.range(1, 3, {collapsed: true})),
-      update(v: EditorView, u: ViewUpdate) { if (u.transactions.length) (this as any).decorations = null }
-    }))])
+    let cm = tempEditor("abcd", [ViewExtension.decorations({
+      create() { return Decoration.set(Decoration.range(1, 3, {collapsed: true})) },
+      update(v, u, d) { return u.transactions.length ? Decoration.none : d }
+    })])
     cm.domAtPos(0)!.node.firstChild!.textContent = "x"
     flush(cm)
     ist(cm.state.doc.toString(), "xbcd")

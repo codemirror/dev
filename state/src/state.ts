@@ -4,11 +4,6 @@ import {Transaction, MetaSlot} from "./transaction"
 import {unique} from "./unique"
 import {Extension, BehaviorStore} from "../../extension/src/extension"
 
-// A behavior is a type of value that can be associated with an editor
-// state. It is used to configure the state, for example by
-// associating helper functions with it (see
-// `StateExtension.indentation`) or configuring the way it behaves
-// (see `StateExtension.allowMultipleSelections`).
 export class StateExtension extends Extension {
   static stateField = StateExtension.defineBehavior<StateField<any>>()
   static allowMultipleSelections = StateExtension.defineBehavior<boolean>()

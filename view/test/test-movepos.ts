@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {Decoration, WidgetType, EditorView, viewPlugin} from "../src"
+import {Decoration, WidgetType, ViewExtension} from "../src"
 import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)
@@ -13,11 +13,14 @@ class OWidget extends WidgetType<void> {
   }
 }
 
-const oWidgets = viewPlugin((view: EditorView) => {
-  let doc = view.state.doc.toString(), deco = []
-  for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
-    deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
-  return {decorations: Decoration.set(deco)}
+const oWidgets = ViewExtension.decorations({
+  create(view) {
+    let doc = view.state.doc.toString(), deco = []
+    for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
+      deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
+    return Decoration.set(deco)
+  },
+  update(view, update, deco) { return deco }
 })
 
 class BigWidget extends WidgetType<void> {
@@ -113,11 +116,12 @@ describe("EditorView.movePos", () => {
   })
 
   it("can cross large line widgets during line motion", () => {
-    let cm = tempEditor("one\ntwo", [viewPlugin(() => {
-      return {decorations: Decoration.set([
+    let cm = tempEditor("one\ntwo", [ViewExtension.decorations({
+      create() { return Decoration.set([
         Decoration.line(0, {widget: new BigWidget(undefined), side: 1}),
         Decoration.line(4, {widget: new BigWidget(undefined), side: -1})
-      ])}
+      ]) },
+      update(v, u, deco) { return deco }
     })])
     ist(cm.contentDOM.offsetHeight, 400, ">")
     ist(cm.movePos(0, "forward", "line"), 4)

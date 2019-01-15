@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src"
-import {EditorState, StateExtension} from "../../state/src"
+import {EditorState} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
-import {EditorView, ViewUpdate, viewPlugin} from "../../view/src/"
+import {ViewExtension} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 
 const matching: {[key: string]: string | undefined} = {
@@ -97,17 +97,13 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
   return Decoration.set(decorations)
 }
 
-export const matchBrackets = StateExtension.unique((configs: Config[]) => {
+export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
   let config = combineConfig(configs)
-  return viewPlugin((v: EditorView) => {
-    let decorations = Decoration.none
-    return {
-      get decorations() { return decorations },
-      update(v: EditorView, update: ViewUpdate) {
-        if (!update.transactions.length) return
-        // FIXME make this use a behavior exported by the highlighter
-        decorations = doMatchBrackets(v.state, undefined, config)
-      }
+  return ViewExtension.decorations({
+    create(view) { return Decoration.none },
+    update({state}, {transactions}, deco) {
+      // FIXME make this use a tokenizer behavior exported by the highlighter
+      return transactions.length ? doMatchBrackets(state, undefined, config) : deco
     }
   })
 }, {})

@@ -1,18 +1,16 @@
 import {keymap, Keymap} from "../src/keymap"
-import {EditorState} from "../../state/src"
-import {viewPlugin} from "../../view/src"
+import {ViewExtension} from "../../view/src"
 const ist = require("ist")
 
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
-  let state = EditorState.create({extensions: [keymap(map)]})
-  return state.behavior.get(viewPlugin)[0](fakeView as any)
+  return ViewExtension.resolve([keymap(map)]).get(ViewExtension.handleDOMEvents)[0]
 }
 
-function dispatch(plugin: any, key: string, mods?: any) {
+function dispatch(handlers: any, key: string, mods?: any) {
   let event: Partial<KeyboardEvent> = Object.assign({}, mods, {key})
-  plugin.handleDOMEvents.keydown(fakeView, event)
+  handlers.keydown(fakeView, event)
 }
 
 function counter() {

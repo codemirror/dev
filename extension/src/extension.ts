@@ -9,8 +9,9 @@ export class Extension {
               /* @internal */ public value: any,
               /* @internal */ public priority: number = -2) {}
 
-  private setPrio(priority: number) {
-    return new Extension(this.kind, this.id, this.value, priority)
+  private setPrio(priority: number): this {
+    // Crude casting because TypeScript doesn't understand new this.constructor
+    return new (this.constructor as any)(this.kind, this.id, this.value, priority) as this
   }
   fallback() { return this.setPrio(-1) }
   extend() { return this.setPrio(1) }
@@ -38,8 +39,7 @@ export class Extension {
   // of values associated with it. An `Extension` can be seen as a
   // tree of sub-extensions with behaviors as leaves.
   static defineBehavior<Value>() {
-    let behavior = (value: Value) => new Extension(Kind.BEHAVIOR, behavior, value)
-    ;(behavior as any).tag = this
+    let behavior = (value: Value) => new this(Kind.BEHAVIOR, behavior, value)
     return behavior
   }
 
@@ -47,19 +47,19 @@ export class Extension {
     const type = new UniqueExtensionType(instantiate)
     return (spec: Spec | undefined = defaultSpec) => {
       if (spec === undefined) throw new RangeError("This extension has no default spec")
-      return new Extension(Kind.UNIQUE, type, spec)
+      return new this(Kind.UNIQUE, type, spec)
     }
   }
 
   static all(...extensions: Extension[]) {
-    return new Extension(Kind.MULTI, null, extensions)
+    return new this(Kind.MULTI, null, extensions)
   }
 
   // Resolve an array of extenders by expanding all extensions until
   // only behaviors are left, and then collecting the behaviors into
   // arrays of values, preserving priority ordering throughout.
   static resolve(extensions: ReadonlyArray<Extension>): BehaviorStore {
-    let pending: Extension[] = new Extension(Kind.MULTI, null, extensions).flatten(0)
+    let pending: Extension[] = new this(Kind.MULTI, null, extensions).flatten(0)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -67,7 +67,7 @@ export class Extension {
     // behavior, and thus find and order all its specs in order to
     // resolve them.
     for (let resolved: UniqueExtensionType[] = [];;) {
-      let top = findTopUnique(pending)
+      let top = findTopUnique(pending, this)
       if (!top) break // Only behaviors left
       // Prematurely evaluated a behavior type because of missing
       // sub-behavior information -- start over, in the assumption
@@ -79,12 +79,16 @@ export class Extension {
     }
     // Collect the behavior values.
     let store = new BehaviorStore
-    for (let {id: behavior} of pending) {
-      if (store.behaviors.indexOf(behavior) > -1) continue // Already collected
-      if (behavior.tag !== this) throw new RangeError("Incompatible extension class: " + behavior.tag.name + " while resolving in " + this.name)
+    for (let ext of pending) {
+      if (!(ext instanceof this)) {
+        // Collect extensions of the wrong type into store.foreign
+        store.foreign.push(ext)
+        continue
+      }
+      if (store.behaviors.indexOf(ext.id) > -1) continue // Already collected
       let values: Extension[] = []
-      for (let e of pending) if (e.id == behavior) e.collect(values)
-      store.behaviors.push(behavior)
+      for (let e of pending) if (e.id == ext.id) e.collect(values)
+      store.behaviors.push(ext.id)
       store.values.push(values.map(v => v.value))
     }
     return store
@@ -133,6 +137,9 @@ export class BehaviorStore {
   behaviors: any[] = []
   // @internal
   values: any[][] = []
+  // Any extensions that weren't an instance of the given type when
+  // resolving.
+  foreign: Extension[] = []
 
   get<Value>(behavior: (v: Value) => Extension): Value[] {
     let found = this.behaviors.indexOf(behavior)
@@ -143,9 +150,9 @@ export class BehaviorStore {
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
 // still in extenders.
-function findTopUnique(extensions: Extension[]): UniqueExtensionType | null {
+function findTopUnique(extensions: Extension[], type: typeof Extension): UniqueExtensionType | null {
   let foundUnique = false
-  for (let ext of extensions) if (ext.kind == Kind.UNIQUE) {
+  for (let ext of extensions) if (ext.kind == Kind.UNIQUE && ext instanceof type) {
     foundUnique = true
     if (!extensions.some(e => e.kind == Kind.UNIQUE && (e.id as UniqueExtensionType).hasSub(ext.id)))
       return ext.id

@@ -1,5 +1,5 @@
 import {EditorState, Transaction} from "../../state/src"
-import {viewPlugin} from "../../view/src"
+import {ViewExtension} from "../../view/src"
 import {RangeDecoration} from "../../view/src/decoration"
 import {Range} from "../../rangeset/src/rangeset"
 
@@ -26,18 +26,21 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
   const extension = legacyMode({mode, sleepTime: 0})
   const view: {state: EditorState, viewport?: Viewport, updateState: () => void} = {
     state: EditorState.create({doc, extensions: [extension]}),
+    viewport: {from: 0, to: 0},
     updateState: onDecorationUpdate
   }
-  const plugin = view.state.behavior.get(viewPlugin)[0](view as any)
+  // FIXME this is terrible
+  const plugin = (ViewExtension.resolve(view.state.behavior.foreign) as any).values[0][0]
+  let decorations = plugin.create(view)
 
   return {
     calls,
     getDecorations(vp: Viewport) {
       view.viewport = vp
-      ;(plugin.update as any)(view, {transactions: []})
-      const decorations: Range<RangeDecoration>[] = []
-      plugin.decorations!.collect(decorations, 0)
-      return decorations
+      decorations = plugin.update(view, {transactions: []}, decorations)
+      const result: Range<RangeDecoration>[] = []
+      decorations.collect(result, 0)
+      return result
     },
     get transaction() {
       return view.state.transaction
@@ -45,7 +48,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     apply(transaction: Transaction, {from, to}: Viewport) {
       view.state = transaction.apply()
       view.viewport = {from, to}
-      ;(plugin.update as any)(view, {transactions: [transaction]})
+      decorations = plugin.update(view, {transactions: [transaction]}, decorations)
     }
   }
 }

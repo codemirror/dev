@@ -1,4 +1,4 @@
-import {EditorView, ViewUpdate, viewPlugin} from "../../view/src"
+import {EditorView, ViewUpdate, ViewExtension} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src"
 import {Decoration} from "../../view/src/decoration"
@@ -156,7 +156,7 @@ export const legacyMode = (config: Config) => {
   })
   return StateExtension.all(
     StateExtension.stateField(field),
-    viewPlugin(getViewPlugin(field, config)),
+    ViewExtension.decorations(decoSpec(field, config)),
     StateExtension.indentation((state: EditorState, pos: number): number => {
       if (!config.mode.indent) return -1
       let modeState = state.getField(field).getState(state, pos, config.mode)
@@ -167,25 +167,24 @@ export const legacyMode = (config: Config) => {
   )
 }
 
-function getViewPlugin(field: StateField<StateCache<any>>, config: Config) {
+function decoSpec(field: StateField<StateCache<any>>, config: Config) {
   const {sleepTime = 100, maxWorkTime = 100, mode} = config
-  return (v: EditorView) => {
-    let decorations = Decoration.none, from = -1, to = -1
-    function update(v: EditorView, force: boolean) {
-      let vp = v.viewport
-      if (force || vp.from < from || vp.to > to) {
-        ;({from, to} = vp)
-        const stateCache = v.state.getField(field)!
-        decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
-        stateCache.advanceFrontier(v.state, from, mode, sleepTime, maxWorkTime).then(() => {
-          update(v, true)
-          v.updateState([], v.state)
-        }, () => {})
-      }
+  let decorations = Decoration.none, from = -1, to = -1
+  function update(v: EditorView, force: boolean) {
+    let vp = v.viewport
+    if (force || vp.from < from || vp.to > to) {
+      ;({from, to} = vp)
+      const stateCache = v.state.getField(field)!
+      decorations = Decoration.set(stateCache.getDecorations(v.state, from, to, mode))
+      stateCache.advanceFrontier(v.state, from, mode, sleepTime, maxWorkTime).then(() => {
+        update(v, true)
+        v.updateState([], v.state) // FIXME maybe add a specific EditorView method for this
+      }, () => {})
     }
-    return {
-      get decorations() { return decorations },
-      update: (v: EditorView, u: ViewUpdate) => update(v, u.transactions.some(tr => tr.docChanged))
-    }
+    return decorations
+  }
+  return {
+    create(view: EditorView) { return update(view, false) },
+    update(view: EditorView, {transactions}: ViewUpdate) { return update(view, transactions.some(tr => tr.docChanged)) }
   }
 }

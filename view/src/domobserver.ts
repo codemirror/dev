@@ -29,7 +29,7 @@ export class DOMObserver {
 
   scrollTargets: HTMLElement[] = []
   intersection: IntersectionObserver | null = null
-  intersecting: boolean = true
+  intersecting: boolean = false
 
   constructor(private docView: DocView,
               private onChange: (from: number, to: number, typeOver: boolean) => boolean,

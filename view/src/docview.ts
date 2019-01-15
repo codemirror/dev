@@ -6,11 +6,10 @@ import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
 import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
-import {EditorState, ChangeSet, ChangedRange} from "../../state/src"
+import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {getRoot, clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
-import {ViewUpdate} from "./editorview"
 
 type A<T> = ReadonlyArray<T>
 
@@ -72,7 +71,7 @@ export class DocView extends ContentView {
     this.heightMap = HeightMap.empty().applyChanges([], this.heightOracle.setDoc(state.doc), changedRanges)
     this.children.length = this.viewports.length = 0
     this.decorations = []
-    let {viewport, contentChanges} = this.computeViewport(new ViewUpdate([], state, state, true), changedRanges, 0, -1)
+    let {viewport, contentChanges} = this.computeViewport(new ViewUpdate([], state, state, false), changedRanges, 0, -1)
     this.updateInner(contentChanges, 0, viewport)
     this.cancelLayoutCheck()
     this.callbacks.onUpdateDOM()
@@ -345,7 +344,10 @@ export class DocView extends ContentView {
         return {viewport, contentChanges}
       }
       // Update the public viewport so that plugins can observe its current value
-      if (viewportChange) ({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
+      if (viewportChange) {
+        ({from: this.publicViewport._from, to: this.publicViewport._to} = viewport)
+        if (update) update.viewportChanged = true
+      }
       this.callbacks.onViewUpdate(update || new ViewUpdate([], this.state, this.state, true))
       let decorations = this.callbacks.getDecorations()
       // If the decorations are stable, stop.
@@ -735,4 +737,13 @@ export class EditorViewport {
   forEachLine(f: (height: LineHeight) => void) {
     this.docView.heightMap.forEachLine(this.from, this.to, 0, this.docView.heightOracle, f)
   }
+}
+
+export class ViewUpdate {
+  // FIXME more fields (focus, dragging, ...)
+  // FIXME should scrollIntoView be stored in this?
+  constructor(public transactions: ReadonlyArray<Transaction>,
+              public oldState: EditorState,
+              public state: EditorState,
+              public viewportChanged: boolean) {}
 }
