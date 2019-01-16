@@ -192,7 +192,7 @@ export class DocView extends ContentView {
       posA = fromA
       if (fromA == toA && fromB == toB && !changes.some(ch => fromB <= ch.toB && toB >= ch.fromB))
         continue
-      
+
       let fromI, fromOff, toI: number, toOff
       if (toA == oldLength) { toI = this.children.length; toOff = -1 }
       else ({i: toI, off: toOff} = cursor.findPos(toA))

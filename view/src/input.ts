@@ -71,7 +71,7 @@ export class InputState {
 
   destroy() {
     if (this.mouseSelection) this.mouseSelection.destroy()
-  }    
+  }
 }
 
 export type MouseSelectionUpdate = (view: EditorView, startSelection: EditorSelection,

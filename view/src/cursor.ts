@@ -59,7 +59,7 @@ export function movePos(view: EditorView, start: number,
           goal.pos = pos
           return pos
         }
-      } 
+      }
     }
     // Can't do a precise one based on DOM positions, fall back to per-column
     return moveLineByColumn(view.state.doc, view.state.tabSize, start, dir)
@@ -289,7 +289,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
     break
   }
   let lineStart = heightLine.start
-  // If this is outside of the rendered viewport, we can't determine a position 
+  // If this is outside of the rendered viewport, we can't determine a position
   if (lineStart < view.viewport.from)
     return view.viewport.from == 0 ? 0 : -1
   if (lineStart > view.viewport.to)

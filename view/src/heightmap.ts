@@ -263,7 +263,7 @@ class HeightMapLine extends HeightMap {
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
     if (measured && measured.from <= offset && measured.more) {
       let height = measured.heights[measured.index++]
-      // If either this line's deco data or the measured heights contain info about 
+      // If either this line's deco data or the measured heights contain info about
       if (this.deco.length && this.deco[0] < 0 || measured.more && measured.heights[measured.index] < 0) {
         let above = measured.more && measured.heights[measured.index] == -2
           ? measured.heights[(measured.index += 2) - 1] : 0
