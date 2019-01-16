@@ -59,7 +59,7 @@ export function movePos(view: EditorView, start: number,
           goal.pos = pos
           return pos
         }
-      }
+      } 
     }
     // Can't do a precise one based on DOM positions, fall back to per-column
     return moveLineByColumn(view.state.doc, view.state.tabSize, start, dir)
@@ -302,12 +302,11 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   // using caret(Position|Range)FromPoint as a shortcut
   let node: Node | undefined, offset: number = -1
   if (element && view.contentDOM.contains(element) && !(view.docView.nearest(element) instanceof WidgetView)) {
-    // TypeScript doesn't know these methods exist on DocumentOrShadowRoot
-    if ((root as any).caretPositionFromPoint) {
-      let pos = (root as any).caretPositionFromPoint(x, y)
+    if (root.caretPositionFromPoint) {
+      let pos = root.caretPositionFromPoint(x, y)
       if (pos) ({offsetNode: node, offset} = pos)
-    } else if ((root as any).caretRangeFromPoint) {
-      let range = (root as any).caretRangeFromPoint(x, y)
+    } else if (root.caretRangeFromPoint) {
+      let range = root.caretRangeFromPoint(x, y)
       if (range) ({startContainer: node, startOffset: offset} = range)
     }
   }
