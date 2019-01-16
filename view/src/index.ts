@@ -1,4 +1,4 @@
-export {EditorView, ViewExtension, ViewStateSpec, DOMEffect, ViewSlot} from "./editorview"
+export {EditorView, ViewExtension, ViewField, ViewSlot, DOMEffect, EditorConfig} from "./editorview"
 export {EditorViewport, ViewUpdate} from "./docview"
 export {Decoration, DecorationSet, DecoratedRange, WidgetType,
         RangeDecorationSpec, WidgetDecorationSpec, LineDecorationSpec} from "./decoration"

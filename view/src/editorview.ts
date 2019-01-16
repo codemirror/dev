@@ -9,32 +9,65 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
 
-export class ViewExtension extends Extension {
-  static state<State>(spec: ViewStateSpec<State>, slots: ViewSlot<State>[] = []): ViewExtension {
-    if (slots.length == 0) return viewState(spec)
-    return viewStateWithSlots(spec, slots)
-  }
+export class ViewSlot<S> {
+  // @internal
+  constructor(/* @internal */ public type: any,
+              /* @internal */ public accessor: (state: S) => any) {}
 
-  static decorations(spec: ViewStateSpec<DecorationSet> & {map?: boolean}) {
-    let box = {value: Decoration.none}, map = spec.map !== false
-    return ViewExtension.all(
-      viewState({
-        create(view) {
-          return box.value = spec.create(view)
-        },
-        update(view, update, value) {
-          if (map) for (let tr of update.transactions) value = value.map(tr.changes)
-          return box.value = spec.update(view, update, value)
+  static define<V>() {
+    let type = {}
+    return {
+      slot<S>(accessor: (state: S) => V): ViewSlot<S> {
+        return new ViewSlot<S>(type, accessor)
+      },
+      get(view: EditorView) {
+        let result: V[] = []
+        for (let field of view.behavior.get(viewField)) {
+          for (let slot of field.slots)
+            if (slot.type == type) result.push(slot.accessor(view.getField(field)) as V)
         }
-      }),
-      decorationBehavior(box)
-    )
+        return result
+      }
+    }
+  }
+}
+
+const decorationSlot = ViewSlot.define<DecorationSet>()
+
+export class ViewField<S> {
+  create: (state: EditorState) => S
+  update: (state: S, update: ViewUpdate) => S
+  slots: ViewSlot<S>[]
+  extension: ViewExtension
+  
+  constructor({create, update, slots = []}: {
+    create: (state: EditorState) => S,
+    update: (value: S, update: ViewUpdate) => S,
+    slots?: ViewSlot<S>[]
+  }) {
+    this.create = create; this.update = update; this.slots = slots
+    this.extension = viewField(this)
   }
 
-  static defineSlot = defineViewSlot
+  static decorations({create, update, map}: {
+    create?: (state: EditorState) => DecorationSet,
+    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
+    map?: boolean
+  }) {
+    return new ViewField<DecorationSet>({
+      create: create || (() => Decoration.none),
+      update(deco: DecorationSet, u: ViewUpdate) {
+        if (map) for (let tr of u.transactions) deco = deco.map(tr.changes)
+        return update(deco, u)
+      },
+      slots: [decorationSlot.slot(d => d)]
+    }).extension
+  }
 
-  static decorationSlot: <State>(accessor: (state: State) => DecorationSet) => ViewSlot<State> = null as any
+  static decorationSlot = decorationSlot.slot
+}
 
+export class ViewExtension extends Extension {
   static handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
   static domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
@@ -42,59 +75,11 @@ export class ViewExtension extends Extension {
   static styleModules = ViewExtension.defineBehavior<StyleModule>()
 }
 
-// FIXME does it make sense to isolate these from the actual view
-// (only giving state, viewport etc)?
-export interface ViewStateSpec<T> {
-  create(view: EditorView): T
-  update(view: EditorView, update: ViewUpdate, value: T): T
-}
-
-const viewState = ViewExtension.defineBehavior<ViewStateSpec<any>>()
+const viewField = ViewExtension.defineBehavior<ViewField<any>>()
 
 export type DOMEffect = {
   update?: () => void
   destroy?: () => void
-}
-
-function defineViewSlot<T>() {
-  let behavior = ViewExtension.defineBehavior<{value: T}>()
-  return {
-    // @internal
-    behavior,
-    get(view: EditorView): T[] {
-      return view.behavior.get(behavior).map(box => box.value)
-    },
-    slot<State>(accessor: (state: State) => T) {
-      return new ViewSlot(behavior, accessor)
-    }
-  }
-}
-
-export class ViewSlot<State> {
-  constructor(/* @internal */ public behavior: (value: any) => ViewExtension,
-              /* @internal */ public accessor: (state: State) => any) {}
-}
-
-const {behavior: decorationBehavior,
-       get: getDecoratations,
-       slot: decorationSlot} = defineViewSlot<DecorationSet>()
-
-ViewExtension.decorationSlot = decorationSlot
-
-function viewStateWithSlots<State>(spec: ViewStateSpec<State>, slots: ViewSlot<any>[]) {
-  let boxes = slots.map(slot => ({value: null}))
-  function save(value: any) {
-    for (let i = 0; i < slots.length; i++)
-      boxes[i].value = slots[i].accessor(value)
-    return value
-  }
-  return ViewExtension.all(
-    viewState({
-      create(view) { return save(spec.create(view)) },
-      update(view, update, value) { return save(spec.update(view, update, value)) }
-    }),
-    ...slots.map((slot, i) => slot.behavior(boxes[i]))
-  )
 }
 
 export interface EditorConfig {
@@ -123,7 +108,7 @@ export class EditorView {
   readonly viewport: EditorViewport
 
   public behavior!: BehaviorStore
-  private extState!: any[]
+  private fields!: any[]
   private domEffects: DOMEffect[] = []
 
   private updatingState: boolean = false
@@ -144,9 +129,9 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, this.root, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
       onViewUpdate: (update: ViewUpdate) => {
-        let specs = this.behavior.get(viewState)
-        for (let i = 0; i < specs.length; i++)
-          this.extState[i] = specs[i].update(this, update, this.extState[i])
+        let fields = this.behavior.get(viewField)
+        for (let i = 0; i < fields.length; i++)
+          this.fields[i] = fields[i].update(this.fields[i], update)
       },
       onInitDOM: () => {
         this.domEffects = this.behavior.get(ViewExtension.domEffect).map(spec => spec(this))
@@ -154,7 +139,7 @@ export class EditorView {
       onUpdateDOM: () => {
         for (let spec of this.domEffects) if (spec.update) spec.update()
       },
-      getDecorations: () => getDecoratations(this)
+      getDecorations: () => decorationSlot.get(this)
     })
     this.viewport = this.docView.publicViewport
     this.setState(config.state, config.extensions)
@@ -170,7 +155,7 @@ export class EditorView {
       for (let s of this.behavior.get(ViewExtension.styleModules)) StyleModule.mount(this.root, s)
       if (this.behavior.foreign.length)
         throw new Error("Non-ViewExtension extensions found when setting view state")
-      this.extState = this.behavior.get(viewState).map(spec => spec.create(this))
+      this.fields = this.behavior.get(viewField).map(field => field.create(this.state))
       this.inputState = new InputState(this)
       this.docView.init(state)
     })
@@ -198,10 +183,10 @@ export class EditorView {
     finally { this.updatingState = false }
   }
 
-  extensionState<State>(spec: ViewStateSpec<State>): State | undefined {
-    let index = this.behavior.get(viewState).indexOf(spec)
-    if (index < 0) return undefined
-    return this.extState[index]
+  getField<S>(field: ViewField<S>): S {
+    let index = this.behavior.get(viewField).indexOf(field)
+    if (index < 0) throw new RangeError("Field isn't present in this view")
+    return this.fields[index] as S
   }
 
   domAtPos(pos: number): {node: Node, offset: number} | null {
