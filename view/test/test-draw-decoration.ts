@@ -1,4 +1,4 @@
-import {EditorView, ViewExtension, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
+import {EditorView, ViewField, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
 import {StateField, MetaSlot, EditorSelection} from "../../state/src"
 import ist from "ist"
@@ -17,9 +17,9 @@ function decos(startState: DecorationSet = Decoration.none) {
     }
   })
   return [
-    ViewExtension.decorations({
-      create(v) { return v.state.getField(field) },
-      update(v) { return v.state.getField(field) },
+    ViewField.decorations({
+      create(state) { return state.getField(field) },
+      update(_, {state}) { return state.getField(field) },
       map: false
     }),
     field.extension
