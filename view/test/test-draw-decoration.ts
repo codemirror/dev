@@ -1,6 +1,6 @@
 import {EditorView, ViewExtension, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
-import {StateField, StateExtension, MetaSlot, EditorSelection} from "../../state/src"
+import {StateField, MetaSlot, EditorSelection} from "../../state/src"
 import ist from "ist"
 
 const filterSlot = new MetaSlot<(from: number, to: number, spec: any) => boolean>("filterDeco")
@@ -22,7 +22,7 @@ function decos(startState: DecorationSet = Decoration.none) {
       update(v) { return v.state.getField(field) },
       map: false
     }),
-    StateExtension.stateField(field)
+    field.extension
   ]
 }
 

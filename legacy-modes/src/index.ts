@@ -155,7 +155,7 @@ export const legacyMode = (config: Config) => {
     name: "mode"
   })
   return StateExtension.all(
-    StateExtension.stateField(field),
+    field.extension,
     ViewExtension.decorations(decoSpec(field, config)),
     StateExtension.indentation((state: EditorState, pos: number): number => {
       if (!config.mode.indent) return -1

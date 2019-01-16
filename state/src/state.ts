@@ -5,7 +5,6 @@ import {unique} from "./unique"
 import {Extension, BehaviorStore} from "../../extension/src/extension"
 
 export class StateExtension extends Extension {
-  static stateField = StateExtension.defineBehavior<StateField<any>>()
   static allowMultipleSelections = StateExtension.defineBehavior<boolean>()
   static indentation = StateExtension.defineBehavior<(state: EditorState, pos: number) => number>()
 }
@@ -22,7 +21,7 @@ class Configuration {
     let behavior = StateExtension.resolve(config.extensions || [])
     return new Configuration(
       behavior,
-      behavior.get(StateExtension.stateField),
+      behavior.get(stateFieldBehavior),
       behavior.get(StateExtension.allowMultipleSelections).some(x => x),
       config.tabSize || 4,
       config.lineSeparator || null)
@@ -125,10 +124,13 @@ export class EditorState {
   }
 }
 
+const stateFieldBehavior = StateExtension.defineBehavior<StateField<any>>()
+
 export class StateField<T> {
   readonly init: (state: EditorState) => T
   readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
   readonly name: string
+  readonly extension: StateExtension
 
   constructor({init, apply, name = "stateField"}: {
     init: (state: EditorState) => T,
@@ -138,6 +140,7 @@ export class StateField<T> {
     this.init = init
     this.apply = apply
     this.name = unique(name, fieldNames)
+    this.extension = stateFieldBehavior(this)
   }
 }
 

@@ -45,7 +45,7 @@ export const history = StateExtension.unique<HistoryConfig>(configs => {
   }, {minDepth: Math.max})
   let field = historyField(config)
   return StateExtension.all(
-    StateExtension.stateField(field),
+    field.extension,
     historyBehavior(new HistoryContext(field, config))
   )
 }, {})
