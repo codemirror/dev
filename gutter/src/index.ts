@@ -13,8 +13,6 @@ import {StyleModule} from "style-mod"
 
 // FIXME seriously slow on Firefox when devtools are open
 
-// FIXME this forces a checkLayout right on init, which is wasteful
-
 interface CompleteGutterConfig {
   fixed: boolean,
   formatNumber: (lineNo: number) => string

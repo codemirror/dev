@@ -148,6 +148,9 @@ export class EditorView {
         for (let i = 0; i < specs.length; i++)
           this.extState[i] = specs[i].update(this, update, this.extState[i])
       },
+      onInitDOM: () => {
+        this.domEffects = this.behavior.get(ViewExtension.domEffect).map(spec => spec(this))
+      },
       onUpdateDOM: () => {
         for (let spec of this.domEffects) if (spec.update) spec.update()
       },
@@ -170,7 +173,6 @@ export class EditorView {
       this.extState = this.behavior.get(viewState).map(spec => spec.create(this))
       this.inputState = new InputState(this)
       this.docView.init(state)
-      this.domEffects = this.behavior.get(ViewExtension.domEffect).map(spec => spec(this))
     })
   }
 

@@ -55,6 +55,7 @@ export class DocView extends ContentView {
     onDOMChange: (from: number, to: number, typeOver: boolean) => boolean,
     onViewUpdate: (update: ViewUpdate) => void,
     onUpdateDOM: () => void,
+    onInitDOM: () => void,
     getDecorations: () => DecorationSet[]
   }) {
     super()
@@ -74,7 +75,7 @@ export class DocView extends ContentView {
     let {viewport, contentChanges} = this.computeViewport(new ViewUpdate([], state, state, false), changedRanges, 0, -1)
     this.updateInner(contentChanges, 0, viewport)
     this.cancelLayoutCheck()
-    this.callbacks.onUpdateDOM()
+    this.callbacks.onInitDOM()
     this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
