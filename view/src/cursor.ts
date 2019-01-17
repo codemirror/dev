@@ -216,37 +216,58 @@ export class LineContext {
 // common use case that will repeatedly trigger this code. Maybe
 // introduce some element of binary search after all?
 
+function getdx(x: number, rect: ClientRect): number {
+  return rect.left > x ? rect.left - x : Math.max(0, x - rect.right)
+}
+function getdy(y: number, rect: ClientRect): number {
+  return rect.top > y ? rect.top - y : Math.max(0, y - rect.bottom)
+}
+function yOverlap(a: ClientRect, b: ClientRect): boolean {
+  return a.top < b.bottom - 1 && a.bottom > b.top + 1
+}
+function upTop(rect: ClientRect, top: number): ClientRect {
+  return top < rect.top ? {top, left: rect.left, right: rect.right, bottom: rect.bottom} as ClientRect : rect
+}
+function upBot(rect: ClientRect, bottom: number): ClientRect {
+  return bottom > rect.bottom ? {top: rect.top, left: rect.left, right: rect.right, bottom} as ClientRect : rect
+}
+
 function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node, offset: number} {
-  let closest, dxClosest = 2e8, xClosest!: number, offset = 0
-  let rowBot = y, rowTop = y
-  for (let child: Node | null = parent.firstChild, childIndex = 0; child; child = child.nextSibling, childIndex++) {
+  let closest, closestRect, closestX!: number, closestY!: number
+  let above, below, aboveRect, belowRect
+  for (let child: Node | null = parent.firstChild; child; child = child.nextSibling) {
     let rects = clientRectsFor(child)
     for (let i = 0; i < rects.length; i++) {
-      let rect = rects[i]
-      if (rect.top <= rowBot && rect.bottom >= rowTop) {
-        rowBot = Math.max(rect.bottom, rowBot)
-        rowTop = Math.min(rect.top, rowTop)
-        let dx = rect.left > x ? rect.left - x
-            : rect.right < x ? x - rect.right : 0
-        if (dx < dxClosest) {
-          closest = child
-          dxClosest = dx
-          xClosest = dx == 0 ? x : rect.left > x ? rect.left : rect.right
-          if (child.nodeType == 1)
-            offset = childIndex + (x >= (rect.left + rect.right) / 2 ? 1 : 0)
-          continue
-        }
+      let rect: ClientRect = rects[i]
+      if (closestRect && yOverlap(closestRect, rect))
+        rect = upTop(upBot(rect, closestRect.bottom), closestRect.top)
+      let dx = getdx(x, rect), dy = getdy(y, rect)
+      if (dx == 0 && dy == 0)
+        return child.nodeType == 3 ? domPosInText(child as Text, x, y) : domPosAtCoords(child as HTMLElement, x, y)
+      if (!closest || closestY > dy || closestY == dy && closestX > dx) {
+        closest = child; closestRect = rect; closestX = dx; closestY = dy
       }
-      if (!closest && (x >= rect.right && y >= rect.top ||
-                       x >= rect.left && y >= rect.bottom))
-        offset = childIndex + 1
+      if (dx == 0) {
+        if (y > rect.bottom && (!aboveRect || aboveRect.bottom < rect.bottom)) { above = child; aboveRect = rect }
+        else if (y < rect.top && (!belowRect || belowRect.top > rect.top)) { below = child; belowRect = rect }
+      } else if (aboveRect && yOverlap(aboveRect, rect)) {
+        aboveRect = upBot(aboveRect, rect.bottom)
+      } else if (belowRect && yOverlap(belowRect, rect)) {
+        belowRect = upTop(belowRect, rect.top)
+      }
     }
   }
-  if (closest && closest.nodeType == 3)
-    return domPosInText(closest as Text, xClosest, y)
-  if (!closest || (closest as HTMLElement).contentEditable == "false" || (dxClosest && closest.nodeType == 1))
-    return {node: parent, offset}
-  return domPosAtCoords(closest as HTMLElement, xClosest, y)
+  if (aboveRect && aboveRect.bottom >= y) { closest = above; closestRect = aboveRect }
+  else if (belowRect && belowRect.top <= y) { closest = below; closestRect = belowRect }
+
+  if (!closest) return {node: parent, offset: 0}
+  let clipX = Math.max(closestRect!.left, Math.min(closestRect!.right, x))
+  if (closest.nodeType == 3) return domPosInText(closest as Text, clipX, y)
+  if (!closestX && (closest as HTMLElement).contentEditable == "true")
+    domPosAtCoords(closest as HTMLElement, clipX, y)
+  let offset = Array.prototype.indexOf.call(parent.childNodes, closest) +
+    (x >= (closestRect!.left + closestRect!.right) / 2 ? 1 : 0)
+  return {node: parent, offset}
 }
 
 function domPosInText(node: Text, x: number, y: number): {node: Node, offset: number} {
