@@ -14,7 +14,7 @@ class OWidget extends WidgetType<void> {
 }
 
 const oWidgets = ViewField.decorations({
-  create(state) {
+  create({state}) {
     let doc = state.doc.toString(), deco = []
     for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
       deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
@@ -81,6 +81,7 @@ describe("EditorView.movePos", () => {
 
   function testLineMotion(focus: boolean) {
     let cm = tempEditor("one two\nthree\nتممين")
+    console.log(cm.contentDOM.innerHTML)
     if (focus) requireFocus(cm)
     else cm.contentDOM.blur()
     ist(cm.movePos(0, "forward", "line"), 8)

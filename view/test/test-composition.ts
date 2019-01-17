@@ -55,8 +55,8 @@ function wordDeco(state: EditorState): DecorationSet {
 }
 
 const wordHighlighter = ViewField.decorations({
-  create(state) { return wordDeco(state) },
-  update(_, {state}) { return wordDeco(state) },
+  create({state}) { return wordDeco(state) },
+  update(_, {new: {state}}) { return wordDeco(state) },
   map: false
 })
 
@@ -65,7 +65,7 @@ function widgets(positions: number[], sides: number[]) {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
   return ViewField.decorations({
-    create(s) {
+    create() {
       return Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
     },
     update(deco) { return deco }
