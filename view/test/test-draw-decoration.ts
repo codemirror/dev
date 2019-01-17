@@ -18,8 +18,8 @@ function decos(startState: DecorationSet = Decoration.none) {
   })
   return [
     ViewField.decorations({
-      create(state) { return state.getField(field) },
-      update(_, {state}) { return state.getField(field) },
+      create({state}) { return state.getField(field) },
+      update(_, {new: {state}}) { return state.getField(field) },
       map: false
     }),
     field.extension

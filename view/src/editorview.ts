@@ -1,86 +1,26 @@
 import {EditorState, Transaction, MetaSlot} from "../../state/src"
-import {Extension, BehaviorStore} from "../../extension/src/extension"
-import {DocView, EditorViewport, ViewUpdate} from "./docview"
+import {BehaviorStore} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
+
+import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {Rect} from "./dom"
-import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
+import {ViewExtension, ViewFields, viewField} from "./extension"
 
-export class ViewSlot<S> {
-  // @internal
-  constructor(/* @internal */ public type: any,
-              /* @internal */ public accessor: (state: S) => any) {}
+export const handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
-  static define<V>() {
-    let type = {}
-    return {
-      slot<S>(accessor: (state: S) => V): ViewSlot<S> {
-        return new ViewSlot<S>(type, accessor)
-      },
-      get(view: EditorView) {
-        let result: V[] = []
-        for (let field of view.behavior.get(viewField)) {
-          for (let slot of field.slots)
-            if (slot.type == type) result.push(slot.accessor(view.getField(field)) as V)
-        }
-        return result
-      }
-    }
-  }
-}
-
-const decorationSlot = ViewSlot.define<DecorationSet>()
-
-export class ViewField<S> {
-  create: (state: EditorState) => S
-  update: (state: S, update: ViewUpdate) => S
-  slots: ViewSlot<S>[]
-  extension: ViewExtension
-  
-  constructor({create, update, slots = []}: {
-    create: (state: EditorState) => S,
-    update: (value: S, update: ViewUpdate) => S,
-    slots?: ViewSlot<S>[]
-  }) {
-    this.create = create; this.update = update; this.slots = slots
-    this.extension = viewField(this)
-  }
-
-  static decorations({create, update, map}: {
-    create?: (state: EditorState) => DecorationSet,
-    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
-    map?: boolean
-  }) {
-    return new ViewField<DecorationSet>({
-      create: create || (() => Decoration.none),
-      update(deco: DecorationSet, u: ViewUpdate) {
-        if (map) for (let tr of u.transactions) deco = deco.map(tr.changes)
-        return update(deco, u)
-      },
-      slots: [decorationSlot.slot(d => d)]
-    }).extension
-  }
-
-  static decorationSlot = decorationSlot.slot
-}
-
-export class ViewExtension extends Extension {
-  static handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
-
-  static domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
-
-  static styleModules = ViewExtension.defineBehavior<StyleModule>()
-}
-
-const viewField = ViewExtension.defineBehavior<ViewField<any>>()
-
+// FIXME allow listening for updates here too?
 export type DOMEffect = {
   update?: () => void
   destroy?: () => void
 }
+
+export const domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
+
+export const styleModules = ViewExtension.defineBehavior<StyleModule>()
 
 export interface EditorConfig {
   state: EditorState,
@@ -90,8 +30,7 @@ export interface EditorConfig {
 }
 
 export class EditorView {
-  private _state!: EditorState
-  get state(): EditorState { return this._state }
+  get state(): EditorState { return this.fields.state }
 
   dispatch: (tr: Transaction) => void
   root: DocumentOrShadowRoot
@@ -107,8 +46,8 @@ export class EditorView {
 
   readonly viewport: EditorViewport
 
-  public behavior!: BehaviorStore
-  private fields!: any[]
+  readonly behavior!: BehaviorStore
+  readonly fields!: ViewFields
   private domEffects: DOMEffect[] = []
 
   private updatingState: boolean = false
@@ -128,18 +67,17 @@ export class EditorView {
 
     this.docView = new DocView(this.contentDOM, this.root, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-      onViewUpdate: (update: ViewUpdate) => {
-        let fields = this.behavior.get(viewField)
-        for (let i = 0; i < fields.length; i++)
-          this.fields[i] = fields[i].update(this.fields[i], update)
+      updateFields: (state, viewport, transactions) => {
+        return (this as any).fields = this.fields
+          ? this.fields.update(state, viewport, transactions)
+          : ViewFields.create(this.behavior.get(viewField), state, viewport)
       },
       onInitDOM: () => {
-        this.domEffects = this.behavior.get(ViewExtension.domEffect).map(spec => spec(this))
+        this.domEffects = this.behavior.get(domEffect).map(spec => spec(this))
       },
       onUpdateDOM: () => {
         for (let spec of this.domEffects) if (spec.update) spec.update()
-      },
-      getDecorations: () => decorationSlot.get(this)
+      }
     })
     this.viewport = this.docView.publicViewport
     this.setState(config.state, config.extensions)
@@ -147,30 +85,27 @@ export class EditorView {
 
   setState(state: EditorState, extensions: ViewExtension[] = []) {
     for (let effect of this.domEffects) if (effect.destroy) effect.destroy()
-    this._state = state
     this.withUpdating(() => {
       setTabSize(this.contentDOM, state.tabSize)
-      this.behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
+      ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
       StyleModule.mount(this.root, styles)
-      for (let s of this.behavior.get(ViewExtension.styleModules)) StyleModule.mount(this.root, s)
+      for (let s of this.behavior.get(styleModules)) StyleModule.mount(this.root, s)
       if (this.behavior.foreign.length)
         throw new Error("Non-ViewExtension extensions found when setting view state")
-      this.fields = this.behavior.get(viewField).map(field => field.create(this.state))
       this.inputState = new InputState(this)
       this.docView.init(state)
     })
   }
 
   updateState(transactions: Transaction[], state: EditorState) {
-    if (transactions.length && transactions[0].startState != this._state)
+    if (transactions.length && transactions[0].startState != this.state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
-      let prevState = this._state
-      this._state = state
+      let prevState = this.state
       if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
       if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
-      this.docView.update(new ViewUpdate(transactions, prevState, state, false),
+      this.docView.update(transactions, state,
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       this.inputState.update(transactions)
     })
@@ -181,12 +116,6 @@ export class EditorView {
     this.updatingState = true
     try { f() }
     finally { this.updatingState = false }
-  }
-
-  getField<S>(field: ViewField<S>): S {
-    let index = this.behavior.get(viewField).indexOf(field)
-    if (index < 0) throw new RangeError("Field isn't present in this view")
-    return this.fields[index] as S
   }
 
   domAtPos(pos: number): {node: Node, offset: number} | null {

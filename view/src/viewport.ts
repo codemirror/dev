@@ -75,4 +75,5 @@ export class ViewportState {
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}
   clip(pos: number): number { return Math.max(this.from, Math.min(this.to, pos)) }
+  eq(b: Viewport) { return this.from == b.from && this.to == b.to }
 }
