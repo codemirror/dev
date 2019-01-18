@@ -1,5 +1,6 @@
 import {EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
-import {EditorView, handleDOMEvents} from "./editorview"
+import {EditorView} from "./editorview"
+import {focusChange, handleDOMEvents} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 
@@ -360,10 +361,13 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
 }
 
 handlers.focus = view => {
+  view.updateState([], view.state, [focusChange(true)])
+  // FIXME handle at the view update level
   view.dom.classList.add("codemirror-focused")
 }
 
 handlers.blur = view => {
+  view.updateState([], view.state, [focusChange(false)])
   view.dom.classList.remove("codemirror-focused")
 }
 

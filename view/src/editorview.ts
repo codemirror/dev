@@ -1,5 +1,5 @@
 import {EditorState, Transaction} from "../../state/src"
-import {BehaviorStore} from "../../extension/src/extension"
+import {BehaviorStore, Slot} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 import {DocView} from "./docview"
@@ -8,18 +8,7 @@ import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
-import {ViewExtension, ViewFields, viewField, ViewUpdate} from "./extension"
-
-export const handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
-
-export type ViewPlugin = {
-  update?: (update: ViewUpdate) => void
-  destroy?: () => void
-}
-
-export const viewPlugin = ViewExtension.defineBehavior<(view: EditorView) => ViewPlugin>()
-
-export const styleModule = ViewExtension.defineBehavior<StyleModule>()
+import {ViewExtension, ViewFields, viewField, ViewUpdate, styleModule, viewPlugin, ViewPlugin} from "./extension"
 
 export interface EditorConfig {
   state: EditorState,
@@ -65,9 +54,9 @@ export class EditorView {
 
     this.docView = new DocView(this.contentDOM, this.root, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-      updateFields: (state, viewport, transactions) => {
+      updateFields: (state, viewport, transactions, slots) => {
         return (this as any).fields = this.fields
-          ? this.fields.update(state, viewport, transactions, this)
+          ? this.fields.update(state, viewport, transactions, slots)
           : ViewFields.create(this.behavior.get(viewField), state, viewport, this)
       },
       onInitDOM: () => {
@@ -94,7 +83,8 @@ export class EditorView {
     })
   }
 
-  updateState(transactions: Transaction[], state: EditorState) {
+  // FIXME rename this to update at some point, make state implicit in transactions
+  updateState(transactions: Transaction[], state: EditorState, updateSlots: Slot[] = []) {
     if (transactions.length && transactions[0].startState != this.state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
@@ -102,7 +92,7 @@ export class EditorView {
       if (transactions.some(tr => tr.getSlot(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
       if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getSlot(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
-      this.docView.update(transactions, state,
+      this.docView.update(transactions, state, updateSlots,
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       this.inputState.update(transactions)
     })
