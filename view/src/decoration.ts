@@ -1,6 +1,7 @@
 import {ChangeSet, ChangedRange} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
 import {Text} from "../../doc/src/"
+import {attrsEq} from "./attributes"
 
 export interface RangeDecorationSpec {
   inclusiveStart?: boolean
@@ -104,7 +105,7 @@ export class RangeDecoration extends Decoration {
       this.spec.class == other.spec.class &&
       this.collapsed == other.collapsed &&
       widgetsEq(this.widget, other.widget) &&
-      attrsEq(this.spec.attributes, other.spec.attributes)
+      attrsEq(this.spec.attributes || null, other.spec.attributes || null)
   }
 }
 
@@ -147,17 +148,6 @@ export class LineDecoration extends Decoration {
   }
 
   get side() { return this.spec.side || 0 }
-}
-
-export function attrsEq(a: any, b: any): boolean {
-  if (a == b) return true
-  if (!a || !b) return false
-  let keysA = Object.keys(a), keysB = Object.keys(b)
-  if (keysA.length != keysB.length) return false
-  for (let key of keysA) {
-    if (keysB.indexOf(key) == -1 || a[key] !== b[key]) return false
-  }
-  return true
 }
 
 export function widgetsEq(a: WidgetType<any> | null, b: WidgetType<any> | null): boolean {

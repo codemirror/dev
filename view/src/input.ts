@@ -362,13 +362,10 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
 
 handlers.focus = view => {
   view.updateState([], view.state, [focusChange(true)])
-  // FIXME handle at the view update level
-  view.dom.classList.add("codemirror-focused")
 }
 
 handlers.blur = view => {
   view.updateState([], view.state, [focusChange(false)])
-  view.dom.classList.remove("codemirror-focused")
 }
 
 handlers.beforeprint = view => {

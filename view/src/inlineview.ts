@@ -1,5 +1,6 @@
 import {ContentView, dirty} from "./contentview"
-import {WidgetType, attrsEq, widgetsEq} from "./decoration"
+import {WidgetType, widgetsEq} from "./decoration"
+import {attrsEq} from "./attributes"
 import {LineView} from "./lineview"
 import {Text} from "../../doc/src"
 import {Rect} from "./dom"

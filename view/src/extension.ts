@@ -4,6 +4,7 @@ import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
 import {Extension, Slot} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
+import {Attrs} from "./attributes"
 
 export const decorationSlot = Slot.define<(field: any) => DecorationSet>()
 
@@ -37,9 +38,11 @@ export class ViewField<V> {
     }).extension
   }
 
-  static decorationSlot<T>(accessor: (field: T) => DecorationSet) {
-    return decorationSlot(accessor)
-  }
+  static decorationSlot<T>(accessor: (field: T) => DecorationSet) { return decorationSlot(accessor) }
+
+  // FIXME naming?
+  static editorAttributes = Slot.define<(field: any) => (Attrs | null)>()
+  static contentAttributes = Slot.define<(field: any) => (Attrs | null)>()
 }
 
 export class ViewExtension extends Extension {}

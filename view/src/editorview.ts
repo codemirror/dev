@@ -8,7 +8,9 @@ import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
-import {ViewExtension, ViewFields, viewField, ViewUpdate, styleModule, viewPlugin, ViewPlugin} from "./extension"
+import {ViewExtension, ViewField, ViewFields, viewField, ViewUpdate, styleModule,
+        viewPlugin, ViewPlugin} from "./extension"
+import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 
 export interface EditorConfig {
   state: EditorState,
@@ -36,6 +38,8 @@ export class EditorView {
   readonly behavior!: BehaviorStore
   readonly fields!: ViewFields
   private plugins: ViewPlugin[] = []
+  private editorAttrs: AttrsFor
+  private contentAttrs: AttrsFor
 
   private updatingState: boolean = false
 
@@ -44,10 +48,13 @@ export class EditorView {
     this.contentDOM.className = "codemirror-content " + styles.content
     this.contentDOM.setAttribute("contenteditable", "true")
     this.contentDOM.setAttribute("spellcheck", "false") // FIXME configurable
+    this.contentAttrs = new AttrsFor(ViewField.editorAttributes, this.contentDOM,
+                                     fields => ({spellcheck: "false"}))
 
     this.dom = document.createElement("div")
-    this.dom.className = "codemirror " + styles.wrapper
     this.dom.appendChild(this.contentDOM)
+    this.editorAttrs = new AttrsFor(ViewField.contentAttributes, this.dom,
+                                    fields => ({class: "codemirror " + styles.wrapper + (this.fields.focused ? " codemirror-focused" : "")}))
 
     this.dispatch = config.dispatch || ((tr: Transaction) => this.updateState([tr], tr.apply()))
     this.root = (config.root || document) as DocumentOrShadowRoot
@@ -55,9 +62,12 @@ export class EditorView {
     this.docView = new DocView(this.contentDOM, this.root, {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
       updateFields: (state, viewport, transactions, slots) => {
-        return (this as any).fields = this.fields
+        ;(this as any).fields = this.fields
           ? this.fields.update(state, viewport, transactions, slots)
           : ViewFields.create(this.behavior.get(viewField), state, viewport, this)
+        this.contentAttrs.update(this.fields)
+        this.editorAttrs.update(this.fields)
+        return this.fields
       },
       onInitDOM: () => {
         this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))
@@ -169,6 +179,21 @@ function setTabSize(elt: HTMLElement, size: number) {
   (elt.style as any).tabSize = (elt.style as any).MozTabSize = size
 }
 
+class AttrsFor {
+  attrs: Attrs | null = null
+
+  constructor(private slot: (accessor: (field: any) => (Attrs | null)) => Slot,
+              private dom: HTMLElement,
+              private deflt: (fields: ViewFields) => Attrs) {}
+
+  update(fields: ViewFields) {
+    let attrs = this.deflt(fields)
+    for (let spec of fields.getSlot(this.slot)) if (spec) attrs = combineAttrs(spec, attrs)
+    updateAttrs(this.dom, this.attrs, attrs)
+    this.attrs = attrs
+  }
+}
+
 const styles = new StyleModule({
   wrapper: {
     position: "relative !important",
@@ -177,7 +202,7 @@ const styles = new StyleModule({
     fontFamily: "monospace",
     lineHeight: 1.4,
 
-    "&.focused": {
+    "&.codemirror-focused": {
       // FIXME it would be great if we could directly use the browser's
       // default focus outline, but it appears we can't, so this tries to
       // approximate that
