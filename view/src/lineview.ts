@@ -2,7 +2,8 @@ import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {attrsEq, WidgetType, LineDecoration} from "./decoration"
+import {WidgetType, LineDecoration} from "./decoration"
+import {combineAttrs, attrsEq, updateAttrs} from "./attributes"
 
 export class LineView extends ContentView {
   children: InlineView[] = []
@@ -140,17 +141,8 @@ export class LineView extends ContentView {
   // Only called when building a line view in ContentBuilder
   addLineDeco(deco: LineDecoration) {
     let attrs = deco.spec.attributes
-    if (attrs) {
-      if (!this.attrs) this.attrs = {}
-      for (let name in attrs) {
-        if (name == "class" && Object.prototype.hasOwnProperty.call(this.attrs, "class"))
-          this.attrs.class += " " + attrs.class
-        else if (name == "style" && Object.prototype.hasOwnProperty.call(this.attrs, "style"))
-          this.attrs.style += ";" + attrs.style
-        else
-          this.attrs[name] = attrs[name]
-      }
-    }
+    if (attrs)
+      this.attrs = combineAttrs(attrs, this.attrs || {})
     if (deco.widget) {
       if (this.widgets == none) this.widgets = []
       let pos = 0
@@ -195,6 +187,7 @@ export class LineView extends ContentView {
     super.sync()
     if (this.prevAttrs !== undefined) {
       updateAttrs(this.dom!, this.prevAttrs, this.attrs)
+      this.dom!.classList.add("codemirror-line")
       this.prevAttrs = undefined
     }
     let last = this.dom!.lastChild
@@ -266,10 +259,3 @@ export class LineWidget {
 }
 
 const none: any[] = []
-
-function updateAttrs(dom: HTMLElement, prev: {[name: string]: string} | null,
-                     attrs: {[name: string]: string} | null) {
-  if (prev) for (let name in prev) dom.removeAttribute(name)
-  if (attrs) for (let name in attrs) dom.setAttribute(name, attrs[name])
-  dom.classList.add("codemirror-line")
-}
