@@ -1,4 +1,4 @@
-import {EditorState, Transaction, MetaSlot} from "../../state/src"
+import {EditorState, Transaction} from "../../state/src"
 import {BehaviorStore} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
@@ -99,8 +99,8 @@ export class EditorView {
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
       let prevState = this.state
-      if (transactions.some(tr => tr.getMeta(MetaSlot.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
-      if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(MetaSlot.preserveGoalColumn)))
+      if (transactions.some(tr => tr.getSlot(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
+      if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getSlot(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
       this.docView.update(transactions, state,
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)

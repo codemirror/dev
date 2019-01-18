@@ -151,8 +151,7 @@ type Config = {
 export const legacyMode = (config: Config) => {
   let field = new StateField<StateCache<any>>({
     init(state: EditorState) { return new StateCache([], 0, null) },
-    apply(tr, cache) { return cache.apply(tr) },
-    name: "mode"
+    apply(tr, cache) { return cache.apply(tr) }
   })
   return StateExtension.all(
     field.extension,

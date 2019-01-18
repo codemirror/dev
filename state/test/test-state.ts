@@ -1,5 +1,6 @@
 const ist = require("ist")
-import {EditorState, Change, EditorSelection, SelectionRange, MetaSlot, StateExtension} from "../src"
+import {EditorState, Change, EditorSelection, SelectionRange, StateExtension, Transaction} from "../src"
+import {Slot} from "../../extension/src/extension"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -24,11 +25,11 @@ describe("EditorState", () => {
     ist(newState.selection.ranges.map(r => r.from).join("/"), "1/6/11")
   })
 
-  const someMeta = new MetaSlot<number>("something")
+  const someSlot = Slot.define<number>()
 
-  it("can store meta properties on transactions", () => {
-    let tr = EditorState.create({doc: "foo"}).transaction.setMeta(someMeta, 55)
-    ist(tr.getMeta(someMeta), 55)
+  it("can store slots on transactions", () => {
+    let tr = EditorState.create({doc: "foo"}).transaction.addSlot(someSlot(55))
+    ist(tr.getSlot(someSlot), 55)
   })
 
   it("throws when a change's bounds are invalid", () => {
@@ -42,7 +43,7 @@ describe("EditorState", () => {
     let deflt = EditorState.create({}), two = EditorState.create({tabSize: 2})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.transaction.setMeta(MetaSlot.changeTabSize, 8).apply()
+    let updated = deflt.transaction.addSlot(Transaction.changeTabSize(8)).apply()
     ist(updated.tabSize, 8)
   })
 
@@ -52,7 +53,7 @@ describe("EditorState", () => {
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.transaction.setMeta(MetaSlot.changeLineSeparator, "\n").apply()
+    let updated = crlf.transaction.addSlot(Transaction.changeLineSeparator("\n")).apply()
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })

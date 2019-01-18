@@ -1,7 +1,6 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
-import {Transaction, MetaSlot} from "./transaction"
-import {unique} from "./unique"
+import {Transaction} from "./transaction"
 import {Extension, BehaviorStore} from "../../extension/src/extension"
 
 export class StateExtension extends Extension {
@@ -56,15 +55,15 @@ export class EditorState {
 
   getField<T>(field: StateField<T>): T {
     let index = this.config.fields.indexOf(field)
-    if (index < 0) throw new RangeError("Field " + field.name + " is not present in this state")
-    if (index >= this.fields.length) throw new RangeError("Field " + field.name + " hasn't been initialized yet")
+    if (index < 0) throw new RangeError("Field is not present in this state")
+    if (index >= this.fields.length) throw new RangeError("Field hasn't been initialized yet")
     return this.fields[index]
   }
 
   /** @internal */
   applyTransaction(tr: Transaction): EditorState {
     let $conf = this.config
-    let tabSize = tr.getMeta(MetaSlot.changeTabSize), lineSep = tr.getMeta(MetaSlot.changeLineSeparator)
+    let tabSize = tr.getSlot(Transaction.changeTabSize), lineSep = tr.getSlot(Transaction.changeLineSeparator)
     if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
     // FIXME changing the line separator might involve rearranging line endings (?)
     if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
@@ -130,19 +129,14 @@ const stateFieldBehavior = StateExtension.defineBehavior<StateField<any>>()
 export class StateField<T> {
   readonly init: (state: EditorState) => T
   readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
-  readonly name: string
   readonly extension: StateExtension
 
-  constructor({init, apply, name = "stateField"}: {
+  constructor({init, apply}: {
     init: (state: EditorState) => T,
-    apply: (tr: Transaction, value: T, newState: EditorState) => T,
-    name?: string
+    apply: (tr: Transaction, value: T, newState: EditorState) => T
   }) {
     this.init = init
     this.apply = apply
-    this.name = unique(name, fieldNames)
     this.extension = stateFieldBehavior(this)
   }
 }
-
-const fieldNames = Object.create(null)
