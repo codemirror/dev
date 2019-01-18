@@ -348,7 +348,7 @@ export class DocView extends ContentView {
       let prevState = this.fields ? this.fields.state : state
       this.fields = this.callbacks.updateFields(state, viewport, transactions)
 
-      let decorations = decorationSlot.get(this.fields)
+      let decorations = this.fields.getSlot(decorationSlot)
       // If the decorations are stable, stop.
       if (transactions.length == 0 && sameArray(decorations, this.decorations))
         return contentChanges
