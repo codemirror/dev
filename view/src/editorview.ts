@@ -2,7 +2,7 @@ import {EditorState, Transaction, MetaSlot} from "../../state/src"
 import {BehaviorStore} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
-import {DocView, EditorViewport} from "./docview"
+import {DocView} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
@@ -30,7 +30,8 @@ export interface EditorConfig {
 }
 
 export class EditorView {
-  get state(): EditorState { return this.fields.state }
+  get state() { return this.fields.state }
+  get viewport() { return this.fields.viewport }
 
   dispatch: (tr: Transaction) => void
   root: DocumentOrShadowRoot
@@ -43,8 +44,6 @@ export class EditorView {
 
   // @internal
   readonly docView: DocView
-
-  readonly viewport: EditorViewport
 
   readonly behavior!: BehaviorStore
   readonly fields!: ViewFields
@@ -79,7 +78,6 @@ export class EditorView {
         for (let spec of this.domEffects) if (spec.update) spec.update()
       }
     })
-    this.viewport = this.docView.publicViewport
     this.setState(config.state, config.extensions)
   }
 
@@ -151,6 +149,11 @@ export class EditorView {
 
   get defaultCharacterWidth() { return this.docView.heightOracle.charWidth }
   get defaultLineHeight() { return this.docView.heightOracle.lineHeight }
+
+  viewportLines(f: (height: LineHeight) => void) {
+    let {from, to} = this.viewport
+    this.docView.heightMap.forEachLine(from, to, 0, this.docView.heightOracle, f)
+  }
 
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
     this.focus()
