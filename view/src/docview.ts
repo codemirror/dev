@@ -20,7 +20,6 @@ const enum Composing { no, starting, yes, ending }
 export class DocView extends ContentView {
   children: (LineView | GapView)[] = []
   viewports: Viewport[] = none
-  publicViewport: EditorViewport
 
   fields!: ViewFields
   decorations!: A<DecorationSet>
@@ -67,7 +66,6 @@ export class DocView extends ContentView {
 
     this.viewportState = new ViewportState
     this.observer = new DOMObserver(this, callbacks.onDOMChange, () => this.checkLayout())
-    this.publicViewport = new EditorViewport(this, 0, 0)
   }
 
   init(state: EditorState) {
@@ -330,7 +328,6 @@ export class DocView extends ContentView {
       this.computingFields = true
       let result = this.computeFieldsInner(transactions, state, contentChanges, bias, scrollIntoView)
       // FIXME public mutable viewport should probably work differently
-      ;({from: this.publicViewport._from, to: this.publicViewport._to} = this.viewport)
       return result
     } finally {
       this.computingFields = false
@@ -722,18 +719,5 @@ function rangesToUpdate(vpA: A<Viewport>, vpB: A<Viewport>, changes: A<ChangedRa
     if (!change) return found
     change.addToSet(found)
     posA = change.toA; posB = change.toB
-  }
-}
-
-// Public shim for giving client code access to viewport information
-export class EditorViewport {
-  /** @internal */
-  constructor(private docView: DocView, public _from: number, public _to: number) {}
-
-  get from() { return this._from }
-  get to() { return this._to }
-
-  forEachLine(f: (height: LineHeight) => void) {
-    this.docView.heightMap.forEachLine(this.from, this.to, 0, this.docView.heightOracle, f)
   }
 }
