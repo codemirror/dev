@@ -1,4 +1,5 @@
 import {EditorState, Transaction} from "../../state/src"
+import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
 import {Extension, Slot} from "../../extension/src/extension"
@@ -45,11 +46,23 @@ export class ViewExtension extends Extension {}
 
 export const viewField = ViewExtension.defineBehavior<ViewField<any>>()
 
+export const handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
+
+export type ViewPlugin = {
+  update?: (update: ViewUpdate) => void
+  destroy?: () => void
+}
+
+export const viewPlugin = ViewExtension.defineBehavior<(view: EditorView) => ViewPlugin>()
+
+export const styleModule = ViewExtension.defineBehavior<StyleModule>()
+
 export class ViewFields {
   private values: any[] = []
 
   private constructor(public state: EditorState,
                       public viewport: Viewport,
+                      public focused: boolean,
                       private fields: ReadonlyArray<ViewField<any>>,
                       private view: EditorView) {}
 
@@ -85,7 +98,7 @@ export class ViewFields {
 
   // @internal
   static create(fields: ReadonlyArray<ViewField<any>>, state: EditorState, viewport: Viewport, view: EditorView) {
-    let set = new ViewFields(state, viewport, fields, view)
+    let set = new ViewFields(state, viewport, view.hasFocus(), fields, view)
     for (let i = 0; i < fields.length; i++) {
       let field = fields[i]
       if (fields.indexOf(field, i + 1) > -1)
@@ -96,24 +109,40 @@ export class ViewFields {
   }
 
   // @internal
-  update(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>, view: EditorView) {
-    let set = new ViewFields(state, viewport, this.fields, view)
-    let update = new ViewUpdate(transactions, this, set)
+  update(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>, slots: Slot[]) {
+    let focusChanged = Slot.get(focusChange, slots)
+    let set = new ViewFields(state, viewport, focusChanged == null ? this.focused : focusChanged, this.fields, this.view)
+    let update = new ViewUpdate(transactions, this, set, slots)
     for (let i = 0; i < this.fields.length; i++)
       set.values.push(this.fields[i].update(this.values[i], update))
     return set
   }
 }
 
+export const focusChange = Slot.define<boolean>()
+
 export class ViewUpdate {
   readonly new: ViewFields
   constructor(public readonly transactions: ReadonlyArray<Transaction>,
               public readonly old: ViewFields,
-              public nw: ViewFields) {
-    this.new = nw // Work around TypeScript getting confused by 'public readonly new'
+              public nw: ViewFields,
+              private slots: Slot[]) {
+    this.new = nw
   }
 
   get viewportChanged() {
     return this.old.viewport.eq(this.new.viewport)
+  }
+
+  get docChanged() {
+    return this.transactions.some(tr => tr.docChanged)
+  }
+
+  getSlot<T>(type: (value: T) => Slot<T>): T | undefined {
+    for (let i = this.transactions.length; i >= 0; i--) {
+      let found = i == this.transactions.length ? Slot.get(type, this.slots) : this.transactions[i].getSlot(type)
+      if (found !== undefined) return found
+    }
+    return undefined
   }
 }

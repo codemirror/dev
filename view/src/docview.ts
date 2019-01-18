@@ -11,6 +11,7 @@ import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 import {ViewFields, ViewUpdate, decorationSlot} from "./extension"
+import {Slot} from "../../extension/src/extension"
 
 type A<T> = ReadonlyArray<T>
 const none = [] as any
@@ -56,7 +57,7 @@ export class DocView extends ContentView {
 
   constructor(dom: HTMLElement, public root: DocumentOrShadowRoot, private callbacks: {
     // FIXME These suggest that the strict separation between docview and editorview isn't really working
-    updateFields: (state: EditorState, viewport: Viewport, transactions: A<Transaction>) => ViewFields,
+    updateFields: (state: EditorState, viewport: Viewport, transactions: A<Transaction>, slots: Slot[]) => ViewFields,
     onDOMChange: (from: number, to: number, typeOver: boolean) => boolean,
     onUpdateDOM: (update: ViewUpdate) => void,
     onInitDOM: () => void
@@ -73,7 +74,7 @@ export class DocView extends ContentView {
     this.heightMap = HeightMap.empty().applyChanges(none, this.heightOracle.setDoc(state.doc), changedRanges)
     this.children = []
     this.viewports = this.decorations = none
-    let contentChanges = this.computeFields(none, state, changedRanges, 0, -1)
+    let contentChanges = this.computeFields(none, state, none, changedRanges, 0, -1)
     this.updateInner(contentChanges, 0)
     this.cancelLayoutCheck()
     this.callbacks.onInitDOM()
@@ -84,7 +85,7 @@ export class DocView extends ContentView {
   // used as a hint to compute a new viewport that includes that
   // position, if we know the editor is going to scroll that position
   // into view.
-  update(transactions: A<Transaction>, state: EditorState, scrollIntoView: number = -1) {
+  update(transactions: A<Transaction>, state: EditorState, updateSlots: Slot[], scrollIntoView: number = -1) {
     // FIXME need some way to stabilize viewport—if a change causes the
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
@@ -102,7 +103,7 @@ export class DocView extends ContentView {
       this.forceSelectionUpdate = true
     this.heightMap = this.heightMap.applyChanges(none, this.heightOracle.setDoc(state.doc), changedRanges)
 
-    let contentChanges = this.computeFields(transactions, state, changedRanges, 0, scrollIntoView)
+    let contentChanges = this.computeFields(transactions, state, updateSlots, changedRanges, 0, scrollIntoView)
 
     if (this.dirty == dirty.not && contentChanges.length == 0 &&
         this.state.selection.primary.from >= this.viewport.from &&
@@ -112,7 +113,7 @@ export class DocView extends ContentView {
     } else {
       this.updateInner(contentChanges, prevFields.state.doc.length)
       this.cancelLayoutCheck()
-      this.callbacks.onUpdateDOM(new ViewUpdate(transactions, prevFields, this.fields))
+      this.callbacks.onUpdateDOM(new ViewUpdate(transactions, prevFields, this.fields, updateSlots))
       if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
     }
@@ -321,12 +322,12 @@ export class DocView extends ContentView {
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
   // Passing update == null means the state didn't change
-  computeFields(transactions: A<Transaction>, state: EditorState,
+  computeFields(transactions: A<Transaction>, state: EditorState, updateSlots: Slot[],
                 contentChanges: A<ChangedRange> = none,
                 bias: number, scrollIntoView: number): A<ChangedRange> {
     try {
       this.computingFields = true
-      let result = this.computeFieldsInner(transactions, state, contentChanges, bias, scrollIntoView)
+      let result = this.computeFieldsInner(transactions, state, updateSlots, contentChanges, bias, scrollIntoView)
       // FIXME public mutable viewport should probably work differently
       return result
     } finally {
@@ -334,19 +335,19 @@ export class DocView extends ContentView {
     }
   }
 
-  computeFieldsInner(transactions: A<Transaction>, state: EditorState,
+  computeFieldsInner(transactions: A<Transaction>, state: EditorState, updateSlots: Slot[],
                      contentChanges: A<ChangedRange> = none,
                      bias: number, scrollIntoView: number): A<ChangedRange> {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(state.doc, this.heightMap, bias, scrollIntoView)
       let viewportChange = this.fields ? !viewport.eq(this.fields.viewport) : true
       // After 5 tries, or when the viewport is stable and no more iterations are needed, return
-      if (i == 5 || !(transactions.length || viewportChange)) {
-        if (transactions.length || viewportChange) console.warn("Viewport and decorations failed to converge")
+      if (i == 5 || !(viewportChange || transactions.length || updateSlots.length)) {
+        if (i == 5) console.warn("Viewport and decorations failed to converge")
         return contentChanges
       }
       let prevState = this.fields ? this.fields.state : state
-      this.fields = this.callbacks.updateFields(state, viewport, transactions)
+      this.fields = this.callbacks.updateFields(state, viewport, transactions, updateSlots)
 
       let decorations = this.fields.getSlot(decorationSlot)
       // If the decorations are stable, stop.
@@ -365,7 +366,7 @@ export class DocView extends ContentView {
       // Accumulate content changes so that they can be redrawn
       contentChanges = extendWithRanges(contentChanges, content)
       // Make sure only one iteration is marked as required / state changing
-      transactions = none
+      transactions = updateSlots = none
     }
   }
 
@@ -412,7 +413,7 @@ export class DocView extends ContentView {
       if (covered && !this.heightOracle.heightChanged) break
       updated = true
       if (i > 10) throw new Error("Layout failed to converge")
-      let contentChanges = covered ? none : this.computeFields(none, this.state, none, scrollBias, -1)
+      let contentChanges = covered ? none : this.computeFields(none, this.state, none, none, scrollBias, -1)
       this.updateInner(contentChanges, this.length)
       lineHeights = null
       refresh = false
@@ -421,7 +422,7 @@ export class DocView extends ContentView {
     }
     if (updated) {
       this.observer.listenForScroll()
-      this.callbacks.onUpdateDOM(new ViewUpdate(none, prevFields, this.fields))
+      this.callbacks.onUpdateDOM(new ViewUpdate(none, prevFields, this.fields, none))
     }
   }
 
