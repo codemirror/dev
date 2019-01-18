@@ -57,6 +57,7 @@ export class EditorState {
   getField<T>(field: StateField<T>): T {
     let index = this.config.fields.indexOf(field)
     if (index < 0) throw new RangeError("Field " + field.name + " is not present in this state")
+    if (index >= this.fields.length) throw new RangeError("Field " + field.name + " hasn't been initialized yet")
     return this.fields[index]
   }
 

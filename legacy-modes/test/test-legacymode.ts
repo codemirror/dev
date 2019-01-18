@@ -24,12 +24,19 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     }
   }
   const extension = legacyMode({mode, sleepTime: 0})
-  const view: {state: EditorState, viewport?: Viewport, updateState: () => void} = {
+  // FIXME this is terrible, and we should find another way to test
+  // this (possibly expose a lower-level layer from the package, and
+  // directly interact with that)
+  const view: any = {
     state: EditorState.create({doc, extensions: [extension]}),
     viewport: {from: 0, to: 0},
-    updateState: onDecorationUpdate
+    updateState: onDecorationUpdate,
+    unsafeGetView() { return view },
+    get fields() { return this }
   }
-  // FIXME this is terrible
+  function update(transactions: Transaction[]) {
+    return {transactions, new: view}
+  }
   const plugin = (ViewExtension.resolve(view.state.behavior.foreign) as any).values[0][0]
   let decorations = plugin.create(view)
 
@@ -37,7 +44,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     calls,
     getDecorations(vp: Viewport) {
       view.viewport = vp
-      decorations = plugin.update(view, {transactions: []}, decorations)
+      decorations = plugin.update(decorations, update([]))
       const result: Range<RangeDecoration>[] = []
       decorations.collect(result, 0)
       return result
@@ -48,7 +55,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     apply(transaction: Transaction, {from, to}: Viewport) {
       view.state = transaction.apply()
       view.viewport = {from, to}
-      decorations = plugin.update(view, {transactions: [transaction]}, decorations)
+      decorations = plugin.update(decorations, update([transaction]))
     }
   }
 }

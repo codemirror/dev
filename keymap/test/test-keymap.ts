@@ -1,11 +1,11 @@
 import {keymap, Keymap} from "../src/keymap"
-import {ViewExtension} from "../../view/src"
+import {ViewExtension, handleDOMEvents} from "../../view/src"
 const ist = require("ist")
 
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
-  return ViewExtension.resolve([keymap(map)]).get(ViewExtension.handleDOMEvents)[0]
+  return ViewExtension.resolve([keymap(map)]).get(handleDOMEvents)[0]
 }
 
 function dispatch(handlers: any, key: string, mods?: any) {
