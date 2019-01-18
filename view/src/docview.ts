@@ -10,7 +10,7 @@ import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
-import {ViewFields, decorationSlot} from "./extension"
+import {ViewFields, ViewUpdate, decorationSlot} from "./extension"
 
 type A<T> = ReadonlyArray<T>
 const none = [] as any
@@ -58,7 +58,7 @@ export class DocView extends ContentView {
     // FIXME These suggest that the strict separation between docview and editorview isn't really working
     updateFields: (state: EditorState, viewport: Viewport, transactions: A<Transaction>) => ViewFields,
     onDOMChange: (from: number, to: number, typeOver: boolean) => boolean,
-    onUpdateDOM: () => void,
+    onUpdateDOM: (update: ViewUpdate) => void,
     onInitDOM: () => void
   }) {
     super()
@@ -89,7 +89,7 @@ export class DocView extends ContentView {
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
 
-    let prevState = this.state
+    let prevFields = this.fields
     let changes = transactions.length == 1 ? transactions[0].changes :
       transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     let changedRanges = changes.changedRanges()
@@ -110,9 +110,9 @@ export class DocView extends ContentView {
       this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {
-      this.updateInner(contentChanges, prevState.doc.length)
+      this.updateInner(contentChanges, prevFields.state.doc.length)
       this.cancelLayoutCheck()
-      this.callbacks.onUpdateDOM()
+      this.callbacks.onUpdateDOM(new ViewUpdate(transactions, prevFields, this.fields))
       if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
     }
@@ -403,7 +403,7 @@ export class DocView extends ContentView {
 
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
 
-    let updated = false
+    let updated = false, prevFields = this.fields
     for (let i = 0;; i++) {
       this.heightOracle.heightChanged = false
       this.heightMap = this.heightMap.updateHeight(
@@ -421,7 +421,7 @@ export class DocView extends ContentView {
     }
     if (updated) {
       this.observer.listenForScroll()
-      this.callbacks.onUpdateDOM()
+      this.callbacks.onUpdateDOM(new ViewUpdate(none, prevFields, this.fields))
     }
   }
 

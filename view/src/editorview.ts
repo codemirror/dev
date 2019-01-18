@@ -8,19 +8,18 @@ import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
-import {ViewExtension, ViewFields, viewField} from "./extension"
+import {ViewExtension, ViewFields, viewField, ViewUpdate} from "./extension"
 
 export const handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
-// FIXME allow listening for updates here too?
-export type DOMEffect = {
-  update?: () => void
+export type ViewPlugin = {
+  update?: (update: ViewUpdate) => void
   destroy?: () => void
 }
 
-export const domEffect = ViewExtension.defineBehavior<(view: EditorView) => DOMEffect>()
+export const viewPlugin = ViewExtension.defineBehavior<(view: EditorView) => ViewPlugin>()
 
-export const styleModules = ViewExtension.defineBehavior<StyleModule>()
+export const styleModule = ViewExtension.defineBehavior<StyleModule>()
 
 export interface EditorConfig {
   state: EditorState,
@@ -47,7 +46,7 @@ export class EditorView {
 
   readonly behavior!: BehaviorStore
   readonly fields!: ViewFields
-  private domEffects: DOMEffect[] = []
+  private plugins: ViewPlugin[] = []
 
   private updatingState: boolean = false
 
@@ -68,26 +67,26 @@ export class EditorView {
       onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
       updateFields: (state, viewport, transactions) => {
         return (this as any).fields = this.fields
-          ? this.fields.update(state, viewport, transactions)
-          : ViewFields.create(this.behavior.get(viewField), state, viewport)
+          ? this.fields.update(state, viewport, transactions, this)
+          : ViewFields.create(this.behavior.get(viewField), state, viewport, this)
       },
       onInitDOM: () => {
-        this.domEffects = this.behavior.get(domEffect).map(spec => spec(this))
+        this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))
       },
-      onUpdateDOM: () => {
-        for (let spec of this.domEffects) if (spec.update) spec.update()
+      onUpdateDOM: (update: ViewUpdate) => {
+        for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
       }
     })
     this.setState(config.state, config.extensions)
   }
 
   setState(state: EditorState, extensions: ViewExtension[] = []) {
-    for (let effect of this.domEffects) if (effect.destroy) effect.destroy()
+    for (let plugin of this.plugins) if (plugin.destroy) plugin.destroy()
     this.withUpdating(() => {
       setTabSize(this.contentDOM, state.tabSize)
       ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
       StyleModule.mount(this.root, styles)
-      for (let s of this.behavior.get(styleModules)) StyleModule.mount(this.root, s)
+      for (let s of this.behavior.get(styleModule)) StyleModule.mount(this.root, s)
       if (this.behavior.foreign.length)
         throw new Error("Non-ViewExtension extensions found when setting view state")
       this.inputState = new InputState(this)
@@ -169,7 +168,7 @@ export class EditorView {
   }
 
   destroy() {
-    for (let effect of this.domEffects) if (effect.destroy) effect.destroy()
+    for (let plugin of this.plugins) if (plugin.destroy) plugin.destroy()
     this.inputState.destroy()
     this.dom.remove()
     this.docView.destroy()

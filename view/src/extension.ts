@@ -2,6 +2,7 @@ import {EditorState, Transaction} from "../../state/src"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
 import {Extension} from "../../extension/src/extension"
+import {EditorView} from "./editorview"
 
 export class ViewSlot<S> {
   private constructor(/* @internal */ public type: any,
@@ -62,9 +63,10 @@ export const viewField = ViewExtension.defineBehavior<ViewField<any>>()
 export class ViewFields {
   private values: any[] = []
 
-  constructor(public state: EditorState,
-              public viewport: Viewport,
-              private fields: ReadonlyArray<ViewField<any>>) {}
+  private constructor(public state: EditorState,
+                      public viewport: Viewport,
+                      private fields: ReadonlyArray<ViewField<any>>,
+                      private view: EditorView) {}
 
   get<T, D>(field: ViewField<T>, defaultValue: D): T | D;
   get<T>(field: ViewField<T>): T;
@@ -79,6 +81,14 @@ export class ViewFields {
     return this.values[index] as T
   }
 
+  // You usually shouldn't do anything with the view object when
+  // computing fields, and mutating it at that point is not allowed,
+  // but there are several reasonable things you may want to do, such
+  // as measure positions or get the default text size, that would
+  // otherwise be very painful, so this method is provided as a way to
+  // get at the view anyway. (FIXME not sure if this is a good idea)
+  unsafeGetView(): EditorView { return this.view }
+
   // @internal
   getSlot<V>(type: any) {
     let result: V[] = []
@@ -90,8 +100,8 @@ export class ViewFields {
   }
 
   // @internal
-  static create(fields: ReadonlyArray<ViewField<any>>, state: EditorState, viewport: Viewport) {
-    let set = new ViewFields(state, viewport, fields)
+  static create(fields: ReadonlyArray<ViewField<any>>, state: EditorState, viewport: Viewport, view: EditorView) {
+    let set = new ViewFields(state, viewport, fields, view)
     for (let i = 0; i < fields.length; i++) {
       let field = fields[i]
       if (fields.indexOf(field, i + 1) > -1)
@@ -102,8 +112,8 @@ export class ViewFields {
   }
 
   // @internal
-  update(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>) {
-    let set = new ViewFields(state, viewport, this.fields)
+  update(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>, view: EditorView) {
+    let set = new ViewFields(state, viewport, this.fields, view)
     let update = new ViewUpdate(transactions, this, set)
     for (let i = 0; i < this.fields.length; i++)
       set.values.push(this.fields[i].update(this.values[i], update))

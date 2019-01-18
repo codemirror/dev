@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {domEffect, ViewField} from "../src/"
+import {viewPlugin, ViewField} from "../src/"
 import ist from "ist"
 
 describe("EditorView extension", () => {
@@ -40,9 +40,15 @@ describe("EditorView extension", () => {
 
   it("calls update on DOM effects when the DOM is changed", () => {
     let updates = 0
-    let cm = tempEditor("xyz", [domEffect(() => ({
-      update() { updates++ }
+    let cm = tempEditor("xyz", [viewPlugin(() => ({
+      update(update) {
+        ist(update.old.state.doc, prevDoc)
+        ist(update.new.state.doc, cm.state.doc)
+        prevDoc = cm.state.doc
+        updates++
+      }
     }))])
+    let prevDoc = cm.state.doc
     ist(updates, 0)
     cm.dispatch(cm.state.transaction.replace(1, 2, "u"))
     ist(updates, 1)

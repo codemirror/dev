@@ -1,5 +1,5 @@
 import {combineConfig} from "../../extension/src/extension"
-import {EditorView, ViewExtension, DOMEffect} from "../../view/src"
+import {EditorView, ViewExtension, ViewPlugin, styleModule, viewPlugin} from "../../view/src"
 import {StyleModule} from "style-mod"
 
 // FIXME Think about how the gutter width changing could cause
@@ -25,12 +25,12 @@ export const gutter = ViewExtension.unique<GutterConfig>(configs => {
     formatNumber: String
   })
   return ViewExtension.all(
-    ViewExtension.domEffect(view => new GutterView(view, config)),
-    ViewExtension.styleModules(styles)
+    viewPlugin(view => new GutterView(view, config)),
+    styleModule(styles)
   )
 }, {})
 
-class GutterView implements DOMEffect {
+class GutterView implements ViewPlugin {
   dom: HTMLElement
   spaceAbove: number = 0
   lines: GutterLine[] = []
@@ -74,7 +74,7 @@ class GutterView implements DOMEffect {
       this.dom.style.paddingTop = spaceAbove + "px"
     }
     let i = 0, lineNo = -1
-    this.view.viewport.forEachLine(line => {
+    this.view.viewportLines(line => {
       let above = line.textTop, below = line.height - line.textBottom, height = line.height - above - below
       if (lineNo < 0) lineNo = this.view.state.doc.lineAt(line.start).number
       if (i == this.lines.length) {

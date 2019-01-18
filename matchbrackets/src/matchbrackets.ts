@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src"
 import {EditorState} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
-import {ViewExtension} from "../../view/src/"
+import {ViewExtension, ViewField, styleModule} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
 import {StyleModule} from "style-mod"
 
@@ -106,14 +106,14 @@ export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
     strict: false
   })
   return ViewExtension.all(
-    ViewExtension.decorations({
+    ViewField.decorations({
       create(view) { return Decoration.none },
-      update({state}, {transactions}, deco) {
+      update(deco, update) {
         // FIXME make this use a tokenizer behavior exported by the highlighter
-        return transactions.length ? doMatchBrackets(state, undefined, config) : deco
+        return update.transactions.length ? doMatchBrackets(update.new.state, undefined, config) : deco
       }
     }),
-    ViewExtension.styleModules(defaultStyles)
+    styleModule(defaultStyles)
   )
 }, {})
 
