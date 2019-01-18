@@ -1,20 +1,20 @@
-export class Slot {
+export class Slot<T = any> {
   // @internal
   constructor(/* @internal */ public type: any,
-              /* @internal */ public value: any) {}
+              /* @internal */ public value: T) {}
 
-  static define<T>(): (value: T) => Slot {
-    let type = (value: T) => new Slot(type, value)
+  static define<T>(): (value: T) => Slot<T> {
+    let type = (value: T) => new Slot<T>(type, value)
     return type
   }
 
-  static collect<T>(type: (value: T) => Slot, slots: ReadonlyArray<Slot>): T[] {
+  static collect<T>(type: (value: T) => Slot<T>, slots: ReadonlyArray<Slot>): T[] {
     let result: T[] = []
     for (let slot of slots) if (slot.type == type) result.push(slot.value as T)
     return result
   }
 
-  static get<T>(type: (value: T) => Slot, slots: ReadonlyArray<Slot>): T | undefined {
+  static get<T>(type: (value: T) => Slot<T>, slots: ReadonlyArray<Slot>): T | undefined {
     for (let i = slots.length - 1; i >= 0; i--)
       if (slots[i].type == type) return slots[i].value as T
     return undefined

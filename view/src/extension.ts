@@ -1,38 +1,21 @@
 import {EditorState, Transaction} from "../../state/src"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
-import {Extension} from "../../extension/src/extension"
+import {Extension, Slot} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 
-export class ViewSlot<S> {
-  private constructor(/* @internal */ public type: any,
-                      /* @internal */ public accessor: (state: S) => any) {}
-
-  static define<V>() {
-    let type = {}
-    return {
-      slot<S>(accessor: (state: S) => V): ViewSlot<S> {
-        return new ViewSlot<S>(type, accessor)
-      },
-      get(fields: ViewFields) {
-        return fields.getSlot<V>(type)
-      }
-    }
-  }
-}
-
-export const decorationSlot = ViewSlot.define<DecorationSet>()
+export const decorationSlot = Slot.define<(field: any) => DecorationSet>()
 
 export class ViewField<V> {
   create: (fields: ViewFields) => V
   update: (value: V, update: ViewUpdate) => V
-  slots: ViewSlot<V>[]
+  slots: Slot<(field: V) => any>[]
   extension: ViewExtension
   
   constructor({create, update, slots = []}: {
     create: (fields: ViewFields) => V
     update: (value: V, update: ViewUpdate) => V,
-    slots?: ViewSlot<V>[]
+    slots?: Slot<(field: V) => any>[]
   }) {
     this.create = create; this.update = update; this.slots = slots
     this.extension = viewField(this)
@@ -49,11 +32,13 @@ export class ViewField<V> {
         if (map) for (let tr of u.transactions) deco = deco.map(tr.changes)
         return update(deco, u)
       },
-      slots: [decorationSlot.slot(d => d)]
+      slots: [decorationSlot(d => d)]
     }).extension
   }
 
-  static decorationSlot = decorationSlot.slot
+  static decorationSlot<T>(accessor: (field: T) => DecorationSet) {
+    return decorationSlot(accessor)
+  }
 }
 
 export class ViewExtension extends Extension {}
@@ -89,12 +74,11 @@ export class ViewFields {
   // get at the view anyway. (FIXME not sure if this is a good idea)
   unsafeGetView(): EditorView { return this.view }
 
-  // @internal
-  getSlot<V>(type: any) {
+  getSlot<V>(type: (value: (field: any) => V) => Slot<(field: any) => V>) {
     let result: V[] = []
     for (let i = 0; i < this.values.length; i++) {
-      for (let slot of this.fields[i].slots)
-        if (slot.type == type) result.push(slot.accessor(this.values[i]) as V)
+      let accessor = Slot.get(type, this.fields[i].slots)
+      if (accessor) result.push(accessor(this.values[i]) as V)
     }
     return result
   }

@@ -21,7 +21,7 @@ export const specialChars = ViewExtension.unique((configs: SpecialCharConfig[]) 
   return new ViewField<SpecialCharHighlighter>({
     create(fields) { return new SpecialCharHighlighter(fields, config) },
     update(self, update) { return self.update(update) },
-    slots: [ViewField.decorationSlot(self => self.decorations)]
+    slots: [ViewField.decorationSlot<SpecialCharHighlighter>(self => self.decorations)]
   }).extension
 }, {})
 
