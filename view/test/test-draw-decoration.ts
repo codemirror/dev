@@ -1,17 +1,18 @@
 import {EditorView, ViewField, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
-import {StateField, MetaSlot, EditorSelection} from "../../state/src"
+import {StateField, EditorSelection} from "../../state/src"
+import {Slot} from "../../extension/src/extension"
 import ist from "ist"
 
-const filterSlot = new MetaSlot<(from: number, to: number, spec: any) => boolean>("filterDeco")
-const addSlot = new MetaSlot<DecoratedRange[]>("addDeco")
+const filterDeco = Slot.define<(from: number, to: number, spec: any) => boolean>()
+const addDeco = Slot.define<DecoratedRange[]>()
 
 function decos(startState: DecorationSet = Decoration.none) {
   let field = new StateField<DecorationSet>({
     init() { return startState },
     apply(tr, value) {
       if (tr.docChanged) value = value.map(tr.changes)
-      let add = tr.getMeta(addSlot), filter = tr.getMeta(filterSlot)
+      let add = tr.getSlot(addDeco), filter = tr.getSlot(filterDeco)
       if (add || filter) value = value.update(add, filter)
       return value
     }
@@ -58,7 +59,7 @@ describe("EditorView decoration", () => {
 
   it("updates for added decorations", () => {
     let cm = decoEditor("hello\ngoodbye")
-    cm.dispatch(cm.state.transaction.setMeta(addSlot, [d(2, 8, {class: "c"})]))
+    cm.dispatch(cm.state.transaction.addSlot(addDeco([d(2, 8, {class: "c"})])))
     let spans = cm.contentDOM.querySelectorAll(".c")
     ist(spans.length, 2)
     ist(spans[0].textContent, "llo")
@@ -70,7 +71,7 @@ describe("EditorView decoration", () => {
   it("updates for removed decorations", () => {
     let cm = decoEditor("one\ntwo\nthree", [d(1, 12, {class: "x"}),
                                             d(4, 7, {tagName: "strong"})])
-    cm.dispatch(cm.state.transaction.setMeta(filterSlot, (from: number) => from == 4))
+    cm.dispatch(cm.state.transaction.addSlot(filterDeco((from: number) => from == 4)))
     ist(cm.contentDOM.querySelectorAll(".x").length, 0)
     ist(cm.contentDOM.querySelectorAll("strong").length, 1)
   })
@@ -78,7 +79,7 @@ describe("EditorView decoration", () => {
   it("doesn't update DOM that doesn't need to change", () => {
     let cm = decoEditor("one\ntwo", [d(0, 3, {tagName: "em"})])
     let secondLine = cm.contentDOM.lastChild!, secondLineText = secondLine.firstChild
-    cm.dispatch(cm.state.transaction.setMeta(filterSlot, () => false))
+    cm.dispatch(cm.state.transaction.addSlot(filterDeco(() => false)))
     ist(cm.contentDOM.lastChild, secondLine)
     ist(secondLine.firstChild, secondLineText)
   })
@@ -145,16 +146,16 @@ describe("EditorView decoration", () => {
       let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
       let elt = cm.contentDOM.querySelector("strong")
       cm.dispatch(cm.state.transaction
-                  .setMeta(addSlot, [w(4, new WordWidget("HI"))])
-                  .setMeta(filterSlot, () => false))
+                  .addSlot(addDeco([w(4, new WordWidget("HI"))]))
+                  .addSlot(filterDeco(() => false)))
       ist(elt, cm.contentDOM.querySelector("strong"))
     })
 
     it("notices replaced collapsed decorations", () => {
       let cm = decoEditor("abc", [d(1, 2, {collapsed: new WordWidget("X")})])
       cm.dispatch(cm.state.transaction
-                  .setMeta(addSlot, [d(1, 2, {collapsed: new WordWidget("Y")})])
-                  .setMeta(filterSlot, () => false))
+                  .addSlot(addDeco([d(1, 2, {collapsed: new WordWidget("Y")})]))
+                  .addSlot(filterDeco(() => false)))
       ist(cm.contentDOM.textContent, "aYc")
     })
 
@@ -162,8 +163,8 @@ describe("EditorView decoration", () => {
       let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
       let elt = cm.contentDOM.querySelector("strong")
       cm.dispatch(cm.state.transaction
-                  .setMeta(addSlot, [w(4, new OtherWidget("hi"))])
-                  .setMeta(filterSlot, () => false))
+                  .addSlot(addDeco([w(4, new OtherWidget("hi"))]))
+                  .addSlot(filterDeco(() => false)))
       ist(elt, cm.contentDOM.querySelector("strong"), "!=")
     })
 
@@ -197,7 +198,7 @@ describe("EditorView decoration", () => {
 
     it("can update widgets in an empty document", () => {
       let cm = decoEditor("", [w(0, new WordWidget("A"))])
-      cm.dispatch(cm.state.transaction.setMeta(addSlot, [w(0, new WordWidget("B"))]))
+      cm.dispatch(cm.state.transaction.addSlot(addDeco([w(0, new WordWidget("B"))])))
       ist(cm.contentDOM.querySelectorAll("strong").length, 2)
     })
   })
@@ -241,15 +242,15 @@ describe("EditorView decoration", () => {
 
     it("updates when line attributes are added", () => {
       let cm = decoEditor("foo\nbar", [l(0, "a")])
-      cm.dispatch(cm.state.transaction.setMeta(addSlot, [l(0, "b"), l(4, "c")]))
+      cm.dispatch(cm.state.transaction.addSlot(addDeco([l(0, "b"), l(4, "c")])))
       classes(cm, "a b", "c")
     })
 
     it("updates when line attributes are removed", () => {
       let ds = [l(0, "a"), l(0, "b"), l(4, "c")]
       let cm = decoEditor("foo\nbar", ds)
-      cm.dispatch(cm.state.transaction.setMeta(
-        filterSlot, (_f: number, _t: number, deco: Decoration) => !ds.slice(1).some(r => r.value == deco)))
+      cm.dispatch(cm.state.transaction.addSlot(
+        filterDeco((_f: number, _t: number, deco: Decoration) => !ds.slice(1).some(r => r.value == deco))))
       classes(cm, "a", "")
     })
 
@@ -301,14 +302,14 @@ describe("EditorView decoration", () => {
 
     it("adds widgets when they appear", () => {
       let cm = decoEditor("foo\nbar", [lw(4, 1, "Y")])
-      cm.dispatch(cm.state.transaction.setMeta(addSlot, [lw(0, -1, "X"), lw(4, 2, "Z")]))
+      cm.dispatch(cm.state.transaction.addSlot(addDeco([lw(0, -1, "X"), lw(4, 2, "Z")])))
       widgets(cm, ["X"], [], ["Y", "Z"])
     })
 
     it("removes widgets when they vanish", () => {
       let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(0, 1, "B"), lw(4, -1, "C"), lw(4, 1, "D")])
       widgets(cm, ["A"], ["B", "C"], ["D"])
-      cm.dispatch(cm.state.transaction.setMeta(filterSlot, (_f: number, _t: number, deco: any) => deco.side < 0))
+      cm.dispatch(cm.state.transaction.addSlot(filterDeco((_f: number, _t: number, deco: any) => deco.side < 0)))
       widgets(cm, ["A"], ["C"], [])
     })
 
@@ -316,8 +317,8 @@ describe("EditorView decoration", () => {
       let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(4, 1, "B")])
       let ws = cm.contentDOM.querySelectorAll("hr")
       cm.dispatch(cm.state.transaction
-                  .setMeta(filterSlot, (_f: number, _t: number, deco: any) => deco.side < 0)
-                  .setMeta(addSlot, [lw(4, 1, "B")]))
+                  .addSlot(filterDeco((_f: number, _t: number, deco: any) => deco.side < 0))
+                  .addSlot(addDeco([lw(4, 1, "B")])))
       widgets(cm, ["A"], [], ["B"])
       let newWs = cm.contentDOM.querySelectorAll("hr")
       ist(newWs[0], ws[0])
@@ -327,8 +328,8 @@ describe("EditorView decoration", () => {
     it("does redraw changed widgets", () => {
       let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(4, 1, "B")])
       cm.dispatch(cm.state.transaction
-                  .setMeta(filterSlot, (_f: number, _t: number, deco: any) => deco.side < 0)
-                  .setMeta(addSlot, [lw(4, 1, "C")]))
+                  .addSlot(filterDeco((_f: number, _t: number, deco: any) => deco.side < 0))
+                  .addSlot(addDeco([lw(4, 1, "C")])))
       widgets(cm, ["A"], [], ["C"])
     })
   })

@@ -1,4 +1,25 @@
-const none = [] as any
+export class Slot {
+  // @internal
+  constructor(/* @internal */ public type: any,
+              /* @internal */ public value: any) {}
+
+  static define<T>(): (value: T) => Slot {
+    let type = (value: T) => new Slot(type, value)
+    return type
+  }
+
+  static collect<T>(type: (value: T) => Slot, slots: ReadonlyArray<Slot>): T[] {
+    let result: T[] = []
+    for (let slot of slots) if (slot.type == type) result.push(slot.value as T)
+    return result
+  }
+
+  static get<T>(type: (value: T) => Slot, slots: ReadonlyArray<Slot>): T | undefined {
+    for (let i = slots.length - 1; i >= 0; i--)
+      if (slots[i].type == type) return slots[i].value as T
+    return undefined
+  }
+}
 
 const enum Kind { BEHAVIOR, MULTI, UNIQUE }
 
@@ -130,6 +151,8 @@ class UniqueExtensionType {
   }
 }
 
+const none = [] as any
+
 // An instance of this is part of EditorState and stores the behaviors
 // provided for the state.
 export class BehaviorStore {
@@ -167,9 +190,11 @@ type NonUndefined<T> = T extends undefined ? never : T
 // object from an array of provided configs. Will, by default, error
 // when a field gets two values that aren't ===-equal, but you can
 // provide combine functions per field to do something else.
-export function combineConfig<Config>(configs: ReadonlyArray<Partial<Config>>,
-                                      defaults: Config,
-                                      combine: {[P in keyof Config]?: (first: NonUndefined<Config[P]>, second: NonUndefined<Config[P]>) => NonUndefined<Config[P]>} = {}): Config {
+export function combineConfig<Config>(
+  configs: ReadonlyArray<Partial<Config>>,
+  defaults: Config,
+  combine: {[P in keyof Config]?: (first: NonUndefined<Config[P]>, second: NonUndefined<Config[P]>) => NonUndefined<Config[P]>} = {}
+): Config {
   let result: Partial<Config> = {}
   for (let config of configs) for (let key of Object.keys(config) as (keyof Config)[]) {
     let value = config[key], current = result[key]

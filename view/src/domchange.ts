@@ -1,7 +1,7 @@
 import {EditorView} from "./editorview"
 import {selectionCollapsed} from "./dom"
 import browser from "./browser"
-import {EditorSelection, Change, MetaSlot} from "../../state/src"
+import {EditorSelection, Change, Transaction} from "../../state/src"
 
 const LINE_SEP = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
@@ -71,7 +71,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     let tr = view.state.transaction.setSelection(newSel)
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
       if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()
-      else tr = tr.setMeta(MetaSlot.userEvent, view.inputState.lastSelectionOrigin)
+      else tr = tr.addSlot(Transaction.userEvent(view.inputState.lastSelectionOrigin!))
     }
     view.dispatch(tr)
     return true
