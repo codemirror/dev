@@ -8,8 +8,9 @@ import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
-import {ViewExtension, ViewField, ViewFields, viewField, ViewUpdate, styleModule,
-        viewPlugin, ViewPlugin} from "./extension"
+import {Viewport} from "./viewport"
+import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule, ViewSnapshot,
+        viewPlugin, ViewPlugin, getField} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 
 export interface EditorConfig {
@@ -20,8 +21,8 @@ export interface EditorConfig {
 }
 
 export class EditorView {
-  get state() { return this.fields.state }
-  get viewport() { return this.fields.viewport }
+  public state!: EditorState
+  public viewport!: Viewport
 
   dispatch: (tr: Transaction) => void
   root: DocumentOrShadowRoot
@@ -36,7 +37,10 @@ export class EditorView {
   readonly docView: DocView
 
   readonly behavior!: BehaviorStore
-  readonly fields!: ViewFields
+  // @internal
+  fields!: ReadonlyArray<ViewField<any>>
+  // @internal
+  fieldValues!: any[]
   private plugins: ViewPlugin[] = []
   private editorAttrs: AttrsFor
   private contentAttrs: AttrsFor
@@ -45,37 +49,22 @@ export class EditorView {
 
   constructor(config: EditorConfig) {
     this.contentDOM = document.createElement("div")
-    this.contentDOM.className = "codemirror-content " + styles.content
-    this.contentDOM.setAttribute("contenteditable", "true")
-    this.contentDOM.setAttribute("spellcheck", "false") // FIXME configurable
-    this.contentAttrs = new AttrsFor(ViewField.editorAttributes, this.contentDOM,
-                                     fields => ({spellcheck: "false"}))
+    this.contentAttrs = new AttrsFor(ViewField.editorAttributeEffect, this.contentDOM, () => ({
+      spellcheck: "false",
+      contenteditable: "true",
+      class: "codemirror-content " + styles.content
+    }))
 
     this.dom = document.createElement("div")
     this.dom.appendChild(this.contentDOM)
-    this.editorAttrs = new AttrsFor(ViewField.contentAttributes, this.dom,
-                                    fields => ({class: "codemirror " + styles.wrapper + (this.fields.focused ? " codemirror-focused" : "")}))
+    this.editorAttrs = new AttrsFor(ViewField.contentAttributeEffect, this.dom, view => ({
+      class: "codemirror " + styles.wrapper + (view.hasFocus() ? " codemirror-focused" : "")
+    }))
 
     this.dispatch = config.dispatch || ((tr: Transaction) => this.updateState([tr], tr.apply()))
     this.root = (config.root || document) as DocumentOrShadowRoot
 
-    this.docView = new DocView(this.contentDOM, this.root, {
-      onDOMChange: (start, end, typeOver) => applyDOMChange(this, start, end, typeOver),
-      updateFields: (state, viewport, transactions, slots) => {
-        ;(this as any).fields = this.fields
-          ? this.fields.update(state, viewport, transactions, slots)
-          : ViewFields.create(this.behavior.get(viewField), state, viewport, this)
-        this.contentAttrs.update(this.fields)
-        this.editorAttrs.update(this.fields)
-        return this.fields
-      },
-      onInitDOM: () => {
-        this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))
-      },
-      onUpdateDOM: (update: ViewUpdate) => {
-        for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
-      }
-    })
+    this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
     this.setState(config.state, config.extensions)
   }
 
@@ -84,17 +73,20 @@ export class EditorView {
     this.withUpdating(() => {
       setTabSize(this.contentDOM, state.tabSize)
       ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
+      this.fields = this.behavior.get(viewField)
       StyleModule.mount(this.root, styles)
       for (let s of this.behavior.get(styleModule)) StyleModule.mount(this.root, s)
       if (this.behavior.foreign.length)
         throw new Error("Non-ViewExtension extensions found when setting view state")
       this.inputState = new InputState(this)
       this.docView.init(state)
+      this.contentAttrs.update(this)
+      this.editorAttrs.update(this)
     })
   }
 
   // FIXME rename this to update at some point, make state implicit in transactions
-  updateState(transactions: Transaction[], state: EditorState, updateSlots: Slot[] = []) {
+  updateState(transactions: Transaction[], state: EditorState, metadata: Slot[] = []) {
     if (transactions.length && transactions[0].startState != this.state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
@@ -102,10 +94,37 @@ export class EditorView {
       if (transactions.some(tr => tr.getSlot(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
       if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getSlot(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
-      this.docView.update(transactions, state, updateSlots,
+      this.docView.update(transactions, state, metadata,
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       this.inputState.update(transactions)
+      this.contentAttrs.update(this)
+      this.editorAttrs.update(this)
     })
+  }
+
+  initPlugins() {
+    this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))
+  }
+
+  updatePlugins(update: ViewUpdate) {
+    for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
+  }
+
+  updateStateInner(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>, metadata: ReadonlyArray<Slot>) {
+    if (this.fieldValues) {
+      let snapshot = new ViewSnapshot(this)
+      this.viewport = viewport
+      this.state = state
+      this.fieldValues = []
+      let update = new ViewUpdate(snapshot, transactions, this, metadata)
+      for (let i = 0; i < this.fields.length; i++)
+        this.fieldValues.push(this.fields[i].update(snapshot.fieldValues[i], update))
+    } else {
+      this.viewport = viewport
+      this.state = state
+      this.fieldValues = []
+      for (let field of this.fields) this.fieldValues.push(field.create(this))
+    }
   }
 
   private withUpdating(f: () => void) {
@@ -113,6 +132,20 @@ export class EditorView {
     this.updatingState = true
     try { f() }
     finally { this.updatingState = false }
+  }
+
+  getField<T>(field: ViewField<T>): T;
+  getField<T, D = undefined>(field: ViewField<T>, defaultValue?: D): T | D {
+    return getField(field, this.fields, this.fieldValues, defaultValue)
+  }
+
+  getEffect<V>(type: (value: (field: any) => V) => Slot<(field: any) => V>) {
+    let result: V[] = []
+    for (let i = 0; i < this.fieldValues.length; i++) {
+      let accessor = Slot.get(type, this.fields[i].effects)
+      if (accessor) result.push(accessor(this.fieldValues[i]) as V)
+    }
+    return result
   }
 
   domAtPos(pos: number): {node: Node, offset: number} | null {
@@ -182,13 +215,13 @@ function setTabSize(elt: HTMLElement, size: number) {
 class AttrsFor {
   attrs: Attrs | null = null
 
-  constructor(private slot: (accessor: (field: any) => (Attrs | null)) => Slot,
+  constructor(private effect: (accessor: (field: any) => (Attrs | null)) => Slot,
               private dom: HTMLElement,
-              private deflt: (fields: ViewFields) => Attrs) {}
+              private deflt: (view: EditorView) => Attrs) {}
 
-  update(fields: ViewFields) {
-    let attrs = this.deflt(fields)
-    for (let spec of fields.getSlot(this.slot)) if (spec) attrs = combineAttrs(spec, attrs)
+  update(view: EditorView) {
+    let attrs = this.deflt(view)
+    for (let spec of view.getEffect(this.effect)) if (spec) attrs = combineAttrs(spec, attrs)
     updateAttrs(this.dom, this.attrs, attrs)
     this.attrs = attrs
   }

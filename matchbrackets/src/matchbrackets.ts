@@ -107,10 +107,10 @@ export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
   })
   return ViewExtension.all(
     ViewField.decorations({
-      create(view) { return Decoration.none },
+      create() { return Decoration.none },
       update(deco, update) {
         // FIXME make this use a tokenizer behavior exported by the highlighter
-        return update.transactions.length ? doMatchBrackets(update.new.state, undefined, config) : deco
+        return update.transactions.length ? doMatchBrackets(update.state, undefined, config) : deco
       }
     }),
     styleModule(defaultStyles)

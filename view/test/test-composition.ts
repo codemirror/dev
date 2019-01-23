@@ -56,7 +56,7 @@ function wordDeco(state: EditorState): DecorationSet {
 
 const wordHighlighter = ViewField.decorations({
   create({state}) { return wordDeco(state) },
-  update(_, {new: {state}}) { return wordDeco(state) },
+  update(_, {state}) { return wordDeco(state) },
   map: false
 })
 
