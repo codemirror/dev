@@ -39,7 +39,7 @@ describe("EditorView extension", () => {
     ist(cm.getField(ports).length, 3)
   })
 
-  it("calls update on DOM effects when the DOM is changed", () => {
+  it("calls update on plugins", () => {
     let updates = 0
     let cm = tempEditor("xyz", [viewPlugin(() => ({
       update(update) {
@@ -54,6 +54,6 @@ describe("EditorView extension", () => {
     cm.dispatch(cm.state.transaction.replace(1, 2, "u"))
     ist(updates, 1)
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(3)))
-    ist(updates, 1)
+    ist(updates, 2)
   })
 })

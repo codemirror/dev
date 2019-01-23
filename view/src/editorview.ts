@@ -45,7 +45,8 @@ export class EditorView {
   private editorAttrs: AttrsFor
   private contentAttrs: AttrsFor
 
-  private updatingState: boolean = false
+  // @internal
+  updating: boolean = false
 
   constructor(config: EditorConfig) {
     this.contentDOM = document.createElement("div")
@@ -80,6 +81,7 @@ export class EditorView {
         throw new Error("Non-ViewExtension extensions found when setting view state")
       this.inputState = new InputState(this)
       this.docView.init(state)
+      this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))
       this.contentAttrs.update(this)
       this.editorAttrs.update(this)
     })
@@ -90,26 +92,25 @@ export class EditorView {
     if (transactions.length && transactions[0].startState != this.state)
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
-      let prevState = this.state
+      let snapshot = new ViewSnapshot(this)
       if (transactions.some(tr => tr.getMeta(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
-      if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
+      if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
       this.docView.update(transactions, state, metadata,
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       this.inputState.update(transactions)
+      this.updatePlugins(new ViewUpdate(snapshot, transactions, this, metadata))
       this.contentAttrs.update(this)
       this.editorAttrs.update(this)
     })
   }
 
-  initPlugins() {
-    this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))
-  }
-
+  // @internal
   updatePlugins(update: ViewUpdate) {
     for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
   }
 
+  // @internal
   updateStateInner(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>, metadata: ReadonlyArray<Slot>) {
     if (this.fieldValues) {
       let snapshot = new ViewSnapshot(this)
@@ -127,11 +128,13 @@ export class EditorView {
     }
   }
 
-  private withUpdating(f: () => void) {
-    if (this.updatingState) throw new Error("Recursive calls of EditorView.updateState or EditorView.setState are not allowed")
-    this.updatingState = true
+  // @internal
+  withUpdating(f: () => void) {
+    if (this.updating)
+      throw new Error("Calls to EditorView.updateState or EditorView.setState are not allowed in extension update or create methods")
+    this.updating = true
     try { f() }
-    finally { this.updatingState = false }
+    finally { this.updating = false }
   }
 
   getField<T>(field: ViewField<T>): T;
