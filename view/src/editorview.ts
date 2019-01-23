@@ -10,7 +10,7 @@ import {movePos, posAtCoords} from "./cursor"
 import {LineHeight} from "./heightmap"
 import {Viewport} from "./viewport"
 import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule, ViewSnapshot,
-        viewPlugin, ViewPlugin, getField} from "./extension"
+        viewPlugin, ViewPlugin, getField, Effect} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 
 export interface EditorConfig {
@@ -142,7 +142,7 @@ export class EditorView {
     return getField(field, this.fields, this.fieldValues, defaultValue)
   }
 
-  getEffect<V>(type: (value: (field: any) => V) => Slot<(field: any) => V>) {
+  getEffect<V>(type: Effect<V>): ReadonlyArray<V> {
     let result: V[] = []
     for (let i = 0; i < this.fieldValues.length; i++) {
       let accessor = Slot.get(type, this.fields[i].effects)

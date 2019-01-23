@@ -1,20 +1,16 @@
+export type SlotType<T> = (value: T) => Slot<T>
+
 export class Slot<T = any> {
   // @internal
   constructor(/* @internal */ public type: any,
               /* @internal */ public value: T) {}
 
-  static define<T>(): (value: T) => Slot<T> {
+  static define<T>(): SlotType<T> {
     let type = (value: T) => new Slot<T>(type, value)
     return type
   }
 
-  static collect<T>(type: (value: T) => Slot<T>, slots: ReadonlyArray<Slot>): T[] {
-    let result: T[] = []
-    for (let slot of slots) if (slot.type == type) result.push(slot.value as T)
-    return result
-  }
-
-  static get<T>(type: (value: T) => Slot<T>, slots: ReadonlyArray<Slot>): T | undefined {
+  static get<T>(type: SlotType<T>, slots: ReadonlyArray<Slot>): T | undefined {
     for (let i = slots.length - 1; i >= 0; i--)
       if (slots[i].type == type) return slots[i].value as T
     return undefined
@@ -22,6 +18,8 @@ export class Slot<T = any> {
 }
 
 const enum Kind { BEHAVIOR, MULTI, UNIQUE }
+
+export type Behavior<Value> = (value: Value) => Extension
 
 export class Extension {
   // @internal
@@ -59,7 +57,7 @@ export class Extension {
   // eventually resolve to. Each behavior can have an ordered sequence
   // of values associated with it. An `Extension` can be seen as a
   // tree of sub-extensions with behaviors as leaves.
-  static defineBehavior<Value>() {
+  static defineBehavior<Value>(): Behavior<Value> {
     let behavior = (value: Value) => new this(Kind.BEHAVIOR, behavior, value)
     return behavior
   }
@@ -164,7 +162,7 @@ export class BehaviorStore {
   // resolving.
   foreign: Extension[] = []
 
-  get<Value>(behavior: (v: Value) => Extension): Value[] {
+  get<Value>(behavior: Behavior<Value>): Value[] {
     let found = this.behaviors.indexOf(behavior)
     return found < 0 ? none : this.values[found]
   }

@@ -233,7 +233,7 @@ class HeightDecoScanner implements RangeIterator<Decoration> {
   ignorePoint(value: Decoration) { return !value.widget }
 }
 
-export function heightRelevantDecorations(decorations: DecorationSet[], ranges: ReadonlyArray<ChangedRange>): number[] {
+export function heightRelevantDecorations(decorations: ReadonlyArray<DecorationSet>, ranges: ReadonlyArray<ChangedRange>): number[] {
   let scanner = new HeightDecoScanner
   for (let {fromB, toB} of ranges) if (fromB < toB) {
     scanner.pos = fromB

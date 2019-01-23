@@ -2,11 +2,11 @@ import {EditorState, Transaction} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
-import {Extension, Slot} from "../../extension/src/extension"
+import {Extension, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
 
-type Effect<T> = (accessor: (field: any) => T) => Slot<(field: any) => T>
+export type Effect<T> = SlotType<(field: any) => T>
 
 export class ViewField<V> {
   readonly create: (view: EditorView) => V
@@ -110,7 +110,7 @@ export class ViewUpdate {
     return this.transactions.some(tr => tr.docChanged)
   }
 
-  getMeta<T>(type: (value: T) => Slot<T>): T | undefined {
+  getMeta<T>(type: SlotType<T>): T | undefined {
     for (let i = this.transactions.length; i >= 0; i--) {
       let found = i == this.transactions.length ? Slot.get(type, this.metadata) : this.transactions[i].getMeta(type)
       if (found !== undefined) return found

@@ -1,5 +1,5 @@
 import {Text} from "../../doc/src"
-import {Slot} from "../../extension/src/extension"
+import {Slot, SlotType} from "../../extension/src/extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
@@ -29,7 +29,7 @@ export class Transaction {
     return new Transaction(this.startState, this.changes, this.docs, this.selection, this.metadata.concat(metadata), this.flags)
   }
 
-  getMeta<T>(type: (value: T) => Slot): T | undefined {
+  getMeta<T>(type: SlotType<T>): T | undefined {
     return Slot.get(type, this.metadata)
   }
 
