@@ -245,7 +245,7 @@ export class DocView extends ContentView {
                        content: (GapView | LineView)[]) {
     let start = fromOff > -1 ? this.children[fromI] as LineView : null
     if (start && fromI == toI && content.length == 1) { // Change within single child
-      start.merge(fromOff, toOff, content[0] as LineView, fromOff == 0)
+      start.merge(fromOff, toOff, content[0] as LineView, fromOff == 0, this.composition)
     } else {
       let end = toOff > -1 ? this.children[toI] as LineView : null
       if (end) {
@@ -254,11 +254,11 @@ export class DocView extends ContentView {
           endPart = end.split(toOff)
           if (fromI != toI) end.transferDOM(endPart)
         }
-        cLast.merge(cLast.length, cLast.length, endPart, false)
+        cLast.merge(cLast.length, cLast.length, endPart, false, this.composition)
         toI++
       }
       if (start) {
-        start.merge(fromOff, start.length, content[0] as LineView, fromOff == 0)
+        start.merge(fromOff, start.length, content[0] as LineView, fromOff == 0, this.composition)
         fromI++
         content.shift()
       }

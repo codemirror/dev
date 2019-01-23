@@ -1,5 +1,4 @@
 import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
-import {DocView} from "./docview"
 import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
 import {WidgetType, LineDecoration} from "./decoration"
@@ -14,7 +13,7 @@ export class LineView extends ContentView {
   attrs: {[name: string]: string} | null = null
 
   // Consumes source
-  merge(from: number, to: number = this.length, source: LineView, takeDeco: boolean) {
+  merge(from: number, to: number = this.length, source: LineView, takeDeco: boolean, composition: CompositionView | null) {
     if (takeDeco) this.setDeco(source)
     if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
 
@@ -70,7 +69,7 @@ export class LineView extends ContentView {
       fromI++
     }
 
-    if (fromI < toI && (this.parent as DocView).composition) {
+    if (composition && fromI < toI) {
       // If there's a zero-length composition on the edge of the update, don't overwrite it
       if (this.children[toI - 1] instanceof CompositionView && this.children[toI - 1].length == 0) toI--
       else if (this.children[fromI] instanceof CompositionView && this.children[fromI].length == 0) fromI++
