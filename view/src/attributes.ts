@@ -22,5 +22,5 @@ export function attrsEq(a: Attrs | null, b: Attrs | null): boolean {
 
 export function updateAttrs(dom: HTMLElement, prev: Attrs | null, attrs: Attrs | null) {
   if (prev) for (let name in prev) if (!(attrs && name in attrs)) dom.removeAttribute(name)
-  if (attrs) for (let name in attrs) dom.setAttribute(name, attrs[name])
+  if (attrs) for (let name in attrs) if (!(prev && prev[name] == attrs[name])) dom.setAttribute(name, attrs[name])
 }

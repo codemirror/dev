@@ -81,7 +81,6 @@ describe("EditorView.movePos", () => {
 
   function testLineMotion(focus: boolean) {
     let cm = tempEditor("one two\nthree\nتممين")
-    console.log(cm.contentDOM.innerHTML)
     if (focus) requireFocus(cm)
     else cm.contentDOM.blur()
     ist(cm.movePos(0, "forward", "line"), 8)
