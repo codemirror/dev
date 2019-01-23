@@ -8,42 +8,43 @@ describe("EditorView extension", () => {
     let field = new ViewField<string[]>({
       create({state}) { return [state.doc.toString()] },
       update(value, update) {
-        return update.transactions.length ? value.concat(update.new.state.doc.toString()) : value
+        return update.transactions.length ? value.concat(update.state.doc.toString()) : value
       }
     })
     let cm = tempEditor("one\ntwo", [field.extension])
     cm.dispatch(cm.state.transaction.replace(0, 1, "O"))
     cm.dispatch(cm.state.transaction.replace(4, 5, "T"))
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1)))
-    ist(cm.fields.get(field).join("/"), "one\ntwo/One\ntwo/One\nTwo/One\nTwo")
+    ist(cm.getField(field).join("/"), "one\ntwo/One\ntwo/One\nTwo/One\nTwo")
   })
 
   it("calls update when the viewport changes", () => {
-    let ports: number[][] = []
-    let cm = tempEditor("x\n".repeat(500), [new ViewField<void>({
-      create({viewport: {from, to}}) { ports.push([from, to]) },
-      update(_, {new: {viewport: {from, to}}}) { ports.push([from, to]) }
-    }).extension])
-    ist(ports.length, 1)
-    ist(ports[0][0], 0)
+    let ports = new ViewField<number[][]>({
+      create({viewport: {from, to}}) { return [[from, to]] },
+      update(ports, {viewport: {from, to}}) { return ports.concat([[from, to]]) }
+    })
+    let cm = tempEditor("x\n".repeat(500), [ports.extension])
+    ist(cm.getField(ports).length, 1)
+    ist(cm.getField(ports)[0][0], 0)
     cm.dom.style.height = "300px"
     cm.dom.style.overflow = "auto"
     cm.dom.scrollTop = 300
     cm.docView.checkLayout()
-    ist(ports.length, 2)
-    ist(ports[1][0], 0, ">")
-    ist(ports[1][1], ports[0][0], ">")
+    let val = cm.getField(ports)
+    ist(val.length, 2)
+    ist(val[1][0], 0, ">")
+    ist(val[1][1], val[0][0], ">")
     cm.dom.scrollTop = 1000
     cm.docView.checkLayout()
-    ist(ports.length, 3)
+    ist(cm.getField(ports).length, 3)
   })
 
   it("calls update on DOM effects when the DOM is changed", () => {
     let updates = 0
     let cm = tempEditor("xyz", [viewPlugin(() => ({
       update(update) {
-        ist(update.old.state.doc, prevDoc)
-        ist(update.new.state.doc, cm.state.doc)
+        ist(update.prevState.doc, prevDoc)
+        ist(update.state.doc, cm.state.doc)
         prevDoc = cm.state.doc
         updates++
       }

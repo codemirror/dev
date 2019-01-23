@@ -1,4 +1,4 @@
-import {ViewFields, ViewUpdate, ViewField} from "../../view/src"
+import {ViewUpdate, ViewField, EditorView} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src"
 import {Decoration, DecorationSet} from "../../view/src/decoration"
@@ -169,25 +169,22 @@ export const legacyMode = (config: Config) => {
 function decoSpec(field: StateField<StateCache<any>>, config: Config) {
   const {sleepTime = 100, maxWorkTime = 100, mode} = config
   let decorations = Decoration.none, from = -1, to = -1
-  function update(fields: ViewFields, force: boolean) {
-    let {viewport, state} = fields
+  function update(view: EditorView, force: boolean) {
+    let {viewport, state} = view
     if (force || viewport.from < from || viewport.to > to) {
       ;({from, to} = viewport)
       const stateCache = state.getField(field)!
       decorations = Decoration.set(stateCache.getDecorations(state, from, to, mode))
       stateCache.advanceFrontier(state, from, mode, sleepTime, maxWorkTime).then(() => {
-        // FIXME background highlighting should probably be scheduled
-        // in a view plugin, rather than here
-        let view = fields.unsafeGetView()
-        update(view.fields, true)
+        update(view, true)
         view.updateState([], state) // FIXME maybe add a specific EditorView method for this
       }, () => {})
     }
     return decorations
   }
   return {
-    create(fields: ViewFields) { return update(fields, false) },
-    update(_: DecorationSet, u: ViewUpdate) { return update(u.new, u.transactions.some(tr => tr.docChanged)) },
+    create(view: EditorView) { return update(view, false) },
+    update(_: DecorationSet, u: ViewUpdate) { return update(u.view, u.docChanged) },
     map: false
   }
 }

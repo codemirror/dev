@@ -1,4 +1,4 @@
-import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewFields, ViewField, ViewUpdate, ViewExtension} from "../../view/src"
+import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewField, ViewUpdate, ViewExtension, EditorView} from "../../view/src"
 import {ChangeSet, ChangedRange} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
@@ -19,9 +19,9 @@ export const specialChars = ViewExtension.unique((configs: SpecialCharConfig[]) 
     addSpecialChars: undefined
   })
   return new ViewField<SpecialCharHighlighter>({
-    create(fields) { return new SpecialCharHighlighter(fields, config) },
+    create(view) { return new SpecialCharHighlighter(view, config) },
     update(self, update) { return self.update(update) },
-    slots: [ViewField.decorationSlot<SpecialCharHighlighter>(self => self.decorations)]
+    effects: [ViewField.decorationEffect(self => self.decorations)]
   }).extension
 }, {})
 
@@ -34,7 +34,7 @@ class SpecialCharHighlighter {
   specials: RegExp
   replaceTabs: boolean
 
-  constructor(public fields: ViewFields, readonly options: CompleteSpecialCharConfig) {
+  constructor(public view: EditorView, readonly options: CompleteSpecialCharConfig) {
     this.updateForViewport()
     this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
@@ -44,7 +44,6 @@ class SpecialCharHighlighter {
   }
 
   update(update: ViewUpdate) {
-    this.fields = update.new
     let allChanges = update.transactions.reduce((ch, tr) => ch.appendSet(tr.changes), ChangeSet.empty)
     if (allChanges.length) {
       this.decorations = this.decorations.map(allChanges)
@@ -57,11 +56,11 @@ class SpecialCharHighlighter {
   }
 
   closeHoles(ranges: ReadonlyArray<ChangedRange>) {
-    let decorations: DecoratedRange[] = [], vp = this.fields.viewport, replaced: number[] = []
+    let decorations: DecoratedRange[] = [], vp = this.view.viewport, replaced: number[] = []
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]
       // Must redraw all tabs further on the line
-      if (this.replaceTabs) to = this.fields.state.doc.lineAt(to).end
+      if (this.replaceTabs) to = this.view.state.doc.lineAt(to).end
       while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JOIN_GAP) to = Math.max(to, ranges[++i].toB)
       // Clip to current viewport, to avoid doing work for invisible text
       from = Math.max(vp.from, from); to = Math.min(vp.to, to)
@@ -78,7 +77,7 @@ class SpecialCharHighlighter {
   }
 
   updateForViewport() {
-    let vp = this.fields.viewport
+    let vp = this.view.viewport
     // Viewports match, don't do anything
     if (this.from == vp.from && this.to == vp.to) return
     let decorations: DecoratedRange[] = []
@@ -94,7 +93,7 @@ class SpecialCharHighlighter {
   }
 
   getDecorationsFor(from: number, to: number, target: DecoratedRange[]) {
-    let {doc} = this.fields.state
+    let {doc} = this.view.state
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {
         while (m = SPECIALS.exec(cursor.value)) {
@@ -102,8 +101,8 @@ class SpecialCharHighlighter {
           if (code == null) continue
           if (code == 9) {
             let line = doc.lineAt(pos + m.index)
-            let size = this.fields.state.tabSize, col = countColumn(doc.slice(line.start, pos + m.index), 0, size)
-            widget = new TabWidget((size - (col % size)) * this.fields.unsafeGetView().defaultCharacterWidth)
+            let size = this.view.state.tabSize, col = countColumn(doc.slice(line.start, pos + m.index), 0, size)
+            widget = new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth)
           } else {
             widget = new SpecialCharWidget(this.options, code)
           }

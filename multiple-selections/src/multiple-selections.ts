@@ -11,8 +11,8 @@ export const multipleSelections = StateExtension.unique((configs: Config[]) => {
     StateExtension.allowMultipleSelections(true),
     ViewField.decorations({
       create(view) { return decorateSelections(view.state, rangeConfig) },
-      update(deco, {old, new: {state}}) {
-        return old.state.doc == state.doc && old.state.selection.eq(state.selection)
+      update(deco, {prevState, state}) {
+        return prevState.doc == state.doc && prevState.selection.eq(state.selection)
           ? deco : decorateSelections(state, rangeConfig)
       },
       map: false

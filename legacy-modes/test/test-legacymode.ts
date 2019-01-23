@@ -30,12 +30,10 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
   const view: any = {
     state: EditorState.create({doc, extensions: [extension]}),
     viewport: {from: 0, to: 0},
-    updateState: onDecorationUpdate,
-    unsafeGetView() { return view },
-    get fields() { return this }
+    updateState: onDecorationUpdate
   }
   function update(transactions: Transaction[]) {
-    return {transactions, new: view}
+    return {transactions, view}
   }
   const plugin = (ViewExtension.resolve(view.state.behavior.foreign) as any).values[0][0]
   let decorations = plugin.create(view)
