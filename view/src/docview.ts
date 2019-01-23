@@ -32,7 +32,6 @@ export class DocView extends ContentView {
   viewportState: ViewportState
   heightMap!: HeightMap
   heightOracle: HeightOracle = new HeightOracle
-  computingUpdate = false
 
   layoutCheckScheduled: number = -1
   // A document position that has to be scrolled into view at the next layout check
@@ -73,7 +72,6 @@ export class DocView extends ContentView {
     let contentChanges = this.computeUpdate(none, state, none, changedRanges, 0, -1)
     this.updateInner(contentChanges, 0)
     this.cancelLayoutCheck()
-    this.view.initPlugins() // FIXME allow the view to do this on its own by adjusting the way it interacts with scheduled layout checks
     this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
@@ -86,7 +84,7 @@ export class DocView extends ContentView {
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
 
-    let snapshot = new ViewSnapshot(this.view)
+    let prevLen = this.state.doc.length
     let changes = transactions.length == 1 ? transactions[0].changes :
       transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     let changedRanges = changes.changedRanges()
@@ -107,9 +105,8 @@ export class DocView extends ContentView {
       this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {
-      this.updateInner(contentChanges, snapshot.state.doc.length)
+      this.updateInner(contentChanges, prevLen)
       this.cancelLayoutCheck()
-      this.view.updatePlugins(new ViewUpdate(snapshot, transactions, this.view, metadata))
       if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
     }
@@ -321,19 +318,6 @@ export class DocView extends ContentView {
   computeUpdate(transactions: A<Transaction>, state: EditorState, metadata: Slot[],
                 contentChanges: A<ChangedRange> = none,
                 bias: number, scrollIntoView: number): A<ChangedRange> {
-    try {
-      this.computingUpdate = true
-      let result = this.computeUpdateInner(transactions, state, metadata, contentChanges, bias, scrollIntoView)
-      // FIXME public mutable viewport should probably work differently
-      return result
-    } finally {
-      this.computingUpdate = false
-    }
-  }
-
-  computeUpdateInner(transactions: A<Transaction>, state: EditorState, metadata: Slot[],
-                     contentChanges: A<ChangedRange> = none,
-                     bias: number, scrollIntoView: number): A<ChangedRange> {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(state.doc, this.heightMap, bias, scrollIntoView)
       let viewportChange = this.viewport ? !viewport.eq(this.viewport) : true
@@ -378,7 +362,7 @@ export class DocView extends ContentView {
   }
 
   forceLayout() {
-    if (this.layoutCheckScheduled > -1 && !this.computingUpdate) this.checkLayout()
+    if (this.layoutCheckScheduled > -1 && !this.view.updating) this.checkLayout()
   }
 
   checkLayout(forceFull = false) {
@@ -400,26 +384,28 @@ export class DocView extends ContentView {
 
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
 
-    let updated: ViewSnapshot | null = null
-    for (let i = 0;; i++) {
-      this.heightOracle.heightChanged = false
-      this.heightMap = this.heightMap.updateHeight(
-        this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
-      let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
-      if (covered && !this.heightOracle.heightChanged) break
-      if (!updated) updated = new ViewSnapshot(this.view)
-      if (i > 10) throw new Error("Layout failed to converge")
-      let contentChanges = covered ? none : this.computeUpdate(none, this.state, none, none, scrollBias, -1)
-      this.updateInner(contentChanges, this.length)
-      lineHeights = null
-      refresh = false
-      scrollBias = 0
-      this.viewportState.updateFromDOM(this.dom, this.paddingTop)
-    }
-    if (updated) {
-      this.observer.listenForScroll()
-      this.view.updatePlugins(new ViewUpdate(updated, none, this.view, none))
-    }
+    this.view.withUpdating(() => {
+      let updated: ViewSnapshot | null = null
+      for (let i = 0;; i++) {
+        this.heightOracle.heightChanged = false
+        this.heightMap = this.heightMap.updateHeight(
+          this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
+        let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
+        if (covered && !this.heightOracle.heightChanged) break
+        if (!updated) updated = new ViewSnapshot(this.view)
+        if (i > 10) throw new Error("Layout failed to converge")
+        let contentChanges = covered ? none : this.computeUpdate(none, this.state, none, none, scrollBias, -1)
+        this.updateInner(contentChanges, this.length)
+        lineHeights = null
+        refresh = false
+        scrollBias = 0
+        this.viewportState.updateFromDOM(this.dom, this.paddingTop)
+      }
+      if (updated) {
+        this.observer.listenForScroll()
+        this.view.updatePlugins(new ViewUpdate(updated, none, this.view, none))
+      }
+    })
   }
 
   scrollPosIntoView(pos: number) {
