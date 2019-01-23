@@ -91,8 +91,8 @@ export class EditorView {
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
       let prevState = this.state
-      if (transactions.some(tr => tr.getSlot(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
-      if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getSlot(Transaction.preserveGoalColumn)))
+      if (transactions.some(tr => tr.getMeta(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
+      if (state.doc != prevState.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
       this.docView.update(transactions, state, metadata,
                           transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)

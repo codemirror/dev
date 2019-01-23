@@ -13,7 +13,7 @@ export class Transaction {
                       readonly changes: ChangeSet,
                       readonly docs: ReadonlyArray<Text>,
                       readonly selection: EditorSelection,
-                      private readonly slots: ReadonlyArray<Slot>,
+                      private readonly metadata: ReadonlyArray<Slot>,
                       private readonly flags: number) {}
 
   static start(state: EditorState, time: number = Date.now()) {
@@ -25,12 +25,12 @@ export class Transaction {
     return last < 0 ? this.startState.doc : this.docs[last]
   }
 
-  addSlot(...slots: Slot[]): Transaction {
-    return new Transaction(this.startState, this.changes, this.docs, this.selection, this.slots.concat(slots), this.flags)
+  addMeta(...metadata: Slot[]): Transaction {
+    return new Transaction(this.startState, this.changes, this.docs, this.selection, this.metadata.concat(metadata), this.flags)
   }
 
-  getSlot<T>(type: (value: T) => Slot): T | undefined {
-    return Slot.get(type, this.slots)
+  getMeta<T>(type: (value: T) => Slot): T | undefined {
+    return Slot.get(type, this.metadata)
   }
 
   change(change: Change, mirror?: number): Transaction {
@@ -40,7 +40,7 @@ export class Transaction {
     let changes = this.changes.append(change, mirror)
     return new Transaction(this.startState, changes, this.docs.concat(change.apply(this.doc)),
                            this.selection.map(changes.partialMapping(changes.length - 1)),
-                           this.slots, this.flags)
+                           this.metadata, this.flags)
   }
 
   replace(from: number, to: number, text: string | ReadonlyArray<string>): Transaction {
@@ -79,7 +79,7 @@ export class Transaction {
   setSelection(selection: EditorSelection): Transaction {
     return new Transaction(this.startState, this.changes, this.docs,
                            this.startState.multipleSelections ? selection : selection.asSingle(),
-                           this.slots, this.flags | FLAG_SELECTION_SET)
+                           this.metadata, this.flags | FLAG_SELECTION_SET)
   }
 
   get selectionSet(): boolean {
@@ -92,7 +92,7 @@ export class Transaction {
 
   scrollIntoView(): Transaction {
     return new Transaction(this.startState, this.changes, this.docs, this.selection,
-                           this.slots, this.flags | FLAG_SCROLL_INTO_VIEW)
+                           this.metadata, this.flags | FLAG_SCROLL_INTO_VIEW)
   }
 
   get scrolledIntoView(): boolean {

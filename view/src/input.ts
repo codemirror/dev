@@ -151,7 +151,7 @@ class MouseSelection {
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.transaction.setSelection(selection)
-                         .addSlot(Transaction.userEvent("pointer")))
+                         .addMeta(Transaction.userEvent("pointer")))
   }
 
   map(changes: ChangeSet) {
@@ -222,7 +222,7 @@ function capturePaste(view: EditorView) {
 
 function doPaste(view: EditorView, text: string) {
   view.dispatch(view.state.transaction.replaceSelection(text)
-                .addSlot(Transaction.userEvent("paste")).scrollIntoView())
+                .addMeta(Transaction.userEvent("paste")).scrollIntoView())
 }
 
 function mustCapture(event: KeyboardEvent): boolean {
@@ -309,7 +309,7 @@ handlers.drop = (view, event: DragEvent) => {
   let change = new Change(dropPos, dropPos, view.state.splitLines(text))
   tr = tr.change(change)
     .setSelection(EditorSelection.single(dropPos, dropPos + change.length))
-    .addSlot(Transaction.userEvent("drop"))
+    .addMeta(Transaction.userEvent("drop"))
   view.focus()
   view.dispatch(tr)
 }
@@ -356,7 +356,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut") {
-    view.dispatch(view.state.transaction.replaceSelection([""]).scrollIntoView().addSlot(Transaction.userEvent("cut")))
+    view.dispatch(view.state.transaction.replaceSelection([""]).scrollIntoView().addMeta(Transaction.userEvent("cut")))
   }
 }
 

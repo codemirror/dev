@@ -97,7 +97,7 @@ export class ViewUpdate {
 
   getMeta<T>(type: (value: T) => Slot<T>): T | undefined {
     for (let i = this.transactions.length; i >= 0; i--) {
-      let found = i == this.transactions.length ? Slot.get(type, this.metadata) : this.transactions[i].getSlot(type)
+      let found = i == this.transactions.length ? Slot.get(type, this.metadata) : this.transactions[i].getMeta(type)
       if (found !== undefined) return found
     }
     return undefined

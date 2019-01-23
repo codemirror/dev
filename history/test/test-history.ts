@@ -12,7 +12,7 @@ const mkState = (config?: any, doc?: string) => EditorState.create({
 const type = (state: EditorState, text: string, at = state.doc.length) => state.transaction.replace(at, at, text).apply()
 const timedType = (state: EditorState, text: string, atTime: number) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
 const receive = (state: EditorState, text: string, from: number, to = from) => {
-  return state.transaction.replace(from, to, text).addSlot(Transaction.addToHistory(false)).apply()
+  return state.transaction.replace(from, to, text).addMeta(Transaction.addToHistory(false)).apply()
 }
 const command = (state: EditorState, cmd: any, success: boolean = true) => {
   ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), success)
@@ -157,7 +157,7 @@ describe("history", () => {
     state = type(state, "hi")
     state = closeHistory(state.transaction).apply()
     state = type(state, "hello")
-    state = state.transaction.replace(0, 7, "").addSlot(Transaction.addToHistory(false)).apply()
+    state = state.transaction.replace(0, 7, "").addMeta(Transaction.addToHistory(false)).apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
     ist(state.doc.toString(), "")
@@ -328,9 +328,9 @@ describe("history", () => {
     it("merges selection-only transactions from keyboard", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).addSlot(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(3)).addSlot(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).addSlot(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(3)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 0)
     })
@@ -352,10 +352,10 @@ describe("history", () => {
     it("doesn't merge selection-only transactions if they change the number of selections", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).addSlot(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = state.transaction.setSelection(EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)])).
-        addSlot(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).addSlot(Transaction.userEvent("keyboard")).apply()
+        addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = command(state, undoSelection)
       ist(state.selection.ranges.length, 2)
       state = command(state, undoSelection)
@@ -365,9 +365,9 @@ describe("history", () => {
     it("doesn't merge selection-only transactions if a selection changes empty state", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).addSlot(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(2, 3)).addSlot(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).addSlot(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(2, 3)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.transaction.setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.anchor, 2)
       ist(state.selection.primary.head, 3)
