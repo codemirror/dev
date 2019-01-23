@@ -6,6 +6,8 @@ import {Extension, Slot} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
 
+type Effect<T> = (accessor: (field: any) => T) => Slot<(field: any) => T>
+
 export class ViewField<V> {
   readonly create: (view: EditorView) => V
   readonly update: (value: V, update: ViewUpdate) => V
@@ -20,6 +22,10 @@ export class ViewField<V> {
   }
 
   get extension() { return viewField(this) }
+
+  static decorationEffect = Slot.define<(field: any) => DecorationSet>()
+  static editorAttributeEffect = Slot.define<(field: any) => (Attrs | null)>()
+  static contentAttributeEffect = Slot.define<(field: any) => (Attrs | null)>()
 
   static decorations({create, update, map}: {
     create?: (view: EditorView) => DecorationSet,
@@ -36,9 +42,18 @@ export class ViewField<V> {
     }).extension
   }
 
-  static decorationEffect = Slot.define<(field: any) => DecorationSet>()
-  static editorAttributeEffect = Slot.define<(field: any) => (Attrs | null)>()
-  static contentAttributeEffect = Slot.define<(field: any) => (Attrs | null)>()
+  static editorAttributes = attributeField(ViewField.editorAttributeEffect)
+  static contentAttributes = attributeField(ViewField.contentAttributeEffect)
+}
+
+function attributeField(effect: Effect<Attrs | null>) {
+  return function(value: Attrs | ((view: EditorView) => Attrs | null),
+                  update?: (value: Attrs | null, update: ViewUpdate) => Attrs | null) {
+    return new ViewField<Attrs | null>({
+      create: value instanceof Function ? value : () => value,
+      update: update || (a => a), effects: [effect(a => a)]
+    }).extension
+  }
 }
 
 export class ViewExtension extends Extension {}

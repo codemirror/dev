@@ -50,15 +50,17 @@ export class EditorView {
 
   constructor(config: EditorConfig) {
     this.contentDOM = document.createElement("div")
-    this.contentAttrs = new AttrsFor(ViewField.editorAttributeEffect, this.contentDOM, () => ({
+    let tabSizeStyle = (this.contentDOM.style as any).tabSize != null ? "tab-size: " : "-moz-tab-size: "
+    this.contentAttrs = new AttrsFor(ViewField.contentAttributeEffect, this.contentDOM, () => ({
       spellcheck: "false",
       contenteditable: "true",
-      class: "codemirror-content " + styles.content
+      class: "codemirror-content " + styles.content,
+      style: tabSizeStyle + this.state.tabSize
     }))
 
     this.dom = document.createElement("div")
     this.dom.appendChild(this.contentDOM)
-    this.editorAttrs = new AttrsFor(ViewField.contentAttributeEffect, this.dom, view => ({
+    this.editorAttrs = new AttrsFor(ViewField.editorAttributeEffect, this.dom, view => ({
       class: "codemirror " + styles.wrapper + (view.hasFocus() ? " codemirror-focused" : "")
     }))
 
@@ -72,7 +74,6 @@ export class EditorView {
   setState(state: EditorState, extensions: ViewExtension[] = []) {
     for (let plugin of this.plugins) if (plugin.destroy) plugin.destroy()
     this.withUpdating(() => {
-      setTabSize(this.contentDOM, state.tabSize)
       ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
       this.fields = this.behavior.get(viewField)
       StyleModule.mount(this.root, styles)
@@ -93,7 +94,6 @@ export class EditorView {
       throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
     this.withUpdating(() => {
       let snapshot = new ViewSnapshot(this)
-      if (transactions.some(tr => tr.getMeta(Transaction.changeTabSize) != undefined)) setTabSize(this.contentDOM, state.tabSize)
       if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
       this.docView.update(transactions, state, metadata,
@@ -209,10 +209,6 @@ export class EditorView {
     this.dom.remove()
     this.docView.destroy()
   }
-}
-
-function setTabSize(elt: HTMLElement, size: number) {
-  (elt.style as any).tabSize = (elt.style as any).MozTabSize = size
 }
 
 class AttrsFor {

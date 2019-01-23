@@ -56,4 +56,15 @@ describe("EditorView extension", () => {
     cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(3)))
     ist(updates, 2)
   })
+
+  it("allows content attributes to be changed through effects", () => {
+    let cm = tempEditor("", [ViewField.contentAttributes({spellcheck: "true"})])
+    ist(cm.contentDOM.spellcheck, true)
+  })
+
+  it("allows editor attributes to be changed through effects", () => {
+    let cm = tempEditor("", [ViewField.editorAttributes({class: "something"})])
+    ist(cm.dom.classList.contains("something"))
+    ist(cm.dom.classList.contains("codemirror"))
+  })
 })
