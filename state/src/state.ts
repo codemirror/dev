@@ -63,7 +63,7 @@ export class EditorState {
   /** @internal */
   applyTransaction(tr: Transaction): EditorState {
     let $conf = this.config
-    let tabSize = tr.getSlot(Transaction.changeTabSize), lineSep = tr.getSlot(Transaction.changeLineSeparator)
+    let tabSize = tr.getMeta(Transaction.changeTabSize), lineSep = tr.getMeta(Transaction.changeLineSeparator)
     if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
     // FIXME changing the line separator might involve rearranging line endings (?)
     if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)

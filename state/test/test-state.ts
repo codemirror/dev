@@ -28,8 +28,8 @@ describe("EditorState", () => {
   const someSlot = Slot.define<number>()
 
   it("can store slots on transactions", () => {
-    let tr = EditorState.create({doc: "foo"}).transaction.addSlot(someSlot(55))
-    ist(tr.getSlot(someSlot), 55)
+    let tr = EditorState.create({doc: "foo"}).transaction.addMeta(someSlot(55))
+    ist(tr.getMeta(someSlot), 55)
   })
 
   it("throws when a change's bounds are invalid", () => {
@@ -43,7 +43,7 @@ describe("EditorState", () => {
     let deflt = EditorState.create({}), two = EditorState.create({tabSize: 2})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.transaction.addSlot(Transaction.changeTabSize(8)).apply()
+    let updated = deflt.transaction.addMeta(Transaction.changeTabSize(8)).apply()
     ist(updated.tabSize, 8)
   })
 
@@ -53,7 +53,7 @@ describe("EditorState", () => {
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.transaction.addSlot(Transaction.changeLineSeparator("\n")).apply()
+    let updated = crlf.transaction.addMeta(Transaction.changeLineSeparator("\n")).apply()
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })
