@@ -1,5 +1,5 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
-import {DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration} from "./decoration"
+import {DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration, BlockWidgetDecoration} from "./decoration"
 import {LineView} from "./lineview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
@@ -12,11 +12,11 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   textOff: number = 0
   lineStart: boolean
 
-  constructor(text: Text, public pos: number) {
-    this.cursor = text.iter()
+  constructor(private doc: Text, public pos: number) {
+    this.cursor = doc.iter()
     this.skip = pos
     this.lines = [new LineView]
-    this.lineStart = text.lineAt(pos).start == pos
+    this.lineStart = doc.lineAt(pos).start == pos
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null,
@@ -94,10 +94,17 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   }
 
   point(deco: Decoration) {
-    if (deco instanceof WidgetDecoration)
+    if (deco instanceof WidgetDecoration) {
       this.curLine.append(new WidgetView(0, deco.widget, deco.bias))
-    else if (this.lineStart)
-      this.curLine.addLineDeco(deco as LineDecoration)
+    } else if (deco instanceof LineDecoration) {
+      if (this.lineStart) this.curLine.addLineDeco(deco as LineDecoration)
+    } else if (deco instanceof BlockWidgetDecoration) {
+      // FIXME
+      if (deco.bias < 0 && this.lineStart)
+      {} // this.lines.splice(this.lines.length - 1, 0, new BlockWidgetView(deco.widget))
+      else if (deco.bias > 0 && this.doc.lineAt(this.pos).end == this.pos)
+      {} // this.lines.push(new BlockWidgetView(deco.widget))
+    }
   }
 
   get curLine() { return this.lines[this.lines.length - 1] }

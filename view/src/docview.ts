@@ -8,7 +8,7 @@ import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
 import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
-import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations} from "./decoration"
+import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 import {ViewUpdate, ViewSnapshot, ViewField} from "./extension"
 import {EditorView} from "./editorview"
@@ -571,6 +571,31 @@ export class DocView extends ContentView {
       this.updateInner(ranges, this.length)
     })
   }
+}
+
+export class BlockWidgetView extends ContentView {
+  dom!: HTMLElement | null
+  parent!: DocView | null
+
+  constructor(public widget: WidgetType, public length: number) { super() }
+
+  get children() { return none }
+
+  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
+    if (!this.dom) {
+      this.setDOM(this.widget.toDOM())
+      this.dom!.contentEditable = "false"
+    }
+    return super.syncInto(parent, pos)
+  }
+
+  sync() { this.dirty = dirty.not }
+
+  get overrideDOMText() {
+    return this.parent ? this.parent!.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
+  }
+
+  domBoundsAround() { return null }
 }
 
 // Browsers appear to reserve a fixed amount of bits for height

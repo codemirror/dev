@@ -136,7 +136,7 @@ function textCoords(text: Node, pos: number): Rect {
 export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
-  constructor(public length: number, readonly widget: WidgetType<any> | null, readonly side: number) {
+  constructor(public length: number, readonly widget: WidgetType | null, readonly side: number) {
     super()
   }
 

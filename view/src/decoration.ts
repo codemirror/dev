@@ -10,11 +10,11 @@ export interface RangeDecorationSpec {
   // Shorthand for {attributes: {class: value}}
   class?: string
   tagName?: string
-  collapsed?: boolean | WidgetType<any>
+  collapsed?: boolean | WidgetType
 }
 
 export interface WidgetDecorationSpec {
-  widget: WidgetType<any>
+  widget: WidgetType
   side?: number
 }
 
@@ -22,13 +22,22 @@ export interface LineDecorationSpec {
   attributes?: {[key: string]: string}
 }
 
-export abstract class WidgetType<T> {
+export interface BlockWidgetDecorationSpec {
+  widget: WidgetType,
+  side?: number
+}
+
+export interface BlockRangeDecorationSpec {
+  widget: WidgetType
+}
+
+export abstract class WidgetType<T = any> {
   constructor(readonly value: T) {}
   abstract toDOM(): HTMLElement;
   eq(value: T): boolean { return this.value === value }
 
   /** @internal */
-  compare(other: WidgetType<any>): boolean {
+  compare(other: WidgetType): boolean {
     return this == other || this.constructor == other.constructor && this.eq(other.value)
   }
 
@@ -45,7 +54,7 @@ export abstract class Decoration implements RangeValue {
     // @internal
     readonly bias: number,
     // @internal
-    readonly widget: WidgetType<any> | null,
+    readonly widget: WidgetType | null,
     readonly spec: any) {}
 
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null;
@@ -63,6 +72,15 @@ export abstract class Decoration implements RangeValue {
     return new Range(pos, pos, new LineDecoration(spec))
   }
 
+  static blockWidget(pos: number, spec: BlockWidgetDecorationSpec): DecoratedRange {
+    let side = spec.side || -1
+    return new Range(pos, pos, new BlockWidgetDecoration(spec.widget, side + (side < 0 ? -BIG_BIAS : BIG_BIAS), spec))
+  }
+
+  static blockRange(from: number, to: number, spec: BlockRangeDecorationSpec): DecoratedRange {
+    return new Range(from, to, new BlockWidgetDecoration(spec.widget, -BIG_BIAS, spec))
+  }
+
   static set(of: DecoratedRange | ReadonlyArray<DecoratedRange>): DecorationSet {
     return RangeSet.of<Decoration>(of)
   }
@@ -71,6 +89,9 @@ export abstract class Decoration implements RangeValue {
 
   // @internal
   abstract sameEffect(other: Decoration): boolean
+
+  // @internal
+  hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
 }
 
 const BIG_BIAS = 2e9
@@ -108,7 +129,7 @@ export class RangeDecoration extends Decoration {
 }
 
 export class WidgetDecoration extends Decoration {
-  widget!: WidgetType<any>
+  widget!: WidgetType
 
   constructor(readonly spec: WidgetDecorationSpec) {
     super(spec.side || 0, spec.widget || null, spec)
@@ -130,24 +151,55 @@ export class LineDecoration extends Decoration {
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
-    for (let change of mapping.changes) {
-      // If the line break before was deleted, drop this decoration
-      if (change.from <= pos - 1 && change.to >= pos) return null
-      if (change.from < pos) pos += change.length - (change.to - change.from)
-    }
-    return new Range(pos, pos, this)
+    pos = mapStrict(pos, -1, mapping)
+    return pos < 0 ? null : new Range(pos, pos, this)
   }
 
   sameEffect(other: Decoration): boolean {
     return other instanceof LineDecoration &&
-      attrsEq(this.spec.attributes, other.spec.attributes) &&
-      this.side == other.side
+      attrsEq(this.spec.attributes, other.spec.attributes)
   }
-
-  get side() { return this.spec.side || 0 }
 }
 
-export function widgetsEq(a: WidgetType<any> | null, b: WidgetType<any> | null): boolean {
+// Map `pos`, but return -1 when the character before or after
+// (depending on `side`) is deleted.
+function mapStrict(pos: number, side: number, mapping: ChangeSet): number {
+  for (let change of mapping.changes) {
+    // If the line break before was deleted, drop this decoration
+    if (change.from <= pos + (side < 0 ? -1 : 0) && change.to >= pos + (side > 0 ? 1 : 0)) return -1
+    if (change.from < pos) pos += change.length - (change.to - change.from)
+  }
+  return pos
+}
+
+export class BlockWidgetDecoration extends Decoration {
+  constructor(widget: WidgetType, startBias: number, spec: any) {
+    super(startBias, widget, spec)
+  }
+
+  map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
+    if (from == to) {
+      from = mapStrict(from, this.bias, mapping)
+      return from < 0 ? null : new Range(from, from, this)
+    } else {
+      from = mapStrict(from, -1, mapping)
+      to = mapStrict(to, 1, mapping)
+      return from < 0 || to < 0 ? null : new Range(from, to, this)
+    }
+  }
+
+  sameEffect(other: Decoration): boolean {
+    return other instanceof BlockWidgetDecoration &&
+      widgetsEq(this.widget, other.widget) &&
+      this.bias == other.bias
+  }
+
+  get collapsed() { return true }
+
+  hasHeight() { return true }
+}
+
+export function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
   return a == b || !!(a && b && a.compare(b))
 }
 
@@ -197,7 +249,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 
   compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
-    if (!widgetsEq(byA.widget, byB.widget)) {
+    if (!byA.sameEffect(byB)) {
       addRange(from, to, this.changes.content)
       addRange(from, to, this.changes.height)
     }
@@ -206,8 +258,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
   comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
     if (!compareSets(pointsA, pointsB)) {
       addRange(pos, pos, this.changes.content)
-      if (pointsA.some(d => !!(d.widget && d.widget.estimatedHeight > -1)) ||
-          pointsB.some(d => !!(d.widget && d.widget.estimatedHeight > -1)))
+      if (pointsA.some(d => d.hasHeight()) || pointsB.some(d => d.hasHeight()))
         addRange(pos, pos, this.changes.height)
     }
   }
