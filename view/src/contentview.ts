@@ -8,6 +8,10 @@ export const enum dirty { not = 0, child = 1, node = 2 }
 
 const none: any[] = []
 
+export function breakBetween(before: ContentView | null, after: ContentView) {
+  return before && before.breakAfter && after.breakBefore ? 1 : 0
+}
+
 export abstract class ContentView {
   parent: ContentView | null = null
   dom: Node | null = null
@@ -15,7 +19,6 @@ export abstract class ContentView {
   abstract length: number
   abstract children: ContentView[]
 
-  get childGap() { return 0 }
   get overrideDOMText(): ReadonlyArray<string> | null { return null }
 
   get posAtStart(): number {
@@ -27,10 +30,12 @@ export abstract class ContentView {
   }
 
   posBefore(view: ContentView): number {
-    let pos = this.posAtStart
+    let pos = this.posAtStart, prev: ContentView | null = null
     for (let child of this.children) {
+      pos += breakBetween(prev, child)
       if (child == view) return pos
-      pos += child.length + this.childGap
+      pos += child.length
+      prev = child
     }
     throw new RangeError("Invalid child in posBefore")
   }
@@ -40,10 +45,11 @@ export abstract class ContentView {
   }
 
   coordsAt(pos: number): Rect | null {
-    for (let off = 0, i = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = off + child.length
-      if (end >= pos && (end != off || this.childGap)) return child.coordsAt(pos - off)
-      off = end + this.childGap
+    for (let off = 0, i = 0, prev = null; i < this.children.length; i++) {
+      let child = this.children[i], start = off + breakBetween(prev, child), end = start + child.length
+      if (end >= pos && start != end) return child.coordsAt(pos - start)
+      off = end
+      prev = child
     }
     return null
   }
@@ -91,21 +97,24 @@ export abstract class ContentView {
     while (after && !after.cmView) after = after.nextSibling
     if (!after) return this.length
 
-    for (let i = 0, pos = 0;; i++) {
+    for (let i = 0, pos = 0, prev = null;; i++) {
       let child = this.children[i]
+      pos += breakBetween(prev, child)
       if (child.dom == after) return pos
-      pos += child.length + this.childGap
+      pos += child.length
+      prev = child
     }
   }
 
   domBoundsAround(from: number, to: number, offset = 0): {startDOM: Node | null, endDOM: Node | null, from: number, to: number} | null {
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    for (let i = 0, pos = offset; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
-      if (pos < from && end > to) return child.domBoundsAround(from, to, pos)
-      if (end >= from && fromI == -1) { fromI = i; fromStart = pos }
+    for (let i = 0, pos = offset, prev = null; i < this.children.length; i++) {
+      let child = this.children[i], start = pos + breakBetween(prev, child), end = start + child.length
+      if (start < from && end > to) return child.domBoundsAround(from, to, start)
+      if (end >= from && fromI == -1) { fromI = i; fromStart = start }
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
-      pos = end + this.childGap
+      pos = end
+      prev = child
     }
     return {from: fromStart, to: toEnd,
             startDOM: (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom!.firstChild,
@@ -156,8 +165,12 @@ export abstract class ContentView {
   ignoreMutation(rec: MutationRecord): boolean { return false }
   ignoreEvent(event: Event): boolean { return false }
 
+  childCursor(pos: number = this.length, i: number = this.children.length) {
+    return new ChildCursor(this.children, pos, i)
+  }
+
   childPos(pos: number, bias: number = 1): {i: number, off: number} {
-    return new ChildCursor(this.children, this.length, this.childGap).findPos(pos, bias)
+    return this.childCursor().findPos(pos, bias)
   }
 
   toString() {
@@ -165,6 +178,9 @@ export abstract class ContentView {
     return name + (this.children.length ? "(" + this.children.join() + ")" :
                    this.length ? "[" + (name == "Text" ? (this as any).text : this.length) + "]" : "")
   }
+
+  get breakAfter() { return false }
+  get breakBefore() { return false }
 }
 
 // Remove a DOM node and return its next sibling.
@@ -187,10 +203,7 @@ export function syncNodeInto(parent: HTMLElement, pos: Node | null, dom: Node): 
 export class ChildCursor {
   off: number = 0
 
-  constructor(public children: ContentView[], public pos: number,
-              public gap: number = 0, public i: number = children.length) {
-    this.pos += gap
-  }
+  constructor(public children: ReadonlyArray<ContentView>, public pos: number, public i: number) {}
 
   findPos(pos: number, bias: number = 1): this {
     for (;;) {
@@ -198,7 +211,25 @@ export class ChildCursor {
         this.off = pos - this.pos
         return this
       }
-      this.pos -= this.children[--this.i].length + this.gap
+      this.pos -= this.children[--this.i].length
+    }
+  }
+}
+
+export class DocChildCursor extends ChildCursor {
+  constructor(children: ReadonlyArray<ContentView>, pos: number, i: number) {
+    if (i) super(children, pos - children[children.length - 1].length, i - 1)
+    else super(children, pos, i)
+  }
+
+  findPos(pos: number): this {
+    for (;;) {
+      if (pos >= this.pos) {
+        this.off = pos - this.pos
+        return this
+      }
+      let next = this.children[--this.i]
+      this.pos -= next.length + breakBetween(next, this.children[this.i + 1])
     }
   }
 }

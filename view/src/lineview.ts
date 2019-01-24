@@ -17,7 +17,7 @@ export class LineView extends ContentView {
     if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
 
     let elts = source.children
-    let cur = new ChildCursor(this.children, this.length)
+    let cur = this.childCursor()
     let {i: toI, off: toOff} = cur.findPos(to, 1)
     let {i: fromI, off: fromOff} = cur.findPos(from, -1)
     let dLen = from - to
@@ -81,7 +81,7 @@ export class LineView extends ContentView {
   split(at: number) {
     let end = new LineView
     if (this.length == 0) return end
-    let {i, off} = new ChildCursor(this.children, this.length).findPos(at)
+    let {i, off} = this.childCursor().findPos(at)
     if (off) {
       end.append(this.children[i].slice(off))
       this.children[i].cut(off)
@@ -126,7 +126,7 @@ export class LineView extends ContentView {
   }
 
   domFromPos(pos: number): {node: Node, offset: number} {
-    let {i, off} = new ChildCursor(this.children, this.length).findPos(pos)
+    let {i, off} = this.childCursor().findPos(pos)
     if (off) {
       let textDOM: Node | null = (this.children[i] as any).textDOM
       if (textDOM) return {node: textDOM, offset: off}
@@ -193,4 +193,7 @@ export class LineView extends ContentView {
     this.replaceChildren(index, index, [view])
     return view
   }
+
+  get breakAfter() { return true }
+  get breakBefore() { return true }
 }

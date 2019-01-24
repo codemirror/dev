@@ -1,4 +1,4 @@
-import {ContentView, ChildCursor, dirty} from "./contentview"
+import {ContentView, ChildCursor, DocChildCursor, dirty, breakBetween} from "./contentview"
 import {LineView} from "./lineview"
 import {TextView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
@@ -20,7 +20,7 @@ const none = [] as any
 const enum Composing { no, starting, yes, ending }
 
 export class DocView extends ContentView {
-  children: (LineView | GapView)[] = []
+  children: (LineView | BlockWidgetView)[] = []
   viewports: Viewport[] = none
 
   decorations!: A<DecorationSet>
@@ -51,8 +51,6 @@ export class DocView extends ContentView {
   get state() { return this.view.state }
 
   get viewport() { return this.view.viewport }
-
-  get childGap() { return 1 }
 
   get root() { return this.view.root }
 
@@ -173,7 +171,7 @@ export class DocView extends ContentView {
                       oldLength: number) {
     let redraw = rangesToUpdate(this.viewports, viewports, changes, this.length)
     if (compositionRange) compositionRange.subtractFromSet(redraw)
-    let cursor = new ChildCursor(this.children, oldLength, 1)
+    let cursor = this.childCursor(oldLength)
     for (let i = redraw.length - 1, posA = this.length;; i--) {
       let next = i < 0 ? null : redraw[i], nextA = next ? next.toA : 0
       if (compositionRange && compositionRange.fromA <= posA && compositionRange.toA >= nextA) {
@@ -429,16 +427,18 @@ export class DocView extends ContentView {
   }
 
   domFromPos(pos: number): {node: Node, offset: number} | null {
-    let {i, off} = new ChildCursor(this.children, this.length, 1).findPos(pos)
+    let {i, off} = this.childCursor().findPos(pos)
     return this.children[i].domFromPos(off)
   }
 
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.viewport
-    for (let pos = 0, i = 0; pos <= to && i < this.children.length; i++) {
+    for (let pos = 0, i = 0, prev = null; pos <= to && i < this.children.length; i++) {
       let child = this.children[i] as LineView
+      pos += breakBetween(prev, child)
       if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
-      pos += child.length + 1
+      pos += child.length
+      prev = child
     }
     return result
   }
@@ -571,13 +571,17 @@ export class DocView extends ContentView {
       this.updateInner(ranges, this.length)
     })
   }
+
+  childCursor(pos: number = this.length, i: number = this.children.length): ChildCursor {
+    return new DocChildCursor(this.children, pos, i)
+  }
 }
 
 export class BlockWidgetView extends ContentView {
   dom!: HTMLElement | null
   parent!: DocView | null
 
-  constructor(public widget: WidgetType, public length: number) { super() }
+  constructor(public widget: WidgetType, public length: number, public side: number) { super() }
 
   get children() { return none }
 
@@ -596,6 +600,9 @@ export class BlockWidgetView extends ContentView {
   }
 
   domBoundsAround() { return null }
+
+  get breakBefore() { return this.length > 0 || this.side < 0 }
+  get breakAfter() { return this.length > 0 || this.side > 0 }
 }
 
 // Browsers appear to reserve a fixed amount of bits for height
@@ -651,6 +658,9 @@ export class GapView extends ContentView {
   }
 
   domBoundsAround() { return null }
+
+  get breakAfter() { return true }
+  get breakBefore() { return true }
 }
 
 function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
