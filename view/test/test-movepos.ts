@@ -23,6 +23,7 @@ const oWidgets = ViewField.decorations({
   update(deco) { return deco }
 })
 
+/*
 class BigWidget extends WidgetType<void> {
   toDOM() {
     let node = document.createElement("div")
@@ -31,6 +32,7 @@ class BigWidget extends WidgetType<void> {
   }
   get estimatedHeight() { return 200 }
 }
+*/
 
 describe("EditorView.movePos", () => {
   it("does the right thing for character motion when focused", () => {
@@ -115,6 +117,7 @@ describe("EditorView.movePos", () => {
     ist(cm.movePos(10, "backward", "line"), 6)
   })
 
+  /*
   it("can cross large line widgets during line motion", () => {
     let cm = tempEditor("one\ntwo", [ViewField.decorations({
       create() { return Decoration.set([
@@ -131,6 +134,7 @@ describe("EditorView.movePos", () => {
     ist(cm.movePos(5, "backward", "line"), 1)
     ist(cm.movePos(7, "backward", "line"), 3)
   })
+  */
 
   function testLineBoundaryMotion(focus: boolean) {
     let cm = tempEditor("\none two\n")

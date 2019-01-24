@@ -1,12 +1,11 @@
 import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
 import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {WidgetType, LineDecoration} from "./decoration"
+import {LineDecoration} from "./decoration"
 import {combineAttrs, attrsEq, updateAttrs} from "./attributes"
 
 export class LineView extends ContentView {
   children: InlineView[] = []
-  widgets: LineWidget[] = none
   length: number = 0
   dom!: HTMLElement | null
   prevAttrs: {[name: string]: string} | null | undefined = undefined
@@ -111,23 +110,6 @@ export class LineView extends ContentView {
       }
       this.attrs = source.attrs
     }
-    // Reconcile the new widgets with the existing ones
-    for (let i = 0, j = 0;;) {
-      let a = i == this.widgets.length ? null : this.widgets[i]
-      let b = j == source.widgets.length ? null : source.widgets[j]
-      if (!a && !b) break
-      if (a && b && a.eq(b)) {
-        i++; j++
-      } else if (!a || (b && b.side <= a.side)) {
-        if (this.widgets == none) this.widgets = []
-        this.widgets.splice(i++, 0, b!.finish())
-        this.parent!.markDirty()
-        j++
-      } else {
-        this.widgets.splice(i, 1)
-        this.parent!.markDirty()
-      }
-    }
   }
 
   // Only called when building a line view in ContentBuilder
@@ -140,14 +122,7 @@ export class LineView extends ContentView {
   // Only called when building a line view in ContentBuilder
   addLineDeco(deco: LineDecoration) {
     let attrs = deco.spec.attributes
-    if (attrs)
-      this.attrs = combineAttrs(attrs, this.attrs || {})
-    if (deco.widget) {
-      if (this.widgets == none) this.widgets = []
-      let pos = 0
-      while (pos < this.widgets.length && this.widgets[pos].side <= deco.side) pos++
-      this.widgets.splice(pos, 0, new LineWidget(deco.widget, deco.side))
-    }
+    if (attrs) this.attrs = combineAttrs(attrs, this.attrs || {})
   }
 
   domFromPos(pos: number): {node: Node, offset: number} {
@@ -165,18 +140,8 @@ export class LineView extends ContentView {
       this.setDOM(document.createElement("div"))
       this.dom!.className = "codemirror-line"
       if (this.attrs) this.prevAttrs = null
-      for (let w of this.widgets) if (!w.dom) w.finish()
     }
-    for (let i = 0, main = false;; i++) {
-      let widget = i == this.widgets.length ? null : this.widgets[i]
-      if (!main && (!widget || widget.side > 0)) {
-        main = true
-        pos = syncNodeInto(parent, pos, this.dom!)
-      }
-      if (!widget) break
-      pos = syncNodeInto(parent, pos, widget.dom!)
-    }
-    return pos
+    return syncNodeInto(parent, pos, this.dom!)
   }
 
   // FIXME might need another hack to work around Firefox's behavior
@@ -215,20 +180,6 @@ export class LineView extends ContentView {
     return super.coordsAt(pos)
   }
 
-  // Ignore mutations in line widgets
-  ignoreMutation(rec: MutationRecord): boolean {
-    return !this.dom!.contains(rec.target.nodeType == 1 ? rec.target : rec.target.parentNode!)
-  }
-
-  // Find the appropriate widget, and ask it whether an event needs to be ignored
-  ignoreEvent(event: Event): boolean {
-    if (this.widgets.length == 0 || this.dom!.contains(event.target as Node)) return false
-    for (let widget of this.widgets)
-      if (widget.dom!.contains(event.target as Node))
-        return widget.widget.ignoreEvent(event)
-    return true
-  }
-
   createCompositionViewAround(textNode: Node): CompositionView {
     let dom = textNode
     while (dom.parentNode != this.dom) dom = dom.parentNode!
@@ -243,18 +194,3 @@ export class LineView extends ContentView {
     return view
   }
 }
-
-export class LineWidget {
-  dom: HTMLElement | null = null
-  constructor(readonly widget: WidgetType<any>, readonly side: number) {}
-  eq(other: LineWidget) {
-    return this.widget.compare(other.widget) && this.side == other.side
-  }
-  finish() {
-    this.dom = this.widget.toDOM()
-    this.dom.cmIgnore = true
-    return this
-  }
-}
-
-const none: any[] = []

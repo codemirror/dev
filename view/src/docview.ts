@@ -437,17 +437,7 @@ export class DocView extends ContentView {
     let result = [], {from, to} = this.viewport
     for (let pos = 0, i = 0; pos <= to && i < this.children.length; i++) {
       let child = this.children[i] as LineView
-      if (pos >= from) {
-        result.push(child.dom!.getBoundingClientRect().height)
-        let before = 0, after = 0
-        for (let w of child.widgets) {
-          let h = w.dom!.getBoundingClientRect().height
-          if (w.side > 0) after += h
-          else before += h
-        }
-        if (before) result.push(-2, before)
-        if (after) result.push(-1, after)
-      }
+      if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
       pos += child.length + 1
     }
     return result

@@ -273,6 +273,7 @@ describe("EditorView decoration", () => {
     })
   })
 
+  /*
   class LineWidget extends WidgetType<string> {
     toDOM() {
       let elt = document.createElement("hr")
@@ -333,4 +334,5 @@ describe("EditorView decoration", () => {
       widgets(cm, ["A"], [], ["C"])
     })
   })
+  */
 })

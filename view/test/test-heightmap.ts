@@ -60,6 +60,7 @@ describe("HeightMap", () => {
     ist(map.toString(), "line(20)")
   })
 
+  /*
   it("stores information about line widgets", () => {
     let text = doc(3, 3, 3), oracle = o(text)
     let map = mk(text, [Decoration.line(0, {widget: new MyWidget(10), side: -1}),
@@ -73,6 +74,7 @@ describe("HeightMap", () => {
     ist(map.toString(), "line(3:-2,10,-1,0) line(3:-1,40) line(3)")
     ist(map.height, 110)
   })
+  */
 
   it("joins ranges", () => {
     let text = doc(10, 10, 10, 10)

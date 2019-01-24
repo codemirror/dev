@@ -20,8 +20,6 @@ export interface WidgetDecorationSpec {
 
 export interface LineDecorationSpec {
   attributes?: {[key: string]: string}
-  widget?: WidgetType<any>
-  side?: number
 }
 
 export abstract class WidgetType<T> {
@@ -128,7 +126,7 @@ export class WidgetDecoration extends Decoration {
 
 export class LineDecoration extends Decoration {
   constructor(spec: LineDecorationSpec) {
-    super(-BIG_BIAS, spec.widget || null, spec)
+    super(-BIG_BIAS, null, spec)
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
@@ -143,7 +141,6 @@ export class LineDecoration extends Decoration {
   sameEffect(other: Decoration): boolean {
     return other instanceof LineDecoration &&
       attrsEq(this.spec.attributes, other.spec.attributes) &&
-      widgetsEq(this.widget, other.widget) &&
       this.side == other.side
   }
 
