@@ -54,24 +54,30 @@ export abstract class ContentView {
     return null
   }
 
-  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
-    return syncNodeInto(parent, pos, this.dom!)
-  }
-
-  syncDOMChildren() {
-    let parent = this.dom as HTMLElement, pos: Node | null = parent.firstChild
-    for (let view of this.children) pos = view.syncInto(parent, pos)
-    while (pos) pos = rm(pos)
-  }
-
   sync() {
-    if (this.dirty & dirty.node)
-      this.syncDOMChildren()
-    if (this.dirty & dirty.child)
-      for (let child of this.children)
-        if (child.dirty) child.sync()
-    this.dirty = dirty.not
+    if (this.dirty & dirty.node) {
+      let parent = this.dom as HTMLElement, pos: Node | null = parent.firstChild
+      for (let child of this.children) {
+        if (child.dirty) {
+          if (pos && !child.dom && !pos.cmView) {
+            let prev = pos.previousSibling
+            if (child.reuseDOM(pos)) pos = prev ? prev.nextSibling : parent.firstChild
+          }
+          child.sync()
+          child.dirty = dirty.not
+        }
+        pos = syncNodeInto(parent, pos, child.dom!)
+      }
+      while (pos) pos = rm(pos)
+    } else if (this.dirty & dirty.child) {
+      for (let child of this.children) if (child.dirty) {
+        child.sync()
+        child.dirty = dirty.not
+      }
+    }
   }
+
+  reuseDOM(dom: Node) { return false }
 
   domFromPos(pos: number): {node: Node, offset: number} | null { return null }
 
@@ -122,23 +128,25 @@ export abstract class ContentView {
   }
 
   // FIXME track precise dirty ranges, to avoid full DOM sync on every touched node?
-  markDirty() {
+  markDirty(andParent: boolean = false) {
     if (this.dirty & dirty.node) return
     this.dirty |= dirty.node
-    this.markParentsDirty()
+    this.markParentsDirty(andParent)
   }
 
-  markParentsDirty() {
+  markParentsDirty(childList: boolean) {
     for (let parent = this.parent; parent; parent = parent.parent) {
+      if (childList) parent.dirty |= dirty.node
       if (parent.dirty & dirty.child) return
       parent.dirty |= dirty.child
+      childList = false
     }
   }
 
   setParent(parent: ContentView) {
     if (this.parent != parent) {
       this.parent = parent
-      if (this.dirty) this.markParentsDirty()
+      if (this.dirty) this.markParentsDirty(true)
     }
   }
 
@@ -190,7 +198,7 @@ function rm(dom: Node): Node {
   return next!
 }
 
-export function syncNodeInto(parent: HTMLElement, pos: Node | null, dom: Node): Node | null {
+function syncNodeInto(parent: HTMLElement, pos: Node | null, dom: Node): Node | null {
   if (dom.parentNode == parent) {
     while (pos != dom) pos = rm(pos!)
     pos = dom.nextSibling
@@ -222,9 +230,11 @@ export class DocChildCursor extends ChildCursor {
     else super(children, pos, i)
   }
 
-  findPos(pos: number): this {
+  findPos(pos: number, bias: number = 1): this {
     for (;;) {
-      if (pos >= this.pos) {
+      if (pos >= this.pos || pos == this.pos &&
+          (bias > 0 || this.i == 0 ||
+           breakBetween(this.children[this.i - 1], this.children[this.i]))) {
         this.off = pos - this.pos
         return this
       }

@@ -1,22 +1,38 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration, BlockWidgetDecoration} from "./decoration"
-import {LineView} from "./lineview"
+import {LineView, BlockWidgetView} from "./lineview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
 
 export class ContentBuilder implements RangeIterator<Decoration> {
-  lines: LineView[]
+  content: (LineView | BlockWidgetView)[] = []
+  maybeLine = true
   cursor: TextIterator
   text: string = ""
   skip: number
   textOff: number = 0
-  lineStart: boolean
 
   constructor(private doc: Text, public pos: number) {
     this.cursor = doc.iter()
     this.skip = pos
-    this.lines = [new LineView]
-    this.lineStart = doc.lineAt(pos).start == pos
+  }
+
+  getLine() {
+    if (this.maybeLine) {
+      let line = new LineView
+      this.content.push(line)
+      this.maybeLine = false
+      return line
+    }
+    let last = this.content[this.content.length - 1]
+    // FIXME remove after testing
+    if (!(last instanceof LineView)) throw new Error("Invariant broken: got block widget where line was expected")
+    return last
+  }
+
+  finish() {
+    if (this.maybeLine) this.getLine()
+    return this.content
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null,
@@ -27,9 +43,9 @@ export class ContentBuilder implements RangeIterator<Decoration> {
         this.skip = 0
         if (done) throw new Error("Ran out of text content when drawing inline views")
         if (lineBreak) {
-          this.lines.push(new LineView)
-          this.lineStart = true
+          if (this.maybeLine) this.getLine()
           length--
+          this.maybeLine = true
           continue
         } else {
           this.text = value
@@ -37,8 +53,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
         }
       }
       let take = Math.min(this.text.length - this.textOff, length)
-      this.curLine.append(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
-      this.lineStart = false
+      this.getLine().append(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
       length -= take
       this.textOff += take
     }
@@ -72,13 +87,17 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   advanceCollapsed(pos: number, deco: Decoration) {
     if (pos <= this.pos) return
 
-    let line = this.curLine
-    let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
-    if (line.children.length && line.children[line.children.length - 1].merge(widgetView))
-      line.length += widgetView.length
-    else
-      line.append(widgetView)
-    if (widgetView.length) this.lineStart = false
+    if (deco instanceof BlockWidgetDecoration) {
+      this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.bias, true))
+      this.maybeLine = false
+    } else {
+      let line = this.getLine()
+      let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
+      if (line.children.length && line.children[line.children.length - 1].merge(widgetView))
+        line.length += widgetView.length
+      else
+        line.append(widgetView)
+    }
 
     // Advance the iterator past the collapsed content
     let length = pos - this.pos
@@ -89,32 +108,31 @@ export class ContentBuilder implements RangeIterator<Decoration> {
       this.text = ""
       this.textOff = 0
     }
-
     this.pos = pos
   }
 
   point(deco: Decoration) {
     if (deco instanceof WidgetDecoration) {
-      this.curLine.append(new WidgetView(0, deco.widget, deco.bias))
+      this.getLine().append(new WidgetView(0, deco.widget, deco.bias))
     } else if (deco instanceof LineDecoration) {
-      if (this.lineStart) this.curLine.addLineDeco(deco as LineDecoration)
+      if (this.doc.lineAt(this.pos).start == this.pos)
+        this.getLine().addLineDeco(deco as LineDecoration)
     } else if (deco instanceof BlockWidgetDecoration) {
-      // FIXME
-      if (deco.bias < 0 && this.lineStart)
-      {} // this.lines.splice(this.lines.length - 1, 0, new BlockWidgetView(deco.widget))
-      else if (deco.bias > 0 && this.doc.lineAt(this.pos).end == this.pos)
-      {} // this.lines.push(new BlockWidgetView(deco.widget))
+      if (deco.bias < 0 ? this.maybeLine : this.doc.lineAt(this.pos).end == this.pos)
+        this.content.push(new BlockWidgetView(deco.widget!, 0, deco.bias, false))
     }
   }
 
-  get curLine() { return this.lines[this.lines.length - 1] }
+  ignoreRange(deco: Decoration, to: number): boolean {
+    return deco instanceof BlockWidgetDecoration &&
+      (!this.maybeLine || this.doc.lineAt(to).end != to)
+  }
 
-  ignoreRange(deco: RangeDecoration): boolean { return false }
   ignorePoint(deco: Decoration): boolean { return false }
 
-  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): LineView[] {
+  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): (LineView | BlockWidgetView)[] {
     let builder = new ContentBuilder(text, from)
     RangeSet.iterateSpans(decorations, from, to, builder)
-    return builder.lines
+    return builder.finish()
   }
 }

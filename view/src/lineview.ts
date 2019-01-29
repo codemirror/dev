@@ -1,7 +1,8 @@
-import {ContentView, ChildCursor, syncNodeInto} from "./contentview"
+import {ContentView} from "./contentview"
+import {DocView} from "./docview"
 import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {LineDecoration} from "./decoration"
+import {LineDecoration, WidgetType} from "./decoration"
 import {combineAttrs, attrsEq, updateAttrs} from "./attributes"
 
 export class LineView extends ContentView {
@@ -135,25 +136,22 @@ export class LineView extends ContentView {
     return {node: this.dom!, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
   }
 
-  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
-    if (!this.dom) {
-      this.setDOM(document.createElement("div"))
-      this.dom!.className = "codemirror-line"
-      if (this.attrs) this.prevAttrs = null
-    }
-    return syncNodeInto(parent, pos, this.dom!)
-  }
-
+  
   // FIXME might need another hack to work around Firefox's behavior
   // of not actually displaying the cursor even though it's there in
   // the DOM
   sync() {
-    super.sync()
+    if (!this.dom) {
+      this.setDOM(document.createElement("div"))
+      this.dom!.className = "codemirror-line"
+      this.prevAttrs = this.attrs ? null : undefined
+    }
     if (this.prevAttrs !== undefined) {
       updateAttrs(this.dom!, this.prevAttrs, this.attrs)
       this.dom!.classList.add("codemirror-line")
       this.prevAttrs = undefined
     }
+    super.sync()
     let last = this.dom!.lastChild
     if (!last || last.nodeName == "BR") {
       let hack = document.createElement("BR")
@@ -196,4 +194,44 @@ export class LineView extends ContentView {
 
   get breakAfter() { return true }
   get breakBefore() { return true }
+
+  match(other: ContentView) { return false }
+}
+
+const none = [] as any
+
+export class BlockWidgetView extends ContentView {
+  dom!: HTMLElement | null
+  parent!: DocView | null
+
+  constructor(public widget: WidgetType, public length: number, public side: number, public range: boolean) { super() }
+
+  get children() { return none }
+
+  sync() {
+    if (!this.dom || !this.widget.updateDOM(this.dom)) {
+      this.setDOM(this.widget.toDOM())
+      this.dom!.contentEditable = "false"
+    }
+  }
+
+  get overrideDOMText() {
+    return this.parent ? this.parent!.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
+  }
+
+  domBoundsAround() { return null }
+
+  get breakBefore() { return this.range || this.side < 0 }
+  get breakAfter() { return this.range || this.side > 0 }
+
+  match(other: ContentView) {
+    if (other instanceof BlockWidgetView && other.range == this.range && other.side == this.side &&
+        other.widget.constructor == this.widget.constructor) {
+      if (!other.widget.eq(this.widget.value)) this.markDirty(true)
+      this.widget = other.widget
+      this.length = other.length
+      return true
+    }
+    return false
+  }
 }

@@ -1,5 +1,5 @@
-import {ContentView, dirty} from "./contentview"
-import {WidgetType, widgetsEq} from "./decoration"
+import {ContentView} from "./contentview"
+import {WidgetType} from "./decoration"
 import {attrsEq} from "./attributes"
 import {LineView} from "./lineview"
 import {Text} from "../../doc/src"
@@ -41,36 +41,38 @@ export class TextView extends InlineView {
     this.class = clss
   }
 
-  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
-    if (!this.dom) {
-      let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
-      if (!tagName && pos && pos.nodeType == 3 && !nodeAlreadyInTree(this, pos)) this.textDOM = pos
-      else this.textDOM = document.createTextNode(this.text)
-      if (tagName) {
-        let dom = document.createElement(tagName)
-        dom.appendChild(this.textDOM)
-        if (this.class) dom.className = this.class
-        if (this.attrs) for (let name in this.attrs) dom.setAttribute(name, this.attrs[name])
-        this.setDOM(dom)
-      } else {
-        this.setDOM(this.textDOM)
-      }
-    }
-    return super.syncInto(parent, pos)
-  }
-
   get length() { return this.text.length }
 
+  createDOM(textDOM?: Node) {
+    let tagName = this.tagName || (this.attrs || this.class ? "span" : null)
+    this.textDOM = textDOM || document.createTextNode(this.text)
+    if (tagName) {
+      let dom = document.createElement(tagName)
+      dom.appendChild(this.textDOM)
+      if (this.class) dom.className = this.class
+      if (this.attrs) for (let name in this.attrs) dom.setAttribute(name, this.attrs[name])
+      this.setDOM(dom)
+    } else {
+      this.setDOM(this.textDOM)
+    }
+  }
+
   sync() {
-    if (this.dirty & dirty.node) {
-      if (this.textDOM!.nodeValue != this.text) this.textDOM!.nodeValue = this.text
+    if (!this.dom) this.createDOM()
+    if (this.textDOM!.nodeValue != this.text) {
+      this.textDOM!.nodeValue = this.text
       let dom = this.dom!
       if (this.textDOM != dom && (this.dom!.firstChild != this.textDOM || dom.lastChild != this.textDOM)) {
         while (dom.firstChild) dom.removeChild(dom.firstChild)
         dom.appendChild(this.textDOM!)
       }
     }
-    this.dirty = dirty.not
+  }
+
+  reuseDOM(dom: Node) {
+    if (dom.nodeType != 3) return false
+    this.createDOM(dom)
+    return true
   }
 
   merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
@@ -136,22 +138,19 @@ function textCoords(text: Node, pos: number): Rect {
 export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
-  constructor(public length: number, readonly widget: WidgetType | null, readonly side: number) {
+  constructor(public length: number, public widget: WidgetType | null, readonly side: number) {
     super()
-  }
-
-  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
-    if (!this.dom) {
-      this.setDOM(this.widget ? this.widget.toDOM() : document.createElement("span"))
-      this.dom!.contentEditable = "false"
-    }
-    return super.syncInto(parent, pos)
   }
 
   cut(from: number, to: number = this.length) { this.length -= to - from }
   slice(from: number, to: number = this.length) { return new WidgetView(to - from, this.widget, this.side) }
 
-  sync() { this.dirty = dirty.not }
+  sync() {
+    if (!this.dom || (this.widget && !this.widget.updateDOM(this.dom))) {
+      this.setDOM(this.widget ? this.widget.toDOM() : document.createElement("span"))
+      this.dom!.contentEditable = "false"
+    }
+  }
 
   getSide() { return this.side }
 
@@ -162,8 +161,15 @@ export class WidgetView extends InlineView {
   }
 
   match(other: InlineView): boolean {
-    return other.length == this.length && other instanceof WidgetView &&
-      widgetsEq(this.widget, other.widget)
+    if (other.length == this.length && other instanceof WidgetView && other.side == this.side) {
+      if (!this.widget && !other.widget) return true
+      if (this.widget && other.widget && this.widget.constructor == other.widget.constructor) {
+        if (!this.widget.eq(other.widget.value)) this.markDirty(true)
+        this.widget = other.widget
+        return true
+      }
+    }
+    return false
   }
 
   ignoreMutation(): boolean { return true }
@@ -222,9 +228,4 @@ export class CompositionView extends InlineView {
   }
 
   coordsAt(pos: number): Rect { return textCoords(this.textDOM, pos) }
-}
-
-function nodeAlreadyInTree(view: ContentView, node: Node): boolean {
-  let v = node.cmView
-  return v ? v.rootView == view.rootView : false
 }

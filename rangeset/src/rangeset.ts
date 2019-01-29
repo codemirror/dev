@@ -18,7 +18,7 @@ export interface RangeIterator<T extends RangeValue> {
   advance(pos: number, active: A<T>): void
   advanceCollapsed(pos: number, value: T): void
   point(value: T): void
-  ignoreRange(value: T): boolean
+  ignoreRange(value: T, to: number): boolean
   ignorePoint(value: T): boolean
 }
 
@@ -299,7 +299,7 @@ export class RangeSet<T extends RangeValue> {
         if (range.from + next.offset > to) break
 
         if (range.to + next.offset >= from) {
-          if (range.from < range.to && !iterator.ignoreRange(range.value)) {
+          if (range.from < range.to && !iterator.ignoreRange(range.value, range.to)) {
             range = range.move(next.offset)
 
             iterator.advance(range.from, active)

@@ -89,6 +89,9 @@ describe("EditorView drawing", () => {
     ist(cm.contentDOM.childNodes.length, 500, "<")
     ist(cm.contentDOM.scrollHeight, 10000, ">")
     ist(!cm.contentDOM.textContent!.match(/b/))
+    let gap = cm.contentDOM.lastChild
+    cm.dispatch(cm.state.transaction.replace(2000, 2000, "\n\n"))
+    ist(cm.contentDOM.lastChild, gap) // Make sure gap nodes are reused when resized
     cm.dom.scrollTop = cm.dom.scrollHeight / 2
     cm.docView.checkLayout()
     ist(cm.contentDOM.textContent!.match(/b/))

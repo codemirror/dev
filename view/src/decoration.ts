@@ -1,6 +1,5 @@
 import {ChangeSet, ChangedRange} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
-import {Text} from "../../doc/src/"
 import {attrsEq} from "./attributes"
 
 export interface RangeDecorationSpec {
@@ -35,6 +34,7 @@ export abstract class WidgetType<T = any> {
   constructor(readonly value: T) {}
   abstract toDOM(): HTMLElement;
   eq(value: T): boolean { return this.value === value }
+  updateDOM(dom: HTMLElement): boolean { return false }
 
   /** @internal */
   compare(other: WidgetType): boolean {
@@ -264,9 +264,9 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 }
 
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, docA: Text): Changes {
+export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, lengthA: number): Changes {
   let comp = new DecorationComparator()
-  a.compare(b, diff, comp, docA.length)
+  a.compare(b, diff, comp, lengthA)
   return comp.changes
 }
 

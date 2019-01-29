@@ -1,10 +1,9 @@
 import {ContentView, ChildCursor, DocChildCursor, dirty, breakBetween} from "./contentview"
-import {LineView} from "./lineview"
+import {LineView, BlockWidgetView} from "./lineview"
 import {TextView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
-import {Text} from "../../doc/src"
 import {DOMObserver} from "./domobserver"
 import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
@@ -20,10 +19,11 @@ const none = [] as any
 const enum Composing { no, starting, yes, ending }
 
 export class DocView extends ContentView {
-  children: (LineView | BlockWidgetView)[] = []
+  children!: (LineView | BlockWidgetView)[]
   viewports: Viewport[] = none
 
   decorations!: A<DecorationSet>
+  gapDeco: DecorationSet = Decoration.none
   selectionDirty: any = null
 
   observer: DOMObserver
@@ -65,7 +65,8 @@ export class DocView extends ContentView {
   init(state: EditorState) {
     let changedRanges = [new ChangedRange(0, 0, 0, state.doc.length)]
     this.heightMap = HeightMap.empty().applyChanges(none, this.heightOracle.setDoc(state.doc), changedRanges)
-    this.children = []
+    this.children = [new LineView]
+    this.children[0].setParent(this)
     this.viewports = this.decorations = none
     let contentChanges = this.computeUpdate(none, state, none, changedRanges, 0, -1)
     this.updateInner(contentChanges, 0)
@@ -150,7 +151,7 @@ export class DocView extends ContentView {
       }
     }
 
-    this.updateParts(changes, viewports, compositionRange, oldLength)
+    this.updateChildren(changes, viewports, compositionRange, oldLength)
 
     this.viewports = viewports
     this.observer.ignore(() => {
@@ -160,6 +161,7 @@ export class DocView extends ContentView {
       // recompute the scroll position without a layout)
       this.dom.style.height = this.heightMap.height + "px"
       this.sync()
+      this.dirty = dirty.not
       this.updateSelection()
       this.dom.style.height = ""
     })
@@ -167,102 +169,68 @@ export class DocView extends ContentView {
     if (this.composition && this.composition.rootView != this) this.composition = null
   }
 
-  private updateParts(changes: A<ChangedRange>, viewports: A<Viewport>, compositionRange: ChangedRange | null,
-                      oldLength: number) {
-    let redraw = rangesToUpdate(this.viewports, viewports, changes, this.length)
-    if (compositionRange) compositionRange.subtractFromSet(redraw)
-    let cursor = this.childCursor(oldLength)
-    for (let i = redraw.length - 1, posA = this.length;; i--) {
-      let next = i < 0 ? null : redraw[i], nextA = next ? next.toA : 0
-      if (compositionRange && compositionRange.fromA <= posA && compositionRange.toA >= nextA) {
+  private updateChildren(changes: A<ChangedRange>, viewports: A<Viewport>, compositionRange: ChangedRange | null, oldLength: number) {
+    if (compositionRange) changes = compositionRange.subtractFromSet(changes.slice())
+
+    let gapDeco = this.computeGapDeco(viewports, this.length)
+    let gapChanges = findChangedRanges(this.gapDeco, gapDeco, changes, oldLength) // FIXME pass original, possibly simpler changes?
+    this.gapDeco = gapDeco
+    changes = extendWithRanges(changes, gapChanges.content)
+
+    let allDeco = [gapDeco].concat(this.decorations)
+    let cursor = this.childCursor(oldLength), updatedComposition = false
+    for (let i = changes.length - 1;; i--) {
+      let next = i >= 0 ? changes[i] : null, nextA = next ? next.toA : 0
+      if (compositionRange && !updatedComposition && nextA <= compositionRange.fromA) {
         cursor.findPos(nextA) // Must move cursor past the stuff we modify
         this.composition!.updateLength(compositionRange.toB - compositionRange.fromB)
+        updatedComposition = true
       }
       if (!next) break
       let {fromA, toA, fromB, toB} = next
-      posA = fromA
-      if (fromA == toA && fromB == toB && !changes.some(ch => fromB <= ch.toB && toB >= ch.fromB))
-        continue
-
-      let fromI, fromOff, toI: number, toOff
-      if (toA == oldLength) { toI = this.children.length; toOff = -1 }
-      else ({i: toI, off: toOff} = cursor.findPos(toA))
-      if (fromA == 0) { fromI = 0; fromOff = -1 }
-      else ({i: fromI, off: fromOff} = cursor.findPos(fromA))
-      let searchGap = fromI, content = this.contentBetween(fromB, toB, viewports, (from, to) => {
-        let height = this.heightAt(to, 1) - this.heightAt(from, -1)
-        while (searchGap < toI) {
-          let ch = this.children[searchGap++]
-          if (ch instanceof GapView) return ch.update(to - from, height)
-        }
-        return new GapView(to - from, height)
-      })
-      // If the range starts at the start of the document but both
-      // the current content and the new content start with a line
-      // view, reuse that to avoid a needless DOM reset.
-      if (fromOff == -1 && this.children[fromI] instanceof LineView && content[0] instanceof LineView)
-        fromOff = 0
-      if (toOff == -1 && toI > 0 && this.children[toI - 1] instanceof LineView &&
+      let content = ContentBuilder.build(this.state.doc, fromB, toB, allDeco)
+      let {i: toI, off: toOff} = cursor.findPos(toA, 1) // FIXME add support for bias
+      let {i: fromI, off: fromOff} = cursor.findPos(fromA, -1)
+      if (compositionRange && toI != fromI && this.composition!.parent == this.children[toI] &&
           content[content.length - 1] instanceof LineView)
-        toOff = this.children[--toI].length
-      if (compositionRange && toOff > -1 && this.composition!.parent == this.children[toI])
         (this.children[toI] as LineView).transferDOM(content[content.length - 1] as LineView)
       this.replaceRange(fromI, fromOff, toI, toOff, content)
     }
   }
 
-  private contentBetween(from: number, to: number, viewports: A<Viewport>,
-                         mkGap: (from: number, to: number) => GapView): (GapView | LineView)[] {
-    let result: (GapView | LineView)[] = []
-    for (let i = 0, pos = 0; pos <= to; i++) {
-      let next = i < viewports.length ? viewports[i] : null
-      let start = next ? next.from : this.length
-      if (pos < to && start > from)
-        // Gap are always entirely in range because of the way this is
-        // called (between unchanged slices of text)
-        result.push(mkGap(pos + (i > 0 ? 1 : 0), start - (next ? 1 : 0)))
-      if (!next) break
-      let vpFrom = Math.max(from, next.from), vpTo = Math.min(to, next.to)
-      if (vpFrom <= vpTo) {
-        let content = ContentBuilder.build(this.state.doc, vpFrom, vpTo, this.decorations)
-        if (result.length == 0) result = content
-        else for (let line of content) result.push(line)
-      }
-      pos = next.to
-    }
-    return result
-  }
-
-  // Update a range by replacing it with new content. The caller is
-  // responsible for making sure that the inserted content 'fits'—that
-  // nodes on the sides match the type (gap or line) of the existing
-  // nodes there.
-  // When *Off is -1, that means "this points at the position before
-  // *I, not actually into an existing node"
   private replaceRange(fromI: number, fromOff: number, toI: number, toOff: number,
-                       content: (GapView | LineView)[]) {
-    let start = fromOff > -1 ? this.children[fromI] as LineView : null
-    if (start && fromI == toI && content.length == 1) { // Change within single child
-      start.merge(fromOff, toOff, content[0] as LineView, fromOff == 0, this.composition)
-    } else {
-      let end = toOff > -1 ? this.children[toI] as LineView : null
-      if (end) {
-        let cLast = content[content.length - 1] as LineView, endPart = end
-        if (toOff > 0 || fromI == toI) {
-          endPart = end.split(toOff)
-          if (fromI != toI) end.transferDOM(endPart)
-        }
-        cLast.merge(cLast.length, cLast.length, endPart, false, this.composition)
-        toI++
-      }
-      if (start) {
-        start.merge(fromOff, start.length, content[0] as LineView, fromOff == 0, this.composition)
-        fromI++
-        content.shift()
-      }
-      if (fromI < toI || content.length)
-        this.replaceChildren(fromI, toI, content)
+                       content: (BlockWidgetView | LineView)[]) {
+    let before = this.children[fromI]
+    if (fromI == toI && before instanceof LineView &&
+        content.length == 1 && content[0] instanceof LineView) { // Change within single line
+      before.merge(fromOff, toOff, content[0] as LineView, fromOff == 0, this.composition)
+      return
     }
+
+    let after = this.children[toI], last
+    if (after instanceof LineView && content.length && (last = content[content.length - 1]) instanceof LineView) {
+      let part = after
+      if (toOff > 0 || fromI == toI) {
+        part = after.split(toOff)
+        if (fromI != toI) after.transferDOM(part)
+      }
+      last.merge(last.length, last.length, part, false, this.composition)
+    }
+    toI++
+    if (before instanceof LineView && content[0] instanceof LineView) {
+      before.merge(fromOff, before.length, content.shift() as LineView, fromOff == 0, this.composition)
+      fromI++
+    }
+    // Try to merge widgets on the boundaries of the replacement
+    while (fromI < toI && content.length) {
+      if (this.children[toI - 1].match(content[content.length - 1]))
+        toI--, content.pop()
+      else if (this.children[fromI].match(content[0]))
+        fromI++, content.shift()
+      else
+        break
+    }
+    if (fromI < toI || content.length) this.replaceChildren(fromI, toI, content)
   }
 
   // Sync the DOM selection to this.state.selection
@@ -271,6 +239,7 @@ export class DocView extends ContentView {
     if (!takeFocus && this.root.activeElement != this.dom) return
 
     let primary = this.state.selection.primary
+    // FIXME need to handle the case where the selection falls inside a block range
     let anchor = this.domFromPos(primary.anchor)!
     let head = this.domFromPos(primary.head)!
 
@@ -333,7 +302,7 @@ export class DocView extends ContentView {
         return contentChanges
       // Compare the decorations (between document changes)
       let {content, height} = decoChanges(transactions.length ? contentChanges : none, decorations,
-                                          this.decorations, prevState.doc)
+                                          this.decorations, prevState.doc.length)
       this.decorations = decorations
       // Update the heightmap with these changes. If this is the first
       // iteration and the document changed, also include decorations
@@ -428,12 +397,16 @@ export class DocView extends ContentView {
 
   domFromPos(pos: number): {node: Node, offset: number} | null {
     let {i, off} = this.childCursor().findPos(pos)
-    return this.children[i].domFromPos(off)
+    for (;; i--) {
+      let child = this.children[i]
+      if (child instanceof LineView) return child.domFromPos(off)
+      if (child.range || i == 0) return null
+    }
   }
 
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.viewport
-    for (let pos = 0, i = 0, prev = null; pos <= to && i < this.children.length; i++) {
+    for (let pos = 0, i = 0, prev = null; pos < to && i < this.children.length; i++) {
       let child = this.children[i] as LineView
       pos += breakBetween(prev, child)
       if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
@@ -575,34 +548,21 @@ export class DocView extends ContentView {
   childCursor(pos: number = this.length, i: number = this.children.length): ChildCursor {
     return new DocChildCursor(this.children, pos, i)
   }
-}
 
-export class BlockWidgetView extends ContentView {
-  dom!: HTMLElement | null
-  parent!: DocView | null
-
-  constructor(public widget: WidgetType, public length: number, public side: number) { super() }
-
-  get children() { return none }
-
-  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
-    if (!this.dom) {
-      this.setDOM(this.widget.toDOM())
-      this.dom!.contentEditable = "false"
+  computeGapDeco(viewports: A<Viewport>, docLength: number): DecorationSet {
+    let deco = []
+    for (let pos = 0, i = 0;; i++) {
+      let next = i == viewports.length ? null : viewports[i]
+      let end = next ? next.from - 1 : docLength
+      if (end > pos) {
+        let height = this.heightAt(end, 1) - this.heightAt(pos, -1)
+        deco.push(Decoration.blockRange(pos, end, {widget: new GapWidget(height)}))
+      }
+      if (!next) break
+      pos = next.to + 1
     }
-    return super.syncInto(parent, pos)
+    return Decoration.set(deco)
   }
-
-  sync() { this.dirty = dirty.not }
-
-  get overrideDOMText() {
-    return this.parent ? this.parent!.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
-  }
-
-  domBoundsAround() { return null }
-
-  get breakBefore() { return this.length > 0 || this.side < 0 }
-  get breakAfter() { return this.length > 0 || this.side > 0 }
 }
 
 // Browsers appear to reserve a fixed amount of bits for height
@@ -611,65 +571,37 @@ export class BlockWidgetView extends ContentView {
 // that.
 const MAX_NODE_HEIGHT = 1e7
 
-export class GapView extends ContentView {
-  dom!: HTMLElement | null
-  parent!: DocView | null
-
-  constructor(public length: number, public height: number) { super() }
-
-  get children() { return none }
-
-  update(length: number, height: number) {
-    this.length = length
-    if (this.height != height) {
-      this.height = height
-      this.markDirty()
-    }
-    return this
+class GapWidget extends WidgetType<number> {
+  toDOM() {
+    let elt = document.createElement("div")
+    this.updateDOM(elt)
+    return elt
   }
 
-  syncInto(parent: HTMLElement, pos: Node | null): Node | null {
-    if (!this.dom) {
-      this.setDOM(document.createElement("div"))
-      this.dom!.contentEditable = "false"
-    }
-    return super.syncInto(parent, pos)
-  }
-
-  sync() {
-    if (this.dirty) {
-      if (this.height < MAX_NODE_HEIGHT) {
-        this.dom!.style.height = this.height + "px"
-        while (this.dom!.firstChild) (this.dom!.firstChild as HTMLElement).remove()
-      } else {
-        this.dom!.style.height = ""
-        while (this.dom!.firstChild) (this.dom!.firstChild as HTMLElement).remove()
-        for (let remaining = this.height; remaining > 0; remaining -= MAX_NODE_HEIGHT) {
-          let elt = this.dom!.appendChild(document.createElement("div"))
-          elt.style.height = Math.min(remaining, MAX_NODE_HEIGHT) + "px"
-        }
+  updateDOM(elt: HTMLElement) {
+    if (this.value < MAX_NODE_HEIGHT) {
+      while (elt.lastChild) elt.lastChild.remove()
+      elt.style.height = this.value + "px"
+    } else {
+      elt.style.height = ""
+      for (let remaining = this.value; remaining > 0; remaining -= MAX_NODE_HEIGHT) {
+        let fill = elt.appendChild(document.createElement("div"))
+        fill.style.height = Math.min(remaining, MAX_NODE_HEIGHT) + "px"
       }
-      this.dirty = dirty.not
     }
+    return true
   }
 
-  get overrideDOMText() {
-    return this.parent ? this.parent!.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
-  }
-
-  domBoundsAround() { return null }
-
-  get breakAfter() { return true }
-  get breakBefore() { return true }
+  get estimatedHeight() { return this.value }
 }
 
 function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
-                     oldDecorations: A<DecorationSet>, oldDoc: Text): {content: number[], height: number[]} {
+                     oldDecorations: A<DecorationSet>, oldLength: number): {content: number[], height: number[]} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let i = decorations.length - 1; i >= 0; i--) {
     let deco = decorations[i], oldDeco = i < oldDecorations.length ? oldDecorations[i] : Decoration.none
     if (deco.size == 0 && oldDeco.size == 0) continue
-    let newRanges = findChangedRanges(oldDeco, deco, diff, oldDoc)
+    let newRanges = findChangedRanges(oldDeco, deco, diff, oldLength)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
   }
@@ -677,6 +609,7 @@ function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
 }
 
 function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRange> {
+  if (ranges.length == 0) return diff
   let result: ChangedRange[] = []
   for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
     let next = dI == diff.length ? null : diff[dI], off = posA - posB
@@ -698,34 +631,4 @@ function sameArray<T>(a: A<T>, b: A<T>) {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
-}
-
-function nextRange(viewports: A<Viewport>, pos: number): [boolean, number] {
-  for (let i = 0; i < viewports.length; i++) {
-    let {from, to} = viewports[i]
-    if (from > pos) return [false, from]
-    if (to > pos) return [true, to]
-  }
-  return [false, 2e9]
-}
-
-// Grows a set of ranges to include anything that wasn't drawn (as
-// lines) in both the old and new viewports.
-function rangesToUpdate(vpA: A<Viewport>, vpB: A<Viewport>, changes: A<ChangedRange>,
-                        lenB: number): ChangedRange[]  {
-  for (let i = 0, posA = 0, posB = 0, found: ChangedRange[] = [];; i++) {
-    let change = i < changes.length ? changes[i] : null
-    let nextB = change ? change.fromB : lenB
-    // Unchanged range posB to nextB
-    while (posB < nextB) {
-      let [insideA, toA] = nextRange(vpA, posA), [insideB, toB] = nextRange(vpB, posB)
-      let newB = Math.min(nextB, posB + (toA - posA), toB), newA = posA + (newB - posB)
-      if (!insideA || !insideB) new ChangedRange(posA, newA, posB, newB).addToSet(found)
-      posA = newA; posB = newB
-    }
-
-    if (!change) return found
-    change.addToSet(found)
-    posA = change.toA; posB = change.toB
-  }
 }

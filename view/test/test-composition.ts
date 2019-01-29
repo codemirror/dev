@@ -24,6 +24,7 @@ function compose(cm: EditorView, start: () => Text,
     else update[i](node)
     let {focusNode, focusOffset} = sel
     cm.docView.observer.flush()
+
     if (options.cancel && i == update.length - 1) {
       ist(!cm.docView.composition)
       ist(!hasCompositionNode(cm.docView))
@@ -247,17 +248,18 @@ describe("Composition", () => {
     cm.docView.observer.flush()
     event(cm, "compositionend")
     one.nodeValue = "one!!"
-    let two = cm.domAtPos(7)!.node as Text
-    up(two, ".")
+    let L2 = cm.contentDOM.lastChild
     event(cm, "compositionstart")
+    let two = cm.domAtPos(7)!.node as Text
+    ist(cm.contentDOM.lastChild, L2)
     up(two, ".")
     cm.docView.observer.flush()
-    ist(getSelection().focusNode, two)
-    ist(getSelection().focusOffset, 5)
     ist(hasCompositionNode(cm.docView))
+    ist(getSelection().focusNode, two)
+    ist(getSelection().focusOffset, 4)
     ist(cm.docView.composition)
     event(cm, "compositionend")
     cm.docView.observer.flush()
-    ist(cm.state.doc.toString(), "one!!\ntwo..")
+    ist(cm.state.doc.toString(), "one!!\ntwo.")
   })
 })
