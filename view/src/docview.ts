@@ -191,7 +191,7 @@ export class DocView extends ContentView {
       let content = ContentBuilder.build(this.state.doc, fromB, toB, allDeco)
       let {i: toI, off: toOff} = cursor.findPos(toA, 1) // FIXME add support for bias
       let {i: fromI, off: fromOff} = cursor.findPos(fromA, -1)
-      if (compositionRange && toI != fromI && this.composition!.parent == this.children[toI] &&
+      if (compositionRange && this.composition!.parent == this.children[toI] &&
           content[content.length - 1] instanceof LineView)
         (this.children[toI] as LineView).transferDOM(content[content.length - 1] as LineView)
       this.replaceRange(fromI, fromOff, toI, toOff, content)
@@ -215,10 +215,15 @@ export class DocView extends ContentView {
         if (fromI != toI) after.transferDOM(part)
       }
       last.merge(last.length, last.length, part, false, this.composition)
+    } else if (toOff < after.length) {
+      content.push((after as LineView).split(toOff))
     }
     toI++
-    if (before instanceof LineView && content[0] instanceof LineView) {
+    if (before instanceof LineView && content.length && content[0] instanceof LineView) {
       before.merge(fromOff, before.length, content.shift() as LineView, fromOff == 0, this.composition)
+      fromI++
+    } else if (fromOff) {
+      ;(before as LineView).merge(fromOff, before.length, new LineView, false, this.composition)
       fromI++
     }
     // Try to merge widgets on the boundaries of the replacement

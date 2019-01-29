@@ -85,12 +85,11 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   }
 
   advanceCollapsed(pos: number, deco: Decoration) {
-    if (pos <= this.pos) return
-
     if (deco instanceof BlockWidgetDecoration) {
-      this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.bias, true))
       this.maybeLine = false
-    } else {
+      if (pos > this.pos)
+        this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.bias, true))
+    } else if (pos > this.pos) {
       let line = this.getLine()
       let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
       if (line.children.length && line.children[line.children.length - 1].merge(widgetView))
@@ -118,8 +117,10 @@ export class ContentBuilder implements RangeIterator<Decoration> {
       if (this.doc.lineAt(this.pos).start == this.pos)
         this.getLine().addLineDeco(deco as LineDecoration)
     } else if (deco instanceof BlockWidgetDecoration) {
-      if (deco.bias < 0 ? this.maybeLine : this.doc.lineAt(this.pos).end == this.pos)
+      if (deco.bias < 0 ? this.maybeLine : this.doc.lineAt(this.pos).end == this.pos) {
+        if (deco.bias > 0 && this.maybeLine) this.getLine()
         this.content.push(new BlockWidgetView(deco.widget!, 0, deco.bias, false))
+      }
     }
   }
 

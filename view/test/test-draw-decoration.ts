@@ -273,8 +273,7 @@ describe("EditorView decoration", () => {
     })
   })
 
-  /*
-  class LineWidget extends WidgetType<string> {
+  class BlockWidget extends WidgetType<string> {
     toDOM() {
       let elt = document.createElement("hr")
       elt.setAttribute("data-name", this.value)
@@ -282,8 +281,8 @@ describe("EditorView decoration", () => {
     }
   }
 
-  function lw(pos: number, side = 0, name = "n") {
-    return Decoration.line(pos, {widget: new LineWidget(name), side})
+  function bw(pos: number, side = -1, name = "n") {
+    return Decoration.blockWidget(pos, {widget: new BlockWidget(name), side})
   }
 
   function widgets(cm: EditorView, ...groups: string[][]) {
@@ -295,31 +294,35 @@ describe("EditorView decoration", () => {
     ist(JSON.stringify(found), JSON.stringify(groups))
   }
 
-  describe("line widgets", () => {
-    it("draws line widgets in the right place", () => {
-      let cm = decoEditor("foo\nbar", [lw(0, 0, "A"), lw(0, 2, "C"), lw(0, 1, "B"), lw(4, -2, "D"), lw(4, -1, "E"), lw(4, 1, "F")])
+  describe("block widgets", () => {
+    it("draws block widgets in the right place", () => {
+      let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(3, 2, "C"), bw(3, 1, "B"), bw(4, -2, "D"), bw(4, -1, "E"), bw(7, 1, "F")])
       widgets(cm, ["A"], ["B", "C", "D", "E"], ["F"])
     })
 
     it("adds widgets when they appear", () => {
-      let cm = decoEditor("foo\nbar", [lw(4, 1, "Y")])
-      cm.dispatch(cm.state.transaction.addMeta(addDeco([lw(0, -1, "X"), lw(4, 2, "Z")])))
+      let cm = decoEditor("foo\nbar", [bw(7, 1, "Y")])
+      cm.dispatch(cm.state.transaction.addMeta(addDeco([bw(0, -1, "X"), bw(7, 2, "Z")])))
       widgets(cm, ["X"], [], ["Y", "Z"])
     })
 
     it("removes widgets when they vanish", () => {
-      let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(0, 1, "B"), lw(4, -1, "C"), lw(4, 1, "D")])
+      let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(3, 1, "B"), bw(4, -1, "C"), bw(7, 1, "D")])
       widgets(cm, ["A"], ["B", "C"], ["D"])
-      cm.dispatch(cm.state.transaction.addMeta(filterDeco((_f: number, _t: number, deco: any) => deco.side < 0)))
+      cm.dispatch(cm.state.transaction.addMeta(filterDeco((_f: number, _t: number, deco: any) => deco.spec.side < 0)))
       widgets(cm, ["A"], ["C"], [])
     })
 
+    // FIXME add widgets at end of doc, start of doc, end/start of lines inside doc
+    // block ranges
+    // widgets around block ranges
+
     it("doesn't redraw unchanged widgets", () => {
-      let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(4, 1, "B")])
+      let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(7, 1, "B")])
       let ws = cm.contentDOM.querySelectorAll("hr")
       cm.dispatch(cm.state.transaction
-                  .addMeta(filterDeco((_f: number, _t: number, deco: any) => deco.side < 0))
-                  .addMeta(addDeco([lw(4, 1, "B")])))
+                  .addMeta(filterDeco((_f: number, _t: number, deco: any) => deco.spec.side < 0))
+                  .addMeta(addDeco([bw(7, 1, "B")])))
       widgets(cm, ["A"], [], ["B"])
       let newWs = cm.contentDOM.querySelectorAll("hr")
       ist(newWs[0], ws[0])
@@ -327,12 +330,11 @@ describe("EditorView decoration", () => {
     })
 
     it("does redraw changed widgets", () => {
-      let cm = decoEditor("foo\nbar", [lw(0, -1, "A"), lw(4, 1, "B")])
+      let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(7, 1, "B")])
       cm.dispatch(cm.state.transaction
-                  .addMeta(filterDeco((_f: number, _t: number, deco: any) => deco.side < 0))
-                  .addMeta(addDeco([lw(4, 1, "C")])))
+                  .addMeta(filterDeco((_f: number, _t: number, deco: any) => deco.spec.side < 0))
+                  .addMeta(addDeco([bw(7, 1, "C")])))
       widgets(cm, ["A"], [], ["C"])
     })
   })
-  */
 })

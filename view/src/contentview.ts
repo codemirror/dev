@@ -232,7 +232,7 @@ export class DocChildCursor extends ChildCursor {
 
   findPos(pos: number, bias: number = 1): this {
     for (;;) {
-      if (pos >= this.pos || pos == this.pos &&
+      if (pos > this.pos || pos == this.pos &&
           (bias > 0 || this.i == 0 ||
            breakBetween(this.children[this.i - 1], this.children[this.i]))) {
         this.off = pos - this.pos
