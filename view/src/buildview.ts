@@ -88,7 +88,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     if (deco instanceof BlockWidgetDecoration) {
       this.maybeLine = false
       if (pos > this.pos)
-        this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.bias, true))
+        this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.startSide, true))
     } else if (pos > this.pos) {
       let line = this.getLine()
       let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
@@ -112,14 +112,14 @@ export class ContentBuilder implements RangeIterator<Decoration> {
 
   point(deco: Decoration) {
     if (deco instanceof WidgetDecoration) {
-      this.getLine().append(new WidgetView(0, deco.widget, deco.bias))
+      this.getLine().append(new WidgetView(0, deco.widget, deco.startSide))
     } else if (deco instanceof LineDecoration) {
       if (this.doc.lineAt(this.pos).start == this.pos)
         this.getLine().addLineDeco(deco as LineDecoration)
     } else if (deco instanceof BlockWidgetDecoration) {
-      if (deco.bias < 0 ? this.maybeLine : this.doc.lineAt(this.pos).end == this.pos) {
-        if (deco.bias > 0 && this.maybeLine) this.getLine()
-        this.content.push(new BlockWidgetView(deco.widget!, 0, deco.bias, false))
+      if (deco.startSide < 0 ? this.maybeLine : this.doc.lineAt(this.pos).end == this.pos) {
+        if (deco.startSide > 0 && this.maybeLine) this.getLine()
+        this.content.push(new BlockWidgetView(deco.widget!, 0, deco.startSide, false))
       }
     }
   }

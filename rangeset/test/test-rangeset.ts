@@ -3,31 +3,31 @@ import {Change, ChangeSet, Mapping, ChangedRange} from "../../state/src"
 const ist = require("ist")
 
 class Value implements RangeValue {
-  bias: number
-  biasEnd: number
+  startSide: number
+  endSide: number
   collapsed: boolean
   name: string | null
   pos: number | null
   constructor(spec: any = {}) {
-    this.bias = spec.bias || 1
-    this.biasEnd = spec.biasEnd || -1
+    this.startSide = spec.startSide || 1
+    this.endSide = spec.endSide || -1
     this.collapsed = !!spec.collapsed
     this.name = spec.name || null
     this.pos = spec.pos == null ? null : spec.pos
   }
   map(mapping: Mapping, from: number, to: number): Range<Value> | null {
     if (from == to) {
-      let pos = mapping.mapPos(from, this.bias, true)
+      let pos = mapping.mapPos(from, this.startSide, true)
       return pos < 0 ? null : new Range(pos, pos, this)
     } else {
-      let newFrom = mapping.mapPos(from, this.bias), newTo = mapping.mapPos(to, this.biasEnd)
+      let newFrom = mapping.mapPos(from, this.startSide), newTo = mapping.mapPos(to, this.endSide)
       return newFrom >= newTo ? null : new Range(newFrom, newTo, this)
     }
   }
   static names(v: ReadonlyArray<Value>): string {
-    let result = ""
-    for (let val of v) if (val.name || val.collapsed) result += (result ? "/" : "") + (val.name || "COLLAPSED")
-    return result
+    let result = []
+    for (let val of v) if (val.name || val.collapsed) result.push(val.name || "COLLAPSED")
+    return result.sort().join("/")
   }
 }
 
@@ -175,10 +175,10 @@ describe("RangeSet", () => {
        test([mk(1), mk(4), mk(10)], [[0, 0, 1], [2, 3, 0], [8, 8, 20]], [2, 4, 30]))
 
     it("takes inclusivity into account", () =>
-       test([mk(1, 2, {bias: -1, biasEnd: 1})], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
+       test([mk(1, 2, {startSide: -1, endSide: 1})], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
 
     it("uses side to determine mapping of points", () =>
-       test([mk(1, 1, {bias: 1}), mk(1, 1, {bias: -1})], [[1, 1, 2]], [1, 3]))
+       test([mk(1, 1, {startSide: 1}), mk(1, 1, {startSide: -1})], [[1, 1, 2]], [1, 3]))
 
     it("defaults to exclusive on both sides", () =>
        test([mk(1, 2)], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
@@ -208,7 +208,7 @@ describe("RangeSet", () => {
     it("allows ranges to escape their parent node", () => {
       let ranges = []
       for (let i = 0; i < 100; i++)
-        ranges.push(mk(i, i + 1, {bias: -1, biasEnd: 1}))
+        ranges.push(mk(i, i + 1, {startSide: -1, endSide: 1}))
       let set0 = mkSet(ranges), nodeBoundary = set0.children[0].length
       let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, ["hello"])]))
       ist(set.size, set0.size)
@@ -387,7 +387,7 @@ describe("RangeSet", () => {
       let set = mkSet(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
-        expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=wide/span" + Math.floor(pos / 2)
+        expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "/wide"
       let builder = new Builder(start)
       RangeSet.iterateSpans([set], start, end, builder)
       ist(builder.spans.join(" "), expected)

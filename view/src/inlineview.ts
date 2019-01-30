@@ -108,7 +108,7 @@ export class TextView extends InlineView {
 
   toCompositionView() {
     let parent = this.parent!, view = new CompositionView(this.dom!, this.textDOM!, this.length)
-    this.markParentsDirty()
+    this.markParentsDirty(false)
     let parentIndex = parent.children.indexOf(this)
     parent.children[parentIndex] = view
     view.setParent(parent)

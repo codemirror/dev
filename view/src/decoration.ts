@@ -48,14 +48,18 @@ export abstract class WidgetType<T = any> {
 export type DecorationSet = RangeSet<Decoration>
 export type DecoratedRange = Range<Decoration>
 
+const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8, BLOCK_RANGE_SIDE = BLOCK_BIG_SIDE + 100
+
 export abstract class Decoration implements RangeValue {
   // @internal
   constructor(
     // @internal
-    readonly bias: number,
+    readonly startSide: number,
     // @internal
     readonly widget: WidgetType | null,
     readonly spec: any) {}
+
+  get endSide() { return this.startSide }
 
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null;
 
@@ -73,12 +77,12 @@ export abstract class Decoration implements RangeValue {
   }
 
   static blockWidget(pos: number, spec: BlockWidgetDecorationSpec): DecoratedRange {
-    let side = spec.side || -1
-    return new Range(pos, pos, new BlockWidgetDecoration(spec.widget, side + (side < 0 ? -BIG_BIAS : BIG_BIAS), spec))
+    let sideSpec = spec.side || -1, side = sideSpec + BLOCK_BIG_SIDE * (sideSpec < 0 ? -1 : 0)
+    return new Range(pos, pos, new BlockWidgetDecoration(spec.widget, side, side, spec))
   }
 
   static blockRange(from: number, to: number, spec: BlockRangeDecorationSpec): DecoratedRange {
-    return new Range(from, to, new BlockWidgetDecoration(spec.widget, -BIG_BIAS, spec))
+    return new Range(from, to, new BlockWidgetDecoration(spec.widget, -BLOCK_RANGE_SIDE, BLOCK_RANGE_SIDE, spec))
   }
 
   static set(of: DecoratedRange | ReadonlyArray<DecoratedRange>): DecorationSet {
@@ -94,26 +98,23 @@ export abstract class Decoration implements RangeValue {
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
 }
 
-const BIG_BIAS = 2e9
-
 export class RangeDecoration extends Decoration {
-  readonly endBias: number
   readonly collapsed: boolean
 
   constructor(readonly spec: RangeDecorationSpec) {
-    super(spec.inclusiveStart === true ? -BIG_BIAS : BIG_BIAS,
+    super(INLINE_BIG_SIDE * (spec.inclusiveStart === true ? -1 : 1),
           spec.collapsed instanceof WidgetType ? spec.collapsed : null, spec)
-    this.endBias = spec.inclusiveEnd == true ? BIG_BIAS : -BIG_BIAS
     this.collapsed = !!spec.collapsed
+    Object.defineProperty(this, "endSide", {value: INLINE_BIG_SIDE * (spec.inclusiveEnd === true ? 1 : -1)})
   }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
-    let newFrom = mapping.mapPos(from, this.bias, true), newTo = mapping.mapPos(to, this.endBias, true)
+    let newFrom = mapping.mapPos(from, this.startSide, true), newTo = mapping.mapPos(to, this.endSide, true)
     if (newFrom < 0) {
       if (newTo < 0) return null
-      newFrom = this.bias >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
+      newFrom = this.startSide >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
     } else if (newTo < 0) {
-      newTo = this.endBias < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
+      newTo = this.endSide < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
     }
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
@@ -136,18 +137,18 @@ export class WidgetDecoration extends Decoration {
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
-    pos = mapping.mapPos(pos, this.bias, true)
+    pos = mapping.mapPos(pos, this.startSide, true)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
   sameEffect(other: Decoration): boolean {
-    return other instanceof WidgetDecoration && widgetsEq(this.widget, other.widget) && this.bias == other.bias
+    return other instanceof WidgetDecoration && widgetsEq(this.widget, other.widget) && this.startSide == other.startSide
   }
 }
 
 export class LineDecoration extends Decoration {
   constructor(spec: LineDecorationSpec) {
-    super(-BIG_BIAS, null, spec)
+    super(-INLINE_BIG_SIDE, null, spec)
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
@@ -173,13 +174,14 @@ function mapStrict(pos: number, side: number, mapping: ChangeSet): number {
 }
 
 export class BlockWidgetDecoration extends Decoration {
-  constructor(widget: WidgetType, startBias: number, spec: any) {
-    super(startBias, widget, spec)
+  constructor(widget: WidgetType, startSide: number, endSide: number, spec: any) {
+    super(startSide, widget, spec)
+    Object.defineProperty(this, "endSide", {value: endSide})
   }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
     if (from == to) {
-      from = mapStrict(from, this.bias, mapping)
+      from = mapStrict(from, this.startSide, mapping)
       return from < 0 ? null : new Range(from, from, this)
     } else {
       from = mapStrict(from, -1, mapping)
@@ -191,10 +193,10 @@ export class BlockWidgetDecoration extends Decoration {
   sameEffect(other: Decoration): boolean {
     return other instanceof BlockWidgetDecoration &&
       widgetsEq(this.widget, other.widget) &&
-      this.bias == other.bias
+      this.startSide == other.startSide
   }
 
-  get collapsed() { return true }
+  get collapsed() { return this.startSide < this.endSide }
 
   hasHeight() { return true }
 }

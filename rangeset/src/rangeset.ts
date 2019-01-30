@@ -4,7 +4,8 @@ type A<T> = ReadonlyArray<T>
 
 export interface RangeValue {
   map(mapping: ChangeSet, from: number, to: number): Range<any> | null
-  bias: number
+  startSide: number
+  endSide: number
   collapsed?: boolean
 }
 
@@ -22,7 +23,7 @@ export interface RangeIterator<T extends RangeValue> {
   ignorePoint(value: T): boolean
 }
 
-interface Heapable { heapPos: number; value: RangeValue }
+interface Heapable { heapPos: number; heapSide: number }
 
 export class Range<T extends RangeValue> {
   constructor(
@@ -49,6 +50,7 @@ export class Range<T extends RangeValue> {
   /** @internal Here so that we can put active ranges on a heap
    * and take them off at their end */
   get heapPos() { return this.to }
+  get heapSide() { return this.value.endSide }
 }
 
 const none: A<any> = []
@@ -68,7 +70,7 @@ export class RangeSet<T extends RangeValue> {
     public size: number,
     // @internal The locally stored ranges—which are all of them
     // for leaf nodes, and the ones that don't fit in child sets for
-    // non-leaves. Sorted by start position, then bias.
+    // non-leaves. Sorted by start position, then side.
     public local: A<Range<T>>,
     // @internal The child sets, in position order. Their total
     // length may be smaller than .length if the end is empty (never
@@ -299,7 +301,8 @@ export class RangeSet<T extends RangeValue> {
         if (range.from + next.offset > to) break
 
         if (range.to + next.offset >= from) {
-          if (range.from < range.to && !iterator.ignoreRange(range.value, range.to)) {
+          let point = range.from == range.to && range.value.startSide >= range.value.endSide
+          if (!point && !iterator.ignoreRange(range.value, range.to)) {
             range = range.move(next.offset)
 
             iterator.advance(range.from, active)
@@ -311,7 +314,7 @@ export class RangeSet<T extends RangeValue> {
               active.push(range.value)
               addToHeap(heap, range)
             }
-          } else if (range.from == range.to && !iterator.ignorePoint(range.value)) {
+          } else if (point && !iterator.ignorePoint(range.value)) {
             iterator.advance(range.from, active)
             iterator.point(range.value)
           }
@@ -354,7 +357,7 @@ class LocalSet<T extends RangeValue> {
 
   // Used to make this conform to Heapable
   get heapPos(): number { return this.ranges[this.index].from + this.offset }
-  get value(): T { return this.ranges[this.index].value }
+  get heapSide(): number { return this.ranges[this.index].value.startSide }
 }
 
 function iterRangeSet<T extends RangeValue>(stack: IteratedSet<T>[], skipTo: number = 0) {
@@ -374,8 +377,9 @@ function iterRangeSet<T extends RangeValue>(stack: IteratedSet<T>[], skipTo: num
     }
   }
 }
+
 function compareHeapable(a: Heapable, b: Heapable): number {
-  return a.heapPos - b.heapPos || a.value.bias - b.value.bias
+  return a.heapPos - b.heapPos || a.heapSide - b.heapSide
 }
 
 function addIterToHeap<T extends RangeValue>(heap: Heapable[], stack: IteratedSet<T>[], skipTo: number = 0) {
@@ -421,7 +425,7 @@ function takeFromHeap<T extends Heapable>(heap: T[]): T {
 }
 
 function byPos(a: Range<RangeValue>, b: Range<RangeValue>): number {
-  return a.from - b.from || a.value.bias - b.value.bias
+  return a.from - b.from || a.value.startSide - b.value.startSide
 }
 
 function insertSorted(target: Range<RangeValue>[], range: Range<RangeValue>) {
