@@ -287,9 +287,10 @@ export class RangeSet<T extends RangeValue> {
 
   static iterateSpans<T extends RangeValue>(sets: A<RangeSet<T>>, from: number, to: number, iterator: RangeIterator<T>) {
     let heap: Heapable[] = []
+    let pos = from, posSide = -2e9
 
     for (let set of sets) if (set.size > 0) {
-      addIterToHeap(heap, [new IteratedSet(0, set)], from)
+      addIterToHeap(heap, [new IteratedSet(0, set)], pos)
       if (set.local.length) addToHeap(heap, new LocalSet(0, set.local))
     }
     let active: T[] = []
@@ -300,7 +301,7 @@ export class RangeSet<T extends RangeValue> {
         let range = next.ranges[next.index]
         if (range.from + next.offset > to) break
 
-        if (range.to + next.offset >= from) {
+        if ((range.to + next.offset - pos || range.value.endSide - posSide) >= 0) {
           let point = range.from == range.to && range.value.startSide >= range.value.endSide
           if (!point && !iterator.ignoreRange(range.value, range.to)) {
             range = range.move(next.offset)
@@ -308,8 +309,9 @@ export class RangeSet<T extends RangeValue> {
             iterator.advance(range.from, active)
             let collapsed = range.value.collapsed
             if (collapsed) {
-              from = range.to
-              iterator.advanceCollapsed(Math.min(from, to), range.value)
+              pos = range.to
+              posSide = range.value.endSide
+              iterator.advanceCollapsed(Math.min(pos, to), range.value)
             } else {
               active.push(range.value)
               addToHeap(heap, range)
@@ -321,7 +323,7 @@ export class RangeSet<T extends RangeValue> {
         }
         // Put the rest of the set back onto the heap
         if (++next.index < next.ranges.length) addToHeap(heap, next)
-        else if (next.next) addIterToHeap(heap, next.next, from)
+        else if (next.next) addIterToHeap(heap, next.next, pos)
       } else { // It is a range that ends here
         let range = next as Range<T>
           if (range.to >= to) break

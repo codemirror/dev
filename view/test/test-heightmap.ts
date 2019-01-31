@@ -60,12 +60,11 @@ describe("HeightMap", () => {
     ist(map.toString(), "line(20)")
   })
 
-  /*
   it("stores information about line widgets", () => {
     let text = doc(3, 3, 3), oracle = o(text)
-    let map = mk(text, [Decoration.line(0, {widget: new MyWidget(10), side: -1}),
-                        Decoration.line(0, {widget: new MyWidget(5), side: 1}),
-                        Decoration.line(0, {widget: new MyWidget(13), side: -1})])
+    let map = mk(text, [Decoration.blockWidget(0, {widget: new MyWidget(10), side: -1}),
+                        Decoration.blockWidget(3, {widget: new MyWidget(5), side: 1}),
+                        Decoration.blockWidget(0, {widget: new MyWidget(13), side: -1})])
     ist(map.toString(), "line(3:-2,23,-1,5) gap(7)")
     ist(map.heightAt(0, text, -1), 23)
     ist(map.heightAt(0, text, 1), 23 + oracle.lineHeight)
@@ -74,7 +73,20 @@ describe("HeightMap", () => {
     ist(map.toString(), "line(3:-2,10,-1,0) line(3:-1,40) line(3)")
     ist(map.height, 110)
   })
-  */
+
+  // FIXME make sure widget height ends up in block range 'lines'
+
+  it("stores information about block ranges", () => {
+    let text = doc(3, 3, 3, 3, 3, 3)
+    let map = mk(text, [Decoration.blockRange(4, 11, {widget: new MyWidget(40)}),
+                        Decoration.blockWidget(4, {widget: new MyWidget(10), side: -1}),
+                        Decoration.blockWidget(11, {widget: new MyWidget(15), side: 1}),
+                        // This one covers the block widgets around it (due to priority)
+                        Decoration.blockRange(16, 19, {widget: new MyWidget(50), priority: 10}),
+                        Decoration.blockWidget(16, {widget: new MyWidget(20), side: -1}),
+                        Decoration.blockWidget(19, {widget: new MyWidget(10), side: 1})])
+    ist(map.toString(), "gap(3) line(7:-2,10,-1,15) gap(3) line(3) gap(3)")
+  })
 
   it("joins ranges", () => {
     let text = doc(10, 10, 10, 10)

@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
-import {DecorationSet, RangeDecoration, Decoration} from "./decoration"
+import {DecorationSet, RangeDecoration, Decoration, BlockWidgetDecoration} from "./decoration"
 import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
@@ -76,7 +76,6 @@ export class MeasuredHeights {
   get more() { return this.index < this.heights.length }
 }
 
-// FIXME think about representation of widget heights
 export class LineHeight {
   constructor(readonly start: number, readonly end: number,
               readonly top: number, readonly height: number,
@@ -84,8 +83,8 @@ export class LineHeight {
               readonly line: HeightMapLine | null) {}
 
   get bottom() { return this.top + this.height }
-  get textTop() { return this.top }
-  get textBottom() { return this.bottom }
+  get textTop() { return this.top + (this.line ? lineWidgetHeight(this.line.deco, -2) : 0) }
+  get textBottom() { return this.bottom - (this.line ? lineWidgetHeight(this.line.deco, -1) : 0) }
   get hasCollapsedRanges() {
     if (this.line)
       for (let i = 1; i < this.line.deco.length; i += 2)
@@ -94,14 +93,19 @@ export class LineHeight {
   }
 }
 
+const FLAG_OUTDATED = 1, FLAG_BLOCK_RANGE = 2
+
 export abstract class HeightMap {
   constructor(
     public length: number, // The number of characters covered
     public height: number, // Height of this part of the document
-    public outdated: boolean = true // Tracks whether the height needs to be recomputed
+    public flags: number = FLAG_OUTDATED
   ) {}
 
-  abstract size: number
+  size!: number
+
+  get outdated() { return (this.flags & FLAG_OUTDATED) > 0 }
+  set outdated(value: boolean) { this.flags = value ? this.flags | FLAG_OUTDATED : this.flags & ~FLAG_OUTDATED }
 
   abstract heightAt(pos: number, doc: Text, bias?: -1 | 1, offset?: number): number
   abstract lineAt(height: number, doc: Text, offset?: number): LineHeight
@@ -176,27 +180,38 @@ export abstract class HeightMap {
   }
 }
 
+HeightMap.prototype.size = 1
+
 const noDeco: number[] = []
 
 class HeightMapLine extends HeightMap {
   // Decoration information is stored in a somewhat obscure format—the
-  // array of numbers in `deco` encodes all of collapsed ranges and
-  // inline widgets. It contains a series of pairs of numbers.
+  // array of numbers in `deco` encodes all of collapsed ranges,
+  // inline widgets, and widgets above/below the line. It contains a
+  // series of pairs of numbers.
   //
-  //  - The first number indicates the position of the decoration.
+  //  - The first number indicates the position of the decoration, or
+  //    -2 for widget height above the line, or -1 for widget height
+  //    below the line (see `lineWidgetHeight` and
+  //    `setLineWidgetHeight`)
   //
   //  - The second number is the height of a widget when positive, or
   //    the number of collapse code points if negative.
   //
   // These are the pieces of information that need to be stored about
   // lines to somewhat effectively estimate their height when they are
-  // not actually in view and thus can not be measured.
+  // not actually in view and thus can not be measured. Widget size
+  // above/below is also necessary in heightAt, to skip it.
+  //
+  // The somewhat awkward format is there to reduce the amount of
+  // space required—you can have a huge number of line heightmap
+  // objects when scrolling through a big document, and most of them
+  // don't need any extra data, and thus can just store a single
+  // pointer to `noDeco`.
   constructor(length: number, height: number, public deco: number[] = noDeco) { super(length, height) }
 
-  get size(): number { return 1 }
-
   heightAt(pos: number, doc: Text, bias: 1 | -1): number {
-    return bias < 0 ? 0 : this.height
+    return bias < 0 ? lineWidgetHeight(this.deco, -2) : this.height - lineWidgetHeight(this.deco, -1)
   }
 
   lineAt(height: number, doc: Text, offset: number = 0) {
@@ -252,7 +267,17 @@ class HeightMapLine extends HeightMap {
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
     if (measured && measured.from <= offset && measured.more) {
-      this.setHeight(oracle, measured.heights[measured.index++])
+      let height = measured.heights[measured.index++]
+      // If either this line's deco data or the measured heights contain info about
+      if (this.deco.length && this.deco[0] < 0 || measured.more && measured.heights[measured.index] < 0) {
+        let above = measured.more && measured.heights[measured.index] == -2
+          ? measured.heights[(measured.index += 2) - 1] : 0
+        let below = measured.more && measured.heights[measured.index] == -1
+          ? measured.heights[(measured.index += 2) - 1] : 0
+        this.deco = setLineWidgetHeight(setLineWidgetHeight(this.deco.slice(), -2, above), -1, below)
+        height += above + below
+      }
+      this.setHeight(oracle, height)
     } else if (force || this.outdated) {
       let len = this.length, minH = 0, add = 0
       for (let i = 1; i < this.deco.length; i += 2) {
@@ -306,12 +331,33 @@ function insertDeco(deco: number[], newDeco: number[], pos: number): number[] {
   }
 }
 
+function lineWidgetHeight(deco: number[], type: -1 | -2) {
+  for (let i = 0; i < deco.length; i += 2) {
+    let pos = deco[i]
+    if (pos >= 0) break
+    if (pos == type) return deco[i + 1]
+  }
+  return 0
+}
+
+function setLineWidgetHeight(deco: number[], type: -1 | -2, height: number): number[] {
+  let i = 0
+  for (; i < deco.length; i += 2) {
+    let pos = deco[i]
+    if (pos > type) break
+    if (pos == type) {
+      deco[i + 1] = height
+      return deco
+    }
+  }
+  if (height > 0) deco.splice(i, 0, type, height)
+  return deco
+}
+
 class HeightMapGap extends HeightMap {
   constructor(from: number, to: number, oracle: HeightOracle) {
-    super(to - from, oracle.heightForGap(from, to), false)
+    super(to - from, oracle.heightForGap(from, to), 0)
   }
-
-  get size(): number { return 1 }
 
   heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
@@ -373,9 +419,14 @@ class HeightMapGap extends HeightMap {
       let nodes = [], pos = Math.max(offset, measured.from)
       if (measured.from > offset) nodes.push(new HeightMapGap(offset, measured.from - 1, oracle))
       while (pos <= end && measured.more) {
-        let height = measured.heights[measured.index++]
+        let height = measured.heights[measured.index++], deco = undefined, wType!: -1 | -2
+        while (measured.more && (wType = measured.heights[measured.index] as (-1 | -2)) < 0) {
+          let wHeight = measured.heights[(measured.index += 2) - 1]
+          height += wHeight
+          deco = setLineWidgetHeight(deco || [], wType, wHeight)
+        }
         let len = oracle.doc.lineAt(pos).length
-        nodes.push(new HeightMapLine(len, height))
+        nodes.push(new HeightMapLine(len, height, deco))
         pos += len + 1
       }
       if (pos < end) nodes.push(new HeightMapGap(pos, end, oracle))
@@ -404,7 +455,7 @@ class HeightMapBranch extends HeightMap {
   size: number
 
   constructor(public left: HeightMap, public right: HeightMap) {
-    super(left.length + 1 + right.length, left.height + right.height, left.outdated || right.outdated)
+    super(left.length + 1 + right.length, left.height + right.height, left.outdated || right.outdated ? FLAG_OUTDATED : 0)
     this.size = left.size + right.size
   }
 
@@ -523,20 +574,25 @@ class NodeBuilder implements RangeIterator<Decoration> {
   }
 
   advanceCollapsed(pos: number, deco: Decoration) {
-    if (pos <= this.pos) return
-    if (deco.widget && deco.widget.estimatedHeight >= 0)
-      this.addDeco(deco.widget.estimatedHeight)
-    this.addDeco(this.pos - pos)
-    if (this.curLine) {
+    if (deco instanceof BlockWidgetDecoration) {
+      this.lineStart = -1
+      this.flushTo(this.pos - 1)
+      if (!this.curLine) this.nodes.push(this.curLine = new HeightMapLine(0, 0, []))
       this.curLine.length += pos - this.pos
-      this.writtenTo = pos
+      // FIXME add height
+      this.curLine.flags |= FLAG_BLOCK_RANGE
+    } else {
+      if (deco.widget && deco.widget.estimatedHeight >= 0)
+        this.addDeco(deco.widget.estimatedHeight)
+      this.addDeco(this.pos - pos)
+      this.curLine!.length += pos - this.pos
       if (this.lineEnd < pos) this.lineEnd = -1
     }
-    this.pos = pos
+    this.writtenTo = this.pos = pos
   }
 
   point(deco: Decoration) {
-    this.addDeco(deco.widget!.estimatedHeight)
+    this.addDeco(deco.widget!.estimatedHeight, deco instanceof BlockWidgetDecoration ? (deco.startSide > 0 ? -1 : -2) : undefined)
   }
 
   flushTo(pos: number) {
@@ -546,14 +602,17 @@ class NodeBuilder implements RangeIterator<Decoration> {
     }
   }
 
-  addDeco(val: number) {
+  addDeco(val: number, lineWidget?: -1 | -2) {
     if (!this.curLine) {
       this.lineStart = Math.max(this.writtenTo, this.oracle.doc.lineAt(this.pos).start)
       this.flushTo(this.lineStart - 1)
       this.nodes.push(this.curLine = new HeightMapLine(this.pos - this.lineStart, 0, []))
       this.writtenTo = this.pos
     }
-    this.curLine.deco.push(this.pos - this.lineStart, val)
+    if (lineWidget == null)
+      this.curLine.deco.push(this.pos - this.lineStart, val)
+    else
+      setLineWidgetHeight(this.curLine.deco, lineWidget, val + lineWidgetHeight(this.curLine.deco, lineWidget))
   }
 
   ignoreRange(value: Decoration) { return !(value as RangeDecoration).collapsed }

@@ -27,7 +27,8 @@ export interface BlockWidgetDecorationSpec {
 }
 
 export interface BlockRangeDecorationSpec {
-  widget: WidgetType
+  widget: WidgetType,
+  priority?: number
 }
 
 export abstract class WidgetType<T = any> {
@@ -48,7 +49,7 @@ export abstract class WidgetType<T = any> {
 export type DecorationSet = RangeSet<Decoration>
 export type DecoratedRange = Range<Decoration>
 
-const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8, BLOCK_RANGE_SIDE = BLOCK_BIG_SIDE + 100
+const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8
 
 export abstract class Decoration implements RangeValue {
   // @internal
@@ -62,6 +63,8 @@ export abstract class Decoration implements RangeValue {
   get endSide() { return this.startSide }
 
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null;
+
+  // FIXME split into separate variants for collapsed and styled ranges?
 
   static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
     if (from >= to) throw new RangeError("Range decorations may not be empty")
@@ -77,12 +80,13 @@ export abstract class Decoration implements RangeValue {
   }
 
   static blockWidget(pos: number, spec: BlockWidgetDecorationSpec): DecoratedRange {
-    let sideSpec = spec.side || -1, side = sideSpec + BLOCK_BIG_SIDE * (sideSpec < 0 ? -1 : 0)
+    let sideSpec = spec.side || -1, side = sideSpec + BLOCK_BIG_SIDE * (sideSpec < 0 ? -1 : 1)
     return new Range(pos, pos, new BlockWidgetDecoration(spec.widget, side, side, spec))
   }
 
   static blockRange(from: number, to: number, spec: BlockRangeDecorationSpec): DecoratedRange {
-    return new Range(from, to, new BlockWidgetDecoration(spec.widget, -BLOCK_RANGE_SIDE, BLOCK_RANGE_SIDE, spec))
+    let side = BLOCK_BIG_SIDE + Math.max(0, spec.priority || 0)
+    return new Range(from, to, new BlockWidgetDecoration(spec.widget, -side, side, spec))
   }
 
   static set(of: DecoratedRange | ReadonlyArray<DecoratedRange>): DecorationSet {

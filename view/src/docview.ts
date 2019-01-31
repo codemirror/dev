@@ -410,6 +410,7 @@ export class DocView extends ContentView {
   }
 
   measureVisibleLineHeights() {
+    // FIXME add measurements for block widgets
     let result = [], {from, to} = this.viewport
     for (let pos = 0, i = 0, prev = null; pos < to && i < this.children.length; i++) {
       let child = this.children[i] as LineView
@@ -561,7 +562,7 @@ export class DocView extends ContentView {
       let end = next ? next.from - 1 : docLength
       if (end > pos) {
         let height = this.heightAt(end, 1) - this.heightAt(pos, -1)
-        deco.push(Decoration.blockRange(pos, end, {widget: new GapWidget(height)}))
+        deco.push(Decoration.blockRange(pos, end, {widget: new GapWidget(height), priority: 1e8}))
       }
       if (!next) break
       pos = next.to + 1

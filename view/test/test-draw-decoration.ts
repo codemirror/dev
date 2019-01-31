@@ -285,6 +285,10 @@ describe("EditorView decoration", () => {
     return Decoration.blockWidget(pos, {widget: new BlockWidget(name), side})
   }
 
+  function br(from: number, to: number, name = "r", priority = 0) {
+    return Decoration.blockRange(from, to, {widget: new BlockWidget(name), priority})
+  }
+
   function widgets(cm: EditorView, ...groups: string[][]) {
     let found: string[][] = [[]]
     for (let n: Node | null = cm.contentDOM.firstChild; n; n = n.nextSibling) {
@@ -313,9 +317,15 @@ describe("EditorView decoration", () => {
       widgets(cm, ["A"], ["C"], [])
     })
 
+    it("draws block ranges", () => {
+      let cm = decoEditor("one\ntwo\nthr\nfou", [br(4, 11, "A")])
+      widgets(cm, [], ["A"], [])
+    })
+
     // FIXME add widgets at end of doc, start of doc, end/start of lines inside doc
     // block ranges
     // widgets around block ranges
+    // tests of overlapping collapsed ranges, block or not
 
     it("doesn't redraw unchanged widgets", () => {
       let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(7, 1, "B")])

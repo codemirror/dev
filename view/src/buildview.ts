@@ -86,6 +86,8 @@ export class ContentBuilder implements RangeIterator<Decoration> {
 
   advanceCollapsed(pos: number, deco: Decoration) {
     if (deco instanceof BlockWidgetDecoration) {
+      if (!this.maybeLine || this.doc.lineAt(pos).end != pos)
+        throw new Error("Invalid block range widget—doesn't span entire lines")
       this.maybeLine = false
       if (pos > this.pos)
         this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.startSide, true))
@@ -117,17 +119,14 @@ export class ContentBuilder implements RangeIterator<Decoration> {
       if (this.doc.lineAt(this.pos).start == this.pos)
         this.getLine().addLineDeco(deco as LineDecoration)
     } else if (deco instanceof BlockWidgetDecoration) {
-      if (deco.startSide < 0 ? this.maybeLine : this.doc.lineAt(this.pos).end == this.pos) {
-        if (deco.startSide > 0 && this.maybeLine) this.getLine()
-        this.content.push(new BlockWidgetView(deco.widget!, 0, deco.startSide, false))
-      }
+      if (deco.startSide < 0 ? !this.maybeLine : this.doc.lineAt(this.pos).end != this.pos)
+        throw new Error("Invalid block widget—not at line boundary")
+      if (deco.startSide > 0 && this.maybeLine) this.getLine()
+      this.content.push(new BlockWidgetView(deco.widget!, 0, deco.startSide, false))
     }
   }
 
-  ignoreRange(deco: Decoration, to: number): boolean {
-    return deco instanceof BlockWidgetDecoration &&
-      (!this.maybeLine || this.doc.lineAt(to).end != to)
-  }
+  ignoreRange(deco: Decoration): boolean { return false }
 
   ignorePoint(deco: Decoration): boolean { return false }
 
