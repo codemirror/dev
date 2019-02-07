@@ -8,16 +8,13 @@ export const enum dirty { not = 0, child = 1, node = 2 }
 
 const none: any[] = []
 
-export function breakBetween(before: ContentView | null, after: ContentView) {
-  return before && before.breakAfter && after.breakBefore ? 1 : 0
-}
-
 export abstract class ContentView {
   parent: ContentView | null = null
   dom: Node | null = null
   dirty: number = dirty.node
   abstract length: number
   abstract children: ContentView[]
+  breakAfter!: number
 
   get overrideDOMText(): ReadonlyArray<string> | null { return null }
 
@@ -30,12 +27,10 @@ export abstract class ContentView {
   }
 
   posBefore(view: ContentView): number {
-    let pos = this.posAtStart, prev: ContentView | null = null
+    let pos = this.posAtStart
     for (let child of this.children) {
-      pos += breakBetween(prev, child)
       if (child == view) return pos
-      pos += child.length
-      prev = child
+      pos += child.length + child.breakAfter
     }
     throw new RangeError("Invalid child in posBefore")
   }
@@ -45,11 +40,10 @@ export abstract class ContentView {
   }
 
   coordsAt(pos: number): Rect | null {
-    for (let off = 0, i = 0, prev = null; i < this.children.length; i++) {
-      let child = this.children[i], start = off + breakBetween(prev, child), end = start + child.length
-      if (end >= pos && start != end) return child.coordsAt(pos - start)
-      off = end
-      prev = child
+    for (let off = 0, i = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = off + child.length
+      if (end >= pos && off != end) return child.coordsAt(pos - off)
+      off = end + child.breakAfter
     }
     return null
   }
@@ -103,24 +97,21 @@ export abstract class ContentView {
     while (after && !after.cmView) after = after.nextSibling
     if (!after) return this.length
 
-    for (let i = 0, pos = 0, prev = null;; i++) {
+    for (let i = 0, pos = 0;; i++) {
       let child = this.children[i]
-      pos += breakBetween(prev, child)
       if (child.dom == after) return pos
-      pos += child.length
-      prev = child
+      pos += child.length + child.breakAfter
     }
   }
 
   domBoundsAround(from: number, to: number, offset = 0): {startDOM: Node | null, endDOM: Node | null, from: number, to: number} | null {
     let fromI = -1, fromStart = -1, toI = -1, toEnd = -1
-    for (let i = 0, pos = offset, prev = null; i < this.children.length; i++) {
-      let child = this.children[i], start = pos + breakBetween(prev, child), end = start + child.length
-      if (start < from && end > to) return child.domBoundsAround(from, to, start)
-      if (end >= from && fromI == -1) { fromI = i; fromStart = start }
+    for (let i = 0, pos = offset; i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length
+      if (pos < from && end > to) return child.domBoundsAround(from, to, pos)
+      if (end >= from && fromI == -1) { fromI = i; fromStart = pos }
       if (end >= to && toI == -1) { toI = i; toEnd = end; break }
-      pos = end
-      prev = child
+      pos = end + child.breakAfter
     }
     return {from: fromStart, to: toEnd,
             startDOM: (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom!.firstChild,
@@ -184,12 +175,12 @@ export abstract class ContentView {
   toString() {
     let name = this.constructor.name.replace("View", "")
     return name + (this.children.length ? "(" + this.children.join() + ")" :
-                   this.length ? "[" + (name == "Text" ? (this as any).text : this.length) + "]" : "")
+                   this.length ? "[" + (name == "Text" ? (this as any).text : this.length) + "]" : "") +
+      (this.breakAfter ? "#" : "")
   }
-
-  get breakAfter() { return false }
-  get breakBefore() { return false }
 }
+
+ContentView.prototype.breakAfter = 0
 
 // Remove a DOM node and return its next sibling.
 function rm(dom: Node): Node {
@@ -226,20 +217,19 @@ export class ChildCursor {
 
 export class DocChildCursor extends ChildCursor {
   constructor(children: ReadonlyArray<ContentView>, pos: number, i: number) {
-    if (i) super(children, pos - children[children.length - 1].length, i - 1)
+    if (i) super(children, pos - children[i - 1].length, i - 1)
     else super(children, pos, i)
   }
 
   findPos(pos: number, bias: number = 1): this {
     for (;;) {
       if (pos > this.pos || pos == this.pos &&
-          (bias > 0 || this.i == 0 ||
-           breakBetween(this.children[this.i - 1], this.children[this.i]))) {
+          (bias > 0 || this.i == 0 || this.children[this.i - 1].breakAfter)) {
         this.off = pos - this.pos
         return this
       }
       let next = this.children[--this.i]
-      this.pos -= next.length + breakBetween(next, this.children[this.i + 1])
+      this.pos -= next.length + next.breakAfter
     }
   }
 }

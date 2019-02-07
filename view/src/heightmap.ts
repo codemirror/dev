@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
-import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
-import {DecorationSet, RangeDecoration, Decoration, BlockWidgetDecoration} from "./decoration"
+import {RangeSet, RangeIterator, RangeValue} from "../../rangeset/src/rangeset"
+import {DecorationSet, ReplaceDecoration, WidgetDecoration, Decoration} from "./decoration"
 import {Viewport} from "./viewport"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
@@ -573,8 +573,8 @@ class NodeBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  advanceCollapsed(pos: number, deco: Decoration) {
-    if (deco instanceof BlockWidgetDecoration) {
+  advanceReplaced(pos: number, deco: ReplaceDecoration) {
+    if (deco.block) {
       this.lineStart = -1
       this.flushTo(this.pos - 1)
       if (!this.curLine) this.nodes.push(this.curLine = new HeightMapLine(0, 0, []))
@@ -591,8 +591,8 @@ class NodeBuilder implements RangeIterator<Decoration> {
     this.writtenTo = this.pos = pos
   }
 
-  point(deco: Decoration) {
-    this.addDeco(deco.widget!.estimatedHeight, deco instanceof BlockWidgetDecoration ? (deco.startSide > 0 ? -1 : -2) : undefined)
+  point(deco: WidgetDecoration) {
+    this.addDeco(deco.widget!.estimatedHeight, deco.block ? (deco.startSide > 0 ? -1 : -2) : undefined)
   }
 
   flushTo(pos: number) {
@@ -615,7 +615,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
       setLineWidgetHeight(this.curLine.deco, lineWidget, val + lineWidgetHeight(this.curLine.deco, lineWidget))
   }
 
-  ignoreRange(value: Decoration) { return !(value as RangeDecoration).collapsed }
+  ignoreRange(value: Decoration) { return !(value as RangeValue).replace }
   ignorePoint(value: Decoration) { return !(value.widget && value.widget.estimatedHeight > 0) }
 }
 

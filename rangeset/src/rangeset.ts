@@ -6,18 +6,18 @@ export interface RangeValue {
   map(mapping: ChangeSet, from: number, to: number): Range<any> | null
   startSide: number
   endSide: number
-  collapsed?: boolean
+  replace?: boolean
 }
 
 export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
-  compareCollapsed(from: number, to: number, byA: T, byB: T): void
+  compareReplaced(from: number, to: number, byA: T, byB: T): void
   comparePoints(pos: number, pointsA: T[], pointsB: T[]): void
 }
 
 export interface RangeIterator<T extends RangeValue> {
   advance(pos: number, active: A<T>): void
-  advanceCollapsed(pos: number, value: T): void
+  advanceReplaced(pos: number, value: T): void
   point(value: T): void
   ignoreRange(value: T, to: number): boolean
   ignorePoint(value: T): boolean
@@ -307,11 +307,10 @@ export class RangeSet<T extends RangeValue> {
             range = range.move(next.offset)
 
             iterator.advance(range.from, active)
-            let collapsed = range.value.collapsed
-            if (collapsed) {
+            if (range.value.replace) {
               pos = range.to
               posSide = range.value.endSide
-              iterator.advanceCollapsed(Math.min(pos, to), range.value)
+              iterator.advanceReplaced(Math.min(pos, to), range.value)
             } else {
               active.push(range.value)
               addToHeap(heap, range)
@@ -562,8 +561,8 @@ class ComparisonSide<T extends RangeValue> {
   activeTo: number[] = []
   points: T[] = []
   tip: LocalSet<T> | null = null
-  collapsedBy: T | null = null
-  collapsedTo: number = -1
+  replacedBy: T | null = null
+  replacedTo: number = -1
 
   constructor(readonly stack: IteratedSet<T>[]) {}
 
@@ -663,16 +662,15 @@ class RangeSetComparison<T extends RangeValue> {
       }
       if (range.from < range.to && range.to + next.offset > this.pos) {
         this.advancePos(range.from + next.offset)
-        let collapsed = range.value.collapsed
-        if (collapsed) {
-          side.collapsedBy = range.value
-          side.collapsedTo = Math.max(side.collapsedTo, range.to + next.offset)
-          // Skip regions that are collapsed on both sides
-          let collapsedTo = Math.min(this.a.collapsedTo, this.b.collapsedTo)
-          if (collapsedTo > this.pos) {
+        if (range.value.replace) {
+          side.replacedBy = range.value
+          side.replacedTo = Math.max(side.replacedTo, range.to + next.offset)
+          // Skip regions that are replaced on both sides
+          let replacedTo = Math.min(this.a.replacedTo, this.b.replacedTo)
+          if (replacedTo > this.pos) {
             this.handlePoints()
-            this.comparator.compareCollapsed(this.pos, collapsedTo, this.a.collapsedBy!, this.b.collapsedBy!)
-            this.pos = collapsedTo
+            this.comparator.compareReplaced(this.pos, replacedTo, this.a.replacedBy!, this.b.replacedBy!)
+            this.pos = replacedTo
           }
         }
         this.addActiveRange(Math.min(this.end, range.to + next.offset), range.value, side, otherSide)

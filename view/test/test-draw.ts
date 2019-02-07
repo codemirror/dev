@@ -125,12 +125,31 @@ describe("EditorView drawing", () => {
     ist(domText(cm), content.slice(cm.viewport.from, cm.viewport.to))
   })
 
+  it("can handle deleting a line's content", () => {
+    let cm = tempEditor("foo\nbaz")
+    cm.dispatch(cm.state.transaction.replace(4, 7, ""))
+    ist(domText(cm), "foo\n")
+  })
+
+  it("can insert blank lines at the end of the document", () => {
+    let cm = tempEditor("foo")
+    cm.dispatch(cm.state.transaction.replace(3, 3, "\n\nx"))
+    ist(domText(cm), "foo\n\nx")
+  })
+
+  it("can handle deleting the end of a line", () => {
+    let cm = tempEditor("a\nbc\n")
+    cm.dispatch(cm.state.transaction.replace(3, 4, ""))
+    cm.dispatch(cm.state.transaction.replace(3, 3, "d"))
+    ist(domText(cm), "a\nbd\n")
+  })
+
   it("correctly handles very complicated transactions", () => {
     let doc = "foo\nbar\nbaz", chars = "abcdef  \n"
     let cm = tempEditor(doc)
     for (let i = 0; i < 10; i++) {
       let tr = cm.state.transaction, pos = Math.min(20, doc.length)
-      for (let j = 0; j < 100; j++) {
+      for (let j = 0; j < 1; j++) {
         let choice = Math.random(), r = Math.random()
         if (choice < 0.15) {
           pos = Math.min(doc.length, Math.max(0, pos + 5 - Math.floor(r * 10)))

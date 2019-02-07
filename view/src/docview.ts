@@ -1,4 +1,4 @@
-import {ContentView, ChildCursor, DocChildCursor, dirty, breakBetween} from "./contentview"
+import {ContentView, ChildCursor, DocChildCursor, dirty} from "./contentview"
 import {LineView, BlockWidgetView} from "./lineview"
 import {TextView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
@@ -188,44 +188,55 @@ export class DocView extends ContentView {
       }
       if (!next) break
       let {fromA, toA, fromB, toB} = next
-      let content = ContentBuilder.build(this.state.doc, fromB, toB, allDeco)
-      let {i: toI, off: toOff} = cursor.findPos(toA, 1) // FIXME add support for bias
+      let {content, breakAtStart} = ContentBuilder.build(this.state.doc, fromB, toB, allDeco)
+      let {i: toI, off: toOff} = cursor.findPos(toA, 1)
       let {i: fromI, off: fromOff} = cursor.findPos(fromA, -1)
       if (compositionRange && this.composition!.parent == this.children[toI] &&
           content[content.length - 1] instanceof LineView)
         (this.children[toI] as LineView).transferDOM(content[content.length - 1] as LineView)
-      this.replaceRange(fromI, fromOff, toI, toOff, content)
+      this.replaceRange(fromI, fromOff, toI, toOff, content, breakAtStart)
     }
   }
 
   private replaceRange(fromI: number, fromOff: number, toI: number, toOff: number,
-                       content: (BlockWidgetView | LineView)[]) {
-    let before = this.children[fromI]
+                       content: (BlockWidgetView | LineView)[], breakAtStart: number) {
+    let before = this.children[fromI], last = content.length ? content[content.length - 1] : null
+    let breakAtEnd = last ? last.breakAfter : breakAtStart
+    // Change within a single line
     if (fromI == toI && before instanceof LineView &&
-        content.length == 1 && content[0] instanceof LineView) { // Change within single line
-      before.merge(fromOff, toOff, content[0] as LineView, fromOff == 0, this.composition)
+        !breakAtStart && !breakAtEnd &&
+        (content.length == 1 && last instanceof LineView || content.length == 0)) {
+      before.merge(fromOff, toOff, content.length ? last as LineView : new LineView, fromOff == 0, this.composition)
       return
     }
 
-    let after = this.children[toI], last
-    if (after instanceof LineView && content.length && (last = content[content.length - 1]) instanceof LineView) {
-      let part = after
-      if (toOff > 0 || fromI == toI) {
-        part = after.split(toOff)
-        if (fromI != toI) after.transferDOM(part)
+    let after = this.children[toI], breakAfter = false
+    if (toOff < after.length) {
+      if ((toOff > 0 || fromI == toI) && after instanceof LineView) after = after.split(toOff)
+      if (after instanceof LineView && !breakAtEnd && last instanceof LineView) {
+        if (fromI != toI) (this.children[toI] as LineView).transferDOM(after)
+        last.merge(last.length, last.length, after, false, this.composition)
+        last.breakAfter = after.breakAfter
+      } else {
+        content.push(last = after)
       }
-      last.merge(last.length, last.length, part, false, this.composition)
-    } else if (toOff < after.length) {
-      content.push((after as LineView).split(toOff))
+    } else if (after.breakAfter) {
+      if (last) last.breakAfter = 1
+      else breakAtStart = 1
     }
     toI++
-    if (before instanceof LineView && content.length && content[0] instanceof LineView) {
-      before.merge(fromOff, before.length, content.shift() as LineView, fromOff == 0, this.composition)
-      fromI++
-    } else if (fromOff) {
-      ;(before as LineView).merge(fromOff, before.length, new LineView, false, this.composition)
+
+    before.breakAfter = breakAtStart
+    if (fromOff > 0) {
+      if (before instanceof LineView && !breakAtStart && last && content[0] instanceof LineView) {
+        before.breakAfter = content[0].breakAfter
+        before.merge(fromOff, before.length, content.shift() as LineView, false, this.composition)
+      } else if (fromOff < before.length) {
+        ;(before as LineView).merge(fromOff, before.length, new LineView, false, this.composition)
+      }
       fromI++
     }
+
     // Try to merge widgets on the boundaries of the replacement
     while (fromI < toI && content.length) {
       if (this.children[toI - 1].match(content[content.length - 1]))
@@ -412,12 +423,10 @@ export class DocView extends ContentView {
   measureVisibleLineHeights() {
     // FIXME add measurements for block widgets
     let result = [], {from, to} = this.viewport
-    for (let pos = 0, i = 0, prev = null; pos < to && i < this.children.length; i++) {
+    for (let pos = 0, i = 0; pos < to && i < this.children.length; i++) {
       let child = this.children[i] as LineView
-      pos += breakBetween(prev, child)
       if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
-      pos += child.length
-      prev = child
+      pos += child.length + child.breakAfter
     }
     return result
   }
@@ -562,7 +571,7 @@ export class DocView extends ContentView {
       let end = next ? next.from - 1 : docLength
       if (end > pos) {
         let height = this.heightAt(end, 1) - this.heightAt(pos, -1)
-        deco.push(Decoration.blockRange(pos, end, {widget: new GapWidget(height), priority: 1e8}))
+        deco.push(Decoration.replace(pos, end, {widget: new GapWidget(height), block: true, inclusive: true}))
       }
       if (!next) break
       pos = next.to + 1

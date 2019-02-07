@@ -2,33 +2,33 @@ import {ChangeSet, ChangedRange} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
 import {attrsEq} from "./attributes"
 
-export interface RangeDecorationSpec {
+export interface MarkDecorationSpec {
+  inclusive?: boolean
   inclusiveStart?: boolean
   inclusiveEnd?: boolean
   attributes?: {[key: string]: string}
   // Shorthand for {attributes: {class: value}}
   class?: string
   tagName?: string
-  collapsed?: boolean | WidgetType
 }
 
+// FIXME unify with replace decoration?
 export interface WidgetDecorationSpec {
   widget: WidgetType
   side?: number
+  block?: boolean
+}
+
+export interface ReplaceDecorationSpec {
+  widget?: WidgetType
+  inclusive?: boolean
+  inclusiveStart?: boolean
+  inclusiveEnd?: boolean
+  block?: boolean
 }
 
 export interface LineDecorationSpec {
   attributes?: {[key: string]: string}
-}
-
-export interface BlockWidgetDecorationSpec {
-  widget: WidgetType,
-  side?: number
-}
-
-export interface BlockRangeDecorationSpec {
-  widget: WidgetType,
-  priority?: number
 }
 
 export abstract class WidgetType<T = any> {
@@ -60,33 +60,26 @@ export abstract class Decoration implements RangeValue {
     readonly widget: WidgetType | null,
     readonly spec: any) {}
 
-  get endSide() { return this.startSide }
+  abstract endSide: number
 
-  abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null;
+  abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null
 
-  // FIXME split into separate variants for collapsed and styled ranges?
-
-  static range(from: number, to: number, spec: RangeDecorationSpec): DecoratedRange {
-    if (from >= to) throw new RangeError("Range decorations may not be empty")
-    return new Range(from, to, new RangeDecoration(spec))
+  static mark(from: number, to: number, spec: MarkDecorationSpec): DecoratedRange {
+    if (from >= to) throw new RangeError("Mark decorations may not be empty")
+    return new Range(from, to, new MarkDecoration(spec))
   }
 
   static widget(pos: number, spec: WidgetDecorationSpec): DecoratedRange {
     return new Range(pos, pos, new WidgetDecoration(spec))
   }
 
-  static line(pos: number, spec: LineDecorationSpec): DecoratedRange {
-    return new Range(pos, pos, new LineDecoration(spec))
+  static replace(from: number, to: number, spec: ReplaceDecorationSpec): DecoratedRange {
+    // FIXME when is a replacement allowed to be zero-length?
+    return new Range(from, Math.max(from, to), new ReplaceDecoration(spec))
   }
 
-  static blockWidget(pos: number, spec: BlockWidgetDecorationSpec): DecoratedRange {
-    let sideSpec = spec.side || -1, side = sideSpec + BLOCK_BIG_SIDE * (sideSpec < 0 ? -1 : 1)
-    return new Range(pos, pos, new BlockWidgetDecoration(spec.widget, side, side, spec))
-  }
-
-  static blockRange(from: number, to: number, spec: BlockRangeDecorationSpec): DecoratedRange {
-    let side = BLOCK_BIG_SIDE + Math.max(0, spec.priority || 0)
-    return new Range(from, to, new BlockWidgetDecoration(spec.widget, -side, side, spec))
+  static line(start: number, spec: LineDecorationSpec): DecoratedRange {
+    return new Range(start, start, new LineDecoration(spec))
   }
 
   static set(of: DecoratedRange | ReadonlyArray<DecoratedRange>): DecorationSet {
@@ -102,14 +95,12 @@ export abstract class Decoration implements RangeValue {
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
 }
 
-export class RangeDecoration extends Decoration {
-  readonly collapsed: boolean
-
-  constructor(readonly spec: RangeDecorationSpec) {
-    super(INLINE_BIG_SIDE * (spec.inclusiveStart === true ? -1 : 1),
-          spec.collapsed instanceof WidgetType ? spec.collapsed : null, spec)
-    this.collapsed = !!spec.collapsed
-    Object.defineProperty(this, "endSide", {value: INLINE_BIG_SIDE * (spec.inclusiveEnd === true ? 1 : -1)})
+export class MarkDecoration extends Decoration {
+  endSide: number
+  constructor(spec: MarkDecorationSpec) {
+    let {start, end} = getInclusive(spec)
+    super(INLINE_BIG_SIDE * (start ? -1 : 1), null, spec)
+    this.endSide = INLINE_BIG_SIDE * (end ? 1 : -1)
   }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
@@ -123,21 +114,26 @@ export class RangeDecoration extends Decoration {
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
-  sameEffect(other: RangeDecoration): boolean {
+  sameEffect(other: Decoration): boolean {
     return this == other ||
+      other instanceof MarkDecoration &&
       this.spec.tagName == other.spec.tagName &&
       this.spec.class == other.spec.class &&
-      this.collapsed == other.collapsed &&
-      widgetsEq(this.widget, other.widget) &&
       attrsEq(this.spec.attributes || null, other.spec.attributes || null)
   }
 }
 
 export class WidgetDecoration extends Decoration {
   widget!: WidgetType
+  block: boolean
 
-  constructor(readonly spec: WidgetDecorationSpec) {
-    super(spec.side || 0, spec.widget || null, spec)
+  get endSide() { return this.startSide }
+
+  constructor(spec: WidgetDecorationSpec) {
+    let side = spec.side || 0
+    if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
+    super(side, spec.widget, spec)
+    this.block = !!spec.block
   }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
@@ -155,19 +151,60 @@ export class LineDecoration extends Decoration {
     super(-INLINE_BIG_SIDE, null, spec)
   }
 
+  get endSide() { return this.startSide }
+
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
     pos = mapStrict(pos, -1, mapping)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
   sameEffect(other: Decoration): boolean {
-    return other instanceof LineDecoration &&
-      attrsEq(this.spec.attributes, other.spec.attributes)
+    return other instanceof LineDecoration && attrsEq(this.spec.attributes, other.spec.attributes)
+  }
+}
+
+export class ReplaceDecoration extends Decoration {
+  block: boolean
+  endSide: number
+
+  constructor(spec: ReplaceDecorationSpec) {
+    let block = !!spec.block
+    let {start, end} = getInclusive(spec)
+    let startSide = block ? -BLOCK_BIG_SIDE * (start ? 2 : 1) : INLINE_BIG_SIDE * (start ? -1 : 1)
+    super(startSide, spec.widget || null, spec)
+    this.block = block
+    this.endSide = block ? BLOCK_BIG_SIDE * (end ? 2 : 1) : INLINE_BIG_SIDE * (end ? 1 : -1)
+  }
+
+  get replace() { return true }
+
+  map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
+    if (this.block) {
+      let newFrom = mapStrict(from, -1, mapping), newTo = mapStrict(to, 1, mapping)
+      return newFrom < 0 || newTo < 0 ? null : new Range(newFrom, newTo, this)
+    } else {
+      // FIXME duplicated from markdecoration
+      let newFrom = mapping.mapPos(from, this.startSide, true), newTo = mapping.mapPos(to, this.endSide, true)
+      if (newFrom < 0) {
+        if (newTo < 0) return null
+        newFrom = this.startSide >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
+      } else if (newTo < 0) {
+        newTo = this.endSide < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
+      }
+      return newFrom < newTo ? new Range(newFrom, newTo, this) : null
+    }
+  }
+
+  sameEffect(other: Decoration): boolean {
+    return other instanceof ReplaceDecoration &&
+      widgetsEq(this.widget, other.widget) &&
+      this.block == other.block
   }
 }
 
 // Map `pos`, but return -1 when the character before or after
 // (depending on `side`) is deleted.
+// FIXME make mapPos able to do this? Another changeset method?
 function mapStrict(pos: number, side: number, mapping: ChangeSet): number {
   for (let change of mapping.changes) {
     // If the line break before was deleted, drop this decoration
@@ -177,32 +214,11 @@ function mapStrict(pos: number, side: number, mapping: ChangeSet): number {
   return pos
 }
 
-export class BlockWidgetDecoration extends Decoration {
-  constructor(widget: WidgetType, startSide: number, endSide: number, spec: any) {
-    super(startSide, widget, spec)
-    Object.defineProperty(this, "endSide", {value: endSide})
-  }
-
-  map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
-    if (from == to) {
-      from = mapStrict(from, this.startSide, mapping)
-      return from < 0 ? null : new Range(from, from, this)
-    } else {
-      from = mapStrict(from, -1, mapping)
-      to = mapStrict(to, 1, mapping)
-      return from < 0 || to < 0 ? null : new Range(from, to, this)
-    }
-  }
-
-  sameEffect(other: Decoration): boolean {
-    return other instanceof BlockWidgetDecoration &&
-      widgetsEq(this.widget, other.widget) &&
-      this.startSide == other.startSide
-  }
-
-  get collapsed() { return this.startSide < this.endSide }
-
-  hasHeight() { return true }
+function getInclusive(spec: {inclusive?: boolean, inclusiveStart?: boolean, inclusiveEnd?: boolean}): {start: boolean, end: boolean} {
+  let {inclusiveStart: start, inclusiveEnd: end} = spec
+  if (start == null) start = spec.inclusive
+  if (end == null) end = spec.inclusive
+  return {start: start || false, end: end || false}
 }
 
 export function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
@@ -254,7 +270,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
       addRange(from, to, this.changes.content)
   }
 
-  compareCollapsed(from: number, to: number, byA: Decoration, byB: Decoration) {
+  compareReplaced(from: number, to: number, byA: Decoration, byB: Decoration) {
     if (!byA.sameEffect(byB)) {
       addRange(from, to, this.changes.content)
       addRange(from, to, this.changes.height)
@@ -281,7 +297,7 @@ class HeightDecoScanner implements RangeIterator<Decoration> {
   pos: number = 0
 
   advance(pos: number, active: ReadonlyArray<Decoration>) { this.pos = pos }
-  advanceCollapsed(pos: number) { addRange(this.pos, pos, this.ranges); this.pos = pos }
+  advanceReplaced(pos: number) { addRange(this.pos, pos, this.ranges); this.pos = pos }
   point(value: Decoration) { addRange(this.pos, this.pos, this.ranges) }
   ignoreRange(value: Decoration) { return true }
   ignorePoint(value: Decoration) { return !value.widget }

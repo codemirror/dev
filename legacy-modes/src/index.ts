@@ -53,7 +53,7 @@ class StateCache<S> {
       } else {
         let style = readToken(mode, stream, state)
         if (style)
-          decorations.push(Decoration.range(cursor.offset + stream.start, cursor.offset + stream.pos, {class: 'cm-' + style.replace(/ /g, ' cm-')}))
+          decorations.push(Decoration.mark(cursor.offset + stream.start, cursor.offset + stream.pos, {class: 'cm-' + style.replace(/ /g, ' cm-')}))
         stream.start = stream.pos
       }
     }

@@ -17,7 +17,7 @@ const oWidgets = ViewField.decorations({
   create({state}) {
     let doc = state.doc.toString(), deco = []
     for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
-      deco.push(Decoration.range(i, i + 1, {collapsed: new OWidget(undefined)}))
+      deco.push(Decoration.replace(i, i + 1, {widget: new OWidget(undefined)}))
     return Decoration.set(deco)
   },
   update(deco) { return deco }

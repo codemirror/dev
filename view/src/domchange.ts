@@ -118,7 +118,9 @@ class DOMReader {
       this.readNode(cur)
       let next: Node | null = cur.nextSibling
       if (next == end) break
-      if (isBlockNode(cur) || (isBlockNode(next!) && cur.nodeName != "BR")) this.text += LINE_SEP
+      let view = cur.cmView
+      if ((view ? view.breakAfter : isBlockNode(cur)) ||
+          (isBlockNode(next!) && cur.nodeName != "BR")) this.text += LINE_SEP
       cur = next!
     }
     this.findPointBefore(parent, end)

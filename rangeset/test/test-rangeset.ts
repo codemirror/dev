@@ -5,13 +5,13 @@ const ist = require("ist")
 class Value implements RangeValue {
   startSide: number
   endSide: number
-  collapsed: boolean
+  replace: boolean
   name: string | null
   pos: number | null
   constructor(spec: any = {}) {
     this.startSide = spec.startSide || 1
     this.endSide = spec.endSide || -1
-    this.collapsed = !!spec.collapsed
+    this.replace = !!spec.replace
     this.name = spec.name || null
     this.pos = spec.pos == null ? null : spec.pos
   }
@@ -26,7 +26,7 @@ class Value implements RangeValue {
   }
   static names(v: ReadonlyArray<Value>): string {
     let result = []
-    for (let val of v) if (val.name || val.collapsed) result.push(val.name || "COLLAPSED")
+    for (let val of v) if (val.name || val.replace) result.push(val.name || "REPLACED")
     return result.sort().join("/")
   }
 }
@@ -183,7 +183,7 @@ describe("RangeSet", () => {
     it("defaults to exclusive on both sides", () =>
        test([mk(1, 2)], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
 
-    it("drops collapsed ranges", () =>
+    it("drops replaced ranges", () =>
        test([mk(1, 2)], [[1, 2, 0], [1, 1, 1]], []))
 
     it("drops ranges in deleted regions", () =>
@@ -215,7 +215,7 @@ describe("RangeSet", () => {
       checkSet(set)
     })
 
-    it("removes collapsed tree nodes", () => {
+    it("removes replaced tree nodes", () => {
       let set = set0().map(new ChangeSet([new Change(0, 6000, [""])]))
       ist(set.size, 0)
       ist(depth(set), 1)
@@ -241,7 +241,7 @@ describe("RangeSet", () => {
         this.addRange(from, to)
     }
     compareRangeValues(a: Value, b: Value) { return a.name == b.name }
-    compareCollapsed(from: number, to: number, byA: Value, byB: Value) {
+    compareReplaced(from: number, to: number, byA: Value, byB: Value) {
       if (byA.name != byB.name) this.addRange(from, to)
     }
     comparePoints(pos: number, pointsA: Value[], pointsB: Value[]) {
@@ -308,8 +308,8 @@ describe("RangeSet", () => {
       }, [850, 860])
     })
 
-    it("ignores collapsed sub-nodes", () => {
-      let ranges = [mk(3, 997, {collapsed: true})]
+    it("ignores replaced sub-nodes", () => {
+      let ranges = [mk(3, 997, {replace: true})]
       for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
       let set = mkSet(ranges)
       test(set, {
@@ -318,8 +318,8 @@ describe("RangeSet", () => {
       }, [])
     })
 
-    it("ignores changes in collapsed ranges", () => {
-      let ranges = [mk(3, 997, {collapsed: true})]
+    it("ignores changes in replaced ranges", () => {
+      let ranges = [mk(3, 997, {replace: true})]
       for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
       let set = mkSet(ranges)
       test(set, {
@@ -327,14 +327,14 @@ describe("RangeSet", () => {
       }, [])
     })
 
-    it("notices adding a collapsed range", () => {
-      test([mk(3, 50, {collapsed: true})], {
-        add: [mk(40, 80, {collapsed: true})]
+    it("notices adding a replaced range", () => {
+      test([mk(3, 50, {replace: true})], {
+        add: [mk(40, 80, {replace: true})]
       }, [50, 80])
     })
 
-    it("notices removing a collapsed range", () => {
-      test([mk(3, 50, {collapsed: true})], {
+    it("notices removing a replaced range", () => {
+      test([mk(3, 50, {replace: true})], {
         filter: () => false
       }, [3, 50])
     })
@@ -361,7 +361,7 @@ describe("RangeSet", () => {
       this.spans.push((pos - this.pos) + (name ? "=" + name : ""))
       this.pos = pos
     }
-    advanceCollapsed(pos: number) {
+    advanceReplaced(pos: number) {
       if (pos <= this.pos) return
       this.spans.push((pos - this.pos) + "=ø")
       this.pos = pos
@@ -369,7 +369,7 @@ describe("RangeSet", () => {
     point(value: Value) {
       this.spans.push("[" + value.name + "]")
     }
-    ignoreRange(value: Value) { return !value.name && !value.collapsed }
+    ignoreRange(value: Value) { return !value.name && !value.replace }
     ignorePoint(value: Value) { return !value.name }
   }
 

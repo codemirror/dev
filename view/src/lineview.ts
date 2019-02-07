@@ -11,6 +11,7 @@ export class LineView extends ContentView {
   dom!: HTMLElement | null
   prevAttrs: {[name: string]: string} | null | undefined = undefined
   attrs: {[name: string]: string} | null = null
+  breakAfter = 0
 
   // Consumes source
   merge(from: number, to: number = this.length, source: LineView, takeDeco: boolean, composition: CompositionView | null) {
@@ -81,6 +82,7 @@ export class LineView extends ContentView {
 
   split(at: number) {
     let end = new LineView
+    end.breakAfter = this.breakAfter
     if (this.length == 0) return end
     let {i, off} = this.childCursor().findPos(at)
     if (off) {
@@ -192,25 +194,25 @@ export class LineView extends ContentView {
     return view
   }
 
-  get breakAfter() { return true }
-  get breakBefore() { return true }
-
   match(other: ContentView) { return false }
 }
 
 const none = [] as any
 
+export const enum BlockWidgetType { before, after, cover }
+
 export class BlockWidgetView extends ContentView {
   dom!: HTMLElement | null
   parent!: DocView | null
+  breakAfter = 0
 
-  constructor(public widget: WidgetType, public length: number, public side: number, public range: boolean) { super() }
+  constructor(public widget: WidgetType | null, public length: number, public range: boolean, public type: BlockWidgetType) { super() }
 
   get children() { return none }
 
   sync() {
-    if (!this.dom || !this.widget.updateDOM(this.dom)) {
-      this.setDOM(this.widget.toDOM())
+    if (!this.dom || !(this.widget && this.widget.updateDOM(this.dom))) {
+      this.setDOM(this.widget ? this.widget.toDOM() : document.createElement("div"))
       this.dom!.contentEditable = "false"
     }
   }
@@ -221,15 +223,13 @@ export class BlockWidgetView extends ContentView {
 
   domBoundsAround() { return null }
 
-  get breakBefore() { return this.range || this.side < 0 }
-  get breakAfter() { return this.range || this.side > 0 }
-
   match(other: ContentView) {
-    if (other instanceof BlockWidgetView && other.range == this.range && other.side == this.side &&
-        other.widget.constructor == this.widget.constructor) {
-      if (!other.widget.eq(this.widget.value)) this.markDirty(true)
+    if (other instanceof BlockWidgetView && other.range == this.range &&
+        (other.widget && other.widget.constructor) == (this.widget && this.widget.constructor)) {
+      if (this.widget && !other.widget!.eq(this.widget.value)) this.markDirty(true)
       this.widget = other.widget
       this.length = other.length
+      this.breakAfter = other.breakAfter
       return true
     }
     return false

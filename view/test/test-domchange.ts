@@ -120,7 +120,7 @@ describe("DOM changes", () => {
 
   it("doesn't drop collapsed text", () => {
     let cm = tempEditor("abcd", [ViewField.decorations({
-      create() { return Decoration.set(Decoration.range(1, 3, {collapsed: true})) },
+      create() { return Decoration.set(Decoration.replace(1, 3, {})) },
       update(d, u) { return u.transactions.length ? Decoration.none : d }
     })])
     cm.domAtPos(0)!.node.firstChild!.textContent = "x"

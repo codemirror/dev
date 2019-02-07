@@ -3,6 +3,6 @@ export {ViewExtension, ViewField, handleDOMEvents,
         ViewPlugin, viewPlugin, styleModule, focusChange, ViewUpdate} from "./extension"
 export {Viewport} from "./viewport"
 export {Decoration, DecorationSet, DecoratedRange, WidgetType,
-        RangeDecorationSpec, WidgetDecorationSpec, LineDecorationSpec} from "./decoration"
+        MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec} from "./decoration"
 export {LineHeight} from "./heightmap"
 export {Slot} from "../../extension/src/extension"

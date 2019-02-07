@@ -28,7 +28,7 @@ function decos(startState: DecorationSet = Decoration.none) {
 }
 
 function d(from: number, to: any, spec: any = null) {
-  return Decoration.range(from, to, typeof spec == "string" ? {attributes: {[spec]: "y"}} : spec)
+  return Decoration.mark(from, to, typeof spec == "string" ? {attributes: {[spec]: "y"}} : spec)
 }
 
 function w(pos: number, widget: WidgetType<any>, side: number = 0) {
@@ -151,10 +151,10 @@ describe("EditorView decoration", () => {
       ist(elt, cm.contentDOM.querySelector("strong"))
     })
 
-    it("notices replaced collapsed decorations", () => {
-      let cm = decoEditor("abc", [d(1, 2, {collapsed: new WordWidget("X")})])
+    it("notices replaced replacement decorations", () => {
+      let cm = decoEditor("abc", [Decoration.replace(1, 2, {widget: new WordWidget("X")})])
       cm.dispatch(cm.state.transaction
-                  .addMeta(addDeco([d(1, 2, {collapsed: new WordWidget("Y")})]))
+                  .addMeta(addDeco([Decoration.replace(1, 2, {widget: new WordWidget("Y")})]))
                   .addMeta(filterDeco(() => false)))
       ist(cm.contentDOM.textContent, "aYc")
     })
@@ -203,25 +203,27 @@ describe("EditorView decoration", () => {
     })
   })
 
-  describe("collapsed", () => {
-    it("omits collapsed content", () => {
-      let cm = decoEditor("foobar", [d(1, 4, {collapsed: true})])
+  describe("replaced", () => {
+    function r(from: number, to: number, spec: any) { return Decoration.replace(from, to, spec) }
+
+    it("omits replaced content", () => {
+      let cm = decoEditor("foobar", [r(1, 4, {})])
       ist(cm.contentDOM.textContent, "far")
     })
 
-    it("can collapse across lines", () => {
-      let cm = decoEditor("foo\nbar\nbaz\nbug", [d(1, 14, {collapsed: true})])
+    it("can replace across lines", () => {
+      let cm = decoEditor("foo\nbar\nbaz\nbug", [r(1, 14, {})])
       ist(cm.contentDOM.childNodes.length, 1)
       ist(cm.contentDOM.firstChild!.textContent, "fg")
     })
 
     it("draws replacement widgets", () => {
-      let cm = decoEditor("foo\nbar\nbaz", [d(6, 9, {collapsed: new WordWidget("X")})])
+      let cm = decoEditor("foo\nbar\nbaz", [r(6, 9, {widget: new WordWidget("X")})])
       ist(cm.contentDOM.textContent, "foobaXaz")
     })
 
-    it("can handle multiple overlapping collapsed ranges", () => {
-      let cm = decoEditor("foo\nbar\nbaz\nbug", [d(1, 6, {collapsed: true}), d(6, 9, {collapsed: true}), d(8, 14, {collapsed: true})])
+    it("can handle multiple overlapping replaced ranges", () => {
+      let cm = decoEditor("foo\nbar\nbaz\nbug", [r(1, 6, {}), r(6, 9, {}), r(8, 14, {})])
       ist(cm.contentDOM.childNodes.length, 1)
       ist(cm.contentDOM.firstChild!.textContent, "fg")
     })
@@ -282,11 +284,11 @@ describe("EditorView decoration", () => {
   }
 
   function bw(pos: number, side = -1, name = "n") {
-    return Decoration.blockWidget(pos, {widget: new BlockWidget(name), side})
+    return Decoration.widget(pos, {widget: new BlockWidget(name), side, block: true})
   }
 
-  function br(from: number, to: number, name = "r", priority = 0) {
-    return Decoration.blockRange(from, to, {widget: new BlockWidget(name), priority})
+  function br(from: number, to: number, name = "r", inclusive = false) {
+    return Decoration.replace(from, to, {widget: new BlockWidget(name), inclusive, block: true})
   }
 
   function widgets(cm: EditorView, ...groups: string[][]) {
@@ -325,7 +327,7 @@ describe("EditorView decoration", () => {
     // FIXME add widgets at end of doc, start of doc, end/start of lines inside doc
     // block ranges
     // widgets around block ranges
-    // tests of overlapping collapsed ranges, block or not
+    // tests of overlapping replaced ranges, block or not
 
     it("doesn't redraw unchanged widgets", () => {
       let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(7, 1, "B")])

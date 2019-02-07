@@ -39,7 +39,7 @@ describe("HeightMap", () => {
   it("separates lines with decorations on them", () => {
     let map = mk(doc(10, 10, 20, 5),
                  [Decoration.widget(5, {widget: new MyWidget(20)}),
-                  Decoration.range(25, 46, {collapsed: true})])
+                  Decoration.replace(25, 46, {})])
     ist(map.length, 48)
     ist(map.toString(), "line(10:5,20) gap(10) line(26:3,-21)")
   })
@@ -47,7 +47,7 @@ describe("HeightMap", () => {
   it("ignores irrelevant decorations", () => {
     let map = mk(doc(10, 10, 20, 5),
                  [Decoration.widget(5, {widget: new NoHeightWidget(null)}),
-                  Decoration.range(25, 46, {class: "ahah"})])
+                  Decoration.mark(25, 46, {class: "ahah"})])
     ist(map.length, 48)
     ist(map.toString(), "gap(48)")
   })
@@ -62,9 +62,9 @@ describe("HeightMap", () => {
 
   it("stores information about line widgets", () => {
     let text = doc(3, 3, 3), oracle = o(text)
-    let map = mk(text, [Decoration.blockWidget(0, {widget: new MyWidget(10), side: -1}),
-                        Decoration.blockWidget(3, {widget: new MyWidget(5), side: 1}),
-                        Decoration.blockWidget(0, {widget: new MyWidget(13), side: -1})])
+    let map = mk(text, [Decoration.widget(0, {widget: new MyWidget(10), side: -1, block: true}),
+                        Decoration.widget(3, {widget: new MyWidget(5), side: 1, block: true}),
+                        Decoration.widget(0, {widget: new MyWidget(13), side: -1, block: true})])
     ist(map.toString(), "line(3:-2,23,-1,5) gap(7)")
     ist(map.heightAt(0, text, -1), 23)
     ist(map.heightAt(0, text, 1), 23 + oracle.lineHeight)
@@ -78,19 +78,19 @@ describe("HeightMap", () => {
 
   it("stores information about block ranges", () => {
     let text = doc(3, 3, 3, 3, 3, 3)
-    let map = mk(text, [Decoration.blockRange(4, 11, {widget: new MyWidget(40)}),
-                        Decoration.blockWidget(4, {widget: new MyWidget(10), side: -1}),
-                        Decoration.blockWidget(11, {widget: new MyWidget(15), side: 1}),
+    let map = mk(text, [Decoration.replace(4, 11, {widget: new MyWidget(40), block: true}),
+                        Decoration.widget(4, {widget: new MyWidget(10), side: -1, block: true}),
+                        Decoration.widget(11, {widget: new MyWidget(15), side: 1, block: true}),
                         // This one covers the block widgets around it (due to priority)
-                        Decoration.blockRange(16, 19, {widget: new MyWidget(50), priority: 10}),
-                        Decoration.blockWidget(16, {widget: new MyWidget(20), side: -1}),
-                        Decoration.blockWidget(19, {widget: new MyWidget(10), side: 1})])
+                        Decoration.replace(16, 19, {widget: new MyWidget(50), block: true, inclusive: true}),
+                        Decoration.widget(16, {widget: new MyWidget(20), side: -1, block: true}),
+                        Decoration.widget(19, {widget: new MyWidget(10), side: 1, block: true})])
     ist(map.toString(), "gap(3) line(7:-2,10,-1,15) gap(3) line(3) gap(3)")
   })
 
   it("joins ranges", () => {
     let text = doc(10, 10, 10, 10)
-    let map = mk(text, [Decoration.range(16, 27, {collapsed: true})])
+    let map = mk(text, [Decoration.replace(16, 27, {})])
     ist(map.toString(), "gap(10) line(21:5,-11) gap(10)")
     map = map.applyChanges([], o(text.replace(5, 38, ["yyy"])), [new ChangedRange(5, 38, 5, 8)])
     ist(map.toString(), "gap(13)")
@@ -98,11 +98,11 @@ describe("HeightMap", () => {
 
   it("joins lines", () => {
     let text = doc(10, 10, 10)
-    let map = mk(text, [Decoration.range(2, 5, {collapsed: true}),
+    let map = mk(text, [Decoration.replace(2, 5, {}),
                         Decoration.widget(24, {widget: new MyWidget(20)})])
     ist(map.toString(), "line(10:2,-3) gap(10) line(10:2,20)")
     map = map.applyChanges([
-      Decoration.set([Decoration.range(2, 5, {collapsed: true}),
+      Decoration.set([Decoration.replace(2, 5, {}),
                       Decoration.widget(12, {widget: new MyWidget(20)})])
     ], o(text.replace(10, 22, [""])), [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20:2,-3,12,20)")

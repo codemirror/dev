@@ -51,7 +51,7 @@ function hasCompositionNode(view: any) {
 function wordDeco(state: EditorState): DecorationSet {
   let re = /\w+/g, m, deco = [], text = state.doc.toString()
   while (m = re.exec(text))
-    deco.push(Decoration.range(m.index, m.index + m[0].length, {class: "word"}))
+    deco.push(Decoration.mark(m.index, m.index + m[0].length, {class: "word"}))
   return Decoration.set(deco)
 }
 

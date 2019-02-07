@@ -1,12 +1,13 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
-import {DecorationSet, Decoration, RangeDecoration, WidgetDecoration, LineDecoration, BlockWidgetDecoration} from "./decoration"
-import {LineView, BlockWidgetView} from "./lineview"
+import {DecorationSet, Decoration, ReplaceDecoration, WidgetDecoration, LineDecoration, MarkDecoration} from "./decoration"
+import {LineView, BlockWidgetView, BlockWidgetType} from "./lineview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
 
 export class ContentBuilder implements RangeIterator<Decoration> {
   content: (LineView | BlockWidgetView)[] = []
-  maybeLine = true
+  curLine: LineView | null = null
+  breakAtStart = 0
   cursor: TextIterator
   text: string = ""
   skip: number
@@ -17,22 +18,26 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     this.skip = pos
   }
 
-  getLine() {
-    if (this.maybeLine) {
-      let line = new LineView
-      this.content.push(line)
-      this.maybeLine = false
-      return line
-    }
+  posCovered() {
+    if (this.content.length == 0)
+      return !this.breakAtStart && this.doc.lineAt(this.pos).start != this.pos
     let last = this.content[this.content.length - 1]
-    // FIXME remove after testing
-    if (!(last instanceof LineView)) throw new Error("Invariant broken: got block widget where line was expected")
-    return last
+    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockWidgetType.before)
+  }
+
+  getLine() {
+    if (!this.curLine)
+      this.content.push(this.curLine = new LineView)
+    return this.curLine
+  }
+
+  addWidget(view: BlockWidgetView) {
+    this.curLine = null
+    this.content.push(view)
   }
 
   finish() {
-    if (this.maybeLine) this.getLine()
-    return this.content
+    if (!this.posCovered()) this.getLine()
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null,
@@ -43,9 +48,11 @@ export class ContentBuilder implements RangeIterator<Decoration> {
         this.skip = 0
         if (done) throw new Error("Ran out of text content when drawing inline views")
         if (lineBreak) {
-          if (this.maybeLine) this.getLine()
+          if (!this.posCovered()) this.getLine()
+          if (this.content.length) this.content[this.content.length - 1].breakAfter = 1
+          else this.breakAtStart = 1
+          this.curLine = null
           length--
-          this.maybeLine = true
           continue
         } else {
           this.text = value
@@ -64,7 +71,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
 
     let tagName = null, clss = null
     let attrs: {[key: string]: string} | null = null
-    for (let {spec} of active as RangeDecoration[]) {
+    for (let {spec} of active as MarkDecoration[]) {
       if (spec.tagName) tagName = spec.tagName
       if (spec.class) clss = clss ? clss + " " + spec.class : spec.class
       if (spec.attributes) for (let name in spec.attributes) {
@@ -84,13 +91,10 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  advanceCollapsed(pos: number, deco: Decoration) {
-    if (deco instanceof BlockWidgetDecoration) {
-      if (!this.maybeLine || this.doc.lineAt(pos).end != pos)
-        throw new Error("Invalid block range widget—doesn't span entire lines")
-      this.maybeLine = false
+  advanceReplaced(pos: number, deco: ReplaceDecoration) {
+    if (deco.block) {
       if (pos > this.pos)
-        this.content.push(new BlockWidgetView(deco.widget!, pos - this.pos, deco.startSide, true))
+        this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, true, BlockWidgetType.cover))
     } else if (pos > this.pos) {
       let line = this.getLine()
       let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
@@ -100,7 +104,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
         line.append(widgetView)
     }
 
-    // Advance the iterator past the collapsed content
+    // Advance the iterator past the replaced content
     let length = pos - this.pos
     if (this.textOff + length <= this.text.length) {
       this.textOff += length
@@ -112,17 +116,16 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  point(deco: Decoration) {
-    if (deco instanceof WidgetDecoration) {
-      this.getLine().append(new WidgetView(0, deco.widget, deco.startSide))
-    } else if (deco instanceof LineDecoration) {
+  point(deco: LineDecoration | WidgetDecoration) {
+    if (deco instanceof LineDecoration) {
       if (this.doc.lineAt(this.pos).start == this.pos)
         this.getLine().addLineDeco(deco as LineDecoration)
-    } else if (deco instanceof BlockWidgetDecoration) {
-      if (deco.startSide < 0 ? !this.maybeLine : this.doc.lineAt(this.pos).end != this.pos)
-        throw new Error("Invalid block widget—not at line boundary")
-      if (deco.startSide > 0 && this.maybeLine) this.getLine()
-      this.content.push(new BlockWidgetView(deco.widget!, 0, deco.startSide, false))
+    } else if (deco.block) {
+      if (deco.startSide > 0 && !this.posCovered()) this.getLine()
+      this.addWidget(new BlockWidgetView(deco.widget, 0, false,
+                                         deco.startSide < 0 ? BlockWidgetType.before : BlockWidgetType.after))
+    } else {
+      this.getLine().append(new WidgetView(0, deco.widget, deco.startSide))
     }
   }
 
@@ -130,9 +133,11 @@ export class ContentBuilder implements RangeIterator<Decoration> {
 
   ignorePoint(deco: Decoration): boolean { return false }
 
-  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>): (LineView | BlockWidgetView)[] {
+  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>):
+    {content: (LineView | BlockWidgetView)[], breakAtStart: number} {
     let builder = new ContentBuilder(text, from)
     RangeSet.iterateSpans(decorations, from, to, builder)
-    return builder.finish()
+    builder.finish()
+    return builder
   }
 }
