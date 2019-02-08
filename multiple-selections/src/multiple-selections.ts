@@ -1,5 +1,5 @@
 import {EditorState, StateExtension} from "../../state/src"
-import {ViewField, styleModule, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
+import {ViewField, styleModule, DecorationSet, Decoration, WidgetType, MarkDecorationSpec} from "../../view/src"
 import {StyleModule} from "style-mod"
 
 export interface Config {}
@@ -29,14 +29,14 @@ class CursorWidget extends WidgetType<null> {
   }
 }
 
-function decorateSelections(state: EditorState, rangeConfig: RangeDecorationSpec): DecorationSet {
+function decorateSelections(state: EditorState, rangeConfig: MarkDecorationSpec): DecorationSet {
   let {ranges, primaryIndex} = state.selection
   if (ranges.length == 1) return Decoration.none
   let deco = []
   for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {
     let range = ranges[i]
     deco.push(range.empty ? Decoration.widget(range.from, {widget: new CursorWidget(null)})
-              : Decoration.range(ranges[i].from, ranges[i].to, rangeConfig))
+              : Decoration.mark(ranges[i].from, ranges[i].to, rangeConfig))
   }
   return Decoration.set(deco)
 }

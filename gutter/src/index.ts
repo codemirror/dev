@@ -84,7 +84,7 @@ class GutterView implements ViewPlugin {
       } else {
         this.lines[i].update(lineNo, height, above, below, this.formatNumber)
       }
-      lineNo = line.hasCollapsedRanges ? -1 : lineNo + 1
+      lineNo = line.hasReplacedRanges ? -1 : lineNo + 1
       i++
     })
     while (this.lines.length > i) this.dom.removeChild(this.lines.pop()!.dom)

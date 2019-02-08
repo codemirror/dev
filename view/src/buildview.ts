@@ -1,6 +1,6 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {DecorationSet, Decoration, ReplaceDecoration, WidgetDecoration, LineDecoration, MarkDecoration} from "./decoration"
-import {LineView, BlockWidgetView, BlockWidgetType} from "./lineview"
+import {LineView, BlockWidgetView, BlockType} from "./lineview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
 
@@ -22,7 +22,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     if (this.content.length == 0)
       return !this.breakAtStart && this.doc.lineAt(this.pos).start != this.pos
     let last = this.content[this.content.length - 1]
-    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockWidgetType.before)
+    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockType.before)
   }
 
   getLine() {
@@ -94,7 +94,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   advanceReplaced(pos: number, deco: ReplaceDecoration) {
     if (deco.block) {
       if (pos > this.pos)
-        this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, true, BlockWidgetType.cover))
+        this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, true, BlockType.cover))
     } else if (pos > this.pos) {
       let line = this.getLine()
       let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
@@ -123,7 +123,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     } else if (deco.block) {
       if (deco.startSide > 0 && !this.posCovered()) this.getLine()
       this.addWidget(new BlockWidgetView(deco.widget, 0, false,
-                                         deco.startSide < 0 ? BlockWidgetType.before : BlockWidgetType.after))
+                                         deco.startSide < 0 ? BlockType.before : BlockType.after))
     } else {
       this.getLine().append(new WidgetView(0, deco.widget, deco.startSide))
     }

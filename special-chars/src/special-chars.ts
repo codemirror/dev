@@ -111,7 +111,7 @@ class SpecialCharHighlighter {
           } else {
             widget = new SpecialCharWidget(this.options, code)
           }
-          target.push(Decoration.range(pos + m.index, pos + m.index + m[0].length, {collapsed: widget}))
+          target.push(Decoration.replace(pos + m.index, pos + m.index + m[0].length, {widget}))
         }
       }
       pos += cursor.value.length

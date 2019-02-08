@@ -1,6 +1,6 @@
 import {EditorState, Transaction} from "../../state/src"
 import {ViewExtension} from "../../view/src"
-import {RangeDecoration} from "../../view/src/decoration"
+import {Decoration} from "../../view/src/"
 import {Range} from "../../rangeset/src/rangeset"
 
 import {Mode} from "../src/util"
@@ -43,7 +43,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
     getDecorations(vp: Viewport) {
       view.viewport = vp
       decorations = plugin.update(decorations, update([]))
-      const result: Range<RangeDecoration>[] = []
+      const result: Range<Decoration>[] = []
       decorations.collect(result, 0)
       return result
     },

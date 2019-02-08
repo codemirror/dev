@@ -199,14 +199,14 @@ export class LineView extends ContentView {
 
 const none = [] as any
 
-export const enum BlockWidgetType { before, after, cover }
+export const enum BlockType { before, after, cover }
 
 export class BlockWidgetView extends ContentView {
   dom!: HTMLElement | null
   parent!: DocView | null
   breakAfter = 0
 
-  constructor(public widget: WidgetType | null, public length: number, public range: boolean, public type: BlockWidgetType) { super() }
+  constructor(public widget: WidgetType | null, public length: number, public range: boolean, public type: BlockType) { super() }
 
   get children() { return none }
 

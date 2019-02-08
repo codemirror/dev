@@ -210,7 +210,7 @@ export class DocView extends ContentView {
       return
     }
 
-    let after = this.children[toI], breakAfter = false
+    let after = this.children[toI]
     if (toOff < after.length) {
       if ((toOff > 0 || fromI == toI) && after instanceof LineView) after = after.split(toOff)
       if (after instanceof LineView && !breakAtEnd && last instanceof LineView) {
@@ -421,10 +421,9 @@ export class DocView extends ContentView {
   }
 
   measureVisibleLineHeights() {
-    // FIXME add measurements for block widgets
     let result = [], {from, to} = this.viewport
     for (let pos = 0, i = 0; pos < to && i < this.children.length; i++) {
-      let child = this.children[i] as LineView
+      let child = this.children[i]
       if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
       pos += child.length + child.breakAfter
     }

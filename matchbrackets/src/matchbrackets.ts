@@ -2,7 +2,7 @@ import {Text} from "../../doc/src"
 import {EditorState} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {ViewExtension, ViewField, styleModule} from "../../view/src/"
-import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
+import {DecorationSet, Decoration} from "../../view/src/decoration"
 import {StyleModule} from "style-mod"
 
 const matching: {[key: string]: string | undefined} = {
@@ -28,7 +28,7 @@ function getStyle(decorations: DecorationSet | undefined, at: number): string | 
   let decoration
   while (decoration = iter.next())
     if (decoration.from <= at && at < decoration.to)
-      return (decoration.value as RangeDecoration).spec.class
+      return decoration.value.spec.class
 }
 
 function findMatchingBracket(
@@ -92,8 +92,8 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
     const match = findMatchingBracket(state.doc, referenceDecorations, range.head, config)
     if (!match) continue
     const style = match.match ? defaultStyles.matching : defaultStyles.nonmatching
-    decorations.push(Decoration.range(match.from, match.from + 1, {class: style}))
-    if (match.to) decorations.push(Decoration.range(match.to, match.to + 1, {class: style}))
+    decorations.push(Decoration.mark(match.from, match.from + 1, {class: style}))
+    if (match.to) decorations.push(Decoration.mark(match.to, match.to + 1, {class: style}))
   }
   return Decoration.set(decorations)
 }
