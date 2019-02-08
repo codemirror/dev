@@ -325,7 +325,7 @@ export class RangeSet<T extends RangeValue> {
         else if (next.next) addIterToHeap(heap, next.next, pos)
       } else { // It is a range that ends here
         let range = next as Range<T>
-          if (range.to >= to) break
+        if (range.to > to) break
         iterator.advance(range.to, active)
         active.splice(active.indexOf(range.value), 1)
       }
