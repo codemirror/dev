@@ -310,7 +310,8 @@ export class RangeSet<T extends RangeValue> {
             if (range.value.replace) {
               pos = range.to
               posSide = range.value.endSide
-              iterator.advanceReplaced(Math.min(pos, to), range.value)
+              if (range.from >= from && range.to <= to)
+                iterator.advanceReplaced(Math.min(pos, to), range.value)
             } else {
               active.push(range.value)
               addToHeap(heap, range)
@@ -590,6 +591,7 @@ class ComparisonSide<T extends RangeValue> {
 class RangeSetComparison<T extends RangeValue> {
   a: ComparisonSide<T>
   b: ComparisonSide<T>
+  start: number
   pos: number
   end: number
 
@@ -598,7 +600,7 @@ class RangeSetComparison<T extends RangeValue> {
               private comparator: RangeComparator<T>) {
     this.a = new ComparisonSide<T>([new IteratedSet<T>(startB - startA, a)])
     this.b = new ComparisonSide<T>([new IteratedSet<T>(0, b)])
-    this.pos = startB
+    this.pos = this.start = startB
     this.end = endB
     this.forwardIter(SIDE_A | SIDE_B)
   }
@@ -661,10 +663,11 @@ class RangeSetComparison<T extends RangeValue> {
         return
       }
       if (range.from < range.to && range.to + next.offset > this.pos) {
-        this.advancePos(range.from + next.offset)
-        if (range.value.replace) {
+        let from = range.from + next.offset, to = range.to + next.offset
+        this.advancePos(from)
+        if (range.value.replace && from >= this.start && to <= this.end) {
           side.replacedBy = range.value
-          side.replacedTo = Math.max(side.replacedTo, range.to + next.offset)
+          side.replacedTo = Math.max(side.replacedTo, to)
           // Skip regions that are replaced on both sides
           let replacedTo = Math.min(this.a.replacedTo, this.b.replacedTo)
           if (replacedTo > this.pos) {
@@ -673,7 +676,7 @@ class RangeSetComparison<T extends RangeValue> {
             this.pos = replacedTo
           }
         }
-        this.addActiveRange(Math.min(this.end, range.to + next.offset), range.value, side, otherSide)
+        this.addActiveRange(Math.min(this.end, to), range.value, side, otherSide)
       } else if (range.from == range.to) {
         this.advancePos(range.from + next.offset)
         let found = otherSide.points.indexOf(range.value)

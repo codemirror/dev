@@ -93,9 +93,8 @@ export class ContentBuilder implements RangeIterator<Decoration> {
 
   advanceReplaced(pos: number, deco: ReplaceDecoration) {
     if (deco.block) {
-      if (pos > this.pos)
-        this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, true, BlockType.cover))
-    } else if (pos > this.pos) {
+      this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, true, BlockType.cover))
+    } else {
       let line = this.getLine()
       let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
       if (line.children.length && line.children[line.children.length - 1].merge(widgetView))

@@ -1,6 +1,6 @@
 import {EditorView, ViewField, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
-import {StateField, EditorSelection} from "../../state/src"
+import {EditorSelection} from "../../state/src"
 import {Slot} from "../../extension/src/extension"
 import ist from "ist"
 
@@ -8,22 +8,18 @@ const filterDeco = Slot.define<(from: number, to: number, spec: any) => boolean>
 const addDeco = Slot.define<DecoratedRange[]>()
 
 function decos(startState: DecorationSet = Decoration.none) {
-  let field = new StateField<DecorationSet>({
-    init() { return startState },
-    apply(tr, value) {
-      if (tr.docChanged) value = value.map(tr.changes)
-      let add = tr.getMeta(addDeco), filter = tr.getMeta(filterDeco)
-      if (add || filter) value = value.update(add, filter)
-      return value
-    }
-  })
   return [
     ViewField.decorations({
-      create({state}) { return state.getField(field) },
-      update(_, {state}) { return state.getField(field) },
-      map: false
-    }),
-    field.extension
+      create() { return startState },
+      update(value, {transactions, state}) {
+        for (let tr of transactions) {
+          let add = tr.getMeta(addDeco), filter = tr.getMeta(filterDeco)
+          if (add || filter) value = value.update(add, filter)
+        }
+        return value
+      },
+      map: true
+    })
   ]
 }
 
@@ -324,10 +320,38 @@ describe("EditorView decoration", () => {
       widgets(cm, [], ["A"], [])
     })
 
-    // FIXME add widgets at end of doc, start of doc, end/start of lines inside doc
-    // block ranges
-    // widgets around block ranges
-    // tests of overlapping replaced ranges, block or not
+    it("can add widgets at the end and start of the doc", () => {
+      let cm = decoEditor("one\ntwo")
+      cm.dispatch(cm.state.transaction.addMeta(addDeco([bw(0, -1, "X"), bw(7, 1, "Y")])))
+      widgets(cm, ["X"], [], ["Y"])
+    })
+
+    it("can add widgets around inner lines", () => {
+      let cm = decoEditor("one\ntwo")
+      cm.dispatch(cm.state.transaction.addMeta(addDeco([bw(3, 1, "X"), bw(4, -1, "Y")])))
+      widgets(cm, [], ["X", "Y"], [])
+    })
+
+    it("can replace an empty line with a range", () => {
+      let cm = decoEditor("one\n\ntwo", [br(4, 4, "A")])
+      widgets(cm, [], ["A"], [])
+    })
+
+    it("can put a block range in the middle of a line", () => {
+      let cm = decoEditor("hello", [br(2, 3, "X")])
+      widgets(cm, [], ["X"], [])
+      cm.dispatch(cm.state.transaction.replace(1, 2, "u").addMeta(addDeco([br(2, 3, "X")])))
+      widgets(cm, [], ["X"], [])
+      cm.dispatch(cm.state.transaction.replace(3, 4, "i").addMeta(addDeco([br(2, 3, "X")])))
+      widgets(cm, [], ["X"], [])
+    })
+
+    it("can draw a block range that partially overlaps with a collapsed range", () => {
+      let cm = decoEditor("hello", [Decoration.replace(0, 3, {widget: new WordWidget("X")}),
+                                    br(1, 4, "Y")])
+      widgets(cm, [], ["Y"], [])
+      ist(cm.contentDOM.querySelector("strong"))
+    })
 
     it("doesn't redraw unchanged widgets", () => {
       let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(7, 1, "B")])

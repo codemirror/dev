@@ -411,7 +411,8 @@ class HeightMapGap extends HeightMap {
     } else {
       let lineStart = oracle.doc.lineAt(newTo).start
       if (lineStart > newOffset) target.push(new HeightMapGap(newOffset, lineStart - 1, oracle))
-      let deco = offsetDeco((node as HeightMapLine).deco, 0, 0, newTo - lineStart)
+      let deco = (node as HeightMapLine).deco, offset = newTo - lineStart
+      if (deco.length && offset) deco = deco.map(d => d.move(offset))
       target.push(new HeightMapLine(newTo + node.length - lineStart, node.height, deco))
     }
   }

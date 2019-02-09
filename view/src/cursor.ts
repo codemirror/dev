@@ -158,7 +158,6 @@ export class LineContext {
     }
   }
 
-
   nearViewportEnd(view: EditorView, side: number = 0): boolean {
     for (let {from, to} of view.docView.viewports)
       if (from > 0 && from == this.start && side <= 0 ||

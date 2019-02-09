@@ -14,8 +14,7 @@ export const multipleSelections = StateExtension.unique((configs: Config[]) => {
       update(deco, {prevState, state}) {
         return prevState.doc == state.doc && prevState.selection.eq(state.selection)
           ? deco : decorateSelections(state, rangeConfig)
-      },
-      map: false
+      }
     }),
     styleModule(styles)
   )

@@ -184,7 +184,6 @@ function decoSpec(field: StateField<StateCache<any>>, config: Config) {
   }
   return {
     create(view: EditorView) { return update(view, false) },
-    update(_: DecorationSet, u: ViewUpdate) { return update(u.view, u.docChanged) },
-    map: false
+    update(_: DecorationSet, u: ViewUpdate) { return update(u.view, u.docChanged) }
   }
 }
