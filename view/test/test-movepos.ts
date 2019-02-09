@@ -20,10 +20,10 @@ const oWidgets = ViewField.decorations({
       deco.push(Decoration.replace(i, i + 1, {widget: new OWidget(undefined)}))
     return Decoration.set(deco)
   },
-  update(deco) { return deco }
+  update(deco) { return deco },
+  map: true
 })
 
-/*
 class BigWidget extends WidgetType<void> {
   toDOM() {
     let node = document.createElement("div")
@@ -32,7 +32,6 @@ class BigWidget extends WidgetType<void> {
   }
   get estimatedHeight() { return 200 }
 }
-*/
 
 describe("EditorView.movePos", () => {
   it("does the right thing for character motion when focused", () => {
@@ -117,24 +116,25 @@ describe("EditorView.movePos", () => {
     ist(cm.movePos(10, "backward", "line"), 6)
   })
 
-  /*
   it("can cross large line widgets during line motion", () => {
     let cm = tempEditor("one\ntwo", [ViewField.decorations({
-      create() { return Decoration.set([
-        Decoration.line(0, {widget: new BigWidget(undefined), side: 1}),
-        Decoration.line(4, {widget: new BigWidget(undefined), side: -1})
-      ]) },
+      create() {
+        return Decoration.set([
+          Decoration.widget(3, {widget: new BigWidget(undefined), side: 1, block: true}),
+          Decoration.widget(4, {widget: new BigWidget(undefined), side: -1, block: true})
+        ])
+      },
       update(deco) { return deco }
     })])
+    console.log(cm.docView.heightMap + "")
     ist(cm.contentDOM.offsetHeight, 400, ">")
-    ist(cm.movePos(0, "forward", "line"), 4)
+//    ist(cm.movePos(0, "forward", "line"), 4)
     ist(cm.movePos(2, "forward", "line"), 6)
-    ist(cm.movePos(3, "forward", "line"), 7)
+/*    ist(cm.movePos(3, "forward", "line"), 7)
     ist(cm.movePos(4, "backward", "line"), 0)
     ist(cm.movePos(5, "backward", "line"), 1)
-    ist(cm.movePos(7, "backward", "line"), 3)
+    ist(cm.movePos(7, "backward", "line"), 3)*/
   })
-  */
 
   function testLineBoundaryMotion(focus: boolean) {
     let cm = tempEditor("\none two\n")
