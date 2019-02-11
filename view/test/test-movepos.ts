@@ -126,7 +126,6 @@ describe("EditorView.movePos", () => {
       },
       update(deco) { return deco }
     })])
-    console.log(cm.docView.heightMap + "")
     ist(cm.contentDOM.offsetHeight, 400, ">")
 //    ist(cm.movePos(0, "forward", "line"), 4)
     ist(cm.movePos(2, "forward", "line"), 6)

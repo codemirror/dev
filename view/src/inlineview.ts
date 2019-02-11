@@ -1,7 +1,7 @@
 import {ContentView} from "./contentview"
-import {WidgetType} from "./decoration"
+import {WidgetType, widgetsEq} from "./decoration"
 import {attrsEq} from "./attributes"
-import {LineView} from "./lineview"
+import {LineView} from "./blockview"
 import {Text} from "../../doc/src"
 import {Rect} from "./dom"
 import browser from "./browser"
@@ -138,7 +138,7 @@ function textCoords(text: Node, pos: number): Rect {
 export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
-  constructor(public length: number, public widget: WidgetType | null, readonly side: number) {
+  constructor(public length: number, public widget: WidgetType | null, readonly side: number, readonly open: boolean = false) {
     super()
   }
 
@@ -155,7 +155,9 @@ export class WidgetView extends InlineView {
   getSide() { return this.side }
 
   merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof WidgetView) || this.widget || other.widget) return false
+    if (!(other instanceof WidgetView) || !other.open) return false
+    if (!widgetsEq(this.widget, other.widget))
+      throw new Error("Trying to merge incompatible widgets")
     this.length = from + other.length + (this.length - to)
     return true
   }

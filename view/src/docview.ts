@@ -1,5 +1,5 @@
 import {ContentView, ChildCursor, DocChildCursor, dirty} from "./contentview"
-import {LineView, BlockWidgetView} from "./lineview"
+import {BlockView, LineView, BlockType} from "./blockview"
 import {TextView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
@@ -19,7 +19,7 @@ const none = [] as any
 const enum Composing { no, starting, yes, ending }
 
 export class DocView extends ContentView {
-  children!: (LineView | BlockWidgetView)[]
+  children!: BlockView[]
   viewports: Viewport[] = none
 
   decorations!: A<DecorationSet>
@@ -68,7 +68,7 @@ export class DocView extends ContentView {
     this.children = [new LineView]
     this.children[0].setParent(this)
     this.viewports = this.decorations = none
-    let contentChanges = this.computeUpdate(none, state, none, changedRanges, 0, -1)
+    let contentChanges = this.computeUpdate(null, state, none, changedRanges, 0, -1)
     this.updateInner(contentChanges, 0)
     this.cancelLayoutCheck()
     this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
@@ -199,26 +199,21 @@ export class DocView extends ContentView {
   }
 
   private replaceRange(fromI: number, fromOff: number, toI: number, toOff: number,
-                       content: (BlockWidgetView | LineView)[], breakAtStart: number) {
+                       content: BlockView[], breakAtStart: number) {
     let before = this.children[fromI], last = content.length ? content[content.length - 1] : null
     let breakAtEnd = last ? last.breakAfter : breakAtStart
     // Change within a single line
-    if (fromI == toI && before instanceof LineView &&
-        !breakAtStart && !breakAtEnd &&
-        (content.length == 1 && last instanceof LineView || content.length == 0)) {
-      before.merge(fromOff, toOff, content.length ? last as LineView : new LineView, fromOff == 0, this.composition)
+    if (fromI == toI && !breakAtStart && !breakAtEnd && content.length < 2 &&
+        before.merge(fromOff, toOff, content.length ? last : null, fromOff == 0, this.composition))
       return
-    }
 
     let after = this.children[toI]
     if (toOff < after.length) {
-      if ((toOff > 0 || fromI == toI) && after instanceof LineView) after = after.split(toOff)
-      if (after instanceof LineView && !breakAtEnd && last instanceof LineView) {
-        if (fromI != toI) (this.children[toI] as LineView).transferDOM(after)
-        last.merge(last.length, last.length, after, false, this.composition)
+      if (toOff > 0 || fromI == toI) after = after.split(toOff)
+      if (!breakAtEnd && last && last.merge(last.length, last.length, after, false, this.composition)) {
         last.breakAfter = after.breakAfter
       } else {
-        content.push(last = after)
+        content.push(after)
       }
     } else if (after.breakAfter) {
       if (last) last.breakAfter = 1
@@ -228,11 +223,10 @@ export class DocView extends ContentView {
 
     before.breakAfter = breakAtStart
     if (fromOff > 0) {
-      if (before instanceof LineView && !breakAtStart && last && content[0] instanceof LineView) {
-        before.breakAfter = content[0].breakAfter
-        before.merge(fromOff, before.length, content.shift() as LineView, false, this.composition)
+      if (!breakAtStart && content.length && before.merge(fromOff, before.length, content[0], false, this.composition)) {
+        before.breakAfter = content.shift()!.breakAfter
       } else if (fromOff < before.length) {
-        ;(before as LineView).merge(fromOff, before.length, new LineView, false, this.composition)
+        before.merge(fromOff, before.length, null, false, this.composition)
       }
       fromI++
     }
@@ -298,14 +292,15 @@ export class DocView extends ContentView {
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
   // Passing update == null means the state didn't change
-  computeUpdate(transactions: A<Transaction>, state: EditorState, metadata: Slot[],
-                contentChanges: A<ChangedRange> = none,
-                bias: number, scrollIntoView: number): A<ChangedRange> {
+  computeUpdate(trs: A<Transaction> | null, // Null means we're initializing
+                state: EditorState, metadata: Slot[], contentChanges: A<ChangedRange>,
+                viewportBias: number, scrollIntoView: number): A<ChangedRange> {
+    let init = trs == null, transactions = trs || none
     for (let i = 0;; i++) {
-      let viewport = this.viewportState.getViewport(state.doc, this.heightMap, bias, scrollIntoView)
+      let viewport = this.viewportState.getViewport(state.doc, this.heightMap, viewportBias, scrollIntoView)
       let viewportChange = this.viewport ? !viewport.eq(this.viewport) : true
       // After 5 tries, or when the viewport is stable and no more iterations are needed, return
-      if (i == 5 || !(viewportChange || transactions.length || metadata.length)) {
+      if (i == 5 || !(init || viewportChange || transactions.length || metadata.length)) {
         if (i == 5) console.warn("Viewport and decorations failed to converge")
         return contentChanges
       }
@@ -314,22 +309,24 @@ export class DocView extends ContentView {
 
       let decorations = this.view.getEffect(ViewField.decorationEffect)
       // If the decorations are stable, stop.
-      if (transactions.length == 0 && sameArray(decorations, this.decorations))
+      if (!init && transactions.length == 0 && sameArray(decorations, this.decorations))
         return contentChanges
       // Compare the decorations (between document changes)
-      let {content, height} = decoChanges(transactions.length ? contentChanges : none, decorations,
+      let {content, height} = decoChanges(init || transactions.length ? contentChanges : none, decorations,
                                           this.decorations, prevState.doc.length)
       this.decorations = decorations
       // Update the heightmap with these changes. If this is the first
       // iteration and the document changed, also include decorations
       // for inserted ranges.
       let heightChanges = extendWithRanges(none, height)
-      if (transactions.length) heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
+      if (init || transactions.length)
+        heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
       this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, heightChanges)
       // Accumulate content changes so that they can be redrawn
       contentChanges = extendWithRanges(contentChanges, content)
       // Make sure only one iteration is marked as required / state changing
       transactions = metadata = none
+      init = false
     }
   }
 
@@ -416,7 +413,7 @@ export class DocView extends ContentView {
     for (;; i--) {
       let child = this.children[i]
       if (child instanceof LineView) return child.domFromPos(off)
-      if (child.range || i == 0) return null
+      if (child.type == BlockType.widgetRange || i == 0) return null
     }
   }
 

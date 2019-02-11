@@ -17,7 +17,7 @@ export interface RangeComparator<T extends RangeValue> {
 
 export interface RangeIterator<T extends RangeValue> {
   advance(pos: number, active: A<T>): void
-  advanceReplaced(pos: number, value: T): void
+  advanceReplaced(pos: number, value: T, openStart: boolean, openEnd: boolean): void
   point(value: T): void
   ignoreRange(value: T, to: number): boolean
   ignorePoint(value: T): boolean
@@ -310,8 +310,7 @@ export class RangeSet<T extends RangeValue> {
             if (range.value.replace) {
               pos = range.to
               posSide = range.value.endSide
-              if (range.from >= from && range.to <= to)
-                iterator.advanceReplaced(Math.min(pos, to), range.value)
+              iterator.advanceReplaced(Math.min(pos, to), range.value, range.from < from, range.to > to)
             } else {
               active.push(range.value)
               addToHeap(heap, range)
@@ -591,7 +590,6 @@ class ComparisonSide<T extends RangeValue> {
 class RangeSetComparison<T extends RangeValue> {
   a: ComparisonSide<T>
   b: ComparisonSide<T>
-  start: number
   pos: number
   end: number
 
@@ -600,7 +598,7 @@ class RangeSetComparison<T extends RangeValue> {
               private comparator: RangeComparator<T>) {
     this.a = new ComparisonSide<T>([new IteratedSet<T>(startB - startA, a)])
     this.b = new ComparisonSide<T>([new IteratedSet<T>(0, b)])
-    this.pos = this.start = startB
+    this.pos = startB
     this.end = endB
     this.forwardIter(SIDE_A | SIDE_B)
   }
@@ -664,10 +662,10 @@ class RangeSetComparison<T extends RangeValue> {
       }
       if (range.from < range.to && range.to + next.offset > this.pos) {
         let from = range.from + next.offset, to = range.to + next.offset
-        this.advancePos(from)
-        if (range.value.replace && from >= this.start && to <= this.end) {
+        this.advancePos(Math.max(this.pos, from))
+        if (range.value.replace) {
           side.replacedBy = range.value
-          side.replacedTo = Math.max(side.replacedTo, to)
+          side.replacedTo = Math.min(this.end, Math.max(side.replacedTo, to))
           // Skip regions that are replaced on both sides
           let replacedTo = Math.min(this.a.replacedTo, this.b.replacedTo)
           if (replacedTo > this.pos) {

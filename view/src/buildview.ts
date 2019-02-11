@@ -1,11 +1,11 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
 import {DecorationSet, Decoration, ReplaceDecoration, WidgetDecoration, LineDecoration, MarkDecoration} from "./decoration"
-import {LineView, BlockWidgetView, BlockType} from "./lineview"
+import {BlockView, LineView, BlockWidgetView, BlockType} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
 
 export class ContentBuilder implements RangeIterator<Decoration> {
-  content: (LineView | BlockWidgetView)[] = []
+  content: BlockView[] = []
   curLine: LineView | null = null
   breakAtStart = 0
   cursor: TextIterator
@@ -22,7 +22,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     if (this.content.length == 0)
       return !this.breakAtStart && this.doc.lineAt(this.pos).start != this.pos
     let last = this.content[this.content.length - 1]
-    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockType.before)
+    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockType.widgetBefore)
   }
 
   getLine() {
@@ -91,12 +91,13 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     this.pos = pos
   }
 
-  advanceReplaced(pos: number, deco: ReplaceDecoration) {
+  advanceReplaced(pos: number, deco: ReplaceDecoration, openStart: boolean, openEnd: boolean) {
+    let open = openStart || openEnd
     if (deco.block) {
-      this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, true, BlockType.cover))
+      this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, BlockType.widgetRange, open))
     } else {
       let line = this.getLine()
-      let widgetView = new WidgetView(pos - this.pos, deco.widget, 0)
+      let widgetView = new WidgetView(pos - this.pos, deco.widget, 0, open)
       if (line.children.length && line.children[line.children.length - 1].merge(widgetView))
         line.length += widgetView.length
       else
@@ -121,8 +122,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
         this.getLine().addLineDeco(deco as LineDecoration)
     } else if (deco.block) {
       if (deco.startSide > 0 && !this.posCovered()) this.getLine()
-      this.addWidget(new BlockWidgetView(deco.widget, 0, false,
-                                         deco.startSide < 0 ? BlockType.before : BlockType.after))
+      this.addWidget(new BlockWidgetView(deco.widget, 0, deco.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter))
     } else {
       this.getLine().append(new WidgetView(0, deco.widget, deco.startSide))
     }
@@ -133,7 +133,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   ignorePoint(deco: Decoration): boolean { return false }
 
   static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>):
-    {content: (LineView | BlockWidgetView)[], breakAtStart: number} {
+    {content: BlockView[], breakAtStart: number} {
     let builder = new ContentBuilder(text, from)
     RangeSet.iterateSpans(decorations, from, to, builder)
     builder.finish()

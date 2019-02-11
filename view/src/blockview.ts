@@ -2,23 +2,36 @@ import {ContentView} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {LineDecoration, WidgetType} from "./decoration"
-import {combineAttrs, attrsEq, updateAttrs} from "./attributes"
+import {LineDecoration, WidgetType, widgetsEq} from "./decoration"
+import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 
-export class LineView extends ContentView {
+export const enum BlockType { line, widgetBefore, widgetAfter, widgetRange }
+
+export interface BlockView extends ContentView {
+  merge(from: number, to: number, source: ContentView | null, takeDeco: boolean, composition: CompositionView | null): boolean
+  match(other: BlockView): boolean
+  split(at: number): BlockView
+  type: BlockType
+  dom: HTMLElement | null
+}
+
+export class LineView extends ContentView implements BlockView {
   children: InlineView[] = []
   length: number = 0
   dom!: HTMLElement | null
-  prevAttrs: {[name: string]: string} | null | undefined = undefined
-  attrs: {[name: string]: string} | null = null
+  prevAttrs: Attrs | null | undefined = undefined
+  attrs: Attrs | null = null
   breakAfter = 0
 
   // Consumes source
-  merge(from: number, to: number = this.length, source: LineView, takeDeco: boolean, composition: CompositionView | null) {
-    if (takeDeco) this.setDeco(source)
-    if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
+  merge(from: number, to: number, source: BlockView | null, takeDeco: boolean, composition: CompositionView | null): boolean {
+    if (source) {
+      if (!(source instanceof LineView)) return false
+      if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
+    }
+    if (takeDeco) this.setDeco(source ? source.attrs : null)
 
-    let elts = source.children
+    let elts = source ? source.children : []
     let cur = this.childCursor()
     let {i: toI, off: toOff} = cur.findPos(to, 1)
     let {i: fromI, off: fromOff} = cur.findPos(from, -1)
@@ -30,9 +43,9 @@ export class LineView extends ContentView {
     if (fromI == toI && fromOff) {
       let start = this.children[fromI]
       // Maybe just update that view and be done
-      if (elts.length == 1 && start.merge(elts[0], fromOff, toOff)) return
-      if (elts.length == 0) return start.cut(fromOff, toOff)
-      // Otherwise split it, so that we don't have to worry about aliasting front/end afterwards
+      if (elts.length == 1 && start.merge(elts[0], fromOff, toOff)) return true
+      if (elts.length == 0) { start.cut(fromOff, toOff); return true }
+      // Otherwise split it, so that we don't have to worry about aliasing front/end afterwards
       InlineView.appendInline(elts, [start.slice(toOff)])
       toI++
       toOff = 0
@@ -78,6 +91,7 @@ export class LineView extends ContentView {
 
     // And if anything remains, splice the child array to insert the new elts
     if (elts.length || fromI != toI) this.replaceChildren(fromI, toI, elts)
+    return true
   }
 
   split(at: number) {
@@ -105,13 +119,13 @@ export class LineView extends ContentView {
     this.dom = null
   }
 
-  setDeco(source: LineView) {
-    if (!attrsEq(this.attrs, source.attrs)) {
+  setDeco(attrs: Attrs | null) {
+    if (!attrsEq(this.attrs, attrs)) {
       if (this.dom) {
         this.prevAttrs = this.attrs
         this.markDirty()
       }
-      this.attrs = source.attrs
+      this.attrs = attrs
     }
   }
 
@@ -195,18 +209,36 @@ export class LineView extends ContentView {
   }
 
   match(other: ContentView) { return false }
+
+  get type() { return BlockType.line }
 }
 
 const none = [] as any
 
-export const enum BlockType { before, after, cover }
-
-export class BlockWidgetView extends ContentView {
+export class BlockWidgetView extends ContentView implements BlockView {
   dom!: HTMLElement | null
   parent!: DocView | null
   breakAfter = 0
 
-  constructor(public widget: WidgetType | null, public length: number, public range: boolean, public type: BlockType) { super() }
+  constructor(public widget: WidgetType | null, public length: number, public type: BlockType,
+              public open: boolean = false) {
+    super()
+  }
+
+  merge(from: number, to: number, source: ContentView | null): boolean {
+    if (!(source instanceof BlockWidgetView) || !(source.open || this.open)) return false
+    if (!widgetsEq(this.widget, source.widget))
+      throw new Error("Trying to merge an open widget with an incompatible node")
+    this.length = from + source.length + (this.length - to)
+    this.open = false
+    return true
+  }
+
+  split(at: number) {
+    let len = this.length - at
+    this.length = at
+    return new BlockWidgetView(this.widget, len, this.type)
+  }
 
   get children() { return none }
 
@@ -224,7 +256,7 @@ export class BlockWidgetView extends ContentView {
   domBoundsAround() { return null }
 
   match(other: ContentView) {
-    if (other instanceof BlockWidgetView && other.range == this.range &&
+    if (other instanceof BlockWidgetView && other.type == this.type &&
         (other.widget && other.widget.constructor) == (this.widget && this.widget.constructor)) {
       if (this.widget && !other.widget!.eq(this.widget.value)) this.markDirty(true)
       this.widget = other.widget

@@ -299,13 +299,13 @@ class HeightDecoScanner implements RangeIterator<Decoration> {
   advance(pos: number, active: ReadonlyArray<Decoration>) { this.pos = pos }
   advanceReplaced(pos: number) { addRange(this.pos, pos, this.ranges); this.pos = pos }
   point(value: Decoration) { addRange(this.pos, this.pos, this.ranges) }
-  ignoreRange(value: Decoration) { return true }
+  ignoreRange(value: Decoration) { return !(value as RangeValue).replace }
   ignorePoint(value: Decoration) { return !value.widget }
 }
 
 export function heightRelevantDecorations(decorations: ReadonlyArray<DecorationSet>, ranges: ReadonlyArray<ChangedRange>): number[] {
   let scanner = new HeightDecoScanner
-  for (let {fromB, toB} of ranges) if (fromB < toB) {
+  for (let {fromB, toB} of ranges) {
     scanner.pos = fromB
     RangeSet.iterateSpans(decorations, fromB, toB, scanner)
   }

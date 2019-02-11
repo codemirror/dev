@@ -60,6 +60,14 @@ describe("HeightMap", () => {
     ist(map.toString(), "line(20)")
   })
 
+  it("updates the length of replaced decorations for changes", () => {
+    let text = doc(20)
+    let map = mk(text, [Decoration.replace(5, 15, {})])
+    map = map.applyChanges([Decoration.set(Decoration.replace(5, 10, {}))], o(text.replace(7, 12, [""])),
+                           [new ChangedRange(7, 12, 7, 7)])
+    ist(map.toString(), "line(15:5-10)")
+  })
+
   it("stores information about block widgets", () => {
     let text = doc(3, 3, 3), oracle = o(text)
     let map = mk(text, [Decoration.widget(0, {widget: new MyWidget(10), side: -1, block: true}),

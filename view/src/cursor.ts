@@ -1,5 +1,5 @@
 import {EditorView} from "./editorview"
-import {LineView} from "./lineview"
+import {LineView} from "./blockview"
 import {dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
