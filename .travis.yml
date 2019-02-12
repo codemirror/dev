@@ -1,0 +1,18 @@
+language:            node_js
+node_js:
+  - "lts/*"
+  - node
+env:
+  - ENV=CI
+
+before_install:
+  - npm install -g npm@latest
+
+install:
+  - npm install
+
+script:
+  - npm run test
+
+notifications:
+  email:             false
