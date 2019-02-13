@@ -27,21 +27,20 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "ist": "^1.1.1",
-    "mocha": "^5.1.1",
-    "rollup": "^1.1.0",
-    "rollup-plugin-commonjs": "^9.2.0",
-    "rollup-plugin-typescript2": "^0.19.0",
-    "selenium-webdriver": "^4.0.0-alpha.1",
-    "style-mod": "^1.0.0",
-    "ts-node": "^7.0.1",
-    "typescript": "^3.2.2",
+    "style-mod": "^1.0.1",
     "w3c-keyname": "^2.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
     "@types/selenium-webdriver": "^3.0.14",
-    "benchtable": "^0.1.0",
-    "rollup-plugin-node-resolve": "^4.0.0"
+    "ist": "^1.1.1",
+    "mocha": "^5.1.1",
+    "rollup": "^1.1.2",
+    "rollup-plugin-commonjs": "^9.2.0",
+    "rollup-plugin-node-resolve": "^4.0.0",
+    "rollup-plugin-typescript2": "^0.19.2",
+    "selenium-webdriver": "^4.0.0-alpha.1",
+    "ts-node": "^8.0.2",
+    "typescript": "^3.3.3"
   }
 }
