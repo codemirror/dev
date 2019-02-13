@@ -7,7 +7,7 @@ import {Viewport} from "./viewport"
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
 export class HeightOracle {
-  doc: Text = Text.of([""])
+  doc: Text = Text.empty
   lineWrapping: boolean = false
   heightSamples: {[key: number]: boolean} = {}
   lineHeight: number = 14
@@ -78,34 +78,34 @@ export class MeasuredHeights {
 
 export class LineHeight {
   constructor(readonly start: number, readonly end: number,
-              readonly top: number, readonly height: number,
-              // @internal
-              readonly line: HeightMapLine | null) {}
+              readonly top: number, readonly height: number) {}
 
   get bottom() { return this.top + this.height }
-  get textTop() { return this.top + (this.line ? startWidgetHeight(this.line.deco) : 0) }
-  get textBottom() { return this.bottom - (this.line ? endWidgetHeight(this.line.deco, this.line.length) : 0) }
-  get hasReplacedRanges() {
-    return this.line ? this.line.deco.some(d => d.length > 0) : false
-  }
+  get textTop() { return this.top } // FIXME remove
+  get textBottom() { return this.bottom }
+  get hasReplacedRanges() { return false } // FIXME no longer meaningful
 }
+
+const enum Flag { break = 1, outdated = 2 }
 
 export abstract class HeightMap {
   constructor(
     public length: number, // The number of characters covered
     public height: number, // Height of this part of the document
-    public outdated: boolean = true
+    public flags: number = Flag.outdated
   ) {}
 
   size!: number
 
+  get outdated() { return (this.flags & Flag.outdated) > 0 }
+  set outdated(value) { this.flags = value ? this.flags | Flag.outdated : this.flags & ~Flag.outdated }
+
   abstract heightAt(pos: number, doc: Text, bias?: -1 | 1, offset?: number): number
   abstract lineAt(height: number, doc: Text, offset?: number): LineHeight
   abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
-  abstract decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number): void
-  abstract decomposeRight(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number): void
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean, measured?: MeasuredHeights): HeightMap
   abstract toString(): void
+  // FIXME needs a different protocol
   abstract forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void): void
 
   setHeight(oracle: HeightOracle, height: number) {
@@ -115,90 +115,111 @@ export abstract class HeightMap {
     }
   }
 
-  // from/to are node-relative positions pointing into the node itself
-  // newFrom/newTo are document-relative positions in the updated
-  // document, used for querying line endings and such
-  replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    let result: HeightMap[] = []
-    this.decomposeLeft(from, result, nodes[0], oracle, newFrom)
-    let last
-    if (nodes.length == 1) {
-      last = result.pop()!
-    } else {
-      for (let i = 1; i < nodes.length - 1; i++) result.push(nodes[i])
-      last = nodes[nodes.length - 1]
-    }
-    this.decomposeRight(to, result, last, oracle, newTo)
-    return HeightMap.of(result)
+  // Base case is to replace a leaf node, which simply builds a tree
+  // from the new nodes and returns that (HeightMapBranch and
+  // HeightMapGap override this to actually use from/to)
+  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+    return HeightMap.of(nodes)
   }
 
-  applyChanges(decorations: ReadonlyArray<DecorationSet>, oracle: HeightOracle, changes: ReadonlyArray<ChangedRange>): HeightMap {
-    let me: HeightMap = this, off = 0
-    for (let i = 0; i < changes.length; i++) {
-      let range = changes[i]
-      let nodes = buildChangedNodes(oracle, decorations, range.fromB, range.toB)
-      me = me.replace(range.fromA + off, range.toA + off, nodes, oracle, range.fromB, range.toB)
-      off += range.lenDiff
+  // Again, these are base cases, and are overridden for branch and gap nodes.
+  decomposeLeft(to: number, result: (HeightMap | null)[]) { result.push(this) }
+  decomposeRight(from: number, result: (HeightMap | null)[]) { result.push(this) }
+
+  applyChanges(decorations: ReadonlyArray<DecorationSet>, oldDoc: Text, oracle: HeightOracle,
+               changes: ReadonlyArray<ChangedRange>): HeightMap {
+    let me: HeightMap = this
+    for (let i = changes.length - 1; i >= 0; i--) {
+      let {fromA, toA, fromB, toB} = changes[i]
+      let start = me.lineViewport(fromA, oldDoc), end = start.to >= toA ? start : me.lineViewport(toA, oldDoc)
+      toB += end.to - toA; toA = end.to
+      while (i > 0 && start.from <= changes[i - 1].toA) {
+        fromA = changes[i - 1].fromA
+        fromB = changes[i - 1].fromB
+        i--
+        if (fromA < start.from) start = me.lineViewport(fromA, oldDoc)
+      }
+      fromB += start.from - fromA; fromA = start.from
+      let nodes = NodeBuilder.build(oracle, decorations, fromB, toB)
+      me = me.replace(fromA, toA, nodes)
     }
-    return me
+    return me.updateHeight(oracle, 0)
   }
 
   static empty() { return new HeightMapLine(0, 0) }
 
-  static of(nodes: HeightMap[]): HeightMap {
-    if (nodes.length == 1) return nodes[0]
+  // nodes uses null values to indicate the position of line breaks.
+  // There are never line breaks at the start or end of the array, or
+  // two line breaks next to each other.
+  static of(nodes: (HeightMap | null)[]): HeightMap {
+    if (nodes.length == 1) return nodes[0] as HeightMap
 
     let i = 0, j = nodes.length, before = 0, after = 0
     while (i < j) {
-      if (before < after) before += nodes[i++].size
-      else after += nodes[--j].size
+      if (before < after) {
+        let next = nodes[i++]
+        if (next) before += next.size
+      } else {
+        let next = nodes[--j]
+        if (next) after += next.size
+      }
     }
     for (;;) {
       if (before > after * 2) {
-        let {left, right} = nodes[i - 1] as HeightMapBranch
-        nodes.splice(i - 1, 1, left, right)
+        let {left, break: brk, right} = nodes[i - 1] as HeightMapBranch
+        if (brk) nodes.splice(i - 1, 1, left, null, right)
+        else nodes.splice(i - 1, 1, left, right)
         before -= right.size
         after += right.size
       } else if (after > before * 2) {
-        let {left, right} = nodes[i] as HeightMapBranch
-        nodes.splice(i++, 1, left, right)
+        let {left, break: brk, right} = nodes[i] as HeightMapBranch
+        if (brk) nodes.splice(i++, 1, left, null, right)
+        else nodes.splice(i++, 1, left, right)
+        j++
         after -= left.size
         before += left.size
       } else {
         break
       }
     }
-    return new HeightMapBranch(HeightMap.of(nodes.slice(0, i)), HeightMap.of(nodes.slice(i)))
+    let brk = 0
+    if (nodes[i - 1] == null) { brk = 1; i-- }
+    else if (nodes[i] == null) { brk = 1; j++ }
+    return new HeightMapBranch(HeightMap.of(nodes.slice(0, i)), brk, HeightMap.of(nodes.slice(j)))
   }
 }
 
 HeightMap.prototype.size = 1
 
-const enum DecoType { inline, before, after, range }
-
-class DecoDesc {
-  constructor(public pos: number,
-              public type: DecoType,
-              public height: number,
-              public length: number = 0) {}
-
-  move(offset: number) {
-    return new DecoDesc(this.pos + offset, this.type, this.height, this.length)
+class HeightMapBlock extends HeightMap {
+  heightAt(pos: number, doc: Text, bias: 1 | -1): number {
+    return bias < 0 ? 0 : this.height
   }
 
-  setHeight(height: number) {
-    return new DecoDesc(this.pos, this.type, height, this.length)
+  lineAt(height: number, doc: Text, offset: number = 0) {
+    return new LineHeight(offset, offset + this.length, -height, this.height)
   }
 
-  toString() {
-    return {[DecoType.inline]: "", [DecoType.before]: "B", [DecoType.after]: "A", [DecoType.range]: "R"}[this.type] +
-      this.pos + (this.length ? "-" + (this.pos + this.length) : "")
+  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
+    return new Viewport(offset, offset + this.length)
   }
+
+  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
+    if (measured && measured.from <= offset && measured.more)
+      this.setHeight(oracle, measured.heights[measured.index++])
+    this.outdated = false
+    return this
+  }
+
+  toString() { return `block(${this.length})` }
+
+  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {}
 }
 
-const noDeco: DecoDesc[] = []
+class HeightMapLine extends HeightMapBlock {
+  public collapsed = 0 // Amount of collapsed content in the line
+  public widgetHeight = 0 // Maximum inline widget height
 
-class HeightMapLine extends HeightMap {
   // Decoration information is stored in a somewhat obscure format—the
   // array of numbers in `deco` encodes all of collapsed ranges,
   // inline widgets, and widgets above/below the line.
@@ -207,171 +228,37 @@ class HeightMapLine extends HeightMap {
   // lines to somewhat effectively estimate their height when they are
   // not actually in view and thus can not be measured. Widget size
   // above/below is also necessary in heightAt, to skip it.
-  constructor(length: number, height: number, public deco: DecoDesc[] = noDeco) { super(length, height) }
+  constructor(length: number, height: number) { super(length, height) }
 
-  heightAt(pos: number, doc: Text, bias: 1 | -1): number {
-    return bias < 0 ? startWidgetHeight(this.deco) : this.height - endWidgetHeight(this.deco, this.length)
-  }
-
-  lineAt(height: number, doc: Text, offset: number = 0) {
-    return new LineHeight(offset, offset + this.length, -height, this.height, this)
-  }
-
-  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
-    return new Viewport(offset, offset + this.length)
-  }
-
-  replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    if (nodes.length != 1 || (nodes[0] instanceof HeightMapGap && oracle.doc.lineAt(newFrom).end < newTo))
-      return super.replace(from, to, nodes, oracle, newFrom, newTo)
-    this.deco = offsetDeco(this.deco, from, to, nodes[0].length)
-    if (nodes[0] instanceof HeightMapLine) this.deco = insertDeco(this.deco, (nodes[0] as HeightMapLine).deco, from)
-    this.length += nodes[0].length - (to - from)
-    this.outdated = true
-    return this
-  }
-
-  decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number) {
-    if (to == 0) {
-      target.push(node)
-    } else if (node instanceof HeightMapLine) {
-      target.push(this.joinLine(to, this.length, node))
+  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+    if (nodes.length == 1 && nodes[0] instanceof HeightMapLine && Math.abs(this.length - nodes[0]!.length) < 10) {
+      nodes[0]!.height = this.height
+      return nodes[0]!
     } else {
-      let nextEnd = oracle.doc.lineAt(newTo).end, breakInside = nextEnd < newTo + node.length
-      let newLen = to + (breakInside ? nextEnd - newTo : node.length)
-      target.push(new HeightMapLine(newLen, this.height, offsetDeco(this.deco, to, this.length, 0)))
-      if (breakInside)
-        target.push(new HeightMapGap(nextEnd + 1, newTo + node.length, oracle))
+      return HeightMap.of(nodes)
     }
-  }
-
-  decomposeRight(from: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number) {
-    if (from == this.length) {
-      target.push(node)
-    } else if (node instanceof HeightMapLine) {
-      target.push(this.joinLine(0, from, node))
-    } else {
-      let prevStart = oracle.doc.lineAt(newFrom).start, breakInside = prevStart > newFrom - node.length
-      if (breakInside)
-        target.push(new HeightMapGap(newFrom - node.length, prevStart - 1, oracle))
-      let newLen = (breakInside ? newFrom - prevStart : node.length) + (this.length - from)
-      target.push(new HeightMapLine(newLen, this.height, offsetDeco(this.deco, 0, from, newLen - this.length)))
-    }
-  }
-
-  joinLine(from: number, to: number, node: HeightMapLine): HeightMap {
-    let deco = insertDeco(offsetDeco(this.deco, from, to, node.length), node.deco, from)
-    return new HeightMapLine(this.length + node.length - (to - from), Math.max(this.height, node.height), deco)
   }
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
-    if (measured && measured.from <= offset && measured.more) {
-      let total = 0, updated = false
-      this.iterBlocks((from, to, deco, i) => {
-      // There'll be a measurement for each piece of text and each
-      // block widget in this line
-        let height = measured.heights[measured.index++]
-        if (deco && deco.height != height) {
-          if (!updated) { this.deco = this.deco.slice(); updated = true }
-          oracle.heightChanged = true
-          this.deco[i] = deco.setHeight(height)
-        }
-        total += height
-      })
-      this.setHeight(oracle, total)
-    } else if (force || this.outdated) {
-      let total = 0
-      this.iterBlocks((from, to, deco, startI, endI) => {
-        if (deco) {
-          total += deco.height
-        } else {
-          let min = 0, len = to - from
-          for (let i = startI; i < endI; i++) {
-            min = Math.max(min, this.deco[i].height)
-            len -= this.deco[i].length
-          }
-          total += Math.max(min, oracle.heightForLine(len))
-        }
-      })
-      this.setHeight(oracle, total)
-    }
+    if (measured && measured.from <= offset && measured.more)
+      this.setHeight(oracle, measured.heights[measured.index++])
+    else if (force || this.outdated)
+      this.setHeight(oracle, Math.max(this.widgetHeight, oracle.heightForLine(this.length - this.collapsed)))
     this.outdated = false
     return this
   }
 
-  iterBlocks(f: (from: number, to: number, deco: DecoDesc | null, startI: number, endI: number) => void) {
-    for (let i = 0, start = 0, covered = false, len = this.deco.length;; i++) {
-      let startI = i
-      while (i < len && this.deco[i].type == DecoType.inline) i++
-      let end = i == len ? this.length : this.deco[i].pos
-      // Stretch of text
-      if (end > start || (!covered && (i == len || this.deco[i].type == DecoType.after)))
-        f(start, end, null, startI, i)
-      if (i == len) break
-      let deco = this.deco[i]
-      f(end, start = end + deco.length, deco, i, i + 1)
-      covered = deco.type != DecoType.before
-    }
+  toString() {
+    return `line(${this.length}${this.collapsed ? -this.collapsed : ""}${this.widgetHeight ? ":" + this.widgetHeight : ""})`
   }
-
-  toString() { return `line(${this.length}${this.deco.length ? ":" + this.deco.join(",") : ""})` }
 
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
-    f(new LineHeight(offset, offset + this.length, 0, this.height, this))
+    f(new LineHeight(offset, offset + this.length, 0, this.height))
   }
-}
-
-function offsetDeco(deco: DecoDesc[], from: number, to: number, length: number): DecoDesc[] {
-  let result: DecoDesc[] | null = null
-  let off = length - (to - from)
-  for (let i = 0; i < deco.length; i++) {
-    let d = deco[i]
-    if (d.pos < from || d.pos > to && off == 0) continue
-    if (!result) result = deco.slice(0, i)
-    if (d.pos > to) result.push(d.move(off))
-  }
-  return !result ? deco : result.length ? result : noDeco
-}
-
-function insertDeco(deco: DecoDesc[], newDeco: DecoDesc[], pos: number): DecoDesc[] {
-  if (newDeco.length == 0) return deco
-  let result = [], inserted = false
-  for (let i = 0;; i++) {
-    let next = i == deco.length ? 2e9 : deco[i].pos
-    if (!inserted && next > pos) {
-      for (let j = 0; j < newDeco.length; j++) result.push(newDeco[j])
-      inserted = true
-    }
-    if (next == 2e9) return result
-    result.push(deco[i])
-  }
-}
-
-function startWidgetHeight(deco: ReadonlyArray<DecoDesc>): number {
-  let height = 0, pos = 0
-  for (let d of deco) {
-    if (d.pos > pos || (d.type != DecoType.range && d.type != DecoType.before)) break
-    height += d.height
-    pos = d.pos + d.length
-  }
-  return height
-}
-
-function endWidgetHeight(deco: ReadonlyArray<DecoDesc>, length: number): number {
-  let height = 0, pos = length
-  for (let i = deco.length - 1; i >= 0; i--) {
-    let d = deco[i]
-    if (d.pos + d.length < pos || (d.type != DecoType.range && d.type != DecoType.after)) break
-    height += d.height
-    pos = d.pos
-  }
-  return pos == 0 ? height - startWidgetHeight(deco) : height
 }
 
 class HeightMapGap extends HeightMap {
-  constructor(from: number, to: number, oracle: HeightOracle) {
-    super(to - from, oracle.heightForGap(from, to), false)
-  }
+  constructor(length: number) { super(length, 0) }
 
   heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
@@ -384,7 +271,7 @@ class HeightMapGap extends HeightMap {
     let lines = lastLine - firstLine, line = Math.floor(lines * Math.max(0, Math.min(1, height / this.height)))
     let heightPerLine = this.height / (lines + 1), top = heightPerLine * line - height
     let {start, end} = doc.line(firstLine + line)
-    return new LineHeight(start, end, top, heightPerLine, null)
+    return new LineHeight(start, end, top, heightPerLine)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
@@ -392,40 +279,27 @@ class HeightMapGap extends HeightMap {
     return new Viewport(start, end)
   }
 
-  replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    if (nodes.length != 1 || !(nodes[0] instanceof HeightMapGap))
-      return super.replace(from, to, nodes, oracle, newFrom, newTo)
-    this.length += (newTo - newFrom) - (to - from)
-    let newStart = newFrom - from
-    // FIXME the Math.min is a kludge to deal with the fact that, if
-    // there are further changes that'll be applied by applyChanges,
-    // the estimated length here may extend past the end of the document
-    this.setHeight(oracle, oracle.heightForGap(newStart, Math.min(oracle.doc.length, newStart + this.length)))
-    return this
+  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+    let after = this.length - to
+    if (after > 0) {
+      let last = nodes[nodes.length - 1]
+      if (last instanceof HeightMapGap) nodes[nodes.length - 1] = new HeightMapGap(last.length + after)
+      else nodes.push(null, new HeightMapGap(after - 1))
+    }
+    if (from > 0) {
+      let first = nodes[0]
+      if (first instanceof HeightMapGap) nodes[0] = new HeightMapGap(from + first.length)
+      else nodes.unshift(new HeightMapGap(from - 1), null)
+    }
+    return HeightMap.of(nodes)
   }
 
-  decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number) {
-    let newOffset = newTo - to
-    if (node instanceof HeightMapGap) {
-      target.push(new HeightMapGap(newOffset, newTo + node.length, oracle))
-    } else {
-      let lineStart = oracle.doc.lineAt(newTo).start
-      if (lineStart > newOffset) target.push(new HeightMapGap(newOffset, lineStart - 1, oracle))
-      let deco = (node as HeightMapLine).deco, offset = newTo - lineStart
-      if (deco.length && offset) deco = deco.map(d => d.move(offset))
-      target.push(new HeightMapLine(newTo + node.length - lineStart, node.height, deco))
-    }
+  decomposeLeft(to: number, result: (HeightMap | null)[]) {
+    result.push(to == this.length ? this : new HeightMapGap(to))
   }
 
-  decomposeRight(from: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number) {
-    let newEnd = newFrom + (this.length - from)
-    if (node instanceof HeightMapGap) {
-      target.push(new HeightMapGap(newFrom - node.length, newEnd, oracle))
-    } else {
-      let lineEnd = oracle.doc.lineAt(newFrom).end
-      target.push(new HeightMapLine(node.length + (lineEnd - newFrom), node.height, (node as HeightMapLine).deco))
-      if (newEnd > lineEnd) target.push(new HeightMapGap(lineEnd + 1, newEnd, oracle))
-    }
+  decomposeRight(from: number, result: (HeightMap | null)[]) {
+    result.push(from == 0 ? this : new HeightMapGap(this.length - from))
   }
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights): HeightMap {
@@ -436,14 +310,16 @@ class HeightMapGap extends HeightMap {
       // they would already have been added to the heightmap (gaps
       // only contain plain text).
       let nodes = [], pos = Math.max(offset, measured.from)
-      if (measured.from > offset) nodes.push(new HeightMapGap(offset, measured.from - 1, oracle))
+      if (measured.from > offset) nodes.push(new HeightMapGap(measured.from - offset - 1).updateHeight(oracle, offset))
       while (pos <= end && measured.more) {
         let len = oracle.doc.lineAt(pos).length
-        nodes.push(new HeightMapLine(len, measured.heights[measured.index++]))
+        if (nodes.length) nodes.push(null)
+        let line = new HeightMapLine(len, measured.heights[measured.index++])
+        line.outdated = false
+        nodes.push(line)
         pos += len + 1
       }
-      if (pos < end) nodes.push(new HeightMapGap(pos, end, oracle))
-      for (let node of nodes) node.outdated = false
+      if (pos < end) nodes.push(null, new HeightMapGap(end - pos).updateHeight(oracle, pos))
       oracle.heightChanged = true
       return HeightMap.of(nodes)
     } else if (force || this.outdated) {
@@ -458,7 +334,7 @@ class HeightMapGap extends HeightMap {
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
     for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos <= end;) {
       let end = oracle.doc.lineAt(pos).end
-      f(new LineHeight(pos, end, 0, oracle.heightForLine(end - pos), null))
+      f(new LineHeight(pos, end, 0, oracle.heightForLine(end - pos)))
       pos = end + 1
     }
   }
@@ -467,13 +343,18 @@ class HeightMapGap extends HeightMap {
 class HeightMapBranch extends HeightMap {
   size: number
 
-  constructor(public left: HeightMap, public right: HeightMap) {
-    super(left.length + 1 + right.length, left.height + right.height, left.outdated || right.outdated)
+  constructor(public left: HeightMap, brk: number, public right: HeightMap) {
+    super(left.length + brk + right.length, left.height + right.height, brk | (left.outdated || right.outdated ? Flag.outdated : 0))
     this.size = left.size + right.size
   }
 
+  get break() { return this.flags & Flag.break }
+  set break(value: number) { this.flags = value ? this.flags | Flag.break : this.flags & ~Flag.break }
+
+  // FIXME boundary conditions when there's no break
+
   heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
-    let rightStart = offset + this.left.length + 1
+    let rightStart = offset + this.left.length + this.break
     return pos < rightStart ? this.left.heightAt(pos, doc, bias, offset)
       : this.left.height + this.right.heightAt(pos, doc, bias, rightStart)
   }
@@ -481,57 +362,67 @@ class HeightMapBranch extends HeightMap {
   lineAt(height: number, doc: Text, offset: number = 0) {
     let right = height - this.left.height
     if (right < 0) return this.left.lineAt(height, doc, offset)
-    return this.right.lineAt(right, doc, offset + this.left.length + 1)
+    return this.right.lineAt(right, doc, offset + this.left.length + this.break)
   }
 
   lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
-    let rightStart = this.left.length + 1
+    let rightStart = this.left.length + this.break
     return pos < rightStart ? this.left.lineViewport(pos, doc, offset)
       : this.right.lineViewport(pos - rightStart, doc, offset + rightStart)
   }
 
-  replace(from: number, to: number, nodes: HeightMap[], oracle: HeightOracle, newFrom: number, newTo: number): HeightMap {
-    let rightStart = this.left.length + 1
-    if (to < rightStart)
-      return this.balanced(this.left.replace(from, to, nodes, oracle, newFrom, newTo), this.right)
-    else if (from >= rightStart)
-      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes, oracle, newFrom, newTo))
-    else
-      return super.replace(from, to, nodes, oracle, newFrom, newTo)
-  }
+  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+    let rightStart = this.left.length + this.break
+    if (to <= rightStart)
+      return this.balanced(this.left.replace(from, to, nodes), this.break, this.right)
+    if (from >= rightStart)
+      return this.balanced(this.left, this.break, this.right.replace(from - rightStart, to - rightStart, nodes))
 
-  decomposeLeft(to: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newTo: number) {
-    let rightStart = this.left.length + 1
-    if (to < rightStart) {
-      this.left.decomposeLeft(to, target, node, oracle, newTo)
-    } else {
-      target.push(this.left)
-      this.right.decomposeLeft(to - rightStart, target, node, oracle, newTo)
+    let result: (HeightMap | null)[] = []
+    if (from > 0) this.decomposeLeft(from, result)
+    let left = result.length
+    for (let node of nodes) result.push(node)
+    if (from > 0) mergeGaps(result, left - 1)
+    if (to < this.length) {
+      let right = result.length
+      this.decomposeRight(to, result)
+      mergeGaps(result, right)
     }
+    return HeightMap.of(result)
   }
 
-  decomposeRight(from: number, target: HeightMap[], node: HeightMap, oracle: HeightOracle, newFrom: number) {
-    let rightStart = this.left.length + 1
-    if (from < rightStart) {
-      this.left.decomposeRight(from, target, node, oracle, newFrom)
-      target.push(this.right)
-    } else {
-      this.right.decomposeRight(from - rightStart, target, node, oracle, newFrom)
+  decomposeLeft(to: number, result: (HeightMap | null)[]) {
+    let left = this.left.length
+    if (to <= left) return this.left.decomposeLeft(to, result)
+    result.push(this.left)
+    if (this.break) {
+      left++
+      if (to >= left) result.push(null)
     }
+    if (to > left) this.right.decomposeLeft(to - left, result)
   }
 
-  balanced(left: HeightMap, right: HeightMap): HeightMap {
-    if (left.size > 2 * right.size || right.size > 2 * left.size) return HeightMap.of([left, right])
-    this.left = left; this.right = right
+  decomposeRight(from: number, result: (HeightMap | null)[]) {
+    let left = this.left.length, right = left + this.break
+    if (from >= right) return this.right.decomposeRight(from - right, result)
+    if (from < left) this.left.decomposeRight(from, result)
+    if (this.break && from < right) result.push(null)
+    result.push(this.right)
+  }
+
+  balanced(left: HeightMap, brk: number, right: HeightMap): HeightMap {
+    if (left.size > 2 * right.size || right.size > 2 * left.size)
+      return HeightMap.of(brk ? [left, null, right] : [left, right])
+    this.left = left; this.right = right; this.break = brk
     this.height = left.height + right.height
     this.outdated = left.outdated || right.outdated
     this.size = left.size + right.size
-    this.length = left.length + 1 + right.length
+    this.length = left.length + brk + right.length
     return this
   }
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights): HeightMap {
-    let {left, right} = this, rightStart = offset + left.length + 1, rebalance: any = null
+    let {left, right} = this, rightStart = offset + left.length + this.break, rebalance: any = null
     if (measured && measured.from <= offset + left.length && measured.more)
       rebalance = left = left.updateHeight(oracle, offset, force, measured)
     else
@@ -540,91 +431,147 @@ class HeightMapBranch extends HeightMap {
       rebalance = right = right.updateHeight(oracle, rightStart, force, measured)
     else
       right.updateHeight(oracle, rightStart, force)
-    if (rebalance) return this.balanced(left, right)
+    if (rebalance) return this.balanced(left, this.break, right)
     this.height = this.left.height + this.right.height
     this.outdated = false
     return this
   }
 
-  toString() { return this.left + " " + this.right }
+  toString() { return this.left + (this.break ? " " : "-") + this.right }
 
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
-    let rightStart = offset + this.left.length + 1
+    let rightStart = offset + this.left.length + this.break
     if (from < rightStart) this.left.forEachLine(from, to, offset, oracle, f)
     if (to >= rightStart) this.right.forEachLine(from, to, rightStart, oracle, f)
   }
 }
 
+function mergeGaps(nodes: (HeightMap | null)[], around: number) {
+  let before, after
+  if (nodes[around] == null &&
+      (before = nodes[around - 1]) instanceof HeightMapGap &&
+      (after = nodes[around + 1]) instanceof HeightMapGap)
+    nodes.splice(around - 1, 3, new HeightMapGap(before.length + 1 + after.length))
+}
+
+const relevantWidgetHeight = 5
+
 class NodeBuilder implements RangeIterator<Decoration> {
-  nodes: HeightMap[] = []
+  nodes: (HeightMap | null)[] = []
   writtenTo: number
-  lineStart: number = -1
-  lineEnd: number = -1
-  curLine: HeightMapLine | null = null
+  lineStart = -1
+  lineEnd = -1
+  covering: HeightMapBlock | null = null
 
   constructor(public pos: number, public oracle: HeightOracle) {
     this.writtenTo = pos
   }
 
+  get isCovered() {
+    return this.covering && this.nodes[this.nodes.length - 1] == this.covering
+  }
+
   advance(pos: number) {
     if (pos <= this.pos) return
-    if (this.curLine) {
-      if (this.lineEnd < 0) this.lineEnd = this.oracle.doc.lineAt(this.pos).end
-      if (pos > this.lineEnd) {
-        this.curLine.length += this.lineEnd - this.pos
-        this.curLine.updateHeight(this.oracle, this.lineEnd - this.curLine.length)
-        this.curLine = null
-        this.writtenTo = this.lineEnd + 1
-        this.lineEnd = -1
-      } else {
-        this.curLine.length += pos - this.pos
-        this.writtenTo = pos
+    if (this.lineStart > -1) {
+      let end = Math.min(pos, this.lineEnd), last = this.nodes[this.nodes.length - 1]
+      if (last instanceof HeightMapLine)
+        last.length += end - this.pos
+      else if (end > this.pos || !this.isCovered)
+        this.nodes.push(new HeightMapLine(end - this.pos, -1))
+      this.writtenTo = end
+      if (pos > end) {
+        this.nodes.push(null)
+        this.writtenTo++
+        this.lineStart = -1
       }
-    } else if (this.lineEnd > -1 && pos > this.lineEnd) {
-      this.lineEnd = -1
     }
     this.pos = pos
   }
 
   advanceReplaced(pos: number, deco: ReplaceDecoration) {
-    let type = deco.block ? DecoType.range : DecoType.inline
-    this.addDeco(this.pos, type, deco.widget ? Math.max(deco.widget.estimatedHeight, 0) : 0, pos)
-    this.curLine!.length += pos - this.pos
-    if (this.lineEnd < pos) this.lineEnd = -1
-    this.writtenTo = this.pos = pos
+    let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
+    if (deco.block)
+      this.addBlock(new HeightMapBlock(pos - this.pos, height), true, true)
+    else if (pos > this.pos || height >= relevantWidgetHeight)
+      this.addLineDeco(height, pos - this.pos)
+    if (this.lineEnd > -1 && this.lineEnd < this.pos)
+      this.lineEnd = this.oracle.doc.lineAt(this.pos).end
   }
 
   point(deco: WidgetDecoration) {
-    let type = !deco.block ? DecoType.inline : deco.startSide > 0 ? DecoType.after : DecoType.before
-    this.addDeco(this.pos, type, deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0)
+    let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
+    if (deco.block)
+      this.addBlock(new HeightMapBlock(0, height), deco.startSide < 0, deco.startSide > 0)
+    else if (height >= relevantWidgetHeight)
+      this.addLineDeco(height, 0)
   }
 
-  flushTo(pos: number) {
-    if (pos > this.writtenTo) {
-      this.nodes.push(new HeightMapGap(this.writtenTo, pos, this.oracle))
-      this.writtenTo = pos
+  enterLine() {
+    if (this.lineStart > -1) return
+    let {start, end} = this.oracle.doc.lineAt(this.pos)
+    this.lineStart = start; this.lineEnd = end
+    if (this.writtenTo < start) {
+      if (this.writtenTo < start - 1 || this.nodes[this.nodes.length - 1] == null)
+        this.nodes.push(new HeightMapGap(start - this.writtenTo - 1))
+      this.nodes.push(null)
     }
+    if (this.pos > start)
+      this.nodes.push(new HeightMapLine(this.pos - start, -1))
+    this.writtenTo = this.pos
   }
 
-  addDeco(pos: number, type: DecoType, height: number, end = pos) {
-    if (!this.curLine) {
-      this.lineStart = Math.max(this.writtenTo, this.oracle.doc.lineAt(this.pos).start)
-      this.flushTo(this.lineStart - 1)
-      this.nodes.push(this.curLine = new HeightMapLine(this.pos - this.lineStart, 0, []))
-      this.writtenTo = this.pos
+  ensureLine() {
+    this.enterLine()
+    let last = this.nodes.length ? this.nodes[this.nodes.length - 1] : null
+    if (last instanceof HeightMapLine) return last
+    let line = new HeightMapLine(0, -1)
+    this.nodes.push(line)
+    return line
+  }
+
+  addBlock(block: HeightMapBlock, coverStart: boolean, coverEnd: boolean) {
+    this.enterLine()
+    if (!coverStart && !this.isCovered) this.ensureLine()
+    this.nodes.push(block)
+    this.writtenTo = this.pos = this.pos + block.length
+    if (coverEnd) this.covering = block
+  }
+
+  addLineDeco(height: number, length: number) {
+    let line = this.ensureLine()
+    line.length += length
+    line.collapsed += length
+    line.widgetHeight = Math.max(line.widgetHeight, height)
+    this.writtenTo = this.pos = this.pos + length
+  }
+
+  finish(from: number) {
+    let last = this.nodes.length == 0 ? null : this.nodes[this.nodes.length - 1]
+    if (this.lineStart > -1 && !(last instanceof HeightMapLine) && !this.isCovered)
+      this.nodes.push(new HeightMapLine(0, -1))
+    else if (this.writtenTo < this.pos || last == null)
+      this.nodes.push(new HeightMapGap(this.pos - this.writtenTo))
+    let pos = from
+    for (let node of this.nodes) {
+      if (node instanceof HeightMapLine) node.updateHeight(this.oracle, pos)
+      pos += node ? node.length : 1
     }
-    this.curLine.deco.push(new DecoDesc(pos - this.lineStart, type, height, end - pos))
+    return this.nodes
   }
 
   ignoreRange(value: Decoration) { return !(value as RangeValue).replace }
   ignorePoint(value: WidgetDecoration) { return !(value.block || value.widget && value.widget.estimatedHeight > 0) }
-}
 
-function buildChangedNodes(oracle: HeightOracle, decorations: ReadonlyArray<DecorationSet>, from: number, to: number): HeightMap[] {
-  let builder = new NodeBuilder(from, oracle)
-  RangeSet.iterateSpans(decorations, from, to, builder)
-  if (builder.curLine) builder.curLine.updateHeight(oracle, builder.pos - builder.curLine.length)
-  else builder.flushTo(builder.pos)
-  if (builder.nodes.length == 0) builder.nodes.push(new HeightMapGap(0, 0, oracle))
-  return builder.nodes
+  // Always called with a region that on both sides either stretches
+  // to a line break or the end of the document.
+  // The returned array uses null to indicate line breaks, but never
+  // starts or ends in a line break, or has multiple line breaks next
+  // to each other.
+  static build(oracle: HeightOracle, decorations: ReadonlyArray<DecorationSet>,
+               from: number, to: number): (HeightMap | null)[] {
+    let builder = new NodeBuilder(from, oracle)
+    RangeSet.iterateSpans(decorations, from, to, builder)
+    return builder.finish(from)
+  }
 }

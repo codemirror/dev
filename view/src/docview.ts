@@ -5,13 +5,14 @@ import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
 import {DOMObserver} from "./domobserver"
-import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {HeightMap, HeightOracle, MeasuredHeights, LineHeight} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 import {ViewUpdate, ViewSnapshot, ViewField} from "./extension"
 import {EditorView} from "./editorview"
+import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
 import {Slot} from "../../extension/src/extension"
+import {Text} from "../../doc/src"
 
 type A<T> = ReadonlyArray<T>
 const none = [] as any
@@ -64,7 +65,7 @@ export class DocView extends ContentView {
 
   init(state: EditorState) {
     let changedRanges = [new ChangedRange(0, 0, 0, state.doc.length)]
-    this.heightMap = HeightMap.empty().applyChanges(none, this.heightOracle.setDoc(state.doc), changedRanges)
+    this.heightMap = HeightMap.empty().applyChanges(none, Text.empty, this.heightOracle.setDoc(state.doc), changedRanges)
     this.children = [new LineView]
     this.children[0].setParent(this)
     this.viewports = this.decorations = none
@@ -83,7 +84,7 @@ export class DocView extends ContentView {
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
 
-    let prevLen = this.state.doc.length
+    let prevDoc = this.state.doc
     let changes = transactions.length == 1 ? transactions[0].changes :
       transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     let changedRanges = changes.changedRanges()
@@ -94,7 +95,7 @@ export class DocView extends ContentView {
     // around that. Issue #54
     if (browser.chrome && !this.composition && changes.changes.some(ch => ch.text.length > 1))
       this.forceSelectionUpdate = true
-    this.heightMap = this.heightMap.applyChanges(none, this.heightOracle.setDoc(state.doc), changedRanges)
+    this.heightMap = this.heightMap.applyChanges(none, prevDoc, this.heightOracle.setDoc(state.doc), changedRanges)
 
     let contentChanges = this.computeUpdate(transactions, state, metadata, changedRanges, 0, scrollIntoView)
 
@@ -104,7 +105,7 @@ export class DocView extends ContentView {
       this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {
-      this.updateInner(contentChanges, prevLen)
+      this.updateInner(contentChanges, prevDoc.length)
       this.cancelLayoutCheck()
       if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
       this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
@@ -321,7 +322,7 @@ export class DocView extends ContentView {
       let heightChanges = extendWithRanges(none, height)
       if (init || transactions.length)
         heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
-      this.heightMap = this.heightMap.applyChanges(decorations, this.heightOracle, heightChanges)
+      this.heightMap = this.heightMap.applyChanges(decorations, this.state.doc, this.heightOracle, heightChanges)
       // Accumulate content changes so that they can be redrawn
       contentChanges = extendWithRanges(contentChanges, content)
       // Make sure only one iteration is marked as required / state changing

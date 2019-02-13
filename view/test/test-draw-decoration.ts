@@ -276,6 +276,9 @@ describe("EditorView decoration", () => {
       classes(cm, "a", "")
     })
 
+    // FIXME add a case for a collapsed range that is expanded on one
+    // side, but next to a similar collapsed range on the other
+
     it("can handle insertion", () => {
       let cm = decoEditor("x\ny\nz", [l(2, "a"), l(4, "b")])
       cm.dispatch(cm.state.transaction.replace(2, 2, "hi"))

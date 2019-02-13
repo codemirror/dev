@@ -83,6 +83,8 @@ export abstract class Text {
     let length = textLength(text)
     return length < MAX_LEAF ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
   }
+
+  static empty!: Text
 }
 
 let lineCache: any[] = [], lineCachePos = -2, lineCacheSize = 12
@@ -327,6 +329,8 @@ class TextNode extends Text {
     return chunked.length == 1 ? chunked[0] : new TextNode(chunked, length)
   }
 }
+
+Text.empty = Text.of("")
 
 function textLength(text: ReadonlyArray<string>) {
   let length = -1
