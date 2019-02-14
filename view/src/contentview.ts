@@ -39,14 +39,7 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length
   }
 
-  coordsAt(pos: number): Rect | null {
-    for (let off = 0, i = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = off + child.length + child.breakAfter
-      if (end >= pos && off != end) return child.coordsAt(pos - off)
-      off = end
-    }
-    return null
-  }
+  coordsAt(pos: number): Rect | null { return null }
 
   sync() {
     if (this.dirty & dirty.node) {

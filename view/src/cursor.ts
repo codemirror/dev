@@ -52,6 +52,7 @@ export function movePos(view: EditorView, start: number,
   } else if (granularity == "line") {
     if (context && !context.nearViewportEnd(view, dir)) {
       let startCoords = view.docView.coordsAt(start)!
+      if (!startCoords) console.log("no coords at", start, "in", view.docView + "")
       let goal = getGoalColumn(view, start, startCoords.left)
       for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, dist = 5; dist < 50; dist += 10) {
         let pos = posAtCoords(view, {x: goal.column, y: startY + dist * dir}, dir)

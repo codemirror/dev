@@ -191,8 +191,12 @@ export class LineView extends ContentView implements BlockView {
   }
 
   coordsAt(pos: number): Rect | null {
-    if (this.length == 0) return (this.dom!.lastChild as HTMLElement).getBoundingClientRect()
-    return super.coordsAt(pos)
+    for (let off = 0, i = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = off + child.length
+      if (end >= pos) return child.coordsAt(pos - off)
+      off = end
+    }
+    return (this.dom!.lastChild as HTMLElement).getBoundingClientRect()
   }
 
   createCompositionViewAround(textNode: Node): CompositionView {

@@ -7,7 +7,7 @@ import browser from "./browser"
 import {DOMObserver} from "./domobserver"
 import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType} from "./decoration"
-import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
+import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
 import {ViewUpdate, ViewSnapshot, ViewField} from "./extension"
 import {EditorView} from "./editorview"
 import {EditorState, ChangeSet, ChangedRange, Transaction} from "../../state/src"
@@ -431,6 +431,14 @@ export class DocView extends ContentView {
       let child = this.children[i]
       if (child instanceof LineView) return child.domFromPos(off)
       if (child.type == BlockType.widgetRange || i == 0) return null
+    }
+  }
+
+  coordsAt(pos: number): Rect | null {
+    for (let off = this.length, i = this.children.length - 1;; i--) {
+      let child = this.children[i], start = off - child.breakAfter - child.length
+      if (pos >= start && child.type != BlockType.widgetAfter) return child.coordsAt(pos - start)
+      off = start
     }
   }
 
