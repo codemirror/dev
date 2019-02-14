@@ -156,13 +156,30 @@ export abstract class HeightMap {
 
   // nodes uses null values to indicate the position of line breaks.
   // There are never line breaks at the start or end of the array, or
-  // two line breaks next to each other.
+  // two line breaks next to each other, and the array isn't allowed
+  // to be empty (same restrictions as return value from the builder).
   static of(nodes: (HeightMap | null)[]): HeightMap {
     if (nodes.length == 1) return nodes[0] as HeightMap
 
     let i = 0, j = nodes.length, before = 0, after = 0
-    while (i < j) {
-      if (before < after) {
+    for (;;) {
+      if (i == j) {
+        if (before > after * 2) {
+          let split = nodes[i - 1] as HeightMapBranch
+          if (split.break) nodes.splice(--i, 1, split.left, null, split.right)
+          else nodes.splice(--i, 1, split.left, split.right)
+          j += 1 + split.break
+          before -= split.size
+        } else if (after > before * 2) {
+          let split = nodes[j] as HeightMapBranch
+          if (split.break) nodes.splice(j, 1, split.left, null, split.right)
+          else nodes.splice(j, 1, split.left, split.right)
+          j += 2 + split.break
+          after -= split.size
+        } else {
+          break
+        }
+      } else if (before < after) {
         let next = nodes[i++]
         if (next) before += next.size
       } else {
@@ -170,24 +187,7 @@ export abstract class HeightMap {
         if (next) after += next.size
       }
     }
-    for (;;) {
-      if (before > after * 2) {
-        let {left, break: brk, right} = nodes[i - 1] as HeightMapBranch
-        if (brk) nodes.splice(i - 1, 1, left, null, right)
-        else nodes.splice(i - 1, 1, left, right)
-        before -= right.size
-        after += right.size
-      } else if (after > before * 2) {
-        let {left, break: brk, right} = nodes[i] as HeightMapBranch
-        if (brk) nodes.splice(i++, 1, left, null, right)
-        else nodes.splice(i++, 1, left, right)
-        j++
-        after -= left.size
-        before += left.size
-      } else {
-        break
-      }
-    }
+
     let brk = 0
     if (nodes[i - 1] == null) { brk = 1; i-- }
     else if (nodes[i] == null) { brk = 1; j++ }
