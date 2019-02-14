@@ -104,7 +104,9 @@ export class TextView extends InlineView {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
   }
 
-  coordsAt(pos: number): Rect { return textCoords(this.textDOM!, pos) }
+  coordsAt(pos: number): Rect {
+    return textCoords(this.textDOM!, pos)
+  }
 
   toCompositionView() {
     let parent = this.parent!, view = new CompositionView(this.dom!, this.textDOM!, this.length)

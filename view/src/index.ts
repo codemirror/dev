@@ -4,6 +4,6 @@ export {ViewExtension, ViewField, handleDOMEvents,
 export {Viewport} from "./viewport"
 export {Decoration, DecorationSet, DecoratedRange, WidgetType,
         MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec} from "./decoration"
-export {LineHeight} from "./heightmap"
+export {BlockInfo} from "./heightmap"
 export {BlockType} from "./blockview"
 export {Slot} from "../../extension/src/extension"

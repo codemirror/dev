@@ -73,16 +73,6 @@ export class MeasuredHeights {
   get more() { return this.index < this.heights.length }
 }
 
-export class LineHeight {
-  constructor(readonly start: number, readonly end: number,
-              readonly top: number, readonly height: number) {}
-
-  get bottom() { return this.top + this.height }
-  get textTop() { return this.top } // FIXME remove
-  get textBottom() { return this.bottom }
-  get hasReplacedRanges() { return false } // FIXME no longer meaningful
-}
-
 export class BlockInfo {
   constructor(readonly from: number, readonly length: number,
               readonly top: number, readonly height: number,
@@ -118,11 +108,10 @@ export abstract class HeightMap {
 
   abstract blockAt(height: number, doc: Text, top: number, offset: number): BlockInfo
   abstract lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number): BlockInfo
+  abstract forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void): void
 
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean, measured?: MeasuredHeights): HeightMap
   abstract toString(): void
-  // FIXME needs a different protocol
-  abstract forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void): void
 
   setHeight(oracle: HeightOracle, height: number) {
     if (this.height != height) {
@@ -219,6 +208,10 @@ class HeightMapBlock extends HeightMap {
     return this.blockAt(0, doc, top, offset)
   }
 
+  forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
+    f(this.blockAt(0, doc, top, offset))
+  }
+
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
     if (measured && measured.from <= offset && measured.more)
       this.setHeight(oracle, measured.heights[measured.index++])
@@ -227,8 +220,6 @@ class HeightMapBlock extends HeightMap {
   }
 
   toString() { return `block(${this.length})` }
-
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {}
 }
 
 class HeightMapText extends HeightMapBlock {
@@ -258,21 +249,21 @@ class HeightMapText extends HeightMapBlock {
   toString() {
     return `line(${this.length}${this.collapsed ? -this.collapsed : ""}${this.widgetHeight ? ":" + this.widgetHeight : ""})`
   }
-
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
-    f(new LineHeight(offset, offset + this.length, 0, this.height))
-  }
 }
 
 class HeightMapGap extends HeightMap {
   constructor(length: number) { super(length, 0) }
 
-  blockAt(height: number, doc: Text, top: number, offset: number) {
+  private lines(doc: Text, offset: number): {firstLine: number, lastLine: number, lineHeight: number} {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
-    let lines = lastLine - firstLine + 1, heightPerLine = this.height / lines
-    let line = Math.max(0, Math.min(lines - 1, Math.floor((height - top) / heightPerLine)))
+    return {firstLine, lastLine, lineHeight: this.height / (lastLine - firstLine + 1)}
+  }
+
+  blockAt(height: number, doc: Text, top: number, offset: number) {
+    let {firstLine, lastLine, lineHeight} = this.lines(doc, offset)
+    let line = Math.max(0, Math.min(lastLine - firstLine, Math.floor((height - top) / lineHeight)))
     let {start, length} = doc.line(firstLine + line)
-    return new BlockInfo(start, length, top + heightPerLine * line, heightPerLine, BlockType.text)
+    return new BlockInfo(start, length, top + lineHeight * line, lineHeight, BlockType.text)
   }
 
   lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
@@ -281,10 +272,18 @@ class HeightMapGap extends HeightMap {
       let {start, end} = doc.lineAt(value)
       return new BlockInfo(start, end - start, 0, 0, BlockType.text)
     }
-    let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
-    let lineHeight = this.height / (lastLine - firstLine + 1)
+    let {firstLine, lineHeight} = this.lines(doc, offset)
     let {start, length, number} = doc.lineAt(value)
     return new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.text)
+  }
+
+  forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
+    let {firstLine, lastLine, lineHeight} = this.lines(doc, offset)
+    for (let line = firstLine; line <= lastLine; line++) {
+      let {start, end} = doc.line(line)
+      if (start > to) break
+      if (end >= from) f(new BlockInfo(start, end - start, top, top += lineHeight, BlockType.text))
+    }
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
@@ -338,14 +337,6 @@ class HeightMapGap extends HeightMap {
   }
 
   toString() { return `gap(${this.length})` }
-
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
-    for (let pos = Math.max(from, offset), end = Math.min(to, offset + this.length); pos <= end;) {
-      let end = oracle.doc.lineAt(pos).end
-      f(new LineHeight(pos, end, 0, oracle.heightForLine(end - pos)))
-      pos = end + 1
-    }
-  }
 }
 
 class HeightMapBranch extends HeightMap {
@@ -376,6 +367,19 @@ class HeightMapBranch extends HeightMap {
       return base.join(this.right.lineAt(rightOffset, subQuery, doc, rightTop, rightOffset))
     else
       return this.left.lineAt(rightOffset, subQuery, doc, top, offset).join(base)
+  }
+
+  forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
+    let rightTop = top + this.left.height, rightOffset = offset + this.left.length + this.break
+    if (this.break) {
+      if (from < rightOffset) this.left.forEachLine(from, to, doc, top, offset, f)
+      if (to >= rightOffset) this.right.forEachLine(from, to, doc, rightTop, rightOffset, f)
+    } else {
+      let mid = this.lineAt(rightOffset, QueryType.byPos, doc, top, offset)
+      if (from < mid.from) this.left.forEachLine(from, mid.from - 1, doc, top, offset, f)
+      if (mid.to >= from && mid.from <= to) f(mid)
+      if (to > mid.to) this.right.forEachLine(mid.to + 1, to, doc, rightTop, rightOffset, f)
+    }
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
@@ -445,12 +449,6 @@ class HeightMapBranch extends HeightMap {
   }
 
   toString() { return this.left + (this.break ? " " : "-") + this.right }
-
-  forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {
-    let rightStart = offset + this.left.length + this.break
-    if (from < rightStart) this.left.forEachLine(from, to, offset, oracle, f)
-    if (to >= rightStart) this.right.forEachLine(from, to, rightStart, oracle, f)
-  }
 }
 
 function mergeGaps(nodes: (HeightMap | null)[], around: number) {

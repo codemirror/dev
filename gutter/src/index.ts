@@ -1,5 +1,5 @@
 import {combineConfig} from "../../extension/src/extension"
-import {EditorView, ViewExtension, ViewPlugin, styleModule, viewPlugin} from "../../view/src"
+import {EditorView, ViewExtension, ViewPlugin, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {StyleModule} from "style-mod"
 
 // FIXME Think about how the gutter width changing could cause
@@ -50,7 +50,7 @@ class GutterView implements ViewPlugin {
     }
     view.dom.insertBefore(this.dom, view.contentDOM)
     this.formatNumber = config.formatNumber
-    this.lastLine = new GutterLine(1, 0, 0, 0, this.formatNumber)
+    this.lastLine = new GutterLine(1, 0, 0, this.formatNumber)
     this.lastLine.dom.style.cssText += "visibility: hidden; pointer-events: none"
     this.dom.appendChild(this.lastLine.dom)
     this.update()
@@ -62,31 +62,31 @@ class GutterView implements ViewPlugin {
     // sure the gutter width is stable
     let last = 9
     while (last < this.view.state.doc.lines) last = last * 10 + 9
-    this.lastLine.update(last, 0, 0, 0, this.formatNumber)
+    this.lastLine.update(last, 0, 0, this.formatNumber)
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter()
   }
 
   updateGutter() {
-    let spaceAbove = this.view.lineAt(this.view.viewport.from, 0).top
-    if (spaceAbove != this.spaceAbove) {
-      this.spaceAbove = spaceAbove
-      this.dom.style.paddingTop = spaceAbove + "px"
-    }
-    let i = 0, lineNo = -1
+    let i = 0, height = 0
     this.view.viewportLines(line => {
-      let above = line.textTop, below = line.height - line.textBottom, height = line.height - above - below
-      if (lineNo < 0) lineNo = this.view.state.doc.lineAt(line.start).number
+      let text: BlockInfo | undefined
+      if (Array.isArray(line.type)) text = line.type.find(b => b.type == BlockType.text)
+      else text = line.type == BlockType.text ? line : undefined
+      if (!text) return
+      let above = text.top - height
+      // FIXME optimize (increment) when we can tell it's valid? (no replaced ranges)
+      let lineNo = this.view.state.doc.lineAt(text.from).number
       if (i == this.lines.length) {
-        let newLine = new GutterLine(lineNo, height, above, below, this.formatNumber)
+        let newLine = new GutterLine(lineNo, text.height, above, this.formatNumber)
         this.lines.push(newLine)
         this.dom.appendChild(newLine.dom)
       } else {
-        this.lines[i].update(lineNo, height, above, below, this.formatNumber)
+        this.lines[i].update(lineNo, text.height, above, this.formatNumber)
       }
-      lineNo = line.hasReplacedRanges ? -1 : lineNo + 1
+      height = text.bottom
       i++
-    })
+    }, 0)
     while (this.lines.length > i) this.dom.removeChild(this.lines.pop()!.dom)
     this.dom.style.minHeight = this.view.contentHeight + "px"
   }
@@ -105,21 +105,19 @@ class GutterLine {
   above: number = 0
   below: number = 0
 
-  constructor(lineNo: number, height: number, above: number, below: number, formatNo: (lineNo: number) => string) {
+  constructor(lineNo: number, height: number, above: number, formatNo: (lineNo: number) => string) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter-element"
-    this.update(lineNo, height, above, below, formatNo)
+    this.update(lineNo, height, above, formatNo)
   }
 
-  update(lineNo: number, height: number, above: number, below: number, formatNo: (lineNo: number) => string) {
+  update(lineNo: number, height: number, above: number, formatNo: (lineNo: number) => string) {
     if (this.lineNo != lineNo)
       this.dom.textContent = formatNo(this.lineNo = lineNo)
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
       this.dom.style.marginTop = (this.above = above) ? above + "px" : ""
-    if (this.below != below)
-      this.dom.style.marginBottom = (this.below = below) ? below + "px" : ""
   }
 }
 

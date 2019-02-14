@@ -7,7 +7,7 @@ import {InputState, MouseSelectionUpdate} from "./input"
 import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
-import {LineHeight, BlockInfo} from "./heightmap"
+import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule, ViewSnapshot,
         viewPlugin, ViewPlugin, getField, Effect} from "./extension"
@@ -170,6 +170,11 @@ export class EditorView {
     return this.docView.lineAt(pos, editorTop)
   }
 
+  viewportLines(f: (height: BlockInfo) => void, editorTop?: number) {
+    let {from, to} = this.viewport
+    this.docView.forEachLine(from, to, f, editorTop)
+  }
+
   get contentHeight() {
     return this.docView.heightMap.height + this.docView.paddingTop + this.docView.paddingBottom
   }
@@ -189,11 +194,6 @@ export class EditorView {
 
   get defaultCharacterWidth() { return this.docView.heightOracle.charWidth }
   get defaultLineHeight() { return this.docView.heightOracle.lineHeight }
-
-  viewportLines(f: (height: LineHeight) => void) {
-    let {from, to} = this.viewport
-    this.docView.heightMap.forEachLine(from, to, 0, this.docView.heightOracle, f)
-  }
 
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
     this.focus()

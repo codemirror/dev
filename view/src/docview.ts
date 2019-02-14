@@ -300,6 +300,11 @@ export class DocView extends ContentView {
     return this.heightMap.blockAt(height, this.state.doc, editorTop + this.paddingTop, 0)
   }
 
+  forEachLine(from: number, to: number, f: (line: BlockInfo) => void, editorTop?: number) {
+    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
+    return this.heightMap.forEachLine(from, to, this.state.doc, editorTop + this.paddingTop, 0, f)
+  }
+
   // Compute the new viewport and set of decorations, while giving
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
