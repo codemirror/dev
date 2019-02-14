@@ -326,7 +326,7 @@ class HeightMapGap extends HeightMap {
         nodes.push(line)
         pos += len + 1
       }
-      if (pos < end) nodes.push(null, new HeightMapGap(end - pos).updateHeight(oracle, pos))
+      if (pos <= end) nodes.push(null, new HeightMapGap(end - pos).updateHeight(oracle, pos))
       oracle.heightChanged = true
       return HeightMap.of(nodes)
     } else if (force || this.outdated) {

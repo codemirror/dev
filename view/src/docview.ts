@@ -436,10 +436,11 @@ export class DocView extends ContentView {
 
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.viewport
-    for (let pos = 0, i = 0; pos < to && i < this.children.length; i++) {
-      let child = this.children[i]
+    for (let pos = 0, i = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length + child.breakAfter
+      if (end > to) break
       if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
-      pos += child.length + child.breakAfter
+      pos = end
     }
     return result
   }
