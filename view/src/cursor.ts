@@ -1,5 +1,5 @@
 import {EditorView} from "./editorview"
-import {LineView} from "./blockview"
+import {LineView, BlockType} from "./blockview"
 import {dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
@@ -152,8 +152,10 @@ export class LineContext {
   static get(view: EditorView, pos: number): LineContext | null {
     for (let i = 0, off = 0;; i++) {
       let line = view.docView.children[i], end = off + line.length
-      if (end >= pos)
-        return line instanceof LineView ? new LineContext(line, off, i) : null
+      if (end >= pos) {
+        if (line instanceof LineView) return new LineContext(line, off, i)
+        if (line.length) return null
+      }
       off = end + 1
     }
   }
@@ -297,19 +299,19 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
 }
 
 export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bias: -1 | 1 = -1): number {
-  let content = view.contentDOM.getBoundingClientRect(), heightLine
-  for (;;) {
-    heightLine = view.lineAtHeight(y - content.top)
-    if (heightLine.textTop > 0) {
-      if (bias > 0) y += heightLine.textTop + 1
-      else if (heightLine.start > 0) { y += heightLine.top - 1; continue }
-    } else if (heightLine.textBottom < 0) {
-      if (bias < 0) y += heightLine.textBottom - 1
-      else if (heightLine.end < view.state.doc.length) { y += heightLine.bottom + 1; continue }
+  let content = view.contentDOM.getBoundingClientRect(), block
+  for (let bounced = false;;) {
+    block = view.blockAtHeight(y, content.top)
+    if (block.top > y || block.bottom < y) {
+      bias = block.top > y ? -1 : 1
+      y = Math.min(block.bottom - 1, Math.max(block.top + 1, y))
+      if (bounced) return -1
+      else bounced = true
     }
-    break
+    if (block.type == BlockType.line) break
+    y = bias > 0 ? block.bottom + 1 : block.top - 1
   }
-  let lineStart = heightLine.start
+  let lineStart = block.from
   // If this is outside of the rendered viewport, we can't determine a position
   if (lineStart < view.viewport.from)
     return view.viewport.from == 0 ? 0 : -1

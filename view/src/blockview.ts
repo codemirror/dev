@@ -5,6 +5,7 @@ import {clientRectsFor, Rect, domIndex} from "./dom"
 import {LineDecoration, WidgetType, widgetsEq} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 
+// FIXME move somewhere else?
 export const enum BlockType { line, widgetBefore, widgetAfter, widgetRange }
 
 export interface BlockView extends ContentView {

@@ -155,6 +155,11 @@ export class EditorView {
     return this.docView.domFromPos(pos)
   }
 
+  blockAtHeight(height: number, editorTop?: number) {
+    this.docView.forceLayout()
+    return this.docView.blockAtHeight(height, editorTop)
+  }
+
   heightAtPos(pos: number, top: boolean): number {
     this.docView.forceLayout()
     return this.docView.heightAt(pos, top ? -1 : 1)

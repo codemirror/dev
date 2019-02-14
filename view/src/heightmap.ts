@@ -3,6 +3,7 @@ import {ChangedRange} from "../../state/src"
 import {RangeSet, RangeIterator, RangeValue} from "../../rangeset/src/rangeset"
 import {DecorationSet, ReplaceDecoration, WidgetDecoration, Decoration} from "./decoration"
 import {Viewport} from "./viewport"
+import {BlockType} from "./blockview"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
@@ -65,11 +66,8 @@ export class HeightOracle {
 }
 
 // This object is used by `updateHeight` to make DOM measurements
-// arrive at the right lines. The `heights` array is a sequence of
-// line heights, starting from position `from`. When the lines have
-// line widgets, their height may be followed by a -1 or -2
-// (indicating whether the height is below or above the line) and then
-// a total widget height.
+// arrive at the right nides. The `heights` array is a sequence of
+// block heights, starting from position `from`.
 export class MeasuredHeights {
   public index = 0
   constructor(readonly from: number, readonly heights: number[]) {}
@@ -86,6 +84,15 @@ export class LineHeight {
   get hasReplacedRanges() { return false } // FIXME no longer meaningful
 }
 
+export class BlockInfo {
+  constructor(readonly from: number, readonly length: number,
+              readonly top: number, readonly height: number,
+              readonly type: BlockType) {}
+
+  get to() { return this.from + this.length }
+  get bottom() { return this.top + this.height }
+}
+
 const enum Flag { break = 1, outdated = 2 }
 
 export abstract class HeightMap {
@@ -99,6 +106,8 @@ export abstract class HeightMap {
 
   get outdated() { return (this.flags & Flag.outdated) > 0 }
   set outdated(value) { this.flags = value ? this.flags | Flag.outdated : this.flags & ~Flag.outdated }
+
+  abstract blockAt(height: number, doc: Text, top: number, offset: number): BlockInfo
 
   abstract heightAt(pos: number, doc: Text, bias?: -1 | 1, offset?: number): number
   abstract lineAt(height: number, doc: Text, offset?: number): LineHeight
@@ -146,7 +155,7 @@ export abstract class HeightMap {
     return me.updateHeight(oracle, 0)
   }
 
-  static empty() { return new HeightMapLine(0, 0) }
+  static empty() { return new HeightMapText(0, 0) }
 
   // nodes uses null values to indicate the position of line breaks.
   // There are never line breaks at the start or end of the array, or
@@ -192,6 +201,12 @@ export abstract class HeightMap {
 HeightMap.prototype.size = 1
 
 class HeightMapBlock extends HeightMap {
+  constructor(length: number, height: number, readonly type: BlockType) { super(length, height) }
+
+  blockAt(height: number, doc: Text, top: number, offset: number) {
+    return new BlockInfo(offset, this.length, top, this.height, this.type)
+  }
+
   heightAt(pos: number, doc: Text, bias: 1 | -1): number {
     return bias < 0 ? 0 : this.height
   }
@@ -216,7 +231,7 @@ class HeightMapBlock extends HeightMap {
   forEachLine(from: number, to: number, offset: number, oracle: HeightOracle, f: (height: LineHeight) => void) {}
 }
 
-class HeightMapLine extends HeightMapBlock {
+class HeightMapText extends HeightMapBlock {
   public collapsed = 0 // Amount of collapsed content in the line
   public widgetHeight = 0 // Maximum inline widget height
 
@@ -228,10 +243,10 @@ class HeightMapLine extends HeightMapBlock {
   // lines to somewhat effectively estimate their height when they are
   // not actually in view and thus can not be measured. Widget size
   // above/below is also necessary in heightAt, to skip it.
-  constructor(length: number, height: number) { super(length, height) }
+  constructor(length: number, height: number) { super(length, height, BlockType.line) }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
-    if (nodes.length == 1 && nodes[0] instanceof HeightMapLine && Math.abs(this.length - nodes[0]!.length) < 10) {
+    if (nodes.length == 1 && nodes[0] instanceof HeightMapText && Math.abs(this.length - nodes[0]!.length) < 10) {
       nodes[0]!.height = this.height
       return nodes[0]!
     } else {
@@ -259,6 +274,14 @@ class HeightMapLine extends HeightMapBlock {
 
 class HeightMapGap extends HeightMap {
   constructor(length: number) { super(length, 0) }
+
+  blockAt(height: number, doc: Text, top: number, offset: number) {
+    let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
+    let lines = lastLine - firstLine, line = Math.floor(lines * Math.max(0, Math.min(1, height / this.height)))
+    let heightPerLine = this.height / (lines + 1)
+    let {start, length} = doc.line(firstLine + line)
+    return new BlockInfo(start, length, top + heightPerLine * line, heightPerLine, BlockType.line)
+  }
 
   heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
@@ -314,7 +337,7 @@ class HeightMapGap extends HeightMap {
       while (pos <= end && measured.more) {
         let len = oracle.doc.lineAt(pos).length
         if (nodes.length) nodes.push(null)
-        let line = new HeightMapLine(len, measured.heights[measured.index++])
+        let line = new HeightMapText(len, measured.heights[measured.index++])
         line.outdated = false
         nodes.push(line)
         pos += len + 1
@@ -350,6 +373,12 @@ class HeightMapBranch extends HeightMap {
 
   get break() { return this.flags & Flag.break }
   set break(value: number) { this.flags = value ? this.flags | Flag.break : this.flags & ~Flag.break }
+
+  blockAt(height: number, doc: Text, top: number, offset: number) {
+    let mid = top + this.left.height
+    return height < mid ? this.left.blockAt(height, doc, top, offset)
+      : this.right.blockAt(height, doc, mid, offset + this.left.length + this.break)
+  }
 
   // FIXME boundary conditions when there's no break
 
@@ -475,10 +504,10 @@ class NodeBuilder implements RangeIterator<Decoration> {
     if (pos <= this.pos) return
     if (this.lineStart > -1) {
       let end = Math.min(pos, this.lineEnd), last = this.nodes[this.nodes.length - 1]
-      if (last instanceof HeightMapLine)
+      if (last instanceof HeightMapText)
         last.length += end - this.pos
       else if (end > this.pos || !this.isCovered)
-        this.nodes.push(new HeightMapLine(end - this.pos, -1))
+        this.nodes.push(new HeightMapText(end - this.pos, -1))
       this.writtenTo = end
       if (pos > end) {
         this.nodes.push(null)
@@ -492,7 +521,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   advanceReplaced(pos: number, deco: ReplaceDecoration) {
     let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
     if (deco.block)
-      this.addBlock(new HeightMapBlock(pos - this.pos, height), true, true)
+      this.addBlock(new HeightMapBlock(pos - this.pos, height, BlockType.widgetRange))
     else if (pos > this.pos || height >= relevantWidgetHeight)
       this.addLineDeco(height, pos - this.pos)
     if (this.lineEnd > -1 && this.lineEnd < this.pos)
@@ -502,7 +531,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   point(deco: WidgetDecoration) {
     let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
     if (deco.block)
-      this.addBlock(new HeightMapBlock(0, height), deco.startSide < 0, deco.startSide > 0)
+      this.addBlock(new HeightMapBlock(0, height, deco.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter))
     else if (height >= relevantWidgetHeight)
       this.addLineDeco(height, 0)
   }
@@ -517,25 +546,25 @@ class NodeBuilder implements RangeIterator<Decoration> {
       this.nodes.push(null)
     }
     if (this.pos > start)
-      this.nodes.push(new HeightMapLine(this.pos - start, -1))
+      this.nodes.push(new HeightMapText(this.pos - start, -1))
     this.writtenTo = this.pos
   }
 
   ensureLine() {
     this.enterLine()
     let last = this.nodes.length ? this.nodes[this.nodes.length - 1] : null
-    if (last instanceof HeightMapLine) return last
-    let line = new HeightMapLine(0, -1)
+    if (last instanceof HeightMapText) return last
+    let line = new HeightMapText(0, -1)
     this.nodes.push(line)
     return line
   }
 
-  addBlock(block: HeightMapBlock, coverStart: boolean, coverEnd: boolean) {
+  addBlock(block: HeightMapBlock) {
     this.enterLine()
-    if (!coverStart && !this.isCovered) this.ensureLine()
+    if (block.type == BlockType.widgetAfter && !this.isCovered) this.ensureLine()
     this.nodes.push(block)
     this.writtenTo = this.pos = this.pos + block.length
-    if (coverEnd) this.covering = block
+    if (block.type != BlockType.widgetBefore) this.covering = block
   }
 
   addLineDeco(height: number, length: number) {
@@ -548,13 +577,13 @@ class NodeBuilder implements RangeIterator<Decoration> {
 
   finish(from: number) {
     let last = this.nodes.length == 0 ? null : this.nodes[this.nodes.length - 1]
-    if (this.lineStart > -1 && !(last instanceof HeightMapLine) && !this.isCovered)
-      this.nodes.push(new HeightMapLine(0, -1))
+    if (this.lineStart > -1 && !(last instanceof HeightMapText) && !this.isCovered)
+      this.nodes.push(new HeightMapText(0, -1))
     else if (this.writtenTo < this.pos || last == null)
       this.nodes.push(new HeightMapGap(this.pos - this.writtenTo))
     let pos = from
     for (let node of this.nodes) {
-      if (node instanceof HeightMapLine) node.updateHeight(this.oracle, pos)
+      if (node instanceof HeightMapText) node.updateHeight(this.oracle, pos)
       pos += node ? node.length : 1
     }
     return this.nodes

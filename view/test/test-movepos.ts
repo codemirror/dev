@@ -127,12 +127,12 @@ describe("EditorView.movePos", () => {
       update(deco) { return deco }
     })])
     ist(cm.contentDOM.offsetHeight, 400, ">")
-//    ist(cm.movePos(0, "forward", "line"), 4)
+    ist(cm.movePos(0, "forward", "line"), 4)
     ist(cm.movePos(2, "forward", "line"), 6)
-/*    ist(cm.movePos(3, "forward", "line"), 7)
+    ist(cm.movePos(3, "forward", "line"), 7)
     ist(cm.movePos(4, "backward", "line"), 0)
     ist(cm.movePos(5, "backward", "line"), 1)
-    ist(cm.movePos(7, "backward", "line"), 3)*/
+    ist(cm.movePos(7, "backward", "line"), 3)
   })
 
   function testLineBoundaryMotion(focus: boolean) {
