@@ -86,21 +86,18 @@ export class LineHeight {
 export class BlockInfo {
   constructor(readonly from: number, readonly length: number,
               readonly top: number, readonly height: number,
-              readonly type: BlockType) {}
+              readonly type: BlockType | ReadonlyArray<BlockInfo>) {}
 
   get to() { return this.from + this.length }
   get bottom() { return this.top + this.height }
-}
 
-export class LineInfo {
-  constructor(readonly blocks: ReadonlyArray<BlockInfo>) {}
-
-  get from() { return this.blocks[0].from }
-  get to() { return this.blocks[this.blocks.length - 1].to }
-  get length() { return this.to - this.from }
-  get top() { return this.blocks[0].top }
-  get bottom() { return this.blocks[this.blocks.length - 1].bottom }
-  get height() { return this.bottom - this.top }
+  // @internal
+  join(other: BlockInfo) {
+    let detail = (Array.isArray(this.type) ? this.type : [this])
+      .concat(Array.isArray(other.type) ? other.type : [other])
+    return new BlockInfo(this.from, this.length + other.length,
+                         this.top, this.height + other.height, detail)
+  }
 }
 
 export const enum QueryType { byPos, byHeight, byPosNoHeight }
@@ -120,7 +117,7 @@ export abstract class HeightMap {
   set outdated(value) { this.flags = (value ? Flag.outdated : 0) | (this.flags & ~Flag.outdated) }
 
   abstract blockAt(height: number, doc: Text, top: number, offset: number): BlockInfo
-  abstract lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number): LineInfo
+  abstract lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number): BlockInfo
 
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean, measured?: MeasuredHeights): HeightMap
   abstract toString(): void
@@ -219,7 +216,7 @@ class HeightMapBlock extends HeightMap {
   }
 
   lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
-    return new LineInfo([this.blockAt(0, doc, top, offset)])
+    return this.blockAt(0, doc, top, offset)
   }
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
@@ -279,15 +276,15 @@ class HeightMapGap extends HeightMap {
   }
 
   lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
-    if (type == QueryType.byHeight) return new LineInfo([this.blockAt(value, doc, top, offset)])
+    if (type == QueryType.byHeight) return this.blockAt(value, doc, top, offset)
     if (type == QueryType.byPosNoHeight) {
       let {start, end} = doc.lineAt(value)
-      return new LineInfo([new BlockInfo(start, end - start, 0, 0, BlockType.text)])
+      return new BlockInfo(start, end - start, 0, 0, BlockType.text)
     }
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
     let lineHeight = this.height / (lastLine - firstLine + 1)
     let {start, length, number} = doc.lineAt(value)
-    return new LineInfo([new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.text)])
+    return new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.text)
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
@@ -375,13 +372,10 @@ class HeightMapBranch extends HeightMap {
       : this.right.lineAt(value, type, doc, rightTop, rightOffset)
     if (this.break || (left ? base.to < rightOffset : base.from > rightOffset)) return base
     let subQuery = type == QueryType.byPosNoHeight ? QueryType.byPosNoHeight : QueryType.byPos
-    if (left) {
-      let other = this.right.lineAt(rightOffset, subQuery, doc, rightTop, rightOffset)
-      return new LineInfo(base.blocks.concat(other.blocks))
-    } else {
-      let other = this.left.lineAt(rightOffset, subQuery, doc, top, offset)
-      return new LineInfo(other.blocks.concat(base.blocks))
-    }
+    if (left)
+      return base.join(this.right.lineAt(rightOffset, subQuery, doc, rightTop, rightOffset))
+    else
+      return this.left.lineAt(rightOffset, subQuery, doc, top, offset).join(base)
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {

@@ -1,4 +1,4 @@
-import {HeightMap, HeightOracle, MeasuredHeights, LineInfo, QueryType} from "../src/heightmap"
+import {HeightMap, HeightOracle, MeasuredHeights, BlockInfo, QueryType} from "../src/heightmap"
 import {BlockType} from "../src/blockview"
 import {Decoration, WidgetType} from "../src/decoration"
 import {Text} from "../../doc/src"
@@ -78,8 +78,8 @@ describe("HeightMap", () => {
                         Decoration.widget(0, {widget: new MyWidget(13), side: -1, block: true})])
     ist(map.toString(), "block(0)-block(0)-line(3)-block(0) gap(7)")
     ist(map.height, 28 + 3 * oracle.lineHeight)
-    let {blocks} = map.lineAt(0, byP, text, 0, 0)
-    ist(blocks.map(b => b.height).join(), [10, 13, oracle.lineHeight, 5].join())
+    let {type} = map.lineAt(0, byP, text, 0, 0)
+    ist((type as BlockInfo[]).map(b => b.height).join(), [10, 13, oracle.lineHeight, 5].join())
     ist(map.lineAt(4, byP, text, 0, 0).top, 28 + oracle.lineHeight)
     map = map.updateHeight(oracle, 0, false, new MeasuredHeights(0, [8, 12, 10, 20, 40, 20]))
     ist(map.toString(), "block(0)-block(0)-line(3)-block(0) line(3) line(3)")
@@ -242,9 +242,8 @@ describe("HeightMap", () => {
     })
   })
 
-  function eqLine(a: LineInfo, b: LineInfo) {
-    return a.from == b.from && a.to == b.to && a.top == b.top &&
-      a.bottom == b.bottom && a.blocks.length == b.blocks.length
+  function eqBlock(a: BlockInfo, b: BlockInfo) {
+    return a.from == b.from && a.to == b.to && a.top == b.top && a.bottom == b.bottom
   }
 
   describe("lineAt", () => {
@@ -253,15 +252,15 @@ describe("HeightMap", () => {
       let line1 = map.lineAt(0, byP, text, 0, 0)
       ist(line1.from, 0); ist(line1.to, 3)
       ist(line1.top, 0)
-      ist(map.lineAt(0, byH, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(0, byH, text, 0, 0), line1, eqBlock)
       let line2 = map.lineAt(line1.to + 1, byP, text, 0, 0)
       ist(line2.from, 4); ist(line2.to, 7)
       ist(line2.top, line1.bottom)
-      ist(map.lineAt(line1.bottom + 1, byH, text, 0, 0), line2, eqLine)
+      ist(map.lineAt(line1.bottom + 1, byH, text, 0, 0), line2, eqBlock)
       let line3 = map.lineAt(15, byP, text, 0, 0)
       ist(line3.from, 12); ist(line3.to, 15)
       ist(line3.bottom, map.height)
-      ist(map.lineAt(2e9, byH, text, 0, 0), line3, eqLine)
+      ist(map.lineAt(2e9, byH, text, 0, 0), line3, eqBlock)
     })
 
     it("finds lines in lines", () => {
@@ -269,11 +268,11 @@ describe("HeightMap", () => {
       let line1 = map.lineAt(0, byP, text, 0, 0)
       ist(line1.from, 0); ist(line1.to, 3)
       ist(line1.top, 0); ist(line1.bottom, 10)
-      ist(map.lineAt(9, byH, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(9, byH, text, 0, 0), line1, eqBlock)
       let line2 = map.lineAt(9, byP, text, 0, 0)
       ist(line2.from, 8); ist(line2.to, 11)
       ist(line2.top, 20); ist(line2.bottom, 40)
-      ist(map.lineAt(39, byH, text, 0, 0), line2, eqLine)
+      ist(map.lineAt(39, byH, text, 0, 0), line2, eqBlock)
     })
 
     it("includes adjacent widgets in lines", () => {
@@ -283,17 +282,17 @@ describe("HeightMap", () => {
                           Decoration.widget(15, {widget: new MyWidget(0), block: true, side: 1})])
       let line1 = map.lineAt(4, byP, text, 0, 0)
       ist(line1.from, 4); ist(line1.to, 11)
-      ist(line1.blocks.length, 4)
-      ist(map.lineAt(line1.top + 1, byH, text, 0, 0), line1, eqLine)
-      ist(map.lineAt(line1.bottom - 1, byH, text, 0, 0), line1, eqLine)
-      ist(map.lineAt(line1.top + line1.height / 2, byH, text, 0, 0), line1, eqLine)
-      ist(map.lineAt(5, byP, text, 0, 0), line1, eqLine)
-      ist(map.lineAt(7, byP, text, 0, 0), line1, eqLine)
-      ist(map.lineAt(11, byP, text, 0, 0), line1, eqLine)
+      ist((line1.type as any[]).length, 4)
+      ist(map.lineAt(line1.top + 1, byH, text, 0, 0), line1, eqBlock)
+      ist(map.lineAt(line1.bottom - 1, byH, text, 0, 0), line1, eqBlock)
+      ist(map.lineAt(line1.top + line1.height / 2, byH, text, 0, 0), line1, eqBlock)
+      ist(map.lineAt(5, byP, text, 0, 0), line1, eqBlock)
+      ist(map.lineAt(7, byP, text, 0, 0), line1, eqBlock)
+      ist(map.lineAt(11, byP, text, 0, 0), line1, eqBlock)
       let line2 = map.lineAt(map.height, byH, text, 0, 0)
       ist(line2.from, 12); ist(line2.to, 15)
-      ist(line2.blocks.length, 2)
-      ist(map.lineAt(line2.top + 1, byH, text, 0, 0), line2, eqLine)
+      ist((line2.type as any[]).length!, 2)
+      ist(map.lineAt(line2.top + 1, byH, text, 0, 0), line2, eqBlock)
     })
   })
 })

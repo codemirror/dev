@@ -5,7 +5,7 @@ import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
 import {DOMObserver} from "./domobserver"
-import {HeightMap, QueryType, HeightOracle, MeasuredHeights, LineInfo, BlockInfo} from "./heightmap"
+import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 import {ViewUpdate, ViewSnapshot, ViewField} from "./extension"
@@ -120,11 +120,11 @@ export class DocView extends ContentView {
     let visible = this.viewport, viewports: Viewport[] = [visible]
     let {head, anchor} = this.state.selection.primary
     if (head < visible.from || head > visible.to) {
-      let {from, to} = this.lineAtPos(head, 0)
+      let {from, to} = this.lineAt(head, 0)
       viewports.push(new Viewport(from, to))
     }
     if (!viewports.some(({from, to}) => anchor >= from && anchor <= to)) {
-      let {from, to} = this.lineAtPos(anchor, 0)
+      let {from, to} = this.lineAt(anchor, 0)
       viewports.push(new Viewport(from, to))
     }
     viewports.sort((a, b) => a.from - b.from)
@@ -285,12 +285,12 @@ export class DocView extends ContentView {
     })
   }
 
-  lineAtPos(pos: number, editorTop?: number): LineInfo {
+  lineAt(pos: number, editorTop?: number): BlockInfo {
     if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
     return this.heightMap.lineAt(pos, QueryType.byPos, this.state.doc, editorTop + this.paddingTop, 0)
   }
 
-  lineAtHeight(height: number, editorTop?: number): LineInfo {
+  lineAtHeight(height: number, editorTop?: number): BlockInfo {
     if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
     return this.heightMap.lineAt(height, QueryType.byHeight, this.state.doc, editorTop + this.paddingTop, 0)
   }
@@ -578,7 +578,7 @@ export class DocView extends ContentView {
       let next = i == viewports.length ? null : viewports[i]
       let end = next ? next.from - 1 : docLength
       if (end > pos) {
-        let height = this.lineAtPos(end, 0).bottom - this.lineAtPos(pos, 0).top
+        let height = this.lineAt(end, 0).bottom - this.lineAt(pos, 0).top
         deco.push(Decoration.replace(pos, end, {widget: new GapWidget(height), block: true, inclusive: true}))
       }
       if (!next) break
