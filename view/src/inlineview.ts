@@ -5,26 +5,16 @@ import {LineView} from "./blockview"
 import {Text} from "../../doc/src"
 import {Rect} from "./dom"
 import browser from "./browser"
+import {Open} from "./buildview"
 
 const none: any[] = []
 
 export abstract class InlineView extends ContentView {
-  merge(other: InlineView, from?: number, to?: number) { return false }
+  abstract merge(from: number, to?: number, source?: InlineView | null): boolean
   match(other: InlineView) { return false }
   get children() { return none }
-  abstract cut(from: number, to?: number): void
   abstract slice(from: number, to?: number): InlineView
   getSide() { return 0 }
-
-  static appendInline(a: InlineView[], b: InlineView[]): InlineView[] {
-    let i = 0
-    if (b.length && a.length) {
-      let last = a[a.length - 1]
-      if (last.merge(b[0], last.length)) i++
-    }
-    for (; i < b.length; i++) a.push(b[i])
-    return a
-  }
 }
 
 const MAX_JOIN_LEN = 256
@@ -75,19 +65,15 @@ export class TextView extends InlineView {
     return true
   }
 
-  merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof TextView) ||
-        other.tagName != this.tagName || other.class != this.class ||
-        !attrsEq(other.attrs, this.attrs) || this.length - (to - from) + other.length > MAX_JOIN_LEN)
+  merge(from: number, to: number = this.length, source: InlineView | null = null): boolean {
+    if (source &&
+        (!(source instanceof TextView) ||
+         source.tagName != this.tagName || source.class != this.class ||
+         !attrsEq(source.attrs, this.attrs) || this.length - (to - from) + source.length > MAX_JOIN_LEN))
       return false
-    this.text = this.text.slice(0, from) + other.text + this.text.slice(to)
+    this.text = this.text.slice(0, from) + (source ? source.text : "") + this.text.slice(to)
     this.markDirty()
     return true
-  }
-
-  cut(from: number, to: number = this.length) {
-    this.text = this.text.slice(0, from) + this.text.slice(to)
-    this.markDirty()
   }
 
   slice(from: number, to: number = this.length) {
@@ -140,11 +126,10 @@ function textCoords(text: Node, pos: number): Rect {
 export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
-  constructor(public length: number, public widget: WidgetType | null, readonly side: number, readonly open: boolean = false) {
+  constructor(public length: number, public widget: WidgetType | null, readonly side: number, readonly open: number = 0) {
     super()
   }
 
-  cut(from: number, to: number = this.length) { this.length -= to - from }
   slice(from: number, to: number = this.length) { return new WidgetView(to - from, this.widget, this.side) }
 
   sync() {
@@ -156,11 +141,15 @@ export class WidgetView extends InlineView {
 
   getSide() { return this.side }
 
-  merge(other: InlineView, from: number = 0, to: number = this.length): boolean {
-    if (!(other instanceof WidgetView) || !other.open) return false
-    if (!widgetsEq(this.widget, other.widget))
-      throw new Error("Trying to merge incompatible widgets")
-    this.length = from + other.length + (this.length - to)
+  merge(from: number, to: number = this.length, source: InlineView | null = null) {
+    if (source) {
+      if (!(source instanceof WidgetView) || !source.open ||
+          from > 0 && !(source.open & Open.start) ||
+          to < this.length && !(source.open & Open.end)) return false
+      if (!widgetsEq(this.widget, source.widget))
+        throw new Error("Trying to merge incompatible widgets")
+    }
+    this.length = from + (source ? source.length : 0) + (this.length - to)
     return true
   }
 
@@ -210,12 +199,11 @@ export class CompositionView extends InlineView {
     this.length = newLen
   }
 
-  cut(from: number, to: number = this.length) {
-    if (from != to || from > 0 && from < this.length)
-      throw new Error("bug: Cutting a composition node")
+  merge(): boolean {
+    throw new Error("bug: Called merge on a composition node")
   }
 
-  slice(from: number, to: number = this.length): InlineView {
+  slice(): InlineView {
     throw new Error("bug: Called slice on a composition node")
   }
 

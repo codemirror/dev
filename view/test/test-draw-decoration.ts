@@ -230,6 +230,13 @@ describe("EditorView decoration", () => {
       ist(cm.contentDOM.firstChild!.textContent, "1bcde0")
     })
 
+    it("allows replacing a single replaced range with two adjacent ones", () => {
+      let cm = decoEditor("1234567890", [r(1, 9)])
+      cm.dispatch(cm.state.transaction.replace(2, 8, "cdefgh").addMeta(addDeco([r(1, 5), r(5, 9)]), filterDeco(x => false)))
+      ist(cm.contentDOM.firstChild!.textContent, "10")
+      ist((cm.contentDOM.firstChild as HTMLElement).childNodes.length, 4)
+    })
+
     it("can handle changes inside replaced content", () => {
       let cm = decoEditor("abcdefghij", [r(2, 8)])
       cm.dispatch(cm.state.transaction.replace(4, 6, "n"))
@@ -275,9 +282,6 @@ describe("EditorView decoration", () => {
       cm.dispatch(cm.state.transaction.replace(1, 2, "\n"))
       classes(cm, "a", "")
     })
-
-    // FIXME add a case for a collapsed range that is expanded on one
-    // side, but next to a similar collapsed range on the other
 
     it("can handle insertion", () => {
       let cm = decoEditor("x\ny\nz", [l(2, "a"), l(4, "b")])

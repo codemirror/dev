@@ -4,6 +4,8 @@ import {BlockView, LineView, BlockWidgetView, BlockType} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
 
+export const enum Open { start = 1, end = 2 }
+
 export class ContentBuilder implements RangeIterator<Decoration> {
   content: BlockView[] = []
   curLine: LineView | null = null
@@ -92,17 +94,11 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   }
 
   advanceReplaced(pos: number, deco: ReplaceDecoration, openStart: boolean, openEnd: boolean) {
-    let open = openStart || openEnd
-    if (deco.block) {
+    let open = (openStart ? Open.start : 0) | (openEnd ? Open.end : 0)
+    if (deco.block)
       this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, BlockType.widgetRange, open))
-    } else {
-      let line = this.getLine()
-      let widgetView = new WidgetView(pos - this.pos, deco.widget, 0, open)
-      if (line.children.length && line.children[line.children.length - 1].merge(widgetView))
-        line.length += widgetView.length
-      else
-        line.append(widgetView)
-    }
+    else
+      this.getLine().append(new WidgetView(pos - this.pos, deco.widget, 0, open))
 
     // Advance the iterator past the replaced content
     let length = pos - this.pos

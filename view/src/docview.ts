@@ -214,10 +214,14 @@ export class DocView extends ContentView {
 
     let after = this.children[toI]
     if (toOff < after.length) {
-      if (toOff > 0 || fromI == toI) after = after.split(toOff)
-      if (!breakAtEnd && last && last.merge(last.length, last.length, after, false, this.composition)) {
-        last.breakAfter = after.breakAfter
+      if (fromI == toI) {
+        after = after.split(toOff)
+        toOff = 0
+      }
+      if (!breakAtEnd && last && after.merge(0, toOff, last, true, this.composition)) {
+        content[content.length - 1] = after
       } else {
+        if (toOff) after.merge(0, toOff, null, false, this.composition)
         content.push(after)
       }
     } else if (after.breakAfter) {

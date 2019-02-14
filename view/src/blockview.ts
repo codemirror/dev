@@ -4,6 +4,7 @@ import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
 import {LineDecoration, WidgetType, widgetsEq} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
+import {Open} from "./buildview"
 
 // FIXME move somewhere else?
 export const enum BlockType { text, widgetBefore, widgetAfter, widgetRange }
@@ -44,10 +45,11 @@ export class LineView extends ContentView implements BlockView {
     if (fromI == toI && fromOff) {
       let start = this.children[fromI]
       // Maybe just update that view and be done
-      if (elts.length == 1 && start.merge(elts[0], fromOff, toOff)) return true
-      if (elts.length == 0) { start.cut(fromOff, toOff); return true }
+      if (elts.length == 1 && start.merge(fromOff, toOff, elts[0])) return true
+      if (elts.length == 0) { start.merge(fromOff, toOff, null); return true }
       // Otherwise split it, so that we don't have to worry about aliasing front/end afterwards
-      InlineView.appendInline(elts, [start.slice(toOff)])
+      let after = start.slice(toOff)
+      if (!after.merge(0, 0, elts[elts.length - 1])) elts.push(after)
       toI++
       toOff = 0
     }
@@ -58,18 +60,18 @@ export class LineView extends ContentView implements BlockView {
     // this is done
     if (toOff) {
       let end = this.children[toI]
-      if (elts.length && end.merge(elts[elts.length - 1], 0, toOff)) elts.pop()
-      else end.cut(0, toOff)
+      if (elts.length && end.merge(0, toOff, elts[elts.length - 1])) elts.pop()
+      else end.merge(0, toOff, null)
     } else if (toI < this.children.length && elts.length &&
-               this.children[toI].merge(elts[elts.length - 1], 0, 0)) {
+               this.children[toI].merge(0, 0, elts[elts.length - 1])) {
       elts.pop()
     }
     if (fromOff) {
       let start = this.children[fromI]
-      if (elts.length && start.merge(elts[0], fromOff)) elts.shift()
-      else start.cut(fromOff)
+      if (elts.length && start.merge(fromOff, undefined, elts[0])) elts.shift()
+      else start.merge(fromOff, undefined, null)
       fromI++
-    } else if (fromI && elts.length && this.children[fromI - 1].merge(elts[0], this.children[fromI - 1].length)) {
+    } else if (fromI && elts.length && this.children[fromI - 1].merge(this.children[fromI - 1].length, undefined, elts[0])) {
       elts.shift()
     }
 
@@ -102,7 +104,7 @@ export class LineView extends ContentView implements BlockView {
     let {i, off} = this.childCursor().findPos(at)
     if (off) {
       end.append(this.children[i].slice(off))
-      this.children[i].cut(off)
+      this.children[i].merge(off, undefined, null)
       i++
     }
     for (let j = i; j < this.children.length; j++) end.append(this.children[j])
@@ -225,17 +227,25 @@ export class BlockWidgetView extends ContentView implements BlockView {
   parent!: DocView | null
   breakAfter = 0
 
-  constructor(public widget: WidgetType | null, public length: number, public type: BlockType,
-              public open: boolean = false) {
+  constructor(
+    public widget: WidgetType | null,
+    public length: number,
+    public type: BlockType,
+    // This is set by the builder and used to distinguish between
+    // adjacent widgets and parts of the same widget when calling
+    // `merge`. It's kind of silly that it's an instance variable, but
+    // it's hard to route there otherwise.
+    public open: number = 0) {
     super()
   }
 
   merge(from: number, to: number, source: ContentView | null): boolean {
-    if (!(source instanceof BlockWidgetView) || !(source.open || this.open)) return false
+    if (!(source instanceof BlockWidgetView) || !source.open ||
+        from > 0 && !(source.open & Open.start) ||
+        to < this.length && !(source.open & Open.end)) return false
     if (!widgetsEq(this.widget, source.widget))
       throw new Error("Trying to merge an open widget with an incompatible node")
     this.length = from + source.length + (this.length - to)
-    this.open = false
     return true
   }
 
