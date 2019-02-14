@@ -384,9 +384,9 @@ class HeightMapBranch extends HeightMap {
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     let rightStart = this.left.length + this.break
-    if (to <= rightStart)
+    if (to < rightStart)
       return this.balanced(this.left.replace(from, to, nodes), this.break, this.right)
-    if (from >= rightStart)
+    if (from > this.left.length)
       return this.balanced(this.left, this.break, this.right.replace(from - rightStart, to - rightStart, nodes))
 
     let result: (HeightMap | null)[] = []
