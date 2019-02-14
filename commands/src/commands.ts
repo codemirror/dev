@@ -103,7 +103,10 @@ function getIndentation(state: EditorState, pos: number): number {
 }
 
 export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
-  let indentation = state.selection.ranges.map(r => getIndentation(state, r.from)), i = 0
+  let i = 0, indentation = state.selection.ranges.map(r => {
+    let indent = getIndentation(state, r.from)
+    return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
+  })
   dispatch(state.transaction.reduceRanges((tr, range) => {
     let indent = indentation[i++]
     return {transaction: tr.replace(range.from, range.to, ["", space(indent)]),
