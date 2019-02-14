@@ -5,7 +5,7 @@ import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
 import {DOMObserver} from "./domobserver"
-import {HeightMap, HeightOracle, MeasuredHeights, LineHeight, BlockInfo} from "./heightmap"
+import {HeightMap, QueryType, HeightOracle, MeasuredHeights, LineInfo, BlockInfo} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset} from "./dom"
 import {ViewUpdate, ViewSnapshot, ViewField} from "./extension"
@@ -119,10 +119,14 @@ export class DocView extends ContentView {
 
     let visible = this.viewport, viewports: Viewport[] = [visible]
     let {head, anchor} = this.state.selection.primary
-    if (head < visible.from || head > visible.to)
-      viewports.push(this.heightMap.lineViewport(head, this.state.doc))
-    if (!viewports.some(({from, to}) => anchor >= from && anchor <= to))
-      viewports.push(this.heightMap.lineViewport(anchor, this.state.doc))
+    if (head < visible.from || head > visible.to) {
+      let {from, to} = this.lineAtPos(head, 0)
+      viewports.push(new Viewport(from, to))
+    }
+    if (!viewports.some(({from, to}) => anchor >= from && anchor <= to)) {
+      let {from, to} = this.lineAtPos(anchor, 0)
+      viewports.push(new Viewport(from, to))
+    }
     viewports.sort((a, b) => a.from - b.from)
 
     let compositionRange = null
@@ -281,12 +285,14 @@ export class DocView extends ContentView {
     })
   }
 
-  heightAt(pos: number, bias: 1 | -1) {
-    return this.heightMap.heightAt(pos, this.state.doc, bias) + this.paddingTop
+  lineAtPos(pos: number, editorTop?: number): LineInfo {
+    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
+    return this.heightMap.lineAt(pos, QueryType.byPos, this.state.doc, editorTop + this.paddingTop, 0)
   }
 
-  lineAtHeight(height: number): LineHeight {
-    return this.heightMap.lineAt(height - this.paddingTop, this.state.doc)
+  lineAtHeight(height: number, editorTop?: number): LineInfo {
+    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
+    return this.heightMap.lineAt(height, QueryType.byHeight, this.state.doc, editorTop + this.paddingTop, 0)
   }
 
   blockAtHeight(height: number, editorTop?: number): BlockInfo {
@@ -572,7 +578,7 @@ export class DocView extends ContentView {
       let next = i == viewports.length ? null : viewports[i]
       let end = next ? next.from - 1 : docLength
       if (end > pos) {
-        let height = this.heightAt(end, 1) - this.heightAt(pos, -1)
+        let height = this.lineAtPos(end, 0).bottom - this.lineAtPos(pos, 0).top
         deco.push(Decoration.replace(pos, end, {widget: new GapWidget(height), block: true, inclusive: true}))
       }
       if (!next) break

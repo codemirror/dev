@@ -308,7 +308,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
       if (bounced) return -1
       else bounced = true
     }
-    if (block.type == BlockType.line) break
+    if (block.type == BlockType.text) break
     y = bias > 0 ? block.bottom + 1 : block.top - 1
   }
   let lineStart = block.from

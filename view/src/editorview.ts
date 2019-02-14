@@ -7,7 +7,7 @@ import {InputState, MouseSelectionUpdate} from "./input"
 import {Rect} from "./dom"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
-import {LineHeight} from "./heightmap"
+import {LineInfo, LineHeight} from "./heightmap"
 import {Viewport} from "./viewport"
 import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule, ViewSnapshot,
         viewPlugin, ViewPlugin, getField, Effect} from "./extension"
@@ -160,14 +160,14 @@ export class EditorView {
     return this.docView.blockAtHeight(height, editorTop)
   }
 
-  heightAtPos(pos: number, top: boolean): number {
+  lineAtHeight(height: number, editorTop?: number): LineInfo {
     this.docView.forceLayout()
-    return this.docView.heightAt(pos, top ? -1 : 1)
+    return this.docView.lineAtHeight(height, editorTop)
   }
 
-  lineAtHeight(height: number): LineHeight {
+  lineAtPos(pos: number, editorTop?: number): LineInfo {
     this.docView.forceLayout()
-    return this.docView.lineAtHeight(height)
+    return this.docView.lineAtPos(pos, editorTop)
   }
 
   get contentHeight() {

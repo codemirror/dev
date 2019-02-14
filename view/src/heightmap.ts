@@ -2,7 +2,6 @@ import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 import {RangeSet, RangeIterator, RangeValue} from "../../rangeset/src/rangeset"
 import {DecorationSet, ReplaceDecoration, WidgetDecoration, Decoration} from "./decoration"
-import {Viewport} from "./viewport"
 import {BlockType} from "./blockview"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
@@ -93,6 +92,19 @@ export class BlockInfo {
   get bottom() { return this.top + this.height }
 }
 
+export class LineInfo {
+  constructor(readonly blocks: ReadonlyArray<BlockInfo>) {}
+
+  get from() { return this.blocks[0].from }
+  get to() { return this.blocks[this.blocks.length - 1].to }
+  get length() { return this.to - this.from }
+  get top() { return this.blocks[0].top }
+  get bottom() { return this.blocks[this.blocks.length - 1].bottom }
+  get height() { return this.bottom - this.top }
+}
+
+export const enum QueryType { byPos, byHeight, byPosNoHeight }
+
 const enum Flag { break = 1, outdated = 2 }
 
 export abstract class HeightMap {
@@ -105,13 +117,11 @@ export abstract class HeightMap {
   size!: number
 
   get outdated() { return (this.flags & Flag.outdated) > 0 }
-  set outdated(value) { this.flags = value ? this.flags | Flag.outdated : this.flags & ~Flag.outdated }
+  set outdated(value) { this.flags = (value ? Flag.outdated : 0) | (this.flags & ~Flag.outdated) }
 
   abstract blockAt(height: number, doc: Text, top: number, offset: number): BlockInfo
+  abstract lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number): LineInfo
 
-  abstract heightAt(pos: number, doc: Text, bias?: -1 | 1, offset?: number): number
-  abstract lineAt(height: number, doc: Text, offset?: number): LineHeight
-  abstract lineViewport(pos: number, doc: Text, offset?: number): Viewport
   abstract updateHeight(oracle: HeightOracle, offset?: number, force?: boolean, measured?: MeasuredHeights): HeightMap
   abstract toString(): void
   // FIXME needs a different protocol
@@ -140,13 +150,14 @@ export abstract class HeightMap {
     let me: HeightMap = this
     for (let i = changes.length - 1; i >= 0; i--) {
       let {fromA, toA, fromB, toB} = changes[i]
-      let start = me.lineViewport(fromA, oldDoc), end = start.to >= toA ? start : me.lineViewport(toA, oldDoc)
+      let start = me.lineAt(fromA, QueryType.byPosNoHeight, oldDoc, 0, 0)
+      let end = start.to >= toA ? start : me.lineAt(toA, QueryType.byPosNoHeight, oldDoc, 0, 0)
       toB += end.to - toA; toA = end.to
       while (i > 0 && start.from <= changes[i - 1].toA) {
         fromA = changes[i - 1].fromA
         fromB = changes[i - 1].fromB
         i--
-        if (fromA < start.from) start = me.lineViewport(fromA, oldDoc)
+        if (fromA < start.from) start = me.lineAt(fromA, QueryType.byPosNoHeight, oldDoc, 0, 0)
       }
       fromB += start.from - fromA; fromA = start.from
       let nodes = NodeBuilder.build(oracle, decorations, fromB, toB)
@@ -207,16 +218,8 @@ class HeightMapBlock extends HeightMap {
     return new BlockInfo(offset, this.length, top, this.height, this.type)
   }
 
-  heightAt(pos: number, doc: Text, bias: 1 | -1): number {
-    return bias < 0 ? 0 : this.height
-  }
-
-  lineAt(height: number, doc: Text, offset: number = 0) {
-    return new LineHeight(offset, offset + this.length, -height, this.height)
-  }
-
-  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
-    return new Viewport(offset, offset + this.length)
+  lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
+    return new LineInfo([this.blockAt(0, doc, top, offset)])
   }
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
@@ -235,15 +238,7 @@ class HeightMapText extends HeightMapBlock {
   public collapsed = 0 // Amount of collapsed content in the line
   public widgetHeight = 0 // Maximum inline widget height
 
-  // Decoration information is stored in a somewhat obscure format—the
-  // array of numbers in `deco` encodes all of collapsed ranges,
-  // inline widgets, and widgets above/below the line.
-  //
-  // These are the pieces of information that need to be stored about
-  // lines to somewhat effectively estimate their height when they are
-  // not actually in view and thus can not be measured. Widget size
-  // above/below is also necessary in heightAt, to skip it.
-  constructor(length: number, height: number) { super(length, height, BlockType.line) }
+  constructor(length: number, height: number) { super(length, height, BlockType.text) }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     if (nodes.length == 1 && nodes[0] instanceof HeightMapText && Math.abs(this.length - nodes[0]!.length) < 10) {
@@ -277,29 +272,22 @@ class HeightMapGap extends HeightMap {
 
   blockAt(height: number, doc: Text, top: number, offset: number) {
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
-    let lines = lastLine - firstLine, line = Math.floor(lines * Math.max(0, Math.min(1, height / this.height)))
-    let heightPerLine = this.height / (lines + 1)
+    let lines = lastLine - firstLine + 1, heightPerLine = this.height / lines
+    let line = Math.max(0, Math.min(lines - 1, Math.floor((height - top) / heightPerLine)))
     let {start, length} = doc.line(firstLine + line)
-    return new BlockInfo(start, length, top + heightPerLine * line, heightPerLine, BlockType.line)
+    return new BlockInfo(start, length, top + heightPerLine * line, heightPerLine, BlockType.text)
   }
 
-  heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0) {
+  lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
+    if (type == QueryType.byHeight) return new LineInfo([this.blockAt(value, doc, top, offset)])
+    if (type == QueryType.byPosNoHeight) {
+      let {start, end} = doc.lineAt(value)
+      return new LineInfo([new BlockInfo(start, end - start, 0, 0, BlockType.text)])
+    }
     let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
-    let lines = lastLine - firstLine + 1
-    return (doc.lineAt(pos).number - firstLine + (bias > 0 ? 1 : 0)) * (this.height / lines)
-  }
-
-  lineAt(height: number, doc: Text, offset: number = 0) {
-    let firstLine = doc.lineAt(offset).number, lastLine = doc.lineAt(offset + this.length).number
-    let lines = lastLine - firstLine, line = Math.floor(lines * Math.max(0, Math.min(1, height / this.height)))
-    let heightPerLine = this.height / (lines + 1), top = heightPerLine * line - height
-    let {start, end} = doc.line(firstLine + line)
-    return new LineHeight(start, end, top, heightPerLine)
-  }
-
-  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
-    let {start, end} = doc.lineAt(pos + offset)
-    return new Viewport(start, end)
+    let lineHeight = this.height / (lastLine - firstLine + 1)
+    let {start, length, number} = doc.lineAt(value)
+    return new LineInfo([new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.text)])
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
@@ -372,32 +360,28 @@ class HeightMapBranch extends HeightMap {
   }
 
   get break() { return this.flags & Flag.break }
-  set break(value: number) { this.flags = value ? this.flags | Flag.break : this.flags & ~Flag.break }
+  set break(value: number) { this.flags = value | (this.flags & ~Flag.break) }
 
   blockAt(height: number, doc: Text, top: number, offset: number) {
     let mid = top + this.left.height
-    return height < mid ? this.left.blockAt(height, doc, top, offset)
+    return height < mid || this.right.height == 0 ? this.left.blockAt(height, doc, top, offset)
       : this.right.blockAt(height, doc, mid, offset + this.left.length + this.break)
   }
 
-  // FIXME boundary conditions when there's no break
-
-  heightAt(pos: number, doc: Text, bias: 1 | -1, offset: number = 0): number {
-    let rightStart = offset + this.left.length + this.break
-    return pos < rightStart ? this.left.heightAt(pos, doc, bias, offset)
-      : this.left.height + this.right.heightAt(pos, doc, bias, rightStart)
-  }
-
-  lineAt(height: number, doc: Text, offset: number = 0) {
-    let right = height - this.left.height
-    if (right < 0) return this.left.lineAt(height, doc, offset)
-    return this.right.lineAt(right, doc, offset + this.left.length + this.break)
-  }
-
-  lineViewport(pos: number, doc: Text, offset: number = 0): Viewport {
-    let rightStart = this.left.length + this.break
-    return pos < rightStart ? this.left.lineViewport(pos, doc, offset)
-      : this.right.lineViewport(pos - rightStart, doc, offset + rightStart)
+  lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
+    let rightTop = top + this.left.height, rightOffset = offset + this.left.length + this.break
+    let left = type == QueryType.byHeight ? value < rightTop || this.right.height == 0 : value < rightOffset
+    let base = left ? this.left.lineAt(value, type, doc, top, offset)
+      : this.right.lineAt(value, type, doc, rightTop, rightOffset)
+    if (this.break || (left ? base.to < rightOffset : base.from > rightOffset)) return base
+    let subQuery = type == QueryType.byPosNoHeight ? QueryType.byPosNoHeight : QueryType.byPos
+    if (left) {
+      let other = this.right.lineAt(rightOffset, subQuery, doc, rightTop, rightOffset)
+      return new LineInfo(base.blocks.concat(other.blocks))
+    } else {
+      let other = this.left.lineAt(rightOffset, subQuery, doc, top, offset)
+      return new LineInfo(other.blocks.concat(base.blocks))
+    }
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {

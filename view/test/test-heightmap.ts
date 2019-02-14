@@ -1,8 +1,11 @@
-import {HeightMap, HeightOracle, MeasuredHeights} from "../src/heightmap"
+import {HeightMap, HeightOracle, MeasuredHeights, LineInfo, QueryType} from "../src/heightmap"
+import {BlockType} from "../src/blockview"
 import {Decoration, WidgetType} from "../src/decoration"
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 const ist = require("ist")
+
+const byH = QueryType.byHeight, byP = QueryType.byPos
 
 function o(doc: Text) {
   return (new HeightOracle).setDoc(doc)
@@ -75,9 +78,9 @@ describe("HeightMap", () => {
                         Decoration.widget(0, {widget: new MyWidget(13), side: -1, block: true})])
     ist(map.toString(), "block(0)-block(0)-line(3)-block(0) gap(7)")
     ist(map.height, 28 + 3 * oracle.lineHeight)
-    ist(map.heightAt(0, text, -1), 23)
-    ist(map.heightAt(0, text, 1), 23 + oracle.lineHeight)
-    ist(map.heightAt(4, text, -1), 28 + oracle.lineHeight)
+    let {blocks} = map.lineAt(0, byP, text, 0, 0)
+    ist(blocks.map(b => b.height).join(), [10, 13, oracle.lineHeight, 5].join())
+    ist(map.lineAt(4, byP, text, 0, 0).top, 28 + oracle.lineHeight)
     map = map.updateHeight(oracle, 0, false, new MeasuredHeights(0, [8, 12, 10, 20, 40, 20]))
     ist(map.toString(), "block(0)-block(0)-line(3)-block(0) line(3) line(3)")
     ist(map.height, 110)
@@ -187,5 +190,110 @@ describe("HeightMap", () => {
       .updateHeight(o(text2), 0, false, new MeasuredHeights(0, [10, 10, 10, 10, 10, 10]))
     ist(map.size, 6)
     ist(map.height, 60)
+  })
+
+  describe("blockAt", () => {
+    it("finds blocks in a gap", () => {
+      let text = doc(3, 3, 3, 3, 3), map = mk(text)
+      let block1 = map.blockAt(0, text, 0, 0)
+      ist(block1.from, 0); ist(block1.to, 3)
+      ist(block1.top, 0); ist(block1.bottom, 0, ">")
+      ist(block1.type, BlockType.text)
+      let block2 = map.blockAt(block1.bottom + 1, text, 0, 0)
+      ist(block2.from, 4); ist(block2.to, 7)
+      ist(block2.top, block1.bottom); ist(block2.bottom, block1.bottom, ">")
+      let block3 = map.blockAt(2e9, text, 0, 0)
+      ist(block3.from, 16); ist(block3.to, 19)
+      ist(block3.bottom, map.height)
+    })
+
+    it("finds blocks in lines", () => {
+      let text = doc(3, 3, 3, 3), map = mk(text).updateHeight(o(text), 0, false, new MeasuredHeights(0, [10, 20, 10, 30]))
+      let block1 = map.blockAt(-100, text, 0, 0)
+      ist(block1.from, 0); ist(block1.to, 3)
+      ist(block1.top, 0); ist(block1.bottom, 10)
+      ist(block1.type, BlockType.text)
+      let block2 = map.blockAt(39, text, 0, 0)
+      ist(block2.from, 8); ist(block2.to, 11)
+      ist(block2.top, 30); ist(block2.bottom, 40)
+      let block3 = map.blockAt(77, text, 0, 0)
+      ist(block3.from, 12); ist(block3.to, 15)
+      ist(block3.top, 40); ist(block3.bottom, 70)
+    })
+
+    it("finds widget blocks", () => {
+      let text = doc(3, 3, 3, 3)
+      let map = mk(text, [Decoration.widget(4, {widget: new MyWidget(100), block: true, side: -1}),
+                          Decoration.replace(8, 11, {widget: new MyWidget(30), block: true}),
+                          Decoration.widget(15, {widget: new MyWidget(0), block: true, side: 1})])
+      let block1 = map.blockAt(0, text, 0, 0)
+      ist(block1.from, 0); ist(block1.to, 3)
+      let block2 = map.blockAt(block1.height + 1, text, 0, 0)
+      ist(block2.from, 4); ist(block2.to, 4)
+      ist(block2.top, block1.height); ist(block2.height, 100)
+      ist(block2.type, BlockType.widgetBefore)
+      let top3 = block2.bottom + block1.height
+      let block3 = map.blockAt(top3 + 10, text, 0, 0)
+      ist(block3.from, 8); ist(block3.to, 11)
+      ist(block3.top, top3); ist(block3.height, 30)
+      ist(block3.type, BlockType.widgetRange)
+      let block4 = map.blockAt(block3.bottom + block1.height, text, 0, 0)
+      ist(block4.type, BlockType.widgetAfter, "!=")
+    })
+  })
+
+  function eqLine(a: LineInfo, b: LineInfo) {
+    return a.from == b.from && a.to == b.to && a.top == b.top &&
+      a.bottom == b.bottom && a.blocks.length == b.blocks.length
+  }
+
+  describe("lineAt", () => {
+    it("finds lines in gaps", () => {
+      let text = doc(3, 3, 3, 3), map = mk(text)
+      let line1 = map.lineAt(0, byP, text, 0, 0)
+      ist(line1.from, 0); ist(line1.to, 3)
+      ist(line1.top, 0)
+      ist(map.lineAt(0, byH, text, 0, 0), line1, eqLine)
+      let line2 = map.lineAt(line1.to + 1, byP, text, 0, 0)
+      ist(line2.from, 4); ist(line2.to, 7)
+      ist(line2.top, line1.bottom)
+      ist(map.lineAt(line1.bottom + 1, byH, text, 0, 0), line2, eqLine)
+      let line3 = map.lineAt(15, byP, text, 0, 0)
+      ist(line3.from, 12); ist(line3.to, 15)
+      ist(line3.bottom, map.height)
+      ist(map.lineAt(2e9, byH, text, 0, 0), line3, eqLine)
+    })
+
+    it("finds lines in lines", () => {
+      let text = doc(3, 3, 3, 3), map = mk(text).updateHeight(o(text), 0, false, new MeasuredHeights(0, [10, 10, 20, 10]))
+      let line1 = map.lineAt(0, byP, text, 0, 0)
+      ist(line1.from, 0); ist(line1.to, 3)
+      ist(line1.top, 0); ist(line1.bottom, 10)
+      ist(map.lineAt(9, byH, text, 0, 0), line1, eqLine)
+      let line2 = map.lineAt(9, byP, text, 0, 0)
+      ist(line2.from, 8); ist(line2.to, 11)
+      ist(line2.top, 20); ist(line2.bottom, 40)
+      ist(map.lineAt(39, byH, text, 0, 0), line2, eqLine)
+    })
+
+    it("includes adjacent widgets in lines", () => {
+      let text = doc(3, 3, 3, 3)
+      let map = mk(text, [Decoration.widget(4, {widget: new MyWidget(100), block: true, side: -1}),
+                          Decoration.replace(7, 8, {widget: new MyWidget(30), block: true}),
+                          Decoration.widget(15, {widget: new MyWidget(0), block: true, side: 1})])
+      let line1 = map.lineAt(4, byP, text, 0, 0)
+      ist(line1.from, 4); ist(line1.to, 11)
+      ist(line1.blocks.length, 4)
+      ist(map.lineAt(line1.top + 1, byH, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(line1.bottom - 1, byH, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(line1.top + line1.height / 2, byH, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(5, byP, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(7, byP, text, 0, 0), line1, eqLine)
+      ist(map.lineAt(11, byP, text, 0, 0), line1, eqLine)
+      let line2 = map.lineAt(map.height, byH, text, 0, 0)
+      ist(line2.from, 12); ist(line2.to, 15)
+      ist(line2.blocks.length, 2)
+      ist(map.lineAt(line2.top + 1, byH, text, 0, 0), line2, eqLine)
+    })
   })
 })

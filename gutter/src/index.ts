@@ -68,7 +68,7 @@ class GutterView implements ViewPlugin {
   }
 
   updateGutter() {
-    let spaceAbove = this.view.heightAtPos(this.view.viewport.from, true)
+    let spaceAbove = this.view.lineAtPos(this.view.viewport.from, 0).top
     if (spaceAbove != this.spaceAbove) {
       this.spaceAbove = spaceAbove
       this.dom.style.paddingTop = spaceAbove + "px"

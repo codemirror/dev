@@ -84,7 +84,7 @@ export abstract class Text {
     return length < MAX_LEAF ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
   }
 
-  static empty!: Text
+  static empty: Text
 }
 
 let lineCache: any[] = [], lineCachePos = -2, lineCacheSize = 12
@@ -517,6 +517,7 @@ class LineCursor implements TextIterator {
   get lineBreak() { return false }
 }
 
+// FIXME rename start/end to from/to for consistency with other types?
 export class Line {
   constructor(readonly start: number,
               readonly end: number,

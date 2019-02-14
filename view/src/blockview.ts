@@ -6,7 +6,7 @@ import {LineDecoration, WidgetType, widgetsEq} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 
 // FIXME move somewhere else?
-export const enum BlockType { line, widgetBefore, widgetAfter, widgetRange }
+export const enum BlockType { text, widgetBefore, widgetAfter, widgetRange }
 
 export interface BlockView extends ContentView {
   merge(from: number, to: number, source: ContentView | null, takeDeco: boolean, composition: CompositionView | null): boolean
@@ -211,7 +211,7 @@ export class LineView extends ContentView implements BlockView {
 
   match(other: ContentView) { return false }
 
-  get type() { return BlockType.line }
+  get type() { return BlockType.text }
 }
 
 const none = [] as any
