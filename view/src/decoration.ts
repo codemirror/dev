@@ -57,10 +57,12 @@ export abstract class Decoration implements RangeValue {
     // @internal
     readonly startSide: number,
     // @internal
+    readonly endSide: number,
+    // @internal
     readonly widget: WidgetType | null,
     readonly spec: any) {}
 
-  abstract endSide: number
+  get replace() { return false }
 
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null
 
@@ -70,12 +72,19 @@ export abstract class Decoration implements RangeValue {
   }
 
   static widget(pos: number, spec: WidgetDecorationSpec): DecoratedRange {
-    return new Range(pos, pos, new WidgetDecoration(spec))
+    let side = spec.side || 0
+    if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
+    return new Range(pos, pos, new ReplaceDecoration(spec, side, side, !!spec.block, spec.widget))
   }
 
   static replace(from: number, to: number, spec: ReplaceDecorationSpec): DecoratedRange {
-    // FIXME when is a replacement allowed to be zero-length?
-    return new Range(from, Math.max(from, to), new ReplaceDecoration(spec))
+    let block = !!spec.block
+    let {start, end} = getInclusive(spec)
+    let startSide = block ? -BLOCK_BIG_SIDE * (start ? 2 : 1) : INLINE_BIG_SIDE * (start ? -1 : 1)
+    let endSide = block ? BLOCK_BIG_SIDE * (end ? 2 : 1) : INLINE_BIG_SIDE * (end ? 1 : -1)
+    if (from > to || (from == to && startSide > 0 && endSide < 0))
+      throw new RangeError("Invalid range for replacement decoration")
+    return new Range(from, Math.max(from, to), new ReplaceDecoration(spec, startSide, endSide, block, spec.widget || null))
   }
 
   static line(start: number, spec: LineDecorationSpec): DecoratedRange {
@@ -96,11 +105,11 @@ export abstract class Decoration implements RangeValue {
 }
 
 export class MarkDecoration extends Decoration {
-  endSide: number
   constructor(spec: MarkDecorationSpec) {
     let {start, end} = getInclusive(spec)
-    super(INLINE_BIG_SIDE * (start ? -1 : 1), null, spec)
-    this.endSide = INLINE_BIG_SIDE * (end ? 1 : -1)
+    super(INLINE_BIG_SIDE * (start ? -1 : 1),
+          INLINE_BIG_SIDE * (end ? 1 : -1),
+          null, spec)
   }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
@@ -123,35 +132,10 @@ export class MarkDecoration extends Decoration {
   }
 }
 
-export class WidgetDecoration extends Decoration {
-  widget!: WidgetType
-  block: boolean
-
-  get endSide() { return this.startSide }
-
-  constructor(spec: WidgetDecorationSpec) {
-    let side = spec.side || 0
-    if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
-    super(side, spec.widget, spec)
-    this.block = !!spec.block
-  }
-
-  map(mapping: ChangeSet, pos: number): DecoratedRange | null {
-    pos = mapping.mapPos(pos, this.startSide, true)
-    return pos < 0 ? null : new Range(pos, pos, this)
-  }
-
-  sameEffect(other: Decoration): boolean {
-    return other instanceof WidgetDecoration && widgetsEq(this.widget, other.widget) && this.startSide == other.startSide
-  }
-}
-
 export class LineDecoration extends Decoration {
   constructor(spec: LineDecorationSpec) {
-    super(-INLINE_BIG_SIDE, null, spec)
+    super(-INLINE_BIG_SIDE, -INLINE_BIG_SIDE, null, spec)
   }
-
-  get endSide() { return this.startSide }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
     pos = mapStrict(pos, -1, mapping)
@@ -164,25 +148,21 @@ export class LineDecoration extends Decoration {
 }
 
 export class ReplaceDecoration extends Decoration {
-  block: boolean
-  endSide: number
-
-  constructor(spec: ReplaceDecorationSpec) {
-    let block = !!spec.block
-    let {start, end} = getInclusive(spec)
-    let startSide = block ? -BLOCK_BIG_SIDE * (start ? 2 : 1) : INLINE_BIG_SIDE * (start ? -1 : 1)
-    super(startSide, spec.widget || null, spec)
-    this.block = block
-    this.endSide = block ? BLOCK_BIG_SIDE * (end ? 2 : 1) : INLINE_BIG_SIDE * (end ? 1 : -1)
+  constructor(spec: any, startSide: number, endSide: number, public block: boolean, widget: WidgetType | null) {
+    super(startSide, endSide, widget, spec)
   }
 
   get replace() { return true }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
     if (this.block) {
-      let newFrom = mapStrict(from, -1, mapping), newTo = mapStrict(to, 1, mapping)
+      let newFrom = mapStrict(from, this.startSide, mapping), newTo = mapStrict(to, this.endSide, mapping)
       return newFrom < 0 || newTo < 0 ? null : new Range(newFrom, newTo, this)
     } else {
+      // Old widget mapping code:
+      // pos = mapping.mapPos(pos, this.startSide, true)
+      // return pos < 0 ? null : new Range(pos, pos, this)
+
       // FIXME duplicated from markdecoration
       let newFrom = mapping.mapPos(from, this.startSide, true), newTo = mapping.mapPos(to, this.endSide, true)
       if (newFrom < 0) {
@@ -198,7 +178,8 @@ export class ReplaceDecoration extends Decoration {
   sameEffect(other: Decoration): boolean {
     return other instanceof ReplaceDecoration &&
       widgetsEq(this.widget, other.widget) &&
-      this.block == other.block
+      this.block == other.block &&
+      this.startSide == other.startSide && this.endSide == other.endSide
   }
 }
 
