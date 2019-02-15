@@ -361,6 +361,20 @@ class LocalSet<T extends RangeValue> {
   get heapSide(): number { return this.ranges[this.index].value.startSide }
 }
 
+// Iterating over a range set is done using a stack that represents a
+// position into the range set's tree. There's an IteratedSet for each
+// active level, and iteration happens by calling this function to
+// move the next node onto the stack (which may involve popping off
+// nodes before it).
+//
+// Such a stack represenst the _structural_ part of the tree,
+// iterating over tree nodes. The individual ranges of each top node
+// must be accessed separately, after it has been moved onto the stack
+// (the new node is always at the top, or, if the end of the set has
+// been reached, the stack is empty).
+//
+// Nodes that fall entirely before `skipTo` are never added to the
+// stack, allowing efficient skipping of parts of the tree.
 function iterRangeSet<T extends RangeValue>(stack: IteratedSet<T>[], skipTo: number = 0) {
   for (;;) {
     if (stack.length == 0) break
@@ -379,10 +393,21 @@ function iterRangeSet<T extends RangeValue>(stack: IteratedSet<T>[], skipTo: num
   }
 }
 
+// Iterating over the actual ranges in a set (or multiple sets) is
+// done using a binary heap to efficiently get the ordering right. The
+// heap may contain both LocalSet instances (iterating over the ranges
+// in a set tree node) and actual Range objects. At any point, the one
+// with the lowest position (and side) is taken off next.
+
 function compareHeapable(a: Heapable, b: Heapable): number {
   return a.heapPos - b.heapPos || a.heapSide - b.heapSide
 }
 
+// Advance the iteration over a range set (in `stack`) and add the
+// next node that has any local ranges to the heap as a `LocalSet`.
+// Links the stack to the `LocalSet` (in `.next`) if this node also
+// has child nodes, which will be used to schedule the next call to
+// `addIterToHeap` when the end of that `LocalSet` is reached.
 function addIterToHeap<T extends RangeValue>(heap: Heapable[], stack: IteratedSet<T>[], skipTo: number = 0) {
   for (;;) {
     iterRangeSet<T>(stack, skipTo)
@@ -393,6 +418,10 @@ function addIterToHeap<T extends RangeValue>(heap: Heapable[], stack: IteratedSe
     if (leaf) break
   }
 }
+
+// Classic binary heap implementation, using the conformance to
+// `Heapable` of the elements to compare them with `compareHeapable`,
+// keeping the element with the lowest position at its top.
 
 function addToHeap(heap: Heapable[], elt: Heapable) {
   let index = heap.push(elt) - 1
@@ -587,6 +616,9 @@ class ComparisonSide<T extends RangeValue> {
   }
 }
 
+// Manage the synchronous iteration over a part of two range sets,
+// skipping identical nodes and ranges and calling callbacks on a
+// comparator object when differences are found.
 class RangeSetComparison<T extends RangeValue> {
   a: ComparisonSide<T>
   b: ComparisonSide<T>
@@ -603,25 +635,41 @@ class RangeSetComparison<T extends RangeValue> {
     this.forwardIter(SIDE_A | SIDE_B)
   }
 
+  // Move the iteration forward until all of the sides included in
+  // `side` (bitmask of `SIDE_A` and/or `SIDE_B`) have added new nodes
+  // to their heap, or there is nothing further to iterate over. This
+  // is basically used to ensure the heaps are stocked with nodes from
+  // the stacks that track the iteration.
   forwardIter(side: number) {
     for (; side > 0;) {
       let nextA = this.a.stack.length ? this.a.stack[this.a.stack.length - 1] : null
       let nextB = this.b.stack.length ? this.b.stack[this.b.stack.length - 1] : null
-      if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
+      if (!nextA && (side & SIDE_A)) {
+        // If there's no next node for A, we're done there
+        side &= ~SIDE_A
+      } else if (!nextB && (side & SIDE_B)) {
+        // No next node for B
+        side &= ~SIDE_B
+      } else if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
+        // Both next nodes are the same—skip them
         iterRangeSet<T>(this.a.stack, this.pos)
         iterRangeSet<T>(this.b.stack, this.pos)
       } else if (nextA && (!nextB || (nextA.offset < nextB.offset ||
                                       nextA.offset == nextB.offset && (this.a.stack.length == 1 ||
                                                                        nextA.set.length >= nextB.set.length)))) {
-        if (this.a.forward(this.pos, nextA)) side = side & ~SIDE_A
-      } else if (nextB) {
-        if (this.b.forward(this.pos, nextB)) side = side & ~SIDE_B
+        // If there no next B, or it comes after the next A, or it
+        // sits at the same position and is smaller, move A forward.
+        if (this.a.forward(this.pos, nextA)) side &= ~SIDE_A
       } else {
-        break
+        // Otherwise move B forward
+        if (this.b.forward(this.pos, nextB!)) side &= ~SIDE_B
       }
     }
   }
 
+  // Driver of the comparison process. On each iteration, call
+  // `advance` with the side whose next event (start of end of a
+  // range) comes first, until we run out of events.
   run() {
     let heapA = this.a.heap, heapB = this.b.heap
     for (;;) {
@@ -651,17 +699,23 @@ class RangeSetComparison<T extends RangeValue> {
     }
   }
 
+  // Handle one event (the start or end of a range) on side `side`.
   advance(side: ComparisonSide<T>, otherSide: ComparisonSide<T>) {
     let next = takeFromHeap(side.heap)!
     if (next instanceof LocalSet) {
+      // If this is a local set, we're seeing a new range being
+      // opened.
       let range = next.ranges[next.index++]
-      if (range.from + next.offset > this.end) {
+      // The actual positions are offset relative to the node
+      let from = range.from + next.offset, to = range.to + next.offset
+      // If we found a range past the end, we're done
+      if (from > this.end) {
         side.heap.length = 0
         this.pos = this.end
         return
       }
-      if (range.from < range.to && range.to + next.offset > this.pos) {
-        let from = range.from + next.offset, to = range.to + next.offset
+      // This is a non-point range
+      if (from < to && to > this.pos) {
         this.advancePos(Math.max(this.pos, from))
         if (range.value.replace) {
           side.replacedBy = range.value
@@ -675,16 +729,18 @@ class RangeSetComparison<T extends RangeValue> {
           }
         }
         this.addActiveRange(Math.min(this.end, to), range.value, side, otherSide)
-      } else if (range.from == range.to) {
-        this.advancePos(range.from + next.offset)
+      } else if (from == to) {
+        this.advancePos(from)
         let found = otherSide.points.indexOf(range.value)
         if (found > -1) remove(otherSide.points, found)
         else side.points.push(range.value)
       }
+      // If there's more ranges in this node, re-add it to the heap
       if (next.index < next.ranges.length) addToHeap(side.heap, next)
-      else if (next == this.a.tip) this.forwardIter(SIDE_A)
-      else if (next == this.b.tip) this.forwardIter(SIDE_B)
+      // Otherwise, move the iterator forward (making sure this side is advanced)
+      else this.forwardIter(side == this.a ? SIDE_A : SIDE_B)
     } else {
+      // This is the end of a range, remove it from the active set if it's in there.
       let range = next as Range<T>
       this.advancePos(range.to)
       let found = side.findActive(range.to, range.value)
@@ -692,6 +748,8 @@ class RangeSetComparison<T extends RangeValue> {
     }
   }
 
+  // Add a range to the active set or, if it's already there on the
+  // other side, remove it
   addActiveRange(to: number, value: T, side: ComparisonSide<T>, otherSide: ComparisonSide<T>) {
     let found = otherSide.findActive(to, value)
     if (found > -1) {
