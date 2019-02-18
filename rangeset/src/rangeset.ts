@@ -246,29 +246,22 @@ export class RangeSet<T extends RangeValue> {
     for (let child of this.children) { child.forEachInner(f, offset); offset += child.length }
   }
 
+  // Iterate over the ranges in the set, ordered by their start
+  // position and side
   iter(): {next: () => Range<T> | void} {
     const heap: (Range<T> | LocalSet<T>)[] = []
-
-    if (this.size > 0) {
-      addIterToHeap(heap, [new IteratedSet(0, this)], 0)
-      if (this.local.length) addToHeap(heap, new LocalSet(0, this.local))
-    }
+    addIterToHeap(heap, [new IteratedSet(0, this)], 0)
+    if (this.local.length) addToHeap(heap, new LocalSet(0, this.local))
 
     return {
       next(): Range<T> | void {
         if (heap.length == 0) return
-
-        const next = takeFromHeap(heap)
-        if (next instanceof LocalSet) {
-          const range = next.ranges[next.index].move(next.offset)
-
-          // Put the rest of the set back onto the heap
-          if (++next.index < next.ranges.length) addToHeap(heap, next)
-          else if (next.next) addIterToHeap(heap, next.next, 0)
-          return range
-        } else { // It is a range
-          return next
-        }
+        const next = takeFromHeap(heap) as LocalSet<T>
+        const range = next.ranges[next.index++].move(next.offset)
+        // Put the rest of the set back onto the heap
+        if (next.index < next.ranges.length) addToHeap(heap, next)
+        else if (next.next) addIterToHeap(heap, next.next, 0)
+        return range
       }
     }
   }
