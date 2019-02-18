@@ -4,20 +4,20 @@ type A<T> = ReadonlyArray<T>
 
 export interface RangeValue {
   map(mapping: ChangeSet, from: number, to: number): Range<any> | null
+  eq(other: RangeValue): boolean
   startSide: number
   endSide: number
-  replace?: boolean
+  point: boolean
 }
 
 export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
-  compareReplaced(from: number, to: number, byA: T, byB: T): void
-  comparePoints(pos: number, pointsA: T[], pointsB: T[]): void
+  comparePoint(from: number, to: number, byA: T, byB: T | null): void
 }
 
 export interface RangeIterator<T extends RangeValue> {
   advance(pos: number, active: A<T>): void
-  advanceReplaced(pos: number, value: T, openStart: boolean, openEnd: boolean): void
+  advancePoint(pos: number, value: T, openStart: boolean, openEnd: boolean): void
   point(value: T): void
   ignoreRange(value: T, to: number): boolean
   ignorePoint(value: T): boolean
@@ -300,10 +300,10 @@ export class RangeSet<T extends RangeValue> {
             range = range.move(next.offset)
 
             iterator.advance(range.from, active)
-            if (range.value.replace) {
+            if (range.value.point) {
               pos = range.to
               posSide = range.value.endSide
-              iterator.advanceReplaced(Math.min(pos, to), range.value, range.from < from, range.to > to)
+              iterator.advancePoint(Math.min(pos, to), range.value, range.from < from, range.to > to)
             } else {
               active.push(range.value)
               addToHeap(heap, range)
@@ -583,8 +583,8 @@ class ComparisonSide<T extends RangeValue> {
   activeTo: number[] = []
   points: T[] = []
   tip: LocalSet<T> | null = null
-  replacedBy: T | null = null
-  replacedTo: number = -1
+  point: T | null = null
+  pointTo: number = -1
 
   constructor(readonly stack: IteratedSet<T>[]) {}
 
@@ -604,8 +604,22 @@ class ComparisonSide<T extends RangeValue> {
 
   findActive(to: number, value: T): number {
     for (let i = 0; i < this.active.length; i++)
-      if (this.activeTo[i] == to && this.active[i] == value) return i
+      if (this.activeTo[i] == to && (this.active[i] == value || this.active[i].eq(value)))
+        return i
     return -1
+  }
+
+  clearPoint() {
+    this.pointTo = -1
+    this.point = null
+  }
+
+  get nextPos() {
+    return this.pointTo > -1 ? this.pointTo : this.heap.length ? this.heap[0].heapPos : 2e9
+  }
+
+  get nextSide() {
+    return this.pointTo > -1 ? this.point!.endSide : this.heap.length ? this.heap[0].heapSide : 2e9
   }
 }
 
@@ -628,11 +642,12 @@ class RangeSetComparison<T extends RangeValue> {
     this.forwardIter(SIDE_A | SIDE_B)
   }
 
-  // Move the iteration forward until all of the sides included in
-  // `side` (bitmask of `SIDE_A` and/or `SIDE_B`) have added new nodes
-  // to their heap, or there is nothing further to iterate over. This
-  // is basically used to ensure the heaps are stocked with nodes from
-  // the stacks that track the iteration.
+  // Move the iteration over the tree structure forward until all of
+  // the sides included in `side` (bitmask of `SIDE_A` and/or
+  // `SIDE_B`) have added new nodes to their heap, or there is nothing
+  // further to iterate over. This is basically used to ensure the
+  // heaps are stocked with nodes from the stacks that track the
+  // iteration.
   forwardIter(side: number) {
     for (; side > 0;) {
       let nextA = this.a.stack.length ? this.a.stack[this.a.stack.length - 1] : null
@@ -664,36 +679,28 @@ class RangeSetComparison<T extends RangeValue> {
   // `advance` with the side whose next event (start of end of a
   // range) comes first, until we run out of events.
   run() {
-    let heapA = this.a.heap, heapB = this.b.heap
     for (;;) {
-      if (heapA.length && (!heapB.length || compareHeapable(heapA[0], heapB[0]) < 0)) {
-        this.advance(this.a, this.b)
-      } else if (heapB.length) {
-        this.advance(this.b, this.a)
-      } else {
-        this.comparator.comparePoints(this.pos, this.a.points, this.b.points)
-        break
-      }
+      let nextA = this.a.nextPos, nextB = this.b.nextPos
+      if (nextA == 2e9 && nextB == 2e9) break
+      let diff = nextA - nextB || this.a.nextSide - this.a.nextSide
+      if (diff < 0) this.advance(this.a, this.b)
+      else this.advance(this.b, this.a)
     }
   }
 
-  advancePos(pos: number) {
-    if (pos > this.end) pos = this.end
-    if (pos <= this.pos) return
-    this.handlePoints()
-    this.comparator.compareRange(this.pos, pos, this.a.active, this.b.active)
-    this.pos = pos
-  }
-
-  handlePoints() {
-    if (this.a.points.length || this.b.points.length) {
-      this.comparator.comparePoints(this.pos, this.a.points, this.b.points)
-      this.a.points.length = this.b.points.length = 0
+  advance(side: ComparisonSide<T>, other: ComparisonSide<T>) {
+    if (side.pointTo > -1) {
+      // The next thing that's happening is the end of this.point
+      let end = Math.min(this.end, side.pointTo)
+      if (!other.point || !side.point!.eq(other.point))
+        this.comparator.comparePoint(this.pos, end, side.point!, other.point)
+      this.pos = end
+      if (end == this.end ||
+          other.pointTo == end && other.point!.endSide == side.point!.endSide) other.clearPoint()
+      side.clearPoint()
+      return
     }
-  }
 
-  // Handle one event (the start or end of a range) on side `side`.
-  advance(side: ComparisonSide<T>, otherSide: ComparisonSide<T>) {
     let next = takeFromHeap(side.heap)!
     if (next instanceof LocalSet) {
       // If this is a local set, we're seeing a new range being
@@ -701,59 +708,65 @@ class RangeSetComparison<T extends RangeValue> {
       let range = next.ranges[next.index++]
       // The actual positions are offset relative to the node
       let from = range.from + next.offset, to = range.to + next.offset
-      // If we found a range past the end, we're done
       if (from > this.end) {
+        // If we found a range past the end, we're done
         side.heap.length = 0
         this.pos = this.end
         return
+      } else if (next.index < next.ranges.length) {
+        // If there's more ranges in this node, re-add it to the heap
+        addToHeap(side.heap, next)
+      } else {
+        // Otherwise, move the iterator forward (making sure this side is advanced)
+        this.forwardIter(side == this.a ? SIDE_A : SIDE_B)
       }
-      // This is a non-point range
-      if (from < to && to > this.pos) {
-        this.advancePos(Math.max(this.pos, from))
-        if (range.value.replace) {
-          side.replacedBy = range.value
-          side.replacedTo = Math.min(this.end, Math.max(side.replacedTo, to))
-          // Skip regions that are replaced on both sides
-          let replacedTo = Math.min(this.a.replacedTo, this.b.replacedTo)
-          if (replacedTo > this.pos) {
-            this.handlePoints()
-            this.comparator.compareReplaced(this.pos, replacedTo, this.a.replacedBy!, this.b.replacedBy!)
-            this.pos = replacedTo
-          }
+
+      // Ignore ranges that fall entirely in a point on the other side
+      if (to < other.pointTo || to == other.pointTo && range.value.startSide < other.point!.endSide) return
+      // Otherwise, if the other side isn't a point, advance
+      if (other.pointTo < 0) this.advancePos(from)
+      if (range.value.point) {
+        side.point = range.value
+        side.pointTo = to
+      } else {
+        to = Math.min(to, this.end)
+        // Add this to the set of active ranges
+        let found = other.findActive(to, range.value)
+        if (found > -1) {
+          remove(other.active, found)
+          remove(other.activeTo, found)
+        } else {
+          side.active.push(range.value)
+          side.activeTo.push(to)
+          addToHeap(side.heap, new Range(this.pos, to, range.value))
         }
-        this.addActiveRange(Math.min(this.end, to), range.value, side, otherSide)
-      } else if (from == to) {
-        this.advancePos(from)
-        let found = otherSide.points.indexOf(range.value)
-        if (found > -1) remove(otherSide.points, found)
-        else side.points.push(range.value)
       }
-      // If there's more ranges in this node, re-add it to the heap
-      if (next.index < next.ranges.length) addToHeap(side.heap, next)
-      // Otherwise, move the iterator forward (making sure this side is advanced)
-      else this.forwardIter(side == this.a ? SIDE_A : SIDE_B)
     } else {
       // This is the end of a range, remove it from the active set if it's in there.
       let range = next as Range<T>
-      this.advancePos(range.to)
+      if (other.pointTo < 0) this.advancePos(range.to)
       let found = side.findActive(range.to, range.value)
       if (found > -1) { remove(side.active, found); remove(side.activeTo, found) }
     }
   }
 
-  // Add a range to the active set or, if it's already there on the
-  // other side, remove it
-  addActiveRange(to: number, value: T, side: ComparisonSide<T>, otherSide: ComparisonSide<T>) {
-    let found = otherSide.findActive(to, value)
-    if (found > -1) {
-      remove(otherSide.active, found)
-      remove(otherSide.activeTo, found)
-    } else {
-      side.active.push(value)
-      side.activeTo.push(to)
-      addToHeap(side.heap, new Range(this.pos, to, value))
-    }
+  advancePos(pos: number) {
+    if (pos > this.end) pos = this.end
+    if (pos <= this.pos) return
+    if (!sameSet(this.a.active, this.b.active))
+      this.comparator.compareRange(this.pos, pos, this.a.active, this.b.active)
+    this.pos = pos
   }
+}
+
+function sameSet<T extends RangeValue>(a: T[], b: T[]) {
+  if (a.length != b.length) return false
+  outer: for (let i = 0; i < a.length; i++) {
+    for (let j = 0; j < b.length; j++)
+      if (a[i].eq(b[j])) continue outer
+    return false
+  }
+  return true
 }
 
 function remove<T>(array: T[], index: number) {

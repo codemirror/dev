@@ -5,13 +5,13 @@ const ist = require("ist")
 class Value implements RangeValue {
   startSide: number
   endSide: number
-  replace: boolean
+  point: boolean
   name: string | null
   pos: number | null
   constructor(spec: any = {}) {
     this.startSide = spec.startSide || 1
     this.endSide = spec.endSide || -1
-    this.replace = !!spec.replace
+    this.point = !!spec.point
     this.name = spec.name || null
     this.pos = spec.pos == null ? null : spec.pos
   }
@@ -24,9 +24,12 @@ class Value implements RangeValue {
       return newFrom >= newTo ? null : new Range(newFrom, newTo, this)
     }
   }
+  eq(other: RangeValue): boolean {
+    return other instanceof Value && other.name == this.name
+  }
   static names(v: ReadonlyArray<Value>): string {
     let result = []
-    for (let val of v) if (val.name || val.replace) result.push(val.name || "REPLACED")
+    for (let val of v) if (val.name || val.point) result.push(val.name || "POINT")
     return result.sort().join("/")
   }
 }
@@ -183,7 +186,7 @@ describe("RangeSet", () => {
     it("defaults to exclusive on both sides", () =>
        test([mk(1, 2)], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
 
-    it("drops replaced ranges", () =>
+    it("drops point ranges", () =>
        test([mk(1, 2)], [[1, 2, 0], [1, 1, 1]], []))
 
     it("drops ranges in deleted regions", () =>
@@ -215,7 +218,7 @@ describe("RangeSet", () => {
       checkSet(set)
     })
 
-    it("removes replaced tree nodes", () => {
+    it("removes point tree nodes", () => {
       let set = set0().map(new ChangeSet([new Change(0, 6000, [""])]))
       ist(set.size, 0)
       ist(depth(set), 1)
@@ -236,37 +239,23 @@ describe("RangeSet", () => {
 
   class Comparator implements RangeComparator<Value> {
     ranges: number[] = []
-    compareRange(from: number, to: number, activeA: Value[], activeB: Value[]) {
-      if (Value.names(activeA) != Value.names(activeB))
-        this.addRange(from, to)
-    }
-    compareRangeValues(a: Value, b: Value) { return a.name == b.name }
-    compareReplaced(from: number, to: number, byA: Value, byB: Value) {
-      if (byA.name != byB.name) this.addRange(from, to)
-    }
-    comparePoints(pos: number, pointsA: Value[], pointsB: Value[]) {
-      if (Value.names(pointsA) != Value.names(pointsB)) this.addRange(pos, pos)
-    }
-    comparePointValues(a: Value, b: Value) { return a.name == b.name }
     addRange(from: number, to: number) {
       if (this.ranges.length && this.ranges[this.ranges.length - 1] == from) this.ranges[this.ranges.length - 1] = to
       else this.ranges.push(from, to)
     }
+    compareRange(from: number, to: number) { this.addRange(from, to) }
+    comparePoint(from: number, to: number) { this.addRange(from, to) }
   }
 
   describe("compare", () => {
     function test(ranges: RangeSet<Value> | Range<Value>[], update: any, changes: number[]) {
       let set = Array.isArray(ranges) ? mkSet(ranges) : ranges
       let newSet = set
-      let docRanges = []
+      let docRanges: ChangedRange[] = []
       if (update.changes) {
         let changes = new ChangeSet(update.changes.map(([from, to, len]: [number, number, number]) => new Change(from, to, ["x".repeat(len)])))
         newSet = newSet.map(changes)
-        for (let i = 0, off = 0; i < changes.length; i++) {
-          let {from, to, length} = changes.changes[i]
-          docRanges.push(new ChangedRange(from + off, to + off, from, from + length))
-          off += (to - from) - length
-        }
+        docRanges = changes.changedRanges()
       }
       if (update.add || update.filter)
         newSet = newSet.update(update.add || [], update.filter)
@@ -308,8 +297,8 @@ describe("RangeSet", () => {
       }, [850, 860])
     })
 
-    it("ignores replaced sub-nodes", () => {
-      let ranges = [mk(3, 997, {replace: true})]
+    it("ignores point sub-nodes", () => {
+      let ranges = [mk(3, 997, {point: true})]
       for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
       let set = mkSet(ranges)
       test(set, {
@@ -318,8 +307,8 @@ describe("RangeSet", () => {
       }, [])
     })
 
-    it("ignores changes in replaced ranges", () => {
-      let ranges = [mk(3, 997, {replace: true})]
+    it("ignores changes in points", () => {
+      let ranges = [mk(3, 997, {point: true})]
       for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
       let set = mkSet(ranges)
       test(set, {
@@ -327,14 +316,14 @@ describe("RangeSet", () => {
       }, [])
     })
 
-    it("notices adding a replaced range", () => {
-      test([mk(3, 50, {replace: true})], {
-        add: [mk(40, 80, {replace: true})]
+    it("notices adding a point", () => {
+      test([mk(3, 50, {point: true})], {
+        add: [mk(40, 80, {point: true})]
       }, [50, 80])
     })
 
-    it("notices removing a replaced range", () => {
-      test([mk(3, 50, {replace: true})], {
+    it("notices removing a point", () => {
+      test([mk(3, 50, {point: true})], {
         filter: () => false
       }, [3, 50])
     })
@@ -361,7 +350,7 @@ describe("RangeSet", () => {
       this.spans.push((pos - this.pos) + (name ? "=" + name : ""))
       this.pos = pos
     }
-    advanceReplaced(pos: number) {
+    advancePoint(pos: number) {
       if (pos <= this.pos) return
       this.spans.push((pos - this.pos) + "=ø")
       this.pos = pos
@@ -369,7 +358,7 @@ describe("RangeSet", () => {
     point(value: Value) {
       this.spans.push("[" + value.name + "]")
     }
-    ignoreRange(value: Value) { return !value.name && !value.replace }
+    ignoreRange(value: Value) { return !value.name && !value.point }
     ignorePoint(value: Value) { return !value.name }
   }
 
