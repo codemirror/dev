@@ -343,29 +343,20 @@ describe("RangeSet", () => {
 
   class Builder implements RangeIterator<Value> {
     spans: string[] = []
-    constructor(public pos: number = 0) {}
-    advance(pos: number, active: ReadonlyArray<Value>) {
-      if (pos <= this.pos) return
+    span(from: number, to: number, active: ReadonlyArray<Value>) {
       let name = Value.names(active)
-      this.spans.push((pos - this.pos) + (name ? "=" + name : ""))
-      this.pos = pos
+      this.spans.push((to - from) + (name ? "=" + name : ""))
     }
-    advancePoint(pos: number) {
-      if (pos <= this.pos) return
-      this.spans.push((pos - this.pos) + "=ø")
-      this.pos = pos
+    point(from: number, to: number, value: Value) {
+      return (to > from ? (to - from) + "=" : "") + (value.name ? "[" + value.name + "]" : "ø")
     }
-    point(value: Value) {
-      this.spans.push("[" + value.name + "]")
-    }
-    ignoreRange(value: Value) { return !value.name && !value.point }
-    ignorePoint(value: Value) { return !value.name }
+    ignore(from: number, to: number, value: Value) { return !value.name && !value.point }
   }
 
   describe("iterateSpans", () => {
     it("separates the range in covering spans", () => {
       let set = mkSet([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")])
-      let builder = new Builder(0)
+      let builder = new Builder
       RangeSet.iterateSpans([set], 0, 15, builder)
       ist(builder.spans.join(" "), "3 2=one 3=one/two 2 2=three 3")
     })
@@ -377,13 +368,13 @@ describe("RangeSet", () => {
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
         expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "/wide"
-      let builder = new Builder(start)
+      let builder = new Builder
       RangeSet.iterateSpans([set], start, end, builder)
       ist(builder.spans.join(" "), expected)
     })
 
     it("ignores decorations that don't affect spans", () => {
-      let decos = [mk(0, 10, "yes"), mk(5, 6)], builder = new Builder(2)
+      let decos = [mk(0, 10, "yes"), mk(5, 6)], builder = new Builder
       RangeSet.iterateSpans([mkSet(decos)], 2, 15, builder)
       ist(builder.spans.join(" "), "8=yes 5")
     })
@@ -391,7 +382,7 @@ describe("RangeSet", () => {
     it("reads from multiple sets at once", () => {
       let one = mkSet([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
       let two = mkSet([mk(0, 6, "a"), mk(10, 12, "b")])
-      let builder = new Builder(0)
+      let builder = new Builder
       RangeSet.iterateSpans([one, two], 0, 12, builder)
       ist(builder.spans.join(" "), "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
     })

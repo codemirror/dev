@@ -16,11 +16,9 @@ export interface RangeComparator<T extends RangeValue> {
 }
 
 export interface RangeIterator<T extends RangeValue> {
-  advance(pos: number, active: A<T>): void
-  advancePoint(pos: number, value: T, openStart: boolean, openEnd: boolean): void
-  point(value: T): void
-  ignoreRange(value: T, to: number): boolean
-  ignorePoint(value: T): boolean
+  span(from: number, to: number, active: A<T>): void
+  point(from: number, to: number, value: T): void
+  ignore(from: number, to: number, value: T): boolean
 }
 
 interface Heapable { heapPos: number; heapSide: number }
@@ -291,39 +289,40 @@ export class RangeSet<T extends RangeValue> {
     while (heap.length > 0) {
       let next = takeFromHeap(heap)
       if (next instanceof LocalSet) {
-        let range = next.ranges[next.index]
-        if (range.from + next.offset > to) break
-
-        if ((range.to + next.offset - pos || range.value.endSide - posSide) >= 0) {
-          let point = range.from == range.to && range.value.startSide >= range.value.endSide
-          if (!point && !iterator.ignoreRange(range.value, range.to)) {
-            range = range.move(next.offset)
-
-            iterator.advance(range.from, active)
-            if (range.value.point) {
-              pos = range.to
-              posSide = range.value.endSide
-              iterator.advancePoint(Math.min(pos, to), range.value, range.from < from, range.to > to)
-            } else {
-              active.push(range.value)
-              addToHeap(heap, range)
-            }
-          } else if (point && !iterator.ignorePoint(range.value)) {
-            iterator.advance(range.from, active)
-            iterator.point(range.value)
-          }
-        }
+        let range = next.ranges[next.index], rFrom = range.from + next.offset, rTo = range.to + next.offset
+        if (rFrom > to) break
         // Put the rest of the set back onto the heap
         if (++next.index < next.ranges.length) addToHeap(heap, next)
         else if (next.next) addIterToHeap(heap, next.next, pos)
-      } else { // It is a range that ends here
+
+        if ((rTo - pos || range.value.endSide - posSide) >= 0 && !iterator.ignore(rFrom, rTo, range.value)) {
+          if (rFrom > pos) {
+            iterator.span(pos, rFrom, active)
+            pos = rFrom
+            posSide = range.value.startSide
+          }
+          if (range.value.point) {
+            iterator.point(rFrom, rTo, range.value)
+            if (rTo > to) break
+            pos = rTo
+            posSide = range.value.endSide
+          } else if (rTo > pos) {
+            active.push(range.value)
+            addToHeap(heap, new Range(rFrom, rTo, range.value))
+          }
+        }
+      } else { // A range that ends here
         let range = next as Range<T>
         if (range.to > to) break
-        iterator.advance(range.to, active)
+        if (range.to > pos) {
+          iterator.span(pos, range.to, active)
+          pos = range.to
+          posSide = range.value.endSide
+        }
         active.splice(active.indexOf(range.value), 1)
       }
     }
-    iterator.advance(to, active)
+    if (pos < to) iterator.span(pos, to, active)
   }
 
   static of<T extends RangeValue>(ranges: A<Range<T>> | Range<T>): RangeSet<T> {
