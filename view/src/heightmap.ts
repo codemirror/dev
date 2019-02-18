@@ -1,8 +1,7 @@
 import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
-import {RangeSet, RangeIterator, RangeValue} from "../../rangeset/src/rangeset"
-import {DecorationSet, ReplaceDecoration, WidgetDecoration, Decoration} from "./decoration"
-import {BlockType} from "./blockview"
+import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
+import {DecorationSet, PointDecoration, Decoration, BlockType} from "./decoration"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
@@ -476,40 +475,33 @@ class NodeBuilder implements RangeIterator<Decoration> {
     return this.covering && this.nodes[this.nodes.length - 1] == this.covering
   }
 
-  advance(pos: number) {
-    if (pos <= this.pos) return
+  span(from: number, to: number) {
     if (this.lineStart > -1) {
-      let end = Math.min(pos, this.lineEnd), last = this.nodes[this.nodes.length - 1]
+      let end = Math.min(to, this.lineEnd), last = this.nodes[this.nodes.length - 1]
       if (last instanceof HeightMapText)
         last.length += end - this.pos
       else if (end > this.pos || !this.isCovered)
         this.nodes.push(new HeightMapText(end - this.pos, -1))
       this.writtenTo = end
-      if (pos > end) {
+      if (to > end) {
         this.nodes.push(null)
         this.writtenTo++
         this.lineStart = -1
       }
     }
-    this.pos = pos
+    this.pos = to
   }
 
-  advanceReplaced(pos: number, deco: ReplaceDecoration) {
+  point(from: number, to: number, deco: PointDecoration) {
     let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
-    if (deco.block)
-      this.addBlock(new HeightMapBlock(pos - this.pos, height, BlockType.widgetRange))
-    else if (pos > this.pos || height >= relevantWidgetHeight)
-      this.addLineDeco(height, pos - this.pos)
+    let len = to - from
+    if (deco.block) {
+      this.addBlock(new HeightMapBlock(len, height, deco.type))
+    } else if (len || height >= relevantWidgetHeight) {
+      this.addLineDeco(height, len)
+    }
     if (this.lineEnd > -1 && this.lineEnd < this.pos)
       this.lineEnd = this.oracle.doc.lineAt(this.pos).end
-  }
-
-  point(deco: WidgetDecoration) {
-    let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
-    if (deco.block)
-      this.addBlock(new HeightMapBlock(0, height, deco.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter))
-    else if (height >= relevantWidgetHeight)
-      this.addLineDeco(height, 0)
   }
 
   enterLine() {
@@ -565,8 +557,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
     return this.nodes
   }
 
-  ignoreRange(value: Decoration) { return !(value as RangeValue).replace }
-  ignorePoint(value: WidgetDecoration) { return !(value.block || value.widget && value.widget.estimatedHeight > 0) }
+  ignore(from: number, to: number, value: Decoration) { return from == to && !value.heightRelevant }
 
   // Always called with a region that on both sides either stretches
   // to a line break or the end of the document.

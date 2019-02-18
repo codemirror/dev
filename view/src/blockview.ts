@@ -2,12 +2,9 @@ import {ContentView} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {LineDecoration, WidgetType, widgetsEq} from "./decoration"
+import {LineDecoration, WidgetType, widgetsEq, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
-import {Open} from "./buildview"
-
-// FIXME move somewhere else?
-export const enum BlockType { text, widgetBefore, widgetAfter, widgetRange }
+import {Open} from "../../rangeset/src/rangeset"
 
 export interface BlockView extends ContentView {
   merge(from: number, to: number, source: ContentView | null, takeDeco: boolean, composition: CompositionView | null): boolean

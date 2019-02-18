@@ -1,10 +1,8 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
-import {DecorationSet, Decoration, ReplaceDecoration, WidgetDecoration, LineDecoration, MarkDecoration} from "./decoration"
-import {BlockView, LineView, BlockWidgetView, BlockType} from "./blockview"
+import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType} from "./decoration"
+import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
-
-export const enum Open { start = 1, end = 2 }
 
 export class ContentBuilder implements RangeIterator<Decoration> {
   content: BlockView[] = []
@@ -15,7 +13,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   skip: number
   textOff: number = 0
 
-  constructor(private doc: Text, public pos: number) {
+  constructor(private doc: Text, public pos: number, public end: number) {
     this.cursor = doc.iter()
     this.skip = pos
   }
@@ -68,9 +66,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     }
   }
 
-  advance(pos: number, active: Decoration[]) {
-    if (pos <= this.pos) return
-
+  span(from: number, to: number, active: Decoration[]) {
     let tagName = null, clss = null
     let attrs: {[key: string]: string} | null = null
     for (let {spec} of active as MarkDecoration[]) {
@@ -89,48 +85,42 @@ export class ContentBuilder implements RangeIterator<Decoration> {
       }
     }
 
-    this.buildText(pos - this.pos, tagName, clss, attrs, active)
-    this.pos = pos
+    this.buildText(to - from, tagName, clss, attrs, active)
+    this.pos = to
   }
 
-  advanceReplaced(pos: number, deco: ReplaceDecoration, openStart: boolean, openEnd: boolean) {
-    let open = (openStart ? Open.start : 0) | (openEnd ? Open.end : 0)
-    if (deco.block)
-      this.addWidget(new BlockWidgetView(deco.widget, pos - this.pos, BlockType.widgetRange, open))
-    else
-      this.getLine().append(new WidgetView(pos - this.pos, deco.widget, 0, open))
-
-    // Advance the iterator past the replaced content
-    let length = pos - this.pos
-    if (this.textOff + length <= this.text.length) {
-      this.textOff += length
-    } else {
-      this.skip += length - (this.text.length - this.textOff)
-      this.text = ""
-      this.textOff = 0
+  point(from: number, to: number, deco: Decoration, open: number) {
+    let len = to - from
+    if (deco instanceof PointDecoration) {
+      if (deco.block) {
+        let {type} = deco
+        if (type == BlockType.widgetAfter && !this.posCovered()) this.getLine()
+        this.addWidget(new BlockWidgetView(deco.widget, len, type, open))
+      } else {
+        this.getLine().append(new WidgetView(len, deco.widget, deco.startSide, open))
+      }
+    } else if (this.doc.lineAt(this.pos).start == this.pos) { // Line decoration
+      this.getLine().addLineDeco(deco as LineDecoration)
     }
-    this.pos = pos
-  }
 
-  point(deco: LineDecoration | WidgetDecoration) {
-    if (deco instanceof LineDecoration) {
-      if (this.doc.lineAt(this.pos).start == this.pos)
-        this.getLine().addLineDeco(deco as LineDecoration)
-    } else if (deco.block) {
-      if (deco.startSide > 0 && !this.posCovered()) this.getLine()
-      this.addWidget(new BlockWidgetView(deco.widget, 0, deco.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter))
-    } else {
-      this.getLine().append(new WidgetView(0, deco.widget, deco.startSide))
+    if (len) {
+      // Advance the iterator past the replaced content
+      if (this.textOff + len <= this.text.length) {
+        this.textOff += len
+      } else {
+        this.skip += len - (this.text.length - this.textOff)
+        this.text = ""
+        this.textOff = 0
+      }
+      this.pos = to
     }
   }
 
-  ignoreRange(deco: Decoration): boolean { return false }
-
-  ignorePoint(deco: Decoration): boolean { return false }
+  ignore(): boolean { return false }
 
   static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>):
     {content: BlockView[], breakAtStart: number} {
-    let builder = new ContentBuilder(text, from)
+    let builder = new ContentBuilder(text, from, to)
     RangeSet.iterateSpans(decorations, from, to, builder)
     builder.finish()
     return builder

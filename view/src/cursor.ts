@@ -1,5 +1,6 @@
 import {EditorView} from "./editorview"
-import {LineView, BlockType} from "./blockview"
+import {LineView} from "./blockview"
+import {BlockType} from "./decoration"
 import {dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"

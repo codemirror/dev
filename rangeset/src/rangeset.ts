@@ -15,9 +15,11 @@ export interface RangeComparator<T extends RangeValue> {
   comparePoint(from: number, to: number, byA: T, byB: T | null): void
 }
 
+export const enum Open { start = 1, end = 2 }
+
 export interface RangeIterator<T extends RangeValue> {
   span(from: number, to: number, active: A<T>): void
-  point(from: number, to: number, value: T): void
+  point(from: number, to: number, value: T, open: number): void
   ignore(from: number, to: number, value: T): boolean
 }
 
@@ -302,9 +304,10 @@ export class RangeSet<T extends RangeValue> {
             posSide = range.value.startSide
           }
           if (range.value.point) {
-            iterator.point(rFrom, rTo, range.value)
-            if (rTo > to) break
+            let open = (rFrom < pos ? Open.start : 0) | (rTo > to ? Open.end : 0)
+            iterator.point(pos, Math.min(rTo, to), range.value, open)
             pos = rTo
+            if (rTo > to) break
             posSide = range.value.endSide
           } else if (rTo > pos) {
             active.push(range.value)

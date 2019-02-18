@@ -5,7 +5,7 @@ import {LineView} from "./blockview"
 import {Text} from "../../doc/src"
 import {Rect} from "./dom"
 import browser from "./browser"
-import {Open} from "./buildview"
+import {Open} from "../../rangeset/src/rangeset"
 
 const none: any[] = []
 

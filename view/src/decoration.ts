@@ -12,7 +12,6 @@ export interface MarkDecorationSpec {
   tagName?: string
 }
 
-// FIXME unify with replace decoration?
 export interface WidgetDecorationSpec {
   widget: WidgetType
   side?: number
@@ -51,6 +50,8 @@ export type DecoratedRange = Range<Decoration>
 
 const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8
 
+export const enum BlockType { text, widgetBefore, widgetAfter, widgetRange }
+
 export abstract class Decoration implements RangeValue {
   // @internal
   constructor(
@@ -62,9 +63,17 @@ export abstract class Decoration implements RangeValue {
     readonly widget: WidgetType | null,
     readonly spec: any) {}
 
-  get replace() { return false }
+  get point() { return false }
+
+  // Only relevant when this.block == true
+  get type() {
+    return this.startSide < this.endSide ? BlockType.widgetRange : this.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter
+  }
+
+  get heightRelevant() { return false }
 
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null
+  abstract eq(other: Decoration): boolean
 
   static mark(from: number, to: number, spec: MarkDecorationSpec): DecoratedRange {
     if (from >= to) throw new RangeError("Mark decorations may not be empty")
@@ -74,7 +83,7 @@ export abstract class Decoration implements RangeValue {
   static widget(pos: number, spec: WidgetDecorationSpec): DecoratedRange {
     let side = spec.side || 0
     if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
-    return new Range(pos, pos, new ReplaceDecoration(spec, side, side, !!spec.block, spec.widget))
+    return new Range(pos, pos, new PointDecoration(spec, side, side, !!spec.block, spec.widget))
   }
 
   static replace(from: number, to: number, spec: ReplaceDecorationSpec): DecoratedRange {
@@ -84,7 +93,7 @@ export abstract class Decoration implements RangeValue {
     let endSide = block ? BLOCK_BIG_SIDE * (end ? 2 : 1) : INLINE_BIG_SIDE * (end ? 1 : -1)
     if (from > to || (from == to && startSide > 0 && endSide < 0))
       throw new RangeError("Invalid range for replacement decoration")
-    return new Range(from, Math.max(from, to), new ReplaceDecoration(spec, startSide, endSide, block, spec.widget || null))
+    return new Range(from, Math.max(from, to), new PointDecoration(spec, startSide, endSide, block, spec.widget || null))
   }
 
   static line(start: number, spec: LineDecorationSpec): DecoratedRange {
@@ -96,9 +105,6 @@ export abstract class Decoration implements RangeValue {
   }
 
   static none = RangeSet.empty as DecorationSet
-
-  // @internal
-  abstract sameEffect(other: Decoration): boolean
 
   // @internal
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
@@ -123,7 +129,7 @@ export class MarkDecoration extends Decoration {
     return newFrom < newTo ? new Range(newFrom, newTo, this) : null
   }
 
-  sameEffect(other: Decoration): boolean {
+  eq(other: Decoration): boolean {
     return this == other ||
       other instanceof MarkDecoration &&
       this.spec.tagName == other.spec.tagName &&
@@ -137,22 +143,26 @@ export class LineDecoration extends Decoration {
     super(-INLINE_BIG_SIDE, -INLINE_BIG_SIDE, null, spec)
   }
 
+  get point() { return true }
+
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
     pos = mapStrict(pos, -1, mapping)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
-  sameEffect(other: Decoration): boolean {
+  eq(other: Decoration): boolean {
     return other instanceof LineDecoration && attrsEq(this.spec.attributes, other.spec.attributes)
   }
 }
 
-export class ReplaceDecoration extends Decoration {
+export class PointDecoration extends Decoration {
   constructor(spec: any, startSide: number, endSide: number, public block: boolean, widget: WidgetType | null) {
     super(startSide, endSide, widget, spec)
   }
 
-  get replace() { return true }
+  get point() { return true }
+
+  get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
     if (this.block) {
@@ -175,8 +185,8 @@ export class ReplaceDecoration extends Decoration {
     }
   }
 
-  sameEffect(other: Decoration): boolean {
-    return other instanceof ReplaceDecoration &&
+  eq(other: Decoration): boolean {
+    return other instanceof PointDecoration &&
       widgetsEq(this.widget, other.widget) &&
       this.block == other.block &&
       this.startSide == other.startSide && this.endSide == other.endSide
@@ -204,15 +214,6 @@ function getInclusive(spec: {inclusive?: boolean, inclusiveStart?: boolean, incl
 
 export function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
   return a == b || !!(a && b && a.compare(b))
-}
-
-function compareSets(setA: Decoration[], setB: Decoration[]): boolean {
-  if (setA.length != setB.length) return false
-  search: for (let value of setA) {
-    for (let valueB of setB) if (value.sameEffect(valueB)) continue search
-    return false
-  }
-  return true
 }
 
 const MIN_RANGE_GAP = 4
@@ -247,23 +248,13 @@ class DecorationComparator implements RangeComparator<Decoration> {
   constructor() {}
 
   compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
-    if (!compareSets(activeA, activeB))
-      addRange(from, to, this.changes.content)
+    addRange(from, to, this.changes.content)
   }
 
-  compareReplaced(from: number, to: number, byA: Decoration, byB: Decoration) {
-    if (!byA.sameEffect(byB)) {
-      addRange(from, to, this.changes.content)
+  comparePoint(from: number, to: number, byA: Decoration, byB: Decoration | null) {
+    addRange(from, to, this.changes.content)
+    if (from > to || byA.heightRelevant || byB && byB.heightRelevant)
       addRange(from, to, this.changes.height)
-    }
-  }
-
-  comparePoints(pos: number, pointsA: Decoration[], pointsB: Decoration[]) {
-    if (!compareSets(pointsA, pointsB)) {
-      addRange(pos, pos, this.changes.content)
-      if (pointsA.some(d => d.hasHeight()) || pointsB.some(d => d.hasHeight()))
-        addRange(pos, pos, this.changes.height)
-    }
   }
 }
 
@@ -275,20 +266,15 @@ export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: Read
 
 class HeightDecoScanner implements RangeIterator<Decoration> {
   ranges: number[] = []
-  pos: number = 0
 
-  advance(pos: number, active: ReadonlyArray<Decoration>) { this.pos = pos }
-  advanceReplaced(pos: number) { addRange(this.pos, pos, this.ranges); this.pos = pos }
-  point(value: Decoration) { addRange(this.pos, this.pos, this.ranges) }
-  ignoreRange(value: Decoration) { return !(value as RangeValue).replace }
-  ignorePoint(value: Decoration) { return !value.widget }
+  span() {}
+  point(from: number, to: number, value: PointDecoration) { addRange(from, to, this.ranges) }
+  ignore(from: number, to: number, value: Decoration) { return from == to && !value.heightRelevant }
 }
 
 export function heightRelevantDecorations(decorations: ReadonlyArray<DecorationSet>, ranges: ReadonlyArray<ChangedRange>): number[] {
   let scanner = new HeightDecoScanner
-  for (let {fromB, toB} of ranges) {
-    scanner.pos = fromB
+  for (let {fromB, toB} of ranges)
     RangeSet.iterateSpans(decorations, fromB, toB, scanner)
-  }
   return scanner.ranges
 }
