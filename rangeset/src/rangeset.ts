@@ -15,11 +15,9 @@ export interface RangeComparator<T extends RangeValue> {
   comparePoint(from: number, to: number, byA: T, byB: T | null): void
 }
 
-export const enum Open { start = 1, end = 2 }
-
 export interface RangeIterator<T extends RangeValue> {
   span(from: number, to: number, active: A<T>): void
-  point(from: number, to: number, value: T, open: number): void
+  point(from: number, to: number, value: T, openStart: boolean, openEnd: boolean): void
   ignore(from: number, to: number, value: T): boolean
 }
 
@@ -197,7 +195,7 @@ export class RangeSet<T extends RangeValue> {
       let oldChildEnd = oldPos + child.length
       let newChildEnd = changes.mapPos(oldPos + child.length, 1)
       let touch = touchesChanges(oldPos, oldChildEnd, changes.changes)
-      if (touch == touched.yes) {
+      if (touch == Touched.Yes) {
         let inner = child.mapInner(changes, oldPos, newPos, newChildEnd)
         newChild = inner.set
         if (inner.escaped) for (let range of inner.escaped) {
@@ -207,7 +205,7 @@ export class RangeSet<T extends RangeValue> {
           else
             insertSorted(newLocal || (newLocal = this.local.slice()), range)
         }
-      } else if (touch == touched.covered) {
+      } else if (touch == Touched.Covered) {
         newChild = RangeSet.empty.grow(newChildEnd - newPos)
       }
       if (newChild != child) {
@@ -304,8 +302,7 @@ export class RangeSet<T extends RangeValue> {
             posSide = range.value.startSide
           }
           if (range.value.point) {
-            let open = (rFrom < pos ? Open.start : 0) | (rTo > to ? Open.end : 0)
-            iterator.point(pos, Math.min(rTo, to), range.value, open)
+            iterator.point(pos, Math.min(rTo, to), range.value, rFrom < pos, rTo > to)
             pos = rTo
             if (rTo > to) break
             posSide = range.value.endSide
@@ -776,14 +773,14 @@ function remove<T>(array: T[], index: number) {
   if (index != array.length) array[index] = last
 }
 
-const enum touched {yes, no, covered}
+const enum Touched {Yes, No, Covered}
 
-function touchesChanges(from: number, to: number, changes: A<Change>): touched {
-  let result = touched.no
+function touchesChanges(from: number, to: number, changes: A<Change>): Touched {
+  let result = Touched.No
   for (let change of changes) {
     if (change.to >= from && change.from <= to) {
-      if (change.from < from && change.to > to) result = touched.covered
-      else if (result == touched.no) result = touched.yes
+      if (change.from < from && change.to > to) result = Touched.Covered
+      else if (result == Touched.No) result = Touched.Yes
     }
     let diff = change.length - (change.to - change.from)
     if (from > change.from) from += diff

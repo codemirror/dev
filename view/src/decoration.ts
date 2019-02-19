@@ -50,7 +50,7 @@ export type DecoratedRange = Range<Decoration>
 
 const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8
 
-export const enum BlockType { text, widgetBefore, widgetAfter, widgetRange }
+export const enum BlockType { Text, WidgetBefore, WidgetAfter, WidgetRange }
 
 export abstract class Decoration implements RangeValue {
   // @internal
@@ -166,7 +166,7 @@ export class PointDecoration extends Decoration {
 
   // Only relevant when this.block == true
   get type() {
-    return this.startSide < this.endSide ? BlockType.widgetRange : this.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter
+    return this.startSide < this.endSide ? BlockType.WidgetRange : this.startSide < 0 ? BlockType.WidgetBefore : BlockType.WidgetAfter
   }
 
   get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
@@ -175,8 +175,8 @@ export class PointDecoration extends Decoration {
     // FIXME make mapping behavior configurable?
     if (this.block) {
       let {type} = this
-      let newFrom = type == BlockType.widgetAfter ? mapping.mapPos(from, 1, MapMode.TrackAfter) : mapping.mapPos(from, -1, MapMode.TrackBefore)
-      let newTo = type == BlockType.widgetRange ? mapping.mapPos(to, 1, MapMode.TrackAfter) : newFrom
+      let newFrom = type == BlockType.WidgetAfter ? mapping.mapPos(from, 1, MapMode.TrackAfter) : mapping.mapPos(from, -1, MapMode.TrackBefore)
+      let newTo = type == BlockType.WidgetRange ? mapping.mapPos(to, 1, MapMode.TrackAfter) : newFrom
       return newFrom < 0 || newTo < 0 ? null : new Range(newFrom, newTo, this)
     } else {
       return this.mapSimple(mapping, from, to)

@@ -1,4 +1,4 @@
-import {ContentView, ChildCursor, DocChildCursor, dirty} from "./contentview"
+import {ContentView, ChildCursor, DocChildCursor, Dirty} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {TextView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
@@ -17,7 +17,7 @@ import {Text} from "../../doc/src"
 type A<T> = ReadonlyArray<T>
 const none = [] as any
 
-const enum Composing { no, starting, yes, ending }
+const enum Composing { No, Starting, Yes, Ending }
 
 export class DocView extends ContentView {
   children!: BlockView[]
@@ -38,7 +38,7 @@ export class DocView extends ContentView {
   // A document position that has to be scrolled into view at the next layout check
   scrollIntoView: number = -1
 
-  composing: Composing = Composing.no
+  composing: Composing = Composing.No
   composition: CompositionView | null = null
   composeTimeout: any = -1
 
@@ -99,7 +99,7 @@ export class DocView extends ContentView {
 
     let contentChanges = this.computeUpdate(transactions, state, metadata, changedRanges, 0, scrollIntoView)
 
-    if (this.dirty == dirty.not && contentChanges.length == 0 &&
+    if (this.dirty == Dirty.Not && contentChanges.length == 0 &&
         this.state.selection.primary.from >= this.viewport.from &&
         this.state.selection.primary.to <= this.viewport.to) {
       this.updateSelection()
@@ -166,7 +166,7 @@ export class DocView extends ContentView {
       // recompute the scroll position without a layout)
       this.dom.style.height = this.heightMap.height + "px"
       this.sync()
-      this.dirty = dirty.not
+      this.dirty = Dirty.Not
       this.updateSelection()
       this.dom.style.height = ""
     })
@@ -291,12 +291,12 @@ export class DocView extends ContentView {
 
   lineAt(pos: number, editorTop?: number): BlockInfo {
     if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
-    return this.heightMap.lineAt(pos, QueryType.byPos, this.state.doc, editorTop + this.paddingTop, 0)
+    return this.heightMap.lineAt(pos, QueryType.ByPos, this.state.doc, editorTop + this.paddingTop, 0)
   }
 
   lineAtHeight(height: number, editorTop?: number): BlockInfo {
     if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
-    return this.heightMap.lineAt(height, QueryType.byHeight, this.state.doc, editorTop + this.paddingTop, 0)
+    return this.heightMap.lineAt(height, QueryType.ByHeight, this.state.doc, editorTop + this.paddingTop, 0)
   }
 
   blockAtHeight(height: number, editorTop?: number): BlockInfo {
@@ -434,14 +434,14 @@ export class DocView extends ContentView {
     for (;; i--) {
       let child = this.children[i]
       if (child instanceof LineView) return child.domFromPos(off)
-      if (child.type == BlockType.widgetRange || i == 0) return null
+      if (child.type == BlockType.WidgetRange || i == 0) return null
     }
   }
 
   coordsAt(pos: number): Rect | null {
     for (let off = this.length, i = this.children.length - 1;; i--) {
       let child = this.children[i], start = off - child.breakAfter - child.length
-      if (pos >= start && child.type != BlockType.widgetAfter) return child.coordsAt(pos - start)
+      if (pos >= start && child.type != BlockType.WidgetAfter) return child.coordsAt(pos - start)
       off = start
     }
   }
@@ -503,34 +503,34 @@ export class DocView extends ContentView {
   }
 
   startComposition() {
-    if (this.composing == Composing.ending) {
+    if (this.composing == Composing.Ending) {
       this.observer.flush()
-      if (this.composing == Composing.ending) {
+      if (this.composing == Composing.Ending) {
         clearTimeout(this.composeTimeout)
         this.exitComposition()
       }
     }
-    if (this.composing == Composing.no) {
-      this.composing = Composing.starting
+    if (this.composing == Composing.No) {
+      this.composing = Composing.Starting
       this.composeTimeout = setTimeout(() => this.enterComposition(), 20)
     }
   }
 
   endComposition() {
-    if (this.composing == Composing.yes) {
-      this.composing = Composing.ending
+    if (this.composing == Composing.Yes) {
+      this.composing = Composing.Ending
       this.composeTimeout = setTimeout(() => this.exitComposition(), 20)
-    } else if (this.composing == Composing.starting) {
+    } else if (this.composing == Composing.Starting) {
       clearTimeout(this.composeTimeout)
-      this.composing = Composing.no
+      this.composing = Composing.No
     }
   }
 
   commitComposition(changes: A<ChangedRange>): A<ChangedRange> {
-    if (this.composing == Composing.starting) {
+    if (this.composing == Composing.Starting) {
       clearTimeout(this.composeTimeout)
       this.enterComposition()
-    } else if (this.composing == Composing.ending) {
+    } else if (this.composing == Composing.Ending) {
       clearTimeout(this.composeTimeout)
       changes = this.clearComposition(changes)
     }
@@ -560,7 +560,7 @@ export class DocView extends ContentView {
       else if (focusNode.nodeType == 3 && view instanceof LineView)
         this.composition = view.createCompositionViewAround(focusNode)
     }
-    this.composing = this.composition ? Composing.yes : Composing.no
+    this.composing = this.composition ? Composing.Yes : Composing.No
   }
 
   // Remove this.composition, if present, and set this.composing to
@@ -570,7 +570,7 @@ export class DocView extends ContentView {
   clearComposition(changes: A<ChangedRange>): A<ChangedRange> {
     let composition = this.composition
     this.composition = null
-    this.composing = Composing.no
+    this.composing = Composing.No
     if (composition && composition.rootView == this) {
       let from = composition.posAtStart, to = from + composition.length
       changes = new ChangedRange(from, to, ChangedRange.mapPos(from, -1, changes),

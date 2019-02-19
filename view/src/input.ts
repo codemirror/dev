@@ -226,14 +226,14 @@ function doPaste(view: EditorView, text: string) {
 }
 
 function mustCapture(event: KeyboardEvent): boolean {
-  const enum mod { ctrl = 1, alt = 2, shift = 4, meta = 8 }
-  let mods = (event.ctrlKey ? mod.ctrl : 0) | (event.metaKey ? mod.meta : 0) |
-    (event.altKey ? mod.alt : 0) | (event.shiftKey ? mod.shift : 0)
-  let code = event.keyCode, macCtrl = browser.mac && mods == mod.ctrl
+  const enum Mod { Ctrl = 1, Alt = 2, Shift = 4, Meta = 8 }
+  let mods = (event.ctrlKey ? Mod.Ctrl : 0) | (event.metaKey ? Mod.Meta : 0) |
+    (event.altKey ? Mod.Alt : 0) | (event.shiftKey ? Mod.Shift : 0)
+  let code = event.keyCode, macCtrl = browser.mac && mods == Mod.Ctrl
   return code == 8 || (macCtrl && code == 72) ||  // Backspace, Ctrl-h on Mac
     code == 46 || (macCtrl && code == 68) || // Delete, Ctrl-d on Mac
     code == 27 || // Esc
-    (mods == (browser.mac ? mod.meta : mod.ctrl) && // Ctrl/Cmd-[biyz]
+    (mods == (browser.mac ? Mod.Meta : Mod.Ctrl) && // Ctrl/Cmd-[biyz]
      (code == 66 || code == 73 || code == 89 || code == 90))
 }
 

@@ -25,8 +25,8 @@ export function isWordChar(ch: string, wordChars?: RegExp): boolean {
   return wordChars.test(ch)
 }
 
-export const enum CharType { WORD, SPACE, OTHER }
+export enum CharType { Word, Space, Other }
 
 export function charType(ch: string, wordChars?: RegExp): CharType {
-  return /\s/.test(ch) ? CharType.SPACE : isWordChar(ch, wordChars) ? CharType.WORD : CharType.OTHER
+  return /\s/.test(ch) ? CharType.Space : isWordChar(ch, wordChars) ? CharType.Word : CharType.Other
 }

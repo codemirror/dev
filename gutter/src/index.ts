@@ -71,8 +71,8 @@ class GutterView implements ViewPlugin {
     let i = 0, height = 0
     this.view.viewportLines(line => {
       let text: BlockInfo | undefined
-      if (Array.isArray(line.type)) text = line.type.find(b => b.type == BlockType.text)
-      else text = line.type == BlockType.text ? line : undefined
+      if (Array.isArray(line.type)) text = line.type.find(b => b.type == BlockType.Text)
+      else text = line.type == BlockType.Text ? line : undefined
       if (!text) return
       let above = text.top - height
       // FIXME optimize (increment) when we can tell it's valid? (no replaced ranges)

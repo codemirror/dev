@@ -17,7 +17,7 @@ export class Slot<T = any> {
   }
 }
 
-const enum Kind { BEHAVIOR, MULTI, UNIQUE }
+const enum Kind { Behavior, Multi, Unique }
 
 export type Behavior<Value> = (value: Value) => Extension
 
@@ -38,7 +38,7 @@ export class Extension {
 
   // @internal
   flatten(priority: number, target: Extension[] = []) {
-    if (this.kind == Kind.MULTI) for (let ext of this.value as Extension[]) ext.flatten(this.priority > -2 ? this.priority : priority, target)
+    if (this.kind == Kind.Multi) for (let ext of this.value as Extension[]) ext.flatten(this.priority > -2 ? this.priority : priority, target)
     else target.push(this.priority > -2 ? this : this.setPrio(priority))
     return target
   }
@@ -58,7 +58,7 @@ export class Extension {
   // of values associated with it. An `Extension` can be seen as a
   // tree of sub-extensions with behaviors as leaves.
   static defineBehavior<Value>(): Behavior<Value> {
-    let behavior = (value: Value) => new this(Kind.BEHAVIOR, behavior, value)
+    let behavior = (value: Value) => new this(Kind.Behavior, behavior, value)
     return behavior
   }
 
@@ -66,19 +66,19 @@ export class Extension {
     const type = new UniqueExtensionType(instantiate)
     return (spec: Spec | undefined = defaultSpec) => {
       if (spec === undefined) throw new RangeError("This extension has no default spec")
-      return new this(Kind.UNIQUE, type, spec)
+      return new this(Kind.Unique, type, spec)
     }
   }
 
   static all(...extensions: Extension[]) {
-    return new this(Kind.MULTI, null, extensions)
+    return new this(Kind.Multi, null, extensions)
   }
 
   // Resolve an array of extenders by expanding all extensions until
   // only behaviors are left, and then collecting the behaviors into
   // arrays of values, preserving priority ordering throughout.
   static resolve(extensions: ReadonlyArray<Extension>): BehaviorStore {
-    let pending: Extension[] = new this(Kind.MULTI, null, extensions).flatten(0)
+    let pending: Extension[] = new this(Kind.Multi, null, extensions).flatten(0)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -144,7 +144,7 @@ class UniqueExtensionType {
   subs(specs: any[], priority: number) {
     let subs = this.instantiate(specs).flatten(priority)
     for (let sub of subs)
-      if (sub.kind == Kind.UNIQUE && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
+      if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
     return subs
   }
 }
@@ -173,9 +173,9 @@ export class BehaviorStore {
 // still in extenders.
 function findTopUnique(extensions: Extension[], type: typeof Extension): UniqueExtensionType | null {
   let foundUnique = false
-  for (let ext of extensions) if (ext.kind == Kind.UNIQUE && ext instanceof type) {
+  for (let ext of extensions) if (ext.kind == Kind.Unique && ext instanceof type) {
     foundUnique = true
-    if (!extensions.some(e => e.kind == Kind.UNIQUE && (e.id as UniqueExtensionType).hasSub(ext.id)))
+    if (!extensions.some(e => e.kind == Kind.Unique && (e.id as UniqueExtensionType).hasSub(ext.id)))
       return ext.id
   }
   if (foundUnique) throw new RangeError("Sub-extension cycle in unique extensions")

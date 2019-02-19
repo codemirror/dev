@@ -4,6 +4,8 @@ import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
 
+export const enum Open { Start = 1, End = 2 }
+
 export class ContentBuilder implements RangeIterator<Decoration> {
   content: BlockView[] = []
   curLine: LineView | null = null
@@ -22,7 +24,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     if (this.content.length == 0)
       return !this.breakAtStart && this.doc.lineAt(this.pos).start != this.pos
     let last = this.content[this.content.length - 1]
-    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockType.widgetBefore)
+    return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockType.WidgetBefore)
   }
 
   getLine() {
@@ -89,12 +91,13 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     this.pos = to
   }
 
-  point(from: number, to: number, deco: Decoration, open: number) {
+  point(from: number, to: number, deco: Decoration, openStart: boolean, openEnd: boolean) {
+    let open = (openStart ? Open.Start : 0) | (openEnd ? Open.End : 0)
     let len = to - from
     if (deco instanceof PointDecoration) {
       if (deco.block) {
         let {type} = deco
-        if (type == BlockType.widgetAfter && !this.posCovered()) this.getLine()
+        if (type == BlockType.WidgetAfter && !this.posCovered()) this.getLine()
         this.addWidget(new BlockWidgetView(deco.widget, len, type, open))
       } else {
         this.getLine().append(new WidgetView(len, deco.widget, deco.startSide, open))

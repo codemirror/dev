@@ -4,14 +4,14 @@ declare global {
   interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
 }
 
-export const enum dirty { not = 0, child = 1, node = 2 }
+export const enum Dirty { Not = 0, Child = 1, Node = 2 }
 
 const none: any[] = []
 
 export abstract class ContentView {
   parent: ContentView | null = null
   dom: Node | null = null
-  dirty: number = dirty.node
+  dirty: number = Dirty.Node
   abstract length: number
   abstract children: ContentView[]
   breakAfter!: number
@@ -42,7 +42,7 @@ export abstract class ContentView {
   coordsAt(pos: number): Rect | null { return null }
 
   sync() {
-    if (this.dirty & dirty.node) {
+    if (this.dirty & Dirty.Node) {
       let parent = this.dom as HTMLElement, pos: Node | null = parent.firstChild
       for (let child of this.children) {
         if (child.dirty) {
@@ -51,15 +51,15 @@ export abstract class ContentView {
             if (child.reuseDOM(pos)) pos = prev ? prev.nextSibling : parent.firstChild
           }
           child.sync()
-          child.dirty = dirty.not
+          child.dirty = Dirty.Not
         }
         pos = syncNodeInto(parent, pos, child.dom!)
       }
       while (pos) pos = rm(pos)
-    } else if (this.dirty & dirty.child) {
+    } else if (this.dirty & Dirty.Child) {
       for (let child of this.children) if (child.dirty) {
         child.sync()
-        child.dirty = dirty.not
+        child.dirty = Dirty.Not
       }
     }
   }
@@ -113,16 +113,16 @@ export abstract class ContentView {
 
   // FIXME track precise dirty ranges, to avoid full DOM sync on every touched node?
   markDirty(andParent: boolean = false) {
-    if (this.dirty & dirty.node) return
-    this.dirty |= dirty.node
+    if (this.dirty & Dirty.Node) return
+    this.dirty |= Dirty.Node
     this.markParentsDirty(andParent)
   }
 
   markParentsDirty(childList: boolean) {
     for (let parent = this.parent; parent; parent = parent.parent) {
-      if (childList) parent.dirty |= dirty.node
-      if (parent.dirty & dirty.child) return
-      parent.dirty |= dirty.child
+      if (childList) parent.dirty |= Dirty.Node
+      if (parent.dirty & Dirty.Child) return
+      parent.dirty |= Dirty.Child
       childList = false
     }
   }

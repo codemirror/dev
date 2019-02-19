@@ -4,7 +4,7 @@ import {InlineView, TextView, CompositionView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
 import {LineDecoration, WidgetType, widgetsEq, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
-import {Open} from "../../rangeset/src/rangeset"
+import {Open} from "./buildview"
 
 export interface BlockView extends ContentView {
   merge(from: number, to: number, source: ContentView | null, takeDeco: boolean, composition: CompositionView | null): boolean
@@ -217,7 +217,7 @@ export class LineView extends ContentView implements BlockView {
 
   match(other: ContentView) { return false }
 
-  get type() { return BlockType.text }
+  get type() { return BlockType.Text }
 }
 
 const none = [] as any
@@ -241,8 +241,8 @@ export class BlockWidgetView extends ContentView implements BlockView {
 
   merge(from: number, to: number, source: ContentView | null): boolean {
     if (!(source instanceof BlockWidgetView) || !source.open ||
-        from > 0 && !(source.open & Open.start) ||
-        to < this.length && !(source.open & Open.end)) return false
+        from > 0 && !(source.open & Open.Start) ||
+        to < this.length && !(source.open & Open.End)) return false
     if (!widgetsEq(this.widget, source.widget))
       throw new Error("Trying to merge an open widget with an incompatible node")
     this.length = from + source.length + (this.length - to)

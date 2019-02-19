@@ -49,26 +49,26 @@ export class ViewportState {
     // bottom, depending on the bias (the change in viewport position
     // since the last update). It'll hold a number between 0 and 1
     let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VIEWPORT_MARGIN / 2))
-    let viewport = new Viewport(heightMap.lineAt(this.top - marginTop * VIEWPORT_MARGIN, QueryType.byHeight, doc, 0, 0).from,
-                                heightMap.lineAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, QueryType.byHeight, doc, 0, 0).to)
+    let viewport = new Viewport(heightMap.lineAt(this.top - marginTop * VIEWPORT_MARGIN, QueryType.ByHeight, doc, 0, 0).from,
+                                heightMap.lineAt(this.bottom + (1 - marginTop) * VIEWPORT_MARGIN, QueryType.ByHeight, doc, 0, 0).to)
     // If scrollTo is > -1, make sure the viewport includes that position
     if (scrollTo > -1) {
       if (scrollTo < viewport.from) {
-        let {top} = heightMap.lineAt(scrollTo, QueryType.byPos, doc, 0, 0)
-        viewport = new Viewport(heightMap.lineAt(top - VIEWPORT_MARGIN / 2, QueryType.byHeight, doc, 0, 0).from,
-                                heightMap.lineAt(top + (this.bottom - this.top) + VIEWPORT_MARGIN / 2, QueryType.byHeight, doc, 0, 0).to)
+        let {top} = heightMap.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
+        viewport = new Viewport(heightMap.lineAt(top - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
+                                heightMap.lineAt(top + (this.bottom - this.top) + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
       } else if (scrollTo > viewport.to) {
-        let {bottom} = heightMap.lineAt(scrollTo, QueryType.byPos, doc, 0, 0)
-        viewport = new Viewport(heightMap.lineAt(bottom - (this.bottom - this.top) - VIEWPORT_MARGIN / 2, QueryType.byHeight, doc, 0, 0).from,
-                                heightMap.lineAt(bottom + VIEWPORT_MARGIN / 2, QueryType.byHeight, doc, 0, 0).to)
+        let {bottom} = heightMap.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
+        viewport = new Viewport(heightMap.lineAt(bottom - (this.bottom - this.top) - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
+                                heightMap.lineAt(bottom + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
       }
     }
     return viewport
   }
 
   coveredBy(doc: Text, viewport: Viewport, heightMap: HeightMap, bias = 0) {
-    let {top} = heightMap.lineAt(viewport.from, QueryType.byPos, doc, 0, 0)
-    let {bottom} = heightMap.lineAt(viewport.to, QueryType.byPos, doc, 0, 0)
+    let {top} = heightMap.lineAt(viewport.from, QueryType.ByPos, doc, 0, 0)
+    let {bottom} = heightMap.lineAt(viewport.to, QueryType.ByPos, doc, 0, 0)
     return (viewport.from == 0 || top <= this.top - Math.max(MIN_COVER_MARGIN, Math.min(-bias, MAX_COVER_MARGIN))) &&
       (viewport.to == doc.length || bottom >= this.bottom + Math.max(MIN_COVER_MARGIN, Math.min(bias, MAX_COVER_MARGIN)))
   }

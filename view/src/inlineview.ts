@@ -5,7 +5,7 @@ import {LineView} from "./blockview"
 import {Text} from "../../doc/src"
 import {Rect} from "./dom"
 import browser from "./browser"
-import {Open} from "../../rangeset/src/rangeset"
+import {Open} from "./buildview"
 
 const none: any[] = []
 
@@ -144,8 +144,8 @@ export class WidgetView extends InlineView {
   merge(from: number, to: number = this.length, source: InlineView | null = null) {
     if (source) {
       if (!(source instanceof WidgetView) || !source.open ||
-          from > 0 && !(source.open & Open.start) ||
-          to < this.length && !(source.open & Open.end)) return false
+          from > 0 && !(source.open & Open.Start) ||
+          to < this.length && !(source.open & Open.End)) return false
       if (!widgetsEq(this.widget, source.widget))
         throw new Error("Trying to merge incompatible widgets")
     }

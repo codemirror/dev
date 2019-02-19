@@ -89,21 +89,21 @@ export class BlockInfo {
   }
 }
 
-export const enum QueryType { byPos, byHeight, byPosNoHeight }
+export const enum QueryType { ByPos, ByHeight, ByPosNoHeight }
 
-const enum Flag { break = 1, outdated = 2 }
+const enum Flag { Break = 1, Outdated = 2 }
 
 export abstract class HeightMap {
   constructor(
     public length: number, // The number of characters covered
     public height: number, // Height of this part of the document
-    public flags: number = Flag.outdated
+    public flags: number = Flag.Outdated
   ) {}
 
   size!: number
 
-  get outdated() { return (this.flags & Flag.outdated) > 0 }
-  set outdated(value) { this.flags = (value ? Flag.outdated : 0) | (this.flags & ~Flag.outdated) }
+  get outdated() { return (this.flags & Flag.Outdated) > 0 }
+  set outdated(value) { this.flags = (value ? Flag.Outdated : 0) | (this.flags & ~Flag.Outdated) }
 
   abstract blockAt(height: number, doc: Text, top: number, offset: number): BlockInfo
   abstract lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number): BlockInfo
@@ -135,14 +135,14 @@ export abstract class HeightMap {
     let me: HeightMap = this
     for (let i = changes.length - 1; i >= 0; i--) {
       let {fromA, toA, fromB, toB} = changes[i]
-      let start = me.lineAt(fromA, QueryType.byPosNoHeight, oldDoc, 0, 0)
-      let end = start.to >= toA ? start : me.lineAt(toA, QueryType.byPosNoHeight, oldDoc, 0, 0)
+      let start = me.lineAt(fromA, QueryType.ByPosNoHeight, oldDoc, 0, 0)
+      let end = start.to >= toA ? start : me.lineAt(toA, QueryType.ByPosNoHeight, oldDoc, 0, 0)
       toB += end.to - toA; toA = end.to
       while (i > 0 && start.from <= changes[i - 1].toA) {
         fromA = changes[i - 1].fromA
         fromB = changes[i - 1].fromB
         i--
-        if (fromA < start.from) start = me.lineAt(fromA, QueryType.byPosNoHeight, oldDoc, 0, 0)
+        if (fromA < start.from) start = me.lineAt(fromA, QueryType.ByPosNoHeight, oldDoc, 0, 0)
       }
       fromB += start.from - fromA; fromA = start.from
       let nodes = NodeBuilder.build(oracle, decorations, fromB, toB)
@@ -225,7 +225,7 @@ class HeightMapText extends HeightMapBlock {
   public collapsed = 0 // Amount of collapsed content in the line
   public widgetHeight = 0 // Maximum inline widget height
 
-  constructor(length: number, height: number) { super(length, height, BlockType.text) }
+  constructor(length: number, height: number) { super(length, height, BlockType.Text) }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     if (nodes.length == 1 && nodes[0] instanceof HeightMapText && Math.abs(this.length - nodes[0]!.length) < 10) {
@@ -262,18 +262,18 @@ class HeightMapGap extends HeightMap {
     let {firstLine, lastLine, lineHeight} = this.lines(doc, offset)
     let line = Math.max(0, Math.min(lastLine - firstLine, Math.floor((height - top) / lineHeight)))
     let {start, length} = doc.line(firstLine + line)
-    return new BlockInfo(start, length, top + lineHeight * line, lineHeight, BlockType.text)
+    return new BlockInfo(start, length, top + lineHeight * line, lineHeight, BlockType.Text)
   }
 
   lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
-    if (type == QueryType.byHeight) return this.blockAt(value, doc, top, offset)
-    if (type == QueryType.byPosNoHeight) {
+    if (type == QueryType.ByHeight) return this.blockAt(value, doc, top, offset)
+    if (type == QueryType.ByPosNoHeight) {
       let {start, end} = doc.lineAt(value)
-      return new BlockInfo(start, end - start, 0, 0, BlockType.text)
+      return new BlockInfo(start, end - start, 0, 0, BlockType.Text)
     }
     let {firstLine, lineHeight} = this.lines(doc, offset)
     let {start, length, number} = doc.lineAt(value)
-    return new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.text)
+    return new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.Text)
   }
 
   forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
@@ -281,7 +281,7 @@ class HeightMapGap extends HeightMap {
     for (let line = firstLine; line <= lastLine; line++) {
       let {start, end} = doc.line(line)
       if (start > to) break
-      if (end >= from) f(new BlockInfo(start, end - start, top, top += lineHeight, BlockType.text))
+      if (end >= from) f(new BlockInfo(start, end - start, top, top += lineHeight, BlockType.Text))
     }
   }
 
@@ -342,12 +342,11 @@ class HeightMapBranch extends HeightMap {
   size: number
 
   constructor(public left: HeightMap, brk: number, public right: HeightMap) {
-    super(left.length + brk + right.length, left.height + right.height, brk | (left.outdated || right.outdated ? Flag.outdated : 0))
+    super(left.length + brk + right.length, left.height + right.height, brk | (left.outdated || right.outdated ? Flag.Outdated : 0))
     this.size = left.size + right.size
   }
 
-  get break() { return this.flags & Flag.break }
-  set break(value: number) { this.flags = value | (this.flags & ~Flag.break) }
+  get break() { return this.flags & Flag.Break }
 
   blockAt(height: number, doc: Text, top: number, offset: number) {
     let mid = top + this.left.height
@@ -357,11 +356,11 @@ class HeightMapBranch extends HeightMap {
 
   lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
     let rightTop = top + this.left.height, rightOffset = offset + this.left.length + this.break
-    let left = type == QueryType.byHeight ? value < rightTop || this.right.height == 0 : value < rightOffset
+    let left = type == QueryType.ByHeight ? value < rightTop || this.right.height == 0 : value < rightOffset
     let base = left ? this.left.lineAt(value, type, doc, top, offset)
       : this.right.lineAt(value, type, doc, rightTop, rightOffset)
     if (this.break || (left ? base.to < rightOffset : base.from > rightOffset)) return base
-    let subQuery = type == QueryType.byPosNoHeight ? QueryType.byPosNoHeight : QueryType.byPos
+    let subQuery = type == QueryType.ByPosNoHeight ? QueryType.ByPosNoHeight : QueryType.ByPos
     if (left)
       return base.join(this.right.lineAt(rightOffset, subQuery, doc, rightTop, rightOffset))
     else
@@ -374,7 +373,7 @@ class HeightMapBranch extends HeightMap {
       if (from < rightOffset) this.left.forEachLine(from, to, doc, top, offset, f)
       if (to >= rightOffset) this.right.forEachLine(from, to, doc, rightTop, rightOffset, f)
     } else {
-      let mid = this.lineAt(rightOffset, QueryType.byPos, doc, top, offset)
+      let mid = this.lineAt(rightOffset, QueryType.ByPos, doc, top, offset)
       if (from < mid.from) this.left.forEachLine(from, mid.from - 1, doc, top, offset, f)
       if (mid.to >= from && mid.from <= to) f(mid)
       if (to > mid.to) this.right.forEachLine(mid.to + 1, to, doc, rightTop, rightOffset, f)
@@ -384,9 +383,9 @@ class HeightMapBranch extends HeightMap {
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     let rightStart = this.left.length + this.break
     if (to < rightStart)
-      return this.balanced(this.left.replace(from, to, nodes), this.break, this.right)
+      return this.balanced(this.left.replace(from, to, nodes), this.right)
     if (from > this.left.length)
-      return this.balanced(this.left, this.break, this.right.replace(from - rightStart, to - rightStart, nodes))
+      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes))
 
     let result: (HeightMap | null)[] = []
     if (from > 0) this.decomposeLeft(from, result)
@@ -420,14 +419,14 @@ class HeightMapBranch extends HeightMap {
     result.push(this.right)
   }
 
-  balanced(left: HeightMap, brk: number, right: HeightMap): HeightMap {
+  balanced(left: HeightMap, right: HeightMap): HeightMap {
     if (left.size > 2 * right.size || right.size > 2 * left.size)
-      return HeightMap.of(brk ? [left, null, right] : [left, right])
-    this.left = left; this.right = right; this.break = brk
+      return HeightMap.of(this.break ? [left, null, right] : [left, right])
+    this.left = left; this.right = right
     this.height = left.height + right.height
     this.outdated = left.outdated || right.outdated
     this.size = left.size + right.size
-    this.length = left.length + brk + right.length
+    this.length = left.length + this.break + right.length
     return this
   }
 
@@ -441,7 +440,7 @@ class HeightMapBranch extends HeightMap {
       rebalance = right = right.updateHeight(oracle, rightStart, force, measured)
     else
       right.updateHeight(oracle, rightStart, force)
-    if (rebalance) return this.balanced(left, this.break, right)
+    if (rebalance) return this.balanced(left, right)
     this.height = this.left.height + this.right.height
     this.outdated = false
     return this
@@ -529,10 +528,10 @@ class NodeBuilder implements RangeIterator<Decoration> {
 
   addBlock(block: HeightMapBlock) {
     this.enterLine()
-    if (block.type == BlockType.widgetAfter && !this.isCovered) this.ensureLine()
+    if (block.type == BlockType.WidgetAfter && !this.isCovered) this.ensureLine()
     this.nodes.push(block)
     this.writtenTo = this.pos = this.pos + block.length
-    if (block.type != BlockType.widgetBefore) this.covering = block
+    if (block.type != BlockType.WidgetBefore) this.covering = block
   }
 
   addLineDeco(height: number, length: number) {

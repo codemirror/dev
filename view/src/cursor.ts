@@ -1,7 +1,7 @@
 import {EditorView} from "./editorview"
 import {LineView} from "./blockview"
 import {BlockType} from "./decoration"
-import {dirty} from "./contentview"
+import {Dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../doc/src"
 import {SelectionRange} from "../../state/src"
@@ -207,7 +207,7 @@ export class LineContext {
   }
 
   undoQueryPreparation(view: EditorView, toSync: {lines: LineView[]}) {
-    for (let line of toSync.lines) { line.dirty = dirty.node; line.sync() }
+    for (let line of toSync.lines) { line.dirty = Dirty.Node; line.sync() }
   }
 }
 
@@ -310,7 +310,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
       if (bounced) return -1
       else bounced = true
     }
-    if (block.type == BlockType.text) break
+    if (block.type == BlockType.Text) break
     y = bias > 0 ? block.bottom + 1 : block.top - 1
   }
   let lineStart = block.from

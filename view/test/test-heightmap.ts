@@ -4,7 +4,7 @@ import {Text} from "../../doc/src"
 import {ChangedRange} from "../../state/src"
 const ist = require("ist")
 
-const byH = QueryType.byHeight, byP = QueryType.byPos
+const byH = QueryType.ByHeight, byP = QueryType.ByPos
 
 function o(doc: Text) {
   return (new HeightOracle).setDoc(doc)
@@ -197,7 +197,7 @@ describe("HeightMap", () => {
       let block1 = map.blockAt(0, text, 0, 0)
       ist(block1.from, 0); ist(block1.to, 3)
       ist(block1.top, 0); ist(block1.bottom, 0, ">")
-      ist(block1.type, BlockType.text)
+      ist(block1.type, BlockType.Text)
       let block2 = map.blockAt(block1.bottom + 1, text, 0, 0)
       ist(block2.from, 4); ist(block2.to, 7)
       ist(block2.top, block1.bottom); ist(block2.bottom, block1.bottom, ">")
@@ -211,7 +211,7 @@ describe("HeightMap", () => {
       let block1 = map.blockAt(-100, text, 0, 0)
       ist(block1.from, 0); ist(block1.to, 3)
       ist(block1.top, 0); ist(block1.bottom, 10)
-      ist(block1.type, BlockType.text)
+      ist(block1.type, BlockType.Text)
       let block2 = map.blockAt(39, text, 0, 0)
       ist(block2.from, 8); ist(block2.to, 11)
       ist(block2.top, 30); ist(block2.bottom, 40)
@@ -230,14 +230,14 @@ describe("HeightMap", () => {
       let block2 = map.blockAt(block1.height + 1, text, 0, 0)
       ist(block2.from, 4); ist(block2.to, 4)
       ist(block2.top, block1.height); ist(block2.height, 100)
-      ist(block2.type, BlockType.widgetBefore)
+      ist(block2.type, BlockType.WidgetBefore)
       let top3 = block2.bottom + block1.height
       let block3 = map.blockAt(top3 + 10, text, 0, 0)
       ist(block3.from, 8); ist(block3.to, 11)
       ist(block3.top, top3); ist(block3.height, 30)
-      ist(block3.type, BlockType.widgetRange)
+      ist(block3.type, BlockType.WidgetRange)
       let block4 = map.blockAt(block3.bottom + block1.height, text, 0, 0)
-      ist(block4.type, BlockType.widgetAfter, "!=")
+      ist(block4.type, BlockType.WidgetAfter, "!=")
     })
   })
 
