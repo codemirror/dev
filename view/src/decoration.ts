@@ -1,4 +1,4 @@
-import {ChangeSet, ChangedRange} from "../../state/src"
+import {ChangeSet, ChangedRange, MapMode} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
 import {attrsEq} from "./attributes"
 
@@ -65,11 +65,6 @@ export abstract class Decoration implements RangeValue {
 
   get point() { return false }
 
-  // Only relevant when this.block == true
-  get type() {
-    return this.startSide < this.endSide ? BlockType.widgetRange : this.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter
-  }
-
   get heightRelevant() { return false }
 
   abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null
@@ -108,6 +103,20 @@ export abstract class Decoration implements RangeValue {
 
   // @internal
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
+
+  // @internal
+  mapSimple(mapping: ChangeSet, from: number, to: number) {
+    let newFrom = mapping.mapPos(from, this.startSide, MapMode.TrackDel)
+    if (from == to && this.startSide == this.endSide) return newFrom < 0 ? null : new Range(newFrom, newFrom, this)
+    let newTo = mapping.mapPos(to, this.endSide, MapMode.TrackDel)
+    if (newFrom < 0) {
+      if (newTo < 0) return null
+      newFrom = this.startSide >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
+    } else if (newTo < 0) {
+      newTo = this.endSide < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
+    }
+    return newFrom < newTo ? new Range(newFrom, newTo, this) : null
+  }
 }
 
 export class MarkDecoration extends Decoration {
@@ -119,14 +128,7 @@ export class MarkDecoration extends Decoration {
   }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
-    let newFrom = mapping.mapPos(from, this.startSide, true), newTo = mapping.mapPos(to, this.endSide, true)
-    if (newFrom < 0) {
-      if (newTo < 0) return null
-      newFrom = this.startSide >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
-    } else if (newTo < 0) {
-      newTo = this.endSide < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
-    }
-    return newFrom < newTo ? new Range(newFrom, newTo, this) : null
+    return this.mapSimple(mapping, from, to)
   }
 
   eq(other: Decoration): boolean {
@@ -146,7 +148,7 @@ export class LineDecoration extends Decoration {
   get point() { return true }
 
   map(mapping: ChangeSet, pos: number): DecoratedRange | null {
-    pos = mapStrict(pos, -1, mapping)
+    pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
@@ -162,26 +164,22 @@ export class PointDecoration extends Decoration {
 
   get point() { return true }
 
+  // Only relevant when this.block == true
+  get type() {
+    return this.startSide < this.endSide ? BlockType.widgetRange : this.startSide < 0 ? BlockType.widgetBefore : BlockType.widgetAfter
+  }
+
   get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
 
   map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
+    // FIXME make mapping behavior configurable?
     if (this.block) {
-      let newFrom = mapStrict(from, this.startSide, mapping), newTo = mapStrict(to, this.endSide, mapping)
+      let {type} = this
+      let newFrom = type == BlockType.widgetAfter ? mapping.mapPos(from, 1, MapMode.TrackAfter) : mapping.mapPos(from, -1, MapMode.TrackBefore)
+      let newTo = type == BlockType.widgetRange ? mapping.mapPos(to, 1, MapMode.TrackAfter) : newFrom
       return newFrom < 0 || newTo < 0 ? null : new Range(newFrom, newTo, this)
     } else {
-      // Old widget mapping code:
-      // pos = mapping.mapPos(pos, this.startSide, true)
-      // return pos < 0 ? null : new Range(pos, pos, this)
-
-      // FIXME duplicated from markdecoration
-      let newFrom = mapping.mapPos(from, this.startSide, true), newTo = mapping.mapPos(to, this.endSide, true)
-      if (newFrom < 0) {
-        if (newTo < 0) return null
-        newFrom = this.startSide >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
-      } else if (newTo < 0) {
-        newTo = this.endSide < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
-      }
-      return newFrom < newTo ? new Range(newFrom, newTo, this) : null
+      return this.mapSimple(mapping, from, to)
     }
   }
 
@@ -191,18 +189,6 @@ export class PointDecoration extends Decoration {
       this.block == other.block &&
       this.startSide == other.startSide && this.endSide == other.endSide
   }
-}
-
-// Map `pos`, but return -1 when the character before or after
-// (depending on `side`) is deleted.
-// FIXME make mapPos able to do this? Another changeset method?
-function mapStrict(pos: number, side: number, mapping: ChangeSet): number {
-  for (let change of mapping.changes) {
-    // If the line break before was deleted, drop this decoration
-    if (change.from <= pos + (side < 0 ? -1 : 0) && change.to >= pos + (side > 0 ? 1 : 0)) return -1
-    if (change.from < pos) pos += change.length - (change.to - change.from)
-  }
-  return pos
 }
 
 function getInclusive(spec: {inclusive?: boolean, inclusiveStart?: boolean, inclusiveEnd?: boolean}): {start: boolean, end: boolean} {

@@ -2,8 +2,10 @@ import {Text} from "../../doc/src"
 
 const empty: ReadonlyArray<any> = []
 
+export enum MapMode { Simple, TrackDel, TrackBefore, TrackAfter }
+
 export interface Mapping {
-  mapPos(pos: number, bias?: number, trackDel?: boolean): number
+  mapPos(pos: number, bias?: number, mode?: MapMode): number
 }
 
 export class ChangeDesc implements Mapping {
@@ -11,13 +13,16 @@ export class ChangeDesc implements Mapping {
 
   get invertedDesc() { return new ChangeDesc(this.from, this.from + this.length, this.to - this.from) }
 
-  mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
+  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
     let {from, to, length} = this
     if (pos < from) return pos
     if (pos > to) return pos + (length - (to - from))
-    if (pos == to || pos == from) return (from == to ? bias <= 0 : pos == from) ? from : from + length
+    if (pos == to || pos == from) {
+      if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) return -pos - 1
+      return (from == to ? bias <= 0 : pos == from) ? from : from + length
+    }
     pos = from + (bias <= 0 ? 0 : length)
-    return trackDel ? -pos - 1 : pos
+    return mode != MapMode.Simple ? -pos - 1 : pos
   }
 
   toJSON(): any { return this }
@@ -95,12 +100,12 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
 
   static empty: ChangeSet<any> = new ChangeSet(empty)
 
-  mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
-    return this.mapInner(pos, bias, trackDel, 0, this.length)
+  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
+    return this.mapInner(pos, bias, mode, 0, this.length)
   }
 
   /** @internal */
-  mapInner(pos: number, bias: number, trackDel: boolean, fromI: number, toI: number): number {
+  mapInner(pos: number, bias: number, mode: MapMode, fromI: number, toI: number): number {
     let dir = toI < fromI ? -1 : 1
     let recoverables: {[key: number]: number} | null = null
     let hasMirrors = this.mirror.length > 0, rec, mirror, deleted = false
@@ -133,13 +138,14 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
         ;(recoverables || (recoverables = {}))[mirror] = pos - from
       }
       if (pos > from && pos < to) {
-        deleted = true
+        if (mode != MapMode.Simple) deleted = true
         pos = bias <= 0 ? from : from + length
       } else {
+        if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) deleted = true
         pos = (from == to ? bias <= 0 : pos == from) ? from : from + length
       }
     }
-    return trackDel && deleted ? -pos - 1 : pos
+    return deleted ? -pos - 1 : pos
   }
 
   partialMapping(from: number, to: number = this.length): Mapping {
@@ -191,8 +197,8 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
 
 class PartialMapping implements Mapping {
   constructor(readonly changes: ChangeSet<any>, readonly from: number, readonly to: number) {}
-  mapPos(pos: number, bias: number = -1, trackDel: boolean = false): number {
-    return this.changes.mapInner(pos, bias, trackDel, this.from, this.to)
+  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
+    return this.changes.mapInner(pos, bias, mode, this.from, this.to)
   }
 }
 

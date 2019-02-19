@@ -1,6 +1,6 @@
 import {ViewUpdate, ViewField, EditorView} from "../../view/src"
 import {Range} from "../../rangeset/src/rangeset"
-import {EditorState, StateExtension, StateField, Transaction} from "../../state/src"
+import {EditorState, StateExtension, StateField, Transaction, MapMode} from "../../state/src"
 import {Decoration, DecorationSet} from "../../view/src/decoration"
 
 import {StringStreamCursor} from "./stringstreamcursor"
@@ -135,7 +135,7 @@ class StateCache<S> {
     let {start} = transaction.doc.lineAt(transaction.changes.changes.reduce((m, ch) => Math.min(m, ch.from), 1e9))
     let states = []
     for (let cached of this.states) {
-      let mapped = transaction.changes.mapPos(cached.pos, -1, true)
+      let mapped = transaction.changes.mapPos(cached.pos, -1, MapMode.TrackDel)
       if (mapped > 0) states.push(mapped == cached.pos ? cached : new CachedState(cached.state, mapped))
     }
     return new StateCache(states, Math.min(start, this.frontier), cutDecoratedRange(this.lastDecorations, start))

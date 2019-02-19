@@ -1,5 +1,5 @@
 import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from "../src/rangeset"
-import {Change, ChangeSet, Mapping, ChangedRange} from "../../state/src"
+import {Change, ChangeSet, Mapping, MapMode, ChangedRange} from "../../state/src"
 const ist = require("ist")
 
 class Value implements RangeValue {
@@ -17,7 +17,7 @@ class Value implements RangeValue {
   }
   map(mapping: Mapping, from: number, to: number): Range<Value> | null {
     if (from == to) {
-      let pos = mapping.mapPos(from, this.startSide, true)
+      let pos = mapping.mapPos(from, this.startSide, MapMode.TrackDel)
       return pos < 0 ? null : new Range(pos, pos, this)
     } else {
       let newFrom = mapping.mapPos(from, this.startSide), newTo = mapping.mapPos(to, this.endSide)
