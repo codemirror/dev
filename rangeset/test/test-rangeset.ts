@@ -387,16 +387,4 @@ describe("RangeSet", () => {
       ist(builder.spans.join(" "), "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
     })
   })
-
-  describe("iter", () => {
-    it("iterates over all ranges", () => {
-      const set = mkSet(smallRanges.concat([mk(1000, 4000, {pos: 1000}), mk(2000, 3000, {pos: 2000})]))
-      const iter = set.iter()
-      let count = 0
-      for(let item; item = iter.next(); ++count) {
-        ist(item.from, count > 2001 ? count - 2 : (count > 1000 ? count - 1 : count))
-      }
-      ist(count, 5002)
-    })
-  })
 })
