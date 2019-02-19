@@ -148,7 +148,10 @@ export class LineView extends ContentView implements BlockView {
       let textDOM: Node | null = (this.children[i] as any).textDOM
       if (textDOM) return {node: textDOM, offset: off}
     }
-    while (i > 0 && (this.children[i - 1].getSide() > 0 || this.children[i - 1].dom!.parentNode != this.dom)) i--
+    for (; i > 0; i--) {
+      let prev = this.children[i - 1]
+      if ((prev.length > 0 || prev.getSide() <= 0) && prev.dom!.parentNode == this.dom) break
+    }
     return {node: this.dom!, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
   }
 
