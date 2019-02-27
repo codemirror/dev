@@ -1,6 +1,6 @@
 import {ContentView, ChildCursor, DocChildCursor, Dirty} from "./contentview"
 import {BlockView, LineView} from "./blockview"
-import {TextView, CompositionView} from "./inlineview"
+import {InlineView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
@@ -17,13 +17,12 @@ import {Text} from "../../doc/src"
 type A<T> = ReadonlyArray<T>
 const none = [] as any
 
-const enum Composing { No, Starting, Yes, Ending }
-
 export class DocView extends ContentView {
   children!: BlockView[]
   viewports: Viewport[] = none
 
   decorations!: A<DecorationSet>
+  compositionDeco: DecorationSet = Decoration.none
   gapDeco: DecorationSet = Decoration.none
   selectionDirty: any = null
 
@@ -37,10 +36,6 @@ export class DocView extends ContentView {
   layoutCheckScheduled: number = -1
   // A document position that has to be scrolled into view at the next layout check
   scrollIntoView: number = -1
-
-  composing: Composing = Composing.No
-  composition: CompositionView | null = null
-  composeTimeout: any = -1
 
   paddingTop: number = 0
   paddingBottom: number = 0
@@ -88,20 +83,21 @@ export class DocView extends ContentView {
     let changes = transactions.length == 1 ? transactions[0].changes :
       transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     let changedRanges = changes.changedRanges()
+    this.heightMap = this.heightMap.applyChanges(none, prevDoc, this.heightOracle.setDoc(state.doc), changedRanges)
+
+    let contentChanges = this.computeUpdate(transactions, state, metadata, changedRanges, 0, scrollIntoView)
     // When the DOM nodes around the selection are moved to another
     // parent, Chrome sometimes reports a different selection through
     // getSelection than the one that it actually shows to the user.
     // This forces a selection update when lines are joined to work
     // around that. Issue #54
-    if (browser.chrome && !this.composition && changes.changes.some(ch => ch.text.length > 1))
+    if (browser.chrome && !this.compositionDeco.size && changes.changes.some(ch => ch.text.length > 1))
       this.forceSelectionUpdate = true
-    this.heightMap = this.heightMap.applyChanges(none, prevDoc, this.heightOracle.setDoc(state.doc), changedRanges)
-
-    let contentChanges = this.computeUpdate(transactions, state, metadata, changedRanges, 0, scrollIntoView)
 
     if (this.dirty == Dirty.Not && contentChanges.length == 0 &&
         this.state.selection.primary.from >= this.viewport.from &&
-        this.state.selection.primary.to <= this.viewport.to) {
+        this.state.selection.primary.to <= this.viewport.to &&
+        metadata.length == 0) {
       this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {
@@ -115,8 +111,6 @@ export class DocView extends ContentView {
   // Used both by update and checkLayout do perform the actual DOM
   // update
   private updateInner(changes: A<ChangedRange>, oldLength: number) {
-    changes = this.commitComposition(changes)
-
     let visible = this.viewport, viewports: Viewport[] = [visible]
     let {head, anchor} = this.state.selection.primary
     if (head < visible.from || head > visible.to) {
@@ -129,34 +123,7 @@ export class DocView extends ContentView {
     }
     viewports.sort((a, b) => a.from - b.from)
 
-    let compositionRange = null
-    // FIXME changes also contains decoration changes, so this could
-    // interrupt compositions due to styling updates (such as highlighting)
-    // FIXME we do want to interrupt compositions when they overlap
-    // with collapsed decorations (not doing so will break rendering
-    // code further down, since the decorations aren't drawn in one piece)
-    if (this.composition && this.composition.rootView == this) {
-      let from = this.composition.posAtStart, to = from + this.composition.length
-      let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
-      if (changes.length == 0 || changes.length == 1 &&
-          changes[0].fromA >= from && changes[0].toA <= to &&
-          this.composition.textDOM.nodeValue == this.state.doc.slice(newFrom, newTo)) {
-        // No change, or the change falls entirely inside the
-        // composition and the new text corresponds to what the
-        // composition DOM contains
-        compositionRange = new ChangedRange(from, to, from, to + (changes.length ? changes[0].lenDiff : 0))
-      } else if (changes.every(ch => ch.fromA >= to || ch.toA <= from)) {
-        // Entirely outside
-        compositionRange = new ChangedRange(from, to, newFrom, newFrom + (to - from))
-      } else {
-        // Overlaps with the composition, must make sure it is
-        // overwritten so that we get rid of the node
-        changes = new ChangedRange(from, to, newFrom, newTo).addToSet(changes.slice())
-        this.composition = null
-      }
-    }
-
-    this.updateChildren(changes, viewports, compositionRange, oldLength)
+    this.updateChildren(changes, viewports, oldLength)
 
     this.viewports = viewports
     this.observer.ignore(() => {
@@ -170,35 +137,23 @@ export class DocView extends ContentView {
       this.updateSelection()
       this.dom.style.height = ""
     })
-
-    if (this.composition && this.composition.rootView != this) this.composition = null
   }
 
-  private updateChildren(changes: A<ChangedRange>, viewports: A<Viewport>, compositionRange: ChangedRange | null, oldLength: number) {
-    if (compositionRange) changes = compositionRange.subtractFromSet(changes.slice())
-
+  private updateChildren(changes: A<ChangedRange>, viewports: A<Viewport>, oldLength: number) {
     let gapDeco = this.computeGapDeco(viewports, this.length)
     let gapChanges = findChangedRanges(this.gapDeco, gapDeco, changes, oldLength) // FIXME pass original, possibly simpler changes?
     this.gapDeco = gapDeco
     changes = extendWithRanges(changes, gapChanges.content)
 
     let allDeco = [gapDeco].concat(this.decorations)
-    let cursor = this.childCursor(oldLength), updatedComposition = false
+    let cursor = this.childCursor(oldLength)
     for (let i = changes.length - 1;; i--) {
-      let next = i >= 0 ? changes[i] : null, nextA = next ? next.toA : 0
-      if (compositionRange && !updatedComposition && nextA <= compositionRange.fromA) {
-        cursor.findPos(nextA) // Must move cursor past the stuff we modify
-        this.composition!.updateLength(compositionRange.toB - compositionRange.fromB)
-        updatedComposition = true
-      }
+      let next = i >= 0 ? changes[i] : null
       if (!next) break
       let {fromA, toA, fromB, toB} = next
       let {content, breakAtStart} = ContentBuilder.build(this.state.doc, fromB, toB, allDeco)
       let {i: toI, off: toOff} = cursor.findPos(toA, 1)
       let {i: fromI, off: fromOff} = cursor.findPos(fromA, -1)
-      if (compositionRange && this.composition!.parent == this.children[toI] &&
-          content[content.length - 1] instanceof LineView)
-        (this.children[toI] as LineView).transferDOM(content[content.length - 1] as LineView)
       this.replaceRange(fromI, fromOff, toI, toOff, content, breakAtStart)
     }
   }
@@ -209,7 +164,7 @@ export class DocView extends ContentView {
     let breakAtEnd = last ? last.breakAfter : breakAtStart
     // Change within a single line
     if (fromI == toI && !breakAtStart && !breakAtEnd && content.length < 2 &&
-        before.merge(fromOff, toOff, content.length ? last : null, fromOff == 0, this.composition))
+        before.merge(fromOff, toOff, content.length ? last : null, fromOff == 0))
       return
 
     let after = this.children[toI]
@@ -218,10 +173,10 @@ export class DocView extends ContentView {
         after = after.split(toOff)
         toOff = 0
       }
-      if (!breakAtEnd && last && after.merge(0, toOff, last, true, this.composition)) {
+      if (!breakAtEnd && last && after.merge(0, toOff, last, true)) {
         content[content.length - 1] = after
       } else {
-        if (toOff) after.merge(0, toOff, null, false, this.composition)
+        if (toOff) after.merge(0, toOff, null, false)
         content.push(after)
       }
     } else if (after.breakAfter) {
@@ -232,10 +187,10 @@ export class DocView extends ContentView {
 
     before.breakAfter = breakAtStart
     if (fromOff > 0) {
-      if (!breakAtStart && content.length && before.merge(fromOff, before.length, content[0], false, this.composition)) {
+      if (!breakAtStart && content.length && before.merge(fromOff, before.length, content[0], false)) {
         before.breakAfter = content.shift()!.breakAfter
       } else if (fromOff < before.length) {
-        before.merge(fromOff, before.length, null, false, this.composition)
+        before.merge(fromOff, before.length, null, false)
       }
       fromI++
     }
@@ -328,7 +283,12 @@ export class DocView extends ContentView {
       let prevState = this.state || state
       this.view.updateStateInner(state, viewport, transactions, metadata)
 
-      let decorations = this.view.getEffect(ViewField.decorationEffect)
+      // For the composition decoration, use none on init, recompute
+      // when handling transactions, and use the previous value
+      // otherwise.
+      if (trs == null || !this.view.inputState.composing) this.compositionDeco = Decoration.none
+      else if (transactions.length) this.compositionDeco = computeCompositionDeco(this.view, contentChanges)
+      let decorations = this.view.getEffect(ViewField.decorationEffect).concat(this.compositionDeco)
       // If the decorations are stable, stop.
       if (!init && transactions.length == 0 && sameArray(decorations, this.decorations))
         return contentChanges
@@ -502,90 +462,6 @@ export class DocView extends ContentView {
       this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
   }
 
-  startComposition() {
-    if (this.composing == Composing.Ending) {
-      this.observer.flush()
-      if (this.composing == Composing.Ending) {
-        clearTimeout(this.composeTimeout)
-        this.exitComposition()
-      }
-    }
-    if (this.composing == Composing.No) {
-      this.composing = Composing.Starting
-      this.composeTimeout = setTimeout(() => this.enterComposition(), 20)
-    }
-  }
-
-  endComposition() {
-    if (this.composing == Composing.Yes) {
-      this.composing = Composing.Ending
-      this.composeTimeout = setTimeout(() => this.exitComposition(), 20)
-    } else if (this.composing == Composing.Starting) {
-      clearTimeout(this.composeTimeout)
-      this.composing = Composing.No
-    }
-  }
-
-  commitComposition(changes: A<ChangedRange>): A<ChangedRange> {
-    if (this.composing == Composing.Starting) {
-      clearTimeout(this.composeTimeout)
-      this.enterComposition()
-    } else if (this.composing == Composing.Ending) {
-      clearTimeout(this.composeTimeout)
-      changes = this.clearComposition(changes)
-    }
-    return changes
-  }
-
-  enterComposition() {
-    // FIXME schedule a timeout that ends the composition (or at least
-    // our view of it) after a given inactive time?
-    let {focusNode, focusOffset} = this.root.getSelection()!
-    if (focusNode) {
-      // Enter adjacent nodes when necessary, looking for a text node
-      while (focusNode.nodeType == 1) {
-        if (focusOffset > 0) {
-          focusNode = focusNode.childNodes[focusOffset - 1]
-          focusOffset = maxOffset(focusNode)
-        } else if (focusOffset < focusNode.childNodes.length) {
-          focusNode = focusNode.childNodes[focusOffset]
-          focusOffset = 0
-        } else {
-          break
-        }
-      }
-      let view = this.nearest(focusNode)
-      if (view instanceof TextView)
-        this.composition = view.toCompositionView()
-      else if (focusNode.nodeType == 3 && view instanceof LineView)
-        this.composition = view.createCompositionViewAround(focusNode)
-    }
-    this.composing = this.composition ? Composing.Yes : Composing.No
-  }
-
-  // Remove this.composition, if present, and set this.composing to
-  // no. Return a range that covers the composition's extent (which'll
-  // have to be redrawn to turn it into regular view nodes) when a
-  // composition was removed.
-  clearComposition(changes: A<ChangedRange>): A<ChangedRange> {
-    let composition = this.composition
-    this.composition = null
-    this.composing = Composing.No
-    if (composition && composition.rootView == this) {
-      let from = composition.posAtStart, to = from + composition.length
-      changes = new ChangedRange(from, to, ChangedRange.mapPos(from, -1, changes),
-                                 ChangedRange.mapPos(to, 1, changes)).addToSet(changes.slice())
-    }
-    return changes
-  }
-
-  exitComposition() {
-    let ranges = this.clearComposition(none)
-    if (ranges.length) this.observer.ignore(() => {
-      this.updateInner(ranges, this.length)
-    })
-  }
-
   childCursor(pos: number = this.length, i: number = this.children.length): ChildCursor {
     return new DocChildCursor(this.children, pos, i)
   }
@@ -672,4 +548,62 @@ function sameArray<T>(a: A<T>, b: A<T>) {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
+}
+
+
+export function computeCompositionDeco(view: EditorView, changes: A<ChangedRange>): DecorationSet {
+  let sel = view.root.getSelection()!
+  let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset)
+  if (!textNode) return Decoration.none
+  let cView = view.docView.nearest(textNode)
+  let from: number, to: number, topNode = textNode
+  if (cView instanceof InlineView) {
+    from = cView.posAtStart
+    to = from + cView.length
+    topNode = cView.dom!
+  } else if (cView instanceof LineView) {
+    while (topNode.parentNode != cView.dom) topNode = topNode.parentNode!
+    let prev = topNode.previousSibling
+    while (prev && !prev.cmView) prev = prev.previousSibling
+    from = to = prev ? prev.cmView!.posAtEnd : cView.posAtStart
+  } else {
+    return Decoration.none
+  }
+
+  let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
+  if (
+    // A single change that falls entirely inside the composition, and
+    // the new text corresponds to what the composition DOM contains
+    (changes.length == 1 &&
+     changes[0].fromA >= from && changes[0].toA <= to &&
+     textNode.nodeValue == view.state.doc.slice(newFrom, newTo)) ||
+    // All changes are entirely outside
+    changes.every(ch => ch.fromA >= to || ch.toA <= from)
+  ) {
+    return Decoration.set(Decoration.replace(newFrom, newTo, {
+      widget: new CompositionWidget(topNode)
+    }))
+  }
+  return Decoration.none
+}
+
+class CompositionWidget extends WidgetType<Node> {
+  toDOM() { return this.value as HTMLElement }
+
+  get editable() { return true }
+}
+
+function nearbyTextNode(node: Node, offset: number): Node | null {
+  for (;;) {
+    if (node.nodeType == 3) return node
+    if (node.nodeType == 1 && offset > 0) {
+      node = node.childNodes[offset - 1]
+      offset = maxOffset(node)
+    } else if (node.nodeType == 1 && offset < node.childNodes.length) {
+      node = node.childNodes[offset]
+      offset = 0
+    } else {
+      return null
+    }
+  }
 }

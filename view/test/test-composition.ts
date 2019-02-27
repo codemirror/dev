@@ -1,6 +1,7 @@
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorView, ViewField, Decoration, DecorationSet, WidgetType} from "../src"
 import {EditorState} from "../../state/src"
+import {Slot} from "../../extension/src/extension"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
@@ -14,6 +15,12 @@ function up(node: Text, text: string = "", from = node.nodeValue!.length, to = f
   return node
 }
 
+function hasCompositionDeco(cm: EditorView) {
+  return cm.docView.compositionDeco.size > 0
+}
+
+const dummySlot = Slot.define<null>() // Crude kludge to be able to flush the doc view
+
 function compose(cm: EditorView, start: () => Text,
                  update: ((node: Text) => void)[],
                  options: {end?: (node: Text) => void, cancel?: boolean} = {}) {
@@ -26,26 +33,20 @@ function compose(cm: EditorView, start: () => Text,
     cm.docView.observer.flush()
 
     if (options.cancel && i == update.length - 1) {
-      ist(!cm.docView.composition)
-      ist(!hasCompositionNode(cm.docView))
+      ist(!hasCompositionDeco(cm))
     } else {
       ist(node.parentNode && cm.contentDOM.contains(node.parentNode))
       ist(sel.focusNode, focusNode)
       ist(sel.focusOffset, focusOffset)
-      ist(cm.docView.composition)
-      ist(hasCompositionNode(cm.docView))
+      ist(hasCompositionDeco(cm))
     }
   }
   event(cm, "compositionend")
   if (options.end) options.end(node)
   cm.docView.observer.flush()
-  if (cm.docView.composing != 0) cm.docView.exitComposition() // FIXME too much internals!
-  ist(!cm.docView.composition)
-  ist(!hasCompositionNode(cm.docView))
-}
-
-function hasCompositionNode(view: any) {
-  return view.constructor.name == "CompositionView" || view.children.some(hasCompositionNode)
+  cm.updateState([], cm.state, [dummySlot(null)])
+  ist(!cm.inputState.composing)
+  ist(!hasCompositionDeco(cm))
 }
 
 function wordDeco(state: EditorState): DecorationSet {
@@ -69,7 +70,8 @@ function widgets(positions: number[], sides: number[]) {
     create() {
       return Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
     },
-    update(deco) { return deco }
+    update(deco) { return deco },
+    map: true
   })
 }
 
@@ -254,10 +256,10 @@ describe("Composition", () => {
     ist(cm.contentDOM.lastChild, L2)
     up(two, ".")
     cm.docView.observer.flush()
-    ist(hasCompositionNode(cm.docView))
+    ist(hasCompositionDeco(cm))
     ist(getSelection().focusNode, two)
     ist(getSelection().focusOffset, 4)
-    ist(cm.docView.composition)
+    ist(cm.inputState.composing)
     event(cm, "compositionend")
     cm.docView.observer.flush()
     ist(cm.state.doc.toString(), "one!!\ntwo.")

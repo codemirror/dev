@@ -43,6 +43,9 @@ export abstract class WidgetType<T = any> {
 
   get estimatedHeight(): number { return -1 }
   ignoreEvent(event: Event): boolean { return true }
+
+  // @internal
+  get editable() { return false }
 }
 
 export type DecorationSet = RangeSet<Decoration>

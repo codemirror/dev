@@ -1,13 +1,13 @@
 import {ContentView} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView, CompositionView} from "./inlineview"
+import {InlineView, TextView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
 import {LineDecoration, WidgetType, widgetsEq, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 import {Open} from "./buildview"
 
 export interface BlockView extends ContentView {
-  merge(from: number, to: number, source: ContentView | null, takeDeco: boolean, composition: CompositionView | null): boolean
+  merge(from: number, to: number, source: ContentView | null, takeDeco: boolean): boolean
   match(other: BlockView): boolean
   split(at: number): BlockView
   type: BlockType
@@ -23,7 +23,7 @@ export class LineView extends ContentView implements BlockView {
   breakAfter = 0
 
   // Consumes source
-  merge(from: number, to: number, source: BlockView | null, takeDeco: boolean, composition: CompositionView | null): boolean {
+  merge(from: number, to: number, source: BlockView | null, takeDeco: boolean): boolean {
     if (source) {
       if (!(source instanceof LineView)) return false
       if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
@@ -83,12 +83,6 @@ export class LineView extends ContentView implements BlockView {
       fromI++
     }
 
-    if (composition && fromI < toI) {
-      // If there's a zero-length composition on the edge of the update, don't overwrite it
-      if (this.children[toI - 1] instanceof CompositionView && this.children[toI - 1].length == 0) toI--
-      else if (this.children[fromI] instanceof CompositionView && this.children[fromI].length == 0) fromI++
-    }
-
     // And if anything remains, splice the child array to insert the new elts
     if (elts.length || fromI != toI) this.replaceChildren(fromI, toI, elts)
     return true
@@ -145,8 +139,8 @@ export class LineView extends ContentView implements BlockView {
   domFromPos(pos: number): {node: Node, offset: number} {
     let {i, off} = this.childCursor().findPos(pos)
     if (off) {
-      let textDOM: Node | null = (this.children[i] as any).textDOM
-      if (textDOM) return {node: textDOM, offset: off}
+      let inner = this.children[i].domFromPos(off)
+      if (inner) return inner
     }
     for (; i > 0; i--) {
       let prev = this.children[i - 1]
@@ -199,20 +193,6 @@ export class LineView extends ContentView implements BlockView {
       off = end
     }
     return (this.dom!.lastChild as HTMLElement).getBoundingClientRect()
-  }
-
-  createCompositionViewAround(textNode: Node): CompositionView {
-    let dom = textNode
-    while (dom.parentNode != this.dom) dom = dom.parentNode!
-    let prev = dom.previousSibling, index = 0
-    while (prev) {
-      let found = this.children.indexOf(prev.cmView as any)
-      if (found > -1) { index = found + 1; break }
-      prev = prev.previousSibling
-    }
-    let view = new CompositionView(dom, textNode, 0)
-    this.replaceChildren(index, index, [view])
-    return view
   }
 
   match(other: ContentView) { return false }

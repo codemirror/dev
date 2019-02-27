@@ -1,6 +1,7 @@
 import {EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
 import {EditorView} from "./editorview"
 import {focusChange, handleDOMEvents} from "./extension"
+import {Slot} from "../../extension/src/extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 
@@ -13,6 +14,8 @@ export class InputState {
 
   registeredEvents: string[] = []
   customHandlers: {[key: string]: ((view: EditorView, event: Event) => boolean)[]}
+
+  composing = false
 
   goalColumns: {pos: number, column: number}[] = []
 
@@ -372,10 +375,29 @@ handlers.beforeprint = view => {
   view.docView.checkLayout(true)
 }
 
-handlers.compositionstart = handlers.compositionupdate = view => {
-  view.docView.startComposition()
+// Dummy slot to force a display update in the absence of other triggers
+const compositionEndSlot = Slot.define<null>()
+
+function forceClearComposition(view: EditorView) {
+  if (view.docView.compositionDeco.size)
+    view.updateState([], view.state, [compositionEndSlot(null)])
 }
 
+handlers.compositionstart = handlers.compositionupdate = view => {
+  if (!view.inputState.composing) {
+    if (view.docView.compositionDeco.size) {
+      view.docView.observer.flush()
+      forceClearComposition(view)
+    }
+    // FIXME possibly set a timeout to clear it again on Android
+    view.inputState.composing = true
+  }
+}
+
+
 handlers.compositionend = view => {
-  view.docView.endComposition()
+  view.inputState.composing = false
+  setTimeout(() => {
+    if (!view.inputState.composing) forceClearComposition(view)
+  }, 50)
 }
