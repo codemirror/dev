@@ -60,7 +60,7 @@ export class Change extends ChangeDesc {
 
   static fromJSON(json: any) {
     if (!json || typeof json.from != "number" || typeof json.to != "number" ||
-        !Array.isArray(json.text) || json.text.some((val: any) => typeof val != "string"))
+        !Array.isArray(json.text) || json.text.length == 0 || json.text.some((val: any) => typeof val != "string"))
       throw new RangeError("Invalid JSON representation for Change")
     return new Change(json.from, json.to, json.text)
   }
@@ -221,22 +221,6 @@ export class ChangedRange {
       set.splice(i - 1, 1)
     }
     set.splice(i, 0, me)
-    return set
-  }
-
-  subtractFromSet(set: ChangedRange[]): ChangedRange[] {
-    for (let i = 0; i < set.length; i++) {
-      let range = set[i]
-      if (range.fromA >= this.toA && range.fromB >= this.toB) break
-      if (range.toA <= this.fromA && range.toB <= this.fromB) continue
-      let replace = []
-      if (range.fromA < this.fromA || range.fromB < this.fromB)
-        replace.push(new ChangedRange(range.fromA, this.fromA, range.fromB, this.fromB))
-      if (range.toA > this.toA || range.toB > this.toB)
-        replace.push(new ChangedRange(this.toA, range.toA, range.toB, this.toB))
-      set.splice(i, 1, ...replace)
-      i = i + replace.length - 1
-    }
     return set
   }
 
