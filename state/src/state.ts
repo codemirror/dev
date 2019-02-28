@@ -74,8 +74,8 @@ export class EditorState {
     return newState
   }
 
-  get transaction(): Transaction {
-    return Transaction.start(this)
+  t(time?: number): Transaction {
+    return new Transaction(this, time)
   }
 
   get tabSize(): number { return this.config.tabSize }

@@ -6,9 +6,9 @@ const driver = new Builder().forBrowser("chrome").build()
 const browser = process.env.SELENIUM_BROWSER || "chrome"
 const firefox = browser == "firefox"
 const tests = {
-  async setCursor(n: number) { return driver.executeScript(`view.dispatch(view.state.transaction.setSelection(view.state.selection.constructor.single(${n})).scrollIntoView())`) },
+  async setCursor(n: number) { return driver.executeScript(`view.dispatch(view.state.t().setSelection(view.state.selection.constructor.single(${n})).scrollIntoView())`) },
   async getCursor(): Promise<number> { return driver.executeScript("return view.state.selection.primary.anchor") as Promise<number> },
-  async setText(text: string) { return driver.executeScript(`view.dispatch(view.state.transaction.replace(0, view.state.doc.length, ${JSON.stringify(text)}))`) },
+  async setText(text: string) { return driver.executeScript(`view.dispatch(view.state.t().replace(0, view.state.doc.length, ${JSON.stringify(text)}))`) },
   async getText(): Promise<string> { return driver.executeScript(`return view.state.doc.toString()`) as Promise<string> }
 }
 

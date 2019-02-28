@@ -47,8 +47,8 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
       decorations.collect(result, 0)
       return result
     },
-    get transaction() {
-      return view.state.transaction
+    t() {
+      return view.state.t()
     },
     apply(transaction: Transaction, {from, to}: Viewport) {
       view.state = transaction.apply()
@@ -83,7 +83,7 @@ describe("legacyMode", () => {
 
     ist(decorations.length, 2)
     ist(modeTest.calls.length, 2)
-    modeTest.apply(modeTest.transaction.replace(2, 2, "--"), {from: 0, to: 1})
+    modeTest.apply(modeTest.t().replace(2, 2, "--"), {from: 0, to: 1})
     ist(modeTest.calls.length, 2)
   })
   it("re-uses previously-rendered decorations", () => {

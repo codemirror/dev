@@ -55,7 +55,7 @@ function cmd(target: PopTarget, only: ItemFilter) {
     let {field, config} = hist[0]
     let historyState = state.getField(field)
     if (!historyState.canPop(target, only)) return false
-    const {transaction, state: newState} = historyState.pop(target, only, state.transaction, config.minDepth)
+    const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
     dispatch(transaction.addMeta(historyStateSlot(newState)))
     return true
   }

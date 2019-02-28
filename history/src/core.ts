@@ -110,8 +110,8 @@ export class HistoryState {
     let {changes, branch, selection} = popChanges(done == PopTarget.Done ? this.done : this.undone, only)
 
     let oldSelection = transaction.selection
-    for (let change of changes.changes) transaction = transaction.change(change)
-    transaction = transaction.setSelection(selection)
+    for (let change of changes.changes) transaction.change(change)
+    transaction.setSelection(selection)
     let otherBranch = (done == PopTarget.Done ? this.undone : this.done)
     otherBranch = addChanges(otherBranch, transaction.changes, transaction.changes.length > 0 ? transaction.invertedChanges() : null, oldSelection, maxLen, nope)
     return {transaction, state: new HistoryState(done == PopTarget.Done ? branch : otherBranch,

@@ -190,7 +190,7 @@ describe("Composition", () => {
   it("cancels composition when a change fully overlaps with it", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
     compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x"), [
-      () => cm.dispatch(cm.state.transaction.replace(2, 10, "---"))
+      () => cm.dispatch(cm.state.t().replace(2, 10, "---"))
     ], {cancel: true})
     ist(cm.state.doc.toString(), "on---hree")
   })
@@ -198,7 +198,7 @@ describe("Composition", () => {
   it("cancels composition when a change partially overlaps with it", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
     compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
-      () => cm.dispatch(cm.state.transaction.replace(5, 12, "---"))
+      () => cm.dispatch(cm.state.t().replace(5, 12, "---"))
     ], {cancel: true})
     ist(cm.state.doc.toString(), "one\nx---ee")
   })
@@ -206,7 +206,7 @@ describe("Composition", () => {
   it("cancels composition when a change happens inside of it", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
     compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
-      () => cm.dispatch(cm.state.transaction.replace(5, 6, "!"))
+      () => cm.dispatch(cm.state.t().replace(5, 6, "!"))
     ], {cancel: true})
     ist(cm.state.doc.toString(), "one\nx!wo\nthree")
   })
@@ -215,7 +215,7 @@ describe("Composition", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
     compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
       n => up(n, "y", 1),
-      () => cm.dispatch(cm.state.transaction.replace(1, 2, "!")),
+      () => cm.dispatch(cm.state.t().replace(1, 2, "!")),
       n => up(n, "z", 2)
     ])
     ist(cm.state.doc.toString(), "o!e\nxyztwo\nthree")
@@ -226,7 +226,7 @@ describe("Composition", () => {
     let cm = requireFocus(tempEditor("one\ntwo three", [wordHighlighter]))
     compose(cm, () => up(cm.domAtPos(9)!.node as Text, "x"), [
       n => up(n, "y"),
-      () => cm.dispatch(cm.state.transaction.replace(4, 4, "\n")),
+      () => cm.dispatch(cm.state.t().replace(4, 4, "\n")),
       n => up(n, "z")
     ])
     ist(cm.state.doc.toString(), "one\n\ntwo threexyz")
@@ -236,7 +236,7 @@ describe("Composition", () => {
     let cm = requireFocus(tempEditor("one\ntwo three", [wordHighlighter]))
     compose(cm, () => up(cm.domAtPos(9)!.node as Text, "x"), [
       n => up(n, "y"),
-      () => cm.dispatch(cm.state.transaction.replace(7, 8, "\n")),
+      () => cm.dispatch(cm.state.t().replace(7, 8, "\n")),
       n => up(n, "z")
     ])
     ist(cm.state.doc.toString(), "one\ntwo\nthreexyz")

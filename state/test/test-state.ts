@@ -11,7 +11,7 @@ describe("EditorState", () => {
 
   it("can apply changes", () => {
     let state = EditorState.create({doc: "hello"})
-    let transaction = state.transaction.change(new Change(2, 4, ["w"])).change(new Change(4, 4, ["!"]))
+    let transaction = state.t().change(new Change(2, 4, ["w"])).change(new Change(4, 4, ["!"]))
     ist(transaction.doc.toString(), "hewo!")
     ist(transaction.apply().doc.toString(), "hewo!")
   })
@@ -20,7 +20,7 @@ describe("EditorState", () => {
     let state = EditorState.create({doc: "abcdefgh",
                                     extensions: [StateExtension.allowMultipleSelections(true)],
                                     selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
-    let newState = state.transaction.replaceSelection("Q").apply()
+    let newState = state.t().replaceSelection("Q").apply()
     ist(newState.doc.toString(), "QabcdQefghQ")
     ist(newState.selection.ranges.map(r => r.from).join("/"), "1/6/11")
   })
@@ -28,22 +28,22 @@ describe("EditorState", () => {
   const someSlot = Slot.define<number>()
 
   it("can store slots on transactions", () => {
-    let tr = EditorState.create({doc: "foo"}).transaction.addMeta(someSlot(55))
+    let tr = EditorState.create({doc: "foo"}).t().addMeta(someSlot(55))
     ist(tr.getMeta(someSlot), 55)
   })
 
   it("throws when a change's bounds are invalid", () => {
     let state = EditorState.create({doc: "1234"})
-    ist.throws(() => state.transaction.replace(-1, 1, ""))
-    ist.throws(() => state.transaction.replace(2, 1, ""))
-    ist.throws(() => state.transaction.replace(2, 10, "x"))
+    ist.throws(() => state.t().replace(-1, 1, ""))
+    ist.throws(() => state.t().replace(2, 1, ""))
+    ist.throws(() => state.t().replace(2, 10, "x"))
   })
 
   it("stores and updates tab size", () => {
     let deflt = EditorState.create({}), two = EditorState.create({tabSize: 2})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.transaction.addMeta(Transaction.changeTabSize(8)).apply()
+    let updated = deflt.t().addMeta(Transaction.changeTabSize(8)).apply()
     ist(updated.tabSize, 8)
   })
 
@@ -53,7 +53,7 @@ describe("EditorState", () => {
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.transaction.addMeta(Transaction.changeLineSeparator("\n")).apply()
+    let updated = crlf.t().addMeta(Transaction.changeLineSeparator("\n")).apply()
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })

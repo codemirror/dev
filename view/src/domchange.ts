@@ -55,23 +55,23 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
           dispatchKey(view, "Delete", 46))))
       return view.state != startState
 
-    let tr = startState.transaction
+    let tr = startState.t()
     if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
       let before = sel.from < change.from ? startState.doc.slice(sel.from, change.from, LINE_SEP) : ""
       let after = sel.to > change.to ? startState.doc.slice(change.to, sel.to, LINE_SEP) : ""
-      tr = tr.replaceSelection((before + change.text.join(LINE_SEP) + after).split(LINE_SEP))
+      tr.replaceSelection((before + change.text.join(LINE_SEP) + after).split(LINE_SEP))
     } else {
-      tr = tr.change(change)
+      tr.change(change)
       if (newSel && !tr.selection.primary.eq(newSel.primary))
-        tr = tr.setSelection(tr.selection.replaceRange(newSel.primary))
+        tr.setSelection(tr.selection.replaceRange(newSel.primary))
     }
     view.dispatch(tr.scrollIntoView())
     return true
   } else if (newSel && !newSel.primary.eq(sel)) {
-    let tr = view.state.transaction.setSelection(newSel)
+    let tr = view.state.t().setSelection(newSel)
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
-      if (view.inputState.lastSelectionOrigin == "keyboard") tr = tr.scrollIntoView()
-      else tr = tr.addMeta(Transaction.userEvent(view.inputState.lastSelectionOrigin!))
+      if (view.inputState.lastSelectionOrigin == "keyboard") tr.scrollIntoView()
+      else tr.addMeta(Transaction.userEvent(view.inputState.lastSelectionOrigin!))
     }
     view.dispatch(tr)
     return true

@@ -12,9 +12,9 @@ describe("EditorView extension", () => {
       }
     })
     let cm = tempEditor("one\ntwo", [field.extension])
-    cm.dispatch(cm.state.transaction.replace(0, 1, "O"))
-    cm.dispatch(cm.state.transaction.replace(4, 5, "T"))
-    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(1)))
+    cm.dispatch(cm.state.t().replace(0, 1, "O"))
+    cm.dispatch(cm.state.t().replace(4, 5, "T"))
+    cm.dispatch(cm.state.t().setSelection(EditorSelection.single(1)))
     ist(cm.getField(field).join("/"), "one\ntwo/One\ntwo/One\nTwo/One\nTwo")
   })
 
@@ -51,9 +51,9 @@ describe("EditorView extension", () => {
     }))])
     let prevDoc = cm.state.doc
     ist(updates, 0)
-    cm.dispatch(cm.state.transaction.replace(1, 2, "u"))
+    cm.dispatch(cm.state.t().replace(1, 2, "u"))
     ist(updates, 1)
-    cm.dispatch(cm.state.transaction.setSelection(EditorSelection.single(3)))
+    cm.dispatch(cm.state.t().setSelection(EditorSelection.single(3)))
     ist(updates, 2)
   })
 

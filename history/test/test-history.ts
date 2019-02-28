@@ -9,10 +9,10 @@ const mkState = (config?: any, doc?: string) => EditorState.create({
   doc
 })
 
-const type = (state: EditorState, text: string, at = state.doc.length) => state.transaction.replace(at, at, text).apply()
-const timedType = (state: EditorState, text: string, atTime: number) => Transaction.start(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
+const type = (state: EditorState, text: string, at = state.doc.length) => state.t().replace(at, at, text).apply()
+const timedType = (state: EditorState, text: string, atTime: number) => new Transaction(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
 const receive = (state: EditorState, text: string, from: number, to = from) => {
-  return state.transaction.replace(from, to, text).addMeta(Transaction.addToHistory(false)).apply()
+  return state.t().replace(from, to, text).addMeta(Transaction.addToHistory(false)).apply()
 }
 const command = (state: EditorState, cmd: any, success: boolean = true) => {
   ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), success)
@@ -101,7 +101,7 @@ describe("history", () => {
 
   it("accurately maps changes through each other", () => {
     let state = mkState({}, "123")
-    state = state.transaction.replace(1, 2, "cd").replace(3, 4, "ef").replace(0, 1, "ab").apply()
+    state = state.t().replace(1, 2, "cd").replace(3, 4, "ef").replace(0, 1, "ab").apply()
     state = receive(state, "!!!!!!!!", 2, 2)
     state = command(state, undo)
     state = command(state, redo)
@@ -110,7 +110,7 @@ describe("history", () => {
 
   function unsyncedComplex(state: EditorState) {
     state = type(state, "hello")
-    state = closeHistory(state.transaction).apply()
+    state = closeHistory(state.t()).apply()
     state = type(state, "!")
     state = receive(state, "....", 0)
     state = type(state, "\n\n", 2)
@@ -130,8 +130,8 @@ describe("history", () => {
   it("supports overlapping edits", () => {
     let state = mkState()
     state = type(state, "hello")
-    state = closeHistory(state.transaction).apply()
-    state = state.transaction.replace(0, 5, "").apply()
+    state = closeHistory(state.t()).apply()
+    state = state.t().replace(0, 5, "").apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
     ist(state.doc.toString(), "hello")
@@ -143,8 +143,8 @@ describe("history", () => {
     let state = mkState()
     state = receive(state, "h", 0)
     state = type(state, "ello")
-    state = closeHistory(state.transaction).apply()
-    state = state.transaction.replace(0, 5, "").apply()
+    state = closeHistory(state.t()).apply()
+    state = state.t().replace(0, 5, "").apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
     ist(state.doc.toString(), "hello")
@@ -155,9 +155,9 @@ describe("history", () => {
   it("supports overlapping unsynced deletes", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = closeHistory(state.transaction).apply()
+    state = closeHistory(state.t()).apply()
     state = type(state, "hello")
-    state = state.transaction.replace(0, 7, "").addMeta(Transaction.addToHistory(false)).apply()
+    state = state.t().replace(0, 7, "").addMeta(Transaction.addToHistory(false)).apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
     ist(state.doc.toString(), "")
@@ -167,10 +167,10 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "one")
     state = type(state, " two")
-    state = closeHistory(state.transaction).apply()
+    state = closeHistory(state.t()).apply()
     state = type(state, " three")
     state = type(state, "zero ", 0)
-    state = closeHistory(state.transaction).apply()
+    state = closeHistory(state.t()).apply()
     state = type(state, "\n\n", 0)
     state = type(state, "top", 0)
     for (let i = 0; i < 6; i++) {
@@ -193,11 +193,11 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "one")
     state = type(state, " two")
-    state = closeHistory(state.transaction).apply()
+    state = closeHistory(state.t()).apply()
     state = receive(state, "xxx", state.doc.length)
     state = type(state, " three")
     state = type(state, "zero ", 0)
-    state = closeHistory(state.transaction).apply()
+    state = closeHistory(state.t()).apply()
     state = type(state, "\n\n", 0)
     state = type(state, "top", 0)
     state = receive(state, "yyy", 0)
@@ -212,10 +212,10 @@ describe("history", () => {
   it("restores selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = closeHistory(state.transaction).apply()
-    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+    state = closeHistory(state.t()).apply()
+    state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
     const selection = state.selection
-    state = state.transaction.replaceSelection("hello").apply()
+    state = state.t().replaceSelection("hello").apply()
     const selection2 = state.selection
     state = command(state, undo)
     ist(state.selection.eq(selection))
@@ -225,8 +225,8 @@ describe("history", () => {
 
   it("restores the selection before the first change in an item (#46)", () => {
     let state = mkState()
-    state = state.transaction.replace(0, 0, "a").setSelection(EditorSelection.single(1)).apply()
-    state = state.transaction.replace(1, 1, "b").setSelection(EditorSelection.single(2)).apply()
+    state = state.t().replace(0, 0, "a").setSelection(EditorSelection.single(1)).apply()
+    state = state.t().replace(1, 1, "b").setSelection(EditorSelection.single(2)).apply()
     state = command(state, undo)
     ist(state.doc.toString(), "")
     ist(state.selection.primary.anchor, 0)
@@ -235,16 +235,16 @@ describe("history", () => {
   it("doesn't merge document changes if there's a selection change in between", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
-    state = state.transaction.replaceSelection("hello").apply()
+    state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
+    state = state.t().replaceSelection("hello").apply()
     ist(undoDepth(state), 2)
   })
 
   it("rebases selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = closeHistory(state.transaction).apply()
-    state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+    state = closeHistory(state.t()).apply()
+    state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
     state = type(state, "hello", 0)
     state = receive(state, "---", 0)
     state = command(state, undo)
@@ -279,14 +279,14 @@ describe("history", () => {
     let state = mkState({minDepth: 10})
     for (let i = 0; i < 40; ++i) {
       state = type(state, "a")
-      state = closeHistory(state.transaction).apply()
+      state = closeHistory(state.t()).apply()
     }
     ist(undoDepth(state) < 40)
   })
 
   it("supports transactions with multiple changes", () => {
     let state = mkState()
-    state = state.transaction.replace(0, 0, "a").replace(1, 1, "b").apply()
+    state = state.t().replace(0, 0, "a").replace(1, 1, "b").apply()
     state = type(state, "c", 0)
     ist(state.doc.toString(), "cab")
     state = command(state, undo)
@@ -304,7 +304,7 @@ describe("history", () => {
   it("doesn't undo selection-only transactions", () => {
     let state = mkState(undefined, "abc")
     ist(state.selection.primary.head, 0)
-    state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+    state = state.t().setSelection(EditorSelection.single(2)).apply()
     state = command(state, undo, false)
     ist(state.selection.primary.head, 2)
   })
@@ -320,7 +320,7 @@ describe("history", () => {
     it("allows to undo selection-only transactions", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+      state = state.t().setSelection(EditorSelection.single(2)).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 0)
     })
@@ -328,9 +328,9 @@ describe("history", () => {
     it("merges selection-only transactions from keyboard", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(3)).addMeta(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(3)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 0)
     })
@@ -338,9 +338,9 @@ describe("history", () => {
     it("doesn't merge selection-only transactions from other sources", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).apply()
-      state = state.transaction.setSelection(EditorSelection.single(3)).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).apply()
+      state = state.t().setSelection(EditorSelection.single(2)).apply()
+      state = state.t().setSelection(EditorSelection.single(3)).apply()
+      state = state.t().setSelection(EditorSelection.single(1)).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 3)
       state = command(state, undoSelection)
@@ -352,10 +352,10 @@ describe("history", () => {
     it("doesn't merge selection-only transactions if they change the number of selections", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)])).
+      state = state.t().setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)])).
         addMeta(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = command(state, undoSelection)
       ist(state.selection.ranges.length, 2)
       state = command(state, undoSelection)
@@ -365,9 +365,9 @@ describe("history", () => {
     it("doesn't merge selection-only transactions if a selection changes empty state", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(2, 3)).addMeta(Transaction.userEvent("keyboard")).apply()
-      state = state.transaction.setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(2)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(2, 3)).addMeta(Transaction.userEvent("keyboard")).apply()
+      state = state.t().setSelection(EditorSelection.single(1)).addMeta(Transaction.userEvent("keyboard")).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.anchor, 2)
       ist(state.selection.primary.head, 3)
@@ -386,7 +386,7 @@ describe("history", () => {
     it("allows to redo selection-only transactions", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.transaction.setSelection(EditorSelection.single(2)).apply()
+      state = state.t().setSelection(EditorSelection.single(2)).apply()
       state = command(state, undoSelection)
       state = command(state, redoSelection)
       ist(state.selection.primary.head, 2)
@@ -395,16 +395,16 @@ describe("history", () => {
     it("only changes selection", () => {
       let state = mkState()
       state = type(state, "hi")
-      state = closeHistory(state.transaction).apply()
+      state = closeHistory(state.t()).apply()
       const selection = state.selection
-      state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+      state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
       const selection2 = state.selection
       state = command(state, undoSelection)
       ist(state.selection.eq(selection))
       ist(state.doc.toString(), "hi")
       state = command(state, redoSelection)
       ist(state.selection.eq(selection2))
-      state = state.transaction.replaceSelection("hello").apply()
+      state = state.t().replaceSelection("hello").apply()
       const selection3 = state.selection
       state = command(state, undoSelection)
       ist(state.selection.eq(selection2))
@@ -416,7 +416,7 @@ describe("history", () => {
       let state = mkState()
       state = type(state, "hello")
       const selection = state.selection
-      state = state.transaction.setSelection(EditorSelection.single(0, 2)).apply()
+      state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
       state = receive(state, "oops", 0)
       state = receive(state, "!", 9)
       ist(state.selection.eq(EditorSelection.single(0, 6)))

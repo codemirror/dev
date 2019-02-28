@@ -5,13 +5,13 @@ export type Command = (view: EditorView) => boolean
 
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "word" | "line" | "lineboundary"): boolean {
-  let transaction = view.state.transaction.mapRanges(range => {
+  let transaction = view.state.t().forEachRange(range => {
     if (!range.empty && granularity != "lineboundary")
       return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
     return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
-  if (granularity == "line") transaction = transaction.addMeta(Transaction.preserveGoalColumn(true))
+  if (granularity == "line") transaction.addMeta(Transaction.preserveGoalColumn(true))
   view.dispatch(transaction.scrollIntoView())
   return true
 }
@@ -30,11 +30,11 @@ export const moveLineEnd: Command = view => moveSelection(view, "forward", "line
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "word" | "line" | "lineboundary"): boolean {
-  let transaction = view.state.transaction.mapRanges(range => {
+  let transaction = view.state.t().forEachRange(range => {
     return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
-  if (granularity == "line") transaction = transaction.addMeta(Transaction.preserveGoalColumn(true))
+  if (granularity == "line") transaction.addMeta(Transaction.preserveGoalColumn(true))
   view.dispatch(transaction.scrollIntoView())
   return true
 }
@@ -52,30 +52,30 @@ export const extendLineStart: Command = view => extendSelection(view, "backward"
 export const extendLineEnd: Command = view => extendSelection(view, "forward", "lineboundary")
 
 export const selectDocStart: Command = ({state, dispatch}) => {
-  dispatch(state.transaction.setSelection(EditorSelection.single(0)).scrollIntoView())
+  dispatch(state.t().setSelection(EditorSelection.single(0)).scrollIntoView())
   return true
 }
 
 export const selectDocEnd: Command = ({state, dispatch}) => {
-  dispatch(state.transaction.setSelection(EditorSelection.single(state.doc.length)).scrollIntoView())
+  dispatch(state.t().setSelection(EditorSelection.single(state.doc.length)).scrollIntoView())
   return true
 }
 
 export const selectAll: Command = ({state, dispatch}) => {
-  dispatch(state.transaction.setSelection(EditorSelection.single(0, state.doc.length)))
+  dispatch(state.t().setSelection(EditorSelection.single(0, state.doc.length)))
   return true
 }
 
 function deleteText(view: EditorView, dir: "forward" | "backward") {
-  let transaction = view.state.transaction.reduceRanges((transaction, range) => {
+  let transaction = view.state.t().forEachRange((range, transaction) => {
     let {from, to} = range
     if (from == to) {
       let target = view.movePos(range.head, dir, "character", "move")
       from = Math.min(from, target); to = Math.max(to, target)
     }
-    if (from == to) return {transaction, range}
-    return {transaction: transaction.replace(from, to, ""),
-            range: new SelectionRange(from)}
+    if (from == to) return range
+    transaction.replace(from, to, "")
+    return new SelectionRange(from)
   })
   if (!transaction.docChanged) return false
 
@@ -107,10 +107,10 @@ export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
     let indent = getIndentation(state, r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
   })
-  dispatch(state.transaction.reduceRanges((tr, range) => {
+  dispatch(state.t().forEachRange((range, tr) => {
     let indent = indentation[i++]
-    return {transaction: tr.replace(range.from, range.to, ["", space(indent)]),
-            range: new SelectionRange(range.from + indent + 1)}
+    tr.replace(range.from, range.to, ["", space(indent)])
+    return new SelectionRange(range.from + indent + 1)
   }).scrollIntoView())
   return true
 }
@@ -131,10 +131,10 @@ export function indentSelection({state, dispatch}: EditorView): boolean {
     }
   }
   if (positions.length > 0) {
-    let tr = state.transaction
+    let tr = state.t()
     for (let {pos, current, indent} of positions) {
       let start = tr.changes.mapPos(pos)
-      tr = tr.replace(start, start + current, space(indent))
+      tr.replace(start, start + current, space(indent))
     }
     dispatch(tr)
   }

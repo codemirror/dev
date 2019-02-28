@@ -4,20 +4,18 @@ import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
 
-const empty: ReadonlyArray<any> = []
-
 const FLAG_SELECTION_SET = 1, FLAG_SCROLL_INTO_VIEW = 2
 
 export class Transaction {
-  private constructor(readonly startState: EditorState,
-                      readonly changes: ChangeSet,
-                      readonly docs: ReadonlyArray<Text>,
-                      readonly selection: EditorSelection,
-                      private readonly metadata: ReadonlyArray<Slot>,
-                      private readonly flags: number) {}
+  changes: ChangeSet = ChangeSet.empty
+  docs: Text[] = []
+  selection: EditorSelection
+  metadata: Slot[]
+  flags: number = 0
 
-  static start(state: EditorState, time: number = Date.now()) {
-    return new Transaction(state, ChangeSet.empty, empty, state.selection, [Transaction.time(time)], 0)
+  constructor(readonly startState: EditorState, time: number = Date.now()) {
+    this.selection = startState.selection
+    this.metadata = [Transaction.time(time)]
   }
 
   get doc(): Text {
@@ -26,7 +24,8 @@ export class Transaction {
   }
 
   addMeta(...metadata: Slot[]): Transaction {
-    return new Transaction(this.startState, this.changes, this.docs, this.selection, this.metadata.concat(metadata), this.flags)
+    for (let slot of metadata) this.metadata.push(slot)
+    return this
   }
 
   getMeta<T>(type: SlotType<T>): T | undefined {
@@ -37,10 +36,10 @@ export class Transaction {
     if (change.from == change.to && change.length == 0) return this
     if (change.from < 0 || change.to < change.from || change.to > this.doc.length)
       throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
-    let changes = this.changes.append(change, mirror)
-    return new Transaction(this.startState, changes, this.docs.concat(change.apply(this.doc)),
-                           this.selection.map(changes.partialMapping(changes.length - 1)),
-                           this.metadata, this.flags)
+    this.changes = this.changes.append(change, mirror)
+    this.docs.push(change.apply(this.doc))
+    this.selection = this.selection.map(change)
+    return this
   }
 
   replace(from: number, to: number, text: string | ReadonlyArray<string>): Transaction {
@@ -49,37 +48,31 @@ export class Transaction {
 
   replaceSelection(text: string | ReadonlyArray<string>): Transaction {
     let content = typeof text == "string" ? this.startState.splitLines(text) : text
-    return this.reduceRanges((state, r) => {
-      let change = new Change(r.from, r.to, content)
-      return {transaction: state.change(change), range: new SelectionRange(r.from + change.length)}
+    return this.forEachRange(range => {
+      let change = new Change(range.from, range.to, content)
+      this.change(change)
+      return new SelectionRange(range.from + change.length)
     })
   }
 
-  reduceRanges(f: (transaction: Transaction, range: SelectionRange) => (Transaction | {transaction: Transaction, range: SelectionRange})): Transaction {
-    let tr: Transaction = this
-    let sel = tr.selection, start = tr.changes.length, newRanges: SelectionRange[] = []
+  forEachRange(f: (range: SelectionRange, tr: Transaction) => SelectionRange): Transaction {
+    let sel = this.selection, start = this.changes.length, newRanges: SelectionRange[] = []
     for (let range of sel.ranges) {
-      range = range.map(tr.changes.partialMapping(start))
-      let result = f(tr, range)
-      if (result instanceof Transaction) {
-        tr = result
-        newRanges.push(range.map(tr.changes.partialMapping(tr.changes.length - 1)))
-      } else {
-        tr = result.transaction
-        newRanges.push(result.range)
+      let before = this.changes.length
+      let result = f(range.map(this.changes.partialMapping(start)), this)
+      if (this.changes.length > before) {
+        let mapping = this.changes.partialMapping(before)
+        for (let i = 0; i < newRanges.length; i++) newRanges[i] = newRanges[i].map(mapping)
       }
+      newRanges.push(result)
     }
-    return tr.setSelection(EditorSelection.create(newRanges, sel.primaryIndex))
-  }
-
-  mapRanges(f: (range: SelectionRange) => SelectionRange): Transaction {
-    return this.reduceRanges((tr, range) => ({transaction: tr, range: f(range)}))
+    return this.setSelection(EditorSelection.create(newRanges, sel.primaryIndex))
   }
 
   setSelection(selection: EditorSelection): Transaction {
-    return new Transaction(this.startState, this.changes, this.docs,
-                           this.startState.multipleSelections ? selection : selection.asSingle(),
-                           this.metadata, this.flags | FLAG_SELECTION_SET)
+    this.selection = this.startState.multipleSelections ? selection : selection.asSingle()
+    this.flags |= FLAG_SELECTION_SET
+    return this
   }
 
   get selectionSet(): boolean {
@@ -91,8 +84,8 @@ export class Transaction {
   }
 
   scrollIntoView(): Transaction {
-    return new Transaction(this.startState, this.changes, this.docs, this.selection,
-                           this.metadata, this.flags | FLAG_SCROLL_INTO_VIEW)
+    this.flags |= FLAG_SCROLL_INTO_VIEW
+    return this
   }
 
   get scrolledIntoView(): boolean {
