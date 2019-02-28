@@ -46,7 +46,8 @@ export class LineView extends ContentView implements BlockView {
       if (elts.length == 0) { start.merge(fromOff, toOff, null); return true }
       // Otherwise split it, so that we don't have to worry about aliasing front/end afterwards
       let after = start.slice(toOff)
-      if (!after.merge(0, 0, elts[elts.length - 1])) elts.push(after)
+      if (after.merge(0, 0, elts[elts.length - 1])) elts[elts.length - 1] = after
+      else elts.push(after)
       toI++
       toOff = 0
     }
