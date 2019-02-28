@@ -1,5 +1,5 @@
 import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
-import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType} from "./decoration"
+import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType, WidgetType} from "./decoration"
 import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
 import {Text, TextIterator} from "../../doc/src"
@@ -98,9 +98,9 @@ export class ContentBuilder implements RangeIterator<Decoration> {
       if (deco.block) {
         let {type} = deco
         if (type == BlockType.WidgetAfter && !this.posCovered()) this.getLine()
-        this.addWidget(new BlockWidgetView(deco.widget, len, type, open))
+        this.addWidget(new BlockWidgetView(deco.widget || new NullWidget("div"), len, type, open))
       } else {
-        this.getLine().append(new WidgetView(len, deco.widget, deco.startSide, open))
+        this.getLine().append(WidgetView.create(deco.widget || new NullWidget("span"), len, deco.startSide, open))
       }
     } else if (this.doc.lineAt(this.pos).start == this.pos) { // Line decoration
       this.getLine().addLineDeco(deco as LineDecoration)
@@ -128,4 +128,9 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     builder.finish()
     return builder
   }
+}
+
+class NullWidget extends WidgetType<string> {
+  toDOM() { return document.createElement(this.value) }
+  updateDOM(elt: HTMLElement) { return elt.nodeName.toLowerCase() == this.value }
 }

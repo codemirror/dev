@@ -1,5 +1,6 @@
 import {ChangeSet, ChangedRange, MapMode} from "../../state/src"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
+import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
 
 export interface MarkDecorationSpec {
@@ -45,7 +46,7 @@ export abstract class WidgetType<T = any> {
   ignoreEvent(event: Event): boolean { return true }
 
   // @internal
-  get editable() { return false }
+  get customView(): null | typeof WidgetView { return null }
 }
 
 export type DecorationSet = RangeSet<Decoration>
@@ -201,7 +202,7 @@ function getInclusive(spec: {inclusive?: boolean, inclusiveStart?: boolean, incl
   return {start: start || false, end: end || false}
 }
 
-export function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
+function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
   return a == b || !!(a && b && a.compare(b))
 }
 

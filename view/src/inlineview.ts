@@ -1,8 +1,8 @@
 import {ContentView} from "./contentview"
-import {WidgetType, widgetsEq} from "./decoration"
+import {WidgetType} from "./decoration"
 import {attrsEq} from "./attributes"
 import {Text} from "../../doc/src"
-import {Rect, clientRectsFor} from "./dom"
+import {Rect} from "./dom"
 import browser from "./browser"
 import {Open} from "./buildview"
 
@@ -116,16 +116,20 @@ function textCoords(text: Node, pos: number): Rect {
 export class WidgetView extends InlineView {
   dom!: HTMLElement | null
 
-  constructor(public length: number, public widget: WidgetType | null, readonly side: number, readonly open: number = 0) {
+  static create(widget: WidgetType, length: number, side: number, open: number = 0) {
+    return new (widget.customView || WidgetView)(widget, length, side, open)
+  }
+
+  constructor(public widget: WidgetType, public length: number, readonly side: number, readonly open: number) {
     super()
   }
 
-  slice(from: number, to: number = this.length) { return new WidgetView(to - from, this.widget, this.side) }
+  slice(from: number, to: number = this.length) { return WidgetView.create(this.widget, to - from, this.side) }
 
   sync() {
-    if (!this.dom || (this.widget && !this.widget.updateDOM(this.dom))) {
-      this.setDOM(this.widget ? this.widget.toDOM() : document.createElement("span"))
-      if (!this.widget || !this.widget.editable) this.dom!.contentEditable = "false"
+    if (!this.dom || !this.widget.updateDOM(this.dom)) {
+      this.setDOM(this.widget.toDOM())
+      this.dom!.contentEditable = "false"
     }
   }
 
@@ -136,7 +140,7 @@ export class WidgetView extends InlineView {
       if (!(source instanceof WidgetView) || !source.open ||
           from > 0 && !(source.open & Open.Start) ||
           to < this.length && !(source.open & Open.End)) return false
-      if (!widgetsEq(this.widget, source.widget))
+      if (!this.widget.compare(source.widget))
         throw new Error("Trying to merge incompatible widgets")
     }
     this.length = from + (source ? source.length : 0) + (this.length - to)
@@ -145,8 +149,7 @@ export class WidgetView extends InlineView {
 
   match(other: InlineView): boolean {
     if (other.length == this.length && other instanceof WidgetView && other.side == this.side) {
-      if (!this.widget && !other.widget) return true
-      if (this.widget && other.widget && this.widget.constructor == other.widget.constructor) {
+      if (this.widget.constructor == other.widget.constructor) {
         if (!this.widget.eq(other.widget.value)) this.markDirty(true)
         this.widget = other.widget
         return true
@@ -155,11 +158,10 @@ export class WidgetView extends InlineView {
     return false
   }
 
-  ignoreMutation(): boolean { return !this.widget || !this.widget.editable }
-  ignoreEvent(event: Event): boolean { return this.widget ? this.widget.ignoreEvent(event) : false }
+  ignoreMutation(): boolean { return true }
+  ignoreEvent(event: Event): boolean { return this.widget.ignoreEvent(event) }
 
-  get overrideDOMText() {
-    if (this.widget && this.widget.editable) return null
+  get overrideDOMText(): ReadonlyArray<string> | null {
     if (this.length == 0) return [""]
     let top: ContentView = this
     while (top.parent) top = top.parent
@@ -169,19 +171,24 @@ export class WidgetView extends InlineView {
 
   domBoundsAround() { return null }
 
-  domFromPos(pos: number) {
-    if (!this.widget || !this.widget.editable) return null
-    let d = this.dom! as Node // FIXME this is nonsense
-    while (d.firstChild) d = d.firstChild
-    return {node: d, offset: pos}
-  }
-
   coordsAt(pos: number): Rect | null {
-    let rects = clientRectsFor(this.dom!)
+    let rects = this.dom!.getClientRects()
     for (let i = pos > 0 ? rects.length - 1 : 0;; i += (pos > 0 ? -1 : 1)) {
       let rect = rects[i]
       if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) return rects[i]
     }
     return null
   }
+}
+
+export class CompositionView extends WidgetView {
+  domFromPos(pos: number) { return {node: this.widget.value.text, offset: pos} }
+
+  sync() { if (!this.dom) this.setDOM(this.widget.toDOM()) }
+
+  ignoreMutation(): boolean { return false }
+
+  get overrideDOMText() { return null }
+  
+  coordsAt(pos: number) { return textCoords(this.widget.value.text, pos) }
 }

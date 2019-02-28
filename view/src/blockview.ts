@@ -2,7 +2,7 @@ import {ContentView} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView} from "./inlineview"
 import {clientRectsFor, Rect, domIndex} from "./dom"
-import {LineDecoration, WidgetType, widgetsEq, BlockType} from "./decoration"
+import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 import {Open} from "./buildview"
 
@@ -208,7 +208,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
   breakAfter = 0
 
   constructor(
-    public widget: WidgetType | null,
+    public widget: WidgetType,
     public length: number,
     public type: BlockType,
     // This is set by the builder and used to distinguish between
@@ -223,7 +223,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
     if (!(source instanceof BlockWidgetView) || !source.open ||
         from > 0 && !(source.open & Open.Start) ||
         to < this.length && !(source.open & Open.End)) return false
-    if (!widgetsEq(this.widget, source.widget))
+    if (!this.widget.compare(source.widget))
       throw new Error("Trying to merge an open widget with an incompatible node")
     this.length = from + source.length + (this.length - to)
     return true
@@ -238,8 +238,8 @@ export class BlockWidgetView extends ContentView implements BlockView {
   get children() { return none }
 
   sync() {
-    if (!this.dom || !(this.widget && this.widget.updateDOM(this.dom))) {
-      this.setDOM(this.widget ? this.widget.toDOM() : document.createElement("div"))
+    if (!this.dom || !this.widget.updateDOM(this.dom)) {
+      this.setDOM(this.widget.toDOM())
       this.dom!.contentEditable = "false"
     }
   }
@@ -252,8 +252,8 @@ export class BlockWidgetView extends ContentView implements BlockView {
 
   match(other: ContentView) {
     if (other instanceof BlockWidgetView && other.type == this.type &&
-        (other.widget && other.widget.constructor) == (this.widget && this.widget.constructor)) {
-      if (this.widget && !other.widget!.eq(this.widget.value)) this.markDirty(true)
+        other.widget.constructor == this.widget.constructor) {
+      if (!other.widget.eq(this.widget.value)) this.markDirty(true)
       this.widget = other.widget
       this.length = other.length
       this.breakAfter = other.breakAfter

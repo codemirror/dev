@@ -1,6 +1,6 @@
 import {ContentView, ChildCursor, DocChildCursor, Dirty} from "./contentview"
 import {BlockView, LineView} from "./blockview"
-import {InlineView} from "./inlineview"
+import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
 import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
@@ -581,16 +581,20 @@ export function computeCompositionDeco(view: EditorView, changes: A<ChangedRange
     changes.every(ch => ch.fromA >= to || ch.toA <= from)
   ) {
     return Decoration.set(Decoration.replace(newFrom, newTo, {
-      widget: new CompositionWidget(topNode)
+      widget: new CompositionWidget({top: topNode, text: textNode})
     }))
   }
   return Decoration.none
 }
 
-class CompositionWidget extends WidgetType<Node> {
-  toDOM() { return this.value as HTMLElement }
+class CompositionWidget extends WidgetType<{top: Node, text: Node}> {
+  eq(value: {top: Node, text: Node}) { return this.value.top == value.top && this.value.text == value.text }
 
-  get editable() { return true }
+  toDOM() { return this.value.top as HTMLElement }
+
+  ignoreEvent() { return false }
+
+  get customView() { return CompositionView }
 }
 
 function nearbyTextNode(node: Node, offset: number): Node | null {
