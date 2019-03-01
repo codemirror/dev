@@ -1,4 +1,4 @@
-import {ContentView, ChildCursor, DocChildCursor, Dirty} from "./contentview"
+import {ContentView, ChildCursor, DocChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
@@ -235,8 +235,8 @@ export class DocView extends ContentView {
 
     let primary = this.state.selection.primary
     // FIXME need to handle the case where the selection falls inside a block range
-    let anchor = this.domFromPos(primary.anchor)!
-    let head = this.domFromPos(primary.head)!
+    let anchor = this.domAtPos(primary.anchor)
+    let head = this.domAtPos(primary.head)
 
     let domSel = this.root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
@@ -411,13 +411,14 @@ export class DocView extends ContentView {
     return view.localPosFromDOM(node, offset) + view.posAtStart
   }
 
-  domFromPos(pos: number): {node: Node, offset: number} | null {
-    let {i, off} = this.childCursor().findPos(pos)
-    for (;; i--) {
+  domAtPos(pos: number): DOMPos {
+    let {i, off} = this.childCursor().findPos(pos, -1)
+    for (; i < this.children.length - 1;) {
       let child = this.children[i]
-      if (child instanceof LineView) return child.domFromPos(off)
-      if (child.type == BlockType.WidgetRange || i == 0) return null
+      if (off < child.length || child instanceof LineView) break
+      i++; off = 0
     }
+    return this.children[i].domAtPos(off)
   }
 
   coordsAt(pos: number): Rect | null {

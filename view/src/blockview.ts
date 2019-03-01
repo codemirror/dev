@@ -1,7 +1,7 @@
-import {ContentView} from "./contentview"
+import {ContentView, DOMPos} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView} from "./inlineview"
-import {clientRectsFor, Rect, domIndex} from "./dom"
+import {clientRectsFor, Rect} from "./dom"
 import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 import {Open} from "./buildview"
@@ -137,19 +137,21 @@ export class LineView extends ContentView implements BlockView {
     if (attrs) this.attrs = combineAttrs(attrs, this.attrs || {})
   }
 
-  domFromPos(pos: number): {node: Node, offset: number} {
-    let {i, off} = this.childCursor().findPos(pos)
-    if (off) {
-      let inner = this.children[i].domFromPos(off)
-      if (inner) return inner
+  domAtPos(pos: number): DOMPos {
+    let i = 0
+    for (let off = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = off + child.length
+      if (end == off && child.getSide() <= 0) continue
+      if (pos > off && pos < end && child.dom!.parentNode == this.dom) return child.domAtPos(pos - off)
+      if (pos <= off) break
+      off = end
     }
     for (; i > 0; i--) {
-      let prev = this.children[i - 1]
-      if ((prev.length > 0 || prev.getSide() <= 0) && prev.dom!.parentNode == this.dom) break
+      let before = this.children[i - 1].dom!
+      if (before.parentNode == this.dom) return DOMPos.after(before)
     }
-    return {node: this.dom!, offset: i ? domIndex(this.children[i - 1].dom!) + 1 : 0}
+    return new DOMPos(this.dom!, 0)
   }
-
   
   // FIXME might need another hack to work around Firefox's behavior
   // of not actually displaying the cursor even though it's there in
@@ -228,6 +230,10 @@ export class BlockWidgetView extends ContentView implements BlockView {
       throw new Error("Trying to merge an open widget with an incompatible node")
     this.length = from + source.length + (this.length - to)
     return true
+  }
+
+  domAtPos(pos: number) {
+    return pos == 0 ? DOMPos.before(this.dom!) : DOMPos.after(this.dom!, pos == this.length)
   }
 
   split(at: number) {

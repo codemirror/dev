@@ -1,10 +1,17 @@
-import {Rect, maxOffset} from "./dom"
+import {Rect, maxOffset, domIndex} from "./dom"
 
 declare global {
   interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
 }
 
 export const enum Dirty { Not = 0, Child = 1, Node = 2 }
+
+export class DOMPos {
+  constructor(readonly node: Node, readonly offset: number, readonly precise = true) {}
+
+  static before(dom: Node, precise?: boolean) { return new DOMPos(dom.parentNode!, domIndex(dom), precise) }
+  static after(dom: Node, precise?: boolean) { return new DOMPos(dom.parentNode!, domIndex(dom) + 1, precise) }
+}
 
 const none: any[] = []
 
@@ -66,7 +73,7 @@ export abstract class ContentView {
 
   reuseDOM(dom: Node) { return false }
 
-  domFromPos(pos: number): {node: Node, offset: number} | null { return null }
+  abstract domAtPos(pos: number): DOMPos
 
   localPosFromDOM(node: Node, offset: number): number {
     let after: Node | null
@@ -208,6 +215,7 @@ export class ChildCursor {
   }
 }
 
+// FIXME merge back with ChildCursor again
 export class DocChildCursor extends ChildCursor {
   constructor(children: ReadonlyArray<ContentView>, pos: number, i: number) {
     if (i) super(children, pos - children[i - 1].length, i - 1)

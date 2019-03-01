@@ -78,7 +78,7 @@ function widgets(positions: number[], sides: number[]) {
 describe("Composition", () => {
   it("supports composition on an empty line", () => {
     let cm = requireFocus(tempEditor("foo\n\nbar"))
-    compose(cm, () => up(cm.domAtPos(4)!.node.appendChild(document.createTextNode("a"))), [
+    compose(cm, () => up(cm.domAtPos(4).node.appendChild(document.createTextNode("a"))), [
       n => up(n, "b"),
       n => up(n, "c")
     ])
@@ -87,7 +87,7 @@ describe("Composition", () => {
 
   it("supports composition at end of line in existing node", () => {
     let cm = requireFocus(tempEditor("foo"))
-    compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
+    compose(cm, () => up(cm.domAtPos(2).node as Text), [
       n => up(n, "!"),
       n => up(n, "?")
     ])
@@ -96,7 +96,7 @@ describe("Composition", () => {
 
   it("supports composition at end of line in a new node", () => {
     let cm = requireFocus(tempEditor("foo"))
-    compose(cm, () => up(cm.domAtPos(0)!.node.appendChild(document.createTextNode("!"))), [
+    compose(cm, () => up(cm.domAtPos(0).node.appendChild(document.createTextNode("!"))), [
       n => up(n, "?")
     ])
     ist(cm.state.doc.toString(), "foo!?")
@@ -105,7 +105,7 @@ describe("Composition", () => {
   it("supports composition at start of line in a new node", () => {
     let cm = requireFocus(tempEditor("foo"))
     compose(cm, () => {
-      let l0 = cm.domAtPos(0)!.node
+      let l0 = cm.domAtPos(0).node
       return up(l0.insertBefore(document.createTextNode("!"), l0.firstChild))
     }, [
       n => up(n, "?")
@@ -115,7 +115,7 @@ describe("Composition", () => {
 
   it("supports composition inside existing text", () => {
     let cm = requireFocus(tempEditor("foo"))
-    compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
+    compose(cm, () => up(cm.domAtPos(2).node as Text), [
       n => up(n, "x", 1),
       n => up(n, "y", 2),
       n => up(n, "z", 3)
@@ -125,7 +125,7 @@ describe("Composition", () => {
 
   it("can deal with Android-style newline-after-composition", () => {
     let cm = requireFocus(tempEditor("abcdef"))
-    compose(cm, () => up(cm.domAtPos(2)!.node as Text), [
+    compose(cm, () => up(cm.domAtPos(2).node as Text), [
       n => up(n, "x", 3),
       n => up(n, "y", 4)
     ], {end: n => {
@@ -139,7 +139,7 @@ describe("Composition", () => {
 
   it("handles replacement of existing words", () => {
     let cm = requireFocus(tempEditor("one two three"))
-    compose(cm, () => up(cm.domAtPos(1)!.node as Text, "five", 4, 7), [
+    compose(cm, () => up(cm.domAtPos(1).node as Text, "five", 4, 7), [
       n => up(n, "seven", 4, 8),
       n => up(n, "zero", 4, 9)
     ])
@@ -148,7 +148,7 @@ describe("Composition", () => {
 
   it("doesn't get interrupted by changes in decorations", () => {
     let cm = requireFocus(tempEditor("foo ...", [wordHighlighter]))
-    compose(cm, () => up(cm.domAtPos(5)!.node as Text), [
+    compose(cm, () => up(cm.domAtPos(5).node as Text), [
       n => up(n, "hi", 1, 4)
     ])
     ist(cm.state.doc.toString(), "foo hi")
@@ -156,7 +156,7 @@ describe("Composition", () => {
 
   it("works inside highlighted text", () => {
     let cm = requireFocus(tempEditor("one two", [wordHighlighter]))
-    compose(cm, () => up(cm.domAtPos(1)!.node as Text, "x"), [
+    compose(cm, () => up(cm.domAtPos(1).node as Text, "x"), [
       n => up(n, "y"),
       n => up(n, ".")
     ])
@@ -165,7 +165,7 @@ describe("Composition", () => {
 
   it("can handle compositions spanning multiple tokens", () => {
     let cm = requireFocus(tempEditor("one two", [wordHighlighter]))
-    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "a"), [
+    compose(cm, () => up(cm.domAtPos(5).node as Text, "a"), [
       n => up(n, "b"),
       n => up(n, "c")
     ], {end: n => {
@@ -179,7 +179,7 @@ describe("Composition", () => {
   it("doesn't overwrite widgets next to the composition", () => {
     let cm = requireFocus(tempEditor("", [widgets([0, 0], [-1, 1])]))
     compose(cm, () => {
-      let l0 = cm.domAtPos(0)!.node
+      let l0 = cm.domAtPos(0).node
       return up(l0.insertBefore(document.createTextNode("a"), l0.lastChild))
     }, [n => up(n, "b", 0, 1)], {end: () => {
       ist(cm.contentDOM.querySelectorAll("var").length, 2)
@@ -189,7 +189,7 @@ describe("Composition", () => {
 
   it("cancels composition when a change fully overlaps with it", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
-    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x"), [
+    compose(cm, () => up(cm.domAtPos(5).node as Text, "x"), [
       () => cm.dispatch(cm.state.t().replace(2, 10, "---"))
     ], {cancel: true})
     ist(cm.state.doc.toString(), "on---hree")
@@ -197,7 +197,7 @@ describe("Composition", () => {
 
   it("cancels composition when a change partially overlaps with it", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
-    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
+    compose(cm, () => up(cm.domAtPos(5).node as Text, "x", 0), [
       () => cm.dispatch(cm.state.t().replace(5, 12, "---"))
     ], {cancel: true})
     ist(cm.state.doc.toString(), "one\nx---ee")
@@ -205,7 +205,7 @@ describe("Composition", () => {
 
   it("cancels composition when a change happens inside of it", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
-    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
+    compose(cm, () => up(cm.domAtPos(5).node as Text, "x", 0), [
       () => cm.dispatch(cm.state.t().replace(5, 6, "!"))
     ], {cancel: true})
     ist(cm.state.doc.toString(), "one\nx!wo\nthree")
@@ -213,7 +213,7 @@ describe("Composition", () => {
 
   it("doesn't cancel composition when a change happens elsewhere", () => {
     let cm = requireFocus(tempEditor("one\ntwo\nthree"))
-    compose(cm, () => up(cm.domAtPos(5)!.node as Text, "x", 0), [
+    compose(cm, () => up(cm.domAtPos(5).node as Text, "x", 0), [
       n => up(n, "y", 1),
       () => cm.dispatch(cm.state.t().replace(1, 2, "!")),
       n => up(n, "z", 2)
@@ -224,7 +224,7 @@ describe("Composition", () => {
   // FIXME also test with newline inserted directly in front of the composition
   it("doesn't cancel composition when the composition is moved into a new line", () => {
     let cm = requireFocus(tempEditor("one\ntwo three", [wordHighlighter]))
-    compose(cm, () => up(cm.domAtPos(9)!.node as Text, "x"), [
+    compose(cm, () => up(cm.domAtPos(9).node as Text, "x"), [
       n => up(n, "y"),
       () => cm.dispatch(cm.state.t().replace(4, 4, "\n")),
       n => up(n, "z")
@@ -234,7 +234,7 @@ describe("Composition", () => {
 
   it("doesn't cancel composition when a newline is added immediately in front", () => {
     let cm = requireFocus(tempEditor("one\ntwo three", [wordHighlighter]))
-    compose(cm, () => up(cm.domAtPos(9)!.node as Text, "x"), [
+    compose(cm, () => up(cm.domAtPos(9).node as Text, "x"), [
       n => up(n, "y"),
       () => cm.dispatch(cm.state.t().replace(7, 8, "\n")),
       n => up(n, "z")
@@ -245,14 +245,14 @@ describe("Composition", () => {
   it("handles compositions rapidly following each other", () => {
     let cm = requireFocus(tempEditor("one\ntwo"))
     event(cm, "compositionstart")
-    let one = cm.domAtPos(1)!.node as Text
+    let one = cm.domAtPos(1).node as Text
     up(one, "!")
     cm.docView.observer.flush()
     event(cm, "compositionend")
     one.nodeValue = "one!!"
     let L2 = cm.contentDOM.lastChild
     event(cm, "compositionstart")
-    let two = cm.domAtPos(7)!.node as Text
+    let two = cm.domAtPos(7).node as Text
     ist(cm.contentDOM.lastChild, L2)
     up(two, ".")
     cm.docView.observer.flush()

@@ -30,7 +30,7 @@ export function movePos(view: EditorView, start: number,
       !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
     return view.docView.observer.ignore(() => {
       let prepared = context!.prepareForQuery(view, start)
-      let startDOM = view.docView.domFromPos(start)!
+      let startDOM = view.docView.domAtPos(start)
       let equiv = (!browser.chrome || prepared.lines.length == 0) &&
         isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset) && false
       // Firefox skips an extra character ahead when extending across

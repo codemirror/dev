@@ -1,4 +1,4 @@
-import {ContentView} from "./contentview"
+import {ContentView, DOMPos} from "./contentview"
 import {WidgetType} from "./decoration"
 import {attrsEq} from "./attributes"
 import {Text} from "../../doc/src"
@@ -83,7 +83,7 @@ export class TextView extends InlineView {
     return node == this.textDOM ? offset : offset ? this.text.length : 0
   }
 
-  domFromPos(pos: number) { return {node: this.textDOM!, offset: pos} }
+  domAtPos(pos: number) { return new DOMPos(this.textDOM!, pos) }
 
   domBoundsAround(from: number, to: number, offset: number) {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
@@ -169,6 +169,10 @@ export class WidgetView extends InlineView {
     return text ? text.sliceLines(start, start + this.length) : [""]
   }
 
+  domAtPos(pos: number) {
+    return pos == 0 ? DOMPos.before(this.dom!) : DOMPos.after(this.dom!, pos == this.length)
+  }
+
   domBoundsAround() { return null }
 
   coordsAt(pos: number): Rect | null {
@@ -182,7 +186,7 @@ export class WidgetView extends InlineView {
 }
 
 export class CompositionView extends WidgetView {
-  domFromPos(pos: number) { return {node: this.widget.value.text, offset: pos} }
+  domAtPos(pos: number) { return new DOMPos(this.widget.value.text, pos) }
 
   sync() { if (!this.dom) this.setDOM(this.widget.toDOM()) }
 

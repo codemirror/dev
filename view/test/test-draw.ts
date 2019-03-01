@@ -55,7 +55,7 @@ describe("EditorView drawing", () => {
 
   it("redraws lazily", () => {
     let cm = tempEditor("one\ntwo\nthree")
-    let line0 = cm.domAtPos(0)!.node, line1 = line0.nextSibling!, line2 = line1.nextSibling!
+    let line0 = cm.domAtPos(0).node, line1 = line0.nextSibling!, line2 = line1.nextSibling!
     let text0 = line0.firstChild!, text2 = line2.firstChild!
     cm.dispatch(cm.state.t().replace(5, 5, "x"))
     ist(text0.parentElement, line0)
@@ -73,11 +73,11 @@ describe("EditorView drawing", () => {
 
   it("draws BR nodes on empty lines", () => {
     let cm = tempEditor("one\n\ntwo")
-    let emptyLine = cm.domAtPos(4)!.node
+    let emptyLine = cm.domAtPos(4).node
     ist(emptyLine.childNodes.length, 1)
     ist(emptyLine.firstChild!.nodeName, "BR")
     cm.dispatch(cm.state.t().replace(4, 4, "x"))
-    ist(!Array.from(cm.domAtPos(4)!.node.childNodes).some(n => (n as any).nodeName == "BR"))
+    ist(!Array.from(cm.domAtPos(4).node.childNodes).some(n => (n as any).nodeName == "BR"))
   })
 
   it("only draws visible content", () => {

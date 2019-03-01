@@ -72,8 +72,7 @@ describe("EditorView.movePos", () => {
   })
 
   it("can move through widgets by character when focused", () => {
-    let cm = tempEditor("o, foo, do", [oWidgets]), len = cm.state.doc.length
-    requireFocus(cm)
+    let cm = requireFocus(tempEditor("o, foo, do", [oWidgets])), len = cm.state.doc.length
     for (let i = 0; i <= len; i++)
       ist(cm.movePos(i, "right", "character"), Math.min(i + 1, len))
     for (let i = len; i >= 0; i--)

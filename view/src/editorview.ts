@@ -154,8 +154,8 @@ export class EditorView {
     return result
   }
 
-  domAtPos(pos: number): {node: Node, offset: number} | null {
-    return this.docView.domFromPos(pos)
+  domAtPos(pos: number): {node: Node, offset: number} {
+    return this.docView.domAtPos(pos)
   }
 
   blockAtHeight(height: number, editorTop?: number) {

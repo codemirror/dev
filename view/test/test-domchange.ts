@@ -10,13 +10,13 @@ function flush(cm: EditorView) {
 describe("DOM changes", () => {
   it("notices text changes", () => {
     let cm = tempEditor("foo\nbar")
-    cm.domAtPos(1)!.node.nodeValue = "froo"
+    cm.domAtPos(1).node.nodeValue = "froo"
     flush(cm)
     ist(cm.state.doc.toString(), "froo\nbar")
   })
 
   it("handles browser enter behavior", () => {
-    let cm = tempEditor("foo\nbar"), line0 = cm.domAtPos(0)!.node
+    let cm = tempEditor("foo\nbar"), line0 = cm.domAtPos(0).node
     line0.appendChild(document.createElement("br"))
     line0.appendChild(document.createElement("br"))
     flush(cm)
@@ -25,7 +25,7 @@ describe("DOM changes", () => {
 
   it("supports deleting lines", () => {
     let cm = tempEditor("1\n2\n3\n4\n5\n6")
-    for (let i = 0, lineDOM = cm.domAtPos(0)!.node.parentNode!; i < 4; i++) lineDOM.childNodes[1].remove()
+    for (let i = 0, lineDOM = cm.domAtPos(0).node.parentNode!; i < 4; i++) lineDOM.childNodes[1].remove()
     flush(cm)
     ist(cm.state.doc.toString(), "1\n6")
   })
@@ -34,7 +34,7 @@ describe("DOM changes", () => {
     let cm = tempEditor("okay")
     let node = document.createElement("div")
     node.textContent = "ayayayayayay"
-    for (let i = 0, lineDOM = cm.domAtPos(0)!.node.parentNode!; i < 100; i++) lineDOM.appendChild(node.cloneNode(true))
+    for (let i = 0, lineDOM = cm.domAtPos(0).node.parentNode!; i < 100; i++) lineDOM.appendChild(node.cloneNode(true))
     flush(cm)
     ist(cm.state.doc.toString(), "okay" + "\nayayayayayay".repeat(100))
   })
@@ -42,7 +42,7 @@ describe("DOM changes", () => {
   it("properly handles selection for ambiguous backspace", () => {
     let cm = tempEditor("foo")
     cm.dispatch(cm.state.t().setSelection(EditorSelection.single(2)))
-    cm.domAtPos(1)!.node.nodeValue = "fo"
+    cm.domAtPos(1).node.nodeValue = "fo"
     cm.inputState.lastKeyCode = 8
     cm.inputState.lastKeyTime = Date.now()
     flush(cm)
@@ -51,7 +51,7 @@ describe("DOM changes", () => {
 
   it("notices text changes at the end of a long document", () => {
     let cm = tempEditor("foo\nbar\n".repeat(15))
-    cm.domAtPos(8*15)!.node.textContent = "a"
+    cm.domAtPos(8*15).node.textContent = "a"
     flush(cm)
     ist(cm.state.doc.toString(), "foo\nbar\n".repeat(15) + "a")
   })
@@ -123,29 +123,29 @@ describe("DOM changes", () => {
       create() { return Decoration.set(Decoration.replace(1, 3, {})) },
       update(d, u) { return u.transactions.length ? Decoration.none : d }
     })])
-    cm.domAtPos(0)!.node.firstChild!.textContent = "x"
+    cm.domAtPos(0).node.firstChild!.textContent = "x"
     flush(cm)
     ist(cm.state.doc.toString(), "xbcd")
   })
 
   it("preserves text nodes when edited in the middle", () => {
-    let cm = tempEditor("abcd"), text = cm.domAtPos(1)!.node
+    let cm = tempEditor("abcd"), text = cm.domAtPos(1).node
     text.textContent = "axxd"
     flush(cm)
-    ist(cm.domAtPos(1)!.node, text)
+    ist(cm.domAtPos(1).node, text)
   })
 
   it("preserves text nodes when edited at the start", () => {
-    let cm = tempEditor("abcd"), text = cm.domAtPos(1)!.node
+    let cm = tempEditor("abcd"), text = cm.domAtPos(1).node
     text.textContent = "xxcd"
     flush(cm)
-    ist(cm.domAtPos(1)!.node, text)
+    ist(cm.domAtPos(1).node, text)
   })
 
   it("preserves text nodes when edited at the end", () => {
-    let cm = tempEditor("abcd"), text = cm.domAtPos(1)!.node
+    let cm = tempEditor("abcd"), text = cm.domAtPos(1).node
     text.textContent = "abxx"
     flush(cm)
-    ist(cm.domAtPos(1)!.node, text)
+    ist(cm.domAtPos(1).node, text)
   })
 })
