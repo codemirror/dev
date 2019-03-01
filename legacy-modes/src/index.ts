@@ -177,7 +177,7 @@ function decoSpec(field: StateField<StateCache<any>>, config: Config) {
       decorations = Decoration.set(stateCache.getDecorations(state, from, to, mode))
       stateCache.advanceFrontier(state, from, mode, sleepTime, maxWorkTime).then(() => {
         update(view, true)
-        view.updateState([], state) // FIXME maybe add a specific EditorView method for this
+        view.update([]) // FIXME maybe add a specific EditorView method for this
       }, () => {})
     }
     return decorations

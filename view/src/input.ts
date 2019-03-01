@@ -364,11 +364,11 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
 }
 
 handlers.focus = view => {
-  view.updateState([], view.state, [focusChange(true)])
+  view.update([], [focusChange(true)])
 }
 
 handlers.blur = view => {
-  view.updateState([], view.state, [focusChange(false)])
+  view.update([], [focusChange(false)])
 }
 
 handlers.beforeprint = view => {
@@ -380,7 +380,7 @@ const compositionEndSlot = Slot.define<null>()
 
 function forceClearComposition(view: EditorView) {
   if (view.docView.compositionDeco.size)
-    view.updateState([], view.state, [compositionEndSlot(null)])
+    view.update([], [compositionEndSlot(null)])
 }
 
 handlers.compositionstart = handlers.compositionupdate = view => {

@@ -44,7 +44,7 @@ function compose(cm: EditorView, start: () => Text,
   event(cm, "compositionend")
   if (options.end) options.end(node)
   cm.docView.observer.flush()
-  cm.updateState([], cm.state, [dummySlot(null)])
+  cm.update([], [dummySlot(null)])
   ist(!cm.inputState.composing)
   ist(!hasCompositionDeco(cm))
 }

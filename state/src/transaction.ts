@@ -10,8 +10,9 @@ export class Transaction {
   changes: ChangeSet = ChangeSet.empty
   docs: Text[] = []
   selection: EditorSelection
-  metadata: Slot[]
-  flags: number = 0
+  private metadata: Slot[]
+  private flags: number = 0
+  private state: EditorState | null = null
 
   constructor(readonly startState: EditorState, time: number = Date.now()) {
     this.selection = startState.selection
@@ -24,6 +25,7 @@ export class Transaction {
   }
 
   addMeta(...metadata: Slot[]): Transaction {
+    this.ensureOpen()
     for (let slot of metadata) this.metadata.push(slot)
     return this
   }
@@ -33,6 +35,7 @@ export class Transaction {
   }
 
   change(change: Change, mirror?: number): Transaction {
+    this.ensureOpen()
     if (change.from == change.to && change.length == 0) return this
     if (change.from < 0 || change.to < change.from || change.to > this.doc.length)
       throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
@@ -70,6 +73,7 @@ export class Transaction {
   }
 
   setSelection(selection: EditorSelection): Transaction {
+    this.ensureOpen()
     this.selection = this.startState.multipleSelections ? selection : selection.asSingle()
     this.flags |= FLAG_SELECTION_SET
     return this
@@ -84,6 +88,7 @@ export class Transaction {
   }
 
   scrollIntoView(): Transaction {
+    this.ensureOpen()
     this.flags |= FLAG_SCROLL_INTO_VIEW
     return this
   }
@@ -92,8 +97,12 @@ export class Transaction {
     return (this.flags & FLAG_SCROLL_INTO_VIEW) > 0
   }
 
+  private ensureOpen() {
+    if (this.state) throw new Error("Transactions may not be modified after being applied")
+  }
+
   apply(): EditorState {
-    return this.startState.applyTransaction(this)
+    return this.state || (this.state = this.startState.applyTransaction(this))
   }
 
   invertedChanges(): ChangeSet<Change> {

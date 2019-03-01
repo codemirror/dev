@@ -30,7 +30,7 @@ function getModeTest(doc: string, onDecorationUpdate = () => {}) {
   const view: any = {
     state: EditorState.create({doc, extensions: [extension]}),
     viewport: {from: 0, to: 0},
-    updateState: onDecorationUpdate
+    update: onDecorationUpdate
   }
   function update(transactions: Transaction[]) {
     return {transactions, view}

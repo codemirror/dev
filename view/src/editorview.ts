@@ -64,7 +64,7 @@ export class EditorView {
       class: "codemirror " + styles.wrapper + (view.hasFocus() ? " codemirror-focused" : "")
     }))
 
-    this.dispatch = config.dispatch || ((tr: Transaction) => this.updateState([tr], tr.apply()))
+    this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
@@ -88,10 +88,13 @@ export class EditorView {
     })
   }
 
-  // FIXME rename this to update at some point, make state implicit in transactions
-  updateState(transactions: Transaction[], state: EditorState, metadata: Slot[] = []) {
-    if (transactions.length && transactions[0].startState != this.state)
-      throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
+  update(transactions: Transaction[], metadata: Slot[] = []) {
+    let state = this.state
+    for (let tr of transactions) {
+      if (tr.startState != state)
+        throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
+      state = tr.apply()
+    }
     this.withUpdating(() => {
       let snapshot = new ViewSnapshot(this)
       if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
@@ -131,7 +134,7 @@ export class EditorView {
   // @internal
   withUpdating(f: () => void) {
     if (this.updating)
-      throw new Error("Calls to EditorView.updateState or EditorView.setState are not allowed in extension update or create methods")
+      throw new Error("Calls to EditorView.update or EditorView.setState are not allowed in extension update or create methods")
     this.updating = true
     try { f() }
     finally { this.updating = false }
