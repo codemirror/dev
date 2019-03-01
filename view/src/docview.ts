@@ -40,6 +40,17 @@ export class DocView extends ContentView {
   paddingTop: number = 0
   paddingBottom: number = 0
 
+  // Track a minimum width for the editor. When measuring sizes in
+  // checkLayout, this is updated to point at the width of a given
+  // element and its extent in the document. When a change happens in
+  // that range, these are reset. That way, once we've seen a
+  // line/element of a given length, we keep the editor wide enough to
+  // fit at least that element, until it is changed, at which point we
+  // forget it again.
+  minWidth = 0
+  minWidthFrom = 0
+  minWidthTo = 0
+
   dom!: HTMLElement
 
   get length() { return this.state.doc.length }
@@ -64,6 +75,7 @@ export class DocView extends ContentView {
     this.children = [new LineView]
     this.children[0].setParent(this)
     this.viewports = this.decorations = none
+    this.minWidth = 0
     let contentChanges = this.computeUpdate(null, state, none, changedRanges, 0, -1)
     this.updateInner(contentChanges, 0)
     this.cancelLayoutCheck()
@@ -83,6 +95,14 @@ export class DocView extends ContentView {
     let changes = transactions.length == 1 ? transactions[0].changes :
       transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     let changedRanges = changes.changedRanges()
+    if (this.minWidth > 0 && changedRanges.length) {
+      if (!changedRanges.every(({fromA, toA}) => toA < this.minWidthFrom || fromA > this.minWidthTo)) {
+        this.minWidth = 0
+      } else {
+        this.minWidthFrom = changes.mapPos(this.minWidthFrom)
+        this.minWidthTo = changes.mapPos(this.minWidthTo)
+      }
+    }
     this.heightMap = this.heightMap.applyChanges(none, prevDoc, this.heightOracle.setDoc(state.doc), changedRanges)
 
     let contentChanges = this.computeUpdate(transactions, state, metadata, changedRanges, 0, scrollIntoView)
@@ -132,6 +152,7 @@ export class DocView extends ContentView {
       // no relayout is triggered and I cannot imagine how it can
       // recompute the scroll position without a layout)
       this.dom.style.height = this.heightMap.height + "px"
+      this.dom.style.minWidth = this.minWidth + "px"
       this.sync()
       this.dirty = Dirty.Not
       this.updateSelection()
@@ -341,6 +362,7 @@ export class DocView extends ContentView {
       let {lineHeight, charWidth} = this.measureTextSize()
       refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
                                           lineHeight, charWidth, (this.dom).clientWidth / charWidth, lineHeights)
+      if (refresh) this.minWidth = 0
     }
 
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
@@ -409,10 +431,18 @@ export class DocView extends ContentView {
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.viewport
     for (let pos = 0, i = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length + child.breakAfter
+      let child = this.children[i], end = pos + child.length
       if (end > to) break
-      if (pos >= from) result.push(child.dom!.getBoundingClientRect().height)
-      pos = end
+      if (pos >= from) {
+        result.push(child.dom!.getBoundingClientRect().height)
+        let width = child.dom!.scrollWidth
+        if (width > this.minWidth) {
+          this.minWidth = width
+          this.minWidthFrom = pos
+          this.minWidthTo = end
+        }
+      }
+      pos = end + child.breakAfter
     }
     return result
   }
