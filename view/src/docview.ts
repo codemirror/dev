@@ -141,7 +141,7 @@ export class DocView extends ContentView {
 
   private updateChildren(changes: A<ChangedRange>, viewports: A<Viewport>, oldLength: number) {
     let gapDeco = this.computeGapDeco(viewports, this.length)
-    let gapChanges = findChangedRanges(this.gapDeco, gapDeco, changes, oldLength) // FIXME pass original, possibly simpler changes?
+    let gapChanges = findChangedRanges(this.gapDeco, gapDeco, changes, oldLength)
     this.gapDeco = gapDeco
     changes = extendWithRanges(changes, gapChanges.content)
 

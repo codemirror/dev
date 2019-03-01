@@ -690,7 +690,6 @@ class RangeSetComparison<T extends RangeValue> {
       if (from > this.end) {
         // If we found a range past the end, we're done
         side.heap.length = 0
-        this.pos = this.end
         return
       } else if (next.index < next.ranges.length) {
         // If there's more ranges in this node, re-add it to the heap
