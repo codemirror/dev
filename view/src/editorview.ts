@@ -259,12 +259,13 @@ const styles = new StyleModule({
     whiteSpace: "pre",
     boxSizing: "border-box",
 
-    padding: "4px 2px 4px 4px",
+    padding: "4px 0",
     outline: "none",
     caretColor: "black",
 
-    "& codemirror-line": {
-      display: "block"
+    "& .codemirror-line": {
+      display: "block",
+      padding: "0 2px 0 4px"
     }
   }
 }, {priority: 0})

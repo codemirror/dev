@@ -436,7 +436,7 @@ export class DocView extends ContentView {
       if (pos >= from) {
         result.push(child.dom!.getBoundingClientRect().height)
         let width = child.dom!.scrollWidth
-        if (width > this.minWidth) {
+        if (width > this.minWidth + 1) {
           this.minWidth = width
           this.minWidthFrom = pos
           this.minWidthTo = end
