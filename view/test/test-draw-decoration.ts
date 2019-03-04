@@ -242,6 +242,20 @@ describe("EditorView decoration", () => {
       cm.dispatch(cm.state.t().replace(4, 6, "n"))
       ist(cm.contentDOM.textContent, "abij")
     })
+
+    it("preserves selection endpoints inside replaced ranges", () => {
+      let cm = requireFocus(decoEditor("abcdefgh", [r(0, 4)]))
+      cm.dispatch(cm.state.t().setSelection(EditorSelection.single(2, 6)))
+      let sel = document.getSelection()!, range = document.createRange()
+      range.setEnd(sel.focusNode, sel.focusOffset + 1)
+      range.setStart(sel.anchorNode, sel.anchorOffset)
+      sel.removeAllRanges()
+      sel.addRange(range)
+      cm.docView.observer.flush()
+      let {anchor, head} = cm.state.selection.primary
+      ist(head, 7)
+      ist(anchor, 2)
+    })
   })
 
   describe("line attributes", () => {

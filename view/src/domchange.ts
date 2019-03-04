@@ -10,7 +10,8 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   let sel = view.state.selection.primary, bounds
   if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
     let {from, to} = bounds
-    let selPoints = selectionPoints(view.contentDOM, view.root), reader = new DOMReader(selPoints)
+    let selPoints = view.docView.impreciseHead || view.docView.impreciseAnchor ? [] : selectionPoints(view.contentDOM, view.root)
+    let reader = new DOMReader(selPoints)
     reader.readRange(bounds.startDOM, bounds.endDOM)
     newSel = selectionFromPoints(selPoints, from)
 
@@ -26,9 +27,11 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
                                   reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
   } else if (view.hasFocus()) {
     let domSel = view.root.getSelection()!
-    let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
-    let anchor = selectionCollapsed(domSel) ? head :
-      view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
+    let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
+    let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ? view.state.selection.primary.head
+      : view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
+    let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset ? view.state.selection.primary.anchor
+      : selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
     if (head != sel.head || anchor != sel.anchor)
       newSel = EditorSelection.single(anchor, head)
   }

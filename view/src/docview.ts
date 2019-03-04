@@ -51,6 +51,11 @@ export class DocView extends ContentView {
   minWidthFrom = 0
   minWidthTo = 0
 
+  // Track whether the DOM selection was set in a lossy way, so that
+  // we don't mess it up when reading it back it
+  impreciseAnchor: DOMPos | null = null
+  impreciseHead: DOMPos | null = null
+
   dom!: HTMLElement
 
   get length() { return this.state.doc.length }
@@ -240,29 +245,31 @@ export class DocView extends ContentView {
 
     let domSel = this.root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
-    if (!this.forceSelectionUpdate &&
-        isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) &&
-        isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset))
-      return
+    if (this.forceSelectionUpdate ||
+        !isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) ||
+        !isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {
+      this.forceSelectionUpdate = false
 
-    this.forceSelectionUpdate = false
+      this.observer.ignore(() => {
+        // Selection.extend can be used to create an 'inverted' selection
+        // (one where the focus is before the anchor), but not all
+        // browsers support it yet.
+        if (domSel.extend) {
+          domSel.collapse(anchor.node, anchor.offset)
+          if (!primary.empty) domSel.extend(head.node, head.offset)
+        } else {
+          let range = document.createRange()
+          if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
+          range.setEnd(head.node, head.offset)
+          range.setStart(anchor.node, anchor.offset)
+          domSel.removeAllRanges()
+          domSel.addRange(range)
+        }
+      })
+    }
 
-    this.observer.ignore(() => {
-      // Selection.extend can be used to create an 'inverted' selection
-      // (one where the focus is before the anchor), but not all
-      // browsers support it yet.
-      if (domSel.extend) {
-        domSel.collapse(anchor.node, anchor.offset)
-        if (!primary.empty) domSel.extend(head.node, head.offset)
-      } else {
-        let range = document.createRange()
-        if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
-        range.setEnd(head.node, head.offset)
-        range.setStart(anchor.node, anchor.offset)
-        domSel.removeAllRanges()
-        domSel.addRange(range)
-      }
-    })
+    this.impreciseAnchor = anchor.precise ? null : new DOMPos(domSel.anchorNode, domSel.anchorOffset)
+    this.impreciseHead = head.precise ? null: new DOMPos(domSel.focusNode, domSel.focusOffset)
   }
 
   lineAt(pos: number, editorTop?: number): BlockInfo {
