@@ -1,22 +1,21 @@
 import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewField, ViewUpdate, ViewExtension, EditorView} from "../../view/src"
 import {ChangeSet, ChangedRange, Transaction} from "../../state/src"
-import {combineConfig} from "../../extension/src/extension"
+import {combineConfig, Full} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 import {StyleModule} from "style-mod"
 
-interface CompleteSpecialCharConfig {
-  render?: (code: number, description: string | null, placeHolder: string) => HTMLElement | null
-  specialChars: RegExp
-  addSpecialChars?: RegExp
+export interface SpecialCharConfig {
+  render?: ((code: number, description: string | null, placeHolder: string) => HTMLElement) | null
+  specialChars?: RegExp
+  addSpecialChars?: RegExp | null
 }
-export type SpecialCharConfig = Partial<CompleteSpecialCharConfig>
 
 export const specialChars = ViewExtension.unique((configs: SpecialCharConfig[]) => {
   // FIXME make configurations compose properly
-  let config: CompleteSpecialCharConfig = combineConfig(configs, {
-    render: undefined,
+  let config = combineConfig(configs, {
+    render: null,
     specialChars: SPECIALS,
-    addSpecialChars: undefined
+    addSpecialChars: null
   })
   return new ViewField<SpecialCharHighlighter>({
     create(view) { return new SpecialCharHighlighter(view, config) },
@@ -34,7 +33,7 @@ class SpecialCharHighlighter {
   specials: RegExp
   replaceTabs: boolean
 
-  constructor(public view: EditorView, readonly options: CompleteSpecialCharConfig) {
+  constructor(public view: EditorView, readonly options: Full<SpecialCharConfig>) {
     this.updateForViewport()
     this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
@@ -153,7 +152,7 @@ function placeHolder(code: number): string | null {
 const DEFAULT_PLACEHOLDER = "\u2022"
 
 class SpecialCharWidget extends WidgetType<number> {
-  constructor(private options: CompleteSpecialCharConfig, code: number) { super(code) }
+  constructor(private options: Full<SpecialCharConfig>, code: number) { super(code) }
 
   toDOM() {
     let ph = placeHolder(this.value) || DEFAULT_PLACEHOLDER

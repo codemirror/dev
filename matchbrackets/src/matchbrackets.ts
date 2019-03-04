@@ -1,6 +1,6 @@
 import {Text} from "../../doc/src"
 import {EditorState} from "../../state/src"
-import {combineConfig} from "../../extension/src/extension"
+import {combineConfig, Full} from "../../extension/src/extension"
 import {ViewExtension, ViewField, styleModule} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
 import {StyleModule} from "style-mod"
@@ -14,16 +14,15 @@ const matching: {[key: string]: string | undefined} = {
   "}": "{<"
 }
 
-interface CompleteConfig {
-  afterCursor: boolean,
-  bracketRegex: RegExp,
-  maxScanDistance: number,
-  strict: boolean,
+export interface Config {
+  afterCursor?: boolean,
+  bracketRegex?: RegExp,
+  maxScanDistance?: number,
+  strict?: boolean,
 }
-export type Config = Partial<CompleteConfig>
 
 function findMatchingBracket(
-  doc: Text, where: number, config: CompleteConfig
+  doc: Text, where: number, config: Full<Config>
 ) : {from: number, to: number | null, forward: boolean, match: boolean} | null {
   let pos = where - 1
   // A cursor is defined as between two characters, but in in vim command mode
@@ -49,7 +48,7 @@ function findMatchingBracket(
 //
 // Returns false when no bracket was found, null when it reached
 // maxScanDistance and gave up
-export function scanForBracket(doc: Text, where: number, dir: -1 | 1, config: CompleteConfig) {
+export function scanForBracket(doc: Text, where: number, dir: -1 | 1, config: Full<Config>) {
   const maxScanDistance = config.maxScanDistance
   const re = config.bracketRegex
   const stack = []
@@ -73,7 +72,7 @@ export function scanForBracket(doc: Text, where: number, dir: -1 | 1, config: Co
   return iter.done ? false : null
 }
 
-function doMatchBrackets(state: EditorState, config: CompleteConfig) {
+function doMatchBrackets(state: EditorState, config: Full<Config>) {
   const decorations = []
   for (const range of state.selection.ranges) {
     if (!range.empty) continue

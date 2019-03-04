@@ -1,4 +1,4 @@
-import {combineConfig} from "../../extension/src/extension"
+import {combineConfig, Full} from "../../extension/src/extension"
 import {EditorView, ViewExtension, ViewPlugin, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {StyleModule} from "style-mod"
 
@@ -13,11 +13,10 @@ import {StyleModule} from "style-mod"
 
 // FIXME seriously slow on Firefox when devtools are open
 
-interface CompleteGutterConfig {
-  fixed: boolean,
-  formatNumber: (lineNo: number) => string
+export interface GutterConfig {
+  fixed?: boolean,
+  formatNumber?: (lineNo: number) => string
 }
-export type GutterConfig = Partial<CompleteGutterConfig>
 
 export const gutter = ViewExtension.unique<GutterConfig>(configs => {
   let config = combineConfig(configs, {
@@ -37,7 +36,7 @@ class GutterView implements ViewPlugin {
   lastLine: GutterLine
   formatNumber: (lineNo: number) => string
 
-  constructor(public view: EditorView, config: CompleteGutterConfig) {
+  constructor(public view: EditorView, config: Full<GutterConfig>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")

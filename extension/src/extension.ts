@@ -184,16 +184,18 @@ function findTopUnique(extensions: Extension[], type: typeof Extension): UniqueE
 
 type NonUndefined<T> = T extends undefined ? never : T
 
+export type Full<T> = {[K in keyof T]-?: T[K]}
+
 // Utility function for combining behaviors to fill in a config
 // object from an array of provided configs. Will, by default, error
 // when a field gets two values that aren't ===-equal, but you can
 // provide combine functions per field to do something else.
 export function combineConfig<Config>(
-  configs: ReadonlyArray<Partial<Config>>,
-  defaults: Config,
+  configs: ReadonlyArray<Config>,
+  defaults: Partial<Config>, // Should hold only the optional properties of Config, but I haven't managed to express that
   combine: {[P in keyof Config]?: (first: NonUndefined<Config[P]>, second: NonUndefined<Config[P]>) => NonUndefined<Config[P]>} = {}
-): Config {
-  let result: Partial<Config> = {}
+): Full<Config> {
+  let result: any = {}
   for (let config of configs) for (let key of Object.keys(config) as (keyof Config)[]) {
     let value = config[key], current = result[key]
     if (current === undefined) result[key] = value
@@ -201,7 +203,13 @@ export function combineConfig<Config>(
     else if (Object.hasOwnProperty.call(combine, key)) result[key] = combine[key]!(current as any, value as any)
     else throw new Error("Config merge conflict for field " + key)
   }
-  for (let key in defaults)
-    if (result[key] === undefined) result[key] = defaults[key]
-  return result as any as Config
+  for (let key in defaults) if (result[key] === undefined) result[key] = defaults[key]
+  return result
+}
+
+export function fillConfig<Config>(config: Config, defaults: Partial<Config>): Full<Config> {
+  let result: any = {}
+  for (let key in config) result[key] = config[key]
+  for (let key in defaults) if (result[key] === undefined) result[key] = defaults[key]
+  return result
 }

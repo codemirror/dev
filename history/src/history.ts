@@ -1,13 +1,13 @@
 import {EditorState, Transaction, StateField, StateExtension} from "../../state/src"
-import {combineConfig, Slot} from "../../extension/src/extension"
+import {combineConfig, Slot, Full} from "../../extension/src/extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = Slot.define<HistoryState>()
 export const closeHistorySlot = Slot.define<boolean>()
 
-interface CompleteHistoryConfig {minDepth: number, newGroupDelay: number}
+export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
 
-function historyField({minDepth, newGroupDelay}: CompleteHistoryConfig) {
+function historyField({minDepth, newGroupDelay}: Full<HistoryConfig>) {
   return new StateField({
     init(editorState: EditorState): HistoryState {
       return HistoryState.empty
@@ -28,10 +28,8 @@ function historyField({minDepth, newGroupDelay}: CompleteHistoryConfig) {
   })
 }
 
-export type HistoryConfig = Partial<CompleteHistoryConfig>
-
 class HistoryContext {
-  constructor(public field: StateField<HistoryState>, public config: CompleteHistoryConfig) {}
+  constructor(public field: StateField<HistoryState>, public config: Full<HistoryConfig>) {}
 }
 
 const historyBehavior = StateExtension.defineBehavior<HistoryContext>()
