@@ -2,7 +2,7 @@ import {EditorState, EditorSelection} from "../state/src"
 import {EditorView} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history/src/history"
-import {gutter, GutterMarkerType} from "../gutter/src/index"
+import {gutter, GutterMarker} from "../gutter/src/index"
 import {baseKeymap, indentSelection} from "../commands/src/commands"
 import {legacyMode} from "../legacy-modes/src/index"
 import {matchBrackets} from "../matchbrackets/src/matchbrackets"
@@ -12,9 +12,10 @@ import {multipleSelections} from "../multiple-selections/src/multiple-selections
 
 let mode = legacyMode({mode: javascript({indentUnit: 2}, {}) as any})
 
-let testMarker = new class extends GutterMarkerType<string> {
-  toDOM(markers: string[]) { return document.createTextNode(markers.join("/")) }
+class TestMarker extends GutterMarker<string> {
+  toDOM() { return document.createTextNode(this.value) }
 }
+let {extension, slot} = gutter({class: "my-gutter", markers: [TestMarker.create(0, "M")]})
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `"use strict";
@@ -23,7 +24,7 @@ const {readFile} = require("fs");
 readFile("package.json", "utf8", (err, data) => {
   console.log(data);
 });`, extensions: [
-  gutter({class: "my-gutter", marker: testMarker}),
+  extension,
   history(),
   specialChars(),
   multipleSelections(),
@@ -45,5 +46,5 @@ document.querySelector("#editor").appendChild(view.dom)
 
 window.add = () => {
   let line = view.state.doc.lineAt(view.state.selection.primary.from)
-  view.dispatch(view.state.t().addMeta(testMarker.update({markers: [testMarker.make(line.start, "X")]})))
+  view.dispatch(view.state.t().addMeta(slot({markers: [TestMarker.create(line.start, "X")]})))
 }

@@ -1,5 +1,6 @@
 import {fillConfig, Full, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView, ViewExtension, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
+import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
 import {StyleModule} from "style-mod"
 
@@ -9,74 +10,47 @@ import {StyleModule} from "style-mod"
 // that it has to do another layout check when the gutter's width
 // changes, which should be relatively rare)
 
-export class GutterMarker<T> {
-  constructor(readonly pos: number, readonly value: T) {}
-}
-
-export abstract class GutterMarkerType<T> {
-  update: SlotType<{markers?: GutterMarker<T>[], replace?: {from: number, to: number}}>
-  constructor() { this.update = Slot.define() }
-  eq(a: T, b: T): boolean { return a === b }
-  abstract toDOM(markers: ReadonlyArray<T>): Node
-  make(pos: number, value: T) { return new GutterMarker(pos, value) }
+export abstract class GutterMarker<T> extends RangeValue {
+  constructor(readonly value: T) { super() }
+  eq(other: GutterMarker<T>) {
+    return this == other || this.constructor == other.constructor && this.value === other.value
+  }
+  map(mapping: ChangeSet, pos: number): Range<GutterMarker<T>> | null {
+    pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
+    return pos < 0 ? null : new Range(pos, pos, this)
+  }
+  abstract toDOM(): Node
+  static create<T>(pos: number, value: T): Range<GutterMarker<T>> {
+    return new Range(pos, pos, new (this as any)(value))
+  }
 }
 
 export interface GutterConfig {
-  class: string,
-  marker: GutterMarkerType<any>
-  fixed?: boolean,
+  class: string
+  markers?: Range<GutterMarker<any>>[]
+  fixed?: boolean
   renderEmptyElements?: boolean
 }
 
-export function gutter<T>(config: GutterConfig): ViewExtension {
-  let conf = fillConfig(config, {fixed: true, renderEmptyElements: false})
-  return ViewExtension.all(
-    viewPlugin(view => new GutterView(view, conf)),
+type MarkerUpdate = {markers?: Range<GutterMarker<any>>[], replace?: {from: number, to: number}}
+
+export function gutter<T>(config: GutterConfig) {
+  let conf = fillConfig(config, {fixed: true, renderEmptyElements: false, markers: []})
+  let slot = Slot.define<MarkerUpdate>()
+  let extension = ViewExtension.all(
+    viewPlugin(view => new GutterView(view, slot, conf)),
     styleModule(styles)
   )
-}
-
-function mapMarkers(positions: number[], changes: ChangeSet) {
-  if (changes.changes.length) for (let i = 0; i < positions.length; i++) {
-    let pos = positions[i]
-    if (pos > -1) {
-      let newPos = changes.mapPos(pos, -1, MapMode.TrackBefore)
-      if (newPos != pos) positions[i] = newPos < 0 ? -1 : newPos
-    }
-  }
-}
-
-function updateMarkers<T>(positions: number[], values: T[],
-                          update: {markers?: GutterMarker<T>[], replace?: {from: number, to: number}}) {
-  let newPositions: number[] = [], newValues: T[] = []
-  let add = update.markers || [], replace = update.replace
-  add.sort((a, b) => a.pos - b.pos)
-  let addI = 0, oldI = 0
-  for (;;) {
-    let nextAdd = addI < add.length ? add[addI].pos : 2e8
-    let nextOld = oldI < positions.length ? positions[oldI] : 2e8
-    if (nextAdd <= nextOld) {
-      if (nextAdd == 2e8) break
-      newPositions.push(nextAdd)
-      newValues.push(add[addI++].value)
-    } else {
-      if (nextOld > -1 && (!replace || replace.from > nextOld || replace.to < nextOld)) {
-        newPositions.push(nextOld)
-        newValues.push(values[oldI])
-      }
-      oldI++
-    }
-  }
-  return {positions: newPositions, values: newValues}
+  // FIXME UGH
+  return {slot, extension}
 }
 
 class GutterView implements ViewPlugin {
   dom: HTMLElement
   elements: GutterElement[] = []
-  markers: any[]
-  markerPositions: number[]
+  markers: RangeSet<GutterMarker<any>>
 
-  constructor(public view: EditorView, public config: Full<GutterConfig>) {
+  constructor(public view: EditorView, public slot: SlotType<MarkerUpdate>, public config: Full<GutterConfig>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter " + config.class + " " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")
@@ -87,17 +61,23 @@ class GutterView implements ViewPlugin {
       this.dom.style.position = "sticky"
     }
     view.dom.insertBefore(this.dom, view.contentDOM)
-    this.markers = [] // FIXME allow to initialize somehow?
-    this.markerPositions = []
+    this.markers = RangeSet.of(config.markers)
     this.updateGutter()
   }
 
   update(update: ViewUpdate) {
     for (let tr of update.transactions) {
-      mapMarkers(this.markerPositions, tr.changes)
-      let markerUpdate = tr.getMeta(this.config.marker.update)
-      if (markerUpdate)
-        ({values: this.markers, positions: this.markerPositions} = updateMarkers(this.markerPositions, this.markers, markerUpdate))
+      this.markers = this.markers.map(tr.changes)
+      let markerUpdate = tr.getMeta(this.slot)
+      if (markerUpdate) {
+        let repl = null, from = 0, to = 0
+        if (markerUpdate.replace) {
+          repl = () => false
+          ;({from, to} = markerUpdate.replace)
+        }
+        if (repl || markerUpdate.markers)
+          this.markers = this.markers.update(markerUpdate.markers || [], repl, from, to)
+      }
     }
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter()
@@ -105,16 +85,17 @@ class GutterView implements ViewPlugin {
 
   updateGutter() {
     let i = 0, height = 0
-    let markerI = 0, localMarkers: any[] = []
+    let markers = this.markers.iter(this.view.viewport.from, this.view.viewport.to)
+    let localMarkers: any[] = [], nextMarker = markers.next()
     this.view.viewportLines(line => {
       let text: BlockInfo | undefined
       if (Array.isArray(line.type)) text = line.type.find(b => b.type == BlockType.Text)
       else text = line.type == BlockType.Text ? line : undefined
       if (!text) return
 
-      while (markerI < this.markers.length && this.markerPositions[markerI] <= line.from) {
-        if (this.markerPositions[markerI] == line.from) localMarkers.push(this.markers[markerI])
-        markerI++
+      while (nextMarker && nextMarker.from <= line.from) {
+        if (nextMarker.from == line.from) localMarkers.push(nextMarker.value)
+        nextMarker = markers.next()
       }
       if (localMarkers.length || this.config.renderEmptyElements) {
         let above = text.top - height
@@ -145,30 +126,30 @@ class GutterElement {
   dom: HTMLElement
   height: number = -1
   above: number = 0
-  markers!: ReadonlyArray<any>
+  markers!: ReadonlyArray<GutterMarker<any>>
 
-  constructor(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<any>) {
+  constructor(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker<any>>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter-element"
     this.update(config, height, above, markers)
   }
 
-  update(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<any>) {
+  update(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker<any>>) {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
       this.dom.style.marginTop = (this.above = above) ? above + "px" : ""
-    if (!this.markers || !sameMarkers(config.marker, markers, this.markers)) {
+    if (!this.markers || !sameMarkers(markers, this.markers)) {
       this.markers = markers
       for (let ch; ch = this.dom.lastChild;) ch.remove()
-      if (markers.length) this.dom.appendChild(config.marker.toDOM(markers))
+      for (let m of markers) this.dom.appendChild(m.toDOM())
     }
   }
 }
 
-function sameMarkers<T>(type: GutterMarkerType<T>, a: ReadonlyArray<T>, b: ReadonlyArray<T>): boolean {
+function sameMarkers<T>(a: ReadonlyArray<GutterMarker<T>>, b: ReadonlyArray<GutterMarker<T>>): boolean {
   if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (type.eq(a[i], b[i])) return false
+  for (let i = 0; i < a.length; i++) if (!a[i].eq(b[i])) return false
   return true
 }
 

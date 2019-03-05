@@ -394,7 +394,6 @@ handlers.compositionstart = handlers.compositionupdate = view => {
   }
 }
 
-
 handlers.compositionend = view => {
   view.inputState.composing = false
   setTimeout(() => {
