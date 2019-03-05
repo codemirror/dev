@@ -389,7 +389,7 @@ describe("RangeSet", () => {
   })
 
   describe("iter", () => {
-    it("iterates over all ranges", () => {
+    it("iterates over ranges", () => {
       const set = mkSet(smallRanges.concat([mk(1000, 4000, {pos: 1000}), mk(2000, 3000, {pos: 2000})]))
       const iter = set.iter()
       let count = 0
@@ -397,6 +397,15 @@ describe("RangeSet", () => {
         ist(item.from, count > 2001 ? count - 2 : (count > 1000 ? count - 1 : count))
       }
       ist(count, 5002)
+    })
+
+    it("can iterate over a subset", () => {
+      let iter = set0().iter(1000, 2000), count = 0
+      for (let item; item = iter.next(); count++) {
+        ist(item.from, 2000, "<=")
+        ist(item.to, 1000, ">=")
+      }
+      ist(count, 1003)
     })
   })
 })
