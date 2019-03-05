@@ -2,13 +2,16 @@ import {ChangeSet, Change, ChangedRange} from "../../state/src"
 
 type A<T> = ReadonlyArray<T>
 
-export interface RangeValue {
-  map(mapping: ChangeSet, from: number, to: number): Range<any> | null
-  eq(other: RangeValue): boolean
-  startSide: number
-  endSide: number
-  point: boolean
+export abstract class RangeValue {
+  abstract map(mapping: ChangeSet, from: number, to: number): Range<any> | null
+  eq(other: RangeValue) { return this == other }
+  startSide!: number
+  endSide!: number
+  point!: boolean
 }
+
+RangeValue.prototype.startSide = RangeValue.prototype.endSide = 0
+RangeValue.prototype.point = false
 
 export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void

@@ -56,7 +56,7 @@ const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8
 
 export const enum BlockType { Text, WidgetBefore, WidgetAfter, WidgetRange }
 
-export abstract class Decoration implements RangeValue {
+export abstract class Decoration extends RangeValue {
   // @internal
   constructor(
     // @internal
@@ -65,7 +65,7 @@ export abstract class Decoration implements RangeValue {
     readonly endSide: number,
     // @internal
     readonly widget: WidgetType | null,
-    readonly spec: any) {}
+    readonly spec: any) { super() }
 
   get point() { return false }
 

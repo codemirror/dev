@@ -2,13 +2,14 @@ import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from "../sr
 import {Change, ChangeSet, Mapping, MapMode, ChangedRange} from "../../state/src"
 const ist = require("ist")
 
-class Value implements RangeValue {
+class Value extends RangeValue {
   startSide: number
   endSide: number
   point: boolean
   name: string | null
   pos: number | null
   constructor(spec: any = {}) {
+    super()
     this.startSide = spec.startSide || 1
     this.endSide = spec.endSide || -1
     this.point = !!spec.point
