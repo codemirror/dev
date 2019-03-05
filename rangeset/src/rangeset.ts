@@ -284,7 +284,7 @@ export class RangeSet<T extends RangeValue> {
 
   static iterateSpans<T extends RangeValue>(sets: A<RangeSet<T>>, from: number, to: number, iterator: RangeIterator<T>) {
     let heap: Heapable[] = []
-    let pos = from, posSide = -2e9
+    let pos = from, posSide = -FAR
 
     for (let set of sets) if (set.size > 0) {
       addIterToHeap(heap, [new IteratedSet(0, set)], pos)
@@ -580,7 +580,7 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
   }
 }
 
-const SIDE_A = 1, SIDE_B = 2
+const SIDE_A = 1, SIDE_B = 2, FAR = 2e9
 
 class ComparisonSide<T extends RangeValue> {
   heap: LocalSet<T>[] = []
@@ -589,7 +589,7 @@ class ComparisonSide<T extends RangeValue> {
   points: T[] = []
   tip: LocalSet<T> | null = null
   point: T | null = null
-  pointTo: number = -1
+  pointTo: number = -FAR
 
   constructor(readonly stack: IteratedSet<T>[]) {}
 
@@ -615,16 +615,16 @@ class ComparisonSide<T extends RangeValue> {
   }
 
   clearPoint() {
-    this.pointTo = -1
+    this.pointTo = -FAR
     this.point = null
   }
 
   get nextPos() {
-    return this.pointTo > -1 ? this.pointTo : this.heap.length ? this.heap[0].heapPos : 2e9
+    return this.pointTo > -FAR ? this.pointTo : this.heap.length ? this.heap[0].heapPos : FAR
   }
 
   get nextSide() {
-    return this.pointTo > -1 ? this.point!.endSide : this.heap.length ? this.heap[0].heapSide : 2e9
+    return this.pointTo > -FAR ? this.point!.endSide : this.heap.length ? this.heap[0].heapSide : FAR
   }
 }
 
@@ -686,7 +686,7 @@ class RangeSetComparison<T extends RangeValue> {
   run() {
     for (;;) {
       let nextA = this.a.nextPos, nextB = this.b.nextPos
-      if (nextA == 2e9 && nextB == 2e9) break
+      if (nextA == FAR && nextB == FAR) break
       let diff = nextA - nextB || this.a.nextSide - this.a.nextSide
       if (diff < 0) this.advance(this.a, this.b)
       else this.advance(this.b, this.a)
