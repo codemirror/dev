@@ -64,6 +64,10 @@ export const viewField = ViewExtension.defineBehavior<ViewField<any>>()
 
 export const handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
+export const clickAddsSelectionRange = ViewExtension.defineBehavior<(event: MouseEvent) => boolean>()
+
+export const dragMovesSelection = ViewExtension.defineBehavior<(event: MouseEvent) => boolean>()
+
 export type ViewPlugin = {
   update?: (update: ViewUpdate) => void
   destroy?: () => void

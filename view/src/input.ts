@@ -1,6 +1,7 @@
 import {EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
 import {EditorView} from "./editorview"
-import {focusChange, handleDOMEvents, ViewUpdate} from "./extension"
+import {focusChange, handleDOMEvents, ViewUpdate,
+        clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
 import {Slot} from "../../extension/src/extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
@@ -99,10 +100,9 @@ class MouseSelection {
     doc.addEventListener("mousemove", this.move = this.move.bind(this))
     doc.addEventListener("mouseup", this.up = this.up.bind(this))
 
-    // FIXME make these configurable somehow
     this.extend = event.shiftKey
-    this.multiple = view.state.multipleSelections && (browser.mac ? event.metaKey : event.ctrlKey)
-    this.dragMove = !(browser.mac ? event.altKey : event.ctrlKey)
+    this.multiple = view.state.multipleSelections && addsSelectionRange(view, event)
+    this.dragMove = dragMovesSelection(view, event)
 
     this.startSelection = view.state.selection
     let {pos, bias} = this.queryPos(event)
@@ -164,6 +164,16 @@ class MouseSelection {
     }
     if (this.dragging) this.dragging = this.dragging.map(changes)
   }
+}
+
+function addsSelectionRange(view: EditorView, event: MouseEvent) {
+  let behavior = view.behavior.get(clickAddsSelectionRange)
+  return behavior.length ? behavior[0](event) : browser.mac ? event.metaKey : event.ctrlKey
+}
+
+function dragMovesSelection(view: EditorView, event: MouseEvent) {
+  let behavior = view.behavior.get(dragBehavior)
+  return behavior.length ? behavior[0](event) : browser.mac ? !event.altKey : !event.ctrlKey
 }
 
 function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) {
