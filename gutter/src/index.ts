@@ -1,4 +1,4 @@
-import {fillConfig, Full, Slot, SlotType} from "../../extension/src/extension"
+import {fillConfig, Full} from "../../extension/src/extension"
 import {EditorView, ViewExtension, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
@@ -10,7 +10,7 @@ import {StyleModule} from "style-mod"
 // that it has to do another layout check when the gutter's width
 // changes, which should be relatively rare)
 
-export abstract class GutterMarker<T> extends RangeValue {
+export abstract class GutterMarker<T = any> extends RangeValue {
   constructor(readonly value: T) { super() }
   eq(other: GutterMarker<T>) {
     return this == other || this.constructor == other.constructor && this.value === other.value
@@ -23,34 +23,42 @@ export abstract class GutterMarker<T> extends RangeValue {
   static create<T>(pos: number, value: T): Range<GutterMarker<T>> {
     return new Range(pos, pos, new (this as any)(value))
   }
+  static set(of: Range<GutterMarker> | ReadonlyArray<Range<GutterMarker>>): GutterMarkerSet {
+    return RangeSet.of<GutterMarker>(of)
+  }
 }
+
+export type GutterMarkerSet = RangeSet<GutterMarker>
 
 export interface GutterConfig {
   class: string
-  markers?: Range<GutterMarker<any>>[]
   fixed?: boolean
   renderEmptyElements?: boolean
+  initialMarkers?: (view: EditorView) => GutterMarkerSet
+  updateMarkers?: (markers: GutterMarkerSet, update: ViewUpdate) => GutterMarkerSet
 }
 
-type MarkerUpdate = {markers?: Range<GutterMarker<any>>[], replace?: {from: number, to: number}}
+const defaults = {
+  fixed: true,
+  renderEmptyElements: false,
+  initialMarkers: () => RangeSet.empty,
+  updateMarkers: (markers: GutterMarkerSet) => markers
+}
 
 export function gutter<T>(config: GutterConfig) {
-  let conf = fillConfig(config, {fixed: true, renderEmptyElements: false, markers: []})
-  let slot = Slot.define<MarkerUpdate>()
-  let extension = ViewExtension.all(
-    viewPlugin(view => new GutterView(view, slot, conf)),
+  let conf = fillConfig(config, defaults)
+  return ViewExtension.all(
+    viewPlugin(view => new GutterView(view, conf)),
     styleModule(styles)
   )
-  // FIXME UGH
-  return {slot, extension}
 }
 
 class GutterView implements ViewPlugin {
   dom: HTMLElement
   elements: GutterElement[] = []
-  markers: RangeSet<GutterMarker<any>>
+  markers: GutterMarkerSet
 
-  constructor(public view: EditorView, public slot: SlotType<MarkerUpdate>, public config: Full<GutterConfig>) {
+  constructor(public view: EditorView, public config: Full<GutterConfig>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter " + config.class + " " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")
@@ -61,24 +69,13 @@ class GutterView implements ViewPlugin {
       this.dom.style.position = "sticky"
     }
     view.dom.insertBefore(this.dom, view.contentDOM)
-    this.markers = RangeSet.of(config.markers)
+    this.markers = config.initialMarkers(view)
     this.updateGutter()
   }
 
   update(update: ViewUpdate) {
-    for (let tr of update.transactions) {
-      this.markers = this.markers.map(tr.changes)
-      let markerUpdate = tr.getMeta(this.slot)
-      if (markerUpdate) {
-        let repl = null, from = 0, to = 0
-        if (markerUpdate.replace) {
-          repl = () => false
-          ;({from, to} = markerUpdate.replace)
-        }
-        if (repl || markerUpdate.markers)
-          this.markers = this.markers.update(markerUpdate.markers || [], repl, from, to)
-      }
-    }
+    for (let tr of update.transactions) this.markers = this.markers.map(tr.changes)
+    this.markers = this.config.updateMarkers(this.markers, update)
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter()
   }
@@ -126,15 +123,15 @@ class GutterElement {
   dom: HTMLElement
   height: number = -1
   above: number = 0
-  markers!: ReadonlyArray<GutterMarker<any>>
+  markers!: ReadonlyArray<GutterMarker>
 
-  constructor(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker<any>>) {
+  constructor(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter-element"
     this.update(config, height, above, markers)
   }
 
-  update(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker<any>>) {
+  update(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)

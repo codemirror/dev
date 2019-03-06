@@ -15,7 +15,14 @@ let mode = legacyMode({mode: javascript({indentUnit: 2}, {}) as any})
 class TestMarker extends GutterMarker<string> {
   toDOM() { return document.createTextNode(this.value) }
 }
-let {extension, slot} = gutter({class: "my-gutter", markers: [TestMarker.create(0, "M")]})
+
+function markEmptyLines(view: EditorView) {
+  let deco = []
+  view.viewportLines(line => {
+    if (line.from == line.to) deco.push(TestMarker.create(line.from, "»"))
+  })
+  return TestMarker.set(deco)
+}
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `"use strict";
@@ -24,7 +31,7 @@ const {readFile} = require("fs");
 readFile("package.json", "utf8", (err, data) => {
   console.log(data);
 });`, extensions: [
-  extension,
+  gutter({class: "my-gutter", initialMarkers: markEmptyLines, updateMarkers: (_, update) => markEmptyLines(update.view)}),
   history(),
   specialChars(),
   multipleSelections(),
@@ -43,8 +50,3 @@ readFile("package.json", "utf8", (err, data) => {
 
 let view = (window as any).view = new EditorView({state})
 document.querySelector("#editor").appendChild(view.dom)
-
-window.add = () => {
-  let line = view.state.doc.lineAt(view.state.selection.primary.from)
-  view.dispatch(view.state.t().addMeta(slot({markers: [TestMarker.create(line.start, "X")]})))
-}
