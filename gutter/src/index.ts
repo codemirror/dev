@@ -74,8 +74,7 @@ class GutterView implements ViewPlugin {
   }
 
   update(update: ViewUpdate) {
-    for (let tr of update.transactions) this.markers = this.markers.map(tr.changes)
-    this.markers = this.config.updateMarkers(this.markers, update)
+    this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter()
   }

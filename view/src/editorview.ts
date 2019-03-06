@@ -9,7 +9,7 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
-import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule, ViewSnapshot,
+import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule,
         viewPlugin, ViewPlugin, getField, Effect} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 
@@ -88,7 +88,7 @@ export class EditorView {
     })
   }
 
-  update(transactions: Transaction[], metadata: Slot[] = []) {
+  update(transactions: Transaction[] = [], metadata: Slot[] = []) {
     let state = this.state
     for (let tr of transactions) {
       if (tr.startState != state)
@@ -96,15 +96,16 @@ export class EditorView {
       state = tr.apply()
     }
     this.withUpdating(() => {
-      let snapshot = new ViewSnapshot(this)
+      let update = transactions.length > 0 || metadata.length > 0 ? new ViewUpdate(this, transactions, metadata) : null
       if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
         this.inputState.goalColumns.length = 0
-      this.docView.update(transactions, state, metadata,
-                          transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
-      this.inputState.update(transactions)
-      this.updatePlugins(new ViewUpdate(snapshot, transactions, this, metadata))
-      this.contentAttrs.update(this)
-      this.editorAttrs.update(this)
+      this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+      if (update) {
+        this.inputState.update(update)
+        this.updatePlugins(update)
+        this.contentAttrs.update(this)
+        this.editorAttrs.update(this)
+      }
     })
   }
 
@@ -114,21 +115,20 @@ export class EditorView {
   }
 
   // @internal
-  updateStateInner(state: EditorState, viewport: Viewport, transactions: ReadonlyArray<Transaction>, metadata: ReadonlyArray<Slot>) {
-    if (this.fieldValues) {
-      let snapshot = new ViewSnapshot(this)
-      this.viewport = viewport
-      this.state = state
-      this.fieldValues = []
-      let update = new ViewUpdate(snapshot, transactions, this, metadata)
-      for (let i = 0; i < this.fields.length; i++)
-        this.fieldValues.push(this.fields[i].update(snapshot.fieldValues[i], update))
-    } else {
-      this.viewport = viewport
-      this.state = state
-      this.fieldValues = []
-      for (let field of this.fields) this.fieldValues.push(field.create(this))
-    }
+  initInner(state: EditorState, viewport: Viewport) {
+    this.viewport = viewport
+    this.state = state
+    this.fieldValues = []
+    for (let field of this.fields) this.fieldValues.push(field.create(this))
+  }
+
+  // @internal
+  updateInner(update: ViewUpdate, viewport: Viewport) {
+    this.viewport = viewport
+    this.state = update.state
+    this.fieldValues = []
+    for (let i = 0; i < this.fields.length; i++)
+      this.fieldValues.push(this.fields[i].update(update.prevFieldValues[i], update))
   }
 
   // @internal

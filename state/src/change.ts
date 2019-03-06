@@ -153,6 +153,7 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
     return new PartialMapping(this, from, to)
   }
 
+  // FIXME cache this?
   changedRanges(): ChangedRange[] {
     let set: ChangedRange[] = []
     for (let i = 0; i < this.length; i++) {

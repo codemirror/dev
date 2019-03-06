@@ -1,6 +1,6 @@
 import {EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
 import {EditorView} from "./editorview"
-import {focusChange, handleDOMEvents} from "./extension"
+import {focusChange, handleDOMEvents, ViewUpdate} from "./extension"
 import {Slot} from "../../extension/src/extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
@@ -67,9 +67,8 @@ export class InputState {
     this.mouseSelection = new MouseSelection(this, view, event, update)
   }
 
-  update(transactions: Transaction[]) {
-    if (this.mouseSelection)
-      this.mouseSelection.map(transactions.reduce((set, tr) => set.appendSet(tr.changes), ChangeSet.empty))
+  update(update: ViewUpdate) {
+    if (this.mouseSelection) this.mouseSelection.map(update.changes)
     this.lastKeyCode = this.lastSelectionTime = 0
   }
 

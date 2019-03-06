@@ -1,5 +1,5 @@
 import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewField, ViewUpdate, ViewExtension, EditorView} from "../../view/src"
-import {ChangeSet, ChangedRange, Transaction} from "../../state/src"
+import {ChangedRange, Transaction} from "../../state/src"
 import {combineConfig, Full} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 import {StyleModule} from "style-mod"
@@ -47,12 +47,11 @@ class SpecialCharHighlighter {
       this.decorations = Decoration.none
       this.from = this.to = 0
     } else {
-      let allChanges = update.transactions.reduce((ch, tr) => ch.appendSet(tr.changes), ChangeSet.empty)
-      if (allChanges.length) {
-        this.decorations = this.decorations.map(allChanges)
-        this.from = allChanges.mapPos(this.from, 1)
-        this.to = allChanges.mapPos(this.to, -1)
-        this.closeHoles(allChanges.changedRanges())
+      if (update.changes.length) {
+        this.decorations = this.decorations.map(update.changes)
+        this.from = update.changes.mapPos(this.from, 1)
+        this.to = update.changes.mapPos(this.to, -1)
+        this.closeHoles(update.changes.changedRanges())
       }
     }
     this.updateForViewport()

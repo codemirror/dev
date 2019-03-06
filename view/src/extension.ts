@@ -1,4 +1,4 @@
-import {EditorState, Transaction} from "../../state/src"
+import {EditorState, Transaction, ChangeSet} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
@@ -7,6 +7,8 @@ import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
 
 export type Effect<T> = SlotType<(field: any) => T>
+
+const none: any[] = []
 
 export class ViewField<V> {
   readonly create: (view: EditorView) => V
@@ -35,7 +37,7 @@ export class ViewField<V> {
     return new ViewField<DecorationSet>({
       create: create || (() => Decoration.none),
       update(deco: DecorationSet, u: ViewUpdate) {
-        if (map) for (let tr of u.transactions) deco = deco.map(tr.changes)
+        if (map) deco = deco.map(u.changes)
         return update(deco, u)
       },
       effects: [ViewField.decorationEffect(d => d)]
@@ -71,39 +73,39 @@ export const viewPlugin = ViewExtension.defineBehavior<(view: EditorView) => Vie
 
 export const styleModule = ViewExtension.defineBehavior<StyleModule>()
 
-export class ViewSnapshot {
-  public state: EditorState
-  public fields: ReadonlyArray<ViewField<any>>
-  public fieldValues: ReadonlyArray<any>
-  public viewport: Viewport
-  constructor(view: EditorView) {
-    this.state = view.state
-    this.fields = view.fields
-    this.fieldValues = view.fieldValues
-    this.viewport = view.viewport
-  }
-}
-
 export const focusChange = Slot.define<boolean>()
 
 export class ViewUpdate {
-  constructor(private prev: ViewSnapshot,
-              public readonly transactions: ReadonlyArray<Transaction>,
-              public readonly view: EditorView,
-              private metadata: ReadonlyArray<Slot>) {}
+  readonly state: EditorState
+  readonly changes: ChangeSet
+  readonly prevState: EditorState
+  // @internal
+  readonly prevFields: ReadonlyArray<ViewField<any>>
+  // @internal
+  readonly prevFieldValues: ReadonlyArray<any>
+  readonly prevViewport: Viewport
 
-  get prevState() { return this.prev.state }
-  get state() { return this.view.state }
-  get prevViewport() { return this.prev.viewport }
+  constructor(readonly view: EditorView,
+              readonly transactions: ReadonlyArray<Transaction> = none,
+              // @internal
+              readonly metadata: ReadonlyArray<Slot> = none) {
+    this.state = transactions.length ? transactions[transactions.length - 1].apply() : view.state
+    this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
+    this.prevState = view.state
+    this.prevFields = view.fields
+    this.prevFieldValues = view.fieldValues
+    this.prevViewport = view.viewport
+  }
+
   get viewport() { return this.view.viewport }
 
   prevField<T>(field: ViewField<T>): T
   prevField<T, D = undefined>(field: ViewField<T>, defaultValue?: D): T | D {
-    return getField(field, this.prev.fields, this.prev.fieldValues, defaultValue)
+    return getField(field, this.prevFields, this.prevFieldValues, defaultValue)
   }
 
   get viewportChanged() {
-    return this.prev.viewport.eq(this.view.viewport)
+    return this.prevViewport.eq(this.view.viewport)
   }
 
   get docChanged() {
