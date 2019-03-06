@@ -1,4 +1,4 @@
-import {combineConfig, fillConfig, Full} from "../../extension/src/extension"
+import {combineConfig, fillConfig, Full, Slot} from "../../extension/src/extension"
 import {EditorView, ViewExtension, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
@@ -176,10 +176,17 @@ function sameMarkers<T>(a: ReadonlyArray<GutterMarker<T>>, b: ReadonlyArray<Gutt
   return true
 }
 
-interface LineNumberConfig {
+export interface LineNumberConfig {
   fixed?: boolean,
   formatNumber?: (lineNo: number) => string
 }
+
+export type LineNumberMarkerUpdate = {
+  add?: Range<GutterMarker>[],
+  filter?: (from: number, to: number, marker: GutterMarker) => boolean
+}
+
+export const lineNumberMarkers = Slot.define<LineNumberMarkerUpdate>()
 
 export const lineNumbers = ViewExtension.unique<LineNumberConfig>(configs => {
   let config = combineConfig(configs, {
@@ -194,6 +201,11 @@ export const lineNumbers = ViewExtension.unique<LineNumberConfig>(configs => {
   return gutter({
     class: "codemirror-line-numbers " + styles.lineNumberGutter,
     fixed: config.fixed,
+    updateMarkers(markers: GutterMarkerSet, update: ViewUpdate) {
+      let slot = update.getMeta(lineNumberMarkers)
+      if (slot) markers = markers.update(slot.add || [], slot.filter || null)
+      return markers
+    },
     lineMarker(view, line, others) {
       if (others.length) return null
       // FIXME try to make the line number queries cheaper?
