@@ -2,7 +2,7 @@ import {EditorState, EditorSelection} from "../state/src"
 import {EditorView} from "../view/src/"
 import {keymap} from "../keymap/src/keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history/src/history"
-import {lineNumbers, GutterMarker, lineNumberMarkers} from "../gutter/src/index"
+import {lineNumbers} from "../gutter/src/index"
 import {baseKeymap, indentSelection} from "../commands/src/commands"
 import {legacyMode} from "../legacy-modes/src/index"
 import {matchBrackets} from "../matchbrackets/src/matchbrackets"
@@ -38,18 +38,3 @@ readFile("package.json", "utf8", (err, data) => {
 
 let view = (window as any).view = new EditorView({state})
 document.querySelector("#editor").appendChild(view.dom)
-
-class MyMarker extends GutterMarker<void> {
-  toDOM() {
-    let s = document.createElement("span")
-    s.textContent = "★"
-    s.style.color = "red"
-    return s
-  }
-}
-
-window.add = () => {
-  let {selection, doc} = view.state
-  let line = doc.lineAt(selection.primary.from).start
-  view.dispatch(view.state.t().addMeta(lineNumberMarkers({add: [MyMarker.create(line, undefined)], filter: () => false})))
-}

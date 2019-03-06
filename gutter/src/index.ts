@@ -4,31 +4,32 @@ import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
 import {StyleModule} from "style-mod"
 
-// FIXME Think about how the gutter width changing could cause
-// problems when line wrapping is on by changing a line's height
-// (solution is possibly some way for this plugin to signal the view
-// that it has to do another layout check when the gutter's width
-// changes, which should be relatively rare)
-
-// FIXME add a way for gutter markers to add classes to the gutter element
-
 export abstract class GutterMarker<T = any> extends RangeValue {
   constructor(readonly value: T) { super() }
+
   eq(other: GutterMarker<T>) {
     return this == other || this.constructor == other.constructor && this.value === other.value
   }
+
   map(mapping: ChangeSet, pos: number): Range<GutterMarker<T>> | null {
     pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
-  abstract toDOM(): Node
+
+  toDOM(): Node | null { return null }
+
+  elementClass!: string | null
+
   static create<T>(pos: number, value: T): Range<GutterMarker<T>> {
     return new Range(pos, pos, new (this as any)(value))
   }
+
   static set(of: Range<GutterMarker> | ReadonlyArray<Range<GutterMarker>>): GutterMarkerSet {
     return RangeSet.of<GutterMarker>(of)
   }
 }
+
+GutterMarker.prototype.elementClass = null
 
 export type GutterMarkerSet = RangeSet<GutterMarker>
 
@@ -153,7 +154,6 @@ class GutterElement {
 
   constructor(height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
     this.dom = document.createElement("div")
-    this.dom.className = "codemirror-gutter-element"
     this.update(height, above, markers)
   }
 
@@ -165,7 +165,14 @@ class GutterElement {
     if (this.markers != markers) {
       this.markers = markers
       for (let ch; ch = this.dom.lastChild;) ch.remove()
-      for (let m of markers) this.dom.appendChild(m.toDOM())
+      let cls = "codemirror-gutter-element"
+      for (let m of markers) {
+        let dom = m.toDOM()
+        if (dom) this.dom.appendChild(dom)
+        let c = m.elementClass
+        if (c) cls += " " + c
+      }
+      this.dom.className = cls
     }
   }
 }
