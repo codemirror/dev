@@ -221,7 +221,6 @@ describe("Composition", () => {
     ist(cm.state.doc.toString(), "o!e\nxyztwo\nthree")
   })
 
-  // FIXME also test with newline inserted directly in front of the composition
   it("doesn't cancel composition when the composition is moved into a new line", () => {
     let cm = requireFocus(tempEditor("one\ntwo three", [wordHighlighter]))
     compose(cm, () => up(cm.domAtPos(9).node as Text, "x"), [
@@ -230,6 +229,16 @@ describe("Composition", () => {
       n => up(n, "z")
     ])
     ist(cm.state.doc.toString(), "one\n\ntwo threexyz")
+  })
+
+  it("doesn't cancel composition when a line break is inserted in front of it", () => {
+    let cm = requireFocus(tempEditor("one two three", [wordHighlighter]))
+    compose(cm, () => up(cm.domAtPos(9).node as Text, "x"), [
+      n => up(n, "y"),
+      () => cm.dispatch(cm.state.t().replace(8, 8, "\n")),
+      n => up(n, "z")
+    ])
+    ist(cm.state.doc.toString(), "one two \nthreexyz")
   })
 
   it("doesn't cancel composition when a newline is added immediately in front", () => {

@@ -586,7 +586,6 @@ function sameArray<T>(a: A<T>, b: A<T>) {
   return true
 }
 
-
 export function computeCompositionDeco(view: EditorView, changes: A<ChangedRange>): DecorationSet {
   let sel = view.root.getSelection()!
   let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset)
@@ -606,21 +605,19 @@ export function computeCompositionDeco(view: EditorView, changes: A<ChangedRange
     return Decoration.none
   }
 
-  let newFrom = ChangedRange.mapPos(from, -1, changes), newTo = ChangedRange.mapPos(to, 1, changes)
-  if (
-    // A single change that falls entirely inside the composition, and
-    // the new text corresponds to what the composition DOM contains
-    (changes.length == 1 &&
-     changes[0].fromA >= from && changes[0].toA <= to &&
-     textNode.nodeValue == view.state.doc.slice(newFrom, newTo)) ||
-    // All changes are entirely outside
-    changes.every(ch => ch.fromA >= to || ch.toA <= from)
-  ) {
-    return Decoration.set(Decoration.replace(newFrom, newTo, {
-      widget: new CompositionWidget({top: topNode, text: textNode})
-    }))
+  let newFrom = ChangedRange.mapPos(from, 1, changes), newTo = Math.max(newFrom, ChangedRange.mapPos(to, -1, changes))
+  let text = textNode.nodeValue!, doc = view.state.doc
+  if (newTo - newFrom < text.length) {
+    if (doc.slice(newFrom, Math.min(doc.length, newFrom + text.length)) == text) newTo = newFrom + text.length
+    else if (doc.slice(Math.max(0, newTo - text.length), newTo) == text) newFrom = newTo - text.length
+    else return Decoration.none
+  } else if (doc.slice(newFrom, newTo) != text) {
+    return Decoration.none
   }
-  return Decoration.none
+
+  return Decoration.set(Decoration.replace(newFrom, newTo, {
+    widget: new CompositionWidget({top: topNode, text: textNode})
+  }))
 }
 
 class CompositionWidget extends WidgetType<{top: Node, text: Node}> {
