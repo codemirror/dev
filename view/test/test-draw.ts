@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {EditorView} from "../src/"
+import {EditorView, ViewField} from "../src/"
 import ist from "ist"
 
 function domText(view: EditorView) {
@@ -171,6 +171,20 @@ describe("EditorView drawing", () => {
     }
   })
 
-  // FIXME add test that ensures an editor added to the dom after its
-  // initial checkLayout animationframe passed still updates itself.
+  function later() {
+    return new Promise(resolve => setTimeout(resolve, 50))
+  }
+
+  it("notices it is added to the DOM even if initially detached", () => {
+    if (!(window as any).IntersectionObserver) return // Only works with intersection observer support
+    let cm = tempEditor("a\n\b\nc\nd", [ViewField.contentAttributes({style: "font-size: 60px"})])
+    let parent = cm.dom.parentNode!
+    cm.dom.remove()
+    return later().then(() => {
+      parent.appendChild(cm.dom)
+      return later().then(() => {
+        ist(cm.contentHeight, 200, ">")
+      })
+    })
+  })
 })
