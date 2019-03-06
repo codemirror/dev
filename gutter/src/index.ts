@@ -1,4 +1,4 @@
-import {fillConfig, Full} from "../../extension/src/extension"
+import {combineConfig, fillConfig, Full} from "../../extension/src/extension"
 import {EditorView, ViewExtension, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
@@ -9,6 +9,8 @@ import {StyleModule} from "style-mod"
 // (solution is possibly some way for this plugin to signal the view
 // that it has to do another layout check when the gutter's width
 // changes, which should be relatively rare)
+
+// FIXME add a way for gutter markers to add classes to the gutter element
 
 export abstract class GutterMarker<T = any> extends RangeValue {
   constructor(readonly value: T) { super() }
@@ -36,13 +38,21 @@ export interface GutterConfig {
   renderEmptyElements?: boolean
   initialMarkers?: (view: EditorView) => GutterMarkerSet
   updateMarkers?: (markers: GutterMarkerSet, update: ViewUpdate) => GutterMarkerSet
+  lineMarker?: (view: EditorView, line: BlockInfo, markers: ReadonlyArray<GutterMarker>) => GutterMarker | null
+  // @internal
+  initialSpacer?: null | ((view: EditorView) => GutterMarker)
+  // @internal
+  updateSpacer?: null | ((spacer: GutterMarker, update: ViewUpdate) => GutterMarker)
 }
 
 const defaults = {
   fixed: true,
   renderEmptyElements: false,
   initialMarkers: () => RangeSet.empty,
-  updateMarkers: (markers: GutterMarkerSet) => markers
+  updateMarkers: (markers: GutterMarkerSet) => markers,
+  lineMarker: () => null,
+  initialSpacer: null,
+  updateSpacer: null
 }
 
 export function gutter<T>(config: GutterConfig) {
@@ -57,6 +67,7 @@ class GutterView implements ViewPlugin {
   dom: HTMLElement
   elements: GutterElement[] = []
   markers: GutterMarkerSet
+  spacer: GutterElement | null = null
 
   constructor(public view: EditorView, public config: Full<GutterConfig>) {
     this.dom = document.createElement("div")
@@ -70,11 +81,20 @@ class GutterView implements ViewPlugin {
     }
     view.dom.insertBefore(this.dom, view.contentDOM)
     this.markers = config.initialMarkers(view)
+    if (config.initialSpacer) {
+      this.spacer = new GutterElement(0, 0, [config.initialSpacer(view)])
+      this.dom.appendChild(this.spacer.dom)
+      this.spacer.dom.style.cssText += "visibility: hidden; pointer-events: none"
+    }
     this.updateGutter()
   }
 
   update(update: ViewUpdate) {
     this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
+    if (this.spacer && this.config.updateSpacer) {
+      let updated = this.config.updateSpacer(this.spacer.markers[0], update)
+      if (updated != this.spacer.markers[0]) this.spacer.update(0, 0, [updated])
+    }
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter()
   }
@@ -89,18 +109,25 @@ class GutterView implements ViewPlugin {
       else text = line.type == BlockType.Text ? line : undefined
       if (!text) return
 
-      while (nextMarker && nextMarker.from <= line.from) {
-        if (nextMarker.from == line.from) localMarkers.push(nextMarker.value)
+      while (nextMarker && nextMarker.from <= text.from) {
+        if (nextMarker.from == text.from) localMarkers.push(nextMarker.value)
         nextMarker = markers.next()
       }
+      let forLine = this.config.lineMarker(this.view, text, localMarkers)
+      if (forLine) localMarkers.unshift(forLine)
       if (localMarkers.length || this.config.renderEmptyElements) {
         let above = text.top - height
         if (i == this.elements.length) {
-          let newElt = new GutterElement(this.config, text.height, above, localMarkers)
+          let newElt = new GutterElement(text.height, above, localMarkers)
           this.elements.push(newElt)
           this.dom.appendChild(newElt.dom)
         } else {
-          this.elements[i].update(this.config, text.height, above, localMarkers)
+          let markers: ReadonlyArray<GutterMarker> = localMarkers, elt = this.elements[i]
+          if (sameMarkers(markers, elt.markers)) {
+            markers = elt.markers
+            localMarkers.length = 0
+          }
+          elt.update(text.height, above, markers)
         }
         height = text.bottom
         i++
@@ -124,18 +151,18 @@ class GutterElement {
   above: number = 0
   markers!: ReadonlyArray<GutterMarker>
 
-  constructor(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
+  constructor(height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter-element"
-    this.update(config, height, above, markers)
+    this.update(height, above, markers)
   }
 
-  update(config: Full<GutterConfig>, height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
+  update(height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
       this.dom.style.marginTop = (this.above = above) ? above + "px" : ""
-    if (!this.markers || !sameMarkers(markers, this.markers)) {
+    if (this.markers != markers) {
       this.markers = markers
       for (let ch; ch = this.dom.lastChild;) ch.remove()
       for (let m of markers) this.dom.appendChild(m.toDOM())
@@ -149,7 +176,6 @@ function sameMarkers<T>(a: ReadonlyArray<GutterMarker<T>>, b: ReadonlyArray<Gutt
   return true
 }
 
-/*
 interface LineNumberConfig {
   fixed?: boolean,
   formatNumber?: (lineNo: number) => string
@@ -160,100 +186,34 @@ export const lineNumbers = ViewExtension.unique<LineNumberConfig>(configs => {
     fixed: true,
     formatNumber: String
   })
-  return ViewExtension.all(
-    viewPlugin(view => new GutterView(view, config)),
-    styleModule(styles)
-  )
+  class NumberMarker extends GutterMarker<number> {
+    toDOM() {
+      return document.createTextNode(config.formatNumber(this.value))
+    }
+  }
+  return gutter({
+    class: "codemirror-line-numbers " + styles.lineNumberGutter,
+    fixed: config.fixed,
+    lineMarker(view, line, others) {
+      if (others.length) return null
+      // FIXME try to make the line number queries cheaper?
+      return new NumberMarker(view.state.doc.lineAt(line.from).number)
+    },
+    initialSpacer(view: EditorView) {
+      return new NumberMarker(maxLineNumber(view.state.doc.lines))
+    },
+    updateSpacer(spacer: GutterMarker, update: ViewUpdate) {
+      let max = maxLineNumber(update.view.state.doc.lines)
+      return max == spacer.value ? spacer : new NumberMarker(max)
+    }
+  })
 }, {})
 
-class GutterView implements ViewPlugin {
-  dom: HTMLElement
-  lines: GutterLine[] = []
-  lastLine: GutterLine
-  formatNumber: (lineNo: number) => string
-
-  constructor(public view: EditorView, config: Full<GutterConfig>) {
-    this.dom = document.createElement("div")
-    this.dom.className = "codemirror-gutter " + styles.gutter
-    this.dom.setAttribute("aria-hidden", "true")
-    this.dom.style.cssText = `left: 0; box-sizing: border-box; height: 100%; overflow: hidden; flex-shrink: 0;`
-    if (config.fixed) {
-      // FIXME IE11 fallback, which doesn't support position: sticky,
-      // by using position: relative + event handlers that realign the
-      // gutter (or just force fixed=false on IE11?)
-      this.dom.style.position = "sticky"
-    }
-    view.dom.insertBefore(this.dom, view.contentDOM)
-    this.lastLine = new GutterLine(1, 0, 0, this.formatNumber)
-    this.lastLine.dom.style.cssText += "visibility: hidden; pointer-events: none"
-    this.dom.appendChild(this.lastLine.dom)
-    this.update()
-  }
-
-  update() {
-    // Create the first number consisting of all 9s that is at least
-    // as big as the line count, and put that in this.lastLine to make
-    // sure the gutter width is stable
-    let last = 9
-    while (last < this.view.state.doc.lines) last = last * 10 + 9
-    this.lastLine.update(last, 0, 0, this.formatNumber)
-    // FIXME would be nice to be able to recognize updates that didn't redraw
-    this.updateGutter()
-  }
-
-  updateGutter() {
-    let i = 0, height = 0
-    this.view.viewportLines(line => {
-      let text: BlockInfo | undefined
-      if (Array.isArray(line.type)) text = line.type.find(b => b.type == BlockType.Text)
-      else text = line.type == BlockType.Text ? line : undefined
-      if (!text) return
-      let above = text.top - height
-      // FIXME optimize (increment) when we can tell it's valid? (no replaced ranges)
-      let lineNo = this.view.state.doc.lineAt(text.from).number
-      if (i == this.lines.length) {
-        let newLine = new GutterLine(lineNo, text.height, above, this.formatNumber)
-        this.lines.push(newLine)
-        this.dom.appendChild(newLine.dom)
-      } else {
-        this.lines[i].update(lineNo, text.height, above, this.formatNumber)
-      }
-      height = text.bottom
-      i++
-    }, 0)
-    while (this.lines.length > i) this.dom.removeChild(this.lines.pop()!.dom)
-    this.dom.style.minHeight = this.view.contentHeight + "px"
-  }
-
-  destroy() {
-    this.dom.remove()
-  }
-
-  get styles() { return styles }
+function maxLineNumber(lines: number) {
+  let last = 9
+  while (last < lines) last = last * 10 + 9
+  return last
 }
-
-class GutterLine {
-  dom: HTMLElement
-  lineNo: number = -1
-  height: number = -1
-  above: number = 0
-  below: number = 0
-
-  constructor(lineNo: number, height: number, above: number) {
-    this.dom = document.createElement("div")
-    this.dom.className = "codemirror-gutter-element"
-  }
-
-  update(lineNo: number, height: number, above: number, config: Full<GutterConfig>) {
-    if (this.lineNo != lineNo)
-      this.dom.textContent = formatNo(this.lineNo = lineNo)
-    if (this.height != height)
-      this.dom.style.height = (this.height = height) + "px"
-    if (this.above != above)
-      this.dom.style.marginTop = (this.above = above) ? above + "px" : ""
-  }
-}
-*/
 
 const styles = new StyleModule({
   gutter: {
