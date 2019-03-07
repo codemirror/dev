@@ -201,7 +201,7 @@ describe("HeightMap", () => {
       let block2 = map.blockAt(block1.bottom + 1, text, 0, 0)
       ist(block2.from, 4); ist(block2.to, 7)
       ist(block2.top, block1.bottom); ist(block2.bottom, block1.bottom, ">")
-      let block3 = map.blockAt(2e9, text, 0, 0)
+      let block3 = map.blockAt(1e9, text, 0, 0)
       ist(block3.from, 16); ist(block3.to, 19)
       ist(block3.bottom, map.height)
     })
@@ -259,7 +259,7 @@ describe("HeightMap", () => {
       let line3 = map.lineAt(15, byP, text, 0, 0)
       ist(line3.from, 12); ist(line3.to, 15)
       ist(line3.bottom, map.height)
-      ist(map.lineAt(2e9, byH, text, 0, 0), line3, eqBlock)
+      ist(map.lineAt(1e9, byH, text, 0, 0), line3, eqBlock)
     })
 
     it("finds lines in lines", () => {

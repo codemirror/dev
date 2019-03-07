@@ -580,7 +580,7 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
   }
 }
 
-const SIDE_A = 1, SIDE_B = 2, FAR = 2e9
+const SIDE_A = 1, SIDE_B = 2, FAR = 1e9
 
 class ComparisonSide<T extends RangeValue> {
   heap: LocalSet<T>[] = []

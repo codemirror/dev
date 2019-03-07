@@ -566,7 +566,7 @@ function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRan
   let result: ChangedRange[] = []
   for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
     let next = dI == diff.length ? null : diff[dI], off = posA - posB
-    let end = next ? next.fromB : 2e9
+    let end = next ? next.fromB : 1e9
     while (rI < ranges.length && ranges[rI] < end) {
       let from = ranges[rI], to = ranges[rI + 1]
       let fromB = Math.max(posB, from), toB = Math.min(end, to)

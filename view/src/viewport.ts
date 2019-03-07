@@ -40,8 +40,8 @@ export class ViewportState {
   }
 
   coverEverything() {
-    this.top = -2e9
-    this.bottom = 2e9
+    this.top = -1e9
+    this.bottom = 1e9
   }
 
   getViewport(doc: Text, heightMap: HeightMap, bias: number, scrollTo: number): Viewport {
