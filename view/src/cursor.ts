@@ -301,16 +301,17 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
 
 export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bias: -1 | 1 = -1): number {
   let content = view.contentDOM.getBoundingClientRect(), block
+  let halfLine = view.defaultLineHeight / 2
   for (let bounced = false;;) {
     block = view.blockAtHeight(y, content.top)
     if (block.top > y || block.bottom < y) {
       bias = block.top > y ? -1 : 1
-      y = Math.min(block.bottom - 1, Math.max(block.top + 1, y))
+      y = Math.min(block.bottom - halfLine, Math.max(block.top + halfLine, y))
       if (bounced) return -1
       else bounced = true
     }
     if (block.type == BlockType.Text) break
-    y = bias > 0 ? block.bottom + 1 : block.top - 1
+    y = bias > 0 ? block.bottom + halfLine : block.top - halfLine
   }
   let lineStart = block.from
   // If this is outside of the rendered viewport, we can't determine a position
