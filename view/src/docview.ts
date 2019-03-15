@@ -436,14 +436,15 @@ export class DocView extends ContentView {
 
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.viewport
+    let minWidth = Math.max(this.dom.clientWidth, this.minWidth) + 1
     for (let pos = 0, i = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       if (end > to) break
       if (pos >= from) {
         result.push(child.dom!.getBoundingClientRect().height)
         let width = child.dom!.scrollWidth
-        if (width > this.minWidth + 1) {
-          this.minWidth = width
+        if (width > minWidth) {
+          this.minWidth = minWidth = width
           this.minWidthFrom = pos
           this.minWidthTo = end
         }
