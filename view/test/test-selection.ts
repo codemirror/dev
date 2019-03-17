@@ -39,8 +39,8 @@ describe("EditorView selection", () => {
     let cm = requireFocus(tempEditor("abc\n\ndef"))
     function test(pos: number, node: Node, offset: number) {
       cm.dispatch(cm.state.t().setSelection(EditorSelection.single(pos)))
-      ist(window.getSelection()!.focusNode, node)
-      ist(window.getSelection()!.focusOffset, offset)
+      let sel = window.getSelection()!
+      ist(isEquivalentPosition(node, offset, sel.focusNode, sel.focusOffset))
     }
     let abc = cm.contentDOM.firstChild!.firstChild!
     let def = cm.contentDOM.lastChild!.firstChild!
@@ -54,3 +54,37 @@ describe("EditorView selection", () => {
     test(8, def.parentNode!, 1)
   })
 })
+
+function isEquivalentPosition(node: Node, off: number, targetNode: Node | null, targetOff: number): boolean {
+  function scanFor(node: Node, off: number, targetNode: Node, targetOff: number, dir: -1 | 1): boolean {
+    for (;;) {
+      if (node == targetNode && off == targetOff) return true
+      if (off == (dir < 0 ? 0 : maxOffset(node))) {
+        if (node.nodeName == "DIV") return false
+        let parent = node.parentNode
+        if (!parent || parent.nodeType != 1) return false
+        off = domIndex(node) + (dir < 0 ? 0 : 1)
+        node = parent
+      } else if (node.nodeType == 1) {
+        node = node.childNodes[off + (dir < 0 ? -1 : 0)]
+        off = dir < 0 ? maxOffset(node) : 0
+      } else {
+        return false
+      }
+    }
+  }
+
+  function domIndex(node: Node): number {
+    for (var index = 0;; index++) {
+      node = node.previousSibling!
+      if (!node) return index
+    }
+  }
+
+  function maxOffset(node: Node): number {
+    return node.nodeType == 3 ? node.nodeValue!.length : node.childNodes.length
+  }
+
+  return targetNode ? (scanFor(node, off, targetNode, targetOff, -1) ||
+                       scanFor(node, off, targetNode, targetOff, 1)) : false
+}
