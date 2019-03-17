@@ -234,7 +234,7 @@ class AttrsFor {
   }
 }
 
-const styles = new StyleModule({
+export const styles = new StyleModule({
   wrapper: {
     position: "relative !important",
     display: "flex !important",
@@ -262,10 +262,10 @@ const styles = new StyleModule({
     padding: "4px 0",
     outline: "none",
     caretColor: "black",
+  },
 
-    "& .codemirror-line": {
-      display: "block",
-      padding: "0 2px 0 4px"
-    }
+  line: {
+    display: "block",
+    padding: "0 2px 0 4px"
   }
 }, {priority: 0})

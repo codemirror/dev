@@ -37,6 +37,7 @@ export interface GutterConfig {
   class: string
   fixed?: boolean
   renderEmptyElements?: boolean
+  elementClass?: string
   initialMarkers?: (view: EditorView) => GutterMarkerSet
   updateMarkers?: (markers: GutterMarkerSet, update: ViewUpdate) => GutterMarkerSet
   lineMarker?: (view: EditorView, line: BlockInfo, markers: ReadonlyArray<GutterMarker>) => GutterMarker | null
@@ -49,6 +50,7 @@ export interface GutterConfig {
 const defaults = {
   fixed: true,
   renderEmptyElements: false,
+  elementClass: "",
   initialMarkers: () => RangeSet.empty,
   updateMarkers: (markers: GutterMarkerSet) => markers,
   lineMarker: () => null,
@@ -83,7 +85,7 @@ class GutterView implements ViewPlugin {
     view.dom.insertBefore(this.dom, view.contentDOM)
     this.markers = config.initialMarkers(view)
     if (config.initialSpacer) {
-      this.spacer = new GutterElement(0, 0, [config.initialSpacer(view)])
+      this.spacer = new GutterElement(0, 0, [config.initialSpacer(view)], this.config.elementClass)
       this.dom.appendChild(this.spacer.dom)
       this.spacer.dom.style.cssText += "visibility: hidden; pointer-events: none"
     }
@@ -94,7 +96,7 @@ class GutterView implements ViewPlugin {
     this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
     if (this.spacer && this.config.updateSpacer) {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
-      if (updated != this.spacer.markers[0]) this.spacer.update(0, 0, [updated])
+      if (updated != this.spacer.markers[0]) this.spacer.update(0, 0, [updated], this.config.elementClass)
     }
     // FIXME would be nice to be able to recognize updates that didn't redraw
     this.updateGutter()
@@ -119,7 +121,7 @@ class GutterView implements ViewPlugin {
       if (localMarkers.length || this.config.renderEmptyElements) {
         let above = text.top - height
         if (i == this.elements.length) {
-          let newElt = new GutterElement(text.height, above, localMarkers)
+          let newElt = new GutterElement(text.height, above, localMarkers, this.config.elementClass)
           this.elements.push(newElt)
           this.dom.appendChild(newElt.dom)
         } else {
@@ -128,7 +130,7 @@ class GutterView implements ViewPlugin {
             markers = elt.markers
             localMarkers.length = 0
           }
-          elt.update(text.height, above, markers)
+          elt.update(text.height, above, markers, this.config.elementClass)
         }
         height = text.bottom
         i++
@@ -152,12 +154,12 @@ class GutterElement {
   above: number = 0
   markers!: ReadonlyArray<GutterMarker>
 
-  constructor(height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
+  constructor(height: number, above: number, markers: ReadonlyArray<GutterMarker>, eltClass: string) {
     this.dom = document.createElement("div")
-    this.update(height, above, markers)
+    this.update(height, above, markers, eltClass)
   }
 
-  update(height: number, above: number, markers: ReadonlyArray<GutterMarker>) {
+  update(height: number, above: number, markers: ReadonlyArray<GutterMarker>, eltClass: string) {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
@@ -165,7 +167,8 @@ class GutterElement {
     if (this.markers != markers) {
       this.markers = markers
       for (let ch; ch = this.dom.lastChild;) ch.remove()
-      let cls = "codemirror-gutter-element"
+      let cls = "codemirror-gutter-element " + styles.gutterElement
+      if (eltClass) cls += " " + eltClass
       for (let m of markers) {
         let dom = m.toDOM()
         if (dom) this.dom.appendChild(dom)
@@ -208,6 +211,7 @@ export const lineNumbers = ViewExtension.unique<LineNumberConfig>(configs => {
   return gutter({
     class: "codemirror-line-numbers " + styles.lineNumberGutter,
     fixed: config.fixed,
+    elementClass: styles.lineNumberGutterElement,
     updateMarkers(markers: GutterMarkerSet, update: ViewUpdate) {
       let slot = update.getMeta(lineNumberMarkers)
       if (slot) markers = markers.update(slot.add || [], slot.filter || null)
@@ -242,23 +246,23 @@ const styles = new StyleModule({
     left: 0,
     boxSizing: "border-box",
     height: "100%",
-    overflow: "hidden",
+    overflow: "hidden"
+  },
 
-    "& > .codemirror-gutter-element": {
-      boxSizing: "border-box"
-    }
+  gutterElement: {
+    boxSizing: "border-box"
   },
 
   lineNumberGutter: {
     background: "#f5f5f5",
-    borderRight: "1px solid silver",
+    borderRight: "1px solid silver"
+  },
 
-    "& > .codemirror-gutter-element": {
-      padding: "0 3px 0 5px",
-      minWidth: "20px",
-      textAlign: "right",
-      color: "#999",
-      whiteSpace: "nowrap"
-    }    
+  lineNumberGutterElement: {
+    padding: "0 3px 0 5px",
+    minWidth: "20px",
+    textAlign: "right",
+    color: "#999",
+    whiteSpace: "nowrap"
   }
 })
