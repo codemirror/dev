@@ -78,7 +78,7 @@ function doMatchBrackets(state: EditorState, config: Full<Config>) {
     if (!range.empty) continue
     const match = findMatchingBracket(state.doc, range.head, config)
     if (!match) continue
-    const style = match.match ? defaultStyles.matching : defaultStyles.nonmatching
+    const style = match.match ? matchingClass : nonmatchingClass
     decorations.push(Decoration.mark(match.from, match.from + 1, {class: style}))
     if (match.to) decorations.push(Decoration.mark(match.to, match.to + 1, {class: style}))
   }
@@ -104,8 +104,10 @@ export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
   )
 }, {})
 
-// FIXME themeability
 const defaultStyles = new StyleModule({
   matching: {color: "#0b0"},
   nonmatching: {color: "#a22"}
 })
+
+const matchingClass = "codemirror-matching-bracket " + defaultStyles.matching
+const nonmatchingClass = "codemirror-nonmatching-bracket " + defaultStyles.nonmatching
