@@ -42,7 +42,8 @@ function decoEditor(doc: string, decorations: any = []) {
 describe("EditorView decoration", () => {
   it("renders tag names", () => {
     let cm = decoEditor("one\ntwo", d(2, 5, {tagName: "em"}))
-    ist(cm.contentDOM.innerHTML, "<div class=\"codemirror-line\">on<em>e</em></div><div class=\"codemirror-line\"><em>t</em>wo</div>")
+    ist(cm.contentDOM.innerHTML.replace(/<\/?div.*?>/g, "|"),
+        "|on<em>e</em>||<em>t</em>wo|")
   })
 
   it("renders attributes", () => {
@@ -261,7 +262,8 @@ describe("EditorView decoration", () => {
   describe("line attributes", () => {
     function classes(cm: EditorView, ...lines: string[]) {
       for (let i = 0; i < lines.length; i++) {
-        let className = (cm.contentDOM.childNodes[i] as HTMLElement).className.split(" ").filter(c => c != "codemirror-line").sort().join(" ")
+        let className = (cm.contentDOM.childNodes[i] as HTMLElement).className.split(" ")
+          .filter(c => c != "codemirror-line" && !/ͼ/.test(c)).sort().join(" ")
         ist(className, lines[i])
       }
     }
