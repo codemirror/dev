@@ -29,9 +29,9 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     let domSel = view.root.getSelection()!
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
     let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ? view.state.selection.primary.head
-      : view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
+      : view.docView.posFromDOM(domSel.focusNode!, domSel.focusOffset)
     let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset ? view.state.selection.primary.anchor
-      : selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset)
+      : selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode!, domSel.anchorOffset)
     if (head != sel.head || anchor != sel.anchor)
       newSel = EditorSelection.single(anchor, head)
   }
@@ -173,7 +173,7 @@ function selectionPoints(dom: HTMLElement, root: DocumentOrShadowRoot): DOMPoint
   if (anchorNode) {
     result.push(new DOMPoint(anchorNode, anchorOffset))
     if (focusNode != anchorNode || focusOffset != anchorOffset)
-      result.push(new DOMPoint(focusNode, focusOffset))
+      result.push(new DOMPoint(focusNode!, focusOffset))
   }
   return result
 }

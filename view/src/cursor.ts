@@ -40,7 +40,7 @@ export function movePos(view: EditorView, start: number,
       else if (action == "extend" && !equiv) sel.extend(startDOM.node, startDOM.offset)
       sel.modify(action, direction, granularity)
       view.docView.setSelectionDirty()
-      let result = view.docView.posFromDOM(sel.focusNode, sel.focusOffset)
+      let result = view.docView.posFromDOM(sel.focusNode!, sel.focusOffset)
       context!.undoQueryPreparation(view, prepared)
       return result
     })

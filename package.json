@@ -41,6 +41,6 @@
     "rollup-plugin-typescript2": "^0.19.2",
     "selenium-webdriver": "^4.0.0-alpha.1",
     "ts-node": "^8.0.2",
-    "typescript": "^3.3.3"
+    "typescript": "^3.4.3"
   }
 }

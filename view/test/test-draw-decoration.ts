@@ -182,8 +182,8 @@ describe("EditorView decoration", () => {
                            w(2, new WordWidget("B"), 1)]))
       cm.dispatch(cm.state.t().setSelection(EditorSelection.single(2)))
       let domSel = document.getSelection()!
-      ist(domSel.focusNode.childNodes[domSel.focusOffset - 1].textContent, "A")
-      ist(domSel.focusNode.childNodes[domSel.focusOffset].textContent, "B")
+      ist(domSel.focusNode!.childNodes[domSel.focusOffset - 1].textContent, "A")
+      ist(domSel.focusNode!.childNodes[domSel.focusOffset].textContent, "B")
     })
 
     it("preserves widgets alongside edits regardless of side", () => {
@@ -248,8 +248,8 @@ describe("EditorView decoration", () => {
       let cm = requireFocus(decoEditor("abcdefgh", [r(0, 4)]))
       cm.dispatch(cm.state.t().setSelection(EditorSelection.single(2, 6)))
       let sel = document.getSelection()!, range = document.createRange()
-      range.setEnd(sel.focusNode, sel.focusOffset + 1)
-      range.setStart(sel.anchorNode, sel.anchorOffset)
+      range.setEnd(sel.focusNode!, sel.focusOffset + 1)
+      range.setStart(sel.anchorNode!, sel.anchorOffset)
       sel.removeAllRanges()
       sel.addRange(range)
       cm.docView.observer.flush()

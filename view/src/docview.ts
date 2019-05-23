@@ -267,8 +267,8 @@ export class DocView extends ContentView {
       })
     }
 
-    this.impreciseAnchor = anchor.precise ? null : new DOMPos(domSel.anchorNode, domSel.anchorOffset)
-    this.impreciseHead = head.precise ? null: new DOMPos(domSel.focusNode, domSel.focusOffset)
+    this.impreciseAnchor = anchor.precise ? null : new DOMPos(domSel.anchorNode!, domSel.anchorOffset)
+    this.impreciseHead = head.precise ? null: new DOMPos(domSel.focusNode!, domSel.focusOffset)
   }
 
   lineAt(pos: number, editorTop?: number): BlockInfo {
