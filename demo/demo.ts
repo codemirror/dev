@@ -6,11 +6,14 @@ import {lineNumbers} from "../gutter/src/index"
 import {baseKeymap, indentSelection} from "../commands/src/commands"
 import {legacyMode} from "../legacy-modes/src/index"
 import {matchBrackets} from "../matchbrackets/src/matchbrackets"
-import javascript from "../legacy-modes/src/javascript"
+//import javascript from "../legacy-modes/src/javascript"
 import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 
-let mode = legacyMode({mode: javascript({indentUnit: 2}, {}) as any})
+import {javascript} from "../javascript/src/javascript"
+import {highlight} from "../highlight/src/highlight"
+
+//let mode = legacyMode({mode: javascript({indentUnit: 2}, {}) as any})
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `"use strict";
@@ -23,7 +26,8 @@ readFile("package.json", "utf8", (err, data) => {
   history(),
   specialChars(),
   multipleSelections(),
-  mode,
+  javascript(),
+  highlight(),
   matchBrackets(),
   keymap({
     "Mod-z": undo,
