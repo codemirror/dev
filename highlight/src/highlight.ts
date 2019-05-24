@@ -11,10 +11,10 @@ function highlightDeco(view: EditorView) {
   let cur: string | null = null, start = from
   // FIXME this is broken and crude
   tree.iterate(from, to, 0, (tag, a, b) => {
-    let scope = syntax.scopes.get(tag)
-    if (scope != cur) {
+    let type = syntax.tokenTypes.get(tag)
+    if (type != cur) {
       if (a > start && cur) tokens.push(Decoration.mark(start, a, {class: "cm-" + cur}))
-      cur = scope
+      cur = type
       start = Math.max(from, a)
     }
     return true

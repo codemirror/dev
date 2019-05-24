@@ -5,12 +5,12 @@ import {EditorState, StateExtension, StateField, Transaction} from "../../state/
 
 // FIXME put lezer-specific definitions in different file from generic definitions. maybe even different package
 
-export type ScopeMap = TagMap<string> // FIXME make compulsory field?
+export type TokenMap = TagMap<string> // FIXME make compulsory field?
 
 export abstract class Syntax {
   abstract extension: StateExtension
 
-  constructor(readonly scopes: ScopeMap, private slots: ReadonlyArray<Slot> = []) {}
+  constructor(readonly tokenTypes: TokenMap, private slots: ReadonlyArray<Slot> = []) {}
 
   getSlot<T>(type: SlotType<T>): T | undefined {
     return Slot.get(type, this.slots)
@@ -23,8 +23,8 @@ export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
   extension: StateExtension
 
-  constructor(readonly parser: Parser, scopes: ScopeMap, slots: ReadonlyArray<Slot>) {
-    super(scopes, slots)
+  constructor(readonly parser: Parser, tokenTypes: TokenMap, slots: ReadonlyArray<Slot>) {
+    super(tokenTypes, slots)
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
