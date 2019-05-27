@@ -76,8 +76,7 @@ export class EditorView {
     this.withUpdating(() => {
       ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
       this.fields = this.behavior.get(viewField)
-      StyleModule.mount(this.root, styles)
-      for (let s of this.behavior.get(styleModule)) StyleModule.mount(this.root, s)
+      StyleModule.mount(this.root, this.behavior.get(styleModule).concat(styles).reverse())
       if (this.behavior.foreign.length)
         throw new Error("Non-ViewExtension extensions found when setting view state")
       this.inputState = new InputState(this)

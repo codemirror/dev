@@ -27,7 +27,7 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "style-mod": "^1.0.1",
+    "style-mod": "^2.0.0",
     "w3c-keyname": "^2.1.0",
     "lezer": "git://github.com/lezer-parser/lezer.git",
     "lezer-generator": "git://github.com/lezer-parser/lezer-generator.git",
