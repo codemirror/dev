@@ -35,7 +35,7 @@ const tokens = new TagMap(parser, {
   "=>": "punctuation.arrow"
 })
 
-export const javascriptSyntax = new LezerSyntax(parser, [tokenTypes(tokens)])
+export const javascriptSyntax = new LezerSyntax("javascript", parser, [tokenTypes(tokens)])
 
 export function javascript() {
   return StateExtension.all(

@@ -8,7 +8,7 @@ import {EditorState, StateExtension, StateField, Transaction} from "../../state/
 export abstract class Syntax {
   abstract extension: StateExtension
 
-  constructor(private slots: Slot[] = []) {}
+  constructor(readonly name: string, private slots: Slot[] = []) {}
 
   getSlot<T>(type: SlotType<T>): T | undefined {
     return Slot.get(type, this.slots)
@@ -25,8 +25,8 @@ export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
   extension: StateExtension
 
-  constructor(readonly parser: Parser, slots: Slot[] = []) {
-    super(slots)
+  constructor(name: string, readonly parser: Parser, slots: Slot[] = []) {
+    super(name, slots)
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
