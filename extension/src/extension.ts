@@ -2,11 +2,11 @@ export type SlotType<T> = (value: T) => Slot<T>
 
 export class Slot<T = any> {
   // @internal
-  constructor(/* @internal */ public type: any,
+  constructor(/* @internal */ public type: SlotType<T>,
               /* @internal */ public value: T) {}
 
   static define<T>(): SlotType<T> {
-    let type = (value: T) => new Slot<T>(type, value)
+    let type: SlotType<T> = (value: T) => new Slot<T>(type, value)
     return type
   }
 
