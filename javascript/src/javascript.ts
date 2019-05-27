@@ -2,8 +2,9 @@ import {TagMap} from "lezer"
 import parser from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
 import {LezerSyntax} from "../../syntax/src/syntax"
+import {tokenTypes} from "../../highlight/src/highlight"
 
-const tokenTypes = new TagMap(parser, {
+const tokens = new TagMap(parser, {
   Definition: "variable.definition",
   PropertyName: "property",
   Template: "string.template",
@@ -34,7 +35,7 @@ const tokenTypes = new TagMap(parser, {
   "=>": "punctuation.arrow"
 })
 
-export const javascriptSyntax = new LezerSyntax(parser, tokenTypes, [])
+export const javascriptSyntax = new LezerSyntax(parser, [tokenTypes(tokens)])
 
 export function javascript() {
   return StateExtension.all(

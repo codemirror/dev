@@ -1,19 +1,21 @@
-import {Parser, TagMap, SyntaxTree, Tree, InputStream} from "lezer"
+import {Parser, SyntaxTree, Tree, InputStream} from "lezer"
 import {Slot, SlotType} from "../../extension/src/extension"
 import {Text} from "../../doc/src/"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
 
 // FIXME put lezer-specific definitions in different file from generic definitions. maybe even different package
 
-export type TokenMap = TagMap<string> // FIXME make compulsory field?
-
 export abstract class Syntax {
   abstract extension: StateExtension
 
-  constructor(readonly tokenTypes: TokenMap, private slots: ReadonlyArray<Slot> = []) {}
+  constructor(private slots: Slot[] = []) {}
 
   getSlot<T>(type: SlotType<T>): T | undefined {
     return Slot.get(type, this.slots)
+  }
+
+  addSlot<T>(slot: Slot<T>) {
+    this.slots.push(slot)
   }
 
   abstract getTree(state: EditorState, from: number, to: number): SyntaxTree
@@ -23,8 +25,8 @@ export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
   extension: StateExtension
 
-  constructor(readonly parser: Parser, tokenTypes: TokenMap, slots: ReadonlyArray<Slot>) {
-    super(tokenTypes, slots)
+  constructor(readonly parser: Parser, slots: Slot[] = []) {
+    super(slots)
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
@@ -38,11 +40,6 @@ export class LezerSyntax extends Syntax {
 }
 
 export const syntax = StateExtension.defineBehavior<Syntax>()
-
-export function syntaxTree(state: EditorState, from: number, to: number): {syntax: Syntax, tree: SyntaxTree} | null {
-  let found = state.behavior.get(syntax)[0]
-  return found ? {syntax: found, tree: found.getTree(state, from, to)} : null
-}
 
 class DocStream implements InputStream {
   pos = 0
