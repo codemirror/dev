@@ -11,6 +11,7 @@ import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 
 import {javascript} from "../javascript/src/javascript"
+import {defaultTheme} from "../theme/src/theme"
 import {highlight} from "../highlight/src/highlight"
 
 //let mode = legacyMode({mode: javascript({indentUnit: 2}, {}) as any})
@@ -27,6 +28,7 @@ readFile("package.json", "utf8", (err, data) => {
   specialChars(),
   multipleSelections(),
   javascript(),
+  defaultTheme,
   highlight(),
   matchBrackets(),
   keymap({

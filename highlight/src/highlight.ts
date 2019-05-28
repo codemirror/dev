@@ -1,5 +1,5 @@
 import {TagMap} from "lezer"
-import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange} from "../../view/src"
+import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, themeClass} from "../../view/src"
 import {Slot} from "../../extension/src/extension"
 import {Syntax, syntax} from "../../syntax/src/syntax"
 
@@ -15,11 +15,16 @@ class TokenContext {
 
   constructor(readonly type: string, readonly style: string, readonly prev: TokenContext | null) {}
 
-  enter(type: string, theme: (type: string) => string) {
+  enter(type: string, themes: readonly ((type: string) => string)[]) {
     let found = this.cached[type]
     if (!found) {
-      let fullType = type + "." + this.type
-      found = this.cached[type] = new TokenContext(fullType, theme(fullType), this)
+      let fullType = "token." + type + "." + this.type
+      let classes = ""
+      for (let theme of themes) {
+        let value = theme(fullType)
+        if (value) classes += (classes ? " " + value : value)
+      }
+      found = this.cached[type] = new TokenContext(fullType, classes, this)
     }
     return found
   }
@@ -27,19 +32,6 @@ class TokenContext {
   static start(type: string) {
     return new TokenContext(type, "", null)
   }
-}
-
-// FIXME replace with actual theming system
-let theme = (type: string) => {
-  let parts = type.split(".")
-  for (let i = parts.length - 1; i >= 0; i--) {
-    let part = parts[i]
-    if (part == "meta") return "cm-meta"
-    if (part == "keyword") return "cm-keyword"
-    if (part == "string") return "cm-string"
-    if (part == "number") return "cm-number"
-  }
-  return ""
 }
 
 class Highlighter {
@@ -52,7 +44,8 @@ class Highlighter {
   }
 
   buildDeco(view: EditorView) {
-    if (!this.syntax) return Decoration.none
+    let themes = view.behavior.get(themeClass)
+    if (!this.syntax || themes.length == 0) return Decoration.none
 
     let {from, to} = view.viewport
     let tree = this.syntax.getTree(view.state, from, to)
@@ -71,7 +64,7 @@ class Highlighter {
     tree.iterate(from, to, 0, (tag, start) => {
       let type = tokenMap!.get(tag)
       if (type != null) {
-        context = context.enter(type, theme)
+        context = context.enter(type, themes)
         advance(start, context.style)
       }
       return true // FIXME drop this requirement

@@ -68,7 +68,7 @@ export const clickAddsSelectionRange = ViewExtension.defineBehavior<(event: Mous
 
 export const dragMovesSelection = ViewExtension.defineBehavior<(event: MouseEvent) => boolean>()
 
-export const themeElement = ViewExtension.defineBehavior<(type: string) => string>()
+export const themeClass = ViewExtension.defineBehavior<(type: string) => string>()
 
 export type ViewPlugin = {
   update?: (update: ViewUpdate) => void

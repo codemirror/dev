@@ -10,7 +10,7 @@ import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule,
-        viewPlugin, ViewPlugin, getField, Effect} from "./extension"
+        viewPlugin, ViewPlugin, getField, Effect, themeClass} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 
 export interface EditorConfig {
@@ -149,6 +149,15 @@ export class EditorView {
     for (let i = 0; i < this.fieldValues.length; i++) {
       let accessor = Slot.get(type, this.fields[i].effects)
       if (accessor) result.push(accessor(this.fieldValues[i]) as V)
+    }
+    return result
+  }
+
+  themeClass(type: string): string {
+    let result = ""
+    for (let theme of this.behavior.get(themeClass)) {
+      let cls = theme(type)
+      if (cls) result += (result ? " " + cls : cls)
     }
     return result
   }
