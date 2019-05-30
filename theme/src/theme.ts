@@ -51,7 +51,7 @@ function ruleTree(rules: {[name: string]: ThemeRule}) {
         style = {}
         if (parentStyle) for (let p in parentStyle) style[p] = parentStyle[p]
       }
-      style[prop] = value
+      style[prop] = value as string
     }
     if (style) {
       let name = "c" + (classID++)
