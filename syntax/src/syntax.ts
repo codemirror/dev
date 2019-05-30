@@ -1,4 +1,4 @@
-import {Parser, SyntaxTree, Tree, InputStream} from "lezer"
+import {Parser, Tree, InputStream} from "lezer"
 import {Slot, SlotType} from "../../extension/src/extension"
 import {Text} from "../../doc/src/"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
@@ -18,7 +18,7 @@ export abstract class Syntax {
     this.slots.push(slot)
   }
 
-  abstract getTree(state: EditorState, from: number, to: number): SyntaxTree
+  abstract getTree(state: EditorState, from: number, to: number): Tree
 }
 
 export class LezerSyntax extends Syntax {
@@ -34,7 +34,7 @@ export class LezerSyntax extends Syntax {
     this.extension = StateExtension.all(syntax(this), this.field.extension)
   }
 
-  getTree(state: EditorState, from: number, to: number): SyntaxTree {
+  getTree(state: EditorState, from: number, to: number): Tree {
     return state.getField(this.field).getTree(this.parser, state.doc, from, to)
   }
 }
@@ -81,7 +81,7 @@ class DocStream implements InputStream {
 class SyntaxState {
   private parsed = false
 
-  constructor(private tree: SyntaxTree) {}
+  constructor(private tree: Tree) {}
 
   apply(tr: Transaction) {
     return new SyntaxState(this.tree.unchanged(tr.changes.changedRanges()))

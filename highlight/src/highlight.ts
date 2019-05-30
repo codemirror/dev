@@ -61,7 +61,7 @@ class Highlighter {
       cur = type
     }
 
-    tree.iterate(from, to, 0, (tag, start) => {
+    tree.iterate(from, to, (tag, start) => {
       let type = tokenMap!.get(tag)
       if (type != null) {
         context = context.enter(type, themes)
