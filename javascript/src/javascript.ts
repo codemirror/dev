@@ -3,6 +3,7 @@ import parser from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
 import {LezerSyntax} from "../../syntax/src/syntax"
 import {tokenTypes} from "../../highlight/src/highlight"
+import {syntaxIndentation, dontIndent, parens, braces, brackets, statement} from "../../indent/src/indent"
 
 const tokens = new TagMap(parser, {
   Definition: "variable.definition",
@@ -35,11 +36,56 @@ const tokens = new TagMap(parser, {
   "=>": "punctuation.arrow"
 })
 
+const indentStrategies = new TagMap(parser, {
+  ExportDeclaration: statement,
+  ClassDeclaration: statement,
+  VariableDeclaration: statement, // FIXME force to 4?
+  ImportDeclaration: statement,
+  TryStatement: statement,
+  ReturnStatement: statement,
+  ThrowStatement: statement,
+  BreakStatement: statement,
+  ContinueStatement: statement,
+  DebuggerStatement: statement,
+  LabeledStatement: statement,
+  ExpressionStatement: statement,
+
+  // FIXME hanging statements
+  ForStatement: statement,
+  WhileStatement: statement,
+  WithStatement: statement,
+  DoWhileStatement: statement,
+  IfStatement: statement,
+
+  ParamList: parens,
+  ArgList: parens,
+  ParenthesizedExpression: parens,
+  LoopDeclaration: parens,
+
+  ArrayPattern: brackets,
+  ArrayExpression: brackets,
+
+  ObjectPattern: braces,
+  ObjectExpression: braces,
+  ClassBody: braces,
+  ExportGroup: braces,
+  ImportGroup: braces,
+  Block: braces,
+
+  Template: dontIndent,
+
+  // FIXME
+  // "SwitchCase"
+  // "SwitchDefault", "SwitchStatement"
+  // "ConditionalExpression"
+  BlockComment: dontIndent
+})
+
 export const javascriptSyntax = new LezerSyntax("javascript", parser, [tokenTypes(tokens)])
 
 export function javascript() {
   return StateExtension.all(
-    javascriptSyntax.extension
-    // ... indentation, etc
+    javascriptSyntax.extension,
+    syntaxIndentation(javascriptSyntax, indentStrategies)
   )
 }
