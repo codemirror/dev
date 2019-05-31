@@ -1,13 +1,20 @@
-import {TagMap, TreeContext} from "lezer"
-import {Syntax} from "../../syntax/src/syntax"
+import {TagMap, TreeContext, TERM_ERR} from "lezer"
+import {LezerSyntax} from "../../syntax/src/syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
 // FIXME handle nested syntaxes
 
-export function syntaxIndentation(syntax: Syntax, strategies: TagMap<IndentStrategy>) {
+export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<IndentStrategy>) {
   return StateExtension.indentation((state, pos) => {
     let inner = new IndentContextInner(pos, strategies, syntax, state)
-    for (let cx: TreeContext | null = syntax.getTree(state, pos, pos).resolve(pos); cx; cx = cx.parent) {
+    let cx: TreeContext | null = syntax.getTree(state, pos, pos).resolve(pos)
+    if (cx.end == pos) for (let scan = cx!;;) {
+      let last = scan.childBefore(scan.end + 1)
+      if (!last || last.end < scan.end) break
+      if (last.type == TERM_ERR) cx = scan
+      scan = last
+    }
+    for (; cx; cx = cx.parent) {
       let strategy = strategies.get(cx.type) || (cx.parent == null ? topStrategy : null)
       if (strategy) {
         let indentContext = new IndentContext(inner, cx, strategy)
@@ -21,7 +28,7 @@ export function syntaxIndentation(syntax: Syntax, strategies: TagMap<IndentStrat
 export class IndentContextInner {
   constructor(readonly pos: number,
               readonly strategies: TagMap<IndentStrategy>,
-              readonly syntax: Syntax,
+              readonly syntax: LezerSyntax,
               readonly state: EditorState) {}
 }
 
