@@ -236,7 +236,7 @@ function upBot(rect: ClientRect, bottom: number): ClientRect {
 }
 
 function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node, offset: number} {
-  let closest, closestRect, closestX!: number, closestY!: number
+  let closest, closestRect!: ClientRect, closestX!: number, closestY!: number
   let above, below, aboveRect, belowRect
   for (let child: Node | null = parent.firstChild; child; child = child.nextSibling) {
     let rects = clientRectsFor(child)
