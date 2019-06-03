@@ -31,6 +31,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
         scanPos = scan.end + 1
       }
     }
+
     for (; cx; cx = cx.parent) {
       let strategy = strategies.get(cx.type) || (cx.parent == null ? topStrategy : null)
       if (strategy) {

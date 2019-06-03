@@ -85,7 +85,7 @@ class SyntaxState {
   constructor(private tree: Tree) {}
 
   apply(tr: Transaction) {
-    return new SyntaxState(this.tree.unchanged(tr.changes.changedRanges()))
+    return tr.docChanged ? new SyntaxState(this.tree.unchanged(tr.changes.changedRanges())) : this
   }
 
   getTree(parser: Parser, doc: Text, from: number, to: number) {

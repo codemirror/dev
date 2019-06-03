@@ -54,27 +54,26 @@ class Highlighter {
     let tokenMap = this.syntax.getSlot(tokenTypes)!
     let context = this.baseContext
     let cur = "", start = from
-    function advance(pos: number, type: string) {
-      if (type == cur) return
-      if (pos > start && cur) tokens.push(Decoration.mark(start, pos, {class: cur}))
+    function flush(pos: number, style: string) {
+      if (style == cur) return
+      if (pos > start && cur)
+        tokens.push(Decoration.mark(start, pos, {class: cur}))
       start = pos
-      cur = type
+      cur = style
     }
 
-    tree.iterate(from, to, (tag, start) => {
-      let type = tokenMap!.get(tag)
-      if (type != null) {
-        context = context.enter(type, themes)
-        advance(start, context.style)
+    tree.iterate(from, to, (type, start) => {
+      let tokType = tokenMap!.get(type)
+      if (tokType != null) {
+        context = context.enter(tokType, themes)
+        flush(start, context.style)
       }
-      return true // FIXME drop this requirement
-    }, (tag, _, end) => {
-      let type = tokenMap!.get(tag)
-      if (type != null) {
-        advance(end, context.style)
+    }, (type, _, end) => {
+      let tokType = tokenMap!.get(type)
+      if (tokType != null) {
         context = context.prev!
+        flush(end, context.style)
       }
-      return true
     })
     return Decoration.set(tokens)
   }
@@ -88,7 +87,7 @@ export function highlight() { // FIXME allow specifying syntax?
       return new Highlighter(null, view)
     },
     update(highlighter, update) {
-      if (update.docChanged) highlighter.deco = highlighter.buildDeco(update.view)
+      if (update.docChanged || update.viewportChanged) highlighter.deco = highlighter.buildDeco(update.view)
       return highlighter // FIXME immutable?
     },
     effects: [ViewField.decorationEffect(h => h.deco)]
