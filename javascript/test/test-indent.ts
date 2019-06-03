@@ -42,4 +42,10 @@ one(
   )
 )`))
 
+  it("aligns lists", () => check(`
+one(two,
+    three({four: five,
+           six: seven
+          }))`))
+
 })

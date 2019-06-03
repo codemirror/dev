@@ -46,7 +46,7 @@ export class IndentContextInner {
 }
 
 export class IndentContext {
-  _next: IndentContext | null = null
+  private _next: IndentContext | null = null
 
   constructor(private inner: IndentContextInner,
               readonly context: TreeContext,
@@ -105,8 +105,9 @@ export class IndentContext {
     return this.countColumn(line, line.search(/\S/))
   }
 
-  get nodeColumn() {
-    return this.countColumn(this.textBefore, -1)
+  column(pos: number) {
+    let line = this.state.doc.lineAt(pos)
+    return this.countColumn(line.slice(0, pos - line.start), pos - line.start)
   }
 }
 
@@ -120,20 +121,39 @@ export const topStrategy: IndentStrategy = {
   baseIndent() { return 0 }
 }
 
+function bracketedAligned(context: IndentContext) {
+  let cx = context.context
+  let openToken = cx.childAfter(cx.start)
+  if (!openToken) return null
+  let openLine = context.state.doc.lineAt(openToken.start)
+  for (let pos = openToken.end;;) {
+    let next = cx.childAfter(pos)
+    if (!next) return null
+    if (!context.syntax.parser.isSkipped(next.type))
+      return next.start < openLine.end ? openToken : null
+    pos = next.end
+  }
+}
+
 // FIXME alignment
-export function bracketed(closing: string): IndentStrategy {
+export function bracketed({closing, align = true}: {closing: string, align?: boolean}): IndentStrategy {
   return {
     getIndent(context: IndentContext) {
       let closed = context.textAfter.slice(0, closing.length) == closing
+      let aligned = align ? bracketedAligned(context) : null
+      if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
       return context.next.baseIndent() + (closed ? 0 : context.unit)
     },
     baseIndent(context: IndentContext) {
-      return context.next.baseIndent() + (context.startLine.start == context.prev!.startLine.start ? 0 : context.unit)
+      let newLine = context.startLine.start != context.prev!.startLine.start
+      let aligned = align && newLine ? bracketedAligned(context) : null
+      if (aligned) return context.column(aligned.end)
+      return context.next.baseIndent() + (newLine ? context.unit : 0)
     }
   }
 }
 
-export const parens = bracketed(")"), braces = bracketed("}"), brackets = bracketed("]")
+export const parens = bracketed({closing: ")"}), braces = bracketed({closing: "}"}), brackets = bracketed({closing: "]"})
 
 export const statement: IndentStrategy = {
   getIndent(context: IndentContext) {
