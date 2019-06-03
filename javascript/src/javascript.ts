@@ -3,7 +3,7 @@ import parser from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
 import {LezerSyntax} from "../../syntax/src/syntax"
 import {tokenTypes} from "../../highlight/src/highlight"
-import {syntaxIndentation, dontIndent, parens, braces, brackets, statement} from "../../indent/src/indent"
+import {syntaxIndentation, dontIndent, parens, braces, brackets, statement, compositeStatement} from "../../indent/src/indent"
 
 const tokens = new TagMap(parser, {
   Definition: "variable.definition",
@@ -55,12 +55,14 @@ const indentStrategies = new TagMap(parser, {
   WhileStatement: statement,
   WithStatement: statement,
   DoWhileStatement: statement,
-  IfStatement: statement,
+  IfStatement: compositeStatement(/^else\b/),
 
   ParamList: parens,
   ArgList: parens,
   ParenthesizedExpression: parens,
-  LoopDeclaration: parens,
+  ForSpec: parens,
+  ForInSpec: parens,
+  ForOfSpec: parens,
 
   ArrayPattern: brackets,
   ArrayExpression: brackets,

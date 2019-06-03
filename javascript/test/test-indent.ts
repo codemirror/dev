@@ -48,4 +48,15 @@ one(two,
            six: seven
           }))`))
 
+  it("indents unfinished nodes", () => check(`
+if (foo &&
+    `))
+
+  it("deindents else", () => check(`
+if (1)
+  a
+else
+  b
+`))
+
 })

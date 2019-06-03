@@ -17,11 +17,19 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
   return StateExtension.indentation((state, pos) => {
     let inner = new IndentContextInner(pos, strategies, syntax, state)
     let cx: TreeContext | null = syntax.getTree(state, pos, pos).resolve(pos)
-    if (cx.end == pos) for (let scan = cx!;;) {
-      let last = scan.childBefore(scan.end + 1)
-      if (!last || last.end < scan.end) break
-      if (last.type == TERM_ERR) cx = scan
-      scan = last
+    // Enter previous nodes that end in empty error terms, which means
+    // they were broken off by error recovery, so that indentation
+    // works even if the constructs haven't been finished.
+    for (let scan = cx!, scanPos = pos;;) {
+      let last = scan.childBefore(scanPos)
+      if (!last) break
+      if (last.type == TERM_ERR && last.start == last.end) {
+        cx = scan
+        scanPos = last.start
+      } else {
+        scan = last
+        scanPos = scan.end + 1
+      }
     }
     for (; cx; cx = cx.parent) {
       let strategy = strategies.get(cx.type) || (cx.parent == null ? topStrategy : null)
@@ -135,7 +143,6 @@ function bracketedAligned(context: IndentContext) {
   }
 }
 
-// FIXME alignment
 export function bracketed({closing, align = true}: {closing: string, align?: boolean}): IndentStrategy {
   return {
     getIndent(context: IndentContext) {
@@ -161,6 +168,17 @@ export const statement: IndentStrategy = {
   },
   baseIndent(context: IndentContext) {
     return context.lineIndent
+  }
+}
+
+export function compositeStatement(dedentBefore: RegExp): IndentStrategy {
+  return {
+    getIndent(context: IndentContext) {
+      return context.baseIndent() + (dedentBefore.test(context.textAfter) ? 0 : context.unit)
+    },
+    baseIndent(context: IndentContext) {
+      return context.lineIndent
+    }
   }
 }
 
