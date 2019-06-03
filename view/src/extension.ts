@@ -111,7 +111,7 @@ export class ViewUpdate {
   }
 
   get viewportChanged() {
-    return this.prevViewport.eq(this.view.viewport)
+    return !this.prevViewport.eq(this.view.viewport)
   }
 
   get docChanged() {
