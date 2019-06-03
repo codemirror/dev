@@ -58,8 +58,9 @@ class DocStream implements InputStream {
     return ch
   }
 
+  // FIXME optimize
   peek(pos = this.pos) {
-    return pos < 0 || pos >= this.doc.length ? -1 : this.doc.slice(this.pos, this.pos + 1).charCodeAt(0)
+    return pos < 0 || pos >= this.doc.length ? -1 : this.doc.slice(pos, pos + 1).charCodeAt(0)
   }
 
   accept(term: number, pos = this.pos) {
