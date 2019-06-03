@@ -43,7 +43,7 @@
     "rollup-plugin-node-resolve": "^4.0.0",
     "rollup-plugin-typescript2": "^0.19.2",
     "selenium-webdriver": "^4.0.0-alpha.1",
-    "ts-node": "^8.0.2",
+    "ts-node": "^8.2.0",
     "typescript": "^3.5.1"
   }
 }

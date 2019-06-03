@@ -2,6 +2,15 @@ import {TagMap, TreeContext, TERM_ERR} from "lezer"
 import {LezerSyntax} from "../../syntax/src/syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
+export const indentUnit = StateExtension.defineBehavior<number>()
+
+const DEFAULT_INDENT_UNIT = 2
+
+export function getIndentUnit(state: EditorState) {
+  let values = state.behavior.get(indentUnit)
+  return values.length ? values[0] : DEFAULT_INDENT_UNIT
+}
+
 // FIXME handle nested syntaxes
 
 export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<IndentStrategy>) {
@@ -17,7 +26,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
     for (; cx; cx = cx.parent) {
       let strategy = strategies.get(cx.type) || (cx.parent == null ? topStrategy : null)
       if (strategy) {
-        let indentContext = new IndentContext(inner, cx, strategy)
+        let indentContext = new IndentContext(inner, cx, strategy, null)
         return indentContext.getIndent()
       }
     }
@@ -26,28 +35,37 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
 }
 
 export class IndentContextInner {
+  unit: number
+
   constructor(readonly pos: number,
               readonly strategies: TagMap<IndentStrategy>,
               readonly syntax: LezerSyntax,
-              readonly state: EditorState) {}
+              readonly state: EditorState) {
+    this.unit = getIndentUnit(state)
+  }
 }
 
 export class IndentContext {
+  _next: IndentContext | null = null
+
   constructor(private inner: IndentContextInner,
               readonly context: TreeContext,
-              readonly strategy: IndentStrategy) {}
+              readonly strategy: IndentStrategy,
+              readonly prev: IndentContext | null) {}
 
   get syntax() { return this.inner.syntax }
   get state() { return this.inner.state }
   get pos() { return this.inner.pos }
+  get unit() { return this.inner.unit }
 
   get next() {
+    if (this._next) return this._next
     let last = this.context, found = null
     for (let cx = this.context.parent; !found && cx; cx = cx.parent) {
       found = this.inner.strategies.get(cx.type)
       last = cx
     }
-    return new IndentContext(this.inner, last, found || topStrategy)
+    return this._next = new IndentContext(this.inner, last, found || topStrategy, this)
   }
 
   get textAfter() {
@@ -102,18 +120,15 @@ export const topStrategy: IndentStrategy = {
   baseIndent() { return 0 }
 }
 
-const UNIT = 2 // FIXME make configurable somehow
-
 // FIXME alignment
 export function bracketed(closing: string): IndentStrategy {
   return {
     getIndent(context: IndentContext) {
       let closed = context.textAfter.slice(0, closing.length) == closing
-      return context.next.baseIndent() + (closed ? 0 : UNIT)
+      return context.next.baseIndent() + (closed ? 0 : context.unit)
     },
     baseIndent(context: IndentContext) {
-      let {next} = context
-      return next.baseIndent() + (next.startLine.start == context.startLine.start ? 0 : UNIT)
+      return context.next.baseIndent() + (context.startLine.start == context.prev!.startLine.start ? 0 : context.unit)
     }
   }
 }
@@ -122,7 +137,7 @@ export const parens = bracketed(")"), braces = bracketed("}"), brackets = bracke
 
 export const statement: IndentStrategy = {
   getIndent(context: IndentContext) {
-    return context.baseIndent() + UNIT // FIXME configurable statement indent?
+    return context.baseIndent() + context.unit
   },
   baseIndent(context: IndentContext) {
     return context.lineIndent
