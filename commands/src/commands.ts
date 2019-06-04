@@ -107,10 +107,11 @@ export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
     let indent = getIndentation(state, r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
   })
-  dispatch(state.t().forEachRange((range, tr) => {
-    let indent = indentation[i++]
-    tr.replace(range.from, range.to, ["", space(indent)])
-    return new SelectionRange(range.from + indent + 1)
+  dispatch(state.t().forEachRange(({from, to}, tr) => {
+    let indent = indentation[i++], line = tr.doc.lineAt(to)
+    while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
+    tr.replace(from, to, ["", space(indent)])
+    return new SelectionRange(from + indent + 1)
   }).scrollIntoView())
   return true
 }
