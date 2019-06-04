@@ -17,6 +17,7 @@ const tokens = new TagMap(parser, {
   Keyword: "keyword",
   OperatorKeyword: "keyword.operator",
   String: "string.quoted",
+  RegExp: "string.regexp",
   Number: "number",
   Boolean: "atom.boolean",
   This: "keyword.expression.this",
