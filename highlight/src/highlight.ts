@@ -63,13 +63,13 @@ class Highlighter {
     }
 
     tree.iterate(from, to, (type, start) => {
-      let tokType = tokenMap!.get(type)
+      let tokType = tokenMap.get(type)
       if (tokType != null) {
         context = context.enter(tokType, themes)
         flush(start, context.style)
       }
     }, (type, _, end) => {
-      let tokType = tokenMap!.get(type)
+      let tokType = tokenMap.get(type)
       if (tokType != null) {
         context = context.prev!
         flush(end, context.style)
