@@ -1,11 +1,10 @@
-import {TagMap} from "lezer"
 import parser from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
 import {LezerSyntax} from "../../syntax/src/syntax"
 import {tokenTypes} from "../../highlight/src/highlight"
 import {syntaxIndentation, dontIndent, parens, braces, brackets, statement, compositeStatement} from "../../indent/src/indent"
 
-const tokens = new TagMap(parser, {
+const tokens = parser.tagMap({
   Definition: "variable.definition",
   PropertyName: "property",
   Template: "string.template",
@@ -37,7 +36,7 @@ const tokens = new TagMap(parser, {
   "=>": "punctuation.arrow"
 })
 
-const indentStrategies = new TagMap(parser, {
+const indentStrategies = parser.tagMap({
   ExportDeclaration: statement,
   ClassDeclaration: statement,
   VariableDeclaration: statement, // FIXME force to 4?
