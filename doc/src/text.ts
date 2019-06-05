@@ -30,7 +30,7 @@ export abstract class Text {
     return cacheLine(this, this.lineInner(pos, false, 1, 0).finish(this))
   }
   line(n: number): Line {
-    if (n < 1 || n > this.lines) throw new RangeError("Invalid line number ${n} in ${this.lines}-line document")
+    if (n < 1 || n > this.lines) throw new RangeError(`Invalid line number ${n} in ${this.lines}-line document`)
     for (let i = 0; i < lineCache.length; i += 2) {
       if (lineCache[i] != this) continue
       let line = lineCache[i + 1]
