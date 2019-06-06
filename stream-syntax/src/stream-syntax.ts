@@ -24,6 +24,11 @@ export abstract class StreamParser<State> {
     }
     return newState
   }
+
+  // FIXME provide access to indent unit somehow?
+  indent(state: State, textAfter: string): number {
+    return -1
+  }
 }
 
 function readToken<State>(parser: StreamParser<State>, state: State, stream: StringStream) {
@@ -38,6 +43,7 @@ function readToken<State>(parser: StreamParser<State>, state: State, stream: Str
 export class StreamSyntax extends Syntax {
   private field: StateField<SyntaxState<any>>
   public extension: StateExtension
+  public indentation: StateExtension
 
   constructor(name: string, readonly parser: StreamParser<any>, slots: Slot[] = []) {
     super(name, slots.concat(tokenTypes(tokenMap)))
@@ -46,6 +52,9 @@ export class StreamSyntax extends Syntax {
       apply(tr, value) { return value.apply(tr) }
     })
     this.extension = StateExtension.all(syntax(this), this.field.extension)
+    this.indentation = StateExtension.indentation((state: EditorState, pos: number) => {
+      return state.getField(this.field).getIndent(this.parser, state, pos)
+    })
   }
 
   getTree(state: EditorState, from: number, to: number): Tree {
@@ -83,7 +92,7 @@ class SyntaxState<ParseState> {
       this.cache[(lineBefore - 1) >> CACHE_STEP_SHIFT] = parser.copyState(state)
   }
 
-  cachedState(parser: StreamParser<ParseState>, editorState: EditorState, line: number) {
+  findState(parser: StreamParser<ParseState>, editorState: EditorState, line: number) {
     let cacheIndex = Math.min(this.cache.length - 1, (line - 1) >> CACHE_STEP_SHIFT)
     let cachedLine = (cacheIndex << CACHE_STEP_SHIFT) + 1
     let startPos = editorState.doc.line(cachedLine).start
@@ -104,7 +113,7 @@ class SyntaxState<ParseState> {
   }
 
   highlightUpto(parser: StreamParser<ParseState>, editorState: EditorState, to: number) {
-    let state = this.frontierState || this.cachedState(parser, editorState, this.frontierLine)
+    let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)
     if (!state) return // FIXME make up a state? return a partial temp tree?
     // FIXME interrupt at some point when too much work is done
     let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
@@ -134,6 +143,14 @@ class SyntaxState<ParseState> {
   getTree(parser: StreamParser<ParseState>, state: EditorState, to: number) {
     if (this.frontierPos < to) this.highlightUpto(parser, state, to)
     return this.tree
+  }
+
+  getIndent(parser: StreamParser<ParseState>, state: EditorState, pos: number) {
+    let line = state.doc.lineAt(pos)
+    let parseState = this.findState(parser, state, line.number)
+    if (parseState == null) return -1
+    let text = line.slice(pos - line.start, Math.min(line.end, pos + 100) - line.start)
+    return parser.indent(parseState, /^\s*(.*)/.exec(text)![1])
   }
 }
 
