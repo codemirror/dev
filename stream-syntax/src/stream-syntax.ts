@@ -4,7 +4,7 @@ import {StringStreamCursor} from "../../legacy-modes/src/stringstreamcursor" // 
 import {Slot} from "../../extension/src/extension"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
 import {tokenTypes} from "../../highlight/src/highlight"
-import {Tree, TagMap} from "lezer"
+import {Tree, TagMap} from "lezer-tree"
 
 export {StringStream}
 

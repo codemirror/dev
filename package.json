@@ -30,7 +30,7 @@
     "style-mod": "^2.0.0",
     "w3c-keyname": "^2.1.0",
     "lezer": "git://github.com/lezer-parser/lezer.git",
-    "lezer-generator": "git://github.com/lezer-parser/lezer-generator.git",
+    "lezer-tree": "git://github.com/lezer-parser/lezer-tree.git",
     "lezer-javascript": "git://github.com/lezer-parser/javascript.git"
   },
   "devDependencies": {
