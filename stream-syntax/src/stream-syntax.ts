@@ -1,6 +1,5 @@
 import {Syntax, syntax} from "../../syntax/src/syntax"
-import {StringStream} from "../../legacy-modes/src/stringstream" // FIXME move here
-import {StringStreamCursor} from "../../legacy-modes/src/stringstreamcursor" // FIXME move here
+import {StringStream, StringStreamCursor} from "./stringstream"
 import {Slot} from "../../extension/src/extension"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
 import {tokenTypes} from "../../highlight/src/highlight"

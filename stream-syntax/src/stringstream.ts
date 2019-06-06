@@ -1,4 +1,22 @@
-import { countColumn } from "./misc"
+import {Text, TextIterator} from "../../doc/src"
+
+// Counts the column offset in a string, taking tabs into account.
+// Used mostly to find indentation.
+// FIXME more or less duplicated in indent/src/indent.ts
+function countColumn(string: string, end: number | null, tabSize: number, startIndex?: number, startValue?: number): number {
+  if (end == null) {
+    end = string.search(/[^\s\u00a0]/)
+    if (end == -1) end = string.length
+  }
+  for (let i = startIndex || 0, n = startValue || 0;;) {
+    let nextTab = string.indexOf("\t", i)
+    if (nextTab < 0 || nextTab >= end)
+      return n + (end - i)
+    n += nextTab - i
+    n += tabSize - (n % tabSize)
+    i = nextTab + 1
+  }
+}
 
 // STRING STREAM
 
@@ -90,5 +108,24 @@ export class StringStream {
   baseToken() {
     let oracle = this.lineOracle
     return oracle && oracle.baseToken(this.pos)
+  }
+}
+
+export class StringStreamCursor {
+  private curLineEnd: number
+  private readonly iter: TextIterator
+
+  constructor(text: Text, public offset: number, readonly tabSize: number = 4) {
+    this.iter = text.iterLines(offset)
+    this.curLineEnd = this.offset - 1
+  }
+
+  next() {
+    let {value, done} = this.iter.next()
+    if (done) throw new RangeError("Reached end of document")
+    const res = new StringStream(value, this.tabSize, null)
+    this.offset = this.curLineEnd + 1
+    this.curLineEnd += value.length + 1
+    return res
   }
 }
