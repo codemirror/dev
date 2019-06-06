@@ -8,37 +8,51 @@ import {Tree, TagMap} from "lezer-tree"
 
 export {StringStream}
 
-export abstract class StreamParser<State> {
-  abstract token(stream: StringStream, state: State): string | null
+export type StreamParserSpec<State> = {
+  token(stream: StringStream, state: State, editorState: EditorState): string | null
+  blankLine?(state: State, editorState: EditorState): void
+  startState?(editorState: EditorState): State
+  copyState?(state: State): State
+  indent?(state: State, textAfter: string, editorState: EditorState): number
+}
 
-  blankLine(state: State) {}
+export class StreamParser<State> {
+  token: (stream: StringStream, state: State, editorState: EditorState) => string | null
+  blankLine: (state: State, editorState: EditorState) => void
+  // FIXME maybe support passing something from the parent when nesting
+  startState: (editorState: EditorState) => State
+  copyState: (state: State) => State
+  indent: (state: State, textAfter: string, editorState: EditorState) => number
+  
+  constructor(spec: StreamParserSpec<State>) {
+    this.token = spec.token
+    this.blankLine = spec.blankLine || (() => {})
+    this.startState = spec.startState || (() => (true as any))
+    this.copyState = spec.copyState || defaultCopyState
+    this.indent = spec.indent || (() => -1)
+  }
 
-  startState(): State { return (true as any) }
-
-  copyState(state: State) {
-    if (typeof state != "object") return state
-    let newState = {} as State
-    for (let prop in state) {
-      let val = state[prop]
-      newState[prop] = (val instanceof Array ? val.slice() : val) as any
+  readToken(state: State, stream: StringStream, editorState: EditorState) {
+    stream.start = stream.pos
+    for (let i = 0; i < 10; i++) {
+      let result = this.token(stream, state, editorState)
+      if (stream.pos > stream.start) return result
     }
-    return newState
-  }
-
-  // FIXME provide access to indent unit somehow?
-  indent(state: State, textAfter: string): number {
-    return -1
+    throw new Error("Stream parser failed to advance stream.")
   }
 }
 
-function readToken<State>(parser: StreamParser<State>, state: State, stream: StringStream) {
-  stream.start = stream.pos
-  for (let i = 0; i < 10; i++) {
-    let result = parser.token(stream, state)
-    if (stream.pos > stream.start) return result
+function defaultCopyState<State>(state: State) {
+  if (typeof state != "object") return state
+  let newState = {} as State
+  for (let prop in state) {
+    let val = state[prop]
+    newState[prop] = (val instanceof Array ? val.slice() : val) as any
   }
-  throw new Error("Stream parser failed to advance stream.")
+  return newState
 }
+
+export type LegacyMode<State> = {name: string} & StreamParserSpec<State>
 
 export class StreamSyntax extends Syntax {
   private field: StateField<SyntaxState<any>>
@@ -48,7 +62,7 @@ export class StreamSyntax extends Syntax {
   constructor(name: string, readonly parser: StreamParser<any>, slots: Slot[] = []) {
     super(name, slots.concat(tokenTypes(tokenMap)))
     this.field = new StateField<SyntaxState<any>>({
-      init() { return new SyntaxState(Tree.empty, [parser.startState()], 1, 0, null) },
+      init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
       apply(tr, value) { return value.apply(tr) }
     })
     this.extension = StateExtension.all(syntax(this), this.field.extension)
@@ -59,6 +73,10 @@ export class StreamSyntax extends Syntax {
 
   getTree(state: EditorState, from: number, to: number): Tree {
     return state.getField(this.field).getTree(this.parser, state, to)
+  }
+
+  static legacy(mode: LegacyMode<any>): StreamSyntax {
+    return new StreamSyntax(mode.name, new StreamParser(mode))
   }
 }
 
@@ -103,9 +121,9 @@ class SyntaxState<ParseState> {
     for (let l = cachedLine; l < line; l++) {
       let stream = cursor.next()
       if (stream.eol()) {
-        parser.blankLine(state)
+        parser.blankLine(state, editorState)
       } else {
-        while (!stream.eol()) readToken(parser, state, stream)
+        while (!stream.eol()) parser.readToken(state, stream, editorState)
       }
       this.maybeStoreState(parser, l, state)
     }
@@ -122,10 +140,10 @@ class SyntaxState<ParseState> {
     while (pos < to) {
       let stream = cursor.next(), offset = cursor.offset
       if (stream.eol()) {
-        parser.blankLine(state)
+        parser.blankLine(state, editorState)
       } else {
         while (!stream.eol()) {
-          let type = readToken(parser, state, stream)
+          let type = parser.readToken(state, stream, editorState)
           if (type) buffer.push(tokenID(type), offset + stream.start, offset + stream.pos, 4)
         }
       }
@@ -150,7 +168,7 @@ class SyntaxState<ParseState> {
     let parseState = this.findState(parser, state, line.number)
     if (parseState == null) return -1
     let text = line.slice(pos - line.start, Math.min(line.end, pos + 100) - line.start)
-    return parser.indent(parseState, /^\s*(.*)/.exec(text)![1])
+    return parser.indent(parseState, /^\s*(.*)/.exec(text)![1], state)
   }
 }
 
@@ -165,4 +183,13 @@ function tokenID(name: string) {
     tokenNames.push(name)
   }
   return id
+}
+
+export function legacyMode(spec: LegacyMode<any>) {
+  let syntax = StreamSyntax.legacy(spec)
+  // FIXME add behavior for commenting, electric chars, etc
+  return StateExtension.all(
+    syntax.extension,
+    syntax.indentation
+  )
 }

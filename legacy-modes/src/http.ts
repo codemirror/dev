@@ -1,25 +1,25 @@
-import {StreamParser, StringStream, StreamSyntax} from "../stream-syntax/src/stream-syntax"
+import {LegacyMode, StringStream} from "../../stream-syntax/src/stream-syntax"
 
 type ParseState = {cur: (stream: StringStream, state: ParseState) => string | null}
 
-class HttpParser extends StreamParser<ParseState> {
+let httpMode: LegacyMode<ParseState> = {
+  name: "http",
+
   token(stream: StringStream, state: ParseState) {
     if (state.cur != header && state.cur != body && stream.eatSpace()) return null
     return state.cur(stream, state)
-  }
+  },
 
   blankLine(state: ParseState) {
     state.cur = body
-  }
+  },
 
   startState() {
     return {cur: start}
   }
 }
 
-export function httpSyntax() {
-  return new StreamSyntax("http", new HttpParser).extension
-}
+export default httpMode
 
 function failFirstLine(stream: StringStream, state: ParseState) {
   stream.skipToEnd()
@@ -31,7 +31,7 @@ function start(stream: StringStream, state: ParseState) {
   if (stream.match(/^HTTP\/\d\.\d/)) {
     state.cur = responseStatusCode
     return "keyword"
-  } else if (stream.match(/^[A-Z]+/) && /[ \t]/.test(stream.peek())) {
+  } else if (stream.match(/^[A-Z]+/) && /[ \t]/.test(stream.peek()!)) {
     state.cur = requestPath
     return "keyword"
   } else {
@@ -40,7 +40,7 @@ function start(stream: StringStream, state: ParseState) {
 }
 
 function responseStatusCode(stream: StringStream, state: ParseState) {
-  var code = stream.match(/^\d+/)
+  var code = stream.match(/^\d+/) as RegExpMatchArray
   if (!code) return failFirstLine(stream, state)
 
   state.cur = responseStatusText

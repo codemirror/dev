@@ -35,7 +35,7 @@ export class StringStream {
     else ok = ch && (match instanceof RegExp ? match.test(ch) : match(ch))
     if (ok) {++this.pos; return ch}
   }
-  eatWhile(match: string | RegExp): boolean {
+  eatWhile(match: string | RegExp | ((ch: string) => boolean)): boolean {
     let start = this.pos
     while (this.eat(match)){}
     return this.pos > start
