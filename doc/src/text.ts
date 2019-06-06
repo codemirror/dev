@@ -411,7 +411,7 @@ class RawTextCursor implements TextIterator {
       let top = this.nodes[last]
       let offset = this.offsets[last]
       if (top instanceof TextLeaf) {
-        // Internal ofset with lineBreak == false means we have to
+        // Internal offset with lineBreak == false means we have to
         // count the line break at this position
         if (offset != (this.dir > 0 ? 0 : top.text.length) && !this.lineBreak) {
           this.lineBreak = true
