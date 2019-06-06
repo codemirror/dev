@@ -2,15 +2,6 @@ import {TagMap, Subtree, TERM_ERR} from "lezer"
 import {LezerSyntax} from "../../syntax/src/syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
-export const indentUnit = StateExtension.defineBehavior<number>()
-
-const DEFAULT_INDENT_UNIT = 2
-
-export function getIndentUnit(state: EditorState) {
-  let values = state.behavior.get(indentUnit)
-  return values.length ? values[0] : DEFAULT_INDENT_UNIT
-}
-
 // FIXME handle nested syntaxes
 
 export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<IndentStrategy>) {
@@ -50,7 +41,7 @@ export class IndentContextInner {
               readonly strategies: TagMap<IndentStrategy>,
               readonly syntax: LezerSyntax,
               readonly state: EditorState) {
-    this.unit = getIndentUnit(state)
+    this.unit = state.indentUnit
   }
 }
 

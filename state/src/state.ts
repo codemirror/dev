@@ -6,6 +6,7 @@ import {Extension, BehaviorStore} from "../../extension/src/extension"
 export class StateExtension extends Extension {
   static allowMultipleSelections = StateExtension.defineBehavior<boolean>()
   static indentation = StateExtension.defineBehavior<(state: EditorState, pos: number) => number>()
+  static indentUnit = StateExtension.defineBehavior<number>()
 }
 
 class Configuration {
@@ -43,6 +44,8 @@ export interface EditorStateConfig {
   lineSeparator?: string | null
 }
 
+const DEFAULT_INDENT_UNIT = 2
+
 export class EditorState {
   /** @internal */
   constructor(/* @internal */ readonly config: Configuration,
@@ -79,6 +82,11 @@ export class EditorState {
   }
 
   get tabSize(): number { return this.config.tabSize }
+
+  get indentUnit(): number {
+    let values = this.behavior.get(StateExtension.indentUnit)
+    return values.length ? values[0] : DEFAULT_INDENT_UNIT
+  }
 
   get multipleSelections(): boolean { return this.config.multipleSelections }
 
