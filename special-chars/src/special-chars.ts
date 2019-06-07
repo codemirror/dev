@@ -120,7 +120,7 @@ class SpecialCharHighlighter {
 }
 
 // FIXME configurable
-const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff]/gu
+const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
 
 const NAMES: {[key: number]: string} = {
   0: "null",
@@ -137,7 +137,8 @@ const NAMES: {[key: number]: string} = {
   8207: "right-to-left mark",
   8232: "line separator",
   8233: "paragraph separator",
-  65279: "zero width no-break space"
+  65279: "zero width no-break space",
+  65532: "object replacement"
 }
 
 // Assigns placeholder characters from the Control Pictures block to
