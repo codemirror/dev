@@ -150,7 +150,7 @@ class SyntaxState<ParseState> {
     return state
   }
 
-  moveFrontier(parser: StreamParser<ParseState>, editorState: EditorState, upto: number) {
+  advanceFrontier(parser: StreamParser<ParseState>, editorState: EditorState, upto: number) {
     let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)!
     let sliceEnd = Date.now() + WORK_SLICE
     let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
@@ -180,7 +180,7 @@ class SyntaxState<ParseState> {
 
   getTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, unfinished?: (req: TreeRequest) => void): Tree {
     if (this.frontierPos < upto) {
-      this.moveFrontier(parser, state, upto)
+      if (this.working == -1) this.advanceFrontier(parser, state, upto)
       if (this.frontierPos < upto && unfinished) {
         let req = this.requests.find(r => r.upto == upto && !r.promise.canceled)
         if (!req) {
@@ -195,14 +195,14 @@ class SyntaxState<ParseState> {
   }
 
   scheduleWork(parser: StreamParser<ParseState>, state: EditorState) {
-    if (this.working > -1) return
+    if (this.working != -1) return
     this.working = setTimeout(() => this.work(parser, state), WORK_PAUSE) as any
   }
 
   work(parser: StreamParser<ParseState>, state: EditorState) {
     this.working = -1
     let upto = this.requests.reduce((max, req) => req.promise.canceled ? max : Math.max(max, req.upto), 0)
-    if (upto > this.frontierPos) this.moveFrontier(parser, state, upto)
+    if (upto > this.frontierPos) this.advanceFrontier(parser, state, upto)
 
     for (let req of this.requests) {
       if (req.upto <= this.frontierPos && !req.promise.canceled) req.resolve(this.tree)
