@@ -1,5 +1,5 @@
 import {TagMap} from "lezer"
-import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, themeClass} from "../../view/src"
+import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, themeClass, notified} from "../../view/src"
 import {Slot} from "../../extension/src/extension"
 import {Syntax, syntax} from "../../syntax/src/syntax"
 
@@ -48,7 +48,7 @@ class Highlighter {
     if (!this.syntax || themes.length == 0) return Decoration.none
 
     let {from, to} = view.viewport
-    let tree = this.syntax.tryGetTree(view.state, from, to) // FIXME wire up view notification
+    let tree = this.syntax.tryGetTree(view.state, from, to, view.notify)
 
     let tokens: DecoratedRange[] = []
     let tokenMap = this.syntax.getSlot(tokenTypes)!
@@ -87,7 +87,8 @@ export function highlight() { // FIXME allow specifying syntax?
       return new Highlighter(null, view)
     },
     update(highlighter, update) {
-      if (update.docChanged || update.viewportChanged) highlighter.deco = highlighter.buildDeco(update.view)
+      if (update.docChanged || update.viewportChanged || update.getMeta(notified))
+        highlighter.deco = highlighter.buildDeco(update.view)
       return highlighter // FIXME immutable?
     },
     effects: [ViewField.decorationEffect(h => h.deco)]

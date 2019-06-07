@@ -10,7 +10,7 @@ import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule,
-        viewPlugin, ViewPlugin, getField, Effect, themeClass} from "./extension"
+        viewPlugin, ViewPlugin, getField, Effect, themeClass, notified} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 
 export interface EditorConfig {
@@ -48,6 +48,10 @@ export class EditorView {
   // @internal
   updating: boolean = false
 
+  // @internal
+  notifications: (Promise<any> & {canceled?: boolean})[] = []
+  notify: (promise: Promise<any> & {canceled?: boolean}) => void
+
   constructor(config: EditorConfig) {
     this.contentDOM = document.createElement("div")
     let tabSizeStyle = (this.contentDOM.style as any).tabSize != null ? "tab-size: " : "-moz-tab-size: "
@@ -67,11 +71,19 @@ export class EditorView {
     this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
     this.root = (config.root || document) as DocumentOrShadowRoot
 
+    this.notify = (promise) => {
+      promise.then(() => {
+        if (!promise.canceled) this.update([], [notified(null)])
+      })
+      this.notifications.push(promise)
+    }
+
     this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
     this.setState(config.state, config.extensions)
   }
 
   setState(state: EditorState, extensions: ViewExtension[] = []) {
+    this.clearNotifications()
     for (let plugin of this.plugins) if (plugin.destroy) plugin.destroy()
     this.withUpdating(() => {
       ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
@@ -88,6 +100,7 @@ export class EditorView {
   }
 
   update(transactions: Transaction[] = [], metadata: Slot[] = []) {
+    this.clearNotifications()
     let state = this.state
     for (let tr of transactions) {
       if (tr.startState != state)
@@ -106,6 +119,11 @@ export class EditorView {
         this.editorAttrs.update(this)
       }
     })
+  }
+
+  private clearNotifications() {
+    for (let promise of this.notifications) promise.canceled = true
+    this.notifications.length = 0
   }
 
   // @internal

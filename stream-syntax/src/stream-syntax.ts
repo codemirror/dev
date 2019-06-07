@@ -184,10 +184,10 @@ class SyntaxState<ParseState> {
       if (this.frontierPos < upto && unfinished) {
         let req = this.requests.find(r => r.upto == upto && !r.promise.canceled)
         if (!req) {
-          let req = new RequestInfo(upto)
+          req = new RequestInfo(upto)
           this.requests.push(req)
         }
-        unfinished(req!.promise)
+        unfinished(req.promise)
         this.scheduleWork(parser, state)
       }
     }
