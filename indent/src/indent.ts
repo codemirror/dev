@@ -7,7 +7,7 @@ import {EditorState, StateExtension} from "../../state/src/"
 export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<IndentStrategy>) {
   return StateExtension.indentation((state, pos) => {
     let inner = new IndentContextInner(pos, strategies, syntax, state)
-    let tree: Subtree | null = syntax.getTree(state, pos, pos).resolve(pos)
+    let tree: Subtree | null = syntax.tryGetTree(state, pos, pos).resolve(pos)
     // Enter previous nodes that end in empty error terms, which means
     // they were broken off by error recovery, so that indentation
     // works even if the constructs haven't been finished.

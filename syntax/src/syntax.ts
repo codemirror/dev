@@ -5,6 +5,8 @@ import {EditorState, StateExtension, StateField, Transaction} from "../../state/
 
 // FIXME put lezer-specific definitions in different file from generic definitions. maybe even different package
 
+export type TreeRequest = Promise<Tree> & {canceled?: boolean}
+
 export abstract class Syntax {
   abstract extension: StateExtension
 
@@ -18,7 +20,8 @@ export abstract class Syntax {
     this.slots.push(slot)
   }
 
-  abstract getTree(state: EditorState, from: number, to: number): Tree
+  abstract getTree(state: EditorState, from: number, to: number): TreeRequest
+  abstract tryGetTree(state: EditorState, from: number, to: number, unfinished?: (req: TreeRequest) => void): Tree
 }
 
 export class LezerSyntax extends Syntax {
@@ -34,7 +37,12 @@ export class LezerSyntax extends Syntax {
     this.extension = StateExtension.all(syntax(this), this.field.extension)
   }
 
-  getTree(state: EditorState, from: number, to: number): Tree {
+  getTree(state: EditorState, from: number, to: number): TreeRequest {
+    return Promise.resolve(this.tryGetTree(state, from, to))
+  }
+
+  // FIXME add actual incrementality
+  tryGetTree(state: EditorState, from: number, to: number): Tree {
     return state.getField(this.field).getTree(this.parser, state.doc, from, to)
   }
 }

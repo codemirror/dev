@@ -1,4 +1,4 @@
-import {Syntax, syntax} from "../../syntax/src/syntax"
+import {Syntax, syntax, TreeRequest} from "../../syntax/src/syntax"
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {Slot} from "../../extension/src/extension"
 import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
@@ -53,6 +53,16 @@ function defaultCopyState<State>(state: State) {
 
 export type LegacyMode<State> = {name: string} & StreamParserSpec<State>
 
+class RequestInfo {
+  promise: TreeRequest
+  resolve!: (tree: Tree) => void
+
+  constructor(readonly upto: number) {
+    this.promise = new Promise<Tree>(r => this.resolve = r)
+    this.promise.canceled = false
+  }
+}
+
 export class StreamSyntax extends Syntax {
   private field: StateField<SyntaxState<any>>
   public extension: StateExtension
@@ -70,8 +80,14 @@ export class StreamSyntax extends Syntax {
     })
   }
 
-  getTree(state: EditorState, from: number, to: number): Tree {
-    return state.getField(this.field).getTree(this.parser, state, to)
+  getTree(state: EditorState, from: number, to: number): TreeRequest {
+    let later = null
+    let direct = this.tryGetTree(state, from, to, (req) => later = req)
+    return later || Promise.resolve(direct)
+  }
+
+  tryGetTree(state: EditorState, from: number, to: number, unfinished?: (request: TreeRequest) => void): Tree {
+    return state.getField(this.field).getTree(this.parser, state, to, unfinished)
   }
 
   static legacy(mode: LegacyMode<any>): StreamSyntax {
@@ -83,7 +99,12 @@ const CACHE_STEP_SHIFT = 6, CACHE_STEP = 1 << CACHE_STEP_SHIFT
 
 const MAX_RECOMPUTE_DISTANCE = 20e3
 
+const WORK_SLICE = 100, WORK_PAUSE = 200
+
 class SyntaxState<ParseState> {
+  requests: RequestInfo[] = []
+  working = -1
+
   constructor(public tree: Tree,
               // Slot 0 stores the start state (line 1), slot 1 the
               // state at the start of line 65, etc, so lineNo ==
@@ -129,14 +150,13 @@ class SyntaxState<ParseState> {
     return state
   }
 
-  highlightUpto(parser: StreamParser<ParseState>, editorState: EditorState, to: number) {
-    let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)
-    if (!state) return // FIXME make up a state? return a partial temp tree?
-    // FIXME interrupt at some point when too much work is done
+  moveFrontier(parser: StreamParser<ParseState>, editorState: EditorState, upto: number) {
+    let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)!
+    let sliceEnd = Date.now() + WORK_SLICE
     let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
     let buffer: number[] = []
     let line = this.frontierLine, pos = this.frontierPos
-    while (pos < to) {
+    while (pos < upto) {
       let stream = cursor.next(), offset = cursor.offset
       if (stream.eol()) {
         parser.blankLine(state, editorState)
@@ -149,17 +169,46 @@ class SyntaxState<ParseState> {
       this.maybeStoreState(parser, line, state)
       line++
       pos += stream.string.length + 1
+      if (Date.now() > sliceEnd) break
     }
-    let tree = Tree.fromBuffer(buffer)
-    this.tree = this.tree.append(tree)
+    let tree = Tree.fromBuffer(buffer).balance()
+    this.tree = this.tree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
     this.frontierState = state
   }
 
-  getTree(parser: StreamParser<ParseState>, state: EditorState, to: number) {
-    if (this.frontierPos < to) this.highlightUpto(parser, state, to)
+  getTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, unfinished?: (req: TreeRequest) => void): Tree {
+    if (this.frontierPos < upto) {
+      this.moveFrontier(parser, state, upto)
+      if (this.frontierPos < upto && unfinished) {
+        let req = this.requests.find(r => r.upto == upto && !r.promise.canceled)
+        if (!req) {
+          let req = new RequestInfo(upto)
+          this.requests.push(req)
+        }
+        unfinished(req!.promise)
+        this.scheduleWork(parser, state)
+      }
+    }
     return this.tree
+  }
+
+  scheduleWork(parser: StreamParser<ParseState>, state: EditorState) {
+    if (this.working > -1) return
+    this.working = setTimeout(() => this.work(parser, state), WORK_PAUSE) as any
+  }
+
+  work(parser: StreamParser<ParseState>, state: EditorState) {
+    this.working = -1
+    let upto = this.requests.reduce((max, req) => req.promise.canceled ? max : Math.max(max, req.upto), 0)
+    if (upto > this.frontierPos) this.moveFrontier(parser, state, upto)
+
+    for (let req of this.requests) {
+      if (req.upto <= this.frontierPos && !req.promise.canceled) req.resolve(this.tree)
+    }
+    this.requests = this.requests.filter(r => r.upto > this.frontierPos && !r.promise.canceled)
+    if (this.requests.length) this.scheduleWork(parser, state)
   }
 
   getIndent(parser: StreamParser<ParseState>, state: EditorState, pos: number) {

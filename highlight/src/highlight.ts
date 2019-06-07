@@ -48,7 +48,7 @@ class Highlighter {
     if (!this.syntax || themes.length == 0) return Decoration.none
 
     let {from, to} = view.viewport
-    let tree = this.syntax.getTree(view.state, from, to)
+    let tree = this.syntax.tryGetTree(view.state, from, to) // FIXME wire up view notification
 
     let tokens: DecoratedRange[] = []
     let tokenMap = this.syntax.getSlot(tokenTypes)!

@@ -8,7 +8,7 @@ function s(doc: string) {
 }
 
 function tr(state: EditorState) {
-  return javascriptSyntax.getTree(state, 0, state.doc.length)
+  return javascriptSyntax.tryGetTree(state, 0, state.doc.length)
 }
 
 let tags = javascriptSyntax.parser.tags
