@@ -1,7 +1,6 @@
-import {Syntax, syntax, TreeRequest} from "../../syntax/src/syntax"
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {Slot} from "../../extension/src/extension"
-import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
+import {EditorState, StateExtension, StateField, Transaction, Syntax, syntax, SyntaxRequest} from "../../state/src/"
 import {tokenTypes} from "../../highlight/src/highlight"
 import {Tree, TagMap} from "lezer-tree"
 
@@ -54,7 +53,7 @@ function defaultCopyState<State>(state: State) {
 export type LegacyMode<State> = {name: string} & StreamParserSpec<State>
 
 class RequestInfo {
-  promise: TreeRequest
+  promise: SyntaxRequest
   resolve!: (tree: Tree) => void
 
   constructor(readonly upto: number) {
@@ -80,13 +79,7 @@ export class StreamSyntax extends Syntax {
     })
   }
 
-  getTree(state: EditorState, from: number, to: number): TreeRequest {
-    let later = null
-    let direct = this.tryGetTree(state, from, to, (req) => later = req)
-    return later || Promise.resolve(direct)
-  }
-
-  tryGetTree(state: EditorState, from: number, to: number, unfinished?: (request: TreeRequest) => void): Tree {
+  tryGetTree(state: EditorState, from: number, to: number, unfinished?: (request: SyntaxRequest) => void): Tree {
     return state.getField(this.field).getTree(this.parser, state, to, unfinished)
   }
 
@@ -178,7 +171,7 @@ class SyntaxState<ParseState> {
     this.frontierState = state
   }
 
-  getTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, unfinished?: (req: TreeRequest) => void): Tree {
+  getTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, unfinished?: (req: SyntaxRequest) => void): Tree {
     if (this.frontierPos < upto) {
       if (this.working == -1) this.advanceFrontier(parser, state, upto)
       if (this.frontierPos < upto && unfinished) {

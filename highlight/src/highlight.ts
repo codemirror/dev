@@ -1,7 +1,7 @@
 import {TagMap} from "lezer"
 import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, themeClass, notified} from "../../view/src"
 import {Slot} from "../../extension/src/extension"
-import {Syntax, syntax} from "../../syntax/src/syntax"
+import {Syntax, syntax} from "../../state/src/"
 
 export const tokenTypes = Slot.define<TagMap<string>>()
 

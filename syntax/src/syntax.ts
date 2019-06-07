@@ -1,28 +1,7 @@
 import {Parser, Tree, InputStream} from "lezer"
-import {Slot, SlotType} from "../../extension/src/extension"
+import {Slot} from "../../extension/src/extension"
 import {Text, TextIterator} from "../../doc/src/"
-import {EditorState, StateExtension, StateField, Transaction} from "../../state/src/"
-
-// FIXME put lezer-specific definitions in different file from generic definitions. maybe even different package
-
-export type TreeRequest = Promise<Tree> & {canceled?: boolean}
-
-export abstract class Syntax {
-  abstract extension: StateExtension
-
-  constructor(readonly name: string, private slots: Slot[] = []) {}
-
-  getSlot<T>(type: SlotType<T>): T | undefined {
-    return Slot.get(type, this.slots)
-  }
-
-  addSlot<T>(slot: Slot<T>) {
-    this.slots.push(slot)
-  }
-
-  abstract getTree(state: EditorState, from: number, to: number): TreeRequest
-  abstract tryGetTree(state: EditorState, from: number, to: number, unfinished?: (req: TreeRequest) => void): Tree
-}
+import {EditorState, StateExtension, StateField, Transaction, syntax, Syntax} from "../../state/src/"
 
 export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
@@ -37,17 +16,11 @@ export class LezerSyntax extends Syntax {
     this.extension = StateExtension.all(syntax(this), this.field.extension)
   }
 
-  getTree(state: EditorState, from: number, to: number): TreeRequest {
-    return Promise.resolve(this.tryGetTree(state, from, to))
-  }
-
   // FIXME add actual incrementality
   tryGetTree(state: EditorState, from: number, to: number): Tree {
     return state.getField(this.field).getTree(this.parser, state.doc, from, to)
   }
 }
-
-export const syntax = StateExtension.defineBehavior<Syntax>()
 
 class DocStream implements InputStream {
   pos = 0
