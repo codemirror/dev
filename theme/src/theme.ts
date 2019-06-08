@@ -5,21 +5,11 @@ type ThemeRule = {[name: string]: ThemeRule | string}
 
 export function theme(rules: {[name: string]: ThemeRule}) {
   let {tree, styles} = ruleTree(rules)
+  let cache: {[type: string]: string} = Object.create(null)
   return ViewExtension.all(
     themeClass(type => {
-      let parts = type.split(".")
-      for (let i = 0; i < parts.length; i++) {
-        let match = tree.next[parts[i]]
-        if (match) {
-          for (let j = i + 1; j < parts.length; j++) {
-            let next = match.next[parts[j]]
-            if (!next) break
-            match = next
-          }
-          if (match.classes) return match.classes
-        }
-      }
-      return ""
+      let cached = cache[type]
+      return cached != null ? cached : (cache[type] = tree.lookup(type.split(".")))
     }),
     styleModule(styles)
   )
@@ -35,6 +25,20 @@ class MatchTree {
     if (found) return found
     if (this.next == none) this.next = Object.create(null)
     return this.next[part] = new MatchTree
+  }
+  lookup(parts: string[]): string {
+    for (let i = 0; i < parts.length; i++) {
+      let match = this.next[parts[i]]
+      if (match) {
+        for (let j = i + 1; j < parts.length; j++) {
+          let next = match.next[parts[j]]
+          if (!next) break
+          match = next
+        }
+        if (match.classes) return match.classes
+      }
+    }
+    return ""
   }
 }
 

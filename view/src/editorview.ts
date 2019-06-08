@@ -59,14 +59,14 @@ export class EditorView {
     this.contentAttrs = new AttrsFor(ViewField.contentAttributeEffect, this.contentDOM, () => ({
       spellcheck: "false",
       contenteditable: "true",
-      class: "codemirror-content " + styles.content,
+      class: styles.content + " codemirror-content " + this.themeClass("editor.content"),
       style: tabSizeStyle + this.state.tabSize
     }))
 
     this.dom = document.createElement("div")
     this.dom.appendChild(this.contentDOM)
     this.editorAttrs = new AttrsFor(ViewField.editorAttributeEffect, this.dom, view => ({
-      class: "codemirror " + styles.wrapper + (view.hasFocus() ? " codemirror-focused" : "")
+      class: "codemirror " + styles.wrapper + (view.hasFocus() ? " codemirror-focused " : " ") + this.themeClass("editor.wrapper")
     }))
 
     this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
