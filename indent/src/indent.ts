@@ -1,8 +1,9 @@
 import {TagMap, Subtree, TERM_ERR} from "lezer"
-import {LezerSyntax} from "../../syntax/src/syntax"
+import {LezerSyntax} from "../../lezer-syntax/src/syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
 // FIXME handle nested syntaxes
+// FIXME rename or move into lezer-syntax?
 
 export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<IndentStrategy>) {
   return StateExtension.indentation((state, pos) => {
