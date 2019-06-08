@@ -5,7 +5,7 @@ import {clientRectsFor, Rect} from "./dom"
 import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 import {Open} from "./buildview"
-import {styles} from "./editorview"
+import {styles} from "./styles"
 
 export interface BlockView extends ContentView {
   merge(from: number, to: number, source: ContentView | null, takeDeco: boolean): boolean
