@@ -1,6 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {Slot} from "../../extension/src/extension"
-import {EditorState, StateExtension, StateField, Transaction, Syntax, syntax, SyntaxRequest} from "../../state/src/"
+import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
 import {tokenTypes} from "../../highlight/src/highlight"
 import {Tree, TagMap} from "lezer-tree"
 
@@ -73,7 +73,7 @@ export class StreamSyntax extends Syntax {
       init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = StateExtension.all(syntax(this), this.field.extension)
+    this.extension = StateExtension.all(StateExtension.syntax(this), this.field.extension)
     this.indentation = StateExtension.indentation((state: EditorState, pos: number) => {
       return state.getField(this.field).getIndent(this.parser, state, pos)
     })

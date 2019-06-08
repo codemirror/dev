@@ -1,12 +1,14 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
+import {Syntax} from "./syntax"
 import {Extension, BehaviorStore} from "../../extension/src/extension"
 
 export class StateExtension extends Extension {
   static allowMultipleSelections = StateExtension.defineBehavior<boolean>()
   static indentation = StateExtension.defineBehavior<(state: EditorState, pos: number) => number>()
   static indentUnit = StateExtension.defineBehavior<number>()
+  static syntax = StateExtension.defineBehavior<Syntax>()
 }
 
 class Configuration {

@@ -2,8 +2,6 @@ import {SlotType, Slot} from "../../extension/src/extension"
 import {EditorState, StateExtension} from "./state"
 import {Tree} from "lezer-tree"
 
-export const syntax = StateExtension.defineBehavior<Syntax>()
-
 export type SyntaxRequest = Promise<Tree> & {canceled?: boolean}
 
 export abstract class Syntax {

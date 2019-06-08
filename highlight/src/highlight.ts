@@ -1,7 +1,7 @@
 import {TagMap} from "lezer"
 import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, themeClass, notified} from "../../view/src"
 import {Slot} from "../../extension/src/extension"
-import {Syntax, syntax} from "../../state/src/"
+import {Syntax, StateExtension} from "../../state/src/"
 
 export const tokenTypes = Slot.define<TagMap<string>>()
 
@@ -39,7 +39,7 @@ class Highlighter {
   baseContext: TokenContext
 
   constructor(readonly syntax: Syntax | null, view: EditorView) {
-    this.baseContext = TokenContext.start("syntax:" + (syntax ? syntax.name : "null"))
+    this.baseContext = TokenContext.start("lang:" + (syntax ? syntax.name : "null"))
     this.deco = this.buildDeco(view)
   }
 
@@ -82,7 +82,7 @@ class Highlighter {
 export function highlight() { // FIXME allow specifying syntax?
   return new ViewField<Highlighter>({
     create(view) {
-      for (let s of view.state.behavior.get(syntax))
+      for (let s of view.state.behavior.get(StateExtension.syntax))
         if (s.getSlot(tokenTypes)) return new Highlighter(s, view)
       return new Highlighter(null, view)
     },

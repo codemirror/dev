@@ -1,7 +1,7 @@
 import {Parser, ParseContext, Tree, InputStream} from "lezer"
 import {Slot} from "../../extension/src/extension"
 import {Text, TextIterator} from "../../doc/src/"
-import {EditorState, StateExtension, StateField, Transaction, syntax, Syntax, SyntaxRequest} from "../../state/src/"
+import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
 
 // FIXME rename package to lezer-syntax
 
@@ -15,7 +15,7 @@ export class LezerSyntax extends Syntax {
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = StateExtension.all(syntax(this), this.field.extension)
+    this.extension = StateExtension.all(StateExtension.syntax(this), this.field.extension)
   }
 
   tryGetTree(state: EditorState, from: number, to: number, unfinished?: (promise: SyntaxRequest) => void): Tree {
