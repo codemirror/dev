@@ -81,7 +81,7 @@ export const styleModule = ViewExtension.defineBehavior<StyleModule>()
 
 export const focusChange = Slot.define<boolean>()
 
-export const notified = Slot.define<null>()
+export const notified = Slot.define<boolean>()
 
 export class ViewUpdate {
   readonly state: EditorState

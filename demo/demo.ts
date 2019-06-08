@@ -5,13 +5,10 @@ import {history, redo, redoSelection, undo, undoSelection} from "../history/src/
 import {lineNumbers} from "../gutter/src/index"
 import {baseKeymap, indentSelection} from "../commands/src/commands"
 import {matchBrackets} from "../matchbrackets/src/matchbrackets"
-//import javascript from "../legacy-modes/src/javascript"
 import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 
-import {legacyMode} from "../stream-syntax/src/stream-syntax"
-import javascript from "../legacy-modes/src/javascript"
-//import {javascript} from "../javascript/src/javascript"
+import {javascript} from "../javascript/src/javascript"
 import {defaultTheme} from "../theme/src/theme"
 import {highlight} from "../highlight/src/highlight"
 
@@ -26,7 +23,7 @@ readFile("package.json", "utf8", (err, data) => {
   history(),
   specialChars(),
   multipleSelections(),
-  legacyMode(javascript()),
+  javascript(),
   defaultTheme,
   highlight(),
   matchBrackets(),

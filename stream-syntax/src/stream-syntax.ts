@@ -197,10 +197,11 @@ class SyntaxState<ParseState> {
     let upto = this.requests.reduce((max, req) => req.promise.canceled ? max : Math.max(max, req.upto), 0)
     if (upto > this.frontierPos) this.advanceFrontier(parser, state, upto)
 
-    for (let req of this.requests) {
-      if (req.upto <= this.frontierPos && !req.promise.canceled) req.resolve(this.tree)
-    }
-    this.requests = this.requests.filter(r => r.upto > this.frontierPos && !r.promise.canceled)
+    this.requests = this.requests.filter(req => {
+      if (req.upto > this.frontierPos && !req.promise.canceled) return true
+      if (!req.promise.canceled) req.resolve(this.tree)
+      return false
+    })
     if (this.requests.length) this.scheduleWork(parser, state)
   }
 

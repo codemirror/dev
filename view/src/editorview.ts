@@ -73,7 +73,7 @@ export class EditorView {
 
     this.notify = (promise) => {
       promise.then(() => {
-        if (!promise.canceled) this.update([], [notified(null)])
+        if (!promise.canceled) this.update([], [notified(true)])
       })
       this.notifications.push(promise)
     }
