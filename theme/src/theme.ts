@@ -96,5 +96,9 @@ export const defaultTheme = theme({
     meta: {color: "#555"},
     tag: {color: "#170"},
     attribute: {color: "#00c"},
+  },
+  brackets: {
+    matching: {color: "#0b0"},
+    nonmatching: {color: "#a22"}
   }
 })

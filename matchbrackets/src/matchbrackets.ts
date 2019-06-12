@@ -1,113 +1,119 @@
-import {Text} from "../../doc/src"
-import {EditorState} from "../../state/src"
-import {combineConfig, Full} from "../../extension/src/extension"
-import {ViewExtension, ViewField, styleModule} from "../../view/src/"
+import {EditorState, StateExtension} from "../../state/src"
+import {combineConfig} from "../../extension/src/extension"
+import {ViewExtension, ViewField} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
-import {StyleModule} from "style-mod"
-
-const matching: {[key: string]: string | undefined} = {
-  "(": ")>",
-  ")": "(<",
-  "[": "]>",
-  "]": "[<",
-  "{": "}>",
-  "}": "{<"
-}
+import {Tree, Subtree, TagMap} from "lezer-tree"
+import {tokenTypes} from "../../highlight/src/highlight"
 
 export interface Config {
   afterCursor?: boolean,
-  bracketRegex?: RegExp,
-  maxScanDistance?: number,
-  strict?: boolean,
+  brackets?: string,
+  maxScanDistance?: number
 }
 
-function findMatchingBracket(
-  doc: Text, where: number, config: Full<Config>
-) : {from: number, to: number | null, forward: boolean, match: boolean} | null {
-  let pos = where - 1
-  // A cursor is defined as between two characters, but in in vim command mode
-  // (i.e. not insert mode), the cursor is visually represented as a
-  // highlighted box on top of the 2nd character. Otherwise, we allow matches
-  // from before or after the cursor.
-  const match = (!config.afterCursor && pos >= 0 && matching[doc.slice(pos, pos + 1)]) ||
-      matching[doc.slice(++pos, pos + 1)]
-  if (!match) return null
-  const dir = match[1] == ">" ? 1 : -1
-  if (config.strict && (dir > 0) != (pos == where)) return null
+const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
-  const found = scanForBracket(doc, pos + (dir > 0 ? 1 : 0), dir, config)
-  if (found == null) return null
-  return {from: pos, to: found ? found.pos : null,
-          match: found && found.ch == match.charAt(0), forward: dir > 0}
-}
-
-// bracketRegex is used to specify which type of bracket to scan
-// should be a regexp, e.g. /[[\]]/
-//
-// Note: If "where" is on an open bracket, then this bracket is ignored.
-//
-// Returns false when no bracket was found, null when it reached
-// maxScanDistance and gave up
-export function scanForBracket(doc: Text, where: number, dir: -1 | 1, config: Full<Config>) {
-  const maxScanDistance = config.maxScanDistance
-  const re = config.bracketRegex
-  const stack = []
-  const iter = doc.iterRange(where, dir > 0 ? doc.length : 0)
-  for (let distance = 0; !iter.done && distance <= maxScanDistance;) {
-    iter.next()
-    const text = iter.value
-    if (dir < 0) distance += text.length
-    const basePos = where + distance * dir
-    for (let pos = dir > 0 ? 0 : text.length - 1, end = dir > 0 ? text.length : -1; pos != end; pos += dir) {
-      const ch = text.charAt(pos)
-      if (re.test(ch)) {
-        const match = matching[ch]!
-        if ((match.charAt(1) == ">") == (dir > 0)) stack.push(ch)
-        else if (!stack.length) return {pos: basePos + pos, ch}
-        else stack.pop()
-      }
-    }
-    if (dir > 0) distance += text.length
-  }
-  return iter.done ? false : null
-}
-
-function doMatchBrackets(state: EditorState, config: Full<Config>) {
-  const decorations = []
-  for (const range of state.selection.ranges) {
-    if (!range.empty) continue
-    const match = findMatchingBracket(state.doc, range.head, config)
-    if (!match) continue
-    const style = match.match ? matchingClass : nonmatchingClass
-    decorations.push(Decoration.mark(match.from, match.from + 1, {class: style}))
-    if (match.to) decorations.push(Decoration.mark(match.to, match.to + 1, {class: style}))
-  }
-  return Decoration.set(decorations)
-}
-
-export const matchBrackets = ViewExtension.unique((configs: Config[]) => {
+export const bracketMatching = ViewExtension.unique((configs: Config[]) => {
   let config = combineConfig(configs, {
-    afterCursor: false,
-    bracketRegex: /[(){}[\]]/,
-    maxScanDistance: 10000,
-    strict: false
+    afterCursor: true,
+    brackets: DEFAULT_BRACKETS,
+    maxScanDistance: DEFAULT_SCAN_DIST
   })
+
   return ViewExtension.all(
     ViewField.decorations({
       create() { return Decoration.none },
       update(deco, update) {
-        // FIXME make this use a tokenizer behavior exported by the highlighter
-        return update.transactions.length ? doMatchBrackets(update.state, config) : deco
+        if (!update.transactions.length) return deco
+        let {state} = update, decorations = []
+        for (let range of state.selection.ranges) {
+          if (!range.empty) continue
+          let match = matchBrackets(state, range.head, -1, config)
+            || (range.head > 0 && matchBrackets(state, range.head - 1, 1, config))
+            || (config.afterCursor &&
+                (matchBrackets(state, range.head, 1, config) ||
+                 (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
+          if (!match) continue
+          let style = update.view.themeClass(match.matched ? "brackets.matching" : "brackets.nonmatching") +
+            ` codemirror-${match.matched ? "" : "non"}matching-bracket`
+          decorations.push(Decoration.mark(match.start.from, match.start.to, {class: style}))
+          if (match.end) decorations.push(Decoration.mark(match.end.from, match.end.to, {class: style}))
+        }
+        return Decoration.set(decorations)
       }
-    }),
-    styleModule(defaultStyles)
+    })
   )
 }, {})
 
-const defaultStyles = new StyleModule({
-  matching: {color: "#0b0"},
-  nonmatching: {color: "#a22"}
-})
+function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {
+  for (let syntax of state.behavior.get(StateExtension.syntax)) {
+    let tokens = syntax.getSlot(tokenTypes)
+    if (tokens) {
+      let tree = syntax.tryGetTree(state, dir < 0 ? Math.max(0, pos - maxScanDistance) : pos,
+                                   dir < 0 ? pos : Math.min(state.doc.length, pos + maxScanDistance))
+      return {tree, tokens}
+    }
+  }
+  return {tree: Tree.empty, tokens: TagMap.empty}
+}
 
-const matchingClass = "codemirror-matching-bracket " + defaultStyles.matching
-const nonmatchingClass = "codemirror-nonmatching-bracket " + defaultStyles.nonmatching
+const BRACKET_TYPE = /\bpunctuation\.([^\.]+)\.(open|close)\b/
+
+type MatchResult = {start: {from: number, to: number}, end?: {from: number, to: number}, matched: boolean} | null
+
+export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult {
+  let maxScanDistance = config.maxScanDistance || DEFAULT_SCAN_DIST
+  let {tokens, tree} = getTree(state, pos, dir, maxScanDistance)
+  let sub = tree.resolve(pos, dir)
+  let tokenType = tokens.get(sub.type)
+  let marked = tokenType && BRACKET_TYPE.exec(tokenType)
+  if (marked && marked[2] == (dir < 0 ? "close" : "open"))
+    return matchMarkedBrackets(state, pos, dir, sub, tokens, marked[1], maxScanDistance)
+  else
+    return matchPlainBrackets(state, pos, dir, tree, tokens, tokenType, maxScanDistance, config.brackets || DEFAULT_BRACKETS)
+}
+
+function matchMarkedBrackets(state: EditorState, pos: number, dir: -1 | 1, token: Subtree, tokens: TagMap<string>,
+                             bracketType: string, maxScanDistance: number) {
+  let depth = 0, firstToken = {from: token.start, to: token.end}
+  let to = dir < 0 ? Math.max(0, pos - maxScanDistance) : Math.min(state.doc.length, pos + maxScanDistance)
+  return token.root.iterate(pos, to, (type, start, end) => {
+    if (dir < 0 ? end > pos : start < pos) return
+    let tokenType = tokens.get(type)
+    let bracket = tokenType && BRACKET_TYPE.exec(tokenType)
+    if (bracket) {
+      if (bracket[2] == (dir < 0 ? "close" : "open")) depth++
+      else if (depth == 1) return {start: firstToken, end: {from: start, to: end}, matched: bracketType == bracket[1]}
+      else depth--
+    }
+    return
+  }) || {start: firstToken, matched: false}
+}
+
+function matchPlainBrackets(state: EditorState, pos: number, dir: number, tree: Tree, tokens: TagMap<string>,
+                            tokenType: string | null, maxScanDistance: number, brackets: string) {
+  let startCh = dir < 0 ? state.doc.slice(pos - 1, pos) : state.doc.slice(pos, pos + 1)
+  let bracket = brackets.indexOf(startCh)
+  if (bracket < 0 || (bracket % 2 == 0) != (dir > 0)) return null
+
+  let startToken = {from: dir < 0 ? pos - 1 : pos, to: dir > 0 ? pos + 1 : pos}
+  let iter = state.doc.iterRange(pos, dir > 0 ? state.doc.length : 0), depth = 0
+  for (let distance = 0; !(iter.next()).done && distance <= maxScanDistance;) {
+    let text = iter.value
+    if (dir < 0) distance += text.length
+    let basePos = pos + distance * dir
+    for (let pos = dir > 0 ? 0 : text.length - 1, end = dir > 0 ? text.length : -1; pos != end; pos += dir) {
+      let found = brackets.indexOf(text[pos])
+      if (found < 0 || tokens.get(tree.resolve(basePos + pos, 1).type) != tokenType) continue
+      if ((found % 2 == 0) == (dir > 0)) {
+        depth++
+      } else if (depth == 1) { // Closing
+        return {start: startToken, end: {from: basePos + pos, to: basePos + pos + 1}, matched: (found >> 1) == (bracket >> 1)}
+      } else {
+        depth--
+      }
+    }
+    if (dir > 0) distance += text.length
+  }
+  return iter.done ? {start: startToken, matched: false} : null
+}

@@ -4,7 +4,7 @@ import {keymap} from "../keymap/src/keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history/src/history"
 import {lineNumbers} from "../gutter/src/index"
 import {baseKeymap, indentSelection} from "../commands/src/commands"
-import {matchBrackets} from "../matchbrackets/src/matchbrackets"
+import {bracketMatching} from "../matchbrackets/src/matchbrackets"
 import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 
@@ -26,7 +26,7 @@ readFile("package.json", "utf8", (err, data) => {
   javascript(),
   defaultTheme,
   highlight(),
-  matchBrackets(),
+  bracketMatching(),
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,
