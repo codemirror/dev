@@ -85,8 +85,16 @@ export class RangeSet<T extends RangeValue> {
          filterFrom: number = 0,
          filterTo: number = this.length): RangeSet<T> {
     let maxLen = added.reduce((l, d) => Math.max(l, d.to), this.length)
-    return this.updateInner(added.length ? added.slice().sort(byPos) : added,
-                            filter, filterFrom, filterTo, 0, maxLen)
+    // Make sure `added` is sorted
+    if (added.length) for (let i = 1, prev = added[0]; i < added.length; i++) {
+      let next = added[i]
+      if (byPos(prev, next) > 0) {
+        added = added.slice().sort(byPos)
+        break
+      }
+      prev = next
+    }
+    return this.updateInner(added, filter, filterFrom, filterTo, 0, maxLen)
   }
 
   /** @internal */
