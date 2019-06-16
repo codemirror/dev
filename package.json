@@ -33,7 +33,8 @@
     "lezer-tree": "^0.3.0",
     "lezer-javascript": "^0.3.0",
     "lezer-css": "^0.3.0",
-    "lezer-html": "^0.3.0"
+    "lezer-html": "^0.3.0",
+    "builddocs": "git://github.com/marijnh/builddocs.git#v1"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
