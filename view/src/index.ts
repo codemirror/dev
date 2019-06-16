@@ -8,3 +8,6 @@ export {Decoration, DecorationSet, DecoratedRange, WidgetType,
 export {BlockInfo} from "./heightmap"
 export {DOMPos} from "./contentview"
 export {Slot} from "../../extension/src/extension"
+export {Rect} from "./dom"
+export {Attrs} from "./attributes"
+export {MouseSelectionUpdate} from "./input"
