@@ -61,7 +61,7 @@ export abstract class Text {
 
   iter(dir: 1 | -1 = 1): TextIterator { return new RawTextCursor(this, dir) }
   iterRange(from: number, to: number = this.length): TextIterator { return new PartialTextCursor(this, from, to) }
-  iterLines(from: number = 0) { return new LineCursor(this, from) }
+  iterLines(from: number = 0): TextIterator { return new LineCursor(this, from) }
 
   // @internal
   abstract decomposeStart(to: number, target: Text[]): void
@@ -519,6 +519,7 @@ class LineCursor implements TextIterator {
 
 // FIXME rename start/end to from/to for consistency with other types?
 export class Line {
+  // @internal
   constructor(readonly start: number,
               readonly end: number,
               readonly number: number,

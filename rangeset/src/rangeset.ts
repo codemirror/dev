@@ -51,6 +51,7 @@ export class Range<T extends RangeValue> {
   /** @internal Here so that we can put active ranges on a heap
    * and take them off at their end */
   get heapPos() { return this.to }
+  /* @internal */
   get heapSide() { return this.value.endSide }
 }
 
