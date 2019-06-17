@@ -72,7 +72,7 @@ class Highlighter {
       let tokType = tokenMap.get(type)
       if (tokType != null) {
         context = context.prev!
-        flush(end, context.style)
+        flush(Math.min(to, end), context.style)
       }
     })
     return Decoration.set(tokens)
