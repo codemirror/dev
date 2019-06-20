@@ -22,9 +22,6 @@ export class LezerSyntax extends Syntax {
 }
 
 class DocStream implements InputStream {
-  pos = 0
-  token = -1
-  tokenEnd = -1
   cursor: TextIterator
   cursorPos = 0
   string = ""
@@ -33,41 +30,19 @@ class DocStream implements InputStream {
     this.cursor = doc.iter()
   }
 
-  next() {
-    if (this.pos >= this.length) return -1
+  get(pos: number) {
+    if (pos >= this.length) return -1
     let stringStart = this.cursorPos - this.string.length
-    if (this.pos < stringStart || this.pos >= this.cursorPos) {
-      if (this.pos < this.cursorPos) { // Reset the cursor if we have to go back
+    if (pos < stringStart || pos >= this.cursorPos) {
+      if (pos < this.cursorPos) { // Reset the cursor if we have to go back
         this.cursor = this.doc.iter()
         this.cursorPos = 0
       }
-      this.string = this.cursor.next(this.pos - this.cursorPos).value
-      this.cursorPos = this.pos + this.string.length
+      this.string = this.cursor.next(pos - this.cursorPos).value
+      this.cursorPos = pos + this.string.length
       stringStart = this.cursorPos - this.string.length
     }
-    let ch = this.string.charCodeAt(this.pos - stringStart)
-    this.pos++
-    return ch
-  }
-
-  peek(pos = this.pos) {
-    if (pos < 0 || pos >= this.length) return -1
-    let stringStart = this.cursorPos - this.string.length
-    if (pos < stringStart || pos >= this.cursorPos)
-      return this.doc.slice(pos, pos + 1).charCodeAt(0)
-    else
-      return this.string.charCodeAt(pos - stringStart)
-  }
-
-  accept(term: number, pos = this.pos) {
-    this.token = term
-    this.tokenEnd = pos
-  }
-
-  goto(n: number) {
-    this.token = this.tokenEnd = -1
-    this.pos = n
-    return this
+    return this.string.charCodeAt(pos - stringStart)
   }
 
   read(from: number, to: number) {
