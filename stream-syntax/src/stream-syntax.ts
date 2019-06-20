@@ -2,7 +2,7 @@ import {StringStream, StringStreamCursor} from "./stringstream"
 import {Slot} from "../../extension/src/extension"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
 import {tokenTypes} from "../../highlight/src/highlight"
-import {Tree, TagMap} from "lezer-tree"
+import {Tree, TagMap, allocateGrammarID} from "lezer-tree"
 
 export {StringStream}
 
@@ -94,6 +94,8 @@ const MAX_RECOMPUTE_DISTANCE = 20e3
 
 const WORK_SLICE = 100, WORK_PAUSE = 200
 
+const grammarID = allocateGrammarID()
+
 class SyntaxState<ParseState> {
   requests: RequestInfo[] = []
   working = -1
@@ -164,7 +166,7 @@ class SyntaxState<ParseState> {
       pos += stream.string.length + 1
       if (Date.now() > sliceEnd) break
     }
-    let tree = Tree.fromBuffer(buffer).balance()
+    let tree = Tree.fromBuffer(buffer, grammarID).balance()
     this.tree = this.tree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
@@ -216,7 +218,7 @@ class SyntaxState<ParseState> {
 
 const tokenTable: {[name: string]: number} = Object.create(null)
 const tokenNames: string[] = [""]
-const tokenMap = new TagMap(tokenNames)
+const tokenMap = new TagMap({[grammarID]: tokenNames})
 
 function tokenID(name: string) {
   let id = tokenTable[name]

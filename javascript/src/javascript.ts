@@ -1,4 +1,4 @@
-import parser from "lezer-javascript"
+import {parser} from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
 import {LezerSyntax} from "../../lezer-syntax/src/syntax"
 import {tokenTypes} from "../../highlight/src/highlight"

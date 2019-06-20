@@ -3,8 +3,6 @@ import {Slot} from "../../extension/src/extension"
 import {Text, TextIterator} from "../../doc/src/"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
 
-// FIXME rename package to lezer-syntax
-
 export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
   extension: StateExtension
@@ -31,14 +29,12 @@ class DocStream implements InputStream {
   cursorPos = 0
   string = ""
 
-  constructor(readonly doc: Text) {
+  constructor(readonly doc: Text, readonly length: number = doc.length) {
     this.cursor = doc.iter()
   }
 
-  get length() { return this.doc.length }
-
   next() {
-    if (this.pos >= this.doc.length) return -1
+    if (this.pos >= this.length) return -1
     let stringStart = this.cursorPos - this.string.length
     if (this.pos < stringStart || this.pos >= this.cursorPos) {
       if (this.pos < this.cursorPos) { // Reset the cursor if we have to go back
@@ -55,7 +51,7 @@ class DocStream implements InputStream {
   }
 
   peek(pos = this.pos) {
-    if (pos < 0 || pos >= this.doc.length) return -1
+    if (pos < 0 || pos >= this.length) return -1
     let stringStart = this.cursorPos - this.string.length
     if (pos < stringStart || pos >= this.cursorPos)
       return this.doc.slice(pos, pos + 1).charCodeAt(0)
@@ -80,6 +76,10 @@ class DocStream implements InputStream {
       return this.doc.slice(from, to)
     else
       return this.string.slice(from - stringStart, to - stringStart)
+  }
+
+  clip(at: number) {
+    return new DocStream(this.doc, at)
   }
 }
 
