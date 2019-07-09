@@ -1,4 +1,4 @@
-import {TagMap, Subtree, ErrTerm} from "lezer"
+import {TagMap, Subtree} from "lezer"
 import {LezerSyntax} from "../../lezer-syntax/src/syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
@@ -15,7 +15,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
     for (let scan = tree!, scanPos = pos;;) {
       let last = scan.childBefore(scanPos)
       if (!last) break
-      if (last.type == ErrTerm && last.start == last.end) {
+      if ((last.type & 0xffff) == 1 /* FIXME export error term id from lezer */ && last.start == last.end) {
         tree = scan
         scanPos = last.start
       } else {

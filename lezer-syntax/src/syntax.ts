@@ -79,7 +79,7 @@ class SyntaxState {
   constructor(private tree: Tree) {}
 
   apply(tr: Transaction) {
-    return tr.docChanged ? new SyntaxState(this.tree.unchanged(tr.changes.changedRanges())) : this
+    return tr.docChanged ? new SyntaxState(this.tree.applyChanges(tr.changes.changedRanges())) : this
   }
 
   // FIXME implement clearing out parts of the tree when it is too big

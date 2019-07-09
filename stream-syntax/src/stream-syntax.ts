@@ -166,7 +166,7 @@ class SyntaxState<ParseState> {
       pos += stream.string.length + 1
       if (Date.now() > sliceEnd) break
     }
-    let tree = Tree.fromBuffer(buffer, grammarID).balance()
+    let tree = Tree.build(buffer, grammarID).balance()
     this.tree = this.tree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
