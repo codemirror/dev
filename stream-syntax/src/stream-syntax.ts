@@ -1,8 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {Slot} from "../../extension/src/extension"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
-import {tokenTypes} from "../../highlight/src/highlight"
-import {Tree, TagMap, allocateGrammarID} from "lezer-tree"
+import {Tree, Tag} from "lezer-tree"
 
 export {StringStream}
 
@@ -12,6 +10,7 @@ export type StreamParserSpec<State> = {
   startState?(editorState: EditorState): State
   copyState?(state: State): State
   indent?(state: State, textAfter: string, editorState: EditorState): number
+  docTag?: string
 }
 
 export class StreamParser<State> {
@@ -21,6 +20,7 @@ export class StreamParser<State> {
   startState: (editorState: EditorState) => State
   copyState: (state: State) => State
   indent: (state: State, textAfter: string, editorState: EditorState) => number
+  docType: number
   
   constructor(spec: StreamParserSpec<State>) {
     this.token = spec.token
@@ -28,6 +28,7 @@ export class StreamParser<State> {
     this.startState = spec.startState || (() => (true as any))
     this.copyState = spec.copyState || defaultCopyState
     this.indent = spec.indent || (() => -1)
+    this.docType = tokenID(spec.docTag || "document")
   }
 
   readToken(state: State, stream: StringStream, editorState: EditorState) {
@@ -67,8 +68,8 @@ export class StreamSyntax extends Syntax {
   public extension: StateExtension
   public indentation: StateExtension
 
-  constructor(name: string, readonly parser: StreamParser<any>, slots: Slot[] = []) {
-    super(name, slots.concat(tokenTypes(tokenMap)))
+  constructor(readonly parser: StreamParser<any>) {
+    super()
     this.field = new StateField<SyntaxState<any>>({
       init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
       apply(tr, value) { return value.apply(tr) }
@@ -84,7 +85,8 @@ export class StreamSyntax extends Syntax {
   }
 
   static legacy(mode: LegacyMode<any>): StreamSyntax {
-    return new StreamSyntax(mode.name, new StreamParser(mode))
+    if (!mode.docTag) mode.docTag = "document.lang=" + mode.name
+    return new StreamSyntax(new StreamParser(mode))
   }
 }
 
@@ -93,8 +95,6 @@ const CACHE_STEP_SHIFT = 6, CACHE_STEP = 1 << CACHE_STEP_SHIFT
 const MAX_RECOMPUTE_DISTANCE = 20e3
 
 const WORK_SLICE = 100, WORK_PAUSE = 200
-
-const grammarID = allocateGrammarID()
 
 class SyntaxState<ParseState> {
   requests: RequestInfo[] = []
@@ -166,7 +166,7 @@ class SyntaxState<ParseState> {
       pos += stream.string.length + 1
       if (Date.now() > sliceEnd) break
     }
-    let tree = Tree.build(buffer, grammarID).balance()
+    let tree = Tree.build(buffer, tokenTags, parser.docType).balance()
     this.tree = this.tree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
@@ -217,14 +217,13 @@ class SyntaxState<ParseState> {
 }
 
 const tokenTable: {[name: string]: number} = Object.create(null)
-const tokenNames: string[] = [""]
-const tokenMap = new TagMap({[grammarID]: tokenNames})
+const tokenTags: Tag[] = [new Tag("placeholder.error")]
 
-function tokenID(name: string) {
-  let id = tokenTable[name]
+function tokenID(tag: string) {
+  let id = tokenTable[tag]
   if (id == null) {
-    id = tokenTable[name] = (tokenNames.length << 1) + 1
-    tokenNames.push(name)
+    id = tokenTable[tag] = (tokenTags.length << 1) + 1
+    tokenTags.push(new Tag(tag))
   }
   return id
 }

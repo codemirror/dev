@@ -1,5 +1,4 @@
 import {Parser, ParseContext, Tree, InputStream} from "lezer"
-import {Slot} from "../../extension/src/extension"
 import {Text, TextIterator} from "../../doc/src/"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
 
@@ -7,8 +6,8 @@ export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
   extension: StateExtension
 
-  constructor(name: string, readonly parser: Parser, slots: Slot[] = []) {
-    super(name, slots)
+  constructor(readonly parser: Parser) {
+    super()
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
@@ -58,7 +57,7 @@ class DocStream implements InputStream {
   }
 }
 
-const WORK_SLICE = 100, WORK_PAUSE = 200
+const enum Work { Slice = 100, Pause = 200 }
 
 class RequestInfo {
   promise: SyntaxRequest
@@ -98,7 +97,7 @@ class SyntaxState {
   }
 
   continueParse(to: number) {
-    let endTime = Date.now() + WORK_SLICE
+    let endTime = Date.now() + Work.Slice
     for (let i = 0;; i++) {
       let done = this.parse!.advance()
       if (done) {
@@ -119,7 +118,7 @@ class SyntaxState {
 
   scheduleWork() {
     if (this.working != -1) return
-    this.working = setTimeout(() => this.work(), WORK_PAUSE) as any
+    this.working = setTimeout(() => this.work(), Work.Pause) as any
   }
 
   work() {

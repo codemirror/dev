@@ -1,45 +1,11 @@
-import {TagMap} from "lezer"
+import {Tag} from "lezer-tree"
 import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, themeClass, notified} from "../../view/src"
-import {Slot} from "../../extension/src/extension"
 import {Syntax, StateExtension} from "../../state/src/"
-
-export const tokenTypes = Slot.define<TagMap<string>>()
-
-class Set {
-  [next: string]: TokenContext
-}
-Set.prototype = Object.create(null)
-
-class TokenContext {
-  cached = new Set
-
-  constructor(readonly type: string, readonly style: string, readonly prev: TokenContext | null) {}
-
-  enter(type: string, themes: readonly ((type: string) => string)[]) {
-    let found = this.cached[type]
-    if (!found) {
-      let fullType = "token." + type + "." + this.type
-      let classes = ""
-      for (let theme of themes) {
-        let value = theme(fullType)
-        if (value) classes += (classes ? " " + value : value)
-      }
-      found = this.cached[type] = new TokenContext(fullType, classes, this)
-    }
-    return found
-  }
-
-  static start(type: string) {
-    return new TokenContext(type, "", null)
-  }
-}
 
 class Highlighter {
   deco: DecorationSet
-  baseContext: TokenContext
 
   constructor(readonly syntax: Syntax | null, view: EditorView) {
-    this.baseContext = TokenContext.start("lang:" + (syntax ? syntax.name : "null"))
     this.deco = this.buildDeco(view)
   }
 
@@ -51,28 +17,31 @@ class Highlighter {
     let tree = this.syntax.tryGetTree(view.state, from, to, view.notify)
 
     let tokens: DecoratedRange[] = []
-    let tokenMap = this.syntax.getSlot(tokenTypes)!
-    let context = this.baseContext
-    let cur = "", start = from
+    let start = from
     function flush(pos: number, style: string) {
-      if (style == cur) return
-      if (pos > start && cur)
-        tokens.push(Decoration.mark(start, pos, {class: cur}))
+      if (pos > start && style)
+        tokens.push(Decoration.mark(start, pos, {class: style}))
       start = pos
-      cur = style
     }
 
-    tree.iterate(from, to, (type, start) => {
-      let tokType = tokenMap.get(type)
-      if (tokType != null) {
-        context = context.enter(tokType, themes)
-        flush(start, context.style)
+    let context: Tag[] = [], classes: string[] = [], top = ""
+    tree.iterate(from, to, (tag, start) => {
+      let add = view.themeClass(tag, context)
+      console.log("Start of ", tag.tag, "add", add)
+      context.push(tag)
+      classes.push(top)
+      if (add) {
+        flush(start, top)
+        if (top) top += " "
+        top += add
       }
-    }, (type, _, end) => {
-      let tokType = tokenMap.get(type)
-      if (tokType != null) {
-        context = context.prev!
-        flush(Math.min(to, end), context.style)
+    }, (tag, _, end) => {
+      context.pop()
+      let prev = classes.pop()!
+      console.log("End of ", tag.tag, "from", top, "to", prev)
+      if (prev != top) {
+        flush(Math.min(to, end), top)
+        top = prev
       }
     })
     return Decoration.set(tokens)
@@ -83,7 +52,7 @@ export function highlight() { // FIXME allow specifying syntax?
   return new ViewField<Highlighter>({
     create(view) {
       for (let s of view.state.behavior.get(StateExtension.syntax))
-        if (s.getSlot(tokenTypes)) return new Highlighter(s, view)
+        return new Highlighter(s, view)
       return new Highlighter(null, view)
     },
     update(highlighter, update) {

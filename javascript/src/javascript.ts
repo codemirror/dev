@@ -1,89 +1,29 @@
 import {parser} from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
 import {LezerSyntax} from "../../lezer-syntax/src/syntax"
-import {tokenTypes} from "../../highlight/src/highlight"
 import {syntaxIndentation, dontIndent, parens, braces, brackets, statement, compositeStatement} from "../../indent/src/indent"
+import {TagMatch} from "lezer-tree"
 
-const tokens = parser.tagMap({
-  Definition: "variable.definition",
-  PropertyName: "property",
-  Template: "string.template",
-  Variable: "variable",
-  Operator: "operator",
-  Label: "meta.label",
-  BlockComment: "comment.block",
-  LineComment: "comment.line",
-  Keyword: "keyword",
-  OperatorKeyword: "keyword.operator",
-  String: "string.quoted",
-  RegExp: "string.regexp",
-  Number: "number",
-  Boolean: "atom.boolean",
-  This: "keyword.expression.this",
-  Null: "atom.null",
-  Super: "keyword.expression.super",
-  "(": "punctuation.paren.open",
-  ")": "punctuation.paren.close",
-  "[": "punctuation.bracket.open",
-  "]": "punctuation.bracket.close",
-  "{": "punctuation.brace.open",
-  "}": "punctuation.brace.close",
-  ";": "punctuation.semicolon",
-  "...": "punctuation.spread",
-  ",": "punctuation.comma",
-  ":": "punctuation.colon",
-  ".": "punctuation.dot",
-  "=>": "punctuation.arrow"
-})
+const indentStrategies = new TagMatch({
+  // FIXME force variable decl indentation to 4?
+  // FIXME option to do hanging statements different from continued ones?
+  "statement": statement,
+  "if.conditional.statement": compositeStatement(/^else\b/),
 
-const indentStrategies = parser.tagMap({
-  ExportDeclaration: statement,
-  ClassDeclaration: statement,
-  VariableDeclaration: statement, // FIXME force to 4?
-  ImportDeclaration: statement,
-  TryStatement: statement,
-  ReturnStatement: statement,
-  ThrowStatement: statement,
-  BreakStatement: statement,
-  ContinueStatement: statement,
-  DebuggerStatement: statement,
-  LabeledStatement: statement,
-  ExpressionStatement: statement,
+  'delim="( )"': parens,
+  'delim="[ ]"': brackets,
+  'delim="{ }"': braces,
 
-  // FIXME hanging statements
-  ForStatement: statement,
-  WhileStatement: statement,
-  WithStatement: statement,
-  DoWhileStatement: statement,
-  IfStatement: compositeStatement(/^else\b/),
-
-  ParamList: parens,
-  ArgList: parens,
-  ParenthesizedExpression: parens,
-  ForSpec: parens,
-  ForInSpec: parens,
-  ForOfSpec: parens,
-
-  ArrayPattern: brackets,
-  ArrayExpression: brackets,
-
-  ObjectPattern: braces,
-  ObjectExpression: braces,
-  ClassBody: braces,
-  ExportGroup: braces,
-  ImportGroup: braces,
-  Block: braces,
-
-  Template: dontIndent,
+  "template.string.literal.expression": dontIndent,
+  "block.comment": dontIndent
 
   // FIXME
   // "SwitchCase"
   // "SwitchDefault", "SwitchStatement"
   // "ConditionalExpression"
-  BlockComment: dontIndent
 })
 
-export const javascriptSyntax = new LezerSyntax("javascript", parser, [tokenTypes(tokens)])
+export const javascriptSyntax = new LezerSyntax(parser)
 
 export function javascript() {
   return StateExtension.all(

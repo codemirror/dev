@@ -1,104 +1,43 @@
-import {StyleModule} from "style-mod"
+import {StyleModule, Style} from "style-mod"
 import {ViewExtension, styleModule, themeClass} from "../../view/src"
+import {TagMatch, TagMatchSpec} from "lezer-tree"
 
-type ThemeRule = {[name: string]: ThemeRule | string}
+function mapSpec<A, B>(spec: TagMatchSpec<A>, f: (a: A) => B): TagMatchSpec<B> {
+  let result: {[name: string]: B | TagMatchSpec<B>} = {}
+  for (let prop in spec)
+    result[prop] = /^\./.test(prop) ? mapSpec(spec[prop] as TagMatchSpec<A>, f) : f(spec[prop] as A)
+  return result
+}
 
-export function theme(rules: {[name: string]: ThemeRule}) {
-  let {tree, styles} = ruleTree(rules)
-  let cache: {[type: string]: string} = Object.create(null)
+export function theme(rules: TagMatchSpec<Style>) {
+  let styleObj: {[name: string]: Style} = {}, classID = 1
+  let toClassName = mapSpec(rules, (style: Style) => {
+    let name = "c" + (classID++)
+    styleObj[name] = style
+    return name
+  })
+  let styles = new StyleModule(styleObj)
+  let match = new TagMatch(mapSpec(toClassName, name => styles[name]))
   return ViewExtension.all(
-    themeClass(type => {
-      let cached = cache[type]
-      return cached != null ? cached : (cache[type] = tree.lookup(type.split(".")))
-    }),
+    themeClass((tag, context) => match.best(tag, context) || ""),
     styleModule(styles)
   )
 }
 
-const none: {[prop: string]: any} = Object.create(null)
-
-class MatchTree {
-  classes = ""
-  next: {[part: string]: MatchTree} = none
-  ensure(part: string) {
-    let found = this.next[part]
-    if (found) return found
-    if (this.next == none) this.next = Object.create(null)
-    return this.next[part] = new MatchTree
-  }
-  lookup(parts: string[]): string {
-    for (let i = 0; i < parts.length; i++) {
-      let match = this.next[parts[i]]
-      if (match) {
-        for (let j = i + 1; j < parts.length; j++) {
-          let next = match.next[parts[j]]
-          if (!next) break
-          match = next
-        }
-        if (match.classes) return match.classes
-      }
-    }
-    return ""
-  }
-}
-
-function ruleTree(rules: {[name: string]: ThemeRule}) {
-  let styles: {[name: string]: {[prop: string]: string}} = {}, classID = 0
-
-  function explore(target: MatchTree, rules: ThemeRule, parentStyle: {[property: string]: string} | null) {
-    let style: {[prop: string]: string} | null = null
-    // First fill in the direct styles, if any
-    if (target != top) for (let prop in rules) {
-      let value = rules[prop]
-      if (typeof value != "string" && !/&/.test(prop)) continue
-      if (!style) {
-        style = {}
-        if (parentStyle) for (let p in parentStyle) style[p] = parentStyle[p]
-      }
-      style[prop] = value as string
-    }
-    if (style) {
-      let name = "c" + (classID++)
-      styles[name] = style
-      target.classes += (target.classes ? " " : "") + name
-    }
-    // Then handle child rules
-    for (let prop in rules) {
-      let value = rules[prop]
-      if (typeof value == "string" || /&/.test(prop)) continue
-      let curTarget = target
-      for (let part of prop.split(".")) curTarget = curTarget.ensure(part)
-      explore(curTarget, value, style)
-    }
-  }
-  let top = new MatchTree
-  explore(top, rules, null)
-  let mod = new StyleModule(styles)
-
-  function mapClasses(tree: MatchTree) {
-    tree.classes = tree.classes && tree.classes.split(" ").map(c => (mod as any)[c]).join(" ")
-    for (let sub in tree.next) mapClasses(tree.next[sub])
-  }
-  mapClasses(top)
-  return {tree: top, styles: mod}
-}
-
 export const defaultTheme = theme({
-  token: {
-    keyword: {color: "#708"},
-    atom: {color: "#219"},
-    number: {color: "#164"},
-    "variable.definition": {color: "#00f"},
-    "variable.type": {color: "#085"},
-    comment: {color: "#940"},
-    string: {color: "#a11"},
-    "string.regexp": {color: "#e40"},
-    meta: {color: "#555"},
-    tag: {color: "#170"},
-    attribute: {color: "#00c"},
-  },
-  brackets: {
-    matching: {color: "#0b0"},
-    nonmatching: {color: "#a22"}
+  "keyword": {color: "#708"},
+  "keyword.expression, literal.expression": {color: "#219"},
+  "number.literal.expression": {color: "#164"},
+  "string.literal.expression": {color: "#a11"},
+  "regexp.literal.expression": {color: "#e40"},
+  "variable.definition.name": {color: "#00f"},
+  "type.name": {color: "#085"},
+  "comment": {color: "#940"},
+  "metadata": {color: "#555"},
+  "definition.property.name": {color: "#00c"},
+
+  ".bracket": {
+    "matching": {color: "#0b0"},
+    "nonmatching": {color: "#a22"}
   }
 })

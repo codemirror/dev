@@ -1,6 +1,7 @@
 import {EditorState, Transaction} from "../../state/src"
 import {BehaviorStore, Slot} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
+import {Tag} from "lezer-tree"
 
 import {DocView} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
@@ -172,10 +173,10 @@ export class EditorView {
     return result
   }
 
-  themeClass(type: string): string {
+  themeClass(tag: string | Tag, context: readonly Tag[] = none): string {
     let result = ""
     for (let theme of this.behavior.get(themeClass)) {
-      let cls = theme(type)
+      let cls = theme(typeof tag == "string" ? new Tag(tag) : tag, context) // FIXME cache Tag instances?
       if (cls) result += (result ? " " + cls : cls)
     }
     return result
@@ -260,3 +261,5 @@ class AttrsFor {
     this.attrs = attrs
   }
 }
+
+const none: readonly any[] = []

@@ -1,11 +1,11 @@
-import {TagMap, Subtree} from "lezer"
+import {TagMatch, Subtree, ErrorType} from "lezer-tree"
 import {LezerSyntax} from "../../lezer-syntax/src/syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
 // FIXME handle nested syntaxes
 // FIXME rename or move into lezer-syntax?
 
-export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<IndentStrategy>) {
+export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMatch<IndentStrategy>) {
   return StateExtension.indentation((state, pos) => {
     let inner = new IndentContextInner(pos, strategies, syntax, state)
     let tree: Subtree | null = syntax.tryGetTree(state, pos, pos).resolve(pos)
@@ -15,7 +15,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
     for (let scan = tree!, scanPos = pos;;) {
       let last = scan.childBefore(scanPos)
       if (!last) break
-      if ((last.type & 0xffff) == 1 /* FIXME export error term id from lezer */ && last.start == last.end) {
+      if (last.type == ErrorType && last.start == last.end) {
         tree = scan
         scanPos = last.start
       } else {
@@ -25,7 +25,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMap<Indent
     }
 
     for (; tree; tree = tree.parent) {
-      let strategy = strategies.get(tree.type) || (tree.parent == null ? topStrategy : null)
+      let strategy = strategies.best(tree.tag) || (tree.parent == null ? topStrategy : null)
       if (strategy) {
         let indentContext = new IndentContext(inner, tree, strategy, null)
         return indentContext.getIndent()
@@ -39,7 +39,7 @@ export class IndentContextInner {
   unit: number
 
   constructor(readonly pos: number,
-              readonly strategies: TagMap<IndentStrategy>,
+              readonly strategies: TagMatch<IndentStrategy>,
               readonly syntax: LezerSyntax,
               readonly state: EditorState) {
     this.unit = state.indentUnit
@@ -63,7 +63,7 @@ export class IndentContext {
     if (this._next) return this._next
     let last = this.tree, found = null
     for (let tree = this.tree.parent; !found && tree; tree = tree.parent) {
-      found = this.inner.strategies.get(tree.type)
+      found = this.inner.strategies.best(tree.tag)
       last = tree
     }
     return this._next = new IndentContext(this.inner, last, found || topStrategy, this)
