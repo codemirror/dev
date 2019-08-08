@@ -27,7 +27,6 @@ class Highlighter {
     let context: Tag[] = [], classes: string[] = [], top = ""
     tree.iterate(from, to, (tag, start) => {
       let add = view.themeClass(tag, context)
-      console.log("Start of ", tag.tag, "add", add)
       context.push(tag)
       classes.push(top)
       if (add) {
@@ -38,7 +37,6 @@ class Highlighter {
     }, (tag, _, end) => {
       context.pop()
       let prev = classes.pop()!
-      console.log("End of ", tag.tag, "from", top, "to", prev)
       if (prev != top) {
         flush(Math.min(to, end), top)
         top = prev
