@@ -85,8 +85,10 @@ class SyntaxState {
   getTree(parser: Parser, doc: Text, from: number, to: number, unfinished?: (promise: SyntaxRequest) => void) {
     if (to <= this.parsedTo) return this.tree
 
-    if (!this.parse) this.parse = parser.startParse(new DocStream(doc), {cache: this.tree})
-    this.continueParse(to)
+    if (!this.parse) {
+      this.parse = parser.startParse(new DocStream(doc), {cache: this.tree})
+      this.continueParse(to)
+    }
     if (this.parsedTo < to && unfinished) {
       this.scheduleWork()
       let req = this.requests.find(r => r.upto == to && !r.promise.canceled)
