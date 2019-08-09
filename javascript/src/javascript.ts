@@ -1,18 +1,17 @@
 import {parser} from "lezer-javascript"
 import {StateExtension} from "../../state/src/"
-import {LezerSyntax} from "../../lezer-syntax/src/syntax"
-import {syntaxIndentation, dontIndent, parens, braces, brackets, statement, compositeStatement} from "../../indent/src/indent"
-import {TagMatch} from "lezer-tree"
+import {syntaxIndentation, dontIndent, parenIndent, braceIndent, bracketIndent, statementIndent, compositeStatementIndent,
+        LezerSyntax} from "../../lezer-syntax/src"
 
-const indentStrategies = new TagMatch({
+const indentStrategies = {
   // FIXME force variable decl indentation to 4?
   // FIXME option to do hanging statements different from continued ones?
-  "statement": statement,
-  "if.conditional.statement": compositeStatement(/^else\b/),
+  "statement": statementIndent,
+  "if.conditional.statement": compositeStatementIndent(/^else\b/),
 
-  'delim="( )"': parens,
-  'delim="[ ]"': brackets,
-  'delim="{ }"': braces,
+  'delim="( )"': parenIndent,
+  'delim="[ ]"': bracketIndent,
+  'delim="{ }"': braceIndent,
 
   "template.string.literal.expression": dontIndent,
   "block.comment": dontIndent
@@ -21,7 +20,7 @@ const indentStrategies = new TagMatch({
   // "SwitchCase"
   // "SwitchDefault", "SwitchStatement"
   // "ConditionalExpression"
-})
+}
 
 export const javascriptSyntax = new LezerSyntax(parser)
 

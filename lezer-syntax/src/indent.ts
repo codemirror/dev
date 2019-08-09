@@ -1,13 +1,13 @@
-import {TagMatch, Subtree, ErrorType} from "lezer-tree"
-import {LezerSyntax} from "../../lezer-syntax/src/syntax"
+import {TagMatch, TagMatchSpec, Subtree, ErrorType} from "lezer-tree"
+import {LezerSyntax} from "./syntax"
 import {EditorState, StateExtension} from "../../state/src/"
 
 // FIXME handle nested syntaxes
-// FIXME rename or move into lezer-syntax?
 
-export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMatch<IndentStrategy>) {
+export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMatchSpec<IndentStrategy>) {
+  let match = new TagMatch(strategies)
   return StateExtension.indentation((state, pos) => {
-    let inner = new IndentContextInner(pos, strategies, syntax, state)
+    let inner = new IndentContextInner(pos, match, syntax, state)
     let tree: Subtree | null = syntax.tryGetTree(state, pos, pos).resolve(pos)
     // Enter previous nodes that end in empty error terms, which means
     // they were broken off by error recovery, so that indentation
@@ -25,7 +25,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMatch<Inde
     }
 
     for (; tree; tree = tree.parent) {
-      let strategy = strategies.best(tree.tag) || (tree.parent == null ? topStrategy : null)
+      let strategy = match.best(tree.tag) || (tree.parent == null ? topIndent : null)
       if (strategy) {
         let indentContext = new IndentContext(inner, tree, strategy, null)
         return indentContext.getIndent()
@@ -35,7 +35,7 @@ export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMatch<Inde
   })
 }
 
-export class IndentContextInner {
+class IndentContextInner {
   unit: number
 
   constructor(readonly pos: number,
@@ -66,7 +66,7 @@ export class IndentContext {
       found = this.inner.strategies.best(tree.tag)
       last = tree
     }
-    return this._next = new IndentContext(this.inner, last, found || topStrategy, this)
+    return this._next = new IndentContext(this.inner, last, found || topIndent, this)
   }
 
   get textAfter() {
@@ -117,7 +117,7 @@ export interface IndentStrategy {
   baseIndent?: (context: IndentContext) => number
 }
 
-export const topStrategy: IndentStrategy = {
+export const topIndent: IndentStrategy = {
   getIndent() { return 0 },
   baseIndent() { return 0 }
 }
@@ -136,7 +136,7 @@ function bracketedAligned(context: IndentContext) {
   }
 }
 
-export function bracketed({closing, align = true}: {closing: string, align?: boolean}): IndentStrategy {
+export function delimitedIndent({closing, align = true}: {closing: string, align?: boolean}): IndentStrategy {
   return {
     getIndent(context: IndentContext) {
       let closed = context.textAfter.slice(0, closing.length) == closing
@@ -153,9 +153,11 @@ export function bracketed({closing, align = true}: {closing: string, align?: boo
   }
 }
 
-export const parens = bracketed({closing: ")"}), braces = bracketed({closing: "}"}), brackets = bracketed({closing: "]"})
+export const parenIndent = delimitedIndent({closing: ")"}),
+  braceIndent = delimitedIndent({closing: "}"}),
+  bracketIndent = delimitedIndent({closing: "]"})
 
-export const statement: IndentStrategy = {
+export const statementIndent: IndentStrategy = {
   getIndent(context: IndentContext) {
     return context.baseIndent() + context.unit
   },
@@ -164,7 +166,7 @@ export const statement: IndentStrategy = {
   }
 }
 
-export function compositeStatement(dedentBefore: RegExp): IndentStrategy {
+export function compositeStatementIndent(dedentBefore: RegExp): IndentStrategy {
   return {
     getIndent(context: IndentContext) {
       return context.baseIndent() + (dedentBefore.test(context.textAfter) ? 0 : context.unit)
