@@ -5,7 +5,6 @@ import {DecorationSet, Decoration} from "./decoration"
 import {Extension, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
-import {Tag} from "lezer-tree"
 
 export type Effect<T> = SlotType<(field: any) => T>
 
@@ -69,7 +68,7 @@ export const clickAddsSelectionRange = ViewExtension.defineBehavior<(event: Mous
 
 export const dragMovesSelection = ViewExtension.defineBehavior<(event: MouseEvent) => boolean>()
 
-export const themeClass = ViewExtension.defineBehavior<(tag: Tag, context: readonly Tag[]) => string>()
+export const themeClass = ViewExtension.defineBehavior<(tag: string) => string>()
 
 export type ViewPlugin = {
   update?: (update: ViewUpdate) => void

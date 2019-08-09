@@ -9,8 +9,7 @@ import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 
 import {javascript} from "../javascript/src/javascript"
-import {defaultTheme} from "../theme/src/theme"
-import {highlight} from "../highlight/src/highlight"
+import {defaultTheme, highlight} from "../theme/src/theme"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `"use strict";
