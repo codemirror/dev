@@ -9,7 +9,7 @@ import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
 import {syntaxIndentation} from "../lezer-syntax/src"
 
-import {javascript} from "../javascript/src/javascript"
+import {html} from "../html/src/html"
 import {defaultTheme, highlight} from "../theme/src/theme"
 
 let isMac = /Mac/.test(navigator.platform)
@@ -23,7 +23,7 @@ readFile("package.json", "utf8", (err, data) => {
   history(),
   specialChars(),
   multipleSelections(),
-  javascript(),
+  html(),
   syntaxIndentation,
   defaultTheme,
   highlight(),
