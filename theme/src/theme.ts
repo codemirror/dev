@@ -81,7 +81,7 @@ class Highlighter {
     // on leaf nodes, this is optimized by only tracking context if
     // there is any—that is, if any parent node is styled.
     let tokenContext: TokenContext | null = null
-    tree.iterate(from, to, (tag, start) => {
+    tree.iterate(from, to, ({tag}, start) => {
       let cls = curCover, cover = curCover
       for (let theme of themes) {
         let val = theme.match.best(tag, parents)
@@ -107,7 +107,7 @@ class Highlighter {
         curCover = cover
       }
       parents.push(tag)
-    }, (tag, _, end) => {
+    }, ({tag}, _, end) => {
       parents.pop()
       if (tokenContext) {
         if (tokenContext.cls != curClass) flush(Math.min(to, end), curClass)

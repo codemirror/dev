@@ -1,18 +1,31 @@
-import {Parser, ParseContext, Tree, InputStream} from "lezer"
+import {Parser, ParseContext, InputStream} from "lezer"
+import {TagMatchSpec, Tree} from "lezer-tree"
 import {Text, TextIterator} from "../../doc/src/"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
+import {IndentStrategy, registerIndentation} from "./indent"
+
+export type LezerSyntaxSpec = {
+  parser: Parser
+  indentation?: TagMatchSpec<IndentStrategy>
+}
 
 export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
-  extension: StateExtension
+  readonly extension: StateExtension
+  readonly parser: Parser
 
-  constructor(readonly parser: Parser) {
+  constructor(spec: LezerSyntaxSpec) {
     super()
+    this.parser = spec.parser
+    if (spec.indentation) registerIndentation(this.parser.group, spec.indentation)
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = StateExtension.all(StateExtension.syntax(this), this.field.extension)
+    this.extension = StateExtension.all(
+      StateExtension.syntax(this),
+      this.field.extension
+    )
   }
 
   tryGetTree(state: EditorState, from: number, to: number, unfinished?: (promise: SyntaxRequest) => void): Tree {

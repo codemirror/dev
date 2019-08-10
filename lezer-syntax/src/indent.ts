@@ -1,49 +1,66 @@
-import {TagMatch, TagMatchSpec, Subtree, ErrorType} from "lezer-tree"
-import {LezerSyntax} from "./syntax"
+import {TagMatch, TagMatchSpec, Subtree, Tree, NodeGroup, NodeType} from "lezer-tree"
 import {EditorState, StateExtension} from "../../state/src/"
 
-// FIXME handle nested syntaxes
+const groupMetaProp = "codemirrorIndentStrategies"
 
-export function syntaxIndentation(syntax: LezerSyntax, strategies: TagMatchSpec<IndentStrategy>) {
-  let match = new TagMatch(strategies)
-  return StateExtension.indentation((state, pos) => {
-    let inner = new IndentContextInner(pos, match, syntax, state)
-    let tree: Subtree | null = syntax.tryGetTree(state, pos, pos).resolve(pos)
-    // Enter previous nodes that end in empty error terms, which means
-    // they were broken off by error recovery, so that indentation
-    // works even if the constructs haven't been finished.
-    for (let scan = tree!, scanPos = pos;;) {
-      let last = scan.childBefore(scanPos)
-      if (!last) break
-      if (last.type == ErrorType && last.start == last.end) {
-        tree = scan
-        scanPos = last.start
-      } else {
-        scan = last
-        scanPos = scan.end + 1
-      }
-    }
+export function registerIndentation(group: NodeGroup, strategies: TagMatchSpec<IndentStrategy>) {
+  group.metadata[groupMetaProp] = new TagMatch(strategies)
+}
 
-    for (; tree; tree = tree.parent) {
-      let strategy = match.best(tree.tag) || (tree.parent == null ? topIndent : null)
-      if (strategy) {
-        let indentContext = new IndentContext(inner, tree, strategy, null)
-        return indentContext.getIndent()
-      }
+export const syntaxIndentation = StateExtension.unique<null>(() => StateExtension.indentation(indentationBehavior))(null)
+
+function indentationBehavior(state: EditorState, pos: number) {
+  for (let syntax of state.behavior.get(StateExtension.syntax)) {
+    let tree = syntax.tryGetTree(state, pos, pos)
+    if (tree) {
+      let result = computeIndentation(state, tree, pos)
+      if (result > -1) return result
     }
-    return -1
-  })
+  }
+  return -1
+}
+
+function computeIndentation(state: EditorState, ast: Tree, pos: number) {
+  let tree: Subtree | null = ast.resolve(pos)
+  let inner = new IndentContextInner(pos, state)
+    
+  // Enter previous nodes that end in empty error terms, which means
+  // they were broken off by error recovery, so that indentation
+  // works even if the constructs haven't been finished.
+  for (let scan = tree!, scanPos = pos;;) {
+    let last = scan.childBefore(scanPos)
+    if (!last) break
+    if (last.type.error && last.start == last.end) {
+      tree = scan
+      scanPos = last.start
+    } else {
+      scan = last
+      scanPos = scan.end + 1
+    }
+  }
+
+  for (; tree; tree = tree.parent) {
+    let strategy = nodeStrategy(tree.type) || (tree.parent == null ? topIndent : null)
+    if (strategy) {
+      let indentContext = new IndentContext(inner, tree, strategy, null)
+      return indentContext.getIndent()
+    }
+  }
+  return -1
 }
 
 class IndentContextInner {
   unit: number
 
   constructor(readonly pos: number,
-              readonly strategies: TagMatch<IndentStrategy>,
-              readonly syntax: LezerSyntax,
               readonly state: EditorState) {
     this.unit = state.indentUnit
   }
+}
+
+function nodeStrategy(type: NodeType) {
+  let match = type.group.metadata[groupMetaProp] as TagMatch<IndentStrategy>
+  return match ? match.best(type.tag) : null
 }
 
 export class IndentContext {
@@ -54,7 +71,6 @@ export class IndentContext {
               readonly strategy: IndentStrategy,
               readonly prev: IndentContext | null) {}
 
-  get syntax() { return this.inner.syntax }
   get state() { return this.inner.state }
   get pos() { return this.inner.pos }
   get unit() { return this.inner.unit }
@@ -63,7 +79,7 @@ export class IndentContext {
     if (this._next) return this._next
     let last = this.tree, found = null
     for (let tree = this.tree.parent; !found && tree; tree = tree.parent) {
-      found = this.inner.strategies.best(tree.tag)
+      found = nodeStrategy(tree.type)
       last = tree
     }
     return this._next = new IndentContext(this.inner, last, found || topIndent, this)
@@ -130,7 +146,7 @@ function bracketedAligned(context: IndentContext) {
   for (let pos = openToken.end;;) {
     let next = tree.childAfter(pos)
     if (!next) return null
-    if (!context.syntax.parser.isSkipped(next.type))
+    if (!next.type.skipped)
       return next.start < openLine.end ? openToken : null
     pos = next.end
   }

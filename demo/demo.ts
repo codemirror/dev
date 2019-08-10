@@ -7,6 +7,7 @@ import {baseKeymap, indentSelection} from "../commands/src/commands"
 import {bracketMatching} from "../matchbrackets/src/matchbrackets"
 import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
+import {syntaxIndentation} from "../lezer-syntax/src"
 
 import {javascript} from "../javascript/src/javascript"
 import {defaultTheme, highlight} from "../theme/src/theme"
@@ -23,6 +24,7 @@ readFile("package.json", "utf8", (err, data) => {
   specialChars(),
   multipleSelections(),
   javascript(),
+  syntaxIndentation,
   defaultTheme,
   highlight(),
   bracketMatching(),

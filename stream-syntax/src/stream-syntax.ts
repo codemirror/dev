@@ -1,6 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
-import {Tree, Tag} from "lezer-tree"
+import {Tree, Tag, NodeGroup} from "lezer-tree"
 
 export {StringStream}
 
@@ -166,7 +166,7 @@ class SyntaxState<ParseState> {
       pos += stream.string.length + 1
       if (Date.now() > sliceEnd) break
     }
-    let tree = Tree.build(buffer, tokenTags, parser.docType).balance()
+    let tree = Tree.build(buffer, nodeGroup.types[parser.docType]).balance()
     this.tree = this.tree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
@@ -217,14 +217,11 @@ class SyntaxState<ParseState> {
 }
 
 const tokenTable: {[name: string]: number} = Object.create(null)
-const tokenTags: Tag[] = [new Tag("placeholder.error")]
+const nodeGroup = new NodeGroup
 
 function tokenID(tag: string) {
   let id = tokenTable[tag]
-  if (id == null) {
-    id = tokenTable[tag] = (tokenTags.length << 1) + 1
-    tokenTags.push(new Tag(tag))
-  }
+  if (id == null) id = tokenTable[tag] = nodeGroup.define(new Tag(tag)).id
   return id
 }
 

@@ -1,9 +1,8 @@
 import {parser} from "lezer-javascript"
-import {StateExtension} from "../../state/src/"
-import {syntaxIndentation, dontIndent, parenIndent, braceIndent, bracketIndent, statementIndent, compositeStatementIndent,
+import {dontIndent, parenIndent, braceIndent, bracketIndent, statementIndent, compositeStatementIndent,
         LezerSyntax} from "../../lezer-syntax/src"
 
-const indentStrategies = {
+const indentation = {
   // FIXME force variable decl indentation to 4?
   // FIXME option to do hanging statements different from continued ones?
   "statement": statementIndent,
@@ -22,11 +21,6 @@ const indentStrategies = {
   // "ConditionalExpression"
 }
 
-export const javascriptSyntax = new LezerSyntax(parser)
+export const javascriptSyntax = new LezerSyntax({parser, indentation})
 
-export function javascript() {
-  return StateExtension.all(
-    javascriptSyntax.extension,
-    syntaxIndentation(javascriptSyntax, indentStrategies)
-  )
-}
+export function javascript() { return javascriptSyntax.extension }
