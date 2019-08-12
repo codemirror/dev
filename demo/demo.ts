@@ -13,12 +13,13 @@ import {html} from "../html/src/html"
 import {defaultTheme, highlight} from "../theme/src/theme"
 
 let isMac = /Mac/.test(navigator.platform)
-let state = EditorState.create({doc: `"use strict";
-const {readFile} = require("fs");
+let state = EditorState.create({doc: `<script>
+  const {readFile} = require("fs");
 
-readFile("package.json", "utf8", (err, data) => {
-  console.log(data);
-});`, extensions: [
+  readFile("package.json", "utf8", (err, data) => {
+    console.log(data);
+  });
+</script>`, extensions: [
   lineNumbers(),
   history(),
   specialChars(),
