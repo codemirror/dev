@@ -147,17 +147,21 @@ export function highlight() { // FIXME allow specifying syntax?
 
 export const defaultTheme = theme({
   "keyword": {color: "#708"},
-  "keyword.expression, literal.expression": {color: "#219"},
-  ".literal.expression": {
-    "number": {color: "#164"},
-    "string": {color: "#a11"},
-    "regexp": {color: "#e40"}
+  ".expression": {
+    "keyword, literal": {color: "#219"},
+    ".literal": {
+      "number": {color: "#164"},
+      "string": {color: "#a11"},
+      "regexp": {color: "#e40"}
+    }
   },
-  "variable.definition.name": {color: "#00f"},
-  "type.name": {color: "#085"},
+  ".name": {
+    "variable.definition": {color: "#00f"},
+    "type": {color: "#085"},
+    "definition.property": {color: "#00c"}
+  },
   "comment": {color: "#940"},
   "metadata": {color: "#555"},
-  "definition.property.name": {color: "#00c"},
   "error": {color: "#f00"},
 
   ".bracket": {
