@@ -2,7 +2,7 @@ import {EditorState, StateExtension} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
 import {ViewExtension, ViewField} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
-import {Tree, Subtree, Tag, NodeType} from "lezer-tree"
+import {Tree, Subtree, NodeType} from "lezer-tree"
 
 export interface Config {
   afterCursor?: boolean,
@@ -54,40 +54,34 @@ function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: 
 
 type MatchResult = {start: {from: number, to: number}, end?: {from: number, to: number}, matched: boolean} | null
 
-function isBracket(tag: Tag, type: "open" | "close") {
-  return tag.parts[tag.parts.length - 1] == "punctuation" && tag.parts.some(p => p == type)
+function isBracket(node: NodeType, type: "open" | "close") {
+  return false // FIXME
 }
 
-function matches(tag: Tag, other: Tag) {
-  for (let i = 1;; i++) {
-    let iTag = tag.parts.length - i, iOther = other.parts.length - i
-    if (iTag < 0 || iOther < 0) return false
-    let pTag = tag.parts[iTag], pOther = other.parts[iOther]
-    if (pTag != pOther)
-      return pTag == "open" && pOther == "close" || pTag == "close" && pOther == "open"
-  }
+function matches(node: NodeType, other: NodeType) {
+  return false // FIXME
 }
 
 export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult {
   let maxScanDistance = config.maxScanDistance || DEFAULT_SCAN_DIST
   let tree = getTree(state, pos, dir, maxScanDistance)
   let sub = tree.resolve(pos, dir)
-  if (isBracket(sub.tag, dir < 0 ? "close" : "open"))
-    return matchMarkedBrackets(state, pos, dir, sub, sub.tag, maxScanDistance)
+  if (isBracket(sub.type, dir < 0 ? "close" : "open"))
+    return matchMarkedBrackets(state, pos, dir, sub, sub.type, maxScanDistance)
   else
     return matchPlainBrackets(state, pos, dir, tree, sub.type, maxScanDistance, config.brackets || DEFAULT_BRACKETS)
 }
 
 function matchMarkedBrackets(state: EditorState, pos: number, dir: -1 | 1, token: Subtree,
-                             startTag: Tag, maxScanDistance: number) {
+                             startNode: NodeType, maxScanDistance: number) {
   let depth = 0, firstToken = {from: token.start, to: token.end}
   let to = dir < 0 ? Math.max(0, pos - maxScanDistance) : Math.min(state.doc.length, pos + maxScanDistance)
-  return token.root.iterate(pos, to, ({tag}, start, end) => {
+  return token.root.iterate(pos, to, (type, start, end) => {
     if (dir < 0 ? end > pos : start < pos) return
-    if (isBracket(tag, dir < 0 ? "close" : "open")) {
+    if (isBracket(type, dir < 0 ? "close" : "open")) {
       depth++
-    } else if (isBracket(tag, dir < 0 ? "open" : "close")) {
-      if (depth == 1) return {start: firstToken, end: {from: start, to: end}, matched: matches(tag, startTag)}
+    } else if (isBracket(type, dir < 0 ? "open" : "close")) {
+      if (depth == 1) return {start: firstToken, end: {from: start, to: end}, matched: matches(type, startNode)}
       else depth--
     }
     return

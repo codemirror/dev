@@ -1,23 +1,14 @@
 import {Parser, ParseContext, InputStream} from "lezer"
-import {TagMatchSpec, Tree} from "lezer-tree"
+import {Tree} from "lezer-tree"
 import {Text, TextIterator} from "../../doc/src/"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
-import {IndentStrategy, registerIndentation} from "./indent"
-
-export type LezerSyntaxSpec = {
-  parser: Parser
-  indentation?: TagMatchSpec<IndentStrategy>
-}
 
 export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
   readonly extension: StateExtension
-  readonly parser: Parser
 
-  constructor(spec: LezerSyntaxSpec) {
+  constructor(readonly parser: Parser) {
     super()
-    this.parser = spec.parser
-    if (spec.indentation) registerIndentation(this.parser.group, spec.indentation)
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }

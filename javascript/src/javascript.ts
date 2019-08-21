@@ -1,26 +1,19 @@
 import {parser} from "lezer-javascript"
+import {NodeProp} from "lezer-tree"
 import {dontIndent, parenIndent, braceIndent, bracketIndent, statementIndent, compositeStatementIndent,
-        LezerSyntax} from "../../lezer-syntax/src"
+        indentNodeProp, LezerSyntax} from "../../lezer-syntax/src"
 
-const indentation = {
-  // FIXME force variable decl indentation to 4?
-  // FIXME option to do hanging statements different from continued ones?
-  "statement": statementIndent,
-  "if.conditional.statement": compositeStatementIndent(/^else\b/),
+export const javascriptSyntax = new LezerSyntax(parser.withProps(indentNodeProp.source(type => {
+  let delim = type.prop(NodeProp.delim)
+  if (delim == "( )") return parenIndent
+  if (delim == "{ }") return braceIndent
+  if (delim == "[ ]") return bracketIndent
+  if (type.name == "IfStatement") return compositeStatementIndent(/^else\b/)
+  if (/(Statement|Declaration)$/.test(type.name)) return statementIndent
+  if (type.name == "TemplateString" || type.name == "BlockComment") return dontIndent
+  return undefined
 
-  'delim="( )"': parenIndent,
-  'delim="[ ]"': bracketIndent,
-  'delim="{ }"': braceIndent,
-
-  "template.string.literal.expression": dontIndent,
-  "block.comment": dontIndent
-
-  // FIXME
-  // "SwitchCase"
-  // "SwitchDefault", "SwitchStatement"
-  // "ConditionalExpression"
-}
-
-export const javascriptSyntax = new LezerSyntax({parser, indentation})
+  // FIXME special indentation for switch bodies
+})))
 
 export function javascript() { return javascriptSyntax.extension }

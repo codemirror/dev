@@ -15,19 +15,19 @@ describe("javascript syntax queries", () => {
   it("returns a tree", () => {
     let state = s("let state = s()"), tree = tr(state)
     ist(tree instanceof Tree)
-    ist(tree.tag.toString(), "script.document.lang=javascript")
+    ist(tree.name, "Script")
     ist(tree.length, state.doc.length)
     let def = tree.resolve(6)
-    ist(def.tag.toString().startsWith("definition.variable.name"))
+    ist(def.name, "VariableDefinition")
     ist(def.start, 4)
     ist(def.end, 9)
   })
 
   it("keeps the tree up to date through changes", () => {
     let state = s("if (2)\n  x")
-    ist(tr(state).childAfter(0)!.tag.toString().startsWith("if.conditional.statement"))
+    ist(tr(state).childAfter(0)!.name, "IfStatement")
     state = state.t().replace(0, 3, "fac").apply()
-    ist(tr(state).childAfter(0)!.tag.toString().startsWith("expression.statement"))
+    ist(tr(state).childAfter(0)!.name, "ExpressionStatement")
   })
 
   it("reuses nodes when parsing big documents", () => {

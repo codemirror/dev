@@ -1,50 +1,113 @@
 import {StyleModule, Style} from "style-mod"
 import {ViewExtension, styleModule, themeClass, EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, notified} from "../../view/src"
-import {Tag, TagMatch, TagMatchSpec} from "lezer-tree"
+import {NodeProp, StyleNames} from "lezer-tree"
 import {Syntax, StateExtension} from "../../state/src/"
 
-function mapSpec<A, B>(spec: TagMatchSpec<A>, f: (a: A) => B): TagMatchSpec<B> {
-  let result: {[name: string]: B | TagMatchSpec<B>} = {}
-  for (let prop in spec)
-    result[prop] = /^\./.test(prop) ? mapSpec(spec[prop] as TagMatchSpec<A>, f) : f(spec[prop] as A)
-  return result
+type ThemeSpec = {[prop: string]: string | number | ThemeSpec}
+
+type FlatStyle = {[prop: string]: string | number}
+type FlatSpec = {name: string, value: FlatStyle}[]
+
+function flattenSpec(spec: ThemeSpec) {
+  let rules: FlatSpec = []
+  function scan(spec: ThemeSpec, prefix: string) {
+    let local: {[prop: string]: string | number} | null = null
+    for (let prop in spec) {
+      let value = spec[prop]
+      if (typeof value == "object") {
+        scan(value, prefix ? prefix + "." + prop : prop)
+      } else {
+        if (!local) local = {}
+        local[prop] = value
+      }
+    }
+    if (local) rules.push({name: prefix, value: local})
+  }
+  scan(spec, "")
+  return rules
+}
+
+function collectTokenStyles(flat: FlatSpec, addStyle: (style: FlatStyle) => string) {
+  let styles: {name: string, style: string, add: string}[] = []
+  for (let {name, value} of flat) {
+    if (!/^token\./.test(name)) continue
+    let style: FlatStyle | null = null, add: FlatStyle | null = null
+    for (let prop in value) {
+      if (prop[0] == "+") {
+        if (!add) add = {}
+        add[prop.slice(1)] = value[prop]
+      } else {
+        if (!style) style = {}
+        style[prop] = value[prop]
+      }
+    }
+    styles.push({name: name.slice(6), style: style ? addStyle(style) : "", add: add ? addStyle(add) : ""})
+  }
+  return styles
+}
+
+function parseTheme(spec: ThemeSpec) {
+  let styleObj: {[name: string]: Style} = {}, nextID = 0
+  function addStyle(style: Style) {
+    let id = "c" + nextID++
+    styleObj[id] = style
+    return id
+  }
+
+  let flat = flattenSpec(spec)
+  let tokenStyles = collectTokenStyles(flat, addStyle)
+  let otherStyles: {name: string, style: string}[] = []
+  for (let {name, value} of flat) {
+    if (/^token\./.test(name)) continue
+    otherStyles.push({name, style: addStyle(value)})
+  }
+
+  let styleMod = new StyleModule(styleObj)
+
+  let tokenArray = [], tokenAddArray = []
+  for (let i = 0; i < StyleNames.length; i++) {
+    let styleName = StyleNames[i], cls = "", selector = "", addCls = ""
+    for (let {name, style, add} of tokenStyles) {
+      let match = styleName.indexOf(name) == 0 && (styleName.length == name.length || styleName[name.length] == ".")
+      if (match && style && name.length > selector.length) cls = styleMod[style]
+      if (match && add) addCls += (addCls ? " " : "") + styleMod[add]
+    }
+    tokenArray.push(cls)
+    tokenAddArray.push(addCls)
+  }
+
+  let classes = otherStyles.map(({name, style}) => ({name, class: styleMod[style]}))
+  return new Theme(styleMod, tokenArray, tokenAddArray.some(s => s) ? tokenAddArray : null, classes)
 }
 
 class Theme {
   constructor(readonly styleMod: StyleModule,
-              readonly match: TagMatch<string>,
-              readonly cover: readonly string[]) {}
-}
+              readonly tokenClasses: readonly string[],
+              readonly tokenAddClasses: readonly string[] | null,
+              readonly rules: readonly {name: string, class: string}[]) {}
 
-function parseTheme(rules: TagMatchSpec<Style>) {
-  let styleObj: {[name: string]: Style} = {}, classID = 1
-  let coverNames: string[] = []
-  let toClassName = mapSpec(rules, (style: Style) => {
-    let name = "c" + (classID++)
-    if (style.coverChildren) coverNames.push(name)
-    if (style.coverChildren !== undefined) {
-      let copy: Style = {}
-      for (let prop in style) if (prop != "coverChildren") copy[prop] = style[prop]
-      style = copy
+  match(query: string) {
+    let found = "", selector = ""
+    for (let {name, class: cls} of this.rules) {
+      if (name.length > selector.length && query.indexOf(name) == 0 &&
+          (query.length == name.length || query[name.length] == ".")) {
+        found = cls
+        selector = name
+      }
     }
-    styleObj[name] = style
-    return name
-  })
-  let styles = new StyleModule(styleObj)
-  return new Theme(styles,
-                   new TagMatch(mapSpec(toClassName, name => styles[name])),
-                   coverNames.map(name => styles[name]))
+    return found
+  }
 }
 
 const themeData = ViewExtension.defineBehavior<Theme>()
 
-export function theme(rules: TagMatchSpec<Style>) {
+export function theme(rules: ThemeSpec) {
   let theme = parseTheme(rules), cache: {[tag: string]: string} = Object.create(null)
   return ViewExtension.all(
     themeData(theme),
     themeClass(str => {
       let value = cache[str]
-      return value != null ? value : (cache[str] = theme.match.best(new Tag(str)) || "")
+      return value != null ? value : (cache[str] = theme.match(str))
     }),
     styleModule(theme.styleMod)
   )
@@ -72,51 +135,51 @@ class Highlighter {
       start = pos
     }
 
-    // Stack of parent nodes
-    let parents: Tag[] = []
-    // The current node's own style and child-covering styles.
-    let curClass = "", curCover = ""
+    // The current node's own classes and adding classes.
+    let curClass = "", curAdd = ""
     // We need to keep some kind of information to be able to return
     // back to a parent node's style. But because most styling happens
     // on leaf nodes, this is optimized by only tracking context if
     // there is any—that is, if any parent node is styled.
     let tokenContext: TokenContext | null = null
-    tree.iterate(from, to, ({tag}, start) => {
-      let cls = curCover, cover = curCover
-      for (let theme of themes) {
-        let val = theme.match.best(tag, parents)
-        if (val) {
+    let styleProp = NodeProp.style
+    tree.iterate(from, to, (type, start) => {
+      let cls = curAdd, add = curAdd
+      let style = type.prop(styleProp)
+      if (style != null) for (let theme of themes) {
+        let val
+        if (val = theme.tokenClasses[style]) {
           if (cls) cls += " "
           cls += val
-          if (theme.cover.includes(val)) {
-            if (cover) cover += " "
-            cover += val
-          }
+        }
+        if (theme.tokenAddClasses && (val = theme.tokenAddClasses[style])) {
+          if (cls) cls += " "
+          cls += val
+          if (add) add += " "
+          add += val
         }
       }
       if (curClass || tokenContext) {
-        tokenContext = new TokenContext(curClass, curCover, tokenContext)
+        tokenContext = new TokenContext(curClass, curAdd, tokenContext)
         if (curClass != cls) {
           flush(start, curClass)
           curClass = cls
         }
-        curCover = cover
+        curAdd = add
       } else if (cls) {
         flush(start, curClass)
         curClass = cls
-        curCover = cover
+        curAdd = add
       }
-      parents.push(tag)
-    }, ({tag}, _, end) => {
-      parents.pop()
+    }, (_t, _s, end) => {
       if (tokenContext) {
         if (tokenContext.cls != curClass) flush(Math.min(to, end), curClass)
         curClass = tokenContext.cls
-        curCover = tokenContext.cover
+        curAdd = tokenContext.add
         tokenContext = tokenContext.parent
       } else if (curClass) {
         flush(Math.min(to, end), curClass)
-        curClass = curCover = ""
+        curClass = curAdd = ""
       }
     })
     return Decoration.set(tokens)
@@ -125,7 +188,7 @@ class Highlighter {
 
 class TokenContext {
   constructor(readonly cls: string,
-              readonly cover: string,
+              readonly add: string,
               readonly parent: TokenContext | null) {}
 }
 
@@ -146,26 +209,29 @@ export function highlight() { // FIXME allow specifying syntax?
 }
 
 export const defaultTheme = theme({
-  "keyword": {color: "#708"},
-  ".expression": {
-    "keyword, literal": {color: "#219"},
-    ".literal": {
-      "number": {color: "#164"},
-      "string": {color: "#a11"},
-      "regexp": {color: "#e40"}
-    }
+  token: {
+    keyword: {
+      expression: {color: "#219"},
+      color: "#708"
+    },
+    literal: {
+      number: {color: "#164"},
+      string: {color: "#a11"},
+      character: {color: "#a11"},
+      regexp: {color: "#e40"},
+      escape: {color: "#e40"}
+    },
+    name: {
+      "variable.define": {color: "#00f"},
+      type: {color: "#085"},
+      "property.define": {color: "#00c"}
+    },
+    comment: {color: "#940"},
+    meta: {color: "#555"},
+    invalid: {color: "#f00"}
   },
-  ".name": {
-    "variable.definition": {color: "#00f"},
-    "type": {color: "#085"},
-    "definition.property": {color: "#00c"}
-  },
-  "comment": {color: "#940"},
-  "metadata": {color: "#555"},
-  "error": {color: "#f00"},
-
-  ".bracket": {
-    "matching": {color: "#0b0"},
-    "nonmatching": {color: "#a22"}
+  bracket: {
+    matching: {color: "#0b0"},
+    nonmatching: {color: "#a22"}
   }
 })

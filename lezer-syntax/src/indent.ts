@@ -1,11 +1,7 @@
-import {TagMatch, TagMatchSpec, Subtree, Tree, NodeGroup, NodeType} from "lezer-tree"
+import {NodeProp, Subtree, Tree} from "lezer-tree"
 import {EditorState, StateExtension} from "../../state/src/"
 
-const groupMetaProp = "codemirrorIndentStrategies"
-
-export function registerIndentation(group: NodeGroup, strategies: TagMatchSpec<IndentStrategy>) {
-  group.metadata[groupMetaProp] = new TagMatch(strategies)
-}
+export const indentNodeProp = new NodeProp<IndentStrategy>()
 
 export const syntaxIndentation = StateExtension.unique<null>(() => StateExtension.indentation(indentationBehavior))(null)
 
@@ -30,7 +26,7 @@ function computeIndentation(state: EditorState, ast: Tree, pos: number) {
   for (let scan = tree!, scanPos = pos;;) {
     let last = scan.childBefore(scanPos)
     if (!last) break
-    if (last.type.error && last.start == last.end) {
+    if (last.type.prop(NodeProp.error) && last.start == last.end) {
       tree = scan
       scanPos = last.start
     } else {
@@ -40,7 +36,7 @@ function computeIndentation(state: EditorState, ast: Tree, pos: number) {
   }
 
   for (; tree; tree = tree.parent) {
-    let strategy = nodeStrategy(tree.type) || (tree.parent == null ? topIndent : null)
+    let strategy = tree.type.prop(indentNodeProp) || (tree.parent == null ? topIndent : null)
     if (strategy) {
       let indentContext = new IndentContext(inner, tree, strategy, null)
       return indentContext.getIndent()
@@ -56,11 +52,6 @@ class IndentContextInner {
               readonly state: EditorState) {
     this.unit = state.indentUnit
   }
-}
-
-function nodeStrategy(type: NodeType) {
-  let match = type.group.metadata[groupMetaProp] as TagMatch<IndentStrategy>
-  return match ? match.best(type.tag) : null
 }
 
 export class IndentContext {
@@ -79,7 +70,7 @@ export class IndentContext {
     if (this._next) return this._next
     let last = this.tree, found = null
     for (let tree = this.tree.parent; !found && tree; tree = tree.parent) {
-      found = nodeStrategy(tree.type)
+      found = tree.type.prop(indentNodeProp)
       last = tree
     }
     return this._next = new IndentContext(this.inner, last, found || topIndent, this)
@@ -146,7 +137,7 @@ function bracketedAligned(context: IndentContext) {
   for (let pos = openToken.end;;) {
     let next = tree.childAfter(pos)
     if (!next) return null
-    if (!next.type.skipped)
+    if (!next.type.prop(NodeProp.skipped))
       return next.start < openLine.end ? openToken : null
     pos = next.end
   }

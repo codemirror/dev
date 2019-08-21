@@ -1,14 +1,9 @@
 import {configureHTML} from "lezer-html"
 import {cssSyntax} from "../../css/src/css"
 import {javascriptSyntax} from "../../javascript/src/javascript"
-import {LezerSyntax, delimitedIndent, statementIndent} from "../../lezer-syntax/src"
+import {LezerSyntax, delimitedIndent, statementIndent, indentNodeProp} from "../../lezer-syntax/src"
 
-const indentation = {
-  "element.expression": delimitedIndent({closing: "</", align: false}),
-  "tag": statementIndent // FIXME name
-}
-
-export const htmlSyntax = new LezerSyntax({parser: configureHTML([
+export const htmlSyntax = new LezerSyntax(configureHTML([
   {tag: "script",
    attrs(attrs) {
      return !attrs.type || /^(?:text|application)\/(?:x-)?(?:java|ecma)script$|^module$|^$/i.test(attrs.type)
@@ -19,7 +14,11 @@ export const htmlSyntax = new LezerSyntax({parser: configureHTML([
      return (!attrs.lang || attrs.lang == "css") && (!attrs.type || /^(text\/)?(x-)?(stylesheet|css)$/i.test(attrs.type))
    },
    parser: cssSyntax.parser}
-]), indentation})
+]).withProps(indentNodeProp.source(type => {
+  if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
+  if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return statementIndent // FIXME name
+  return undefined
+})))
 
 export function html() {
   return htmlSyntax.extension
