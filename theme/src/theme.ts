@@ -1,9 +1,8 @@
 import {StyleModule, Style} from "style-mod"
-import {ViewExtension, styleModule, themeClass, EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, notified} from "../../view/src"
-import {NodeProp, StyleNames} from "lezer-tree"
-import {Syntax, StateExtension} from "../../state/src/"
+import {ViewExtension, styleModule, themeClass} from "../../view/src"
+import {StyleNames} from "./styleprop"
 
-type ThemeSpec = {[prop: string]: string | number | ThemeSpec}
+export type ThemeSpec = {[prop: string]: string | number | ThemeSpec}
 
 type FlatStyle = {[prop: string]: string | number}
 type FlatSpec = {name: string, value: FlatStyle}[]
@@ -99,7 +98,7 @@ class Theme {
   }
 }
 
-const themeData = ViewExtension.defineBehavior<Theme>()
+export const themeData = ViewExtension.defineBehavior<Theme>()
 
 export function theme(rules: ThemeSpec) {
   let theme = parseTheme(rules), cache: {[tag: string]: string} = Object.create(null)
@@ -111,101 +110,6 @@ export function theme(rules: ThemeSpec) {
     }),
     styleModule(theme.styleMod)
   )
-}
-
-class Highlighter {
-  deco: DecorationSet
-
-  constructor(readonly syntax: Syntax | null, view: EditorView) {
-    this.deco = this.buildDeco(view)
-  }
-
-  buildDeco(view: EditorView) {
-    let themes = view.behavior.get(themeData)
-    if (!this.syntax || themes.length == 0) return Decoration.none
-
-    let {from, to} = view.viewport
-    let tree = this.syntax.tryGetTree(view.state, from, to, view.notify)
-
-    let tokens: DecoratedRange[] = []
-    let start = from
-    function flush(pos: number, style: string) {
-      if (pos > start && style)
-        tokens.push(Decoration.mark(start, pos, {class: style}))
-      start = pos
-    }
-
-    // The current node's own classes and adding classes.
-    let curClass = "", curAdd = ""
-    // We need to keep some kind of information to be able to return
-    // back to a parent node's style. But because most styling happens
-    // on leaf nodes, this is optimized by only tracking context if
-    // there is any—that is, if any parent node is styled.
-    let tokenContext: TokenContext | null = null
-    let styleProp = NodeProp.style
-    tree.iterate(from, to, (type, start) => {
-      let cls = curAdd, add = curAdd
-      let style = type.prop(styleProp)
-      if (style != null) for (let theme of themes) {
-        let val
-        if (val = theme.tokenClasses[style]) {
-          if (cls) cls += " "
-          cls += val
-        }
-        if (theme.tokenAddClasses && (val = theme.tokenAddClasses[style])) {
-          if (cls) cls += " "
-          cls += val
-          if (add) add += " "
-          add += val
-        }
-      }
-      if (curClass || tokenContext) {
-        tokenContext = new TokenContext(curClass, curAdd, tokenContext)
-        if (curClass != cls) {
-          flush(start, curClass)
-          curClass = cls
-        }
-        curAdd = add
-      } else if (cls) {
-        flush(start, curClass)
-        curClass = cls
-        curAdd = add
-      }
-    }, (_t, _s, end) => {
-      if (tokenContext) {
-        if (tokenContext.cls != curClass) flush(Math.min(to, end), curClass)
-        curClass = tokenContext.cls
-        curAdd = tokenContext.add
-        tokenContext = tokenContext.parent
-      } else if (curClass) {
-        flush(Math.min(to, end), curClass)
-        curClass = curAdd = ""
-      }
-    })
-    return Decoration.set(tokens)
-  }
-}
-
-class TokenContext {
-  constructor(readonly cls: string,
-              readonly add: string,
-              readonly parent: TokenContext | null) {}
-}
-
-export function highlight() { // FIXME allow specifying syntax?
-  return new ViewField<Highlighter>({
-    create(view) {
-      for (let s of view.state.behavior.get(StateExtension.syntax))
-        return new Highlighter(s, view)
-      return new Highlighter(null, view)
-    },
-    update(highlighter, update) {
-      if (update.docChanged || update.viewportChanged || update.getMeta(notified))
-        highlighter.deco = highlighter.buildDeco(update.view)
-      return highlighter // FIXME immutable?
-    },
-    effects: [ViewField.decorationEffect(h => h.deco)]
-  }).extension
 }
 
 export const defaultTheme = theme({

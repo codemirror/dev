@@ -1,6 +1,7 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
-import {Tree, NodeType, NodeGroup, NodeProp} from "lezer-tree"
+import {Tree, NodeType, NodeGroup} from "lezer-tree"
+import {styleNodeProp} from "../../theme/src"
 
 export {StringStream}
 
@@ -224,7 +225,7 @@ function tokenID(tag: string) {
   let id = tokenTable[tag]
   if (id == null) {
     id = tokenTable[tag] = typeArray.length
-    typeArray.push(new NodeType(tag, {[NodeProp.style.id]: tag}, id))
+    typeArray.push(new NodeType(tag, {[styleNodeProp.id]: tag}, id))
   }
   return id
 }

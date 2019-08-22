@@ -10,7 +10,7 @@ import {multipleSelections} from "../multiple-selections/src/multiple-selections
 import {syntaxIndentation} from "../lezer-syntax/src"
 
 import {html} from "../html/src/html"
-import {defaultTheme, highlight} from "../theme/src/theme"
+import {defaultTheme, highlight} from "../theme/src/"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
