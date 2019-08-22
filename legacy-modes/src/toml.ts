@@ -38,33 +38,33 @@ const tomlMode: LegacyMode<ParseState> = {
     } else if (state.inArray && stream.peek() === ']') {
       stream.next()
       state.inArray--
-      return "punctuation.bracket.close"
+      return "bracket.square.close"
     } else if (state.lhs && stream.peek() === '[' && stream.skipTo(']')) {
       stream.next() //skip closing ]
       // array of objects has an extra open & close []
       if (stream.peek() === ']') stream.next()
-      return "atom.bracketed"
+      return "keyword.expression"
     } else if (stream.peek() === "#") {
       stream.skipToEnd()
       return "comment.line"
     } else if (stream.eatSpace()) {
       return null
     } else if (state.lhs && stream.eatWhile(/[^= ]/)) {
-      return "property"
+      return "name.property"
     } else if (state.lhs && stream.peek() === "=") {
       stream.next()
       state.lhs = false
       return "operator"
     } else if (!state.lhs && stream.match(/^\d\d\d\d[\d\-\:\.T]*Z/)) {
-      return "atom.date"
+      return "keyword.expression"
     } else if (!state.lhs && (stream.match('true') || stream.match('false'))) {
-      return "atom.boolean"
+      return "keyword.expression"
     } else if (!state.lhs && stream.peek() === '[') {
       state.inArray++
       stream.next()
-      return "punctuation.bracket.open"
+      return "bracket.square.open"
     } else if (!state.lhs && stream.match(/^\-?\d+(?:\.\d+)?/)) {
-      return "number"
+      return "literal.number"
     } else {
       stream.next()
       return null

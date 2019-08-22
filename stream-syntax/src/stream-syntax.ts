@@ -1,7 +1,7 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
 import {Tree, NodeType, NodeGroup} from "lezer-tree"
-import {styleNodeProp} from "../../theme/src"
+import {styleNodeProp, Style} from "../../theme/src"
 
 export {StringStream}
 
@@ -218,14 +218,28 @@ class SyntaxState<ParseState> {
 }
 
 const tokenTable: {[name: string]: number} = Object.create(null)
-const typeArray: NodeType[] = []
+const typeArray: NodeType[] = [NodeType.none]
 const nodeGroup = new NodeGroup(typeArray)
+
+function resolveStyle(tag: string) {
+  let parts = tag.split("."), style = Style as any
+  for (let i = 0; i < parts.length; i++) {
+    style = style[parts[i]]
+    if (!style || style.__id == null) return null
+  }
+  return style.__id
+}
 
 function tokenID(tag: string) {
   let id = tokenTable[tag]
   if (id == null) {
-    id = tokenTable[tag] = typeArray.length
-    typeArray.push(new NodeType(tag, {[styleNodeProp.id]: tag}, id))
+    let styleID = resolveStyle(tag)
+    if (styleID == null) {
+      id = 0
+    } else {
+      id = tokenTable[tag] = typeArray.length
+      typeArray.push(new NodeType(tag, {[styleNodeProp.id]: styleID}, id))
+    }
   }
   return id
 }
