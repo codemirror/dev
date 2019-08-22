@@ -160,6 +160,8 @@ export function delimitedIndent({closing, align = true}: {closing: string, align
   }
 }
 
+// FIXME automatically create a delimitedIndent for nodes with delim prop?
+
 export const parenIndent = delimitedIndent({closing: ")"}),
   braceIndent = delimitedIndent({closing: "}"}),
   bracketIndent = delimitedIndent({closing: "]"})

@@ -1,7 +1,7 @@
 import {configureHTML} from "lezer-html"
 import {cssSyntax} from "../../css/src/css"
 import {javascriptSyntax} from "../../javascript/src/javascript"
-import {LezerSyntax, delimitedIndent, statementIndent, indentNodeProp} from "../../lezer-syntax/src"
+import {LezerSyntax, delimitedIndent, statementIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../lezer-syntax/src"
 import {NodeType} from "lezer-tree"
 import {Style as s, styleNodeProp} from "../../theme/src"
 
@@ -22,6 +22,14 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
     if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return statementIndent // FIXME name
     return undefined
   }),
+  openNodeProp.add(NodeType.match({
+    "StartTag StartCloseTag": ["EndTag", "SelfCloseEndTag"],
+    "OpenTag": ["CloseTag"]
+  })),
+  closeNodeProp.add(NodeType.match({
+    "EndTag SelfCloseEndTag": ["StartTag", "StartCloseTag"],
+    "CloseTag": ["OpenTag"]
+  })),
   styleNodeProp.styles(NodeType.match({
     AttributeValue: s.literal.string,
     RawText: s.markup.content,
