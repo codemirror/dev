@@ -1,8 +1,8 @@
-import {NodeType, NodeProp, NodePropSource} from "lezer"
+import {NodeType, NodeProp, NodePropSource} from "lezer-tree"
 
 export const styleNodeProp = new class extends NodeProp<number> {
   styles(f: (type: NodeType) => StyleName | undefined): NodePropSource {
-    return new NodePropSource(this, type => {
+    return this.add(type => {
       let result = f(type)
       return typeof result == "object" ? result.__id : result
     })

@@ -238,7 +238,7 @@ function tokenID(tag: string) {
       id = 0
     } else {
       id = tokenTable[tag] = typeArray.length
-      typeArray.push(new NodeType(tag, {[styleNodeProp.id]: styleID}, id))
+      typeArray.push(new NodeType(tag, styleNodeProp.set({}, id), id))
     }
   }
   return id
