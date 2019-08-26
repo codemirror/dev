@@ -19,6 +19,8 @@ export class Slot<T = any> {
 
 const enum Kind { Behavior, Multi, Unique }
 
+const enum Priority { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
+
 export type Behavior<Value> = (value: Value) => Extension
 
 export class Extension {
@@ -26,20 +28,21 @@ export class Extension {
   constructor(/* @internal */ public kind: Kind,
               /* @internal */ public id: any,
               /* @internal */ public value: any,
-              /* @internal */ public priority: number = -2) {}
+              /* @internal */ public priority: number = Priority.None) {}
 
-  private setPrio(priority: number): this {
+  private setPrio(priority: Priority): this {
     // Crude casting because TypeScript doesn't understand new this.constructor
     return new (this.constructor as any)(this.kind, this.id, this.value, priority) as this
   }
-  fallback() { return this.setPrio(-1) }
-  extend() { return this.setPrio(1) }
-  override() { return this.setPrio(2) }
+  fallback() { return this.setPrio(Priority.Fallback) }
+  extend() { return this.setPrio(Priority.Extend) }
+  override() { return this.setPrio(Priority.Override) }
 
   // @internal
-  flatten(priority: number, target: Extension[] = []) {
-    if (this.kind == Kind.Multi) for (let ext of this.value as Extension[]) ext.flatten(this.priority > -2 ? this.priority : priority, target)
-    else target.push(this.priority > -2 ? this : this.setPrio(priority))
+  flatten(priority: Priority, target: Extension[] = []) {
+    if (this.kind == Kind.Multi) for (let ext of this.value as Extension[])
+      ext.flatten(this.priority != Priority.None ? this.priority : priority, target)
+    else target.push(this.priority != Priority.None ? this : this.setPrio(priority))
     return target
   }
 
@@ -78,7 +81,7 @@ export class Extension {
   // only behaviors are left, and then collecting the behaviors into
   // arrays of values, preserving priority ordering throughout.
   static resolve(extensions: ReadonlyArray<Extension>): BehaviorStore {
-    let pending: Extension[] = new this(Kind.Multi, null, extensions).flatten(0)
+    let pending: Extension[] = new this(Kind.Multi, null, extensions).flatten(Priority.Default)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -141,7 +144,7 @@ class UniqueExtensionType {
     }
   }
 
-  subs(specs: any[], priority: number) {
+  subs(specs: any[], priority: Priority) {
     let subs = this.instantiate(specs).flatten(priority)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
