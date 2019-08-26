@@ -1,38 +1,62 @@
-export type SlotType<T> = (value: T) => Slot<T>
-
+/// A slot is tagged value, where its tag determines its role and
+/// type. These are used, for example, to allow adding open-ended
+/// metadata to transactions.
 export class Slot<T = any> {
-  // @internal
-  constructor(/* @internal */ public type: SlotType<T>,
-              /* @internal */ public value: T) {}
+  /// @internal
+  constructor(/** @internal */ public type: SlotType<T>,
+              /** @internal */ public value: T) {}
 
+  /// Define a new type of slot. Returns a function that you can call
+  /// with a content value to create an instance of this type.
   static define<T>(): SlotType<T> {
     let type: SlotType<T> = (value: T) => new Slot<T>(type, value)
     return type
   }
 
-  static get<T>(type: SlotType<T>, slots: ReadonlyArray<Slot>): T | undefined {
+  /// Retrieve the value of the (first) slot with the given type in an
+  /// array of slots, or return undefined when no such slot is found.
+  static get<T>(type: SlotType<T>, slots: readonly Slot[]): T | undefined {
     for (let i = slots.length - 1; i >= 0; i--)
       if (slots[i].type == type) return slots[i].value as T
     return undefined
   }
 }
 
-const enum Kind { Behavior, Multi, Unique }
+/// A slot type is both the key used to identify that type of slot,
+/// and a function used to create instances of it.
+export type SlotType<T> = (value: T) => Slot<T>
 
 const enum Priority { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
+const enum Kind { Behavior, Multi, Unique }
+
+/// Behaviors are the way in which CodeMirror is configured. Each
+/// behavior type can have zero or more values (of the appropriate
+/// type) associated with it by extensions. A behavior type is a
+/// function that can be called to create an extension adding that
+/// behavior, but also serves as the key that identifies the behavior.
 export type Behavior<Value> = (value: Value) => Extension
 
+/// All extensions are associated with an extension type. This is used
+/// to distinguish extensions meant for different types of hosts (such
+/// as the editor view and state).
 export class ExtensionType {
-  // Define a type of behavior, which is the thing that extensions
-  // eventually resolve to. Each behavior can have an ordered sequence
-  // of values associated with it. An `Extension` can be seen as a
-  // tree of sub-extensions with behaviors as leaves.
+  /// Define a type of behavior. All extensions eventually resolve to
+  /// behaviors. Each behavior can have an ordered sequence of values
+  /// associated with it. An `Extension` can be seen as a tree of
+  /// sub-extensions with behaviors as leaves.
   behavior<Value>(): Behavior<Value> {
     let behavior = (value: Value) => new Extension(Kind.Behavior, behavior, value, this)
     return behavior
   }
 
+  /// Define a unique extension. When resolving extensions, all
+  /// instances of a given unique extension are merged before their
+  /// content extensions are retrieved. The `instantiate` function
+  /// will be called with all the specs (configuration values) passed
+  /// to the instances of the unique extension, and should resolve
+  /// them to a more concrete extension value (or raise an error if
+  /// they conflict).
   unique<Spec>(instantiate: (specs: Spec[]) => Extension, defaultSpec?: Spec): (spec?: Spec) => Extension {
     const type = new UniqueExtensionType(instantiate)
     return (spec: Spec | undefined = defaultSpec) => {
@@ -41,10 +65,10 @@ export class ExtensionType {
     }
   }
 
-  // Resolve an array of extenders by expanding all extensions until
-  // only behaviors are left, and then collecting the behaviors into
-  // arrays of values, preserving priority ordering throughout.
-  resolve(extensions: ReadonlyArray<Extension>): BehaviorStore {
+  /// Resolve an array of extensions by expanding all extensions until
+  /// only behaviors are left, and then collecting the behaviors into
+  /// arrays of values, preserving priority ordering throughout.
+  resolve(extensions: readonly Extension[]): BehaviorStore {
     let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
@@ -81,6 +105,10 @@ export class ExtensionType {
   }
 }
 
+/// And extension is a value that describes a way in which something
+/// is to be extended. It can be produced by instantiating a behavior,
+/// calling unique extension function, or grouping extensions with
+/// `Extension.all`.
 export class Extension {
   /// @internal
   constructor(
@@ -99,11 +127,19 @@ export class Extension {
   private setPrio(priority: Priority) {
     return new Extension(this.kind, this.id, this.value, this.type, priority)
   }
+  /// Create a copy of this extension with a priority below the
+  /// default priority, which will cause default-priority extensions
+  /// to override it even if they are specified later in the extension
+  /// ordering.
   fallback() { return this.setPrio(Priority.Fallback) }
+  /// Create a copy of this extension with a priority above the
+  /// default priority.
   extend() { return this.setPrio(Priority.Extend) }
+  /// Create a copy of this extension with a priority above the
+  /// default and `extend` priorities.
   override() { return this.setPrio(Priority.Override) }
 
-  // @internal
+  /// @internal
   flatten(priority: Priority, target: Extension[] = []) {
     if (this.kind == Kind.Multi) for (let ext of this.value as Extension[])
       ext.flatten(this.priority != Priority.None ? this.priority : priority, target)
@@ -111,16 +147,17 @@ export class Extension {
     return target
   }
 
-  // Insert this extension in an array of extensions so that it
-  // appears after any already-present extensions with the same or
-  // lower priority, but before any extensions with higher priority.
-  // @internal
+  /// Insert this extension in an array of extensions so that it
+  /// appears after any already-present extensions with the same or
+  /// lower priority, but before any extensions with higher priority.
+  /// @internal
   collect(array: Extension[]) {
     let i = 0
     while (i < array.length && array[i].priority >= this.priority) i++
     array.splice(i, 0, this)
   }
 
+  /// Combine a group of extensions into a single extension value.
   static all(...extensions: Extension[]) {
     return new Extension(Kind.Multi, null, extensions, dummyType)
   }
@@ -163,20 +200,22 @@ class UniqueExtensionType {
   }
 }
 
-const none = [] as any
+const none: readonly any[] = []
 
-// An instance of this is part of EditorState and stores the behaviors
-// provided for the state.
+/// A behavior store records the values associated with each behavior
+/// in a given configuration. It is created with
+/// `ExtensionType.resolve`.
 export class BehaviorStore {
-  // @internal
+  /// @internal
   behaviors: any[] = []
-  // @internal
+  /// @internal
   values: any[][] = []
   // Any extensions that weren't an instance of the given type when
   // resolving.
   foreign: Extension[] = []
 
-  get<Value>(behavior: Behavior<Value>): Value[] {
+  /// Retrieve the values for a given behavior.
+  get<Value>(behavior: Behavior<Value>): readonly Value[] {
     let found = this.behaviors.indexOf(behavior)
     return found < 0 ? none : this.values[found]
   }
@@ -198,14 +237,16 @@ function findTopUnique(extensions: Extension[], type: ExtensionType): UniqueExte
 
 type NonUndefined<T> = T extends undefined ? never : T
 
+/// A type function that removes optional modifiers, used to specify
+/// the type of `combineConfig`.
 export type Full<T> = {[K in keyof T]-?: T[K]}
 
-// Utility function for combining behaviors to fill in a config
-// object from an array of provided configs. Will, by default, error
-// when a field gets two values that aren't ===-equal, but you can
-// provide combine functions per field to do something else.
+/// Utility function for combining behaviors to fill in a config
+/// object from an array of provided configs. Will, by default, error
+/// when a field gets two values that aren't ===-equal, but you can
+/// provide combine functions per field to do something else.
 export function combineConfig<Config>(
-  configs: ReadonlyArray<Config>,
+  configs: readonly Config[],
   defaults: Partial<Config>, // Should hold only the optional properties of Config, but I haven't managed to express that
   combine: {[P in keyof Config]?: (first: NonUndefined<Config[P]>, second: NonUndefined<Config[P]>) => NonUndefined<Config[P]>} = {}
 ): Full<Config> {
@@ -221,6 +262,8 @@ export function combineConfig<Config>(
   return result
 }
 
+/// Defaults the fields in a configuration object to values given in
+/// `defaults` if they are not already present.
 export function fillConfig<Config>(config: Config, defaults: Partial<Config>): Full<Config> {
   let result: any = {}
   for (let key in config) result[key] = config[key]
