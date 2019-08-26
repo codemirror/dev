@@ -1,4 +1,4 @@
-import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewField, ViewUpdate, ViewExtension, EditorView} from "../../view/src"
+import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewField, ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange, Transaction} from "../../state/src"
 import {combineConfig, Full} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
@@ -10,7 +10,7 @@ export interface SpecialCharConfig {
   addSpecialChars?: RegExp | null
 }
 
-export const specialChars = ViewExtension.unique((configs: SpecialCharConfig[]) => {
+export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig[]) => {
   // FIXME make configurations compose properly
   let config = combineConfig(configs, {
     render: null,

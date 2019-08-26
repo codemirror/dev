@@ -1,14 +1,15 @@
-import {EditorState, StateExtension} from "../../state/src"
+import {EditorState} from "../../state/src"
 import {ViewField, styleModule, DecorationSet, Decoration, WidgetType, MarkDecorationSpec} from "../../view/src"
+import {Extension} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 export interface Config {}
 
-export const multipleSelections = StateExtension.unique((configs: Config[]) => {
+export const multipleSelections = EditorState.extend.unique((configs: Config[]) => {
   let rangeConfig = {class: styles.secondarySelection} // FIXME configurable?
 
-  return StateExtension.all(
-    StateExtension.allowMultipleSelections(true),
+  return Extension.all(
+    EditorState.allowMultipleSelections(true),
     ViewField.decorations({
       create(view) { return decorateSelections(view.state, rangeConfig) },
       update(deco, {prevState, state}) {

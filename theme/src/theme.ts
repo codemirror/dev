@@ -1,5 +1,6 @@
 import {StyleModule, Style} from "style-mod"
-import {ViewExtension, styleModule, themeClass} from "../../view/src"
+import {EditorView, styleModule, themeClass} from "../../view/src"
+import {Extension} from "../../extension/src/extension"
 import {StyleNames} from "./styleprop"
 
 export type ThemeSpec = {[prop: string]: string | number | ThemeSpec}
@@ -99,11 +100,11 @@ class Theme {
 }
 
 // FIXME should probably be more generic
-export const themeData = ViewExtension.defineBehavior<Theme>()
+export const themeData = EditorView.extend.behavior<Theme>()
 
 export function theme(rules: ThemeSpec) {
   let theme = parseTheme(rules), cache: {[tag: string]: string} = Object.create(null)
-  return ViewExtension.all(
+  return Extension.all(
     themeData(theme),
     themeClass(str => {
       let value = cache[str]

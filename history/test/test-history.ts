@@ -1,11 +1,11 @@
 const ist = require("ist")
 
-import {EditorState, EditorSelection, SelectionRange, Transaction, StateExtension} from "../../state/src"
+import {EditorState, EditorSelection, SelectionRange, Transaction} from "../../state/src"
 import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection} from "../src/history"
 
 const mkState = (config?: any, doc?: string) => EditorState.create({
-  extensions: [history(config), StateExtension.allowMultipleSelections(true)],
+  extensions: [history(config), EditorState.allowMultipleSelections(true)],
   doc
 })
 

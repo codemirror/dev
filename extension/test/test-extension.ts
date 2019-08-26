@@ -1,13 +1,15 @@
 const ist = require("ist")
-import {Extension} from "../src/extension"
+import {Extension, ExtensionType} from "../src/extension"
 
-function mk(...extensions: Extension[]) { return Extension.resolve(extensions) }
+let tp = new ExtensionType
 
-let num = Extension.defineBehavior<number>()
+function mk(...extensions: Extension[]) { return tp.resolve(extensions) }
+
+let num = tp.behavior<number>()
 
 describe("EditorState behavior", () => {
   it("allows querying of behaviors", () => {
-    let str = Extension.defineBehavior<string>()
+    let str = tp.behavior<string>()
     let store = mk(num(10), num(20), str("x"), str("y"))
     ist(store.get(num).join(), "10,20")
     ist(store.get(str).join(), "x,y")
@@ -20,7 +22,7 @@ describe("EditorState behavior", () => {
   })
 
   it("only includes sub-behaviors of unique extensions once", () => {
-    let e = Extension.unique<number>(ns => num(ns.reduce((a, b) => a + b, 0)))
+    let e = tp.unique<number>(ns => num(ns.reduce((a, b) => a + b, 0)))
     let store = mk(num(1), e(2), num(4), e(8))
     ist(store.get(num).join(), "1,10,4")
   })
@@ -30,7 +32,7 @@ describe("EditorState behavior", () => {
   })
 
   it("sorts extensions by priority", () => {
-    let str = Extension.defineBehavior<string>()
+    let str = tp.behavior<string>()
     let store = mk(str("a"), str("b"), str("c").extend(),
                    str("d").override(), str("e").fallback(),
                    str("f").extend(), str("g"))
@@ -44,13 +46,13 @@ describe("EditorState behavior", () => {
   })
 
   it("uses default specs", () => {
-    let e = Extension.unique((specs: number[]) => num(specs.reduce((a, b) => a + b)), 10)
+    let e = tp.unique((specs: number[]) => num(specs.reduce((a, b) => a + b)), 10)
     let store = mk(e(), e(5))
     ist(store.get(num).join(), "15")
   })
 
   it("only allows omitting use argument when there's a default", () => {
-    let e = Extension.unique((specs: number[]) => num(0))
+    let e = tp.unique((specs: number[]) => num(0))
     ist.throws(() => e())
   })
 })

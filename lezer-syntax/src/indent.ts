@@ -1,12 +1,12 @@
 import {NodeProp, Subtree, Tree} from "lezer-tree"
-import {EditorState, StateExtension} from "../../state/src/"
+import {EditorState} from "../../state/src/"
 
 export const indentNodeProp = new NodeProp<IndentStrategy>()
 
-export const syntaxIndentation = StateExtension.unique<null>(() => StateExtension.indentation(indentationBehavior))(null)
+export const syntaxIndentation = EditorState.extend.unique<null>(() => EditorState.indentation(indentationBehavior))(null)
 
 function indentationBehavior(state: EditorState, pos: number) {
-  for (let syntax of state.behavior.get(StateExtension.syntax)) {
+  for (let syntax of state.behavior.get(EditorState.syntax)) {
     let tree = syntax.tryGetTree(state, pos, pos)
     if (tree) {
       let result = computeIndentation(state, tree, pos)

@@ -23,16 +23,81 @@ const enum Priority { None = -2, Fallback = -1, Default = 0, Extend = 1, Overrid
 
 export type Behavior<Value> = (value: Value) => Extension
 
-export class Extension {
-  // @internal
-  constructor(/* @internal */ public kind: Kind,
-              /* @internal */ public id: any,
-              /* @internal */ public value: any,
-              /* @internal */ public priority: number = Priority.None) {}
+export class ExtensionType {
+  // Define a type of behavior, which is the thing that extensions
+  // eventually resolve to. Each behavior can have an ordered sequence
+  // of values associated with it. An `Extension` can be seen as a
+  // tree of sub-extensions with behaviors as leaves.
+  behavior<Value>(): Behavior<Value> {
+    let behavior = (value: Value) => new Extension(Kind.Behavior, behavior, value, this)
+    return behavior
+  }
 
-  private setPrio(priority: Priority): this {
-    // Crude casting because TypeScript doesn't understand new this.constructor
-    return new (this.constructor as any)(this.kind, this.id, this.value, priority) as this
+  unique<Spec>(instantiate: (specs: Spec[]) => Extension, defaultSpec?: Spec): (spec?: Spec) => Extension {
+    const type = new UniqueExtensionType(instantiate)
+    return (spec: Spec | undefined = defaultSpec) => {
+      if (spec === undefined) throw new RangeError("This extension has no default spec")
+      return new Extension(Kind.Unique, type, spec, this)
+    }
+  }
+
+  // Resolve an array of extenders by expanding all extensions until
+  // only behaviors are left, and then collecting the behaviors into
+  // arrays of values, preserving priority ordering throughout.
+  resolve(extensions: ReadonlyArray<Extension>): BehaviorStore {
+    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default)
+    // This does a crude topological ordering to resolve behaviors
+    // top-to-bottom in the dependency ordering. If there are no
+    // cyclic dependencies, we can always find a behavior in the top
+    // `pending` array that isn't a dependency of any unresolved
+    // behavior, and thus find and order all its specs in order to
+    // resolve them.
+    for (let resolved: UniqueExtensionType[] = [];;) {
+      let top = findTopUnique(pending, this)
+      if (!top) break // Only behaviors left
+      // Prematurely evaluated a behavior type because of missing
+      // sub-behavior information -- start over, in the assumption
+      // that newly gathered information will make the next attempt
+      // more successful.
+      if (resolved.indexOf(top) > -1) return this.resolve(extensions)
+      top.resolve(pending)
+      resolved.push(top)
+    }
+    // Collect the behavior values.
+    let store = new BehaviorStore
+    for (let ext of pending) {
+      if (ext.type != this) {
+        // Collect extensions of the wrong type into store.foreign
+        store.foreign.push(ext)
+        continue
+      }
+      if (store.behaviors.indexOf(ext.id) > -1) continue // Already collected
+      let values: Extension[] = []
+      for (let e of pending) if (e.id == ext.id) e.collect(values)
+      store.behaviors.push(ext.id)
+      store.values.push(values.map(v => v.value))
+    }
+    return store
+  }
+}
+
+export class Extension {
+  /// @internal
+  constructor(
+    /// @internal
+    readonly kind: Kind,
+    /// @internal
+    readonly id: any,
+    /// @internal
+    readonly value: any,
+    /// @internal
+    readonly type: ExtensionType,
+    /// @internal
+    readonly priority: number = Priority.None
+  ) {}
+
+  private setPrio(priority: Priority) {
+    return new Extension(this.kind, this.id, this.value, this.type, priority)
   }
   fallback() { return this.setPrio(Priority.Fallback) }
   extend() { return this.setPrio(Priority.Extend) }
@@ -56,66 +121,12 @@ export class Extension {
     array.splice(i, 0, this)
   }
 
-  // Define a type of behavior, which is the thing that extensions
-  // eventually resolve to. Each behavior can have an ordered sequence
-  // of values associated with it. An `Extension` can be seen as a
-  // tree of sub-extensions with behaviors as leaves.
-  static defineBehavior<Value>(): Behavior<Value> {
-    let behavior = (value: Value) => new this(Kind.Behavior, behavior, value)
-    return behavior
-  }
-
-  static unique<Spec>(instantiate: (specs: Spec[]) => Extension, defaultSpec?: Spec): (spec?: Spec) => Extension {
-    const type = new UniqueExtensionType(instantiate)
-    return (spec: Spec | undefined = defaultSpec) => {
-      if (spec === undefined) throw new RangeError("This extension has no default spec")
-      return new this(Kind.Unique, type, spec)
-    }
-  }
-
   static all(...extensions: Extension[]) {
-    return new this(Kind.Multi, null, extensions)
-  }
-
-  // Resolve an array of extenders by expanding all extensions until
-  // only behaviors are left, and then collecting the behaviors into
-  // arrays of values, preserving priority ordering throughout.
-  static resolve(extensions: ReadonlyArray<Extension>): BehaviorStore {
-    let pending: Extension[] = new this(Kind.Multi, null, extensions).flatten(Priority.Default)
-    // This does a crude topological ordering to resolve behaviors
-    // top-to-bottom in the dependency ordering. If there are no
-    // cyclic dependencies, we can always find a behavior in the top
-    // `pending` array that isn't a dependency of any unresolved
-    // behavior, and thus find and order all its specs in order to
-    // resolve them.
-    for (let resolved: UniqueExtensionType[] = [];;) {
-      let top = findTopUnique(pending, this)
-      if (!top) break // Only behaviors left
-      // Prematurely evaluated a behavior type because of missing
-      // sub-behavior information -- start over, in the assumption
-      // that newly gathered information will make the next attempt
-      // more successful.
-      if (resolved.indexOf(top) > -1) return this.resolve(extensions)
-      top.resolve(pending)
-      resolved.push(top)
-    }
-    // Collect the behavior values.
-    let store = new BehaviorStore
-    for (let ext of pending) {
-      if (!(ext instanceof this)) {
-        // Collect extensions of the wrong type into store.foreign
-        store.foreign.push(ext)
-        continue
-      }
-      if (store.behaviors.indexOf(ext.id) > -1) continue // Already collected
-      let values: Extension[] = []
-      for (let e of pending) if (e.id == ext.id) e.collect(values)
-      store.behaviors.push(ext.id)
-      store.values.push(values.map(v => v.value))
-    }
-    return store
+    return new Extension(Kind.Multi, null, extensions, dummyType)
   }
 }
+
+const dummyType = new ExtensionType
 
 class UniqueExtensionType {
   knownSubs: UniqueExtensionType[] = []
@@ -174,9 +185,9 @@ export class BehaviorStore {
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
 // still in extenders.
-function findTopUnique(extensions: Extension[], type: typeof Extension): UniqueExtensionType | null {
+function findTopUnique(extensions: Extension[], type: ExtensionType): UniqueExtensionType | null {
   let foundUnique = false
-  for (let ext of extensions) if (ext.kind == Kind.Unique && ext instanceof type) {
+  for (let ext of extensions) if (ext.kind == Kind.Unique && ext.type == type) {
     foundUnique = true
     if (!extensions.some(e => e.kind == Kind.Unique && (e.id as UniqueExtensionType).hasSub(ext.id)))
       return ext.id

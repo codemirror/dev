@@ -1,5 +1,5 @@
 import {EditorState, Transaction} from "../../state/src"
-import {BehaviorStore, Slot} from "../../extension/src/extension"
+import {BehaviorStore, Slot, Extension} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 import {DocView} from "./docview"
@@ -9,14 +9,14 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
-import {ViewExtension, ViewField, viewField, ViewUpdate, styleModule,
+import {extendView, ViewField, viewField, ViewUpdate, styleModule,
         viewPlugin, ViewPlugin, getField, Effect, themeClass, notified} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
 
 export interface EditorConfig {
   state: EditorState,
-  extensions?: ViewExtension[],
+  extensions?: Extension[],
   root?: Document | ShadowRoot,
   dispatch?: (tr: Transaction) => void
 }
@@ -53,6 +53,8 @@ export class EditorView {
   notifications: (Promise<any> & {canceled?: boolean})[] = []
   notify: (promise: Promise<any> & {canceled?: boolean}) => void
 
+  static extend = extendView
+
   constructor(config: EditorConfig) {
     this.contentDOM = document.createElement("div")
     let tabSizeStyle = (this.contentDOM.style as any).tabSize != null ? "tab-size: " : "-moz-tab-size: "
@@ -83,15 +85,15 @@ export class EditorView {
     this.setState(config.state, config.extensions)
   }
 
-  setState(state: EditorState, extensions: ViewExtension[] = []) {
+  setState(state: EditorState, extensions: Extension[] = []) {
     this.clearNotifications()
     for (let plugin of this.plugins) if (plugin.destroy) plugin.destroy()
     this.withUpdating(() => {
-      ;(this as any).behavior = ViewExtension.resolve(extensions.concat(state.behavior.foreign))
+      ;(this as any).behavior = extendView.resolve(extensions.concat(state.behavior.foreign))
       this.fields = this.behavior.get(viewField)
       StyleModule.mount(this.root, this.behavior.get(styleModule).concat(styles).reverse())
       if (this.behavior.foreign.length)
-        throw new Error("Non-ViewExtension extensions found when setting view state")
+        throw new Error("Non-view extensions found when setting view state")
       this.inputState = new InputState(this)
       this.docView.init(state)
       this.plugins = this.behavior.get(viewPlugin).map(spec => spec(this))

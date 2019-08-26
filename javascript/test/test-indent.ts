@@ -1,9 +1,9 @@
 const ist = require("ist")
-import {EditorState, StateExtension} from "../../state/src"
+import {EditorState} from "../../state/src"
 import {javascript} from "../src/javascript"
 
 function getIndent(state: EditorState, pos: number): number {
-  for (let f of state.behavior.get(StateExtension.indentation)) {
+  for (let f of state.behavior.get(EditorState.indentation)) {
     let result = f(state, pos)
     if (result > -1) return result
   }

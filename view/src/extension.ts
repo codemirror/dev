@@ -2,7 +2,7 @@ import {EditorState, Transaction, ChangeSet} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
-import {Extension, Slot, SlotType} from "../../extension/src/extension"
+import {ExtensionType, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
 
@@ -58,26 +58,26 @@ function attributeField(effect: Effect<Attrs | null>) {
   }
 }
 
-export class ViewExtension extends Extension {}
+export const extendView = new ExtensionType
 
-export const viewField = ViewExtension.defineBehavior<ViewField<any>>()
+export const viewField = extendView.behavior<ViewField<any>>()
 
-export const handleDOMEvents = ViewExtension.defineBehavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
+export const handleDOMEvents = extendView.behavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
-export const clickAddsSelectionRange = ViewExtension.defineBehavior<(event: MouseEvent) => boolean>()
+export const clickAddsSelectionRange = extendView.behavior<(event: MouseEvent) => boolean>()
 
-export const dragMovesSelection = ViewExtension.defineBehavior<(event: MouseEvent) => boolean>()
+export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boolean>()
 
-export const themeClass = ViewExtension.defineBehavior<(tag: string) => string>()
+export const themeClass = extendView.behavior<(tag: string) => string>()
 
 export type ViewPlugin = {
   update?: (update: ViewUpdate) => void
   destroy?: () => void
 }
 
-export const viewPlugin = ViewExtension.defineBehavior<(view: EditorView) => ViewPlugin>()
+export const viewPlugin = extendView.behavior<(view: EditorView) => ViewPlugin>()
 
-export const styleModule = ViewExtension.defineBehavior<StyleModule>()
+export const styleModule = extendView.behavior<StyleModule>()
 
 export const focusChange = Slot.define<boolean>()
 

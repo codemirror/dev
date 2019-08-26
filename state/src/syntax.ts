@@ -1,10 +1,11 @@
-import {EditorState, StateExtension} from "./state"
+import {EditorState} from "./state"
+import {Extension} from "../../extension/src/extension"
 import {Tree} from "lezer-tree"
 
 export type SyntaxRequest = Promise<Tree> & {canceled?: boolean}
 
 export abstract class Syntax {
-  abstract extension: StateExtension
+  abstract extension: Extension
 
   getTree(state: EditorState, from: number, to: number): SyntaxRequest {
     let later = null

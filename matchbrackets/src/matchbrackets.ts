@@ -1,9 +1,9 @@
-import {EditorState, StateExtension} from "../../state/src"
-import {combineConfig} from "../../extension/src/extension"
-import {ViewExtension, ViewField} from "../../view/src/"
+import {EditorState} from "../../state/src"
+import {Extension, combineConfig} from "../../extension/src/extension"
+import {EditorView, ViewField} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
 import {Tree, Subtree, NodeType} from "lezer-tree"
-import {openNodeProp, closeNodeProp} from "../../lezer-syntax/src"
+import {openNodeProp, closeNodeProp} from "../../lezer-syntax/src/"
 
 export interface Config {
   afterCursor?: boolean,
@@ -13,14 +13,14 @@ export interface Config {
 
 const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
-export const bracketMatching = ViewExtension.unique((configs: Config[]) => {
+export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
   let config = combineConfig(configs, {
     afterCursor: true,
     brackets: DEFAULT_BRACKETS,
     maxScanDistance: DEFAULT_SCAN_DIST
   })
 
-  return ViewExtension.all(
+  return Extension.all(
     ViewField.decorations({
       create() { return Decoration.none },
       update(deco, update) {
@@ -46,7 +46,7 @@ export const bracketMatching = ViewExtension.unique((configs: Config[]) => {
 }, {})
 
 function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {
-  for (let syntax of state.behavior.get(StateExtension.syntax)) {
+  for (let syntax of state.behavior.get(EditorState.syntax)) {
     return syntax.tryGetTree(state, dir < 0 ? Math.max(0, pos - maxScanDistance) : pos,
                              dir < 0 ? pos : Math.min(state.doc.length, pos + maxScanDistance))
   }
@@ -55,7 +55,7 @@ function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: 
 
 type MatchResult = {start: {from: number, to: number}, end?: {from: number, to: number}, matched: boolean} | null
 
-function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string) {
+function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string): null | readonly string[] {
   let byProp = node.prop(dir < 0 ? closeNodeProp : openNodeProp)
   if (byProp) return byProp
   if (node.name.length == 1) {

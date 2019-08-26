@@ -2,14 +2,9 @@ import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax} from "./syntax"
-import {Extension, BehaviorStore} from "../../extension/src/extension"
+import {ExtensionType, Extension, BehaviorStore} from "../../extension/src/extension"
 
-export class StateExtension extends Extension {
-  static allowMultipleSelections = StateExtension.defineBehavior<boolean>()
-  static indentation = StateExtension.defineBehavior<(state: EditorState, pos: number) => number>()
-  static indentUnit = StateExtension.defineBehavior<number>()
-  static syntax = StateExtension.defineBehavior<Syntax>()
-}
+const extendState = new ExtensionType
 
 class Configuration {
   constructor(
@@ -20,11 +15,11 @@ class Configuration {
     readonly lineSeparator: string | null) {}
 
   static create(config: EditorStateConfig): Configuration {
-    let behavior = StateExtension.resolve(config.extensions || [])
+    let behavior = extendState.resolve(config.extensions || [])
     return new Configuration(
       behavior,
       behavior.get(stateFieldBehavior),
-      behavior.get(StateExtension.allowMultipleSelections).some(x => x),
+      behavior.get(EditorState.allowMultipleSelections).some(x => x),
       config.tabSize || 4,
       config.lineSeparator || null)
   }
@@ -86,7 +81,7 @@ export class EditorState {
   get tabSize(): number { return this.config.tabSize }
 
   get indentUnit(): number {
-    let values = this.behavior.get(StateExtension.indentUnit)
+    let values = this.behavior.get(EditorState.indentUnit)
     return values.length ? values[0] : DEFAULT_INDENT_UNIT
   }
 
@@ -132,14 +127,21 @@ export class EditorState {
     for (let field of $config.fields) fields.push(field.init(state))
     return state
   }
+
+  static extend = extendState
+
+  static allowMultipleSelections = extendState.behavior<boolean>()
+  static indentation = extendState.behavior<(state: EditorState, pos: number) => number>()
+  static indentUnit = extendState.behavior<number>()
+  static syntax = extendState.behavior<Syntax>()
 }
 
-const stateFieldBehavior = StateExtension.defineBehavior<StateField<any>>()
+const stateFieldBehavior = extendState.behavior<StateField<any>>()
 
 export class StateField<T> {
   readonly init: (state: EditorState) => T
   readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
-  readonly extension: StateExtension
+  readonly extension: Extension
 
   constructor({init, apply}: {
     init: (state: EditorState) => T,

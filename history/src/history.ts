@@ -1,5 +1,5 @@
-import {EditorState, Transaction, StateField, StateExtension} from "../../state/src"
-import {combineConfig, Slot, Full} from "../../extension/src/extension"
+import {EditorState, Transaction, StateField} from "../../state/src"
+import {Extension, combineConfig, Slot, Full} from "../../extension/src/extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = Slot.define<HistoryState>()
@@ -32,15 +32,15 @@ class HistoryContext {
   constructor(public field: StateField<HistoryState>, public config: Full<HistoryConfig>) {}
 }
 
-const historyBehavior = StateExtension.defineBehavior<HistoryContext>()
+const historyBehavior = EditorState.extend.behavior<HistoryContext>()
 
-export const history = StateExtension.unique<HistoryConfig>(configs => {
+export const history = EditorState.extend.unique<HistoryConfig>(configs => {
   let config = combineConfig(configs, {
     minDepth: 100,
     newGroupDelay: 500
   }, {minDepth: Math.max})
   let field = historyField(config)
-  return StateExtension.all(
+  return Extension.all(
     field.extension,
     historyBehavior(new HistoryContext(field, config))
   )

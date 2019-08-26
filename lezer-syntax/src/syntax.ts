@@ -1,11 +1,12 @@
 import {Parser, ParseContext, InputStream} from "lezer"
 import {Tree} from "lezer-tree"
 import {Text, TextIterator} from "../../doc/src/"
-import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
+import {EditorState, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
+import {Extension} from "../../extension/src/extension"
 
 export class LezerSyntax extends Syntax {
   private field: StateField<SyntaxState>
-  readonly extension: StateExtension
+  readonly extension: Extension
 
   constructor(readonly parser: Parser) {
     super()
@@ -13,8 +14,8 @@ export class LezerSyntax extends Syntax {
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = StateExtension.all(
-      StateExtension.syntax(this),
+    this.extension = Extension.all(
+      EditorState.syntax(this),
       this.field.extension
     )
   }

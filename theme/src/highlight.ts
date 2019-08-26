@@ -1,6 +1,6 @@
 import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, notified} from "../../view/src"
 import {themeData} from "./theme"
-import {Syntax, StateExtension} from "../../state/src/"
+import {Syntax, EditorState} from "../../state/src/"
 import {styleNodeProp} from "./styleprop"
 
 class Highlighter {
@@ -84,7 +84,7 @@ class TokenContext {
 export function highlight() { // FIXME allow specifying syntax?
   return new ViewField<Highlighter>({
     create(view) {
-      for (let s of view.state.behavior.get(StateExtension.syntax))
+      for (let s of view.state.behavior.get(EditorState.syntax))
         return new Highlighter(s, view)
       return new Highlighter(null, view)
     },

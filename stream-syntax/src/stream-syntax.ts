@@ -1,5 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateExtension, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
+import {EditorState, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
+import {Extension} from "../../extension/src/extension"
 import {Tree, NodeType, NodeGroup} from "lezer-tree"
 import {styleNodeProp, Style} from "../../theme/src"
 
@@ -66,8 +67,8 @@ class RequestInfo {
 
 export class StreamSyntax extends Syntax {
   private field: StateField<SyntaxState<any>>
-  public extension: StateExtension
-  public indentation: StateExtension
+  public extension: Extension
+  public indentation: Extension
 
   constructor(readonly parser: StreamParser<any>) {
     super()
@@ -75,8 +76,8 @@ export class StreamSyntax extends Syntax {
       init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = StateExtension.all(StateExtension.syntax(this), this.field.extension)
-    this.indentation = StateExtension.indentation((state: EditorState, pos: number) => {
+    this.extension = Extension.all(EditorState.syntax(this), this.field.extension)
+    this.indentation = EditorState.indentation((state: EditorState, pos: number) => {
       return state.getField(this.field).getIndent(this.parser, state, pos)
     })
   }
@@ -247,7 +248,7 @@ function tokenID(tag: string) {
 export function legacyMode(spec: LegacyMode<any>) {
   let syntax = StreamSyntax.legacy(spec)
   // FIXME add behavior for commenting, electric chars, etc
-  return StateExtension.all(
+  return Extension.all(
     syntax.extension,
     syntax.indentation
   )

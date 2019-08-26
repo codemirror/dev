@@ -1,5 +1,5 @@
-import {combineConfig, fillConfig, Full, Slot} from "../../extension/src/extension"
-import {EditorView, ViewExtension, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
+import {Extension, combineConfig, fillConfig, Full, Slot} from "../../extension/src/extension"
+import {EditorView, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
 import {StyleModule} from "style-mod"
@@ -60,7 +60,7 @@ const defaults = {
 
 export function gutter<T>(config: GutterConfig) {
   let conf = fillConfig(config, defaults)
-  return ViewExtension.all(
+  return Extension.all(
     viewPlugin(view => new GutterView(view, conf)),
     styleModule(styles)
   )
@@ -198,7 +198,7 @@ export type LineNumberMarkerUpdate = {
 
 export const lineNumberMarkers = Slot.define<LineNumberMarkerUpdate>()
 
-export const lineNumbers = ViewExtension.unique<LineNumberConfig>(configs => {
+export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs => {
   let config = combineConfig(configs, {
     fixed: true,
     formatNumber: String
