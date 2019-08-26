@@ -98,6 +98,7 @@ class Theme {
   }
 }
 
+// FIXME should probably be more generic
 export const themeData = ViewExtension.defineBehavior<Theme>()
 
 export function theme(rules: ThemeSpec) {
@@ -139,3 +140,6 @@ export const defaultTheme = theme({
     nonmatching: {color: "#a22"}
   }
 })
+
+// FIXME export an externalStyleTheme that just adds classes
+// corresponding to the style names
