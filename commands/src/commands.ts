@@ -116,6 +116,9 @@ export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
   return true
 }
 
+// FIXME this will base all indentation on the same state, which is
+// wrong (indentation looks at the indent of previous lines, which may
+// be changed).
 export function indentSelection({state, dispatch}: EditorView): boolean {
   let lastLine = -1, positions = []
   for (let range of state.selection.ranges) {

@@ -124,20 +124,15 @@ export class IndentContext {
     return this.countColumn(line.slice(0, pos - line.start), pos - line.start)
   }
 
-  private findBase(start: IndentContext) {
-    for (let cx = start;; cx = cx.next) {
+  /// Get this strategy's base indent (or, if it doesn't define one,
+  /// the one from the next parent that does define one).
+  get baseIndent() {
+    for (let cx = this as IndentContext;; cx = cx.next) {
       let f = cx.strategy.baseIndent
       let result = f ? f(cx) : -1
       if (result > -1) return result
     }
   }
-
-  /// Get this strategy's base indent (or, if it doesn't define one,
-  /// the one from the next parent that does define one).
-  get baseIndent() { return this.findBase(this) }
-
-  /// Get a base indent from the next wrapping node that defines one.
-  get nextBaseIndent() { return this.findBase(this.next) }
 }
 
 /// A description of how to indent inside a node type.
@@ -189,13 +184,13 @@ export function delimitedIndent({closing, align = true}: {closing: string, align
       let closed = context.textAfter.slice(0, closing.length) == closing
       let aligned = align ? bracketedAligned(context) : null
       if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
-      return context.nextBaseIndent + (closed ? 0 : context.unit)
+      return context.next.baseIndent + (closed ? 0 : context.unit)
     },
     baseIndent(context: IndentContext) {
       let newLine = context.startLine.start != context.prev!.startLine.start
       let aligned = align && newLine ? bracketedAligned(context) : null
       if (aligned) return context.column(aligned.end)
-      return context.nextBaseIndent + (newLine ? context.unit : 0)
+      return context.next.baseIndent + (newLine ? context.unit : 0)
     }
   }
 }
