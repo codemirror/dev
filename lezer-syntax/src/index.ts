@@ -1,7 +1,7 @@
 export {LezerSyntax} from "./syntax"
 
 export {syntaxIndentation, IndentContext, IndentStrategy, indentNodeProp,
-        topIndent, delimitedIndent, parenIndent, braceIndent, bracketIndent,
+        delimitedIndent, parenIndent, braceIndent, bracketIndent,
         statementIndent, compositeStatementIndent, dontIndent} from "./indent"
 
 export {openNodeProp, closeNodeProp} from "./props"
