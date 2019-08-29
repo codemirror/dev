@@ -1,9 +1,13 @@
+import {Line} from "../../doc/src"
 import {NodeProp, Subtree, Tree} from "lezer-tree"
 import {EditorState} from "../../state/src/"
 
 /// A syntax tree node prop used to associate indentation strategies
-/// with node types.
-export const indentNodeProp = new NodeProp<IndentStrategy>()
+/// with node types. Such a strategy is a function from an indentation
+/// context to a number. That number may be -1, to indicate that no
+/// definitive indentation can be determined, or a column number to
+/// which the given line should be indented.
+export const indentNodeProp = new NodeProp<(context: IndentContext) => number>()
 
 /// An extension that enables syntax-tree based indentation.
 export const syntaxIndentation = EditorState.extend.unique<null>(() => EditorState.indentation(indentationBehavior))(null)
@@ -40,50 +44,28 @@ function computeIndentation(state: EditorState, ast: Tree, pos: number) {
 
   for (; tree; tree = tree.parent) {
     let strategy = tree.type.prop(indentNodeProp) || (tree.parent == null ? topIndent : null)
-    if (strategy) {
-      let indentContext = new IndentContext(state, pos, tree, strategy, null)
-      return indentContext.strategy.getIndent(indentContext)
-    }
+    if (strategy) return strategy(new IndentContext(state, pos, tree))
   }
   return -1
 }
 
-/// Objects of this type provide context information to indentation
-/// strategies. A context is created for the innermost node + strategy
-/// pair that the indenter finds, and from there strategies may
-/// continue querying contexts for wrapping via `.next`.
-export class IndentContext {
-  private _next: IndentContext | null = null
+function topIndent() { return 0 }
 
+/// Objects of this type provide context information and helper
+/// methods to indentation functions.
+export class IndentContext {
   /// @internal
   constructor(
     /// The editor state.
     readonly state: EditorState,
     /// The position at which indentation is being computed.
     readonly pos: number,
-    /// The current syntax tree node.
-    readonly tree: Subtree,
-    /// @internal
-    readonly strategy: IndentStrategy,
-    /// If this context was reached through another context's `next`
-    /// getter, this points at that inner context.
-    readonly prev: IndentContext | null) {}
+    /// The syntax tree node for which the indentation strategy is
+    /// registered.
+    readonly node: Subtree) {}
 
   /// The indent unit (number of spaces per indentation level).
   get unit() { return this.state.indentUnit }
-
-  /// Get an indentation context for the next wrapping node that has a
-  /// strategy associated with it, or the top level (with a strategy
-  /// that always returns 0) if no such node is found.
-  get next() {
-    if (this._next) return this._next
-    let last = this.tree, found = null
-    for (let tree = this.tree.parent; !found && tree; tree = tree.parent) {
-      found = tree.type.prop(indentNodeProp)
-      last = tree
-    }
-    return this._next = new IndentContext(this.state, this.pos, last, found || topIndent, this)
-  }
 
   /// Get the text directly after `this.pos`, either the entire line
   /// or the next 50 characters, whichever is shorter.
@@ -91,12 +73,7 @@ export class IndentContext {
     return this.state.doc.slice(this.pos, Math.min(this.pos + 50, this.state.doc.lineAt(this.pos).end)).match(/^\s*(.*)/)![1]
   }
 
-  /// Get the line description at the start of `this.tree`.
-  get startLine() {
-    return this.state.doc.lineAt(this.tree.start)
-  }
-
-  /// Find the column position (taking tabs into account) of the given
+  /// find the column position (taking tabs into account) of the given
   /// position in the given string.
   countColumn(line: string, pos: number) {
     // FIXME use extending character information
@@ -111,11 +88,28 @@ export class IndentContext {
     }
   }
 
-  /// Find the indentation column of the given line, which defaults to
-  /// the line at which `this.tree` starts.
-  lineIndent(line = this.startLine) {
-    let text = line.slice(0, Math.min(50, line.length, this.tree.start > line.start ? this.tree.start - line.start : 1e8))
+  /// Find the indentation column of the given document line.
+  lineIndent(line: Line) {
+    let text = line.slice(0, Math.min(50, line.length, this.node.start > line.start ? this.node.start - line.start : 1e8))
     return this.countColumn(text, text.search(/\S/))
+  }
+
+  /// Get the indentation at the reference line for `this.tree`, which
+  /// is the line on which it starts, unless there is a node with an
+  /// indentation strategy that is _not_ a parent of this node
+  /// covering the start of that line. If so, the line at the start of
+  /// that node is tried, again skipping on if it is covered by
+  /// another such node.
+  get baseIndent() {
+    let line = this.state.doc.lineAt(this.node.start)
+    // Skip line starts that are covered by a sibling (or cousin, etc)
+    for (;;) {
+      let atBreak = this.node.resolve(line.start)
+      while (!atBreak.type.prop(indentNodeProp) && atBreak.parent) atBreak = atBreak.parent
+      if (isParent(atBreak, this.node)) break
+      line = this.state.doc.lineAt(atBreak.start)
+    }
+    return this.lineIndent(line)
   }
 
   /// Find the column for the given position.
@@ -123,40 +117,18 @@ export class IndentContext {
     let line = this.state.doc.lineAt(pos)
     return this.countColumn(line.slice(0, pos - line.start), pos - line.start)
   }
-
-  /// Get this strategy's base indent (or, if it doesn't define one,
-  /// the one from the next parent that does define one).
-  get baseIndent() {
-    for (let cx = this as IndentContext;; cx = cx.next) {
-      let f = cx.strategy.baseIndent
-      let result = f ? f(cx) : -1
-      if (result > -1) return result
-    }
-  }
 }
 
-/// A description of how to indent inside a node type.
-export interface IndentStrategy {
-  /// Compute the indentation for a position directly inside this
-  /// node, with no smaller wrapping node that has a strategy.
-  getIndent: (context: IndentContext) => number
-  /// Compute the base, contextual indentation for a node. This will
-  /// often be used by inner nodes as a starting value.
-  baseIndent?: (context: IndentContext) => number
-}
-
-// Trivial indent strategy applied when the search hits the root of
-// the syntax tree.
-const topIndent: IndentStrategy = {
-  getIndent() { return 0 },
-  baseIndent() { return 0 }
+function isParent(parent: Subtree, of: Subtree) {
+  for (let cur: Subtree | null = of; cur; cur = cur.parent) if (parent == cur) return true
+  return false
 }
 
 // Check whether a delimited node is aligned (meaning there are
 // non-skipped nodes on the same line as the opening delimiter). And
 // if so, return the opening token.
 function bracketedAligned(context: IndentContext) {
-  let tree = context.tree
+  let tree = context.node
   let openToken = tree.childAfter(tree.start)
   if (!openToken) return null
   let openLine = context.state.doc.lineAt(openToken.start)
@@ -178,62 +150,28 @@ function bracketedAligned(context: IndentContext) {
 ///
 ///     foo(bar,
 ///         baz)
-export function delimitedIndent({closing, align = true}: {closing: string, align?: boolean}): IndentStrategy {
-  return {
-    getIndent(context: IndentContext) {
-      let closed = context.textAfter.slice(0, closing.length) == closing
-      let aligned = align ? bracketedAligned(context) : null
-      if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
-      return context.next.baseIndent + (closed ? 0 : context.unit)
-    },
-    baseIndent(context: IndentContext) {
-      let newLine = context.startLine.start != context.prev!.startLine.start
-      let aligned = align && newLine ? bracketedAligned(context) : null
-      if (aligned) return context.column(aligned.end)
-      return context.next.baseIndent + (newLine ? context.unit : 0)
-    }
+export function delimitedIndent({closing, align = true, units = 1}: {closing: string, align?: boolean, units?: number}) {
+  return (context: IndentContext) => {
+    let closed = context.textAfter.slice(0, closing.length) == closing
+    let aligned = align ? bracketedAligned(context) : null
+    if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
+    return context.baseIndent + (closed ? 0 : context.unit * units)
   }
 }
 
-// FIXME automatically create a delimitedIndent for nodes with delim prop?
+/// An indentation strategy that aligns a node content to its base
+/// indentation.
+export const flatIndent = (context: IndentContext) => context.baseIndent
 
-/// Instance of `delimitedIndent` for parentheses.
-export const parenIndent = delimitedIndent({closing: ")"})
-/// Instance of `delimitedIndent` for curly braces.
-export const braceIndent = delimitedIndent({closing: "}"})
-/// Instance of `delimitedIndent` for square brackets.
-export const bracketIndent = delimitedIndent({closing: "]"})
-
-/// Indentation strategy for statement-like nodes. Will produce a base
-/// indentation aligned with the indentation of the line that starts
-/// the node, and add one indentation unit to that when continuing the
-/// node on a new line.
-export const statementIndent: IndentStrategy = {
-  getIndent(context: IndentContext) {
-    return context.baseIndent + context.unit
-  },
-  baseIndent(context: IndentContext) {
-    return context.lineIndent()
+/// Creates an indentation strategy that, by default, indents
+/// continued lines one unit more than the node's base indentation.
+/// You can provide `except` to prevent indentation of lines that
+/// match a pattern (for example `/^else\b/` in `if`/`else`
+/// constructs), and you can change the amount of units used with the
+/// `units` option.
+export function continuedIndent({except, units = 1}: {except?: RegExp, units?: number} = {}) {
+  return (context: IndentContext) => {
+    let matchExcept = except && except.test(context.textAfter)
+    return context.baseIndent + (matchExcept ? 0 : units * context.unit)
   }
-}
-
-/// Extended form of `statementIndent` that doesn't continued lines
-/// that start with a given regular expression. Can be used for things
-/// like `if`/`else` blocks, where a continuing line that starts with
-/// `else` shouldn't be indented.
-export function compositeStatementIndent(dedentBefore: RegExp): IndentStrategy {
-  return {
-    getIndent(context: IndentContext) {
-      return context.baseIndent + (dedentBefore.test(context.textAfter) ? 0 : context.unit)
-    },
-    baseIndent(context: IndentContext) {
-      return context.lineIndent()
-    }
-  }
-}
-
-/// An indentation strategy that doesn't indent (returns -1 to
-/// indicate that no indentation value is available).
-export const dontIndent: IndentStrategy = {
-  getIndent() { return -1 }
 }

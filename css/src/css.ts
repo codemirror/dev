@@ -1,13 +1,13 @@
 import {parser} from "lezer-css"
 import {NodeProp, NodeType} from "lezer-tree"
-import {LezerSyntax, braceIndent, parenIndent, statementIndent, indentNodeProp} from "../../lezer-syntax/src"
+import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp} from "../../lezer-syntax/src"
 import {styleNodeProp, Style as s} from "../../theme/src"
 
 export const cssSyntax = new LezerSyntax(parser.withProps(
   indentNodeProp.add(type => {
-    if (type.prop(NodeProp.delim) == "( )") return parenIndent
-    if (type.prop(NodeProp.delim) == "{ }") return braceIndent
-    if (type.name == "Declaration") return statementIndent
+    if (type.prop(NodeProp.delim) == "( )") return delimitedIndent({closing: ")"})
+    if (type.prop(NodeProp.delim) == "{ }") return delimitedIndent({closing: "}"})
+    if (type.name == "Declaration") return continuedIndent()
     return undefined
   }),
   styleNodeProp.styles(NodeType.match({

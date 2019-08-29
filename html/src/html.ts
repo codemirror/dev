@@ -1,7 +1,7 @@
 import {configureHTML} from "lezer-html"
 import {cssSyntax} from "../../css/src/css"
 import {javascriptSyntax} from "../../javascript/src/javascript"
-import {LezerSyntax, delimitedIndent, statementIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../lezer-syntax/src"
+import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../lezer-syntax/src"
 import {NodeType} from "lezer-tree"
 import {Style as s, styleNodeProp} from "../../theme/src"
 
@@ -19,7 +19,7 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
 ]).withProps(
   indentNodeProp.add(type => {
     if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
-    if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return statementIndent // FIXME name
+    if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
     return undefined
   }),
   openNodeProp.add(NodeType.match({

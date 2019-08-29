@@ -1,21 +1,27 @@
 import {parser} from "lezer-javascript"
 import {NodeProp, NodeType} from "lezer-tree"
-import {dontIndent, parenIndent, braceIndent, bracketIndent, statementIndent, compositeStatementIndent,
-        indentNodeProp, LezerSyntax} from "../../lezer-syntax/src"
+import {flatIndent, delimitedIndent, continuedIndent, indentNodeProp, LezerSyntax} from "../../lezer-syntax/src"
 import {styleNodeProp, Style as s} from "../../theme/src"
+
+const statementIndent = continuedIndent({except: /^{/})
 
 export const javascriptSyntax = new LezerSyntax(parser.withProps(
   indentNodeProp.add(type => {
-    let delim = type.prop(NodeProp.delim)
-    if (delim == "( )") return parenIndent
-    if (delim == "{ }") return braceIndent
-    if (delim == "[ ]") return bracketIndent
-    if (type.name == "IfStatement") return compositeStatementIndent(/^else\b/)
-    if (/(Statement|Declaration)$/.test(type.name)) return statementIndent
-    if (type.name == "TemplateString" || type.name == "BlockComment") return dontIndent
-    return undefined
+    if (type.name == "IfStatement") return continuedIndent({except: /^({|else\b)/})
+    if (type.name == "TryStatement") return continuedIndent({except: /^({|catch|finally)\b/})
+    if (type.name == "LabeledStatement") return flatIndent
+    if (type.name == "SwitchBody") return context => {
+      let after = context.textAfter, closed = after[0] == "}", isCase = /^(case|default)\b/.test(after)
+      return context.baseIndent + (closed ? 0 : isCase ? 1 : 2) * context.unit
+    }
+    if (type.name == "TemplateString" || type.name == "BlockComment") return () => -1
 
-    // FIXME special indentation for switch bodies
+    let delim = type.prop(NodeProp.delim)
+    if (delim == "( )") return delimitedIndent({closing: ")"})
+    if (delim == "{ }") return delimitedIndent({closing: "}"})
+    if (delim == "[ ]") return delimitedIndent({closing: "]"})
+    if (/(Statement|Declaration)$/.test(type.name) || type.name == "Property") return statementIndent
+    return undefined
   }),
   styleNodeProp.styles(NodeType.match({
     "get set async static": s.keyword.modifier,
