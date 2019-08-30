@@ -158,7 +158,7 @@ class DOMReader {
 }
 
 function isBlockNode(node: Node): boolean {
-  return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
+  return node.nodeType == 1 && (node as HTMLElement).isContentEditable && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
 }
 
 class DOMPoint {

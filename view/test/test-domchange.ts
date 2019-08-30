@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {Decoration, EditorView, ViewField} from "../src"
+import {Decoration, EditorView, ViewField, WidgetType} from "../src"
 import ist from "ist"
 
 function flush(cm: EditorView) {
@@ -147,5 +147,18 @@ describe("DOM changes", () => {
     text.textContent = "abxx"
     flush(cm)
     ist(cm.domAtPos(1).node, text)
+  })
+
+  it("doesn't insert newlines for block widgets", () => {
+    class Widget extends WidgetType<any> {
+      toDOM() { return document.createElement("div") }
+    }
+    let cm = tempEditor("abcd", [ViewField.decorations({
+      create() { return Decoration.set(Decoration.widget(4, {widget: new Widget(null) })) },
+      update(d, u) { return d }
+    })])
+    cm.domAtPos(0).node.appendChild(document.createTextNode("x"))
+    flush(cm)
+    ist(cm.state.doc.toString(), "abcdx")
   })
 })
