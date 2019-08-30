@@ -1,6 +1,6 @@
-import {Decoration, DecoratedRange, DecorationSet, WidgetType, ViewField, ViewUpdate, EditorView} from "../../view/src"
+import {Decoration, DecoratedRange, DecorationSet, styleModule, WidgetType, ViewField, ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange, Transaction} from "../../state/src"
-import {combineConfig, Full} from "../../extension/src/extension"
+import {combineConfig, Extension, Full} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 import {StyleModule} from "style-mod"
 
@@ -17,11 +17,17 @@ export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig
     specialChars: SPECIALS,
     addSpecialChars: null
   })
-  return new ViewField<SpecialCharHighlighter>({
-    create(view) { return new SpecialCharHighlighter(view, config) },
+
+  let styles = document.body.style as any
+  let replaceTabs = (styles.tabSize || styles.MozTabSize) == null
+  if (replaceTabs) config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
+
+  const result = new ViewField<SpecialCharHighlighter>({
+    create(view) { return new SpecialCharHighlighter(view, config, replaceTabs) },
     update(self, update) { return self.update(update) },
     effects: [ViewField.decorationEffect(self => self.decorations)]
   }).extension
+  return replaceTabs ? Extension.all(result, styleModule(style)) : result
 }, {})
 
 const JOIN_GAP = 10
@@ -31,15 +37,11 @@ class SpecialCharHighlighter {
   from = 0
   to = 0
   specials: RegExp
-  replaceTabs: boolean
 
-  constructor(public view: EditorView, readonly options: Full<SpecialCharConfig>) {
-    this.updateForViewport()
+  constructor(public view: EditorView, readonly options: Full<SpecialCharConfig>, private replaceTabs: boolean) {
     this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
-    let styles = document.body.style as any
-    if (this.replaceTabs = (styles.tabSize || styles.MozTabSize) == null)
-      this.specials = new RegExp("\t|" + this.specials.source, "gu")
+    this.updateForViewport()
   }
 
   update(update: ViewUpdate) {
@@ -99,7 +101,7 @@ class SpecialCharHighlighter {
     let {doc} = this.view.state
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {
-        while (m = SPECIALS.exec(cursor.value)) {
+        while (m = this.specials.exec(cursor.value)) {
           let code = m[0].codePointAt ? m[0].codePointAt(0) : m[0].charCodeAt(0), widget
           if (code == null) continue
           if (code == 9) {
@@ -119,7 +121,6 @@ class SpecialCharHighlighter {
   get styles() { return style }
 }
 
-// FIXME configurable
 const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
 
 const NAMES: {[key: number]: string} = {
