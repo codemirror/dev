@@ -94,7 +94,7 @@ function moveLineByColumn(doc: Doc, tabSize: number, pos: number, dir: -1 | 1): 
 function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | null, doc: Doc): number {
   if (context == null) {
     for (let pos = start;; pos += dir) {
-      if (pos == 0 || pos == doc.length) return pos
+      if (dir < 0 && pos == 0 || dir > 0 && pos == doc.length) return pos
       if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
