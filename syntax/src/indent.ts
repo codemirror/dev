@@ -14,7 +14,7 @@ export const syntaxIndentation = EditorState.extend.unique<null>(() => EditorSta
 
 function indentationBehavior(state: EditorState, pos: number) {
   for (let syntax of state.behavior.get(EditorState.syntax)) {
-    let tree = syntax.tryGetTree(state, pos, pos)
+    let tree = syntax.getPartialTree(state, pos, pos)
     if (tree) {
       let result = computeIndentation(state, tree, pos)
       if (result > -1) return result

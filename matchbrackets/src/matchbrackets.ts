@@ -3,7 +3,7 @@ import {Extension, combineConfig} from "../../extension/src/extension"
 import {EditorView, ViewField} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
 import {Tree, Subtree, NodeType} from "lezer-tree"
-import {openNodeProp, closeNodeProp} from "../../lezer-syntax/src/"
+import {openNodeProp, closeNodeProp} from "../../syntax/src/"
 
 export interface Config {
   afterCursor?: boolean,
@@ -47,8 +47,8 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
 
 function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {
   for (let syntax of state.behavior.get(EditorState.syntax)) {
-    return syntax.tryGetTree(state, dir < 0 ? Math.max(0, pos - maxScanDistance) : pos,
-                             dir < 0 ? pos : Math.min(state.doc.length, pos + maxScanDistance))
+    return syntax.getPartialTree(state, dir < 0 ? Math.max(0, pos - maxScanDistance) : pos,
+                                 dir < 0 ? pos : Math.min(state.doc.length, pos + maxScanDistance))
   }
   return Tree.empty
 }

@@ -1,7 +1,7 @@
 const ist = require("ist")
 import {EditorState} from "../../state/src"
 import {javascript} from "../src/javascript"
-import {syntaxIndentation} from "../../lezer-syntax/src"
+import {syntaxIndentation} from "../../syntax/src"
 
 function getIndent(state: EditorState, pos: number): number {
   for (let f of state.behavior.get(EditorState.indentation)) {

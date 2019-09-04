@@ -1,6 +1,6 @@
 import {parser} from "lezer-javascript"
 import {NodeType} from "lezer-tree"
-import {flatIndent, continuedIndent, indentNodeProp, LezerSyntax} from "../../lezer-syntax/src"
+import {flatIndent, continuedIndent, indentNodeProp, LezerSyntax} from "../../syntax/src"
 import {styleNodeProp, Style as s} from "../../theme/src"
 
 const statementIndent = continuedIndent({except: /^{/})

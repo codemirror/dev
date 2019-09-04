@@ -1,5 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Transaction, Syntax, SyntaxRequest} from "../../state/src/"
+import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state/src/"
 import {Extension} from "../../extension/src/extension"
 import {Tree, NodeType, NodeGroup} from "lezer-tree"
 import {styleNodeProp, Style} from "../../theme/src"
@@ -56,7 +56,7 @@ function defaultCopyState<State>(state: State) {
 export type LegacyMode<State> = {name: string} & StreamParserSpec<State>
 
 class RequestInfo {
-  promise: SyntaxRequest
+  promise: CancellablePromise<Tree>
   resolve!: (tree: Tree) => void
 
   constructor(readonly upto: number) {
@@ -65,13 +65,12 @@ class RequestInfo {
   }
 }
 
-export class StreamSyntax extends Syntax {
+export class StreamSyntax implements Syntax {
   private field: StateField<SyntaxState<any>>
   public extension: Extension
   public indentation: Extension
 
   constructor(readonly parser: StreamParser<any>) {
-    super()
     this.field = new StateField<SyntaxState<any>>({
       init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
       apply(tr, value) { return value.apply(tr) }
@@ -82,10 +81,23 @@ export class StreamSyntax extends Syntax {
     })
   }
 
-  tryGetTree(state: EditorState, from: number, to: number, unfinished?: (request: SyntaxRequest) => void): Tree {
-    return state.getField(this.field).getTree(this.parser, state, to, unfinished)
+  tryGetTree(state: EditorState, from: number, to: number) {
+    let field = state.getField(this.field)
+    return field.updateTree(this.parser, state, to, false) ? field.tree : null
   }
 
+  getTree(state: EditorState, from: number, to: number) {
+    let field = state.getField(this.field)
+    let rest = field.updateTree(this.parser, state, to, true) as CancellablePromise<Tree> | true
+    return {tree: field.tree, rest: rest === true ? null : rest}
+  }
+
+  getPartialTree(state: EditorState, from: number, to: number) {
+    let field = state.getField(this.field)
+    field.updateTree(this.parser, state, to, false)
+    return field.tree
+  }
+  
   static legacy(mode: LegacyMode<any>): StreamSyntax {
     if (!mode.docTag) mode.docTag = "document.lang=" + mode.name
     return new StreamSyntax(new StreamParser(mode))
@@ -175,20 +187,19 @@ class SyntaxState<ParseState> {
     this.frontierState = state
   }
 
-  getTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, unfinished?: (req: SyntaxRequest) => void): Tree {
-    if (this.frontierPos < upto) {
-      if (this.working == -1) this.advanceFrontier(parser, state, upto)
-      if (this.frontierPos < upto && unfinished) {
-        let req = this.requests.find(r => r.upto == upto && !r.promise.canceled)
-        if (!req) {
-          req = new RequestInfo(upto)
-          this.requests.push(req)
-        }
-        unfinished(req.promise)
-        this.scheduleWork(parser, state)
-      }
+  updateTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, rest: boolean): boolean | CancellablePromise<Tree> {
+    // FIXME make sure multiple calls in same frame don't keep doing work
+    if (this.frontierPos >= upto) return true
+    if (this.working == -1) this.advanceFrontier(parser, state, upto)
+    if (this.frontierPos >= upto) return true
+    if (!rest) return false
+    let req = this.requests.find(r => r.upto == upto && !r.promise.canceled)
+    if (!req) {
+      req = new RequestInfo(upto)
+      this.requests.push(req)
     }
-    return this.tree
+    this.scheduleWork(parser, state)
+    return req.promise
   }
 
   scheduleWork(parser: StreamParser<ParseState>, state: EditorState) {

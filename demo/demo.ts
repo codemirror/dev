@@ -7,7 +7,7 @@ import {baseKeymap, indentSelection} from "../commands/src/commands"
 import {bracketMatching} from "../matchbrackets/src/matchbrackets"
 import {specialChars} from "../special-chars/src/special-chars"
 import {multipleSelections} from "../multiple-selections/src/multiple-selections"
-import {syntaxIndentation} from "../lezer-syntax/src"
+import {syntaxIndentation} from "../syntax/src"
 
 import {html} from "../html/src/html"
 import {defaultTheme, highlight} from "../theme/src/"

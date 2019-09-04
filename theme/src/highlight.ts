@@ -1,21 +1,27 @@
-import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange, notified} from "../../view/src"
+import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange} from "../../view/src"
 import {themeData} from "./theme"
 import {Syntax, EditorState} from "../../state/src/"
 import {styleNodeProp} from "./styleprop"
 
 class Highlighter {
-  deco: DecorationSet
+  deco!: DecorationSet
+  partialDeco = false
 
   constructor(readonly syntax: Syntax | null, view: EditorView) {
-    this.deco = this.buildDeco(view)
+    this.buildDeco(view)
   }
 
   buildDeco(view: EditorView) {
     let themes = view.behavior.get(themeData)
-    if (!this.syntax || themes.length == 0) return Decoration.none
+    if (!this.syntax || themes.length == 0) {
+      this.deco = Decoration.none
+      return
+    }
 
     let {from, to} = view.viewport
-    let tree = this.syntax.tryGetTree(view.state, from, to, view.notify)
+    let {tree, rest} = this.syntax.getTree(view.state, from, to)
+    this.partialDeco = !rest
+    if (rest) view.waitFor(rest)
 
     let tokens: DecoratedRange[] = []
     let start = from
@@ -71,7 +77,7 @@ class Highlighter {
         curClass = curAdd = ""
       }
     })
-    return Decoration.set(tokens)
+    this.deco = Decoration.set(tokens)
   }
 }
 
@@ -89,8 +95,8 @@ export function highlight() { // FIXME allow specifying syntax?
       return new Highlighter(null, view)
     },
     update(highlighter, update) {
-      if (update.docChanged || update.viewportChanged || update.getMeta(notified))
-        highlighter.deco = highlighter.buildDeco(update.view)
+      if (highlighter.partialDeco || update.docChanged || update.viewportChanged)
+        highlighter.buildDeco(update.view)
       return highlighter // FIXME immutable?
     },
     effects: [ViewField.decorationEffect(h => h.deco)]

@@ -1,7 +1,7 @@
 import {configureHTML} from "lezer-html"
 import {cssSyntax} from "../../css/src/css"
 import {javascriptSyntax} from "../../javascript/src/javascript"
-import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../lezer-syntax/src"
+import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../syntax/src"
 import {NodeType} from "lezer-tree"
 import {Style as s, styleNodeProp} from "../../theme/src"
 

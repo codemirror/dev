@@ -1,8 +1,8 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax} from "./syntax"
 import {ExtensionType, Extension, BehaviorStore} from "../../extension/src/extension"
+import {Tree} from "lezer-tree"
 
 const extendState = new ExtensionType
 
@@ -151,4 +151,13 @@ export class StateField<T> {
     this.apply = apply
     this.extension = stateFieldBehavior(this)
   }
+}
+
+export type CancellablePromise<T> = Promise<T> & {canceled?: boolean}
+
+export interface Syntax {
+  extension: Extension
+  getTree(state: EditorState, from: number, to: number): {tree: Tree, rest: CancellablePromise<Tree> | null}
+  tryGetTree(state: EditorState, from: number, to: number): Tree | null
+  getPartialTree(state: EditorState, from: number, to: number): Tree
 }

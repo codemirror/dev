@@ -1,4 +1,4 @@
-import {EditorState, Transaction} from "../../state/src"
+import {EditorState, Transaction, CancellablePromise} from "../../state/src"
 import {BehaviorStore, Slot, Extension} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
@@ -88,11 +88,7 @@ export class EditorView {
   updating: boolean = false
 
   /// @internal
-  notifications: (Promise<any> & {canceled?: boolean})[] = []
-
-  /// Update the view when the given promise resolves. Sets its
-  /// `canceled` property when another factor causes the update.
-  notify: (promise: Promise<any> & {canceled?: boolean}) => void
+  waiting: CancellablePromise<any>[] = []
 
   /// The view extension type, used to define new view extensions.
   static extend = extendView
@@ -119,13 +115,6 @@ export class EditorView {
     this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
     this.root = (config.root || document) as DocumentOrShadowRoot
 
-    this.notify = (promise) => {
-      promise.then(() => {
-        if (!promise.canceled) this.update([], [notified(true)])
-      })
-      this.notifications.push(promise)
-    }
-
     this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
     this.setState(config.state, config.extensions)
   }
@@ -134,7 +123,7 @@ export class EditorView {
   /// updating it with transactions, since it requires a redraw of the
   /// content and a reset of the view extensions.
   setState(state: EditorState, extensions: Extension[] = []) {
-    this.clearNotifications()
+    this.clearWaiting()
     for (let plugin of this.plugins) if (plugin.destroy) plugin.destroy()
     this.withUpdating(() => {
       ;(this as any).behavior = extendView.resolve(extensions.concat(state.behavior.foreign))
@@ -155,7 +144,7 @@ export class EditorView {
   /// produced by the transactions, and notify view fields and plugins
   /// of the change.
   update(transactions: Transaction[] = [], metadata: Slot[] = []) {
-    this.clearNotifications()
+    this.clearWaiting()
     let state = this.state
     for (let tr of transactions) {
       if (tr.startState != state)
@@ -176,9 +165,16 @@ export class EditorView {
     })
   }
 
-  private clearNotifications() {
-    for (let promise of this.notifications) promise.canceled = true
-    this.notifications.length = 0
+  waitFor(promise: CancellablePromise<any>) {
+    promise.then(() => {
+      if (!promise.canceled) this.update([], [notified(true)])
+    })
+    this.waiting.push(promise)
+  }
+
+  private clearWaiting() {
+    for (let promise of this.waiting) promise.canceled = true
+    this.waiting.length = 0
   }
 
   /// @internal
