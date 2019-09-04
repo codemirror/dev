@@ -95,17 +95,16 @@ export class IndentContext {
   }
 
   /// Get the indentation at the reference line for `this.tree`, which
-  /// is the line on which it starts, unless there is a node with an
-  /// indentation strategy that is _not_ a parent of this node
-  /// covering the start of that line. If so, the line at the start of
-  /// that node is tried, again skipping on if it is covered by
-  /// another such node.
+  /// is the line on which it starts, unless there is a node that is
+  /// _not_ a parent of this node covering the start of that line. If
+  /// so, the line at the start of that node is tried, again skipping
+  /// on if it is covered by another such node.
   get baseIndent() {
     let line = this.state.doc.lineAt(this.node.start)
     // Skip line starts that are covered by a sibling (or cousin, etc)
     for (;;) {
       let atBreak = this.node.resolve(line.start)
-      while (!atBreak.type.prop(indentNodeProp) && atBreak.parent) atBreak = atBreak.parent
+      while (atBreak.parent && atBreak.parent.start == atBreak.start) atBreak = atBreak.parent
       if (isParent(atBreak, this.node)) break
       line = this.state.doc.lineAt(atBreak.start)
     }
