@@ -25,7 +25,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
                         preferredPos - from, preferredSide)
     if (diff) change = new Change(from + diff.from, from + diff.toA,
                                   reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
-  } else if (view.hasFocus()) {
+  } else if (view.hasFocus) {
     let domSel = view.root.getSelection()!
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
     let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ? view.state.selection.primary.head

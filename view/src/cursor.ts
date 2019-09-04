@@ -25,7 +25,7 @@ export function movePos(view: EditorView, start: number,
   // supported, the cursor is well inside the rendered viewport, and
   // we're not doing by-line motion on Gecko (which will mess up goal
   // column motion)
-  if (sel.modify && context && !context.nearViewportEnd(view) && view.hasFocus() &&
+  if (sel.modify && context && !context.nearViewportEnd(view) && view.hasFocus &&
       granularity != "word" &&
       !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
     return view.docView.observer.ignore(() => {
