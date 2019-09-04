@@ -1,6 +1,6 @@
 import {parser} from "lezer-javascript"
-import {NodeProp, NodeType} from "lezer-tree"
-import {flatIndent, delimitedIndent, continuedIndent, indentNodeProp, LezerSyntax} from "../../lezer-syntax/src"
+import {NodeType} from "lezer-tree"
+import {flatIndent, continuedIndent, indentNodeProp, LezerSyntax} from "../../lezer-syntax/src"
 import {styleNodeProp, Style as s} from "../../theme/src"
 
 const statementIndent = continuedIndent({except: /^{/})
@@ -15,11 +15,6 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
       return context.baseIndent + (closed ? 0 : isCase ? 1 : 2) * context.unit
     }
     if (type.name == "TemplateString" || type.name == "BlockComment") return () => -1
-
-    let delim = type.prop(NodeProp.delim)
-    if (delim == "( )") return delimitedIndent({closing: ")"})
-    if (delim == "{ }") return delimitedIndent({closing: "}"})
-    if (delim == "[ ]") return delimitedIndent({closing: "]"})
     if (/(Statement|Declaration)$/.test(type.name) || type.name == "Property") return statementIndent
     return undefined
   }),

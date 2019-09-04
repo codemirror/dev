@@ -1,15 +1,12 @@
 import {parser} from "lezer-css"
-import {NodeProp, NodeType} from "lezer-tree"
-import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp} from "../../lezer-syntax/src"
+import {NodeType} from "lezer-tree"
+import {LezerSyntax, continuedIndent, indentNodeProp} from "../../lezer-syntax/src"
 import {styleNodeProp, Style as s} from "../../theme/src"
 
 export const cssSyntax = new LezerSyntax(parser.withProps(
-  indentNodeProp.add(type => {
-    if (type.prop(NodeProp.delim) == "( )") return delimitedIndent({closing: ")"})
-    if (type.prop(NodeProp.delim) == "{ }") return delimitedIndent({closing: "}"})
-    if (type.name == "Declaration") return continuedIndent()
-    return undefined
-  }),
+  indentNodeProp.add(NodeType.match({
+    Declaration: continuedIndent()
+  })),
   styleNodeProp.styles(NodeType.match({
     "import charset namespace keyframes": s.keyword.define,
     "media supports": s.keyword.control,

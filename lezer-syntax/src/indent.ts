@@ -1,5 +1,5 @@
 import {Line} from "../../doc/src"
-import {NodeProp, Subtree, Tree} from "lezer-tree"
+import {NodeType, NodeProp, Subtree, Tree} from "lezer-tree"
 import {EditorState} from "../../state/src/"
 
 /// A syntax tree node prop used to associate indentation strategies
@@ -43,10 +43,19 @@ function computeIndentation(state: EditorState, ast: Tree, pos: number) {
   }
 
   for (; tree; tree = tree.parent) {
-    let strategy = tree.type.prop(indentNodeProp) || (tree.parent == null ? topIndent : null)
+    let strategy = indentStrategy(tree.type) || (tree.parent == null ? topIndent : null)
     if (strategy) return strategy(new IndentContext(state, pos, tree))
   }
   return -1
+}
+
+function indentStrategy(type: NodeType) {
+  let strategy = type.prop(indentNodeProp)
+  if (!strategy) {
+    let delim = type.prop(NodeProp.delim)
+    if (delim) return delimitedIndent({closing: delim.split(" ")[1]})
+  }
+  return strategy
 }
 
 function topIndent() { return 0 }
