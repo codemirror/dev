@@ -38,43 +38,47 @@ class Highlighter {
     // on leaf nodes, this is optimized by only tracking context if
     // there is any—that is, if any parent node is styled.
     let tokenContext: TokenContext | null = null
-    tree.iterate(from, to, (type, start) => {
-      let cls = curAdd, add = curAdd
-      let style = type.prop(styleNodeProp)
-      if (style != null) for (let theme of themes) {
-        let val
-        if (val = theme.tokenClasses[style]) {
-          if (cls) cls += " "
-          cls += val
+    tree.iterate({
+      from, to,
+      enter(type, start) {
+        let cls = curAdd, add = curAdd
+        let style = type.prop(styleNodeProp)
+        if (style != null) for (let theme of themes) {
+          let val
+          if (val = theme.tokenClasses[style]) {
+            if (cls) cls += " "
+            cls += val
+          }
+          if (theme.tokenAddClasses && (val = theme.tokenAddClasses[style])) {
+            if (cls) cls += " "
+            cls += val
+            if (add) add += " "
+            add += val
+          }
         }
-        if (theme.tokenAddClasses && (val = theme.tokenAddClasses[style])) {
-          if (cls) cls += " "
-          cls += val
-          if (add) add += " "
-          add += val
-        }
-      }
-      if (curClass || tokenContext) {
-        tokenContext = new TokenContext(curClass, curAdd, tokenContext)
-        if (curClass != cls) {
+        if (curClass || tokenContext) {
+          tokenContext = new TokenContext(curClass, curAdd, tokenContext)
+          if (curClass != cls) {
+            flush(start, curClass)
+            curClass = cls
+          }
+          curAdd = add
+        } else if (cls) {
           flush(start, curClass)
           curClass = cls
+          curAdd = add
         }
-        curAdd = add
-      } else if (cls) {
-        flush(start, curClass)
-        curClass = cls
-        curAdd = add
-      }
-    }, (_t, _s, end) => {
-      if (tokenContext) {
-        if (tokenContext.cls != curClass) flush(Math.min(to, end), curClass)
-        curClass = tokenContext.cls
-        curAdd = tokenContext.add
-        tokenContext = tokenContext.parent
-      } else if (curClass) {
-        flush(Math.min(to, end), curClass)
-        curClass = curAdd = ""
+      },
+      leave(_t, _s, end) {
+        if (tokenContext) {
+          if (tokenContext.cls != curClass) flush(Math.min(to, end), curClass)
+          curClass = tokenContext.cls
+          curAdd = tokenContext.add
+          tokenContext = tokenContext.parent
+        } else if (curClass) {
+          flush(Math.min(to, end), curClass)
+          curClass = curAdd = ""
+        }
       }
     })
     this.deco = Decoration.set(tokens)

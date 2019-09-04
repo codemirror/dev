@@ -80,17 +80,21 @@ function matchMarkedBrackets(state: EditorState, pos: number, dir: -1 | 1, token
                              matching: readonly string[], maxScanDistance: number, brackets: string) {
   let parent = token.parent, firstToken = {from: token.start, to: token.end}
   let depth = 0
-  return (parent && parent.iterate(dir < 0 ? token.start : token.end, dir < 0 ? parent.start : parent.end, (type, from, to) => {
-    if (dir < 0 ? to > token.start : from < token.end) return undefined
-    if (depth == 0 && matching.includes(type.name)) {
-      return {start: firstToken, end: {from, to}, matched: true}
-    } else if (matchingNodes(type, dir, brackets)) {
-      depth++
-    } else if (matchingNodes(type, -dir as -1 | 1, brackets)) {
-      depth--
-      if (depth == 0) return {start: firstToken, end: {from, to}, matched: false}
+  return (parent && parent.iterate({
+    from: dir < 0 ? token.start : token.end,
+    to: dir < 0 ? parent.start : parent.end,
+    enter(type, from, to) {
+      if (dir < 0 ? to > token.start : from < token.end) return undefined
+      if (depth == 0 && matching.includes(type.name)) {
+        return {start: firstToken, end: {from, to}, matched: true}
+      } else if (matchingNodes(type, dir, brackets)) {
+        depth++
+      } else if (matchingNodes(type, -dir as -1 | 1, brackets)) {
+        depth--
+        if (depth == 0) return {start: firstToken, end: {from, to}, matched: false}
+      }
+      return false
     }
-    return false
   })) || {start: firstToken, matched: false}
 }
 

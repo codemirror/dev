@@ -29,11 +29,11 @@
   "dependencies": {
     "style-mod": "^2.0.0",
     "w3c-keyname": "^2.1.0",
-    "lezer": "^0.3.0",
-    "lezer-tree": "^0.3.0",
-    "lezer-javascript": "^0.3.0",
-    "lezer-css": "^0.3.0",
-    "lezer-html": "^0.3.0"
+    "lezer": "^0.4.0",
+    "lezer-tree": "^0.4.0",
+    "lezer-javascript": "^0.4.0",
+    "lezer-css": "^0.4.0",
+    "lezer-html": "^0.4.0"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
