@@ -1,4 +1,4 @@
-import {Extension, combineConfig, fillConfig, Full, Slot} from "../../extension/src/extension"
+import {Extension, combineConfig, fillConfig, Slot} from "../../extension/src/extension"
 import {EditorView, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
@@ -72,7 +72,7 @@ class GutterView implements ViewPlugin {
   markers: GutterMarkerSet
   spacer: GutterElement | null = null
 
-  constructor(public view: EditorView, public config: Full<GutterConfig>) {
+  constructor(public view: EditorView, public config: Required<GutterConfig>) {
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter " + config.class + " " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")

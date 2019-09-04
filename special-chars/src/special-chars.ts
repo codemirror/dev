@@ -1,6 +1,6 @@
 import {Decoration, DecoratedRange, DecorationSet, styleModule, WidgetType, ViewField, ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange, Transaction} from "../../state/src"
-import {combineConfig, Extension, Full} from "../../extension/src/extension"
+import {combineConfig, Extension} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 import {StyleModule} from "style-mod"
 
@@ -38,7 +38,7 @@ class SpecialCharHighlighter {
   to = 0
   specials: RegExp
 
-  constructor(public view: EditorView, readonly options: Full<SpecialCharConfig>, private replaceTabs: boolean) {
+  constructor(public view: EditorView, readonly options: Required<SpecialCharConfig>, private replaceTabs: boolean) {
     this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
     this.updateForViewport()
@@ -153,7 +153,7 @@ function placeHolder(code: number): string | null {
 const DEFAULT_PLACEHOLDER = "\u2022"
 
 class SpecialCharWidget extends WidgetType<number> {
-  constructor(private options: Full<SpecialCharConfig>, code: number) { super(code) }
+  constructor(private options: Required<SpecialCharConfig>, code: number) { super(code) }
 
   toDOM() {
     let ph = placeHolder(this.value) || DEFAULT_PLACEHOLDER
