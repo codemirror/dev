@@ -121,9 +121,9 @@ class DOMReader {
       this.readNode(cur)
       let next: Node | null = cur.nextSibling
       if (next == end) break
-      let view = cur.cmView
-      if ((view ? view.breakAfter : isEditableBlockElement(cur)) ||
-          (isEditableBlockElement(next!) && cur.nodeName != "BR")) this.text += LINE_SEP
+      let view = cur.cmView, nextView = next!.cmView
+      if ((view ? view.breakAfter : isBlockElement(cur)) ||
+          ((nextView ? nextView.breakAfter : isBlockElement(next!)) && cur.nodeName != "BR")) this.text += LINE_SEP
       cur = next!
     }
     this.findPointBefore(parent, end)
@@ -157,8 +157,8 @@ class DOMReader {
   }
 }
 
-function isEditableBlockElement(node: Node): boolean {
-  return node.nodeType == 1 && (node as HTMLElement).isContentEditable && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
+function isBlockElement(node: Node): boolean {
+  return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
 }
 
 class DOMPoint {
