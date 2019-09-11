@@ -7,51 +7,45 @@ export const closeHistorySlot = Slot.define<boolean>()
 
 export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
 
-function historyField({minDepth, newGroupDelay}: Required<HistoryConfig>) {
-  return new StateField({
-    init(editorState: EditorState): HistoryState {
-      return HistoryState.empty
-    },
+const historyField = new StateField({
+  init(editorState: EditorState): HistoryState {
+    return HistoryState.empty
+  },
 
-    apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
-      const fromMeta = tr.getMeta(historyStateSlot)
-      if (fromMeta) return fromMeta
-      if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
-      if (!tr.changes.length && !tr.selectionSet) return state
+  apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
+    const fromMeta = tr.getMeta(historyStateSlot)
+    if (fromMeta) return fromMeta
+    if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
+    if (!tr.changes.length && !tr.selectionSet) return state
 
-      if (tr.getMeta(Transaction.addToHistory) !== false)
-        return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
-                                tr.startState.selection, tr.getMeta(Transaction.time)!,
-                                tr.getMeta(Transaction.userEvent), newGroupDelay, minDepth)
-      return state.addMapping(tr.changes.desc, minDepth)
-    }
-  })
-}
+    let config = editorState.behavior.get(historyConfig)[0]
+    if (tr.getMeta(Transaction.addToHistory) !== false)
+      return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
+                              tr.startState.selection, tr.getMeta(Transaction.time)!,
+                              tr.getMeta(Transaction.userEvent), config.newGroupDelay, config.minDepth)
+    return state.addMapping(tr.changes.desc, config.minDepth)
+  }
+})
 
-class HistoryContext {
-  constructor(public field: StateField<HistoryState>, public config: Required<HistoryConfig>) {}
-}
-
-const historyBehavior = EditorState.extend.behavior<HistoryContext>()
+const historyConfig = EditorState.extend.behavior<Required<HistoryConfig>>()
 
 export const history = EditorState.extend.unique<HistoryConfig>(configs => {
   let config = combineConfig(configs, {
     minDepth: 100,
     newGroupDelay: 500
   }, {minDepth: Math.max})
-  let field = historyField(config)
   return Extension.all(
-    field.extension,
-    historyBehavior(new HistoryContext(field, config))
+    historyField.extension,
+    historyConfig(config)
   )
 }, {})
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let hist = state.behavior.get(historyBehavior)
-    if (!hist.length) return false
-    let {field, config} = hist[0]
-    let historyState = state.getField(field)
+    let behavior = state.behavior.get(historyConfig)
+    if (!behavior.length) return false
+    let config = behavior[0]
+    let historyState = state.getField(historyField)
     if (!historyState.canPop(target, only)) return false
     const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
     dispatch(transaction.addMeta(historyStateSlot(newState)))
@@ -73,10 +67,8 @@ export function closeHistory(tr: Transaction): Transaction {
 
 function depth(target: PopTarget, only: ItemFilter) {
   return function(state: EditorState): number {
-    let hist = state.behavior.get(historyBehavior)
-    if (hist.length == 0) return 0
-    let {field} = hist[0]
-    return state.getField(field).eventCount(target, only)
+    let histState = state.getField(historyField, false)
+    return histState ? histState.eventCount(target, only) : 0
   }
 }
 

@@ -74,10 +74,16 @@ export class EditorState {
   }
 
   /// Retrieve the value of a [state field](#state.StateField). Throws
-  /// an error when the state doesn't have that field.
-  getField<T>(field: StateField<T>): T {
+  /// an error when the state doesn't have that field, unless you pass
+  /// `false` as second parameter.
+  getField<T>(field: StateField<T>): T
+  getField<T>(field: StateField<T>, require: false): T | undefined
+  getField<T>(field: StateField<T>, require: boolean = true): T | undefined {
     let index = this.config.fields.indexOf(field)
-    if (index < 0) throw new RangeError("Field is not present in this state")
+    if (index < 0) {
+      if (require) throw new RangeError("Field is not present in this state")
+      else return undefined
+    }
     if (index >= this.fields.length) throw new RangeError("Field hasn't been initialized yet")
     return this.fields[index]
   }
