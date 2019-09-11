@@ -165,6 +165,9 @@ export class EditorView {
     })
   }
 
+  /// Wait for the given promise to resolve, and then run an update.
+  /// Or, if an update happens before that, set the promise's
+  /// `canceled` property to true and ignore it.
   waitFor(promise: CancellablePromise<any>) {
     promise.then(() => {
       if (!promise.canceled) this.update([], [notified(true)])

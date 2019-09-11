@@ -10,7 +10,7 @@ const mkState = (config?: any, doc?: string) => EditorState.create({
 })
 
 const type = (state: EditorState, text: string, at = state.doc.length) => state.t().replace(at, at, text).apply()
-const timedType = (state: EditorState, text: string, atTime: number) => new Transaction(state, atTime).replace(state.doc.length, state.doc.length, text).apply()
+const timedType = (state: EditorState, text: string, atTime: number) => state.t(atTime).replace(state.doc.length, state.doc.length, text).apply()
 const receive = (state: EditorState, text: string, from: number, to = from) => {
   return state.t().replace(from, to, text).addMeta(Transaction.addToHistory(false)).apply()
 }
