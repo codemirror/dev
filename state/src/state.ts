@@ -174,6 +174,23 @@ export class EditorState {
     return state
   }
 
+  /// Reconfigure a state with a new set of extensions. This will
+  /// preserve the doc and selection, and allow [state
+  /// fields](#state.StateField) that appear in both the old and the
+  /// new state to preserve their old value via their `reconfigure`
+  /// method.
+  reconfigure(extensions: readonly Extension[]) {
+    let config = Configuration.create({extensions}) // FIXME this resets tab and lineseparator, which should be going anyway
+    let selection = config.multipleSelections ? this.selection : this.selection.asSingle()
+    let fields: any[] = []
+    let state = new EditorState(config, fields, this.doc, selection)
+    for (let field of config.fields) {
+      let oldIndex = this.config.fields.indexOf(field)
+      fields.push(oldIndex > -1 ? field.reconfigure(state, this.fields[oldIndex]) : field.init(state))
+    }
+    return state
+  }
+
   /// The [extension type](#extension.ExtensionType) for editor
   /// states.
   static extend = extendState
@@ -206,6 +223,8 @@ export class StateField<T> {
   readonly init: (state: EditorState) => T
   /// @internal
   readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
+  /// @internal
+  readonly reconfigure: (state: EditorState, oldValue: T) => T
   /// The extension that can be used to
   /// [attach](#state.EditorStateConfig.extensions) this field to a
   /// state.
@@ -215,12 +234,21 @@ export class StateField<T> {
   /// initial value for the field in a newly created editor state. The
   /// `apply` function computes a new value from the previous value
   /// and a [transaction](#state.Transaction).
-  constructor({init, apply}: {
+  ///
+  /// The `reconfigure` method can be used to carry a field's value
+  /// through a call to
+  /// [`EditorState.reconfigure`](#state.EditorState.reconfigure). If
+  /// both the old and the new configuration contain this (exact)
+  /// field, it'll be called (if present) instead of `init`, to create
+  /// the new field value.
+  constructor({init, apply, reconfigure}: {
     init: (state: EditorState) => T,
     apply: (tr: Transaction, value: T, newState: EditorState) => T
+    reconfigure?: (state: EditorState, oldValue: T) => T
   }) {
     this.init = init
     this.apply = apply
+    this.reconfigure = reconfigure || init
     this.extension = stateFieldBehavior(this)
   }
 }

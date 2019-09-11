@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorState, Change, EditorSelection, SelectionRange, Transaction} from "../src"
+import {EditorState, StateField, Change, EditorSelection, SelectionRange, Transaction} from "../src"
 import {Slot} from "../../extension/src/extension"
 
 describe("EditorState", () => {
@@ -56,5 +56,24 @@ describe("EditorState", () => {
     let updated = crlf.t().addMeta(Transaction.changeLineSeparator("\n")).apply()
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
+  })
+
+  it("stores and updates fields", () => {
+    let field1 = new StateField<number>({init: () => 0, apply: (tr, val) => val + 1})
+    let field2 = new StateField<number>({init: state => state.getField(field1) + 10, apply: (tr, val) => val})
+    let state = EditorState.create({extensions: [field1.extension, field2.extension]})
+    ist(state.getField(field1), 0)
+    ist(state.getField(field2), 10)
+    let newState = state.t().apply()
+    ist(newState.getField(field1), 1)
+    ist(newState.getField(field2), 10)
+  })
+
+  it("can preserve fields across reconfiguration", () => {
+    let field = new StateField({init: () => 0, apply: (tr, val) => val + 1, reconfigure: (state, val) => val + 100})
+    let start = EditorState.create({extensions: [field.extension]}).t().apply()
+    ist(start.getField(field), 1)
+    ist(start.reconfigure([field.extension]).getField(field), 101)
+    ist(start.reconfigure([]).getField(field, false), undefined)
   })
 })
