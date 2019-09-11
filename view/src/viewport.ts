@@ -74,8 +74,18 @@ export class ViewportState {
   }
 }
 
+/// Indicates the range of the document that is in the visible
+/// viewport.
 export class Viewport {
-  constructor(readonly from: number, readonly to: number) {}
+  constructor(
+    /// Start of the viewport.
+    readonly from: number,
+    /// End of the viewport.
+    readonly to: number
+  ) {}
+  /// @internal
   clip(pos: number): number { return Math.max(this.from, Math.min(this.to, pos)) }
+  /// Compare this viewport to another one, return true if they have
+  /// the same endpoints.
   eq(b: Viewport) { return this.from == b.from && this.to == b.to }
 }

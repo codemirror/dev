@@ -72,15 +72,30 @@ export class MeasuredHeights {
   get more() { return this.index < this.heights.length }
 }
 
+/// Record used to represent information about a block-level element
+/// in the editor view.
 export class BlockInfo {
-  constructor(readonly from: number, readonly length: number,
-              readonly top: number, readonly height: number,
-              readonly type: BlockType | ReadonlyArray<BlockInfo>) {}
+  /// @internal
+  constructor(
+    /// The start of the element in the document.
+    readonly from: number,
+    /// The length of the element.
+    readonly length: number,
+    /// The top position of the element.
+    readonly top: number,
+    /// Its height.
+    readonly height: number,
+    /// The type of element this is. When querying lines, this may be
+    /// an array of all the blocks that make up the line.
+    readonly type: BlockType | ReadonlyArray<BlockInfo>
+  ) {}
 
+  /// The end of the element as a document position.
   get to() { return this.from + this.length }
+  /// The bottom position of the element.
   get bottom() { return this.top + this.height }
 
-  // @internal
+  /// @internal
   join(other: BlockInfo) {
     let detail = (Array.isArray(this.type) ? this.type : [this])
       .concat(Array.isArray(other.type) ? other.type : [other])
