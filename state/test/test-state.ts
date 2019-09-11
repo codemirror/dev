@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorState, StateField, Change, EditorSelection, SelectionRange, Transaction} from "../src"
+import {EditorState, StateField, Change, EditorSelection, SelectionRange} from "../src"
 import {Slot} from "../../extension/src/extension"
 
 describe("EditorState", () => {
@@ -40,20 +40,20 @@ describe("EditorState", () => {
   })
 
   it("stores and updates tab size", () => {
-    let deflt = EditorState.create({}), two = EditorState.create({tabSize: 2})
+    let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize(2)]})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.t().addMeta(Transaction.changeTabSize(8)).apply()
+    let updated = deflt.reconfigure([EditorState.tabSize(8)])
     ist(updated.tabSize, 8)
   })
 
   it("stores and updates the line separator", () => {
-    let deflt = EditorState.create({}), crlf = EditorState.create({lineSeparator: "\r\n"})
+    let deflt = EditorState.create({}), crlf = EditorState.create({extensions: [EditorState.lineSeparator("\r\n")]})
     ist(deflt.joinLines(["a", "b"]), "a\nb")
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.t().addMeta(Transaction.changeLineSeparator("\n")).apply()
+    let updated = crlf.reconfigure([EditorState.lineSeparator("\n")])
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })

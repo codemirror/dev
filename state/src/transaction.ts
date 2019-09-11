@@ -154,9 +154,6 @@ export class Transaction {
 
   /// Slot used to store timestamps in transactions.
   static time = Slot.define<number>()
-  // FIXME shouldn't this use behaviors now?
-  static changeTabSize = Slot.define<number>()
-  static changeLineSeparator = Slot.define<string | null>()
   /// Slot used to indicate that this transaction shouldn't clear the
   /// goal column, which is used during vertical cursor motion (so
   /// that moving over short lines doesn't reset the horizontal

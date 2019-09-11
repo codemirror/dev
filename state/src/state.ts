@@ -20,16 +20,8 @@ class Configuration {
       behavior,
       behavior.get(stateFieldBehavior),
       behavior.get(EditorState.allowMultipleSelections).some(x => x),
-      config.tabSize || 4,
-      config.lineSeparator || null)
-  }
-
-  updateTabSize(tabSize: number) {
-    return new Configuration(this.behavior, this.fields, this.multipleSelections, tabSize, this.lineSeparator)
-  }
-
-  updateLineSeparator(lineSep: string | null) {
-    return new Configuration(this.behavior, this.fields, this.multipleSelections, this.tabSize, lineSep)
+      behavior.get(EditorState.tabSize)[0] || 4,
+      behavior.get(EditorState.lineSeparator)[0] || null)
   }
 }
 
@@ -45,15 +37,6 @@ export interface EditorStateConfig {
   /// extensions only take effect when the state is put into an editor
   /// view.
   extensions?: ReadonlyArray<Extension>
-  /// The tab size to use in this state.
-  tabSize?: number // FIXME should this be a behavior?
-  /// The default line separator to use. When null (the default),
-  /// anything looking like a line separator will be used to split
-  /// lines, and a single newline character when combining lines. When
-  /// set to a specific string, only that string is used, allowing you
-  /// to round-trip documents through the editor without normalizing
-  /// line separators.
-  lineSeparator?: string | null
 }
 
 const DEFAULT_INDENT_UNIT = 2
@@ -90,15 +73,10 @@ export class EditorState {
 
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
-    let $conf = this.config
-    let tabSize = tr.getMeta(Transaction.changeTabSize), lineSep = tr.getMeta(Transaction.changeLineSeparator)
-    if (tabSize !== undefined) $conf = $conf.updateTabSize(tabSize)
-    // FIXME changing the line separator might involve rearranging line endings (?)
-    if (lineSep !== undefined) $conf = $conf.updateLineSeparator(lineSep)
     let fields: any[] = []
-    let newState = new EditorState($conf, fields, tr.doc, tr.selection)
+    let newState = new EditorState(this.config, fields, tr.doc, tr.selection)
     for (let i = 0; i < this.fields.length; i++)
-      fields[i] = $conf.fields[i].apply(tr, this.fields[i], newState)
+      fields[i] = this.config.fields[i].apply(tr, this.fields[i], newState)
     return newState
   }
 
@@ -135,29 +113,23 @@ export class EditorState {
   /// this state.
   get behavior() { return this.config.behavior }
 
-  // FIXME plugin state serialization
-
   /// Convert this state to a JSON-serializable object.
   toJSON(): any {
+    // FIXME plugin state serialization
     return {
       doc: this.joinLines(this.doc.sliceLines(0, this.doc.length)),
-      selection: this.selection.toJSON(),
-      lineSeparator: this.config.lineSeparator,
-      tabSize: this.tabSize
+      selection: this.selection.toJSON()
     }
   }
 
   /// Deserialize a state from its JSON representation.
   static fromJSON(json: any, config: EditorStateConfig = {}): EditorState {
-    if (!json || (json.lineSeparator && typeof json.lineSeparator != "string") ||
-        typeof json.tabSize != "number" || typeof json.doc != "string")
+    if (!json || typeof json.doc != "string")
       throw new RangeError("Invalid JSON representation for EditorState")
     return EditorState.create({
       doc: json.doc,
       selection: EditorSelection.fromJSON(json.selection),
-      extensions: config.extensions,
-      tabSize: config.tabSize,
-      lineSeparator: config.lineSeparator
+      extensions: config.extensions
     })
   }
 
@@ -165,7 +137,7 @@ export class EditorState {
   static create(config: EditorStateConfig = {}): EditorState {
     let $config = Configuration.create(config)
     let doc = config.doc instanceof Text ? config.doc
-      : Text.of(config.doc || "", config.lineSeparator || undefined)
+      : Text.of(config.doc || "", $config.lineSeparator || undefined)
     let selection = config.selection || EditorSelection.single(0)
     if (!$config.multipleSelections) selection = selection.asSingle()
     let fields: any[] = []
@@ -180,7 +152,8 @@ export class EditorState {
   /// new state to preserve their old value via their `reconfigure`
   /// method.
   reconfigure(extensions: readonly Extension[]) {
-    let config = Configuration.create({extensions}) // FIXME this resets tab and lineseparator, which should be going anyway
+    // FIXME changing the line separator might involve rearranging line endings (?)
+    let config = Configuration.create({extensions})
     let selection = config.multipleSelections ? this.selection : this.selection.asSingle()
     let fields: any[] = []
     let state = new EditorState(config, fields, this.doc, selection)
@@ -206,6 +179,19 @@ export class EditorState {
   /// Behavior that defines a way to query for automatic indentation
   /// depth at the start of a given line.
   static indentation = extendState.behavior<(state: EditorState, pos: number) => number>()
+
+  /// Configures the tab size to use in this state. The first
+  /// (highest-precedence) value of the behavior is used.
+  static tabSize = extendState.behavior<number>()
+
+  /// The line separator to use. By default, any of `"\n"`, `"\r\n"`
+  /// and `"\r"` is treated as a separator when splitting lines, and
+  /// lines are joined with `"\n"`.
+  ///
+  /// When you configure a value here, only that precise separator
+  /// will be used, allowing you to round-trip documents through the
+  /// editor without normalizing line separators.
+  static lineSeparator = extendState.behavior<string>()
 
   /// Behavior for overriding the unit by which indentation happens.
   static indentUnit = extendState.behavior<number>()
