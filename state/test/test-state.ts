@@ -70,7 +70,7 @@ describe("EditorState", () => {
   })
 
   it("can preserve fields across reconfiguration", () => {
-    let field = new StateField({init: () => 0, apply: (tr, val) => val + 1, reconfigure: (state, val) => val + 100})
+    let field = new StateField({init: () => 0, apply: (tr, val) => val + 1, reconfigure: (val, state) => val + 100})
     let start = EditorState.create({extensions: [field.extension]}).t().apply()
     ist(start.getField(field), 1)
     ist(start.reconfigure([field.extension]).getField(field), 101)

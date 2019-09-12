@@ -24,6 +24,10 @@ const historyField = new StateField({
                               tr.startState.selection, tr.getMeta(Transaction.time)!,
                               tr.getMeta(Transaction.userEvent), config.newGroupDelay, config.minDepth)
     return state.addMapping(tr.changes.desc, config.minDepth)
+  },
+
+  reconfigure(state: HistoryState) {
+    return state
   }
 })
 

@@ -159,7 +159,7 @@ export class EditorState {
     let state = new EditorState(config, fields, this.doc, selection)
     for (let field of config.fields) {
       let oldIndex = this.config.fields.indexOf(field)
-      fields.push(oldIndex > -1 ? field.reconfigure(state, this.fields[oldIndex]) : field.init(state))
+      fields.push(oldIndex > -1 ? field.reconfigure(this.fields[oldIndex], this, state) : field.init(state))
     }
     return state
   }
@@ -210,7 +210,7 @@ export class StateField<T> {
   /// @internal
   readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
   /// @internal
-  readonly reconfigure: (state: EditorState, oldValue: T) => T
+  readonly reconfigure: (oldValue: T, oldState: EditorState, newState: EditorState) => T
   /// The extension that can be used to
   /// [attach](#state.EditorStateConfig.extensions) this field to a
   /// state.
@@ -230,11 +230,11 @@ export class StateField<T> {
   constructor({init, apply, reconfigure}: {
     init: (state: EditorState) => T,
     apply: (tr: Transaction, value: T, newState: EditorState) => T
-    reconfigure?: (state: EditorState, oldValue: T) => T
+    reconfigure?: (oldValue: T, olState: EditorState, newState: EditorState) => T
   }) {
     this.init = init
     this.apply = apply
-    this.reconfigure = reconfigure || init
+    this.reconfigure = reconfigure || ((val, old, state) => init(state))
     this.extension = stateFieldBehavior(this)
   }
 }
