@@ -33,27 +33,52 @@ export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boo
 export const themeClass = extendView.behavior<(tag: string) => string>()
 
 /// View plugins are stateful objects that are associated with a view.
-/// They are notified when the view is updated or destroyed. In
-/// contrast to view fields, view plugins are told about updates
-/// _after_ the view has updated itself. They cannot influence the way
-/// the content of the view is drawn, but are useful for things like
-/// drawing UI elements outside of that content (such as a gutter or
-/// tooltip).
+/// They can influence the way the content is drawn, and are notified
+/// of things that happen in the view.
+///
+/// If you declare a constructor for a view plugin, you should make it
+/// take an [`EditorView`](#view.EditorView) as first argument and,
+/// optionally, a configuration value as second. Registering plugins
+/// is done with [`ViewPlugin.extension`](#view.ViewPlugin^extension),
+/// which expects that constructor signature.
+///
+/// When a plugin method throws an exception, the error will be logged
+/// to the console and the plugin will be disabled for the rest of the
+/// view's lifetime (to avoid leaving it in an invalid state).
 export class ViewPlugin<T = undefined> {
-  // FIXME document
+  /// Notify the plugin of an update that happened in the view. This
+  /// is called _before_ the view updates its DOM. It is responsible
+  /// for updating the plugin's internal state and its
+  /// `decoration`/`editorAttributes`/`contentAttributes` properties.
+  /// It should _not_ change the DOM, or read the DOM in a way that
+  /// triggers a layout recomputation.
   update(update: ViewUpdate) {}
 
+  /// This is called after the view updated its DOM structure. It may
+  /// write to the DOM (outside of the editor content). It should not
+  /// trigger a DOM layout.
   draw() {}
 
   measure(): T { return undefined as any as T }
   drawMeasured(measurement: T) {}
 
+  /// Called when the plugin is no longer going to be used.
   destroy() {}
 
+  /// The set of decorations produced by this plugin. Defaults to the
+  /// empty set.
   decorations!: DecorationSet
+
+  /// Attributes added to the editor's wrapping element by this
+  /// plugin. Defaults to none.
   editorAttributes!: Attrs | undefined
+
+  /// Attributes added to the editable content element by this plugin.
+  /// Defaults to none.
   contentAttributes!: Attrs | undefined
 
+  /// Create an extension that registers this plugin, optionally in a
+  /// specific configuration.
   static extension(this: {new (view: EditorView): ViewPlugin<any>}): Extension
   static extension<T>(this: {new (view: EditorView, config: T): ViewPlugin<any>}, config: T): Extension
   static extension<T>(config?: T) { return viewPlugin({constructor: this, config}) }
@@ -69,6 +94,9 @@ export class ViewPlugin<T = undefined> {
     return DecorationPlugin.extension(spec)
   }
 
+  /// Create a plugin extension that sets the given attributes on the
+  /// outer editor and content elements. Both may be `undefined` to
+  /// not add anything.
   static attributes(editor?: Attrs, content?: Attrs) {
     return AttributePlugin.extension({editor, content})
   }

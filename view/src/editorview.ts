@@ -207,7 +207,8 @@ export class EditorView {
     return this.plugins.map(p => p.decorations)
   }
 
-  // FIXME is this a good idea?
+  /// Get an instance of the given plugin class, or `undefined` if
+  /// none exists in this view.
   getPlugin<T extends ViewPlugin>(constructor: {new (...args: any): T}): T | undefined {
     for (let plugin of this.plugins) if (plugin.constructor == constructor) return plugin as T
     return undefined
