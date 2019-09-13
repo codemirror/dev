@@ -13,6 +13,7 @@ import {extendView, ViewUpdate, styleModule,
         viewPlugin, ViewPlugin, themeClass, notified} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
+import browser from "./browser"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
@@ -169,7 +170,7 @@ export class EditorView {
       spellcheck: "false",
       contenteditable: "true",
       class: styles.content + " codemirror-content " + this.themeClass("editor.content"),
-      style: tabSizeStyle + this.state.tabSize
+      style: `${browser.tabSize}: ${this.state.tabSize}`
     }
     for (let {editorAttributes, contentAttributes} of this.plugins) {
       if (editorAttributes) editorAttrs = combineAttrs(editorAttributes, editorAttrs)
@@ -329,5 +330,3 @@ export class EditorView {
     this.docView.destroy()
   }
 }
-
-const tabSizeStyle = typeof document == "undefined" || (document.documentElement.style as any).tabSize != null ? "tab-size: " : "-moz-tab-size: "

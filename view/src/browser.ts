@@ -22,5 +22,6 @@ export default {
   android: /Android\b/.test(nav.userAgent),
   webkit,
   safari: /Apple Computer/.test(nav.vendor),
-  webkit_version: webkit ? +(/\bAppleWebKit\/(\d+)/.exec(navigator.userAgent) || [0, 0])[1] : 0
+  webkit_version: webkit ? +(/\bAppleWebKit\/(\d+)/.exec(navigator.userAgent) || [0, 0])[1] : 0,
+  tabSize: doc.documentElement.style.tabSize != null ? "tab-size" : "-moz-tab-size"
 }
