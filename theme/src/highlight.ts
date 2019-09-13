@@ -1,20 +1,30 @@
-import {EditorView, ViewField, Decoration, DecorationSet, DecoratedRange} from "../../view/src"
+import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecoratedRange} from "../../view/src"
 import {themeData} from "./theme"
 import {Syntax, EditorState} from "../../state/src/"
 import {styleNodeProp} from "./styleprop"
 
-class Highlighter {
-  deco!: DecorationSet
+class Highlighter extends ViewPlugin {
   partialDeco = false
+  readonly syntax: Syntax | null = null
 
-  constructor(readonly syntax: Syntax | null, view: EditorView) {
+  constructor(view: EditorView) {
+    super()
+    for (let s of view.state.behavior.get(EditorState.syntax)) {
+      this.syntax = s
+      break
+    }
     this.buildDeco(view)
+  }
+
+  update(update: ViewUpdate) {
+    if (this.partialDeco || update.docChanged || update.viewportChanged)
+      this.buildDeco(update.view)
   }
 
   buildDeco(view: EditorView) {
     let themes = view.behavior.get(themeData)
     if (!this.syntax || themes.length == 0) {
-      this.deco = Decoration.none
+      this.decorations = Decoration.none
       return
     }
 
@@ -81,7 +91,7 @@ class Highlighter {
         }
       }
     })
-    this.deco = Decoration.set(tokens)
+    this.decorations = Decoration.set(tokens)
   }
 }
 
@@ -92,18 +102,5 @@ class TokenContext {
 }
 
 export function highlight() { // FIXME allow specifying syntax?
-  return new ViewField<Highlighter>({
-    create(view) {
-      for (let s of view.state.behavior.get(EditorState.syntax))
-        return new Highlighter(s, view)
-      return new Highlighter(null, view)
-    },
-    update(highlighter, update) {
-      if (highlighter.partialDeco || update.docChanged || update.viewportChanged)
-        highlighter.buildDeco(update.view)
-      return highlighter // FIXME immutable?
-    },
-    effects: [ViewField.decorationEffect(h => h.deco)]
-  }).extension
+  return Highlighter.extension()
 }
-

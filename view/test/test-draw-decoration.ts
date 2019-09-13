@@ -1,4 +1,4 @@
-import {EditorView, ViewField, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
+import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
 import {Slot} from "../../extension/src/extension"
@@ -9,7 +9,7 @@ const addDeco = Slot.define<DecoratedRange[]>()
 
 function decos(startState: DecorationSet = Decoration.none) {
   return [
-    ViewField.decorations({
+    ViewPlugin.decorate({
       create() { return startState },
       update(value, {transactions, state}) {
         for (let tr of transactions) {

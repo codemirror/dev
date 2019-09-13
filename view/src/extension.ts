@@ -2,91 +2,13 @@ import {EditorState, Transaction, ChangeSet} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet, Decoration} from "./decoration"
-import {ExtensionType, Slot, SlotType} from "../../extension/src/extension"
+import {Extension, ExtensionType, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
 
-export type Effect<T> = SlotType<(field: any) => T>
-
-const none: any[] = []
-
-/// View fields are used to keep extra state in the view and to create
-/// decorations and other effects that influence how the view is
-/// drawn.
-export class ViewField<V> {
-  /// @internal
-  readonly create: (view: EditorView) => V
-  /// @internal
-  readonly update: (value: V, update: ViewUpdate) => V
-  /// @internal
-  readonly effects: Slot<(field: V) => any>[]
-  
-  /// Create a view field with the given initialization and update
-  /// function. When given `effects` determines with effects this
-  /// field has on the view.
-  constructor({create, update, effects = []}: {
-    create: (view: EditorView) => V
-    update: (value: V, update: ViewUpdate) => V,
-    effects?: Slot<(field: V) => any>[]
-  }) {
-    this.create = create; this.update = update; this.effects = effects
-  }
-
-  /// The extension (to be passed in the
-  /// [`extensions`](#view.EditorConfig.extensions) field when creating
-  /// a view) that installs this field.
-  get extension() { return viewField(this) }
-
-  /// Define an effect that produces decorations from a given field
-  /// value.
-  static decorationEffect = Slot.define<(field: any) => DecorationSet>()
-  /// Define an effect that influences the attributes on the editor
-  /// view's outer element.
-  static editorAttributeEffect = Slot.define<(field: any) => (Attrs | null)>()
-  /// Define an effect that sets attributes on the editable element in
-  /// a view.
-  static contentAttributeEffect = Slot.define<(field: any) => (Attrs | null)>()
-
-  /// Create a view field extension that only computes decorations.
-  /// When `map` is true, the set passed to `update` will already have
-  /// been mapped through the transactions in the `ViewUpdate`.
-  static decorations({create, update, map}: {
-    create?: (view: EditorView) => DecorationSet,
-    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
-    map?: boolean
-  }) {
-    return new ViewField<DecorationSet>({
-      create: create || (() => Decoration.none),
-      update(deco: DecorationSet, u: ViewUpdate) {
-        if (map) deco = deco.map(u.changes)
-        return update(deco, u)
-      },
-      effects: [ViewField.decorationEffect(d => d)]
-    }).extension
-  }
-
-  /// Create a view field extension that only computes an
-  /// [`editorAttributeEffect`](#view.ViewField.editorAttributeEffect).
-  static editorAttributes = attributeField(ViewField.editorAttributeEffect)
-
-  /// Create a view field extension that only computes a
-  /// [`contentAttributeEffect`](#view.ViewField.contentAttributeEffect).
-  static contentAttributes = attributeField(ViewField.contentAttributeEffect)
-}
-
-function attributeField(effect: Effect<Attrs | null>) {
-  return function(value: Attrs | ((view: EditorView) => Attrs | null),
-                  update?: (value: Attrs | null, update: ViewUpdate) => Attrs | null) {
-    return new ViewField<Attrs | null>({
-      create: value instanceof Function ? value : () => value,
-      update: update || (a => a), effects: [effect(a => a)]
-    }).extension
-  }
-}
+const none: readonly any[] = []
 
 export const extendView = new ExtensionType
-
-export const viewField = extendView.behavior<ViewField<any>>()
 
 /// Behavior that can be used to add DOM event handlers. The value
 /// should be an object mapping event names to handler functions. The
@@ -117,19 +39,69 @@ export const themeClass = extendView.behavior<(tag: string) => string>()
 /// the content of the view is drawn, but are useful for things like
 /// drawing UI elements outside of that content (such as a gutter or
 /// tooltip).
-export interface ViewPlugin {
-  update?: (update: ViewUpdate) => void
-  destroy?: () => void
-}
-// FIXME allow a phase distinction between DOM reading and dom writing
-// here? (For something like a tooltip plugin that needs to figure out
-// the tooltip position and then update some DOM—don't want to force a
-// relayout for every plugin that does that.)
+export class ViewPlugin<T = undefined> {
+  // FIXME document
+  update(update: ViewUpdate) {}
 
-/// Extension to register view plugins. Call this value with the
-/// plugin's constructor, and [add](#view.EditorConfig.extensions) the
-/// result to the view.
-export const viewPlugin = extendView.behavior<(view: EditorView) => ViewPlugin>()
+  draw() {}
+
+  measure(): T { return undefined as any as T }
+  drawMeasured(measurement: T) {}
+
+  destroy() {}
+
+  decorations!: DecorationSet
+  editorAttributes!: Attrs | undefined
+  contentAttributes!: Attrs | undefined
+
+  static extension(this: {new (view: EditorView): ViewPlugin<any>}): Extension
+  static extension<T>(this: {new (view: EditorView, config: T): ViewPlugin<any>}, config: T): Extension
+  static extension<T>(config?: T) { return viewPlugin({constructor: this, config}) }
+
+  /// Create a view plugin extension that only computes decorations.
+  /// When `map` is true, the set passed to `update` will already have
+  /// been mapped through the transactions in the `ViewUpdate`.
+  static decorate(spec: {
+    create: (view: EditorView) => DecorationSet,
+    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
+    map?: boolean
+  }) {
+    return DecorationPlugin.extension(spec)
+  }
+
+  static attributes(editor?: Attrs, content?: Attrs) {
+    return AttributePlugin.extension({editor, content})
+  }
+}
+
+ViewPlugin.prototype.decorations = Decoration.none
+ViewPlugin.prototype.editorAttributes = undefined
+ViewPlugin.prototype.contentAttributes = undefined
+
+// Registers view plugins.
+export const viewPlugin = extendView.behavior<{constructor: {new (view: EditorView, config: any): ViewPlugin}, config: any}>()
+
+class DecorationPlugin extends ViewPlugin {
+  constructor(view: EditorView, readonly spec: {
+    create: (view: EditorView) => DecorationSet,
+    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
+    map?: boolean
+  }) {
+    super()
+    this.decorations = spec.create(view)
+  }
+  update(update: ViewUpdate) {
+    this.decorations = this.spec.update(this.spec.map ? this.decorations.map(update.changes) : this.decorations, update)
+  }
+}
+
+class AttributePlugin extends ViewPlugin {
+  constructor(view: EditorView, {editor, content}: {editor: Attrs | undefined, content: Attrs | undefined}) {
+    super()
+    this.editorAttributes = editor
+    this.contentAttributes = content
+  }
+}
 
 /// Extension to add a [style
 /// module](https://github.com/marijnh/style-mod#readme) to an editor
@@ -154,10 +126,6 @@ export class ViewUpdate {
   readonly changes: ChangeSet
   /// The previous editor state.
   readonly prevState: EditorState
-  // @internal
-  readonly prevFields: ReadonlyArray<ViewField<any>>
-  // @internal
-  readonly prevFieldValues: ReadonlyArray<any>
   /// The previous viewport range.
   readonly prevViewport: Viewport
 
@@ -173,21 +141,11 @@ export class ViewUpdate {
     this.state = transactions.length ? transactions[transactions.length - 1].apply() : view.state
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     this.prevState = view.state
-    this.prevFields = view.fields
-    this.prevFieldValues = view.fieldValues
     this.prevViewport = view.viewport
   }
 
   /// The new viewport range.
   get viewport() { return this.view.viewport }
-
-  // FIXME remove?
-  /// Access a view field's value as it was before the update (only
-  /// meaningful for view fields whose content isn't mutated).
-  prevField<T>(field: ViewField<T>): T
-  prevField<T, D = undefined>(field: ViewField<T>, defaultValue?: D): T | D {
-    return getField(field, this.prevFields, this.prevFieldValues, defaultValue)
-  }
 
   /// Tells you whether the viewport changed in this update.
   get viewportChanged() {
@@ -209,15 +167,4 @@ export class ViewUpdate {
     }
     return undefined
   }
-}
-
-export function getField<T, D = undefined>(field: ViewField<T>, fields: ReadonlyArray<ViewField<any>>,
-                                           values: ReadonlyArray<any>, defaultValue?: D): T | D {
-  let index = fields.indexOf(field)
-  if (index < 0) {
-    if (defaultValue === undefined) throw new RangeError("Field isn't present")
-    else return defaultValue
-  }
-  if (index >= values.length) throw new RangeError("Accessing a field that isn't initialized yet")
-  return values[index] as T
 }

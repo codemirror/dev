@@ -8,7 +8,7 @@ import {DOMObserver} from "./domobserver"
 import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, ViewField} from "./extension"
+import {ViewUpdate} from "./extension"
 import {EditorView} from "./editorview"
 import {EditorState, ChangedRange} from "../../state/src"
 import {Text} from "../../doc/src"
@@ -315,7 +315,7 @@ export class DocView extends ContentView {
       // otherwise.
       if (!this.view.inputState.composing) this.compositionDeco = Decoration.none
       else if (update && update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, contentChanges)
-      let decorations = this.view.getEffect(ViewField.decorationEffect).concat(this.compositionDeco)
+      let decorations = this.view.getDecorations().concat(this.compositionDeco)
       // If the decorations are stable, stop.
       if (!update && !initializing && sameArray(decorations, this.decorations)) return contentChanges
       // Compare the decorations (between document changes)
@@ -373,15 +373,15 @@ export class DocView extends ContentView {
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
 
     this.view.withUpdating(() => {
-      let update: ViewUpdate | null = null
+      let update = false
       for (let i = 0;; i++) {
         this.heightOracle.heightChanged = false
         this.heightMap = this.heightMap.updateHeight(
           this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
         let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
         if (covered && !this.heightOracle.heightChanged) break
-        if (!update) update = new ViewUpdate(this.view)
-        if (i > 10) throw new Error("Layout failed to converge")
+        update = true
+        if (i > 10) throw new Error("Layout failed to converge") // FIXME warn and break?
         let contentChanges = covered ? none : this.computeUpdate(this.state, null, false, none, scrollBias, -1)
         this.updateInner(contentChanges, this.length)
         lineHeights = null
@@ -391,7 +391,7 @@ export class DocView extends ContentView {
       }
       if (update) {
         this.observer.listenForScroll()
-        this.view.updatePlugins(update)
+        this.view.drawPlugins()
       }
     })
   }

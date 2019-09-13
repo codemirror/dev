@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {Decoration, WidgetType, ViewField} from "../src"
+import {Decoration, WidgetType, ViewPlugin} from "../src"
 import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)
@@ -13,7 +13,7 @@ class OWidget extends WidgetType<void> {
   }
 }
 
-const oWidgets = ViewField.decorations({
+const oWidgets = ViewPlugin.decorate({
   create({state}) {
     let doc = state.doc.toString(), deco = []
     for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
@@ -116,7 +116,7 @@ describe("EditorView.movePos", () => {
   })
 
   it("can cross large line widgets during line motion", () => {
-    let cm = tempEditor("one\ntwo", [ViewField.decorations({
+    let cm = tempEditor("one\ntwo", [ViewPlugin.decorate({
       create() {
         return Decoration.set([
           Decoration.widget(3, {widget: new BigWidget(undefined), side: 1, block: true}),

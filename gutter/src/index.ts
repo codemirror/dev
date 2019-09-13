@@ -1,5 +1,5 @@
 import {Extension, combineConfig, fillConfig, Slot} from "../../extension/src/extension"
-import {EditorView, ViewPlugin, ViewUpdate, styleModule, viewPlugin, BlockType, BlockInfo} from "../../view/src"
+import {EditorView, ViewPlugin, ViewUpdate, styleModule, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
 import {StyleModule} from "style-mod"
@@ -61,18 +61,19 @@ const defaults = {
 export function gutter<T>(config: GutterConfig) {
   let conf = fillConfig(config, defaults)
   return Extension.all(
-    viewPlugin(view => new GutterView(view, conf)),
+    GutterView.extension(conf),
     styleModule(styles)
   )
 }
 
-class GutterView implements ViewPlugin {
+class GutterView extends ViewPlugin {
   dom: HTMLElement
   elements: GutterElement[] = []
   markers: GutterMarkerSet
   spacer: GutterElement | null = null
 
   constructor(public view: EditorView, public config: Required<GutterConfig>) {
+    super()
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter " + config.class + " " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")
@@ -89,7 +90,7 @@ class GutterView implements ViewPlugin {
       this.dom.appendChild(this.spacer.dom)
       this.spacer.dom.style.cssText += "visibility: hidden; pointer-events: none"
     }
-    this.updateGutter()
+    this.draw()
   }
 
   update(update: ViewUpdate) {
@@ -98,11 +99,10 @@ class GutterView implements ViewPlugin {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
       if (updated != this.spacer.markers[0]) this.spacer.update(0, 0, [updated], this.config.elementClass)
     }
-    // FIXME would be nice to be able to recognize updates that didn't redraw
-    this.updateGutter()
   }
 
-  updateGutter() {
+  draw() {
+    // FIXME would be nice to be able to recognize updates that didn't redraw
     let i = 0, height = 0
     let markers = this.markers.iter(this.view.viewport.from, this.view.viewport.to)
     let localMarkers: any[] = [], nextMarker = markers.next()

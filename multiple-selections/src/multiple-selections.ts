@@ -1,5 +1,5 @@
 import {EditorState} from "../../state/src"
-import {ViewField, styleModule, DecorationSet, Decoration, WidgetType, MarkDecorationSpec} from "../../view/src"
+import {ViewPlugin, styleModule, DecorationSet, Decoration, WidgetType, MarkDecorationSpec} from "../../view/src"
 import {Extension} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
@@ -10,7 +10,7 @@ export const multipleSelections = EditorState.extend.unique((configs: Config[]) 
 
   return Extension.all(
     EditorState.allowMultipleSelections(true),
-    ViewField.decorations({
+    ViewPlugin.decorate({
       create(view) { return decorateSelections(view.state, rangeConfig) },
       update(deco, {prevState, state}) {
         return prevState.doc == state.doc && prevState.selection.eq(state.selection)

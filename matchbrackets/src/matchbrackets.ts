@@ -1,6 +1,6 @@
 import {EditorState} from "../../state/src"
 import {Extension, combineConfig} from "../../extension/src/extension"
-import {EditorView, ViewField} from "../../view/src/"
+import {EditorView, ViewPlugin} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
 import {Tree, Subtree, NodeType} from "lezer-tree"
 import {openNodeProp, closeNodeProp} from "../../syntax/src/"
@@ -21,7 +21,7 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
   })
 
   return Extension.all(
-    ViewField.decorations({
+    ViewPlugin.decorate({
       create() { return Decoration.none },
       update(deco, update) {
         if (!update.transactions.length) return deco

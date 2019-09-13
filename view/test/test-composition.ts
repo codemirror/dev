@@ -1,5 +1,5 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorView, ViewField, Decoration, DecorationSet, WidgetType} from "../src"
+import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType} from "../src"
 import {EditorState} from "../../state/src"
 import {Slot} from "../../extension/src/extension"
 import ist from "ist"
@@ -56,7 +56,7 @@ function wordDeco(state: EditorState): DecorationSet {
   return Decoration.set(deco)
 }
 
-const wordHighlighter = ViewField.decorations({
+const wordHighlighter = ViewPlugin.decorate({
   create({state}) { return wordDeco(state) },
   update(_, {state}) { return wordDeco(state) },
   map: false
@@ -66,7 +66,7 @@ function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  return ViewField.decorations({
+  return ViewPlugin.decorate({
     create() {
       return Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
     },

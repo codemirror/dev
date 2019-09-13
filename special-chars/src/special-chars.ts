@@ -1,4 +1,4 @@
-import {Decoration, DecoratedRange, DecorationSet, styleModule, WidgetType, ViewField, ViewUpdate, EditorView} from "../../view/src"
+import {Decoration, DecoratedRange, styleModule, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange} from "../../state/src"
 import {combineConfig, Extension} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
@@ -12,33 +12,30 @@ export interface SpecialCharConfig {
 
 export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig[]) => {
   // FIXME make configurations compose properly
-  let config = combineConfig(configs, {
+  let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
     render: null,
     specialChars: SPECIALS,
     addSpecialChars: null
   })
 
   let styles = document.body.style as any
-  let replaceTabs = (styles.tabSize || styles.MozTabSize) == null
-  if (replaceTabs) config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
+  config.replaceTabs = (styles.tabSize || styles.MozTabSize) == null
+  if (config.replaceTabs)
+    config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
 
-  const result = new ViewField<SpecialCharHighlighter>({
-    create(view) { return new SpecialCharHighlighter(view, config, replaceTabs) },
-    update(self, update) { return self.update(update) },
-    effects: [ViewField.decorationEffect(self => self.decorations)]
-  }).extension
-  return replaceTabs ? Extension.all(result, styleModule(style)) : result
+  let extension = SpecialCharPlugin.extension(config)
+  return config.replaceTabs ? Extension.all(extension, styleModule(style)) : extension
 }, {})
 
 const JOIN_GAP = 10
 
-class SpecialCharHighlighter {
-  decorations: DecorationSet = Decoration.none
+class SpecialCharPlugin extends ViewPlugin {
   from = 0
   to = 0
   specials: RegExp
 
-  constructor(public view: EditorView, readonly options: Required<SpecialCharConfig>, private replaceTabs: boolean) {
+  constructor(public view: EditorView, readonly options: Required<SpecialCharConfig> & {replaceTabs?: boolean}) {
+    super()
     this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
     this.updateForViewport()
@@ -52,7 +49,6 @@ class SpecialCharHighlighter {
       this.closeHoles(update.changes.changedRanges())
     }
     this.updateForViewport()
-    return this
   }
 
   closeHoles(ranges: ReadonlyArray<ChangedRange>) {
@@ -60,7 +56,7 @@ class SpecialCharHighlighter {
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]
       // Must redraw all tabs further on the line
-      if (this.replaceTabs) to = this.view.state.doc.lineAt(to).end
+      if (this.options.replaceTabs) to = this.view.state.doc.lineAt(to).end
       while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JOIN_GAP) to = Math.max(to, ranges[++i].toB)
       // Clip to current viewport, to avoid doing work for invisible text
       from = Math.max(vp.from, from); to = Math.min(vp.to, to)
@@ -112,8 +108,6 @@ class SpecialCharHighlighter {
       pos += cursor.value.length
     }
   }
-
-  get styles() { return style }
 }
 
 const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
