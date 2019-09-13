@@ -110,14 +110,30 @@ export class EditorView {
   /// content and a reset of the view extensions.
   setState(state: EditorState, extensions: Extension[] = []) {
     this.clearWaiting()
-    this.forEachPlugin(p => p.destroy())
     this.withUpdating(() => {
       ;(this as any).behavior = extendView.resolve(extensions.concat(state.behavior.foreign))
       StyleModule.mount(this.root, this.behavior.get(styleModule).concat(styles).reverse())
       if (this.behavior.foreign.length)
         throw new Error("Non-view extensions found when setting view state")
       this.inputState = new InputState(this)
-      this.docView.init(state)
+      this.docView.init(state, viewport => {
+        this.viewport = viewport
+        this.state = state
+        let oldPlugins = this.plugins
+        this.plugins = []
+        for (let {constructor, config} of this.behavior.get(viewPlugin)) {
+          let plugin
+          for (let i = 0, old; i < oldPlugins.length; i++) {
+            if ((old = oldPlugins[i]).constructor == constructor && old.reset(this, config)) {
+              plugin = old
+              oldPlugins.splice(i, 1)
+              break
+            }
+          }
+          this.plugins.push(plugin || new constructor(this, config))
+        }
+        this.forEachPlugin(p => p.destroy(), oldPlugins)
+      })
       this.updateAttrs()
     })
   }
@@ -125,12 +141,12 @@ export class EditorView {
   // Call a function on each plugin. If that crashes, disable the
   // plugin (replacing it with an empty one so that
   // docView.decorations still aligns) and log the error.
-  private forEachPlugin(f: (plugin: ViewPlugin) => void) {
-    for (let i = 0; i < this.plugins.length; i++) {
+  private forEachPlugin(f: (plugin: ViewPlugin) => void, plugins = this.plugins) {
+    for (let i = 0; i < plugins.length; i++) {
       try {
-        f(this.plugins[i])
+        f(plugins[i])
       } catch (e) {
-        this.plugins[i] = new ViewPlugin
+        plugins[i] = new ViewPlugin
         console.error(e)
       }
     }
@@ -216,9 +232,6 @@ export class EditorView {
 
   /// @internal
   initInner(state: EditorState, viewport: Viewport) {
-    this.viewport = viewport
-    this.state = state
-    this.plugins = this.behavior.get(viewPlugin).map(({constructor, config}) => new constructor(this, config))
   }
 
   /// @internal

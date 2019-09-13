@@ -73,7 +73,7 @@ export class DocView extends ContentView {
     this.observer = new DOMObserver(this, onDOMChange, () => this.checkLayout())
   }
 
-  init(state: EditorState) {
+  init(state: EditorState, initialize: (viewport: Viewport) => void) {
     let changedRanges = [new ChangedRange(0, 0, 0, state.doc.length)]
     this.heightMap = HeightMap.empty().applyChanges(none, Text.empty, this.heightOracle.setDoc(state.doc), changedRanges)
     this.children = [new LineView]
@@ -81,7 +81,7 @@ export class DocView extends ContentView {
     this.viewports = this.decorations = none
     this.minWidth = 0
     this.compositionDeco = Decoration.none
-    let contentChanges = this.computeUpdate(state, null, true, changedRanges, 0, -1)
+    let contentChanges = this.computeUpdate(state, null, initialize, changedRanges, 0, -1)
     this.updateInner(contentChanges, 0)
     this.cancelLayoutCheck()
     this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
@@ -109,7 +109,7 @@ export class DocView extends ContentView {
     }
     this.heightMap = this.heightMap.applyChanges(none, prevDoc, this.heightOracle.setDoc(state.doc), changedRanges)
 
-    let contentChanges = this.computeUpdate(state, update, false, changedRanges, 0, scrollIntoView)
+    let contentChanges = this.computeUpdate(state, update, null, changedRanges, 0, scrollIntoView)
     // When the DOM nodes around the selection are moved to another
     // parent, Chrome sometimes reports a different selection through
     // getSelection than the one that it actually shows to the user.
@@ -294,7 +294,7 @@ export class DocView extends ContentView {
   // Compute the new viewport and set of decorations, while giving
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
-  computeUpdate(state: EditorState, update: ViewUpdate | null, initializing: boolean,
+  computeUpdate(state: EditorState, update: ViewUpdate | null, initializing: null | ((viewport: Viewport) => void),
                 contentChanges: A<ChangedRange>, viewportBias: number, scrollIntoView: number): A<ChangedRange> {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(state.doc, this.heightMap, viewportBias, scrollIntoView)
@@ -307,7 +307,7 @@ export class DocView extends ContentView {
         return contentChanges
       }
       let prevState = this.state || state
-      if (initializing) this.view.initInner(state, viewport)
+      if (initializing) initializing(viewport)
       else this.view.updateInner(update || new ViewUpdate(this.view), viewport)
 
       // For the composition decoration, use none on init, recompute
@@ -333,7 +333,7 @@ export class DocView extends ContentView {
       contentChanges = extendWithRanges(contentChanges, content)
       // Make sure only one iteration is marked as required / state changing
       update = null
-      initializing = false
+      initializing = null
     }
   }
 
@@ -382,7 +382,7 @@ export class DocView extends ContentView {
         if (covered && !this.heightOracle.heightChanged) break
         update = true
         if (i > 10) throw new Error("Layout failed to converge") // FIXME warn and break?
-        let contentChanges = covered ? none : this.computeUpdate(this.state, null, false, none, scrollBias, -1)
+        let contentChanges = covered ? none : this.computeUpdate(this.state, null, null, none, scrollBias, -1)
         this.updateInner(contentChanges, this.length)
         lineHeights = null
         refresh = false

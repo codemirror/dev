@@ -90,7 +90,6 @@ class GutterView extends ViewPlugin {
       this.dom.appendChild(this.spacer.dom)
       this.spacer.dom.style.cssText += "visibility: hidden; pointer-events: none"
     }
-    this.draw()
   }
 
   update(update: ViewUpdate) {

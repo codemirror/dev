@@ -40,7 +40,9 @@ export const themeClass = extendView.behavior<(tag: string) => string>()
 /// take an [`EditorView`](#view.EditorView) as first argument and,
 /// optionally, a configuration value as second. Registering plugins
 /// is done with [`ViewPlugin.extension`](#view.ViewPlugin^extension),
-/// which expects that constructor signature.
+/// which expects that constructor signature. The constructor should
+/// set up internal state, but not mutate the DOM—the `draw` function
+/// will be called after the editor has initialized.
 ///
 /// When a plugin method throws an exception, the error will be logged
 /// to the console and the plugin will be disabled for the rest of the
@@ -54,13 +56,22 @@ export class ViewPlugin<T = undefined> {
   /// triggers a layout recomputation.
   update(update: ViewUpdate) {}
 
-  /// This is called after the view updated its DOM structure. It may
-  /// write to the DOM (outside of the editor content). It should not
-  /// trigger a DOM layout.
+  /// This is called after the view updated (or initialized) its DOM
+  /// structure. It may write to the DOM (outside of the editor
+  /// content). It should not trigger a DOM layout.
   draw() {}
 
   measure(): T { return undefined as any as T }
   drawMeasured(measurement: T) {}
+
+  /// When an editor view is given a completely new state (as opposed
+  /// to moving forward by transactions), its plugins are recreated.
+  /// If there's another plugin with the same constructor active, that
+  /// will have this method called with the view and the new config
+  /// (if any). It can return `true` to indicate that it can be used
+  /// instead of creating a new instance. The default implementation
+  /// returns false.
+  reset(view: EditorView, config: any): boolean { return false }
 
   /// Called when the plugin is no longer going to be used.
   destroy() {}

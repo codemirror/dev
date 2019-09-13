@@ -11,7 +11,8 @@ export class LezerSyntax implements Syntax {
   constructor(readonly parser: Parser) {
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
-      apply(tr, value) { return value.apply(tr) }
+      apply(tr, value) { return value.apply(tr) },
+      reconfigure(value) { return value }
     })
     this.extension = Extension.all(
       EditorState.syntax(this),
