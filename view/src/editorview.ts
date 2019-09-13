@@ -110,7 +110,7 @@ export class EditorView {
   /// content and a reset of the view extensions.
   setState(state: EditorState, extensions: Extension[] = []) {
     this.clearWaiting()
-    for (let plugin of this.plugins) plugin.destroy()
+    this.forEachPlugin(p => p.destroy())
     this.withUpdating(() => {
       ;(this as any).behavior = extendView.resolve(extensions.concat(state.behavior.foreign))
       StyleModule.mount(this.root, this.behavior.get(styleModule).concat(styles).reverse())
@@ -120,6 +120,20 @@ export class EditorView {
       this.docView.init(state)
       this.updateAttrs()
     })
+  }
+
+  // Call a function on each plugin. If that crashes, disable the
+  // plugin (replacing it with an empty one so that
+  // docView.decorations still aligns) and log the error.
+  private forEachPlugin(f: (plugin: ViewPlugin) => void) {
+    for (let i = 0; i < this.plugins.length; i++) {
+      try {
+        f(this.plugins[i])
+      } catch (e) {
+        this.plugins[i] = new ViewPlugin
+        console.error(e)
+      }
+    }
   }
 
   /// Update the view for the given array of transactions. This will
@@ -184,7 +198,7 @@ export class EditorView {
 
   /// @internal
   drawPlugins() {
-    for (let plugin of this.plugins) plugin.draw()
+    this.forEachPlugin(p => p.draw())
     this.updateAttrs()
   }
 
@@ -210,7 +224,7 @@ export class EditorView {
   updateInner(update: ViewUpdate, viewport: Viewport) {
     this.viewport = viewport
     this.state = update.state
-    for (let plugin of this.plugins) plugin.update(update)
+    this.forEachPlugin(p => p.update(update))
   }
 
   /// @internal
@@ -324,7 +338,7 @@ export class EditorView {
   /// extensions. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    for (let plugin of this.plugins) plugin.destroy()
+    this.forEachPlugin(p => p.destroy())
     this.inputState.destroy()
     this.dom.remove()
     this.docView.destroy()

@@ -58,8 +58,13 @@ export class InputState {
 
   runCustomHandlers(type: string, view: EditorView, event: Event): boolean {
     let handlers = this.customHandlers[type]
-    if (handlers) for (let handler of handlers)
-      if (handler(view, event) || event.defaultPrevented) return true
+    if (handlers) for (let handler of handlers) {
+      try {
+        if (handler(view, event) || event.defaultPrevented) return true
+      } catch (e) {
+        console.error(e)
+      }
+    }
     return false
   }
 
