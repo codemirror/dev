@@ -1,4 +1,4 @@
-export {EditorStateConfig, EditorState, StateField, Syntax, CancellablePromise} from "./state"
+export {EditorStateConfig, EditorState, Syntax, CancellablePromise} from "./state"
 export {EditorSelection, SelectionRange} from "./selection"
 export {Change, ChangeDesc, ChangeSet, Mapping, MapMode, ChangedRange} from "./change"
 export {Transaction} from "./transaction"

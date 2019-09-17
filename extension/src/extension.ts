@@ -37,16 +37,70 @@ const enum Kind { Behavior, Multi, Unique }
 /// behavior, but also serves as the key that identifies the behavior.
 export type Behavior<Value> = (value: Value) => Extension
 
+/// Parameters passed when [creating](#state.ExtensionType.field) a
+/// [`Field`](#state.Field)
+export interface FieldSpec<Value, Target, Update> {
+  /// Creates the initial value for the field.
+  init: (target: Target) => Value
+  /// Compute a new value from the previous value and a
+  /// [transaction](#state.Transaction).
+  update: (update: Update, value: Value, target: Target) => Value
+  /// This method can be used to carry a field's value through a call
+  /// to [`EditorState.reconfigure`](#state.EditorState.reconfigure).
+  /// If both the old and the new configuration contain this (exact)
+  /// field, it'll be called (if present) instead of `init`, to create
+  /// the new field value.
+  reconfigure?: (value: Value, target: Target) => Value
+  /// The behavior to associate with this field, if any.
+  behavior?: Behavior<Value>
+}
+
+let nextFieldID = 0
+
+/// Fields can store store information. They can be optionally
+/// associated with behaviors. Use
+/// [`ExtensionType.field`](#state.ExtensionType.field) to create
+/// them.
+export class Field<Value> {
+  /// The extension that can be used to
+  /// [attach](#state.EditorStateConfig.extensions) this field to a
+  /// state.
+  readonly extension: Extension
+
+  /// @internal
+  readonly id = ++nextFieldID
+
+  /// @internal
+  constructor(
+    /// @internal
+    readonly init: (target: any) => Value,
+    /// @internal
+    readonly update: (update: any, value: Value, target: any) => Value,
+    /// @internal
+    readonly reconfigure: (value: Value, target: any) => Value,
+    behavior: Behavior<Value>,
+    type: ExtensionType<any, any>
+  ) {
+    this.extension = new Extension(Kind.Behavior, behavior, this, type)
+  }
+}
+
+class StaticField<Value> {
+  constructor(readonly value: Value) {}
+}
+
 /// All extensions are associated with an extension type. This is used
 /// to distinguish extensions meant for different types of hosts (such
 /// as the editor view and state).
-export class ExtensionType {
+export class ExtensionType<Target, Update> {
+  private nullBehavior = this.behavior<any>()
+
   /// Define a type of behavior. All extensions eventually resolve to
   /// behaviors. Each behavior can have an ordered sequence of values
   /// associated with it. An `Extension` can be seen as a tree of
   /// sub-extensions with behaviors as leaves.
   behavior<Value>(): Behavior<Value> {
-    let behavior = (value: Value) => new Extension(Kind.Behavior, behavior, value, this)
+    let behavior = (value: Value) => new Extension(Kind.Behavior, behavior, new StaticField(value), this)
     return behavior
   }
 
@@ -68,7 +122,7 @@ export class ExtensionType {
   /// Resolve an array of extensions by expanding all extensions until
   /// only behaviors are left, and then collecting the behaviors into
   /// arrays of values, preserving priority ordering throughout.
-  resolve(extensions: readonly Extension[]): BehaviorStore {
+  resolve(extensions: readonly Extension[]): ExtensionSet<Target, Update> {
     let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
@@ -88,20 +142,42 @@ export class ExtensionType {
       resolved.push(top)
     }
     // Collect the behavior values.
-    let store = new BehaviorStore
+    let foreign: Extension[] = []
+    let behaviors: Behavior<any>[] = [], behaviorFields: number[][] = [], staticBehavior: (null | any[])[] = []
+    let staticFields: any[] = [], dynamicFields: Field<any>[] = []
     for (let ext of pending) {
       if (ext.type != this) {
         // Collect extensions of the wrong type into store.foreign
-        store.foreign.push(ext)
+        foreign.push(ext)
         continue
       }
-      if (store.behaviors.indexOf(ext.id) > -1) continue // Already collected
+      if (behaviors.indexOf(ext.id) > -1) continue // Already collected
       let values: Extension[] = []
       for (let e of pending) if (e.id == ext.id) e.collect(values)
-      store.behaviors.push(ext.id)
-      store.values.push(values.map(v => v.value))
+      let fieldIDs = values.map(ext => {
+        let field = ext.value as StaticField<any> | Field<any>
+        if (field instanceof StaticField) {
+          staticFields.push(field.value)
+          return ((staticFields.length - 1) << 1) | 1
+        } else {
+          if (dynamicFields.indexOf(field) < 0) dynamicFields.push(field)
+          return field.id << 1
+        }
+      })
+      if (ext.id != this.nullBehavior) {
+        behaviors.push(ext.id)
+        behaviorFields.push(fieldIDs)
+        staticBehavior.push(fieldIDs.every(id => id & 1) ? fieldIDs.map(id => staticFields[id >> 1]) : null)
+      }
     }
-    return store
+    return new ExtensionSet(behaviors, dynamicFields, staticBehavior, staticFields, behaviorFields, foreign)
+  }
+
+  /// Create a new field.
+  field<Value>(spec: FieldSpec<Value, Target, Update>): Field<Value> {
+    return new Field(spec.init, spec.update,
+                     spec.reconfigure || ((val, target) => spec.init(target)),
+                     spec.behavior || this.nullBehavior, this)
   }
 }
 
@@ -116,10 +192,11 @@ export class Extension {
     readonly kind: Kind,
     /// @internal
     readonly id: any,
-    /// @internal
+    /// Holds the field for behaviors, the spec for unique extensions,
+    /// and the array of extensions for multi extensions. @internal
     readonly value: any,
     /// @internal
-    readonly type: ExtensionType,
+    readonly type: ExtensionType<any, any>,
     /// @internal
     readonly priority: number = Priority.None
   ) {}
@@ -202,29 +279,68 @@ class UniqueExtensionType {
 
 const none: readonly any[] = []
 
-/// A behavior store records the values associated with each behavior
-/// in a given configuration. It is created with
-/// `ExtensionType.resolve`.
-export class BehaviorStore {
+/// An extension set describes the fields and behaviors that exist in
+/// a given configuration. It is created with
+/// [`ExtensionType.resolve`](#state.ExtensionType.resolve).
+export class ExtensionSet<Target, Update> {
   /// @internal
-  behaviors: any[] = []
-  /// @internal
-  values: any[][] = []
-  // Any extensions that weren't an instance of the given type when
-  // resolving.
-  foreign: Extension[] = []
+  constructor(
+    /// @internal
+    readonly behaviors: readonly any[],
+    /// @internal
+    readonly fields: readonly Field<any>[],
+    /// @internal
+    readonly staticBehaviors: readonly (null | any[])[],
+    /// @internal
+    readonly staticFields: readonly any[],
+    /// @internal
+    readonly behaviorFields: readonly number[][],
+    /// Any extensions that weren't an instance of the given type when
+    /// resolving.
+    readonly foreign: readonly Extension[] = []
+  ) {}
 
-  /// Retrieve the values for a given behavior.
-  get<Value>(behavior: Behavior<Value>): readonly Value[] {
+  /// Retrieve the values for a given behavior. FIXME
+  getBehavior<Value>(behavior: Behavior<Value>, fields: FieldSet): readonly Value[] {
     let found = this.behaviors.indexOf(behavior)
-    return found < 0 ? none : this.values[found]
+    return (found < 0 ? none : this.staticBehaviors[found] || this.behaviorFields[found]
+            .map(pos => pos & 1 ? this.staticFields[pos >> 1] : fields[pos >> 1])) as Value[]
+  }
+
+  getField<Value>(field: Field<Value>, fields: FieldSet): Value | undefined {
+    return fields[field.id]
+  }
+
+  init(target: Target, fields: FieldSet) {
+    for (let field of this.fields) fields[field.id] = field.init(target)
+    for (let behavior of this.behaviors) fields.changedBehaviors.push(behavior)
+  }
+
+  update(update: Update, target: Target, oldFields: FieldSet, newFields: FieldSet) {
+    for (let field of this.fields)
+      newFields[field.id] = field.update(update, oldFields[field.id], target)
+    outer: for (let i = 0; i < this.behaviors.length; i++) if (!this.staticBehaviors[i]) {
+      for (let field of this.behaviorFields[i]) {
+        if ((field & 1) == 0 && oldFields[field >> 1] != newFields[field >> 1]) {
+          newFields.changedBehaviors.push(this.behaviors[i])
+          continue outer
+        }
+      }
+    }
   }
 }
+
+export class FieldSet {
+  [id: number]: any
+  readonly changedBehaviors: Behavior<any>[] = []
+}
+
+FieldSet.prototype = Object.create(null)
 
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
 // still in extenders.
-function findTopUnique(extensions: Extension[], type: ExtensionType): UniqueExtensionType | null {
+function findTopUnique(extensions: Extension[], type: ExtensionType<any, any>): UniqueExtensionType | null {
   let foundUnique = false
   for (let ext of extensions) if (ext.kind == Kind.Unique && ext.type == type) {
     foundUnique = true

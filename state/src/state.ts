@@ -200,45 +200,6 @@ export class EditorState {
   static syntax = extendState.behavior<Syntax>()
 }
 
-const stateFieldBehavior = extendState.behavior<StateField<any>>()
-
-/// State fields store extra information in the editor state. Because
-/// this state is immutable, the values in these fields must be too.
-export class StateField<T> {
-  /// @internal
-  readonly init: (state: EditorState) => T
-  /// @internal
-  readonly apply: (tr: Transaction, value: T, newState: EditorState) => T
-  /// @internal
-  readonly reconfigure: (oldValue: T, oldState: EditorState, newState: EditorState) => T
-  /// The extension that can be used to
-  /// [attach](#state.EditorStateConfig.extensions) this field to a
-  /// state.
-  readonly extension: Extension
-
-  /// Create a new state field. The `init` function creates the
-  /// initial value for the field in a newly created editor state. The
-  /// `apply` function computes a new value from the previous value
-  /// and a [transaction](#state.Transaction).
-  ///
-  /// The `reconfigure` method can be used to carry a field's value
-  /// through a call to
-  /// [`EditorState.reconfigure`](#state.EditorState.reconfigure). If
-  /// both the old and the new configuration contain this (exact)
-  /// field, it'll be called (if present) instead of `init`, to create
-  /// the new field value.
-  constructor({init, apply, reconfigure}: {
-    init: (state: EditorState) => T,
-    apply: (tr: Transaction, value: T, newState: EditorState) => T
-    reconfigure?: (oldValue: T, olState: EditorState, newState: EditorState) => T
-  }) {
-    this.init = init
-    this.apply = apply
-    this.reconfigure = reconfigure || ((val, old, state) => init(state))
-    this.extension = stateFieldBehavior(this)
-  }
-}
-
 /// This is a
 /// [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
 /// with an additional field that can be used to indicate you are no
