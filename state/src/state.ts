@@ -1,29 +1,10 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {ExtensionType, Extension, BehaviorStore} from "../../extension/src/extension"
+import {ExtensionType, Extension, BehaviorStore, Values, Behavior} from "../../extension/src/extension"
 import {Tree} from "lezer-tree"
 
 const extendState = new ExtensionType
-
-class Configuration {
-  constructor(
-    readonly behavior: BehaviorStore,
-    readonly fields: ReadonlyArray<StateField<any>>,
-    readonly multipleSelections: boolean,
-    readonly tabSize: number,
-    readonly lineSeparator: string | null) {}
-
-  static create(config: EditorStateConfig): Configuration {
-    let behavior = extendState.resolve(config.extensions || [])
-    return new Configuration(
-      behavior,
-      behavior.get(stateFieldBehavior),
-      behavior.get(EditorState.allowMultipleSelections).some(x => x),
-      behavior.get(EditorState.tabSize)[0] || 4,
-      behavior.get(EditorState.lineSeparator)[0] || null)
-  }
-}
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -39,14 +20,13 @@ export interface EditorStateConfig {
   extensions?: ReadonlyArray<Extension>
 }
 
-const DEFAULT_INDENT_UNIT = 2
+const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4
 
 export class EditorState {
   /// @internal
   constructor(
-    /// @internal
-    readonly config: Configuration,
-    private readonly fields: ReadonlyArray<any>,
+    private readonly extensions: BehaviorStore,
+    private readonly values: Values,
     /// The current document.
     readonly doc: Text,
     /// The current selection.
@@ -59,24 +39,26 @@ export class EditorState {
   /// Retrieve the value of a [state field](#state.StateField). Throws
   /// an error when the state doesn't have that field, unless you pass
   /// `false` as second parameter.
-  getField<T>(field: StateField<T>): T
-  getField<T>(field: StateField<T>, require: false): T | undefined
-  getField<T>(field: StateField<T>, require: boolean = true): T | undefined {
-    let index = this.config.fields.indexOf(field)
-    if (index < 0) {
-      if (require) throw new RangeError("Field is not present in this state")
-      else return undefined
+  field<T>(field: StateField<T>): T
+  field<T>(field: StateField<T>, require: false): T | undefined
+  field<T>(field: StateField<T>, require: boolean = true): T | undefined {
+    let value = this.values[field.id]
+    if (value === undefined && !Object.prototype.hasOwnProperty.call(this.values, field.id)) {
+      if (this.behavior(EditorState.field).indexOf(field) > -1)
+        throw new RangeError("Field hasn't been initialized yet")
+      if (require)
+        throw new RangeError("Field is not present in this state")
+      return undefined
     }
-    if (index >= this.fields.length) throw new RangeError("Field hasn't been initialized yet")
-    return this.fields[index]
+    return value
   }
 
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
-    let fields: any[] = []
-    let newState = new EditorState(this.config, fields, tr.doc, tr.selection)
-    for (let i = 0; i < this.fields.length; i++)
-      fields[i] = this.config.fields[i].apply(tr, this.fields[i], newState)
+    let values = new Values
+    let newState = new EditorState(this.extensions, values, tr.doc, tr.selection)
+    for (let field of this.behavior(EditorState.field))
+      values[field.id] = field.update(tr, this.values[field.id], newState)
     return newState
   }
 
@@ -85,33 +67,19 @@ export class EditorState {
     return new Transaction(this, time)
   }
 
-  /// The current tab size.
-  get tabSize(): number { return this.config.tabSize }
-
-  /// The current value of the [`indentUnit`
-  /// behavior](state.EditorState^indentUnit), or 2 if no such
-  /// behavior is present.
-  get indentUnit(): number {
-    // FIXME precompute?
-    let values = this.behavior.get(EditorState.indentUnit)
-    return values.length ? values[0] : DEFAULT_INDENT_UNIT
-  }
-
-  /// Whether multiple selections are
-  /// [enabled](#state.EditorState^allowMultipleSelections).
-  get multipleSelections(): boolean { return this.config.multipleSelections }
-
   /// Join an array of lines using the current [line
   /// separator](#state.EditorStateConfig.lineSeparator).
-  joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.config.lineSeparator || undefined) }
+  joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.behavior(EditorState.lineSeparator)) }
 
   /// Split a string into lines using the current [line
   /// separator](#state.EditorStateConfig.lineSeparator).
-  splitLines(text: string): string[] { return splitLines(text, this.config.lineSeparator || undefined) }
+  splitLines(text: string): string[] { return splitLines(text, this.behavior(EditorState.lineSeparator)) }
 
   /// The [behavior store](#extension.BehaviorStore) associated with
   /// this state.
-  get behavior() { return this.config.behavior }
+  behavior<Output>(behavior: Behavior<any, Output>): Output {
+    return this.extensions.getBehavior(behavior, this.values)
+  }
 
   /// Convert this state to a JSON-serializable object.
   toJSON(): any {
@@ -135,14 +103,14 @@ export class EditorState {
 
   /// Create a new state.
   static create(config: EditorStateConfig = {}): EditorState {
-    let $config = Configuration.create(config)
+    let extensions = extendState.resolve(config.extensions || [])
+    let values = new Values
     let doc = config.doc instanceof Text ? config.doc
-      : Text.of(config.doc || "", $config.lineSeparator || undefined)
+      : Text.of(config.doc || "", extensions.getBehavior(EditorState.lineSeparator, values))
     let selection = config.selection || EditorSelection.single(0)
-    if (!$config.multipleSelections) selection = selection.asSingle()
-    let fields: any[] = []
-    let state = new EditorState($config, fields, doc, selection)
-    for (let field of $config.fields) fields.push(field.init(state))
+    if (!extensions.getBehavior(EditorState.allowMultipleSelections, values)) selection = selection.asSingle()
+    let state = new EditorState(extensions, values, doc, selection)
+    for (let field of state.behavior(EditorState.field)) values[field.id] = field.init(state)
     return state
   }
 
@@ -153,14 +121,13 @@ export class EditorState {
   /// method.
   reconfigure(extensions: readonly Extension[]) {
     // FIXME changing the line separator might involve rearranging line endings (?)
-    let config = Configuration.create({extensions})
-    let selection = config.multipleSelections ? this.selection : this.selection.asSingle()
-    let fields: any[] = []
-    let state = new EditorState(config, fields, this.doc, selection)
-    for (let field of config.fields) {
-      let oldIndex = this.config.fields.indexOf(field)
-      fields.push(oldIndex > -1 ? field.reconfigure(this.fields[oldIndex], this, state) : field.init(state))
-    }
+    let extend = extendState.resolve(extensions)
+    let values = new Values
+    let state = new EditorState(extend, values, this.doc, extend.getBehavior(EditorState.allowMultipleSelections, values) ?
+                                this.selection : this.selection.asSingle())
+    for (let field of state.behavior(EditorState.field))
+      values[field.id] = field.reconfigure && Object.prototype.hasOwnProperty.call(this.values, field.id) ?
+        field.reconfigure(this.values[field.id], state) : field.init(state)
     return state
   }
 
@@ -174,7 +141,10 @@ export class EditorState {
   /// [multiple-selections](#multiple-selections) handle it (which
   /// also makes sure the selections are drawn and new selections can
   /// be created with the mouse).
-  static allowMultipleSelections = extendState.behavior<boolean>()
+  static allowMultipleSelections = extendState.behavior<boolean, boolean>({
+    combine: values => values.some(v => v),
+    static: true
+  })
 
   /// Behavior that defines a way to query for automatic indentation
   /// depth at the start of a given line.
@@ -182,7 +152,9 @@ export class EditorState {
 
   /// Configures the tab size to use in this state. The first
   /// (highest-precedence) value of the behavior is used.
-  static tabSize = extendState.behavior<number>()
+  static tabSize = extendState.behavior<number, number>({
+    combine: values => values.length ? values[0] : DEFAULT_TABSIZE
+  })
 
   /// The line separator to use. By default, any of `"\n"`, `"\r\n"`
   /// and `"\r"` is treated as a separator when splitting lines, and
@@ -191,13 +163,75 @@ export class EditorState {
   /// When you configure a value here, only that precise separator
   /// will be used, allowing you to round-trip documents through the
   /// editor without normalizing line separators.
-  static lineSeparator = extendState.behavior<string>()
+  static lineSeparator = extendState.behavior<string, string | undefined>({
+    combine: values => values.length ? values[0] : undefined,
+    static: true
+  })
 
   /// Behavior for overriding the unit by which indentation happens.
-  static indentUnit = extendState.behavior<number>()
+  static indentUnit = extendState.behavior<number, number>({
+    combine: values => values.length ? values[0] : DEFAULT_INDENT_UNIT
+  })
+
+  static field = extendState.behavior<StateField<any>>({static: true})
 
   /// Behavior that registers a parsing service for the state.
   static syntax = extendState.behavior<Syntax>()
+}
+
+/// Parameters passed when [creating](#state.ExtensionType.field) a
+/// [`Field`](#state.Field)
+export interface StateFieldSpec<Value> {
+  /// Creates the initial value for the field.
+  init: (state: EditorState) => Value
+  /// Compute a new value from the previous value and a
+  /// [transaction](#state.Transaction).
+  update: (tr: Transaction, value: Value, newState: EditorState) => Value
+  /// This method can be used to carry a field's value through a call
+  /// to [`EditorState.reconfigure`](#state.EditorState.reconfigure).
+  /// If both the old and the new configuration contain this (exact)
+  /// field, it'll be called (if present) instead of `init`, to create
+  /// the new field value.
+  reconfigure?: (value: Value, newState: EditorState) => Value
+}
+
+/// Fields can store store information. They can be optionally
+/// associated with behaviors. Use
+/// [`ExtensionType.field`](#state.ExtensionType.field) to create
+/// them.
+export class StateField<Value> {
+  /// The extension that can be used to
+  /// [attach](#state.EditorStateConfig.extensions) this field to a
+  /// state.
+  readonly extension: Extension
+
+  /// @internal
+  readonly id = extendState.storageID()
+  /// @internal
+  readonly init: (target: any) => Value
+  /// @internal
+  readonly update: (update: any, value: Value, target: any) => Value
+  /// @internal
+  readonly reconfigure: ((value: Value, target: any) => Value) | undefined
+
+  /// Declare a new field. The field instance is used as the
+  /// [key](#state.EditorState.field) when retrieving the field's value
+  /// from a state.
+  constructor(spec: StateFieldSpec<Value>) {
+    this.init = spec.init
+    this.update = spec.update
+    this.reconfigure = spec.reconfigure
+    this.extension = EditorState.field(this)
+  }
+
+  /// Create a behavior extension whose value is the value of this
+  /// field, or some derived value retrieved through an accessor
+  /// function.
+  behavior(behavior: Behavior<Value, any>): Extension
+  behavior<T>(behavior: Behavior<T, any>, read: (value: Value) => T): Extension
+  behavior<T>(behavior: Behavior<T, any>, read?: (value: Value) => T): Extension {
+    return extendState.dynamic(behavior, read ? values => read(values[this.id]) : values => values[this.id])
+  }
 }
 
 /// This is a
