@@ -44,7 +44,7 @@ export class EditorState {
   field<T>(field: StateField<T>, require: boolean = true): T | undefined {
     let value = this.values[field.id]
     if (value === undefined && !Object.prototype.hasOwnProperty.call(this.values, field.id)) {
-      if (this.behavior(EditorState.field).indexOf(field) > -1)
+      if (this.behavior(stateField).indexOf(field) > -1)
         throw new RangeError("Field hasn't been initialized yet")
       if (require)
         throw new RangeError("Field is not present in this state")
@@ -57,7 +57,7 @@ export class EditorState {
   applyTransaction(tr: Transaction): EditorState {
     let values = new Values
     let newState = new EditorState(this.extensions, values, tr.doc, tr.selection)
-    for (let field of this.behavior(EditorState.field))
+    for (let field of this.behavior(stateField))
       values[field.id] = field.update(tr, this.values[field.id], newState)
     return newState
   }
@@ -110,7 +110,7 @@ export class EditorState {
     let selection = config.selection || EditorSelection.single(0)
     if (!extensions.getBehavior(EditorState.allowMultipleSelections, values)) selection = selection.asSingle()
     let state = new EditorState(extensions, values, doc, selection)
-    for (let field of state.behavior(EditorState.field)) values[field.id] = field.init(state)
+    for (let field of state.behavior(stateField)) values[field.id] = field.init(state)
     return state
   }
 
@@ -125,7 +125,7 @@ export class EditorState {
     let values = new Values
     let state = new EditorState(extend, values, this.doc, extend.getBehavior(EditorState.allowMultipleSelections, values) ?
                                 this.selection : this.selection.asSingle())
-    for (let field of state.behavior(EditorState.field))
+    for (let field of state.behavior(stateField))
       values[field.id] = field.reconfigure && Object.prototype.hasOwnProperty.call(this.values, field.id) ?
         field.reconfigure(this.values[field.id], state) : field.init(state)
     return state
@@ -173,14 +173,14 @@ export class EditorState {
     combine: values => values.length ? values[0] : DEFAULT_INDENT_UNIT
   })
 
-  static field = extendState.behavior<StateField<any>>({static: true})
-
   /// Behavior that registers a parsing service for the state.
   static syntax = extendState.behavior<Syntax>()
 }
 
-/// Parameters passed when [creating](#state.ExtensionType.field) a
-/// [`Field`](#state.Field)
+const stateField = extendState.behavior<StateField<any>>({static: true})
+
+/// Parameters passed when creating a
+/// [`StateField`](#state.StateField).
 export interface StateFieldSpec<Value> {
   /// Creates the initial value for the field.
   init: (state: EditorState) => Value
@@ -196,9 +196,7 @@ export interface StateFieldSpec<Value> {
 }
 
 /// Fields can store store information. They can be optionally
-/// associated with behaviors. Use
-/// [`ExtensionType.field`](#state.ExtensionType.field) to create
-/// them.
+/// associated with behaviors.
 export class StateField<Value> {
   /// The extension that can be used to
   /// [attach](#state.EditorStateConfig.extensions) this field to a
@@ -221,7 +219,7 @@ export class StateField<Value> {
     this.init = spec.init
     this.update = spec.update
     this.reconfigure = spec.reconfigure
-    this.extension = EditorState.field(this)
+    this.extension = stateField(this)
   }
 
   /// Create a behavior extension whose value is the value of this

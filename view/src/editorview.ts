@@ -9,8 +9,8 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
-import {extendView, ViewUpdate, styleModule,
-        viewPlugin, ViewPlugin, themeClass, notified} from "./extension"
+import {extendView, ViewUpdate, styleModule, themeClass, handleDOMEvents, focusChange,
+        clickAddsSelectionRange, dragMovesSelection, viewPlugin, ViewPlugin, notified} from "./extension"
 import {Attrs, combineAttrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
@@ -357,4 +357,37 @@ export class EditorView {
     this.dom.remove()
     this.docView.destroy()
   }
+
+  /// Behavior to add a [style
+  /// module](https://github.com/marijnh/style-mod#readme) to an editor
+  /// view. The view will ensure that the module is registered in its
+  /// [document root](#view.EditorConfig.root).
+  static styleModule = styleModule
+
+  /// Behavior that can be used to add DOM event handlers. The value
+  /// should be an object mapping event names to handler functions. The
+  /// first such function to return true will be assumed to have handled
+  /// that event, and no other handlers or built-in behavior will be
+  /// activated for it.
+  static handleDOMEvents = handleDOMEvents
+
+  /// Behavior used to configure whether a given selection drag event
+  /// should move or copy the selection. The given predicate will be
+  /// called with the `mousedown` event, and can return `true` when
+  /// the drag should move the content.
+  static dragMovesSelection = dragMovesSelection
+
+  /// Behavior used to configure whether a given selecting click adds
+  /// a new range to the existing selection or replaces it entirely.
+  static clickAddsSelectionRange = clickAddsSelectionRange
+
+  /// Behavior that provides CSS classes to add to elements identified
+  /// by the given string.
+  static themeClass = themeClass
+
+  /// A slot that is used as a flag in view updates caused by changes to
+  /// the view's focus state. Its value will be `true` when the view is
+  /// being focused, `false` when it's losing focus.
+  static focusChange = focusChange
+
 }

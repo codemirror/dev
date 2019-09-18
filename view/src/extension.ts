@@ -1,8 +1,8 @@
 import {EditorState, Transaction, ChangeSet} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
-import {DecorationSet, Decoration} from "./decoration"
-import {Extension, ExtensionType, Slot, SlotType} from "../../extension/src/extension"
+import {DecorationSet} from "./decoration"
+import {Extension, ExtensionType, Behavior, Values, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs} from "./attributes"
 
@@ -10,26 +10,13 @@ const none: readonly any[] = []
 
 export const extendView = new ExtensionType
 
-/// Behavior that can be used to add DOM event handlers. The value
-/// should be an object mapping event names to handler functions. The
-/// first such function to return true will be assumed to have handled
-/// that event, and no other handlers or built-in behavior will be
-/// activated for it.
 export const handleDOMEvents = extendView.behavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
-/// Behavior used to configure whether a given selecting click adds a
-/// new range to the existing selection or replaces it entirely.
 export const clickAddsSelectionRange = extendView.behavior<(event: MouseEvent) => boolean>()
 
-/// Behavior used to configure whether a given selection drag event
-/// should move or copy the selection. The given predicate will be
-/// called with the `mousedown` event, and can return `true` when the
-/// drag should move the content.
 export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boolean>()
 
 // FIXME this should work differently
-/// Behavior that provides CSS classes to add to elements identified
-/// by the given string.
 export const themeClass = extendView.behavior<(tag: string) => string>()
 
 /// View plugins are stateful objects that are associated with a view.
@@ -47,22 +34,22 @@ export const themeClass = extendView.behavior<(tag: string) => string>()
 /// When a plugin method throws an exception, the error will be logged
 /// to the console and the plugin will be disabled for the rest of the
 /// view's lifetime (to avoid leaving it in an invalid state).
-export class ViewPlugin<T = undefined> {
+export interface ViewPluginValue<T = undefined> {
   /// Notify the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state and its
   /// `decoration`/`editorAttributes`/`contentAttributes` properties.
   /// It should _not_ change the DOM, or read the DOM in a way that
   /// triggers a layout recomputation.
-  update(update: ViewUpdate) {}
+  update(update: ViewUpdate): void
 
   /// This is called after the view updated (or initialized) its DOM
   /// structure. It may write to the DOM (outside of the editor
   /// content). It should not trigger a DOM layout.
-  draw() {}
+  draw?(): void
 
-  measure(): T { return undefined as any as T }
-  drawMeasured(measurement: T) {}
+  measure?(): T
+  drawMeasured?(measurement: T): void
 
   /// When an editor view is given a completely new state (as opposed
   /// to moving forward by transactions), its plugins are recreated.
@@ -71,86 +58,77 @@ export class ViewPlugin<T = undefined> {
   /// (if any). It can return `true` to indicate that it can be used
   /// instead of creating a new instance. The default implementation
   /// returns false.
-  reset(view: EditorView, config: any): boolean { return false }
+  reset?(): void
 
   /// Called when the plugin is no longer going to be used.
-  destroy() {}
+  destroy?(): void
+}
 
-  /// The set of decorations produced by this plugin. Defaults to the
-  /// empty set.
-  decorations!: DecorationSet
+export class ViewPlugin<T extends ViewPluginValue> {
+  /// @internal
+  id = extendView.storageID()
+  readonly extension: Extension
 
-  /// Attributes added to the editor's wrapping element by this
-  /// plugin. Defaults to none.
-  editorAttributes!: Attrs | undefined
+  constructor(
+    /// @internal
+    readonly create: (view: EditorView) => T
+  ) {
+    this.extension = viewPlugin(this)
+  }
 
-  /// Attributes added to the editable content element by this plugin.
-  /// Defaults to none.
-  contentAttributes!: Attrs | undefined
+  behavior<Input>(behavior: Behavior<Input, any>, read: (plugin: T) => Input): Extension {
+    return extendView.dynamic(behavior, (values: Values) => read(values[this.id]))
+  }
 
-  /// Create an extension that registers this plugin, optionally in a
-  /// specific configuration.
-  static extension(this: {new (view: EditorView): ViewPlugin<any>}): Extension
-  static extension<T>(this: {new (view: EditorView, config: T): ViewPlugin<any>}, config: T): Extension
-  static extension<T>(config?: T) { return viewPlugin({constructor: this, config}) }
+  decoration(read: (plugin: T) => DecorationSet) {
+    return this.behavior(decoration, read)
+  }
 
   /// Create a view plugin extension that only computes decorations.
   /// When `map` is true, the set passed to `update` will already have
   /// been mapped through the transactions in the `ViewUpdate`.
-  static decorate(spec: {
+  static decoration(spec: {
     create: (view: EditorView) => DecorationSet,
     update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
     map?: boolean
   }) {
-    return DecorationPlugin.extension(spec)
+    let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec))
+    return Extension.all(plugin.extension, plugin.decoration(value => value.decorations))
   }
 
-  /// Create a plugin extension that sets the given attributes on the
-  /// outer editor and content elements. Both may be `undefined` to
-  /// not add anything.
-  static attributes(editor?: Attrs, content?: Attrs) {
-    return AttributePlugin.extension({editor, content})
-  }
+  /// Behavior that provides editor DOM attributes for the editor's
+  /// outer element. FIXME move to EditorView?
+  static editorAttributes = extendView.behavior<Attrs>()
+
+  /// Behavior that provides attributes for the editor's editable DOM
+  /// element.
+  static contentAttributes = extendView.behavior<Attrs>()
 }
 
-ViewPlugin.prototype.decorations = Decoration.none
-ViewPlugin.prototype.editorAttributes = undefined
-ViewPlugin.prototype.contentAttributes = undefined
-
 // Registers view plugins.
-export const viewPlugin = extendView.behavior<{constructor: {new (view: EditorView, config: any): ViewPlugin}, config: any}>()
+export const viewPlugin = extendView.behavior<ViewPlugin<any>>({static: true})
 
-class DecorationPlugin extends ViewPlugin {
+// Provide decorations
+export const decoration = extendView.behavior<DecorationSet>()
+
+class DecorationPlugin implements ViewPluginValue {
+  decorations: DecorationSet
+  
   constructor(view: EditorView, readonly spec: {
     create: (view: EditorView) => DecorationSet,
     update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
     map?: boolean
   }) {
-    super()
     this.decorations = spec.create(view)
   }
+
   update(update: ViewUpdate) {
     this.decorations = this.spec.update(this.spec.map ? this.decorations.map(update.changes) : this.decorations, update)
   }
 }
 
-class AttributePlugin extends ViewPlugin {
-  constructor(view: EditorView, {editor, content}: {editor: Attrs | undefined, content: Attrs | undefined}) {
-    super()
-    this.editorAttributes = editor
-    this.contentAttributes = content
-  }
-}
-
-/// Extension to add a [style
-/// module](https://github.com/marijnh/style-mod#readme) to an editor
-/// view. The view will ensure that the module is registered in its
-/// [document root](#view.EditorConfig.root).
 export const styleModule = extendView.behavior<StyleModule>()
 
-/// A slot that is used as a flag in view updates caused by changes to
-/// the view's focus state. Its value will be `true` when the view is
-/// being focused, `false` when it's losing focus.
 export const focusChange = Slot.define<boolean>()
 
 export const notified = Slot.define<boolean>()

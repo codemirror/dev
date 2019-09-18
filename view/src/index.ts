@@ -1,6 +1,5 @@
 export {EditorView, EditorConfig} from "./editorview"
-export {ViewPlugin, handleDOMEvents, styleModule, focusChange, ViewUpdate,
-        clickAddsSelectionRange, dragMovesSelection, themeClass} from "./extension"
+export {ViewPlugin, ViewPluginValue, ViewUpdate} from "./extension"
 export {Viewport} from "./viewport"
 export {Decoration, DecorationSet, DecoratedRange, WidgetType,
         MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec, BlockType} from "./decoration"
