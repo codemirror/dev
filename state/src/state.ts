@@ -78,8 +78,7 @@ export class EditorState {
   /// separator](#state.EditorStateConfig.lineSeparator).
   splitLines(text: string): string[] { return splitLines(text, this.behavior(EditorState.lineSeparator)) }
 
-  /// The [configuration](#extension.Configuration) associated with
-  /// this state.
+  /// Get the value of a state behavior.
   behavior<Output>(behavior: Behavior<any, Output>): Output {
     return this.configuration.getBehavior(behavior, this.values)
   }

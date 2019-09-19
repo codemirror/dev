@@ -1,4 +1,4 @@
-import {EditorSelection, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
 import {EditorView} from "./editorview"
 import {focusChange, handleDOMEvents, ViewUpdate,
         clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
@@ -14,7 +14,7 @@ export class InputState {
   lastSelectionTime: number = 0
 
   registeredEvents: string[] = []
-  customHandlers: {[key: string]: ((view: EditorView, event: Event) => boolean)[]}
+  customHandlers: readonly {[key: string]: (view: EditorView, event: any) => boolean}[] = []
 
   composing = false
 
@@ -43,10 +43,17 @@ export class InputState {
       view.inputState.lastKeyTime = Date.now()
     })
     if (view.root.activeElement == view.contentDOM) view.dom.classList.add("codemirror-focused")
+    this.ensureHandlers(view)
+  }
 
-    this.customHandlers = customHandlers(view)
-    for (let type in this.customHandlers) {
-      if (this.registeredEvents.indexOf(type) < 0) {
+  ensureHandlers(view: EditorView) {
+    let handlers = view.behavior(handleDOMEvents)
+    if (handlers == this.customHandlers ||
+        (handlers.length == this.customHandlers.length && handlers.every((h, i) => h == this.customHandlers[i])))
+      return
+    this.customHandlers = handlers
+    for (let set of handlers) {
+      for (let type in set) if (this.registeredEvents.indexOf(type) < 0) {
         this.registeredEvents.push(type)
         view.contentDOM.addEventListener(type, event => {
           if (!eventBelongsToEditor(view, event)) return
@@ -57,12 +64,14 @@ export class InputState {
   }
 
   runCustomHandlers(type: string, view: EditorView, event: Event): boolean {
-    let handlers = this.customHandlers[type]
-    if (handlers) for (let handler of handlers) {
-      try {
-        if (handler(view, event) || event.defaultPrevented) return true
-      } catch (e) {
-        console.error(e)
+    for (let handlers of this.customHandlers) {
+      let handler = handlers[type]
+      if (handler) {
+        try {
+          if (handler(view, event) || event.defaultPrevented) return true
+        } catch (e) {
+          console.error(e)
+        }
       }
     }
     return false
@@ -106,7 +115,7 @@ class MouseSelection {
     doc.addEventListener("mouseup", this.up = this.up.bind(this))
 
     this.extend = event.shiftKey
-    this.multiple = view.state.multipleSelections && addsSelectionRange(view, event)
+    this.multiple = view.state.behavior(EditorState.allowMultipleSelections) && addsSelectionRange(view, event)
     this.dragMove = dragMovesSelection(view, event)
 
     this.startSelection = view.state.selection
@@ -172,12 +181,12 @@ class MouseSelection {
 }
 
 function addsSelectionRange(view: EditorView, event: MouseEvent) {
-  let behavior = view.behavior.get(clickAddsSelectionRange)
+  let behavior = view.behavior(clickAddsSelectionRange)
   return behavior.length ? behavior[0](event) : browser.mac ? event.metaKey : event.ctrlKey
 }
 
 function dragMovesSelection(view: EditorView, event: MouseEvent) {
-  let behavior = view.behavior.get(dragBehavior)
+  let behavior = view.behavior(dragBehavior)
   return behavior.length ? behavior[0](event) : browser.mac ? !event.altKey : !event.ctrlKey
 }
 
@@ -206,15 +215,6 @@ function eventBelongsToEditor(view: EditorView, event: Event): boolean {
     if (!node || node.nodeType == 11 || (node.cmView && node.cmView.ignoreEvent(event)))
       return false
   return true
-}
-
-function customHandlers(view: EditorView) {
-  let result = Object.create(null)
-  for (let handlers of view.behavior.get(handleDOMEvents)) {
-    for (let eventType in handlers)
-      (result[eventType] || (result[eventType] = [])).push(handlers[eventType])
-  }
-  return result
 }
 
 const handlers: {[key: string]: (view: EditorView, event: any) => void} = Object.create(null)

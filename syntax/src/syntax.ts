@@ -11,8 +11,7 @@ export class LezerSyntax implements Syntax {
   constructor(readonly parser: Parser) {
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
-      apply(tr, value) { return value.apply(tr) },
-      reconfigure(value) { return value }
+      apply(tr, value) { return value.apply(tr) }
     })
     this.extension = Extension.all(
       EditorState.syntax(this),
@@ -21,18 +20,18 @@ export class LezerSyntax implements Syntax {
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {
-    let field = state.getField(this.field)
+    let field = state.field(this.field)
     return field.updateTree(this.parser, state.doc, from, to, false) ? field.tree : null
   }
 
   getTree(state: EditorState, from: number, to: number) {
-    let field = state.getField(this.field)
+    let field = state.field(this.field)
     let rest = field.updateTree(this.parser, state.doc, from, to, true) as CancellablePromise<Tree> | true
     return {tree: field.tree, rest: rest === true ? null : rest}
   }
 
   getPartialTree(state: EditorState, from: number, to: number) {
-    let field = state.getField(this.field)
+    let field = state.field(this.field)
     field.updateTree(this.parser, state.doc, from, to, false)
     return field.tree
   }

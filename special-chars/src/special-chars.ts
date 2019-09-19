@@ -1,4 +1,5 @@
-import {Decoration, DecoratedRange, styleModule, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view/src"
+import {Decoration, DecorationSet, DecoratedRange, WidgetType, ViewPlugin, ViewPluginValue,
+        ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange} from "../../state/src"
 import {combineConfig, Extension} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
@@ -23,19 +24,21 @@ export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig
   if (config.replaceTabs)
     config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
 
-  let extension = SpecialCharPlugin.extension(config)
-  return config.replaceTabs ? Extension.all(extension, styleModule(style)) : extension
+  let plugin = new ViewPlugin(view => new SpecialCharPlugin(view, config))
+  let deco = plugin.decoration(plugin => plugin.decorations)
+  return config.replaceTabs ? Extension.all(plugin.extension, deco, EditorView.styleModule(style)) :
+    Extension.all(plugin.extension, deco)
 }, {})
 
 const JOIN_GAP = 10
 
-class SpecialCharPlugin extends ViewPlugin {
+class SpecialCharPlugin implements ViewPluginValue {
   from = 0
   to = 0
   specials: RegExp
+  decorations: DecorationSet = Decoration.none
 
   constructor(public view: EditorView, readonly options: Required<SpecialCharConfig> & {replaceTabs?: boolean}) {
-    super()
     this.specials = options.specialChars
     if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
     this.updateForViewport()

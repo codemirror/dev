@@ -73,7 +73,7 @@ describe("EditorState", () => {
     let field = new StateField({init: () => 0, apply: (tr, val) => val + 1})
     let start = EditorState.create({extensions: [field.extension]}).t().apply()
     ist(start.field(field), 1)
-    ist(start.t().reconfigure([field.extension]).apply().field(field), 1)
+    ist(start.t().reconfigure([field.extension]).apply().field(field), 2)
     ist(start.t().reconfigure([]).apply().field(field, false), undefined)
   })
 })

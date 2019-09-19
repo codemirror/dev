@@ -21,7 +21,7 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
   })
 
   return Extension.all(
-    ViewPlugin.decorate({
+    ViewPlugin.decoration({
       create() { return Decoration.none },
       update(deco, update) {
         if (!update.transactions.length) return deco
@@ -46,7 +46,7 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
 }, {})
 
 function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {
-  for (let syntax of state.behavior.get(EditorState.syntax)) {
+  for (let syntax of state.behavior(EditorState.syntax)) {
     return syntax.getPartialTree(state, dir < 0 ? Math.max(0, pos - maxScanDistance) : pos,
                                  dir < 0 ? pos : Math.min(state.doc.length, pos + maxScanDistance))
   }

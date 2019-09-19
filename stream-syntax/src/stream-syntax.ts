@@ -77,23 +77,23 @@ export class StreamSyntax implements Syntax {
     })
     this.extension = Extension.all(EditorState.syntax(this), this.field.extension)
     this.indentation = EditorState.indentation((state: EditorState, pos: number) => {
-      return state.getField(this.field).getIndent(this.parser, state, pos)
+      return state.field(this.field).getIndent(this.parser, state, pos)
     })
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {
-    let field = state.getField(this.field)
+    let field = state.field(this.field)
     return field.updateTree(this.parser, state, to, false) ? field.tree : null
   }
 
   getTree(state: EditorState, from: number, to: number) {
-    let field = state.getField(this.field)
+    let field = state.field(this.field)
     let rest = field.updateTree(this.parser, state, to, true) as CancellablePromise<Tree> | true
     return {tree: field.tree, rest: rest === true ? null : rest}
   }
 
   getPartialTree(state: EditorState, from: number, to: number) {
-    let field = state.getField(this.field)
+    let field = state.field(this.field)
     field.updateTree(this.parser, state, to, false)
     return field.tree
   }

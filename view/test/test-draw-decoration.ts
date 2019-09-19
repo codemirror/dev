@@ -9,7 +9,7 @@ const addDeco = Slot.define<DecoratedRange[]>()
 
 function decos(startState: DecorationSet = Decoration.none) {
   return [
-    ViewPlugin.decorate({
+    ViewPlugin.decoration({
       create() { return startState },
       update(value, {transactions, state}) {
         for (let tr of transactions) {

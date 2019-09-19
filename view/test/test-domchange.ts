@@ -119,7 +119,7 @@ describe("DOM changes", () => {
   })
 
   it("doesn't drop collapsed text", () => {
-    let cm = tempEditor("abcd", [ViewPlugin.decorate({
+    let cm = tempEditor("abcd", [ViewPlugin.decoration({
       create() { return Decoration.set(Decoration.replace(1, 3, {})) },
       update(d, u) { return u.transactions.length ? Decoration.none : d }
     })])
@@ -153,7 +153,7 @@ describe("DOM changes", () => {
     class Widget extends WidgetType<any> {
       toDOM() { return document.createElement("div") }
     }
-    let cm = tempEditor("abcd", [ViewPlugin.decorate({
+    let cm = tempEditor("abcd", [ViewPlugin.decoration({
       create() { return Decoration.set(Decoration.widget(4, {widget: new Widget(null) })) },
       update(d, u) { return d }
     })])

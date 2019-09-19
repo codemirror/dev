@@ -1,5 +1,5 @@
 import {Extension, combineConfig, fillConfig, Slot} from "../../extension/src/extension"
-import {EditorView, ViewPlugin, ViewUpdate, styleModule, BlockType, BlockInfo} from "../../view/src"
+import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
 import {StyleModule} from "style-mod"
@@ -60,20 +60,21 @@ const defaults = {
 
 export function gutter<T>(config: GutterConfig) {
   let conf = fillConfig(config, defaults)
+  // FIXME allow client code to preserve a gutter config
+  let plugin = new ViewPlugin(view => new GutterView(view, conf))
   return Extension.all(
-    GutterView.extension(conf),
-    styleModule(styles)
+    plugin.extension,
+    EditorView.styleModule(styles)
   )
 }
 
-class GutterView extends ViewPlugin {
+class GutterView implements ViewPluginValue {
   dom: HTMLElement
   elements: GutterElement[] = []
   markers: GutterMarkerSet
   spacer: GutterElement | null = null
 
   constructor(public view: EditorView, public config: Required<GutterConfig>) {
-    super()
     this.dom = document.createElement("div")
     this.dom.className = "codemirror-gutter " + config.class + " " + styles.gutter
     this.dom.setAttribute("aria-hidden", "true")

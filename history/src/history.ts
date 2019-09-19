@@ -18,16 +18,12 @@ const historyField = new StateField({
     if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
     if (!tr.changes.length && !tr.selectionSet) return state
 
-    let config = editorState.behavior.get(historyConfig)[0]
+    let config = editorState.behavior(historyConfig)[0]
     if (tr.getMeta(Transaction.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
                               tr.startState.selection, tr.getMeta(Transaction.time)!,
                               tr.getMeta(Transaction.userEvent), config.newGroupDelay, config.minDepth)
     return state.addMapping(tr.changes.desc, config.minDepth)
-  },
-
-  reconfigure(state: HistoryState) {
-    return state
   }
 })
 
@@ -46,10 +42,10 @@ export const history = EditorState.extend.unique<HistoryConfig>(configs => {
 
 function cmd(target: PopTarget, only: ItemFilter) {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let behavior = state.behavior.get(historyConfig)
+    let behavior = state.behavior(historyConfig)
     if (!behavior.length) return false
     let config = behavior[0]
-    let historyState = state.getField(historyField)
+    let historyState = state.field(historyField)
     if (!historyState.canPop(target, only)) return false
     const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
     dispatch(transaction.addMeta(historyStateSlot(newState)))
@@ -71,7 +67,7 @@ export function closeHistory(tr: Transaction): Transaction {
 
 function depth(target: PopTarget, only: ItemFilter) {
   return function(state: EditorState): number {
-    let histState = state.getField(historyField, false)
+    let histState = state.field(historyField, false)
     return histState ? histState.eventCount(target, only) : 0
   }
 }

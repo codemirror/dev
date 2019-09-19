@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
 import {EditorSelection} from "../../state/src"
-import {EditorView, ViewPlugin} from "../src/"
+import {EditorView} from "../src/"
 import ist from "ist"
 
 function domText(view: EditorView) {
@@ -177,7 +177,7 @@ describe("EditorView drawing", () => {
 
   it("notices it is added to the DOM even if initially detached", () => {
     if (!(window as any).IntersectionObserver) return // Only works with intersection observer support
-    let cm = tempEditor("a\n\b\nc\nd", [class extends ViewPlugin { get contentAttributes() { return {style: "font-size: 60px"} } }.extension()])
+    let cm = tempEditor("a\n\b\nc\nd", [EditorView.contentAttributes({style: "font-size: 60px"})])
     let parent = cm.dom.parentNode!
     cm.dom.remove()
     return later().then(() => {

@@ -1,15 +1,16 @@
-import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecoratedRange} from "../../view/src"
+import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, DecoratedRange} from "../../view/src"
+import {Extension} from "../../extension/src/extension"
 import {themeData} from "./theme"
 import {Syntax, EditorState} from "../../state/src/"
 import {styleNodeProp} from "./styleprop"
 
-class Highlighter extends ViewPlugin {
+class Highlighter implements ViewPluginValue {
   partialDeco = false
   readonly syntax: Syntax | null = null
+  decorations = Decoration.none
 
   constructor(view: EditorView) {
-    super()
-    for (let s of view.state.behavior.get(EditorState.syntax)) {
+    for (let s of view.state.behavior(EditorState.syntax)) {
       this.syntax = s
       break
     }
@@ -22,7 +23,7 @@ class Highlighter extends ViewPlugin {
   }
 
   buildDeco(view: EditorView) {
-    let themes = view.behavior.get(themeData)
+    let themes = view.behavior(themeData)
     if (!this.syntax || themes.length == 0) {
       this.decorations = Decoration.none
       return
@@ -102,5 +103,9 @@ class TokenContext {
 }
 
 export function highlight() { // FIXME allow specifying syntax?
-  return Highlighter.extension()
+  let plugin = new ViewPlugin(view => new Highlighter(view))
+  return Extension.all(
+    plugin.extension,
+    plugin.decoration(p => p.decorations)
+  )
 }

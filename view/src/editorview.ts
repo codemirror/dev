@@ -1,5 +1,5 @@
 import {EditorState, Transaction, CancellablePromise} from "../../state/src"
-import {BehaviorStore, Slot, Extension} from "../../extension/src/extension"
+import {Configuration, Slot, Extension, Values, Behavior} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 import {DocView} from "./docview"
@@ -10,8 +10,9 @@ import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {extendView, ViewUpdate, styleModule, themeClass, handleDOMEvents, focusChange,
-        clickAddsSelectionRange, dragMovesSelection, viewPlugin, ViewPlugin, notified} from "./extension"
-import {Attrs, combineAttrs, updateAttrs} from "./attributes"
+        contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
+        viewPlugin, ViewPlugin, ViewPluginValue, notified} from "./extension"
+import {Attrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
 
@@ -72,13 +73,14 @@ export class EditorView {
   /// @internal
   readonly docView: DocView
 
-  /// The behavior stored in the view by extensions. Note that _state_
-  /// behavior will be in `.state.behavior` instead.
-  readonly behavior!: BehaviorStore
+  private extensions: readonly Extension[]
+  /// @internal
+  configuration!: Configuration
 
-  private plugins: ViewPlugin[] = []
+  private plugins: Values = new Values
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
+  private styleModules!: readonly StyleModule[]
 
   /// @internal
   updating: boolean = false
@@ -102,51 +104,29 @@ export class EditorView {
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
-    this.setState(config.state, config.extensions)
-  }
 
-  /// Reset the view to a given state. This is more expensive then
-  /// updating it with transactions, since it requires a redraw of the
-  /// content and a reset of the view extensions.
-  setState(state: EditorState, extensions: Extension[] = []) {
-    this.clearWaiting()
+    this.extensions = config.extensions || []
+    this.configure(config.state.configuration.foreign)
+    this.inputState = new InputState(this)
     this.withUpdating(() => {
-      ;(this as any).behavior = extendView.resolve(extensions.concat(state.behavior.foreign))
-      StyleModule.mount(this.root, this.behavior.get(styleModule).concat(styles).reverse())
-      if (this.behavior.foreign.length)
-        throw new Error("Non-view extensions found when setting view state")
-      this.inputState = new InputState(this)
-      this.docView.init(state, viewport => {
+      this.docView.init(config.state, viewport => {
         this.viewport = viewport
-        this.state = state
-        let oldPlugins = this.plugins
-        this.plugins = []
-        for (let {constructor, config} of this.behavior.get(viewPlugin)) {
-          let plugin
-          for (let i = 0, old; i < oldPlugins.length; i++) {
-            if ((old = oldPlugins[i]).constructor == constructor && old.reset(this, config)) {
-              plugin = old
-              oldPlugins.splice(i, 1)
-              break
-            }
-          }
-          this.plugins.push(plugin || new constructor(this, config))
-        }
-        this.forEachPlugin(p => p.destroy(), oldPlugins)
+        this.state = config.state
+        for (let plugin of this.behavior(viewPlugin))
+          this.plugins[plugin.id] = plugin.create(this)
       })
-      this.updateAttrs()
     })
+    this.mountStyles()
+    this.updateAttrs()
   }
 
   // Call a function on each plugin. If that crashes, disable the
-  // plugin (replacing it with an empty one so that
-  // docView.decorations still aligns) and log the error.
-  private forEachPlugin(f: (plugin: ViewPlugin) => void, plugins = this.plugins) {
-    for (let i = 0; i < plugins.length; i++) {
-      try {
-        f(plugins[i])
-      } catch (e) {
-        plugins[i] = new ViewPlugin
+  // plugin.
+  private forEachPlugin(f: (plugin: ViewPluginValue) => void) {
+    for (let plugin of this.behavior(viewPlugin)) {
+      try { f(this.plugins[plugin.id]) }
+      catch (e) {
+        this.plugins[plugin.id] = {update() {}}
         console.error(e)
       }
     }
@@ -158,11 +138,16 @@ export class EditorView {
   /// change.
   update(transactions: Transaction[] = [], metadata: Slot[] = []) {
     this.clearWaiting()
-    let state = this.state
+    let state = this.state, prevForeign = state.configuration.foreign
     for (let tr of transactions) {
       if (tr.startState != state)
         throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
       state = tr.apply()
+    }
+    let curForeign = state.configuration.foreign
+    if (curForeign != prevForeign && (curForeign.length != prevForeign.length || curForeign.some((v, i) => v != prevForeign[i]))) {
+      this.configure(curForeign)
+      this.updatePlugins()
     }
     this.withUpdating(() => {
       let update = transactions.length > 0 || metadata.length > 0 ? new ViewUpdate(this, transactions, metadata) : null
@@ -170,9 +155,11 @@ export class EditorView {
         this.inputState.goalColumns.length = 0
       this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
       if (update) {
-        this.inputState.update(update)
+        this.inputState.ensureHandlers(this)
         this.drawPlugins()
+        if (this.behavior(styleModule) != this.styleModules) this.mountStyles()
       }
+      this.updateAttrs()
     })
   }
 
@@ -193,45 +180,45 @@ export class EditorView {
 
   /// @internal
   updateAttrs() {
-    // Update attribute effects
-    let editorAttrs: Attrs = {
-      class: "codemirror " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") + this.themeClass("editor.wrapper")
-    }, contentAttrs: Attrs = {
-      spellcheck: "false",
-      contenteditable: "true",
-      class: styles.content + " codemirror-content " + this.themeClass("editor.content"),
-      style: `${browser.tabSize}: ${this.state.tabSize}`
-    }
-    for (let {editorAttributes, contentAttributes} of this.plugins) {
-      if (editorAttributes) editorAttrs = combineAttrs(editorAttributes, editorAttrs)
-      if (contentAttributes) editorAttrs = combineAttrs(contentAttributes, contentAttrs)
-    }
+    let editorAttrs = this.behavior(editorAttributes), contentAttrs = this.behavior(contentAttributes)
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
     this.editorAttrs = editorAttrs
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs
   }
 
-  /// @internal
-  drawPlugins() {
-    this.forEachPlugin(p => p.draw())
-    this.updateAttrs()
+  private configure(fromState: readonly Extension[]) {
+    this.configuration = extendView.resolve([defaultAttrs].concat(this.extensions).concat(fromState))
+    if (this.configuration.foreign.length) throw new Error("Non-view extensions found in view")
+  }
+
+  private updatePlugins() {
+    let old = this.plugins
+    this.plugins = new Values
+    for (let plugin of this.behavior(viewPlugin))
+      this.plugins[plugin.id] = Object.prototype.hasOwnProperty.call(old, plugin.id) ? old[plugin.id] : plugin.create(this)
+  }
+
+  private mountStyles() {
+    this.styleModules = this.behavior(styleModule)
+    StyleModule.mount(this.root, this.styleModules.concat(styles).reverse())
   }
 
   /// @internal
-  getDecorations() {
-    return this.plugins.map(p => p.decorations)
+  drawPlugins() {
+    this.forEachPlugin(p => p.draw && p.draw())
+    this.updateAttrs()
   }
 
   /// Get an instance of the given plugin class, or `undefined` if
   /// none exists in this view.
-  getPlugin<T extends ViewPlugin>(constructor: {new (...args: any): T}): T | undefined {
-    for (let plugin of this.plugins) if (plugin.constructor == constructor) return plugin as T
-    return undefined
+  plugin<T extends ViewPluginValue>(plugin: ViewPlugin<T>): T | undefined {
+    return this.plugins[plugin.id]
   }
 
-  /// @internal
-  initInner(state: EditorState, viewport: Viewport) {
+  /// Get the value of a view behavior.
+  behavior<Output>(behavior: Behavior<any, Output>): Output {
+    return this.configuration.getBehavior(behavior, this.plugins)
   }
 
   /// @internal
@@ -244,7 +231,7 @@ export class EditorView {
   /// @internal
   withUpdating(f: () => void) {
     if (this.updating)
-      throw new Error("Calls to EditorView.update or EditorView.setState are not allowed in extension update or create methods")
+      throw new Error("Calls to EditorView.update are not allowed in plugin update or create methods")
     this.updating = true
     try { f() }
     finally { this.updating = false }
@@ -254,7 +241,7 @@ export class EditorView {
   /// the given tag. (FIXME)
   themeClass(tag: string): string {
     let result = ""
-    for (let theme of this.behavior.get(themeClass)) {
+    for (let theme of this.behavior(themeClass)) {
       let cls = theme(tag)
       if (cls) result += (result ? " " + cls : cls)
     }
@@ -352,7 +339,7 @@ export class EditorView {
   /// extensions. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    this.forEachPlugin(p => p.destroy())
+    this.forEachPlugin(p => p.destroy && p.destroy())
     this.inputState.destroy()
     this.dom.remove()
     this.docView.destroy()
@@ -385,9 +372,40 @@ export class EditorView {
   /// by the given string.
   static themeClass = themeClass
 
+  /// Behavior that provides editor DOM attributes for the editor's
+  /// outer element. FIXME move to EditorView?
+  static contentAttributes = contentAttributes
+
+  /// Behavior that provides attributes for the editor's editable DOM
+  /// element.
+  static editorAttributes = editorAttributes
+
   /// A slot that is used as a flag in view updates caused by changes to
   /// the view's focus state. Its value will be `true` when the view is
   /// being focused, `false` when it's losing focus.
   static focusChange = focusChange
-
 }
+
+// FIXME allow dynamic attributes not associated with a field/plugin
+const defaultAttrPlugin = new ViewPlugin(view => ({
+  update() {},
+  editorAttrs(): Attrs {
+    return {
+      class: "codemirror " + styles.wrapper + (view.hasFocus ? " codemirror-focused " : " ") + view.themeClass("editor.wrapper")
+    }
+  },
+  contentAttrs(): Attrs {
+    return {
+      spellcheck: "false",
+      contenteditable: "true",
+      class: styles.content + " codemirror-content " + view.themeClass("editor.content"),
+      style: `${browser.tabSize}: ${view.state.tabSize}`
+    }
+  }
+}))
+
+const defaultAttrs = Extension.all(
+  defaultAttrPlugin.extension,
+  defaultAttrPlugin.behavior(contentAttributes, p => p.contentAttrs()),
+  defaultAttrPlugin.behavior(editorAttributes, p => p.editorAttrs())
+)

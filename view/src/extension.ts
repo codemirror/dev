@@ -4,7 +4,7 @@ import {Viewport} from "./viewport"
 import {DecorationSet} from "./decoration"
 import {Extension, ExtensionType, Behavior, Values, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
-import {Attrs} from "./attributes"
+import {Attrs, combineAttrs} from "./attributes"
 
 const none: readonly any[] = []
 
@@ -51,15 +51,6 @@ export interface ViewPluginValue<T = undefined> {
   measure?(): T
   drawMeasured?(measurement: T): void
 
-  /// When an editor view is given a completely new state (as opposed
-  /// to moving forward by transactions), its plugins are recreated.
-  /// If there's another plugin with the same constructor active, that
-  /// will have this method called with the view and the new config
-  /// (if any). It can return `true` to indicate that it can be used
-  /// instead of creating a new instance. The default implementation
-  /// returns false.
-  reset?(): void
-
   /// Called when the plugin is no longer going to be used.
   destroy?(): void
 }
@@ -95,15 +86,15 @@ export class ViewPlugin<T extends ViewPluginValue> {
     let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec))
     return Extension.all(plugin.extension, plugin.decoration(value => value.decorations))
   }
-
-  /// Behavior that provides editor DOM attributes for the editor's
-  /// outer element. FIXME move to EditorView?
-  static editorAttributes = extendView.behavior<Attrs>()
-
-  /// Behavior that provides attributes for the editor's editable DOM
-  /// element.
-  static contentAttributes = extendView.behavior<Attrs>()
 }
+
+export const editorAttributes = extendView.behavior<Attrs, Attrs>({
+  combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
+})
+
+export const contentAttributes = extendView.behavior<Attrs, Attrs>({
+  combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
+})
 
 // Registers view plugins.
 export const viewPlugin = extendView.behavior<ViewPlugin<any>>({static: true})

@@ -13,7 +13,7 @@ export const indentNodeProp = new NodeProp<(context: IndentContext) => number>()
 export const syntaxIndentation = EditorState.extend.unique<null>(() => EditorState.indentation(indentationBehavior))(null)
 
 function indentationBehavior(state: EditorState, pos: number) {
-  for (let syntax of state.behavior.get(EditorState.syntax)) {
+  for (let syntax of state.behavior(EditorState.syntax)) {
     let tree = syntax.getPartialTree(state, pos, pos)
     if (tree) {
       let result = computeIndentation(state, tree, pos)

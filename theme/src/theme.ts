@@ -1,5 +1,5 @@
 import {StyleModule, Style} from "style-mod"
-import {EditorView, styleModule, themeClass} from "../../view/src"
+import {EditorView} from "../../view/src"
 import {Extension} from "../../extension/src/extension"
 import {StyleNames} from "./styleprop"
 
@@ -106,11 +106,11 @@ export function theme(rules: ThemeSpec) {
   let theme = parseTheme(rules), cache: {[tag: string]: string} = Object.create(null)
   return Extension.all(
     themeData(theme),
-    themeClass(str => {
+    EditorView.themeClass(str => {
       let value = cache[str]
       return value != null ? value : (cache[str] = theme.match(str))
     }),
-    styleModule(theme.styleMod)
+    EditorView.styleModule(theme.styleMod)
   )
 }
 
