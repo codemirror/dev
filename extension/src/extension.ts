@@ -28,7 +28,7 @@ export type SlotType<T> = (value: T) => Slot<T>
 
 const enum Priority { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
-const enum Kind { Behavior, Multi, Unique }
+const enum Kind { Behavior, Multi, Unique, Tag }
 
 class BehaviorData {
   empty: any
@@ -45,6 +45,32 @@ class BehaviorData {
     let value = (behavior as any)._data
     if (!value) throw new RangeError("Not a behavior")
     return value as BehaviorData
+  }
+}
+
+type Tag = (extension: Extension) => Extension
+
+class TagContext {
+  seen: Tag[] = []
+
+  constructor(readonly tags: Tag[],
+              readonly values: Extension[]) {}
+
+  static create(prev: TagContext, replace: readonly Extension[]) {
+    let tags = prev.tags.slice(), values = prev.values.slice()
+    let leftOver: Extension[] = []
+    for (let ext of replace) {
+      if (ext.kind != Kind.Tag) throw new Error("Tag replacements must be tag extensions")
+      let known = tags.indexOf(ext.id)
+      if (known < 0) {
+        leftOver.push(ext)
+        tags.push(ext.id)
+        values.push(ext.value)
+      } else {
+        values[known] = ext.value
+      }
+    }
+    return {tagCx: new TagContext(tags, values), leftOver}
   }
 }
 
@@ -98,8 +124,17 @@ export class ExtensionType {
   /// Resolve an array of extensions by expanding all extensions until
   /// only behaviors are left, and then collecting the behaviors into
   /// arrays of values, preserving priority ordering throughout.
-  resolve(extensions: readonly Extension[]): BehaviorStore {
-    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default)
+  resolve(extensions: readonly Extension[]) {
+    return this.resolveInner(extensions, new TagContext([], []), none)
+  }
+
+  /// @internal
+  resolveInner(extensions: readonly Extension[], prevTagCx: TagContext,
+               replaceTags: readonly Extension[] = none): BehaviorStore {
+    let {tagCx, leftOver} = TagContext.create(prevTagCx, replaceTags)
+    if (leftOver.length) extensions = extensions.concat(leftOver)
+    
+    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default, tagCx)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -114,9 +149,12 @@ export class ExtensionType {
       // that newly gathered information will make the next attempt
       // more successful.
       if (resolved.indexOf(top) > -1) return this.resolve(extensions)
-      top.resolve(pending)
+      top.resolve(pending, tagCx)
       resolved.push(top)
     }
+    // FIXME should leftover groups be added? That complicates unique
+    // extension resolution
+
     // Collect the behavior values.
     let foreign: Extension[] = []
     let readBehavior: {[id: number]: (fields: Values) => any} = Object.create(null)
@@ -147,7 +185,7 @@ export class ExtensionType {
         return values[behavior.id] = behavior.combine(array)
       }
     }
-    return new BehaviorStore(readBehavior, foreign)
+    return new BehaviorStore(this, extensions, tagCx, readBehavior, foreign)
   }
 
   storageID() { return ++this.nextStorageID }
@@ -189,10 +227,23 @@ export class Extension {
   override() { return this.setPrio(Priority.Override) }
 
   /// @internal
-  flatten(priority: Priority, target: Extension[] = []) {
-    if (this.kind == Kind.Multi) for (let ext of this.value as Extension[])
-      ext.flatten(this.priority != Priority.None ? this.priority : priority, target)
-    else target.push(this.priority != Priority.None ? this : this.setPrio(priority))
+  flatten(priority: Priority, tagCx: TagContext, target: Extension[] = []) {
+    if (this.kind == Kind.Multi) for (let ext of this.value as Extension[]) {
+      ext.flatten(this.priority != Priority.None ? this.priority : priority, tagCx, target)
+    } else if (this.kind == Kind.Tag) {
+      if (tagCx.seen.indexOf(this.id) > -1) throw new Error("Can't include the same tag twice in a single configuration")
+      tagCx.seen.push(this.id)
+      let pos = tagCx.tags.indexOf(this.id), value = this.value as Extension
+      if (pos < 0) {
+        tagCx.tags.push(this.id)
+        tagCx.values.push(value)
+      } else {
+        value = tagCx.values[pos]
+      }
+      value.flatten(this.priority != Priority.None ? this.priority : priority, tagCx, target)
+    } else {
+      target.push(this.priority != Priority.None ? this : this.setPrio(priority))
+    }
     return target
   }
 
@@ -210,6 +261,14 @@ export class Extension {
   static all(...extensions: Extension[]) {
     return new Extension(Kind.Multi, null, extensions, dummyType)
   }
+
+  /// Define an extension tag. These can be used to tag parts of a
+  /// configuration to later replace it through
+  /// [`BehaviorStore.update`](#extension.BehaviorStore.update).
+  static defineTag() {
+    let tag = (extension: Extension) => new Extension(Kind.Tag, tag, extension, dummyType)
+    return tag
+  }
 }
 
 const dummyType = new ExtensionType
@@ -225,7 +284,7 @@ class UniqueExtensionType {
     return false
   }
 
-  resolve(extensions: Extension[]) {
+  resolve(extensions: Extension[], tagCx: TagContext) {
     // Replace all instances of this type in extneions with the
     // sub-extensions that instantiating produces.
     let ours: Extension[] = []
@@ -234,15 +293,15 @@ class UniqueExtensionType {
     for (let i = 0; i < extensions.length; i++) {
       let ext = extensions[i]
       if (ext.id != this) continue
-      let sub = first ? this.subs(ours.map(s => s.value), ext.priority) : none
+      let sub = first ? this.subs(ours.map(s => s.value), ext.priority, tagCx) : none
       extensions.splice(i, 1, ...sub)
       first = false
       i += sub.length - 1
     }
   }
 
-  subs(specs: any[], priority: Priority) {
-    let subs = this.instantiate(specs).flatten(priority)
+  subs(specs: any[], priority: Priority, tagCx: TagContext) {
+    let subs = this.instantiate(specs).flatten(priority, tagCx)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
     return subs
@@ -257,6 +316,9 @@ const none: readonly any[] = []
 export class BehaviorStore {
   /// @internal
   constructor(
+    private type: ExtensionType,
+    private extensions: readonly Extension[],
+    private tags: TagContext,
     private readBehavior: {[id: number]: (values: Values) => any},
     /// Any extensions that weren't an instance of the given type when
     /// resolving.
@@ -268,6 +330,10 @@ export class BehaviorStore {
     let data = BehaviorData.get(behavior)
     let f = this.readBehavior[data.id]
     return f ? f(fields) : data.empty
+  }
+
+  update(replaceTags: readonly Extension[]) {
+    return this.type.resolveInner(this.extensions, this.tags, replaceTags)
   }
 }
 

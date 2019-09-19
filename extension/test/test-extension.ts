@@ -58,4 +58,14 @@ describe("EditorState behavior", () => {
     let e = tp.unique((specs: number[]) => num(0))
     ist.throws(() => e())
   })
+
+  it("can reconfigure a single extension group", () => {
+    let tag = Extension.defineTag()
+    let set = mk(num(1), tag(Extension.all(num(2), num(3))))
+    ist(set.getBehavior(num, v).join(), "1,2,3")
+    let newSet = set.update([tag(num(4).override())])
+    ist(newSet.getBehavior(num, v).join(), "4,1")
+    ist(newSet.update([]).getBehavior(num, v).join(), "4,1")
+    ist(newSet.update([tag(num(2))]).getBehavior(num, v).join(), "1,2")
+  })
 })
