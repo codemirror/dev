@@ -130,7 +130,7 @@ export class ExtensionType {
 
   /// @internal
   resolveInner(extensions: readonly Extension[], prevTagCx: TagContext,
-               replaceTags: readonly Extension[] = none): BehaviorStore {
+               replaceTags: readonly Extension[] = none): Configuration {
     let {tagCx, leftOver} = TagContext.create(prevTagCx, replaceTags)
     if (leftOver.length) extensions = extensions.concat(leftOver)
     
@@ -152,15 +152,13 @@ export class ExtensionType {
       top.resolve(pending, tagCx)
       resolved.push(top)
     }
-    // FIXME should leftover groups be added? That complicates unique
-    // extension resolution
 
     // Collect the behavior values.
     let foreign: Extension[] = []
     let readBehavior: {[id: number]: (fields: Values) => any} = Object.create(null)
     for (let ext of pending) {
       if (ext.type != this) {
-        // Collect extensions of the wrong type into store.foreign
+        // Collect extensions of the wrong type into configuration.foreign
         foreign.push(ext)
         continue
       }
@@ -185,7 +183,7 @@ export class ExtensionType {
         return values[behavior.id] = behavior.combine(array)
       }
     }
-    return new BehaviorStore(this, extensions, tagCx, readBehavior, foreign)
+    return new Configuration(this, extensions, tagCx, readBehavior, foreign)
   }
 
   storageID() { return ++this.nextStorageID }
@@ -264,7 +262,7 @@ export class Extension {
 
   /// Define an extension tag. These can be used to tag parts of a
   /// configuration to later replace it through
-  /// [`BehaviorStore.update`](#extension.BehaviorStore.update).
+  /// [`Configuration.replaceExtensions`](#extension.Configuration.replaceExtensions).
   static defineTag() {
     let tag = (extension: Extension) => new Extension(Kind.Tag, tag, extension, dummyType)
     return tag
@@ -313,7 +311,7 @@ const none: readonly any[] = []
 /// An extension set describes the fields and behaviors that exist in
 /// a given configuration. It is created with
 /// [`ExtensionType.resolve`](#state.ExtensionType.resolve).
-export class BehaviorStore {
+export class Configuration {
   /// @internal
   constructor(
     private type: ExtensionType,
@@ -332,7 +330,9 @@ export class BehaviorStore {
     return f ? f(fields) : data.empty
   }
 
-  update(replaceTags: readonly Extension[]) {
+  /// Replace one or more tagged extensions with new ones, producing a
+  /// new configuration.
+  replaceExtensions(replaceTags: readonly Extension[]) {
     return this.type.resolveInner(this.extensions, this.tags, replaceTags)
   }
 }

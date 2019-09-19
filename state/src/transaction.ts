@@ -1,10 +1,11 @@
 import {Text} from "../../doc/src"
-import {Slot, SlotType} from "../../extension/src/extension"
-import {EditorState} from "./state"
+import {Slot, SlotType, Extension, Configuration} from "../../extension/src/extension"
+// FIXME cyclic, maybe move some of this into ./extension
+import {EditorState, extendState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
 
-const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
+const enum Flag { SelectionSet = 1, ScrollIntoView = 2, Reconfigure = 4 }
 
 /// Changes to the editor state are grouped into transactions.
 /// Usually, a user action creates a single transaction, which may
@@ -19,6 +20,8 @@ export class Transaction {
   selection: EditorSelection
   private metadata: Slot[]
   private flags: number = 0
+  /// @internal
+  configuration: Configuration
   private state: EditorState | null = null
 
   /// @internal
@@ -30,6 +33,7 @@ export class Transaction {
   ) {
     this.selection = startState.selection
     this.metadata = [Transaction.time(time)]
+    this.configuration = startState.configuration
   }
 
   /// The document at the end of the transaction.
@@ -100,7 +104,7 @@ export class Transaction {
   /// Update the selection.
   setSelection(selection: EditorSelection): Transaction {
     this.ensureOpen()
-    this.selection = this.startState.multipleSelections ? selection : selection.asSingle()
+    this.selection = this.startState.behavior(EditorState.allowMultipleSelections) ? selection : selection.asSingle()
     this.flags |= Flag.SelectionSet
     return this
   }
@@ -128,6 +132,22 @@ export class Transaction {
   /// applying this transaction.
   get scrolledIntoView(): boolean {
     return (this.flags & Flag.ScrollIntoView) > 0
+  }
+
+  replaceExtensions(tags: readonly Extension[]) {
+    this.configuration = this.configuration.replaceExtensions(tags)
+    this.flags |= Flag.Reconfigure
+    return this
+  }
+
+  reconfigure(extensions: readonly Extension[]) {
+    this.configuration = extendState.resolve(extensions)
+    this.flags |= Flag.Reconfigure
+    return this
+  }
+
+  get reconfigured(): boolean {
+    return (this.flags & Flag.Reconfigure) > 0
   }
 
   private ensureOpen() {
