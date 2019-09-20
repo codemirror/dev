@@ -134,8 +134,8 @@ export class Transaction {
     return (this.flags & Flag.ScrollIntoView) > 0
   }
 
-  replaceExtensions(tags: readonly Extension[]) {
-    this.configuration = this.configuration.replaceExtensions(tags)
+  replaceExtensions(replace: readonly {from: Extension, to: Extension}[]) {
+    this.configuration = this.configuration.replaceExtensions(replace)
     this.flags |= Flag.Reconfigure
     return this
   }

@@ -26,7 +26,7 @@ export class Slot<T = any> {
 /// and a function used to create instances of it.
 export type SlotType<T> = (value: T) => Slot<T>
 
-const enum Priority { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
+const enum Prio { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
 const enum Kind { Behavior, Multi, Unique, Tag }
 
@@ -109,7 +109,7 @@ export class ExtensionType {
 
   /// @internal
   resolveInner(extensions: readonly Extension[], replace: readonly Replacement[] = none): Configuration {
-    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default, replace)
+    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Prio.Default, replace)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -164,6 +164,25 @@ export class ExtensionType {
   storageID() { return ++this.nextStorageID }
 }
 
+function setPrio(ext: Extension, priority: Prio) {
+  return new Extension(ext.kind, ext.id, ext.value, ext.type, priority)
+}
+
+export const Priority = {
+  /// Create a copy of an extension with a priority below the default
+  /// priority, which will cause default-priority extensions to
+  /// override it even if they are specified later in the extension
+  /// ordering.
+  fallback: (ext: Extension) => setPrio(ext, Prio.Fallback),
+  normal: (ext: Extension) => setPrio(ext, Prio.Default),
+  /// Create a copy of an extension with a priority above the default
+  /// priority.
+  extend: (ext: Extension) => setPrio(ext, Prio.Extend),
+  /// Create a copy of an extension with a priority above the default
+  /// and `extend` priorities.
+  override: (ext: Extension) => setPrio(ext, Prio.Override)
+}
+
 /// And extension is a value that describes a way in which something
 /// is to be extended. It can be produced by instantiating a behavior,
 /// calling unique extension function, or grouping extensions with
@@ -181,34 +200,19 @@ export class Extension {
     /// @internal
     readonly type: ExtensionType,
     /// @internal
-    readonly priority: number = Priority.None
+    readonly priority: number = Prio.None
   ) {}
 
-  private setPrio(priority: Priority) {
-    return new Extension(this.kind, this.id, this.value, this.type, priority)
-  }
-  /// Create a copy of this extension with a priority below the
-  /// default priority, which will cause default-priority extensions
-  /// to override it even if they are specified later in the extension
-  /// ordering.
-  fallback() { return this.setPrio(Priority.Fallback) }
-  /// Create a copy of this extension with a priority above the
-  /// default priority.
-  extend() { return this.setPrio(Priority.Extend) }
-  /// Create a copy of this extension with a priority above the
-  /// default and `extend` priorities.
-  override() { return this.setPrio(Priority.Override) }
-
   /// @internal
-  flatten(priority: Priority, replace: readonly Replacement[], target: Extension[] = []): Extension[] {
+  flatten(priority: Prio, replace: readonly Replacement[], target: Extension[] = []): Extension[] {
     for (let r of replace) if (r.from == this)
       return r.to.flatten(priority, replace, target)
     if (this.kind == Kind.Multi) {
       for (let ext of this.value as Extension[]) {
-        ext.flatten(this.priority != Priority.None ? this.priority : priority, replace, target)
+        ext.flatten(this.priority != Prio.None ? this.priority : priority, replace, target)
       }
     } else {
-      target.push(this.priority != Priority.None ? this : this.setPrio(priority))
+      target.push(this.priority != Prio.None ? this : setPrio(this, priority))
     }
     return target
   }
@@ -258,7 +262,7 @@ class UniqueExtensionType {
     }
   }
 
-  subs(specs: any[], priority: Priority, replace: readonly Replacement[]) {
+  subs(specs: any[], priority: Prio, replace: readonly Replacement[]) {
     let subs = this.instantiate(specs).flatten(priority, replace)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)

@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {Extension, ExtensionType, Values} from "../src/extension"
+import {Extension, ExtensionType, Values, Priority} from "../src/extension"
 
 let tp = new ExtensionType(), v = new Values
 
@@ -36,15 +36,15 @@ describe("EditorState behavior", () => {
 
   it("sorts extensions by priority", () => {
     let str = tp.behavior<string>()
-    let set = mk(str("a"), str("b"), str("c").extend(),
-                 str("d").override(), str("e").fallback(),
-                 str("f").extend(), str("g"))
+    let set = mk(str("a"), str("b"), Priority.extend(str("c")),
+                 Priority.override(str("d")), Priority.fallback(str("e")),
+                 Priority.extend(str("f")), str("g"))
     ist(set.getBehavior(str, v).join(), "d,c,f,a,b,g,e")
   })
 
   it("lets sub-extensions inherit their parent's priority", () => {
     let e = (n: number) => num(n)
-    let set = mk(num(1), e(2).override(), e(4))
+    let set = mk(num(1), Priority.override(e(2)), e(4))
     ist(set.getBehavior(num, v).join(), "2,1,4")
   })
 
@@ -60,7 +60,7 @@ describe("EditorState behavior", () => {
   })
 
   it("can reconfigure a single extension group", () => {
-    let base = Extension.all(num(2), num(3)), four = num(4).override()
+    let base = Extension.all(num(2), num(3)), four = Priority.override(num(4))
     let set = mk(num(1), base)
     ist(set.getBehavior(num, v).join(), "1,2,3")
     let newSet = set.replaceExtensions([{from: base, to: four}])
