@@ -238,7 +238,8 @@ export class EditorView {
   }
 
   /// Query the active themes for the CSS class names associated with
-  /// the given tag. (FIXME)
+  /// the given tag. (FIXME: this isn't a great system. Also doesn't
+  /// invalidate when reconfiguring.)
   themeClass(tag: string): string {
     let result = ""
     for (let theme of this.behavior(themeClass)) {

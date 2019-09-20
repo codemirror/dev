@@ -48,30 +48,9 @@ class BehaviorData {
   }
 }
 
-type Tag = (extension: Extension) => Extension
-
-class TagContext {
-  seen: Tag[] = []
-
-  constructor(readonly tags: Tag[],
-              readonly values: Extension[]) {}
-
-  static create(prev: TagContext, replace: readonly Extension[]) {
-    let tags = prev.tags.slice(), values = prev.values.slice()
-    let leftOver: Extension[] = []
-    for (let ext of replace) {
-      if (ext.kind != Kind.Tag) throw new Error("Tag replacements must be tag extensions")
-      let known = tags.indexOf(ext.id)
-      if (known < 0) {
-        leftOver.push(ext)
-        tags.push(ext.id)
-        values.push(ext.value)
-      } else {
-        values[known] = ext.value
-      }
-    }
-    return {tagCx: new TagContext(tags, values), leftOver}
-  }
+class Replacement {
+  constructor(readonly from: Extension,
+              readonly to: Extension) {}
 }
 
 /// Behaviors are the way in which CodeMirror is configured. Each
@@ -125,16 +104,12 @@ export class ExtensionType {
   /// only behaviors are left, and then collecting the behaviors into
   /// arrays of values, preserving priority ordering throughout.
   resolve(extensions: readonly Extension[]) {
-    return this.resolveInner(extensions, new TagContext([], []), none)
+    return this.resolveInner(extensions)
   }
 
   /// @internal
-  resolveInner(extensions: readonly Extension[], prevTagCx: TagContext,
-               replaceTags: readonly Extension[] = none): Configuration {
-    let {tagCx, leftOver} = TagContext.create(prevTagCx, replaceTags)
-    if (leftOver.length) extensions = extensions.concat(leftOver)
-    
-    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default, tagCx)
+  resolveInner(extensions: readonly Extension[], replace: readonly Replacement[] = none): Configuration {
+    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Priority.Default, replace)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -149,7 +124,7 @@ export class ExtensionType {
       // that newly gathered information will make the next attempt
       // more successful.
       if (resolved.indexOf(top) > -1) return this.resolve(extensions)
-      top.resolve(pending, tagCx)
+      top.resolve(pending, replace)
       resolved.push(top)
     }
 
@@ -183,7 +158,7 @@ export class ExtensionType {
         return values[behavior.id] = behavior.combine(array)
       }
     }
-    return new Configuration(this, extensions, tagCx, readBehavior, foreign)
+    return new Configuration(this, extensions, replace, readBehavior, foreign)
   }
 
   storageID() { return ++this.nextStorageID }
@@ -225,20 +200,13 @@ export class Extension {
   override() { return this.setPrio(Priority.Override) }
 
   /// @internal
-  flatten(priority: Priority, tagCx: TagContext, target: Extension[] = []) {
-    if (this.kind == Kind.Multi) for (let ext of this.value as Extension[]) {
-      ext.flatten(this.priority != Priority.None ? this.priority : priority, tagCx, target)
-    } else if (this.kind == Kind.Tag) {
-      if (tagCx.seen.indexOf(this.id) > -1) throw new Error("Can't include the same tag twice in a single configuration")
-      tagCx.seen.push(this.id)
-      let pos = tagCx.tags.indexOf(this.id), value = this.value as Extension
-      if (pos < 0) {
-        tagCx.tags.push(this.id)
-        tagCx.values.push(value)
-      } else {
-        value = tagCx.values[pos]
+  flatten(priority: Priority, replace: readonly Replacement[], target: Extension[] = []): Extension[] {
+    for (let r of replace) if (r.from == this)
+      return r.to.flatten(priority, replace, target)
+    if (this.kind == Kind.Multi) {
+      for (let ext of this.value as Extension[]) {
+        ext.flatten(this.priority != Priority.None ? this.priority : priority, replace, target)
       }
-      value.flatten(this.priority != Priority.None ? this.priority : priority, tagCx, target)
     } else {
       target.push(this.priority != Priority.None ? this : this.setPrio(priority))
     }
@@ -259,14 +227,6 @@ export class Extension {
   static all(...extensions: Extension[]) {
     return new Extension(Kind.Multi, null, extensions, dummyType)
   }
-
-  /// Define an extension tag. These can be used to tag parts of a
-  /// configuration to later replace it through
-  /// [`Configuration.replaceExtensions`](#extension.Configuration.replaceExtensions).
-  static defineTag() {
-    let tag = (extension: Extension) => new Extension(Kind.Tag, tag, extension, dummyType)
-    return tag
-  }
 }
 
 const dummyType = new ExtensionType
@@ -282,7 +242,7 @@ class UniqueExtensionType {
     return false
   }
 
-  resolve(extensions: Extension[], tagCx: TagContext) {
+  resolve(extensions: Extension[], replace: readonly Replacement[]) {
     // Replace all instances of this type in extneions with the
     // sub-extensions that instantiating produces.
     let ours: Extension[] = []
@@ -291,15 +251,15 @@ class UniqueExtensionType {
     for (let i = 0; i < extensions.length; i++) {
       let ext = extensions[i]
       if (ext.id != this) continue
-      let sub = first ? this.subs(ours.map(s => s.value), ext.priority, tagCx) : none
+      let sub = first ? this.subs(ours.map(s => s.value), ext.priority, replace) : none
       extensions.splice(i, 1, ...sub)
       first = false
       i += sub.length - 1
     }
   }
 
-  subs(specs: any[], priority: Priority, tagCx: TagContext) {
-    let subs = this.instantiate(specs).flatten(priority, tagCx)
+  subs(specs: any[], priority: Priority, replace: readonly Replacement[]) {
+    let subs = this.instantiate(specs).flatten(priority, replace)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
     return subs
@@ -316,7 +276,7 @@ export class Configuration {
   constructor(
     private type: ExtensionType,
     private extensions: readonly Extension[],
-    private tags: TagContext,
+    private replaced: readonly Replacement[],
     private readBehavior: {[id: number]: (values: Values) => any},
     /// Any extensions that weren't an instance of the given type when
     /// resolving.
@@ -330,10 +290,12 @@ export class Configuration {
     return f ? f(fields) : data.empty
   }
 
-  /// Replace one or more tagged extensions with new ones, producing a
-  /// new configuration.
-  replaceExtensions(replaceTags: readonly Extension[]) {
-    return this.type.resolveInner(this.extensions, this.tags, replaceTags)
+  /// Replace one or more extensions with new ones, producing a new
+  /// configuration.
+  replaceExtensions(replace: readonly {from: Extension, to: Extension}[]) {
+    return this.type.resolveInner(this.extensions, this.replaced
+                                  .filter(r => !replace.some(o => r.from == o.from))
+                                  .concat(replace.map(({from, to}) => new Replacement(from, to))))
   }
 }
 

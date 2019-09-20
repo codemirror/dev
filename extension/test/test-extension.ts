@@ -60,12 +60,13 @@ describe("EditorState behavior", () => {
   })
 
   it("can reconfigure a single extension group", () => {
-    let tag = Extension.defineTag()
-    let set = mk(num(1), tag(Extension.all(num(2), num(3))))
+    let base = Extension.all(num(2), num(3)), four = num(4).override()
+    let set = mk(num(1), base)
     ist(set.getBehavior(num, v).join(), "1,2,3")
-    let newSet = set.replaceExtensions([tag(num(4).override())])
+    let newSet = set.replaceExtensions([{from: base, to: four}])
     ist(newSet.getBehavior(num, v).join(), "4,1")
     ist(newSet.replaceExtensions([]).getBehavior(num, v).join(), "4,1")
-    ist(newSet.replaceExtensions([tag(num(2))]).getBehavior(num, v).join(), "1,2")
+    ist(newSet.replaceExtensions([{from: base, to: num(2)}]).getBehavior(num, v).join(), "1,2")
+    ist(newSet.replaceExtensions([{from: four, to: num(2)}]).getBehavior(num, v).join(), "1,2")
   })
 })
