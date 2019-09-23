@@ -28,7 +28,7 @@ export type SlotType<T> = (value: T) => Slot<T>
 
 const enum Prio { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
-const enum Kind { Behavior, Array, Unique }
+const enum Kind { Behavior, Array, Unique, Name }
 
 class BehaviorData {
   empty: any
@@ -46,11 +46,6 @@ class BehaviorData {
     if (!value) throw new RangeError("Not a behavior")
     return value as BehaviorData
   }
-}
-
-class Replacement {
-  constructor(readonly from: Extension,
-              readonly to: Extension) {}
 }
 
 /// Behaviors are the way in which CodeMirror is configured. Each
@@ -108,7 +103,7 @@ export class ExtensionType {
   }
 
   /// @internal
-  resolveInner(extensions: readonly Extension[], replace: readonly Replacement[] = none): Configuration {
+  resolveInner(extensions: readonly Extension[], replace: readonly NamedExtensionValue[] = none): Configuration {
     let pending: ExtensionValue[] = flatten(extensions, Prio.Default, replace)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
@@ -159,6 +154,11 @@ export class ExtensionType {
       }
     }
     return new Configuration(this, extensions, replace, readBehavior, foreign)
+  }
+
+  defineName() {
+    let name = (extension: Extension) => new ExtensionValue(Kind.Name, name, extension, this)
+    return name
   }
 
   storageID() { return ++this.nextStorageID }
@@ -227,16 +227,20 @@ class ExtensionValue {
   }
 }
 
+type NamedExtensionValue = ExtensionValue & {kind: Kind.Name}
+
 function flatten(extension: Extension, priority: Prio,
-                 replace: readonly Replacement[],
+                 replace: readonly NamedExtensionValue[],
                  target: ExtensionValue[] = []): ExtensionValue[] {
-  for (let r of replace) if (r.from == extension)
-    return flatten(r.to, priority, replace, target)
   if (Array.isArray(extension)) {
     for (let ext of extension) flatten(ext, priority, replace, target)
   } else {
     let value = extension as ExtensionValue
-    if (value.kind == Kind.Array) {
+    if (value.kind == Kind.Name) {
+      let inner = value.value
+      for (let r of replace) if (r.id == value.id) inner = r.value
+      flatten(inner, value.priority == Prio.None ? priority : value.priority, replace, target)
+    } else if (value.kind == Kind.Array) {
       for (let ext of value.value as Extension[])
         flatten(ext, value.priority == Prio.None ? priority : value.priority, replace, target)
     } else {
@@ -257,7 +261,7 @@ class UniqueExtensionType {
     return false
   }
 
-  resolve(extensions: ExtensionValue[], replace: readonly Replacement[]) {
+  resolve(extensions: ExtensionValue[], replace: readonly NamedExtensionValue[]) {
     // Replace all instances of this type in extneions with the
     // sub-extensions that instantiating produces.
     let ours: ExtensionValue[] = []
@@ -273,7 +277,7 @@ class UniqueExtensionType {
     }
   }
 
-  subs(specs: any[], priority: Prio, replace: readonly Replacement[]) {
+  subs(specs: any[], priority: Prio, replace: readonly NamedExtensionValue[]) {
     let subs = flatten(this.instantiate(specs), priority, replace)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
@@ -291,7 +295,7 @@ export class Configuration {
   constructor(
     private type: ExtensionType,
     private extensions: readonly Extension[],
-    private replaced: readonly Replacement[],
+    private replaced: readonly NamedExtensionValue[],
     private readBehavior: {[id: number]: (values: Values) => any},
     /// Any extensions that weren't an instance of the given type when
     /// resolving.
@@ -307,10 +311,11 @@ export class Configuration {
 
   /// Replace one or more extensions with new ones, producing a new
   /// configuration.
-  replaceExtensions(replace: readonly {from: Extension, to: Extension}[]) {
-    return this.type.resolveInner(this.extensions, this.replaced
-                                  .filter(r => !replace.some(o => r.from == o.from))
-                                  .concat(replace.map(({from, to}) => new Replacement(from, to))))
+  replaceExtensions(replace: readonly Extension[]) {
+    let repl = replace as readonly NamedExtensionValue[]
+    for (let r of repl) if (r.kind != Kind.Name)
+      throw new RangeError("Extension replacements must be named extension values")
+    return this.type.resolveInner(this.extensions, this.replaced.filter(p => !repl.some(r => r.id == p.id)).concat(repl))
   }
 }
 

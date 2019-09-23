@@ -59,14 +59,14 @@ describe("EditorState behavior", () => {
     ist.throws(() => e())
   })
 
-  it("can reconfigure a single extension group", () => {
-    let base = [num(2), num(3)], four = Priority.override(num(4))
-    let set = mk(num(1), base)
+  it("can reconfigure a named extension", () => {
+    let name = tp.defineName()
+    let set = mk(num(1), name([num(2), num(3)]))
     ist(set.getBehavior(num, v).join(), "1,2,3")
-    let newSet = set.replaceExtensions([{from: base, to: four}])
+    let newSet = set.replaceExtensions([name(Priority.override(num(4)))])
     ist(newSet.getBehavior(num, v).join(), "4,1")
     ist(newSet.replaceExtensions([]).getBehavior(num, v).join(), "4,1")
-    ist(newSet.replaceExtensions([{from: base, to: num(2)}]).getBehavior(num, v).join(), "1,2")
-    ist(newSet.replaceExtensions([{from: four, to: num(2)}]).getBehavior(num, v).join(), "1,2")
+    ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")
+    ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")
   })
 })
