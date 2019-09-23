@@ -146,7 +146,7 @@ export class EditorView {
       state = tr.apply()
     }
     let curForeign = state.configuration.foreign
-    if (curForeign != prevForeign && (curForeign.length != prevForeign.length || curForeign.some((v, i) => v != prevForeign[i]))) {
+    if (curForeign != prevForeign) {
       this.configure(curForeign)
       this.updatePlugins()
     }

@@ -147,12 +147,17 @@ export class ExtensionType<Context> {
           parts.push(ext.value.static)
         }
       })
+      let cached: any, cachedValue: any
       readBehavior[behavior.id] = dynamic.length == 0 ? () => parts : (context: Context) => {
         let values = this.getValues(context), found = values[behavior.id]
         if (found !== undefined || Object.prototype.hasOwnProperty.call(values, behavior.id)) return found
-        let array = parts.slice()
-        for (let {read, index} of dynamic) array[index] = read(context)
-        return values[behavior.id] = behavior.combine(array)
+        let array = parts.slice(), changed = false
+        for (let {read, index} of dynamic) {
+          let newValue = array[index] = read(context)
+          if (!cached || cached[index] != newValue) changed = true
+        }
+        cached = array
+        return values[behavior.id] = changed ? cachedValue = behavior.combine(array) : cachedValue
       }
     }
     return new Configuration(this, extensions, replace, readBehavior, foreign)

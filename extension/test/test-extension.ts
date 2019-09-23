@@ -69,4 +69,18 @@ describe("EditorState behavior", () => {
     ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")
     ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")
   })
+
+  it("supports dynamic behavior", () => {
+    let set = mk(num(1), tp.dynamic(num, () => 88))
+    ist(set.getBehavior(num, new IDMap).join(), "1,88")
+  })
+
+  it("only recomputes a behavior value when necessary", () => {
+    let values = [1, 1, 2], i = 0
+    let set = mk(num(1), tp.dynamic(num, () => values[i++]))
+    let array = set.getBehavior(num, new IDMap)
+    ist(array.join(), "1,1")
+    ist(set.getBehavior(num, new IDMap), array)
+    ist(set.getBehavior(num, new IDMap).join(), "1,2")
+  })
 })
