@@ -11,7 +11,7 @@ import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {extendView, ViewUpdate, styleModule, themeClass, handleDOMEvents, focusChange,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, ViewPlugin, ViewPluginValue, notified} from "./extension"
+        viewPlugin, decorations, ViewPlugin, ViewPluginValue, notified} from "./extension"
 import {Attrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
@@ -75,9 +75,10 @@ export class EditorView {
 
   private extensions: readonly Extension[]
   /// @internal
-  configuration!: Configuration
+  configuration!: Configuration<EditorView>
 
-  private plugins: Values = new Values
+  /// @internal
+  plugins: Values = new Values
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
@@ -218,14 +219,19 @@ export class EditorView {
 
   /// Get the value of a view behavior.
   behavior<Output>(behavior: Behavior<any, Output>): Output {
-    return this.configuration.getBehavior(behavior, this.plugins)
+    return this.configuration.getBehavior(behavior, this)
   }
 
   /// @internal
   updateInner(update: ViewUpdate, viewport: Viewport) {
     this.viewport = viewport
     this.state = update.state
-    this.forEachPlugin(p => p.update(update))
+    let oldPlugins = this.plugins
+    this.plugins = new Values
+    for (let plugin of this.behavior(viewPlugin)) {
+      let value = this.plugins[plugin.id] = oldPlugins[plugin.id]
+      value.update(update) // FIXME try/catch
+    }
   }
 
   /// @internal
@@ -369,6 +375,10 @@ export class EditorView {
   /// a new range to the existing selection or replaces it entirely.
   static clickAddsSelectionRange = clickAddsSelectionRange
 
+  /// A behavior that determines which [decorations](#view.Decoration)
+  /// are shown in the view.
+  static decorations = decorations
+
   /// Behavior that provides CSS classes to add to elements identified
   /// by the given string.
   static themeClass = themeClass
@@ -387,26 +397,14 @@ export class EditorView {
   static focusChange = focusChange
 }
 
-// FIXME allow dynamic attributes not associated with a field/plugin
-const defaultAttrPlugin = new ViewPlugin(view => ({
-  update() {},
-  editorAttrs(): Attrs {
-    return {
-      class: "codemirror " + styles.wrapper + (view.hasFocus ? " codemirror-focused " : " ") + view.themeClass("editor.wrapper")
-    }
-  },
-  contentAttrs(): Attrs {
-    return {
-      spellcheck: "false",
-      contenteditable: "true",
-      class: styles.content + " codemirror-content " + view.themeClass("editor.content"),
-      style: `${browser.tabSize}: ${view.state.tabSize}`
-    }
-  }
-}))
-
 const defaultAttrs: Extension = [
-  defaultAttrPlugin.extension,
-  defaultAttrPlugin.behavior(contentAttributes, p => p.contentAttrs()),
-  defaultAttrPlugin.behavior(editorAttributes, p => p.editorAttrs())
+  extendView.dynamic(editorAttributes, view => ({
+    class: "codemirror " + styles.wrapper + (view.hasFocus ? " codemirror-focused " : " ") + view.themeClass("editor.wrapper")
+  })),
+  extendView.dynamic(contentAttributes, view => ({
+    spellcheck: "false",
+    contenteditable: "true",
+    class: styles.content + " codemirror-content " + view.themeClass("editor.content"),
+    style: `${browser.tabSize}: ${view.state.tabSize}`
+  }))
 ]

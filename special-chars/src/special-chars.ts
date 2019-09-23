@@ -24,10 +24,10 @@ export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig
   if (config.replaceTabs)
     config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
 
-  let plugin = new ViewPlugin(view => new SpecialCharPlugin(view, config))
-  let deco = plugin.decoration(plugin => plugin.decorations)
-  return config.replaceTabs ? [plugin.extension, deco, EditorView.styleModule(style)] :
-    [plugin.extension, deco]
+  let plugin = new ViewPlugin(view => new SpecialCharPlugin(view, config), [
+    {behavior: EditorView.decorations, read: plugin => plugin.decorations}
+  ])
+  return config.replaceTabs ? [plugin.extension, EditorView.styleModule(style)] : plugin.extension
 }, {})
 
 const JOIN_GAP = 10

@@ -102,9 +102,8 @@ class TokenContext {
 }
 
 export function highlight() { // FIXME allow specifying syntax?
-  let plugin = new ViewPlugin(view => new Highlighter(view))
-  return [
-    plugin.extension,
-    plugin.decoration(p => p.decorations)
-  ]
+  let plugin = new ViewPlugin(view => new Highlighter(view), [
+    {behavior: EditorView.decorations, read: p => p.decorations}
+  ])
+  return plugin.extension
 }

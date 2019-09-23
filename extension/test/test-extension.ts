@@ -1,7 +1,7 @@
 const ist = require("ist")
 import {Extension, ExtensionType, Values, Priority} from "../src/extension"
 
-let tp = new ExtensionType(), v = new Values
+let tp = new ExtensionType<Values>(v => v), v = new Values
 
 function mk(...extensions: Extension[]) {
   return tp.resolve(extensions)

@@ -58,8 +58,10 @@ export type Behavior<Input, Output> = (value: Input) => Extension
 /// All extensions are associated with an extension type. This is used
 /// to distinguish extensions meant for different types of hosts (such
 /// as the editor view and state).
-export class ExtensionType {
+export class ExtensionType<Context> {
   private nextStorageID = 0
+
+  constructor(readonly getValues: (context: Context) => Values) {}
 
   /// Define a type of behavior. All extensions eventually resolve to
   /// behaviors. Each behavior can have an ordered sequence of values
@@ -75,7 +77,7 @@ export class ExtensionType {
     return behavior
   }
 
-  dynamic<Input>(behavior: Behavior<Input, any>, read: (values: Values) => Input): Extension {
+  dynamic<Input>(behavior: Behavior<Input, any>, read: (context: Context) => Input): Extension {
     if (BehaviorData.get(behavior).static) throw new Error("Can't create a dynamic source for a static behavior")
     return new ExtensionValue(Kind.Behavior, behavior, {dynamic: read}, this)
   }
@@ -103,7 +105,7 @@ export class ExtensionType {
   }
 
   /// @internal
-  resolveInner(extensions: readonly Extension[], replace: readonly NamedExtensionValue[] = none): Configuration {
+  resolveInner(extensions: readonly Extension[], replace: readonly NamedExtensionValue[] = none): Configuration<Context> {
     let pending: ExtensionValue[] = flatten(extensions, Prio.Default, replace)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
@@ -125,7 +127,7 @@ export class ExtensionType {
 
     // Collect the behavior values.
     let foreign: ExtensionValue[] = []
-    let readBehavior: {[id: number]: (fields: Values) => any} = Object.create(null)
+    let readBehavior: {[id: number]: (context: Context) => any} = Object.create(null)
     for (let ext of pending) {
       if (ext.type != this) {
         // Collect extensions of the wrong type into configuration.foreign
@@ -145,11 +147,11 @@ export class ExtensionType {
           parts.push(ext.value.static)
         }
       })
-      readBehavior[behavior.id] = dynamic.length == 0 ? () => parts : (values: Values) => {
-        let found = values[behavior.id]
+      readBehavior[behavior.id] = dynamic.length == 0 ? () => parts : (context: Context) => {
+        let values = this.getValues(context), found = values[behavior.id]
         if (found !== undefined || Object.prototype.hasOwnProperty.call(values, behavior.id)) return found
         let array = parts.slice()
-        for (let {read, index} of dynamic) array[index] = read(values)
+        for (let {read, index} of dynamic) array[index] = read(context)
         return values[behavior.id] = behavior.combine(array)
       }
     }
@@ -210,7 +212,7 @@ class ExtensionValue {
     /// and the array of extensions for multi extensions. @internal
     readonly value: any,
     /// @internal
-    readonly type: ExtensionType | null,
+    readonly type: ExtensionType<any> | null,
     /// @internal
     readonly priority: number = Prio.None
   ) {}
@@ -290,23 +292,24 @@ const none: readonly any[] = []
 /// An extension set describes the fields and behaviors that exist in
 /// a given configuration. It is created with
 /// [`ExtensionType.resolve`](#state.ExtensionType.resolve).
-export class Configuration {
+export class Configuration<Context> {
   /// @internal
   constructor(
-    private type: ExtensionType,
+    private type: ExtensionType<Context>,
     private extensions: readonly Extension[],
     private replaced: readonly NamedExtensionValue[],
-    private readBehavior: {[id: number]: (values: Values) => any},
+    private readBehavior: {[id: number]: (context: Context) => any},
     /// Any extensions that weren't an instance of the given type when
     /// resolving.
     readonly foreign: readonly Extension[] = []
   ) {}
 
   /// Retrieve the value of a given behavior.
-  getBehavior<Output>(behavior: Behavior<any, Output>, fields: Values): Output {
+  getBehavior<Output>(behavior: Behavior<any, Output>, context?: Context): Output {
     let data = BehaviorData.get(behavior)
+    if (!context && !data.static) throw new RangeError("Need a context to retrieve non-static behavior")
     let f = this.readBehavior[data.id]
-    return f ? f(fields) : data.empty
+    return f ? f(context!) : data.empty
   }
 
   /// Replace one or more extensions with new ones, producing a new
@@ -327,7 +330,7 @@ Values.prototype = Object.create(null)
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
 // still in extenders.
-function findTopUnique(extensions: ExtensionValue[], type: ExtensionType): UniqueExtensionType | null {
+function findTopUnique(extensions: ExtensionValue[], type: ExtensionType<any>): UniqueExtensionType | null {
   let foundUnique = false
   for (let ext of extensions) if (ext.kind == Kind.Unique && ext.type == type) {
     foundUnique = true

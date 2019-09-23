@@ -5,7 +5,7 @@ const ist = require("ist")
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
-  return EditorView.extend.resolve([keymap(map)]).getBehavior(EditorView.handleDOMEvents, {})[0]
+  return EditorView.extend.resolve([keymap(map)]).getBehavior(EditorView.handleDOMEvents, {} as any)[0]
 }
 
 function dispatch(handlers: any, key: string, mods?: any) {

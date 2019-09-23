@@ -6,9 +6,10 @@ import {Viewport, ViewportState} from "./viewport"
 import browser from "./browser"
 import {DOMObserver} from "./domobserver"
 import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./heightmap"
-import {Decoration, DecorationSet, joinRanges, findChangedRanges, heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
+import {Decoration, DecorationSet, joinRanges, findChangedRanges,
+        heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, decoration} from "./extension"
+import {ViewUpdate, decorations as decorationsBehavior} from "./extension"
 import {EditorView} from "./editorview"
 import {EditorState, ChangedRange} from "../../state/src"
 import {Text} from "../../doc/src"
@@ -315,7 +316,7 @@ export class DocView extends ContentView {
       // otherwise.
       if (!this.view.inputState.composing) this.compositionDeco = Decoration.none
       else if (update && update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, contentChanges)
-      let decorations = this.view.behavior(decoration).concat(this.compositionDeco)
+      let decorations = this.view.behavior(decorationsBehavior).concat(this.compositionDeco)
       // If the decorations are stable, stop.
       if (!update && !initializing && sameArray(decorations, this.decorations)) return contentChanges
       // Compare the decorations (between document changes)

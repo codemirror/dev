@@ -2,13 +2,13 @@ import {EditorState, Transaction, ChangeSet} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet} from "./decoration"
-import {Extension, ExtensionType, Behavior, Values, Slot, SlotType} from "../../extension/src/extension"
+import {Extension, Behavior, ExtensionType, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 
 const none: readonly any[] = []
 
-export const extendView = new ExtensionType
+export const extendView = new ExtensionType<EditorView>(view => view.plugins)
 
 export const handleDOMEvents = extendView.behavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
@@ -55,6 +55,11 @@ export interface ViewPluginValue<T = undefined> {
   destroy?(): void
 }
 
+export type BehaviorSpec<T, Input> = {
+  behavior: Behavior<Input, any>,
+  read: (plugin: T) => Input
+}
+
 export class ViewPlugin<T extends ViewPluginValue> {
   /// @internal
   id = extendView.storageID()
@@ -62,17 +67,12 @@ export class ViewPlugin<T extends ViewPluginValue> {
 
   constructor(
     /// @internal
-    readonly create: (view: EditorView) => T
+    readonly create: (view: EditorView) => T,
+    behavior: readonly BehaviorSpec<T, any>[] = []
   ) {
-    this.extension = viewPlugin(this)
-  }
-
-  behavior<Input>(behavior: Behavior<Input, any>, read: (plugin: T) => Input): Extension {
-    return extendView.dynamic(behavior, (values: Values) => read(values[this.id]))
-  }
-
-  decoration(read: (plugin: T) => DecorationSet) {
-    return this.behavior(decoration, read)
+    this.extension = [viewPlugin(this), ...behavior.map(spec => {
+      return extendView.dynamic(spec.behavior, view => spec.read(view.plugin(this)!))
+    })]
   }
 
   /// Create a view plugin extension that only computes decorations.
@@ -83,8 +83,8 @@ export class ViewPlugin<T extends ViewPluginValue> {
     update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
     map?: boolean
   }) {
-    let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec))
-    return [plugin.extension, plugin.decoration(value => value.decorations)]
+    let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec), [{behavior: decorations, read: p => p.decorations}])
+    return plugin.extension
   }
 }
 
@@ -100,7 +100,7 @@ export const contentAttributes = extendView.behavior<Attrs, Attrs>({
 export const viewPlugin = extendView.behavior<ViewPlugin<any>>({static: true})
 
 // Provide decorations
-export const decoration = extendView.behavior<DecorationSet>()
+export const decorations = extendView.behavior<DecorationSet>()
 
 class DecorationPlugin implements ViewPluginValue {
   decorations: DecorationSet
@@ -124,9 +124,8 @@ export const focusChange = Slot.define<boolean>()
 
 export const notified = Slot.define<boolean>()
 
-/// View [fields](#view.ViewField) and [plugins](#view.ViewPlugin) are
-/// given instances of this class, which describe what happened,
-/// whenever the view is updated.
+/// View [plugins](#view.ViewPlugin) are given instances of this
+/// class, which describe what happened, whenever the view is updated.
 export class ViewUpdate {
   /// The new editor state.
   readonly state: EditorState

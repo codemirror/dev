@@ -4,7 +4,7 @@ import {Transaction} from "./transaction"
 import {Extension, ExtensionType, Configuration, Values, Behavior} from "../../extension/src/extension"
 import {Tree} from "lezer-tree"
 
-export const extendState = new ExtensionType
+export const extendState = new ExtensionType<EditorState>(state => state.values)
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -26,8 +26,9 @@ export class EditorState {
   /// @internal
   constructor(
     /// @internal
-    readonly configuration: Configuration,
-    private readonly values: Values,
+    readonly configuration: Configuration<EditorState>,
+    /// @internal
+    readonly values: Values,
     /// The current document.
     readonly doc: Text,
     /// The current selection.
@@ -58,7 +59,7 @@ export class EditorState {
   applyTransaction(tr: Transaction): EditorState {
     let values = new Values, configuration = tr.configuration
     let newState = new EditorState(configuration, values, tr.doc, tr.selection)
-    for (let field of configuration.getBehavior(stateField, values)) {
+    for (let field of configuration.getBehavior(stateField)) {
       let exists = configuration == this.configuration || Object.prototype.hasOwnProperty.call(this.values, field.id)
       values[field.id] = exists ? field.apply(tr, this.values[field.id], newState) : field.init(newState)
     }
@@ -80,7 +81,7 @@ export class EditorState {
 
   /// Get the value of a state behavior.
   behavior<Output>(behavior: Behavior<any, Output>): Output {
-    return this.configuration.getBehavior(behavior, this.values)
+    return this.configuration.getBehavior(behavior, this)
   }
 
   /// Convert this state to a JSON-serializable object.
@@ -108,9 +109,9 @@ export class EditorState {
     let configuration = extendState.resolve(config.extensions || [])
     let values = new Values
     let doc = config.doc instanceof Text ? config.doc
-      : Text.of(config.doc || "", configuration.getBehavior(EditorState.lineSeparator, values))
+      : Text.of(config.doc || "", configuration.getBehavior(EditorState.lineSeparator))
     let selection = config.selection || EditorSelection.single(0)
-    if (!configuration.getBehavior(EditorState.allowMultipleSelections, values)) selection = selection.asSingle()
+    if (!configuration.getBehavior(EditorState.allowMultipleSelections)) selection = selection.asSingle()
     let state = new EditorState(configuration, values, doc, selection)
     for (let field of state.behavior(stateField)) values[field.id] = field.init(state)
     return state
@@ -202,15 +203,6 @@ export class StateField<Value> {
     this.init = spec.init
     this.apply = spec.apply
     this.extension = stateField(this)
-  }
-
-  /// Create a behavior extension whose value is the value of this
-  /// field, or some derived value retrieved through an accessor
-  /// function.
-  behavior(behavior: Behavior<Value, any>): Extension
-  behavior<T>(behavior: Behavior<T, any>, read: (value: Value) => T): Extension
-  behavior<T>(behavior: Behavior<T, any>, read?: (value: Value) => T): Extension {
-    return extendState.dynamic(behavior, read ? values => read(values[this.id]) : values => values[this.id])
   }
 }
 

@@ -21,7 +21,7 @@ export class Transaction {
   private metadata: Slot[]
   private flags: number = 0
   /// @internal
-  configuration: Configuration
+  configuration: Configuration<EditorState>
   private state: EditorState | null = null
 
   /// @internal
@@ -134,7 +134,7 @@ export class Transaction {
     return (this.flags & Flag.ScrollIntoView) > 0
   }
 
-  replaceExtensions(replace: readonly {from: Extension, to: Extension}[]) {
+  replaceExtensions(replace: readonly Extension[]) {
     this.configuration = this.configuration.replaceExtensions(replace)
     this.flags |= Flag.Reconfigure
     return this
