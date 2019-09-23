@@ -1,5 +1,5 @@
 import {EditorState, Transaction, CancellablePromise} from "../../state/src"
-import {Configuration, Slot, Extension, Values, Behavior} from "../../extension/src/extension"
+import {Configuration, Slot, Extension, IDMap, Behavior} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 import {DocView} from "./docview"
@@ -78,7 +78,7 @@ export class EditorView {
   configuration!: Configuration<EditorView>
 
   /// @internal
-  plugins: Values = new Values
+  plugins: IDMap = new IDMap
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
@@ -195,7 +195,7 @@ export class EditorView {
 
   private updatePlugins() {
     let old = this.plugins
-    this.plugins = new Values
+    this.plugins = new IDMap
     for (let plugin of this.behavior(viewPlugin))
       this.plugins[plugin.id] = Object.prototype.hasOwnProperty.call(old, plugin.id) ? old[plugin.id] : plugin.create(this)
   }
@@ -227,7 +227,7 @@ export class EditorView {
     this.viewport = viewport
     this.state = update.state
     let oldPlugins = this.plugins
-    this.plugins = new Values
+    this.plugins = new IDMap
     for (let plugin of this.behavior(viewPlugin)) {
       let value = this.plugins[plugin.id] = oldPlugins[plugin.id]
       value.update(update) // FIXME try/catch

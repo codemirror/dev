@@ -1,7 +1,7 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Extension, ExtensionType, Configuration, Values, Behavior} from "../../extension/src/extension"
+import {Extension, ExtensionType, Configuration, IDMap, Behavior} from "../../extension/src/extension"
 import {Tree} from "lezer-tree"
 
 export const extendState = new ExtensionType<EditorState>(state => state.values)
@@ -28,7 +28,7 @@ export class EditorState {
     /// @internal
     readonly configuration: Configuration<EditorState>,
     /// @internal
-    readonly values: Values,
+    readonly values: IDMap,
     /// The current document.
     readonly doc: Text,
     /// The current selection.
@@ -57,7 +57,7 @@ export class EditorState {
 
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
-    let values = new Values, configuration = tr.configuration
+    let values = new IDMap, configuration = tr.configuration
     let newState = new EditorState(configuration, values, tr.doc, tr.selection)
     for (let field of configuration.getBehavior(stateField)) {
       let exists = configuration == this.configuration || Object.prototype.hasOwnProperty.call(this.values, field.id)
@@ -107,7 +107,7 @@ export class EditorState {
   /// Create a new state.
   static create(config: EditorStateConfig = {}): EditorState {
     let configuration = extendState.resolve(config.extensions || [])
-    let values = new Values
+    let values = new IDMap
     let doc = config.doc instanceof Text ? config.doc
       : Text.of(config.doc || "", configuration.getBehavior(EditorState.lineSeparator))
     let selection = config.selection || EditorSelection.single(0)

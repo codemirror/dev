@@ -61,7 +61,7 @@ export type Behavior<Input, Output> = (value: Input) => Extension
 export class ExtensionType<Context> {
   private nextStorageID = 0
 
-  constructor(readonly getValues: (context: Context) => Values) {}
+  constructor(readonly getValues: (context: Context) => IDMap) {}
 
   /// Define a type of behavior. All extensions eventually resolve to
   /// behaviors. Each behavior can have an ordered sequence of values
@@ -138,7 +138,7 @@ export class ExtensionType<Context> {
       if (Object.prototype.hasOwnProperty.call(readBehavior, behavior.id)) continue // Already collected
       let values: ExtensionValue[] = []
       for (let e of pending) if (e.id == ext.id) e.collect(values)
-      let dynamic: {read: (values: Values) => any, index: number}[] = [], parts: any[] = []
+      let dynamic: {read: (values: IDMap) => any, index: number}[] = [], parts: any[] = []
       values.forEach(ext => {
         if (ext.value.dynamic) {
           dynamic.push({read: ext.value.dynamic, index: parts.length})
@@ -322,10 +322,10 @@ export class Configuration<Context> {
   }
 }
 
-export class Values {
+export class IDMap {
   [id: number]: any
 }
-Values.prototype = Object.create(null)
+IDMap.prototype = Object.create(null)
 
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
