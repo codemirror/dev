@@ -1,7 +1,7 @@
 const ist = require("ist")
-import {Extension, ExtensionType, IDMap, Priority} from "../src/extension"
+import {Extension, ExtensionGroup, IDMap} from "../src/extension"
 
-let tp = new ExtensionType<IDMap>(v => v), v = new IDMap
+let tp = new ExtensionGroup<IDMap>(v => v), v = new IDMap
 
 function mk(...extensions: Extension[]) {
   return tp.resolve(extensions)
@@ -36,15 +36,15 @@ describe("EditorState behavior", () => {
 
   it("sorts extensions by priority", () => {
     let str = tp.behavior<string>()
-    let set = mk(str("a"), str("b"), Priority.extend(str("c")),
-                 Priority.override(str("d")), Priority.fallback(str("e")),
-                 Priority.extend(str("f")), str("g"))
+    let set = mk(str("a"), str("b"), tp.extend(str("c")),
+                 tp.override(str("d")), tp.fallback(str("e")),
+                 tp.extend(str("f")), str("g"))
     ist(set.getBehavior(str, v).join(), "d,c,f,a,b,g,e")
   })
 
   it("lets sub-extensions inherit their parent's priority", () => {
     let e = (n: number) => num(n)
-    let set = mk(num(1), Priority.override(e(2)), e(4))
+    let set = mk(num(1), tp.override(e(2)), e(4))
     ist(set.getBehavior(num, v).join(), "2,1,4")
   })
 
@@ -63,7 +63,7 @@ describe("EditorState behavior", () => {
     let name = tp.defineName()
     let set = mk(num(1), name([num(2), num(3)]))
     ist(set.getBehavior(num, v).join(), "1,2,3")
-    let newSet = set.replaceExtensions([name(Priority.override(num(4)))])
+    let newSet = set.replaceExtensions([name(tp.override(num(4)))])
     ist(newSet.getBehavior(num, v).join(), "4,1")
     ist(newSet.replaceExtensions([]).getBehavior(num, v).join(), "4,1")
     ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")

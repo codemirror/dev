@@ -26,7 +26,7 @@ export class Slot<T = any> {
 /// and a function used to create instances of it.
 export type SlotType<T> = (value: T) => Slot<T>
 
-const enum Prio { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
+const enum Prec { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
 const enum Kind { Behavior, Array, Unique, Name }
 
@@ -58,7 +58,7 @@ export type Behavior<Input, Output> = (value: Input) => Extension
 /// All extensions are associated with an extension type. This is used
 /// to distinguish extensions meant for different types of hosts (such
 /// as the editor view and state).
-export class ExtensionType<Context> {
+export class ExtensionGroup<Context> {
   private nextStorageID = 0
 
   constructor(readonly getValues: (context: Context) => IDMap) {}
@@ -99,14 +99,14 @@ export class ExtensionType<Context> {
 
   /// Resolve an array of extensions by expanding all extensions until
   /// only behaviors are left, and then collecting the behaviors into
-  /// arrays of values, preserving priority ordering throughout.
+  /// arrays of values, preserving precedence ordering throughout.
   resolve(extensions: readonly Extension[]) {
     return this.resolveInner(extensions)
   }
 
   /// @internal
   resolveInner(extensions: readonly Extension[], replace: readonly NamedExtensionValue[] = none): Configuration<Context> {
-    let pending: ExtensionValue[] = flatten(extensions, Prio.Default, replace)
+    let pending: ExtensionValue[] = flatten(extensions, Prec.Default, replace)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -169,6 +169,19 @@ export class ExtensionType<Context> {
   }
 
   storageID() { return ++this.nextStorageID }
+
+  /// Mark an extension with a precedence below the default
+  /// precedence, which will cause default-precedence extensions to
+  /// override it even if they are specified later in the extension
+  /// ordering.
+  fallback = setPrec(Prec.Fallback)
+  /// Mark an extension with normal precedence.
+  normal = setPrec(Prec.Default)
+  /// Mark an extension with a precedence above the default precedence.
+  extend = setPrec(Prec.Extend)
+  /// Mark an extension with a precedence above the default and
+  /// `extend` precedences.
+  override = setPrec(Prec.Override)
 }
 
 declare const extensionBrand: unique symbol
@@ -181,25 +194,10 @@ export type Extension = {[extensionBrand]: true} | ExtensionArray
 // type aliases, and should be unnnecessary in TS 3.7
 interface ExtensionArray extends ReadonlyArray<Extension> {}
 
-function setPrio(priority: Prio): (extension: Extension) => Extension {
+function setPrec(prec: Prec): (extension: Extension) => Extension {
   return (extension: Extension) => extension instanceof ExtensionValue
-    ? new ExtensionValue(extension.kind, extension.id, extension.value, extension.type, priority)
-    : new ExtensionValue(Kind.Array, null, extension, null, priority)
-}
-
-export const Priority = {
-  /// Create a copy of an extension with a priority below the default
-  /// priority, which will cause default-priority extensions to
-  /// override it even if they are specified later in the extension
-  /// ordering.
-  fallback: setPrio(Prio.Fallback),
-  normal: setPrio(Prio.Default),
-  /// Create a copy of an extension with a priority above the default
-  /// priority.
-  extend: setPrio(Prio.Extend),
-  /// Create a copy of an extension with a priority above the default
-  /// and `extend` priorities.
-  override: setPrio(Prio.Override)
+    ? new ExtensionValue(extension.kind, extension.id, extension.value, extension.type, prec)
+    : new ExtensionValue(Kind.Array, null, extension, null, prec)
 }
 
 /// And extension is a value that describes a way in which something
@@ -217,41 +215,42 @@ class ExtensionValue {
     /// and the array of extensions for multi extensions. @internal
     readonly value: any,
     /// @internal
-    readonly type: ExtensionType<any> | null,
+    readonly type: ExtensionGroup<any> | null,
     /// @internal
-    readonly priority: number = Prio.None
+    readonly prec: number = Prec.None
   ) {}
 
   [extensionBrand]!: true
 
-  /// Insert this extension in an array of extensions so that it
-  /// appears after any already-present extensions with the same or
-  /// lower priority, but before any extensions with higher priority.
+  // Insert this extension in an array of extensions so that it
+  // appears after any already-present extensions with the same or
+  // lower precedence, but before any extensions with higher
+  // precedence.
   collect(array: ExtensionValue[]) {
     let i = 0
-    while (i < array.length && array[i].priority >= this.priority) i++
+    while (i < array.length && array[i].prec >= this.prec) i++
     array.splice(i, 0, this)
   }
 }
 
 type NamedExtensionValue = ExtensionValue & {kind: Kind.Name}
 
-function flatten(extension: Extension, priority: Prio,
+function flatten(extension: Extension, prec: Prec,
                  replace: readonly NamedExtensionValue[],
                  target: ExtensionValue[] = []): ExtensionValue[] {
   if (Array.isArray(extension)) {
-    for (let ext of extension) flatten(ext, priority, replace, target)
+    for (let ext of extension) flatten(ext, prec, replace, target)
   } else {
     let value = extension as ExtensionValue
     if (value.kind == Kind.Name) {
       let inner = value.value
       for (let r of replace) if (r.id == value.id) inner = r.value
-      flatten(inner, value.priority == Prio.None ? priority : value.priority, replace, target)
+      flatten(inner, value.prec == Prec.None ? prec : value.prec, replace, target)
     } else if (value.kind == Kind.Array) {
       for (let ext of value.value as Extension[])
-        flatten(ext, value.priority == Prio.None ? priority : value.priority, replace, target)
+        flatten(ext, value.prec == Prec.None ? prec : value.prec, replace, target)
     } else {
-      target.push(value.priority != Prio.None ? value : new ExtensionValue(value.kind, value.id, value.value, value.type, priority))
+      target.push(value.prec != Prec.None ? value : new ExtensionValue(value.kind, value.id, value.value, value.type, prec))
     }
   }
   return target
@@ -277,15 +276,15 @@ class UniqueExtensionType {
     for (let i = 0; i < extensions.length; i++) {
       let ext = extensions[i]
       if (ext.id != this) continue
-      let sub = first ? this.subs(ours.map(s => s.value), ext.priority, replace) : none
+      let sub = first ? this.subs(ours.map(s => s.value), ext.prec, replace) : none
       extensions.splice(i, 1, ...sub)
       first = false
       i += sub.length - 1
     }
   }
 
-  subs(specs: any[], priority: Prio, replace: readonly NamedExtensionValue[]) {
-    let subs = flatten(this.instantiate(specs), priority, replace)
+  subs(specs: any[], prec: Prec, replace: readonly NamedExtensionValue[]) {
+    let subs = flatten(this.instantiate(specs), prec, replace)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
     return subs
@@ -300,7 +299,7 @@ const none: readonly any[] = []
 export class Configuration<Context> {
   /// @internal
   constructor(
-    private type: ExtensionType<Context>,
+    private type: ExtensionGroup<Context>,
     private extensions: readonly Extension[],
     private replaced: readonly NamedExtensionValue[],
     private readBehavior: {[id: number]: (context: Context) => any},
@@ -335,7 +334,7 @@ IDMap.prototype = Object.create(null)
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
 // still in extenders.
-function findTopUnique(extensions: ExtensionValue[], type: ExtensionType<any>): UniqueExtensionType | null {
+function findTopUnique(extensions: ExtensionValue[], type: ExtensionGroup<any>): UniqueExtensionType | null {
   let foundUnique = false
   for (let ext of extensions) if (ext.kind == Kind.Unique && ext.type == type) {
     foundUnique = true

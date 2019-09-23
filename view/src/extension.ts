@@ -2,13 +2,13 @@ import {EditorState, Transaction, ChangeSet} from "../../state/src"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet} from "./decoration"
-import {Extension, Behavior, ExtensionType, Slot, SlotType} from "../../extension/src/extension"
+import {Extension, Behavior, ExtensionGroup, Slot, SlotType} from "../../extension/src/extension"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 
 const none: readonly any[] = []
 
-export const extendView = new ExtensionType<EditorView>(view => view.plugins)
+export const extendView = new ExtensionGroup<EditorView>(view => view.plugins)
 
 export const handleDOMEvents = extendView.behavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
 

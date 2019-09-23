@@ -1,10 +1,10 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Extension, ExtensionType, Configuration, IDMap, Behavior} from "../../extension/src/extension"
+import {Extension, ExtensionGroup, Configuration, IDMap, Behavior} from "../../extension/src/extension"
 import {Tree} from "lezer-tree"
 
-export const extendState = new ExtensionType<EditorState>(state => state.values)
+export const extendState = new ExtensionGroup<EditorState>(state => state.values)
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
