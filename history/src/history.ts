@@ -1,5 +1,5 @@
 import {EditorState, Transaction, StateField} from "../../state/src"
-import {Extension, combineConfig, Slot} from "../../extension/src/extension"
+import {combineConfig, Slot} from "../../extension/src/extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = Slot.define<HistoryState>()
@@ -34,10 +34,10 @@ export const history = EditorState.extend.unique<HistoryConfig>(configs => {
     minDepth: 100,
     newGroupDelay: 500
   }, {minDepth: Math.max})
-  return Extension.all(
+  return [
     historyField.extension,
     historyConfig(config)
-  )
+  ]
 }, {})
 
 function cmd(target: PopTarget, only: ItemFilter) {

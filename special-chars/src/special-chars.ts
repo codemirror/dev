@@ -1,7 +1,7 @@
 import {Decoration, DecorationSet, DecoratedRange, WidgetType, ViewPlugin, ViewPluginValue,
         ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange} from "../../state/src"
-import {combineConfig, Extension} from "../../extension/src/extension"
+import {combineConfig} from "../../extension/src/extension"
 import {countColumn} from "../../doc/src"
 import {StyleModule} from "style-mod"
 
@@ -26,8 +26,8 @@ export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig
 
   let plugin = new ViewPlugin(view => new SpecialCharPlugin(view, config))
   let deco = plugin.decoration(plugin => plugin.decorations)
-  return config.replaceTabs ? Extension.all(plugin.extension, deco, EditorView.styleModule(style)) :
-    Extension.all(plugin.extension, deco)
+  return config.replaceTabs ? [plugin.extension, deco, EditorView.styleModule(style)] :
+    [plugin.extension, deco]
 }, {})
 
 const JOIN_GAP = 10

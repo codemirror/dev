@@ -84,7 +84,7 @@ export class ViewPlugin<T extends ViewPluginValue> {
     map?: boolean
   }) {
     let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec))
-    return Extension.all(plugin.extension, plugin.decoration(value => value.decorations))
+    return [plugin.extension, plugin.decoration(value => value.decorations)]
   }
 }
 

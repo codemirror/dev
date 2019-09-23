@@ -1,6 +1,5 @@
 import {EditorState} from "../../state/src"
 import {ViewPlugin, DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view/src"
-import {Extension} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 export interface Config {}
@@ -8,7 +7,7 @@ export interface Config {}
 export const multipleSelections = EditorState.extend.unique((configs: Config[]) => {
   let rangeConfig = {class: styles.secondarySelection} // FIXME configurable?
 
-  return Extension.all(
+  return [
     EditorState.allowMultipleSelections(true),
     ViewPlugin.decoration({
       create(view) { return decorateSelections(view.state, rangeConfig) },
@@ -18,7 +17,7 @@ export const multipleSelections = EditorState.extend.unique((configs: Config[]) 
       }
     }),
     EditorView.styleModule(styles)
-  )
+  ]
 }, {})
 
 class CursorWidget extends WidgetType<null> {

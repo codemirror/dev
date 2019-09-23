@@ -1,6 +1,5 @@
 import {StyleModule, Style} from "style-mod"
 import {EditorView} from "../../view/src"
-import {Extension} from "../../extension/src/extension"
 import {StyleNames} from "./styleprop"
 
 export type ThemeSpec = {[prop: string]: string | number | ThemeSpec}
@@ -104,14 +103,14 @@ export const themeData = EditorView.extend.behavior<Theme>()
 
 export function theme(rules: ThemeSpec) {
   let theme = parseTheme(rules), cache: {[tag: string]: string} = Object.create(null)
-  return Extension.all(
+  return [
     themeData(theme),
     EditorView.themeClass(str => {
       let value = cache[str]
       return value != null ? value : (cache[str] = theme.match(str))
     }),
     EditorView.styleModule(theme.styleMod)
-  )
+  ]
 }
 
 export const defaultTheme = theme({

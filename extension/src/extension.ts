@@ -28,7 +28,7 @@ export type SlotType<T> = (value: T) => Slot<T>
 
 const enum Prio { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
-const enum Kind { Behavior, Multi, Unique, Tag }
+const enum Kind { Behavior, Array, Unique }
 
 class BehaviorData {
   empty: any
@@ -75,14 +75,14 @@ export class ExtensionType {
   behavior<Input, Output>(
     options: {combine?: (values: readonly Input[]) => Output, static?: boolean} = {}
   ): Behavior<Input, Output> {
-    let behavior = (value: Input) => new Extension(Kind.Behavior, behavior, {static: value}, this)
+    let behavior = (value: Input) => new ExtensionValue(Kind.Behavior, behavior, {static: value}, this)
     ;(behavior as any)._data = new BehaviorData(options.combine || (array => array as any), !!options.static, this.storageID())
     return behavior
   }
 
   dynamic<Input>(behavior: Behavior<Input, any>, read: (values: Values) => Input): Extension {
     if (BehaviorData.get(behavior).static) throw new Error("Can't create a dynamic source for a static behavior")
-    return new Extension(Kind.Behavior, behavior, {dynamic: read}, this)
+    return new ExtensionValue(Kind.Behavior, behavior, {dynamic: read}, this)
   }
 
   /// Define a unique extension. When resolving extensions, all
@@ -96,7 +96,7 @@ export class ExtensionType {
     const type = new UniqueExtensionType(instantiate)
     return (spec: Spec | undefined = defaultSpec) => {
       if (spec === undefined) throw new RangeError("This extension has no default spec")
-      return new Extension(Kind.Unique, type, spec, this)
+      return new ExtensionValue(Kind.Unique, type, spec, this)
     }
   }
 
@@ -109,7 +109,7 @@ export class ExtensionType {
 
   /// @internal
   resolveInner(extensions: readonly Extension[], replace: readonly Replacement[] = none): Configuration {
-    let pending: Extension[] = new Extension(Kind.Multi, null, extensions, this).flatten(Prio.Default, replace)
+    let pending: ExtensionValue[] = flatten(extensions, Prio.Default, replace)
     // This does a crude topological ordering to resolve behaviors
     // top-to-bottom in the dependency ordering. If there are no
     // cyclic dependencies, we can always find a behavior in the top
@@ -129,7 +129,7 @@ export class ExtensionType {
     }
 
     // Collect the behavior values.
-    let foreign: Extension[] = []
+    let foreign: ExtensionValue[] = []
     let readBehavior: {[id: number]: (fields: Values) => any} = Object.create(null)
     for (let ext of pending) {
       if (ext.type != this) {
@@ -139,7 +139,7 @@ export class ExtensionType {
       }
       let behavior = BehaviorData.get(ext.id as Behavior<any, any>)
       if (Object.prototype.hasOwnProperty.call(readBehavior, behavior.id)) continue // Already collected
-      let values: Extension[] = []
+      let values: ExtensionValue[] = []
       for (let e of pending) if (e.id == ext.id) e.collect(values)
       let dynamic: {read: (values: Values) => any, index: number}[] = [], parts: any[] = []
       values.forEach(ext => {
@@ -164,8 +164,20 @@ export class ExtensionType {
   storageID() { return ++this.nextStorageID }
 }
 
-function setPrio(ext: Extension, priority: Prio) {
-  return new Extension(ext.kind, ext.id, ext.value, ext.type, priority)
+declare const extensionBrand: unique symbol
+
+/// Extensions can either be values created by behaviors or unique
+/// extensions, or arrays of extension values.
+export type Extension = {[extensionBrand]: true} | ExtensionArray
+
+// FIXME this is a hack to get around TypeScript's lack of recursive
+// type aliases, and should be unnnecessary in TS 3.7
+interface ExtensionArray extends ReadonlyArray<Extension> {}
+
+function setPrio(priority: Prio): (extension: Extension) => Extension {
+  return (extension: Extension) => extension instanceof ExtensionValue
+    ? new ExtensionValue(extension.kind, extension.id, extension.value, extension.type, priority)
+    : new ExtensionValue(Kind.Array, null, extension, null, priority)
 }
 
 export const Priority = {
@@ -173,21 +185,21 @@ export const Priority = {
   /// priority, which will cause default-priority extensions to
   /// override it even if they are specified later in the extension
   /// ordering.
-  fallback: (ext: Extension) => setPrio(ext, Prio.Fallback),
-  normal: (ext: Extension) => setPrio(ext, Prio.Default),
+  fallback: setPrio(Prio.Fallback),
+  normal: setPrio(Prio.Default),
   /// Create a copy of an extension with a priority above the default
   /// priority.
-  extend: (ext: Extension) => setPrio(ext, Prio.Extend),
+  extend: setPrio(Prio.Extend),
   /// Create a copy of an extension with a priority above the default
   /// and `extend` priorities.
-  override: (ext: Extension) => setPrio(ext, Prio.Override)
+  override: setPrio(Prio.Override)
 }
 
 /// And extension is a value that describes a way in which something
 /// is to be extended. It can be produced by instantiating a behavior,
 /// calling unique extension function, or grouping extensions with
 /// `Extension.all`.
-export class Extension {
+class ExtensionValue {
   /// @internal
   constructor(
     /// @internal
@@ -198,42 +210,41 @@ export class Extension {
     /// and the array of extensions for multi extensions. @internal
     readonly value: any,
     /// @internal
-    readonly type: ExtensionType,
+    readonly type: ExtensionType | null,
     /// @internal
     readonly priority: number = Prio.None
   ) {}
 
-  /// @internal
-  flatten(priority: Prio, replace: readonly Replacement[], target: Extension[] = []): Extension[] {
-    for (let r of replace) if (r.from == this)
-      return r.to.flatten(priority, replace, target)
-    if (this.kind == Kind.Multi) {
-      for (let ext of this.value as Extension[]) {
-        ext.flatten(this.priority != Prio.None ? this.priority : priority, replace, target)
-      }
-    } else {
-      target.push(this.priority != Prio.None ? this : setPrio(this, priority))
-    }
-    return target
-  }
+  [extensionBrand]!: true
 
   /// Insert this extension in an array of extensions so that it
   /// appears after any already-present extensions with the same or
   /// lower priority, but before any extensions with higher priority.
-  /// @internal
-  collect(array: Extension[]) {
+  collect(array: ExtensionValue[]) {
     let i = 0
     while (i < array.length && array[i].priority >= this.priority) i++
     array.splice(i, 0, this)
   }
-
-  /// Combine a group of extensions into a single extension value.
-  static all(...extensions: Extension[]) {
-    return new Extension(Kind.Multi, null, extensions, dummyType)
-  }
 }
 
-const dummyType = new ExtensionType
+function flatten(extension: Extension, priority: Prio,
+                 replace: readonly Replacement[],
+                 target: ExtensionValue[] = []): ExtensionValue[] {
+  for (let r of replace) if (r.from == extension)
+    return flatten(r.to, priority, replace, target)
+  if (Array.isArray(extension)) {
+    for (let ext of extension) flatten(ext, priority, replace, target)
+  } else {
+    let value = extension as ExtensionValue
+    if (value.kind == Kind.Array) {
+      for (let ext of value.value as Extension[])
+        flatten(ext, value.priority == Prio.None ? priority : value.priority, replace, target)
+    } else {
+      target.push(value.priority != Prio.None ? value : new ExtensionValue(value.kind, value.id, value.value, value.type, priority))
+    }
+  }
+  return target
+}
 
 class UniqueExtensionType {
   knownSubs: UniqueExtensionType[] = []
@@ -246,10 +257,10 @@ class UniqueExtensionType {
     return false
   }
 
-  resolve(extensions: Extension[], replace: readonly Replacement[]) {
+  resolve(extensions: ExtensionValue[], replace: readonly Replacement[]) {
     // Replace all instances of this type in extneions with the
     // sub-extensions that instantiating produces.
-    let ours: Extension[] = []
+    let ours: ExtensionValue[] = []
     for (let ext of extensions) if (ext.id == this) ext.collect(ours)
     let first = true
     for (let i = 0; i < extensions.length; i++) {
@@ -263,7 +274,7 @@ class UniqueExtensionType {
   }
 
   subs(specs: any[], priority: Prio, replace: readonly Replacement[]) {
-    let subs = this.instantiate(specs).flatten(priority, replace)
+    let subs = flatten(this.instantiate(specs), priority, replace)
     for (let sub of subs)
       if (sub.kind == Kind.Unique && this.knownSubs.indexOf(sub.id) == -1) this.knownSubs.push(sub.id)
     return subs
@@ -311,7 +322,7 @@ Values.prototype = Object.create(null)
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
 // still in extenders.
-function findTopUnique(extensions: Extension[], type: ExtensionType): UniqueExtensionType | null {
+function findTopUnique(extensions: ExtensionValue[], type: ExtensionType): UniqueExtensionType | null {
   let foundUnique = false
   for (let ext of extensions) if (ext.kind == Kind.Unique && ext.type == type) {
     foundUnique = true

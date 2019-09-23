@@ -18,7 +18,7 @@ describe("EditorState behavior", () => {
   })
 
   it("includes sub-extenders", () => {
-    let e = (s: string) => Extension.all(num(s.length), num(+s))
+    let e = (s: string) => [num(s.length), num(+s)]
     let set = mk(num(5), e("20"), num(40), e("100"))
     ist(set.getBehavior(num, v).join(), "5,2,20,40,3,100")
   })
@@ -60,7 +60,7 @@ describe("EditorState behavior", () => {
   })
 
   it("can reconfigure a single extension group", () => {
-    let base = Extension.all(num(2), num(3)), four = Priority.override(num(4))
+    let base = [num(2), num(3)], four = Priority.override(num(4))
     let set = mk(num(1), base)
     ist(set.getBehavior(num, v).join(), "1,2,3")
     let newSet = set.replaceExtensions([{from: base, to: four}])

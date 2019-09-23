@@ -75,7 +75,7 @@ export class StreamSyntax implements Syntax {
       init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = Extension.all(EditorState.syntax(this), this.field.extension)
+    this.extension = [EditorState.syntax(this), this.field.extension]
     this.indentation = EditorState.indentation((state: EditorState, pos: number) => {
       return state.field(this.field).getIndent(this.parser, state, pos)
     })
@@ -259,8 +259,5 @@ function tokenID(tag: string) {
 export function legacyMode(spec: LegacyMode<any>) {
   let syntax = StreamSyntax.legacy(spec)
   // FIXME add behavior for commenting, electric chars, etc
-  return Extension.all(
-    syntax.extension,
-    syntax.indentation
-  )
+  return [syntax.extension, syntax.indentation]
 }

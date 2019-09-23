@@ -1,5 +1,5 @@
 import {EditorState} from "../../state/src"
-import {Extension, combineConfig} from "../../extension/src/extension"
+import {combineConfig} from "../../extension/src/extension"
 import {EditorView, ViewPlugin} from "../../view/src/"
 import {Decoration} from "../../view/src/decoration"
 import {Tree, Subtree, NodeType} from "lezer-tree"
@@ -20,7 +20,7 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
     maxScanDistance: DEFAULT_SCAN_DIST
   })
 
-  return Extension.all(
+  return [
     ViewPlugin.decoration({
       create() { return Decoration.none },
       update(deco, update) {
@@ -42,7 +42,7 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
         return Decoration.set(decorations)
       }
     })
-  )
+  ]
 }, {})
 
 function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {

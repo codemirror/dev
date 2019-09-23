@@ -1,4 +1,4 @@
-import {Extension, combineConfig, fillConfig, Slot} from "../../extension/src/extension"
+import {combineConfig, fillConfig, Slot} from "../../extension/src/extension"
 import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, BlockType, BlockInfo} from "../../view/src"
 import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
@@ -62,10 +62,7 @@ export function gutter<T>(config: GutterConfig) {
   let conf = fillConfig(config, defaults)
   // FIXME allow client code to preserve a gutter config
   let plugin = new ViewPlugin(view => new GutterView(view, conf))
-  return Extension.all(
-    plugin.extension,
-    EditorView.styleModule(styles)
-  )
+  return [plugin.extension, EditorView.styleModule(styles)]
 }
 
 class GutterView implements ViewPluginValue {

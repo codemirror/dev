@@ -1,5 +1,4 @@
 import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, DecoratedRange} from "../../view/src"
-import {Extension} from "../../extension/src/extension"
 import {themeData} from "./theme"
 import {Syntax, EditorState} from "../../state/src/"
 import {styleNodeProp} from "./styleprop"
@@ -104,8 +103,8 @@ class TokenContext {
 
 export function highlight() { // FIXME allow specifying syntax?
   let plugin = new ViewPlugin(view => new Highlighter(view))
-  return Extension.all(
+  return [
     plugin.extension,
     plugin.decoration(p => p.decorations)
-  )
+  ]
 }

@@ -13,10 +13,7 @@ export class LezerSyntax implements Syntax {
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = Extension.all(
-      EditorState.syntax(this),
-      this.field.extension
-    )
+    this.extension = [EditorState.syntax(this), this.field.extension]
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {

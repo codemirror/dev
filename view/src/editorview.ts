@@ -405,8 +405,8 @@ const defaultAttrPlugin = new ViewPlugin(view => ({
   }
 }))
 
-const defaultAttrs = Extension.all(
+const defaultAttrs: Extension = [
   defaultAttrPlugin.extension,
   defaultAttrPlugin.behavior(contentAttributes, p => p.contentAttrs()),
   defaultAttrPlugin.behavior(editorAttributes, p => p.editorAttrs())
-)
+]
