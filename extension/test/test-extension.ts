@@ -1,7 +1,7 @@
 const ist = require("ist")
-import {Extension, ExtensionGroup, IDMap} from "../src/extension"
+import {Extension, ExtensionGroup} from "../src/extension"
 
-let tp = new ExtensionGroup<IDMap>(v => v), v = new IDMap
+let tp = new ExtensionGroup<{[id: number]: any}>(v => v), v = Object.create(null)
 
 function mk(...extensions: Extension[]) {
   return tp.resolve(extensions)
@@ -72,15 +72,15 @@ describe("EditorState behavior", () => {
 
   it("supports dynamic behavior", () => {
     let set = mk(num(1), tp.dynamic(num, () => 88))
-    ist(set.getBehavior(num, new IDMap).join(), "1,88")
+    ist(set.getBehavior(num, Object.create(null)).join(), "1,88")
   })
 
   it("only recomputes a behavior value when necessary", () => {
     let values = [1, 1, 2], i = 0
     let set = mk(num(1), tp.dynamic(num, () => values[i++]))
-    let array = set.getBehavior(num, new IDMap)
+    let array = set.getBehavior(num, Object.create(null))
     ist(array.join(), "1,1")
-    ist(set.getBehavior(num, new IDMap), array)
-    ist(set.getBehavior(num, new IDMap).join(), "1,2")
+    ist(set.getBehavior(num, Object.create(null)), array)
+    ist(set.getBehavior(num, Object.create(null)).join(), "1,2")
   })
 })

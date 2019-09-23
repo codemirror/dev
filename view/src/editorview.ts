@@ -1,5 +1,5 @@
 import {EditorState, Transaction, CancellablePromise} from "../../state/src"
-import {Configuration, Slot, Extension, IDMap, Behavior} from "../../extension/src/extension"
+import {Configuration, Slot, Extension, Behavior} from "../../extension/src/extension"
 import {StyleModule} from "style-mod"
 
 import {DocView} from "./docview"
@@ -78,7 +78,7 @@ export class EditorView {
   configuration!: Configuration<EditorView>
 
   /// @internal
-  plugins: IDMap = new IDMap
+  plugins: {[id: number]: any} = Object.create(null)
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
@@ -119,18 +119,6 @@ export class EditorView {
     })
     this.mountStyles()
     this.updateAttrs()
-  }
-
-  // Call a function on each plugin. If that crashes, disable the
-  // plugin.
-  private forEachPlugin(f: (plugin: ViewPluginValue) => void) {
-    for (let plugin of this.behavior(viewPlugin)) {
-      try { f(this.plugins[plugin.id]) }
-      catch (e) {
-        this.plugins[plugin.id] = {update() {}}
-        console.error(e)
-      }
-    }
   }
 
   /// Update the view for the given array of transactions. This will
@@ -195,7 +183,7 @@ export class EditorView {
 
   private updatePlugins() {
     let old = this.plugins
-    this.plugins = new IDMap
+    this.plugins = Object.create(null)
     for (let plugin of this.behavior(viewPlugin))
       this.plugins[plugin.id] = Object.prototype.hasOwnProperty.call(old, plugin.id) ? old[plugin.id] : plugin.create(this)
   }
@@ -207,7 +195,13 @@ export class EditorView {
 
   /// @internal
   drawPlugins() {
-    this.forEachPlugin(p => p.draw && p.draw())
+    for (let plugin of this.behavior(viewPlugin)) {
+      let value = this.plugins[plugin.id]
+      if (value.draw) {
+        try { value.draw() }
+        catch(e) { console.error(e) }
+      }
+    }
     this.updateAttrs()
   }
 
@@ -227,10 +221,15 @@ export class EditorView {
     this.viewport = viewport
     this.state = update.state
     let oldPlugins = this.plugins
-    this.plugins = new IDMap
+    this.plugins = Object.create(null)
     for (let plugin of this.behavior(viewPlugin)) {
       let value = this.plugins[plugin.id] = oldPlugins[plugin.id]
-      value.update(update) // FIXME try/catch
+      try {
+        value.update(update)
+      } catch(e) {
+        console.error(e)
+        this.plugins[plugin.id] = {update() {}}
+      }
     }
   }
 
@@ -346,7 +345,13 @@ export class EditorView {
   /// extensions. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    this.forEachPlugin(p => p.destroy && p.destroy())
+    for (let plugin of this.behavior(viewPlugin)) {
+      let value = this.plugins[plugin.id]
+      if (value.destroy) {
+        try { value.destroy() }
+        catch(e) { console.error(e) }
+      }
+    }
     this.inputState.destroy()
     this.dom.remove()
     this.docView.destroy()

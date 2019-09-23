@@ -26,6 +26,12 @@ export class Slot<T = any> {
 /// and a function used to create instances of it.
 export type SlotType<T> = (value: T) => Slot<T>
 
+declare const extensionBrand: unique symbol
+
+/// Extensions can either be values created by behaviors or unique
+/// extensions, or arrays of extension values.
+export type Extension = {[extensionBrand]: true} | ExtensionArray
+
 const enum Prec { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
 const enum Kind { Behavior, Array, Unique, Name }
@@ -49,24 +55,37 @@ class BehaviorData {
 }
 
 /// Behaviors are the way in which CodeMirror is configured. Each
-/// behavior type can have zero or more values (of the appropriate
-/// type) associated with it by extensions. A behavior type is a
-/// function that can be called to create an extension adding that
-/// behavior, but also serves as the key that identifies the behavior.
+/// behavior, in a state or view, can have zero or more values of the
+/// appropriate type associated with it by extensions. A behavior type
+/// is a function that can be called to create an extension adding
+/// that behavior, but also serves as the key that identifies the
+/// behavior.
 export type Behavior<Input, Output> = (value: Input) => Extension
 
-/// All extensions are associated with an extension type. This is used
-/// to distinguish extensions meant for different types of hosts (such
-/// as the editor view and state).
+/// All extensions are associated with an extension group. This is
+/// used to distinguish extensions meant for different types of hosts
+/// (such as the editor view and state).
 export class ExtensionGroup<Context> {
   private nextStorageID = 0
 
-  constructor(readonly getValues: (context: Context) => IDMap) {}
+  /// Create a new group. Client code probably doesn't need to do
+  /// this. `getStore` retrieves the id-to-value map from a context
+  /// object.
+  constructor(readonly getStore: (context: Context) => {[id: number]: any}) {}
 
   /// Define a type of behavior. All extensions eventually resolve to
   /// behaviors. Each behavior can have an ordered sequence of values
-  /// associated with it. An `Extension` can be seen as a tree of
-  /// sub-extensions with behaviors as leaves.
+  /// associated with it.
+  ///
+  /// Behaviors can optionally define a `combine` function, which
+  /// precomputes some value from their elements. If no such function
+  /// is given, their output type is just that array.
+  ///
+  /// Behaviors marked as static don't allow
+  /// [dynamic](#extension.ExtensionGroup.dynamic) extensions, which
+  /// means they can be [read](#extension.Configuration.getBehavior)
+  /// without a context (and are cheaper to maintain since they never
+  /// change).
   behavior<Input>(options?: {static?: boolean}): Behavior<Input, readonly Input[]>
   behavior<Input, Output>(options: {combine: (values: readonly Input[]) => Output, static?: boolean}): Behavior<Input, Output>
   behavior<Input, Output>(
@@ -77,6 +96,9 @@ export class ExtensionGroup<Context> {
     return behavior
   }
 
+  /// Create an extension that adds a dynamically computed value for a
+  /// given behavior. Dynamic behavior should usually just read and
+  /// possibly transform a field from the context.
   dynamic<Input>(behavior: Behavior<Input, any>, read: (context: Context) => Input): Extension {
     if (BehaviorData.get(behavior).static) throw new Error("Can't create a dynamic source for a static behavior")
     return new ExtensionValue(Kind.Behavior, behavior, {dynamic: read}, this)
@@ -138,7 +160,7 @@ export class ExtensionGroup<Context> {
       if (Object.prototype.hasOwnProperty.call(readBehavior, behavior.id)) continue // Already collected
       let values: ExtensionValue[] = []
       for (let e of pending) if (e.id == ext.id) e.collect(values)
-      let dynamic: {read: (values: IDMap) => any, index: number}[] = [], parts: any[] = []
+      let dynamic: {read: (values: {[id: number]: any}) => any, index: number}[] = [], parts: any[] = []
       values.forEach(ext => {
         if (ext.value.dynamic) {
           dynamic.push({read: ext.value.dynamic, index: parts.length})
@@ -149,7 +171,7 @@ export class ExtensionGroup<Context> {
       })
       let cached: any, cachedValue: any
       readBehavior[behavior.id] = dynamic.length == 0 ? () => parts : (context: Context) => {
-        let values = this.getValues(context), found = values[behavior.id]
+        let values = this.getStore(context), found = values[behavior.id]
         if (found !== undefined || Object.prototype.hasOwnProperty.call(values, behavior.id)) return found
         let array = parts.slice(), changed = false
         for (let {read, index} of dynamic) {
@@ -163,11 +185,18 @@ export class ExtensionGroup<Context> {
     return new Configuration(this, extensions, replace, readBehavior, foreign)
   }
 
-  defineName() {
+  /// Define an extension name. Names can be used to tag extensions.
+  /// This method returns a function that can be used to create named
+  /// extensions, which can be used in a configuration as normal, but
+  /// allow [replacement](#extension.Configuration.replaceExtensions)
+  /// with another extension at some point in the future.
+  defineName(): (extension: Extension) => Extension {
     let name = (extension: Extension) => new ExtensionValue(Kind.Name, name, extension, this)
     return name
   }
 
+  /// Allocate a unique storage number for use in field storage. Not
+  /// something client code is likely to need.
   storageID() { return ++this.nextStorageID }
 
   /// Mark an extension with a precedence below the default
@@ -183,12 +212,6 @@ export class ExtensionGroup<Context> {
   /// `extend` precedences.
   override = setPrec(Prec.Override)
 }
-
-declare const extensionBrand: unique symbol
-
-/// Extensions can either be values created by behaviors or unique
-/// extensions, or arrays of extension values.
-export type Extension = {[extensionBrand]: true} | ExtensionArray
 
 // FIXME this is a hack to get around TypeScript's lack of recursive
 // type aliases, and should be unnnecessary in TS 3.7
@@ -293,9 +316,9 @@ class UniqueExtensionType {
 
 const none: readonly any[] = []
 
-/// An extension set describes the fields and behaviors that exist in
-/// a given configuration. It is created with
-/// [`ExtensionType.resolve`](#state.ExtensionType.resolve).
+/// A configuration describes the fields and behaviors that exist in a
+/// given set of extensions. It is created with
+/// [`ExtensionGroup.resolve`](#state.ExtensionGroup.resolve).
 export class Configuration<Context> {
   /// @internal
   constructor(
@@ -303,12 +326,14 @@ export class Configuration<Context> {
     private extensions: readonly Extension[],
     private replaced: readonly NamedExtensionValue[],
     private readBehavior: {[id: number]: (context: Context) => any},
-    /// Any extensions that weren't an instance of the given type when
-    /// resolving.
+    /// Any extensions that weren't an instance of the target
+    /// extension group when resolving.
     readonly foreign: readonly Extension[] = []
   ) {}
 
-  /// Retrieve the value of a given behavior.
+  /// Retrieve the value of a given behavior. When the behavior is
+  /// [static](#extension.ExtensionGroup.behavior), the `context`
+  /// argument can be omitted.
   getBehavior<Output>(behavior: Behavior<any, Output>, context?: Context): Output {
     let data = BehaviorData.get(behavior)
     if (!context && !data.static) throw new RangeError("Need a context to retrieve non-static behavior")
@@ -325,11 +350,6 @@ export class Configuration<Context> {
     return this.type.resolveInner(this.extensions, this.replaced.filter(p => !repl.some(r => r.id == p.id)).concat(repl))
   }
 }
-
-export class IDMap {
-  [id: number]: any
-}
-IDMap.prototype = Object.create(null)
 
 // Find the extension type that must be resolved next, meaning it is
 // not a (transitive) sub-extension of any other extensions that are
