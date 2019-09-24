@@ -25,7 +25,7 @@ export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig
     config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
 
   let plugin = new ViewPlugin(view => new SpecialCharPlugin(view, config), [
-    {behavior: EditorView.decorations, read: plugin => plugin.decorations}
+    ViewPlugin.behavior(EditorView.decorations, (plugin: SpecialCharPlugin) => plugin.decorations)
   ])
   return config.replaceTabs ? [plugin.extension, EditorView.styleModule(style)] : plugin.extension
 }, {})

@@ -89,7 +89,7 @@ export class EditorView {
   /// @internal
   waiting: CancellablePromise<any>[] = []
 
-  /// The view extension type, used to define new view extensions.
+  /// The view extension group, used to define new view extensions.
   static extend = extendView
 
   /// Construct a new view. You'll usually want to put `view.dom` into
@@ -220,15 +220,18 @@ export class EditorView {
   updateInner(update: ViewUpdate, viewport: Viewport) {
     this.viewport = viewport
     this.state = update.state
+    // FIXME separate plugins from behavior cache?
     let oldPlugins = this.plugins
     this.plugins = Object.create(null)
     for (let plugin of this.behavior(viewPlugin)) {
       let value = this.plugins[plugin.id] = oldPlugins[plugin.id]
-      try {
-        value.update(update)
-      } catch(e) {
-        console.error(e)
-        this.plugins[plugin.id] = {update() {}}
+      if (value.update) {
+        try {
+          value.update(update)
+        } catch(e) {
+          console.error(e)
+          this.plugins[plugin.id] = {update() {}}
+        }
       }
     }
   }
