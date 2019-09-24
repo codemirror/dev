@@ -74,7 +74,7 @@ export class ViewPlugin<T extends ViewPluginValue> {
 }
 
 /// This is the interface to which plugins may conform.
-export interface ViewPluginValue<T = undefined> {
+export interface ViewPluginValue<Measure = undefined> {
   /// Notify the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
@@ -87,10 +87,20 @@ export interface ViewPluginValue<T = undefined> {
   /// content). It should not trigger a DOM layout.
   draw?(): void
 
-  measure?(): T
-  drawMeasured?(measurement: T): void
+  /// This will be called in the layout-reading phase of an editor
+  /// update. It should, if the plugin needs to read DOM layout
+  /// information, do this reading and wrap the information into a
+  /// value that it returns. It should not have side effects.
+  measure?(): Measure
 
-  /// Called when the plugin is no longer going to be used.
+  /// If the plugin also has a `measure` method, this method will be
+  /// called at the end of the DOM-writing phase after a layout
+  /// reading phase, with the result from the `measure` method as
+  /// argument. Called before `draw`, in cases where both are called.
+  drawMeasured?(measured: Measure): void
+
+  /// Called when the plugin is no longer going to be used. Should, at
+  /// the very least, undo any changes the plugin made to the DOM.
   destroy?(): void
 }
 

@@ -9,7 +9,7 @@ import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./
 import {Decoration, DecorationSet, joinRanges, findChangedRanges,
         heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, decorations as decorationsBehavior} from "./extension"
+import {ViewUpdate, decorations as decorationsBehavior, viewPlugin, ViewPluginValue} from "./extension"
 import {EditorView} from "./editorview"
 import {EditorState, ChangedRange} from "../../state/src"
 import {Text} from "../../doc/src"
@@ -373,8 +373,14 @@ export class DocView extends ContentView {
 
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
 
+    let toMeasure: ViewPluginValue[] = []
+    for (let plugin of this.view.behavior(viewPlugin)) {
+      let value = this.view.plugin(plugin)!
+      if (value.measure && value.drawMeasured) toMeasure.push(value)
+    }
+    
     this.view.withUpdating(() => {
-      let update = false
+      let update = false, measure = toMeasure.map(plugin => plugin.measure!())
       for (let i = 0;; i++) {
         this.heightOracle.heightChanged = false
         this.heightMap = this.heightMap.updateHeight(
@@ -389,7 +395,9 @@ export class DocView extends ContentView {
         refresh = false
         scrollBias = 0
         this.viewportState.updateFromDOM(this.dom, this.paddingTop)
+        measure = toMeasure.map(plugin => plugin.measure!())
       }
+      toMeasure.forEach((plugin, i) => plugin.drawMeasured!(measure![i]))
       if (update) {
         this.observer.listenForScroll()
         this.view.drawPlugins()
