@@ -1,7 +1,7 @@
 import {Text} from "../../doc/src"
 import {Slot, SlotType, Extension, Configuration} from "../../extension/src/extension"
-// FIXME cyclic, maybe move some of this into ./extension
-import {EditorState, extendState} from "./state"
+import {allowMultipleSelections, extendState} from "./extension"
+import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
 
@@ -9,8 +9,8 @@ const enum Flag { SelectionSet = 1, ScrollIntoView = 2, Reconfigure = 4 }
 
 /// Changes to the editor state are grouped into transactions.
 /// Usually, a user action creates a single transaction, which may
-/// contain zero or more changes. Create a transaction by calling
-/// [`EditorState.t`](#state.EditorState.t).
+/// contain zero or more document changes. Create a transaction by
+/// calling [`EditorState.t`](#state.EditorState.t).
 export class Transaction {
   /// The document changes made by this transaction.
   changes: ChangeSet = ChangeSet.empty
@@ -28,7 +28,6 @@ export class Transaction {
   constructor(
     /// The state from which the transaction starts.
     readonly startState: EditorState,
-    /// The transaction's time stamp.
     time: number = Date.now()
   ) {
     this.selection = startState.selection
@@ -104,7 +103,7 @@ export class Transaction {
   /// Update the selection.
   setSelection(selection: EditorSelection): Transaction {
     this.ensureOpen()
-    this.selection = this.startState.behavior(EditorState.allowMultipleSelections) ? selection : selection.asSingle()
+    this.selection = this.startState.behavior(allowMultipleSelections) ? selection : selection.asSingle()
     this.flags |= Flag.SelectionSet
     return this
   }
@@ -134,18 +133,25 @@ export class Transaction {
     return (this.flags & Flag.ScrollIntoView) > 0
   }
 
+  /// Replace one or more [named
+  /// extensions](#extension.ExtensionGroup.defineName) with new
+  /// instances.
   replaceExtensions(replace: readonly Extension[]) {
+    this.ensureOpen()
     this.configuration = this.configuration.replaceExtensions(replace)
     this.flags |= Flag.Reconfigure
     return this
   }
 
+  /// Move to an entirely new state configuration.
   reconfigure(extensions: readonly Extension[]) {
+    this.ensureOpen()
     this.configuration = extendState.resolve(extensions)
     this.flags |= Flag.Reconfigure
     return this
   }
 
+  /// Indicates whether the transaction reconfigures the state.
   get reconfigured(): boolean {
     return (this.flags & Flag.Reconfigure) > 0
   }
@@ -174,11 +180,13 @@ export class Transaction {
 
   /// Slot used to store timestamps in transactions.
   static time = Slot.define<number>()
+
   /// Slot used to indicate that this transaction shouldn't clear the
   /// goal column, which is used during vertical cursor motion (so
   /// that moving over short lines doesn't reset the horizontal
   /// position to the end of the shortest line).
   static preserveGoalColumn = Slot.define<boolean>()
+
   /// Slot used to associate a transaction with a user interface
   /// event. The view will set this to...
   ///
@@ -188,6 +196,7 @@ export class Transaction {
   ///  - `"keyboard"` when moving the selection via the keyboard
   ///  - `"pointer"` when moving the selection through the pointing device
   static userEvent = Slot.define<string>()
+
   /// Slot indicating whether a transaction should be added to the
   /// undo history or not.
   static addToHistory = Slot.define<boolean>()

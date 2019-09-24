@@ -1,10 +1,8 @@
 import {joinLines, splitLines, Text} from "../../doc/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Extension, ExtensionGroup, Configuration, Behavior} from "../../extension/src/extension"
-import {Tree} from "lezer-tree"
-
-export const extendState = new ExtensionGroup<EditorState>(state => state.values)
+import {Extension, Configuration, Behavior} from "../../extension/src/extension"
+import {extendState, Syntax, stateField, StateField, allowMultipleSelections} from "./extension"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -127,16 +125,11 @@ export class EditorState {
   /// [multiple-selections](#multiple-selections) handle it (which
   /// also makes sure the selections are drawn and new selections can
   /// be created with the mouse).
-  static allowMultipleSelections = extendState.behavior<boolean, boolean>({
-    combine: values => values.some(v => v),
-    static: true
-  })
+  static allowMultipleSelections = allowMultipleSelections
 
   /// Behavior that defines a way to query for automatic indentation
   /// depth at the start of a given line.
   static indentation = extendState.behavior<(state: EditorState, pos: number) => number>()
-
-  get indentation() { return this.behavior(EditorState.indentation) }
 
   /// Configures the tab size to use in this state. The first
   /// (highest-precedence) value of the behavior is used.
@@ -144,6 +137,8 @@ export class EditorState {
     combine: values => values.length ? values[0] : DEFAULT_TABSIZE
   })
 
+  /// The size of a tab in the document, determined by the
+  /// [`tabSize`](#state.EditorState^tabSize) behavior.
   get tabSize() { return this.behavior(EditorState.tabSize) }
 
   /// The line separator to use. By default, any of `"\n"`, `"\r\n"`
@@ -163,71 +158,10 @@ export class EditorState {
     combine: values => values.length ? values[0] : DEFAULT_INDENT_UNIT
   })
 
+  /// The size of an indent unit in the document. Determined by the
+  /// [`indentUnit`](#state.EditorState^indentUnit) behavior.
   get indentUnit() { return this.behavior(EditorState.indentUnit) }
 
   /// Behavior that registers a parsing service for the state.
   static syntax = extendState.behavior<Syntax>()
-}
-
-const stateField = extendState.behavior<StateField<any>>({static: true})
-
-/// Parameters passed when creating a
-/// [`StateField`](#state.StateField).
-export interface StateFieldSpec<Value> {
-  /// Creates the initial value for the field.
-  init: (state: EditorState) => Value
-  /// Compute a new value from the previous value and a
-  /// [transaction](#state.Transaction).
-  apply: (tr: Transaction, value: Value, newState: EditorState) => Value
-}
-
-/// Fields can store store information. They can be optionally
-/// associated with behaviors.
-export class StateField<Value> {
-  /// The extension that can be used to
-  /// [attach](#state.EditorStateConfig.extensions) this field to a
-  /// state.
-  readonly extension: Extension
-
-  /// @internal
-  readonly id = extendState.storageID()
-  /// @internal
-  readonly init: (state: EditorState) => Value
-  /// @internal
-  readonly apply: (tr: Transaction, value: Value, state: EditorState) => Value
-
-  /// Declare a new field. The field instance is used as the
-  /// [key](#state.EditorState.field) when retrieving the field's value
-  /// from a state.
-  constructor(spec: StateFieldSpec<Value>) {
-    this.init = spec.init
-    this.apply = spec.apply
-    this.extension = stateField(this)
-  }
-}
-
-/// This is a
-/// [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
-/// with an additional field that can be used to indicate you are no
-/// longer interested in its result. It is used by the editor view's
-/// [`waitFor`](#view.EditorView.waitFor) mechanism, which helps deal
-/// with partial results (mostly from [`Syntax`](#state.Syntax)
-/// queries).
-export type CancellablePromise<T> = Promise<T> & {canceled?: boolean}
-
-/// Syntax [parsing services](#state.EditorState^syntax) must provide
-/// this interface.
-export interface Syntax {
-  /// The extension that can be used to register this service.
-  extension: Extension
-  /// Get a syntax tree covering at least the given range. When that
-  /// can't be done quickly enough, `rest` will hold a promise that
-  /// you can wait on to get the rest of the tree.
-  getTree(state: EditorState, from: number, to: number): {tree: Tree, rest: CancellablePromise<Tree> | null}
-  /// Get a syntax tree covering the given range, or null if that
-  /// can't be done in reasonable time.
-  tryGetTree(state: EditorState, from: number, to: number): Tree | null
-  /// Get a syntax tree, preferably covering the given range, but less
-  /// is also acceptable.
-  getPartialTree(state: EditorState, from: number, to: number): Tree
 }
