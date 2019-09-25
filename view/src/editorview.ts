@@ -33,6 +33,26 @@ export interface EditorConfig {
   dispatch?: (tr: Transaction) => void
 }
 
+export const enum UpdateState {
+  Idle, // Not updating
+  Measuring, // In the layout-reading phase of a layout check
+  Updating // Updating/drawing, either directly via the `update` method, or as a result of a layout check
+}
+
+// The editor's update state machine looks something like this:
+//
+//     Idle → Updating ⇆ Idle (unchecked) → Measuring → Idle
+//                                         ↑      ↓
+//                                         Updating (measure)
+//
+// The difference between 'Idle' and 'Idle (unchecked)' lies in
+// whether a layout check has been scheduled. A regular update through
+// the `update` method updates the DOM in a write-only fashion, and
+// relies on a check (scheduled with `requestAnimationFrame`) to make
+// sure everything is where it should be and the viewport covers the
+// visible code. That check continues to measure and then optionally
+// update until it reaches a coherent state.
+
 /// An editor view represents the editor's user interface. It holds
 /// the editable DOM surface, and possibly other elements such as the
 /// line number gutter. It handles events and dispatches state
@@ -84,7 +104,7 @@ export class EditorView {
   private styleModules!: readonly StyleModule[]
 
   /// @internal
-  updating: boolean = false
+  updateState: UpdateState = UpdateState.Updating
 
   /// @internal
   waiting: CancellablePromise<any>[] = []
@@ -109,16 +129,15 @@ export class EditorView {
     this.extensions = config.extensions || []
     this.configure(config.state.configuration.foreign)
     this.inputState = new InputState(this)
-    this.withUpdating(() => {
-      this.docView.init(config.state, viewport => {
-        this.viewport = viewport
-        this.state = config.state
-        for (let plugin of this.behavior(viewPlugin))
-          this.plugins[plugin.id] = plugin.create(this)
-      })
+    this.docView.init(config.state, viewport => {
+      this.viewport = viewport
+      this.state = config.state
+      for (let plugin of this.behavior(viewPlugin))
+        this.plugins[plugin.id] = plugin.create(this)
     })
     this.mountStyles()
     this.updateAttrs()
+    this.updateState = UpdateState.Idle
   }
 
   /// Update the view for the given array of transactions. This will
@@ -126,6 +145,10 @@ export class EditorView {
   /// produced by the transactions, and notify view plugins of the
   /// change.
   update(transactions: Transaction[] = [], metadata: Slot[] = []) {
+    if (this.updateState != UpdateState.Idle)
+      throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
+    this.updateState = UpdateState.Updating
+
     this.clearWaiting()
     let state = this.state, prevForeign = state.configuration.foreign
     for (let tr of transactions) {
@@ -138,18 +161,17 @@ export class EditorView {
       this.configure(curForeign)
       this.updatePlugins()
     }
-    this.withUpdating(() => {
-      let update = transactions.length > 0 || metadata.length > 0 ? new ViewUpdate(this, transactions, metadata) : null
-      if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
-        this.inputState.goalColumns.length = 0
-      this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
-      if (update) {
-        this.inputState.ensureHandlers(this)
-        this.drawPlugins()
-        if (this.behavior(styleModule) != this.styleModules) this.mountStyles()
-      }
-      this.updateAttrs()
-    })
+    let update = transactions.length > 0 || metadata.length > 0 ? new ViewUpdate(this, transactions, metadata) : null
+    if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
+      this.inputState.goalColumns.length = 0
+    this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+    if (update) {
+      this.inputState.ensureHandlers(this)
+      this.drawPlugins()
+      if (this.behavior(styleModule) != this.styleModules) this.mountStyles()
+    }
+    this.updateAttrs()
+    this.updateState = UpdateState.Idle
   }
 
   /// Wait for the given promise to resolve, and then run an update.
@@ -239,15 +261,6 @@ export class EditorView {
     }
   }
 
-  /// @internal
-  withUpdating(f: () => void) {
-    if (this.updating)
-      throw new Error("Calls to EditorView.update are not allowed in plugin update or create methods")
-    this.updating = true
-    try { f() }
-    finally { this.updating = false }
-  }
-
   /// Query the active themes for the CSS class names associated with
   /// the given tag. (FIXME: this isn't a great system. Also doesn't
   /// invalidate when reconfiguring.)
@@ -267,12 +280,19 @@ export class EditorView {
     return this.docView.domAtPos(pos)
   }
 
+  private readingLayout() {
+    if (this.updateState == UpdateState.Updating)
+      throw new Error("Reading the editor layout isn't allowed during an update")
+    if (this.updateState == UpdateState.Idle && this.docView.layoutCheckScheduled > -1)
+      this.docView.checkLayout()
+  }
+
   /// Find the line or block widget at the given vertical position.
   /// `editorTop`, if given, provides the vertical position of the top
   /// of the editor. It defaults to the editor's screen position
   /// (which will force a DOM layout).
   blockAtHeight(height: number, editorTop?: number) {
-    this.docView.forceLayout()
+    this.readingLayout()
     return this.docView.blockAtHeight(height, editorTop)
   }
 
@@ -281,13 +301,13 @@ export class EditorView {
   /// structs in its `type` field if this line consists of more than
   /// one block.
   lineAtHeight(height: number, editorTop?: number): BlockInfo {
-    this.docView.forceLayout()
+    this.readingLayout()
     return this.docView.lineAtHeight(height, editorTop)
   }
 
   /// Find the height information for the given line.
   lineAt(pos: number, editorTop?: number): BlockInfo {
-    this.docView.forceLayout()
+    this.readingLayout()
     return this.docView.lineAt(pos, editorTop)
   }
 
@@ -317,7 +337,7 @@ export class EditorView {
 
   /// Get the document position at the given screen coordinates.
   posAtCoords(coords: {x: number, y: number}): number {
-    this.docView.forceLayout()
+    this.readingLayout()
     return posAtCoords(this, coords)
   }
 

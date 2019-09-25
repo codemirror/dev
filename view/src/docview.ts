@@ -10,7 +10,7 @@ import {Decoration, DecorationSet, joinRanges, findChangedRanges,
         heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
 import {ViewUpdate, decorations as decorationsBehavior, viewPlugin, ViewPluginValue} from "./extension"
-import {EditorView} from "./editorview"
+import {EditorView, UpdateState} from "./editorview"
 import {EditorState, ChangedRange} from "../../state/src"
 import {Text} from "../../doc/src"
 
@@ -345,10 +345,6 @@ export class DocView extends ContentView {
     }
   }
 
-  forceLayout() {
-    if (this.layoutCheckScheduled > -1 && !this.view.updating) this.checkLayout()
-  }
-
   checkLayout(forceFull = false) {
     this.cancelLayoutCheck()
     this.measureVerticalPadding()
@@ -359,6 +355,7 @@ export class DocView extends ContentView {
     else scrollBias = this.viewportState.updateFromDOM(this.dom, this.paddingTop)
     if (this.viewportState.top >= this.viewportState.bottom) return // We're invisible!
 
+    this.view.updateState = UpdateState.Measuring
     let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
     if (this.heightOracle.mustRefresh(lineHeights)) {
       let {lineHeight, charWidth} = this.measureTextSize()
@@ -375,30 +372,32 @@ export class DocView extends ContentView {
       if (value.measure && value.drawMeasured) toMeasure.push(value)
     }
     
-    this.view.withUpdating(() => {
-      let update = false, measure = toMeasure.map(plugin => plugin.measure!())
-      for (let i = 0;; i++) {
-        this.heightOracle.heightChanged = false
-        this.heightMap = this.heightMap.updateHeight(
-          this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
-        let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
-        if (covered && !this.heightOracle.heightChanged) break
-        update = true
-        if (i > 10) throw new Error("Layout failed to converge") // FIXME warn and break?
-        let contentChanges = covered ? none : this.computeUpdate(this.state, null, null, none, scrollBias, -1)
-        this.updateInner(contentChanges, this.length)
-        lineHeights = null
-        refresh = false
-        scrollBias = 0
-        this.viewportState.updateFromDOM(this.dom, this.paddingTop)
-        measure = toMeasure.map(plugin => plugin.measure!())
-      }
-      toMeasure.forEach((plugin, i) => plugin.drawMeasured!(measure![i]))
-      if (update) {
-        this.observer.listenForScroll()
-        this.view.drawPlugins()
-      }
-    })
+    let update = false, measure = toMeasure.map(plugin => plugin.measure!())
+    for (let i = 0;; i++) {
+      this.heightOracle.heightChanged = false
+      this.heightMap = this.heightMap.updateHeight(
+        this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
+      let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
+      if (covered && !this.heightOracle.heightChanged) break
+      this.view.updateState = UpdateState.Updating
+      update = true
+      if (i > 10) throw new Error("Layout failed to converge") // FIXME warn and break?
+      let contentChanges = covered ? none : this.computeUpdate(this.state, null, null, none, scrollBias, -1)
+      this.updateInner(contentChanges, this.length)
+      lineHeights = null
+      refresh = false
+      scrollBias = 0
+      this.view.updateState = UpdateState.Measuring
+      this.viewportState.updateFromDOM(this.dom, this.paddingTop)
+      measure = toMeasure.map(plugin => plugin.measure!())
+    }
+    this.view.updateState = UpdateState.Updating
+    toMeasure.forEach((plugin, i) => plugin.drawMeasured!(measure![i]))
+    if (update) {
+      this.observer.listenForScroll()
+      this.view.drawPlugins()
+    }
+    this.view.updateState = UpdateState.Idle
   }
 
   scrollPosIntoView(pos: number) {
