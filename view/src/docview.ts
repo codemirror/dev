@@ -93,10 +93,6 @@ export class DocView extends ContentView {
   // position, if we know the editor is going to scroll that position
   // into view.
   update(update: ViewUpdate | null, scrollIntoView: number = -1) {
-    // FIXME need some way to stabilize viewport—if a change causes the
-    // top of the visible viewport to move, scroll position should be
-    // adjusted to keep the content in place
-
     let prevDoc = this.state.doc
     let state = update ? update.state : this.state
     let changedRanges: ChangedRange[] = update ? update.changes.changedRanges() : none
@@ -302,7 +298,7 @@ export class DocView extends ContentView {
       let viewportChange = this.viewport ? !viewport.eq(this.viewport) : true
       // When the viewport is stable and no more iterations are needed, return
       if (!viewportChange && !update && !initializing) return contentChanges
-      // After 5 tries, or 
+      // After 5 tries, give up
       if (i == 5) {
         console.warn("Viewport and decorations failed to converge")
         return contentChanges
