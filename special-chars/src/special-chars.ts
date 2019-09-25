@@ -2,7 +2,7 @@ import {Decoration, DecorationSet, DecoratedRange, WidgetType, ViewPlugin, ViewP
         ViewUpdate, EditorView} from "../../view/src"
 import {ChangedRange} from "../../state/src"
 import {combineConfig} from "../../extension/src/extension"
-import {countColumn} from "../../doc/src"
+import {countColumn} from "../../text/src"
 import {StyleModule} from "style-mod"
 
 export interface SpecialCharConfig {

@@ -1,4 +1,4 @@
-import {Text} from "../../doc/src"
+import {Text} from "../../text/src"
 import {ChangedRange} from "../../state/src"
 import {RangeSet, RangeIterator} from "../../rangeset/src/rangeset"
 import {DecorationSet, PointDecoration, Decoration, BlockType} from "./decoration"

@@ -1,4 +1,4 @@
-import {Line} from "../../doc/src"
+import {Line} from "../../text/src"
 import {NodeType, NodeProp, Subtree, Tree} from "lezer-tree"
 import {EditorState} from "../../state/src/"
 

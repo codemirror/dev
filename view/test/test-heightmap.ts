@@ -1,6 +1,6 @@
 import {HeightMap, HeightOracle, MeasuredHeights, BlockInfo, QueryType} from "../src/heightmap"
 import {Decoration, WidgetType, BlockType} from "../src/decoration"
-import {Text} from "../../doc/src"
+import {Text} from "../../text/src"
 import {ChangedRange} from "../../state/src"
 const ist = require("ist")
 

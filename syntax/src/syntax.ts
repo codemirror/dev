@@ -1,6 +1,6 @@
 import {Parser, ParseContext, InputStream} from "lezer"
 import {Tree} from "lezer-tree"
-import {Text, TextIterator} from "../../doc/src/"
+import {Text, TextIterator} from "../../text/src/"
 import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state/src/"
 import {Extension} from "../../extension/src/extension"
 

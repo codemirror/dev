@@ -12,7 +12,7 @@ import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rec
 import {ViewUpdate, decorations as decorationsBehavior, viewPlugin, ViewPluginValue} from "./extension"
 import {EditorView, UpdateState} from "./editorview"
 import {EditorState, ChangedRange} from "../../state/src"
-import {Text} from "../../doc/src"
+import {Text} from "../../text/src"
 
 type A<T> = ReadonlyArray<T>
 const none = [] as any

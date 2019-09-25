@@ -1,4 +1,4 @@
-import {joinLines, splitLines, Text} from "../../doc/src"
+import {joinLines, splitLines, Text} from "../../text/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Extension, Configuration, Behavior} from "../../extension/src/extension"

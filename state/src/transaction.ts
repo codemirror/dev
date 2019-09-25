@@ -1,4 +1,4 @@
-import {Text} from "../../doc/src"
+import {Text} from "../../text/src"
 import {Slot, SlotType, Extension, Configuration} from "../../extension/src/extension"
 import {allowMultipleSelections, extendState} from "./extension"
 import {EditorState} from "./state"

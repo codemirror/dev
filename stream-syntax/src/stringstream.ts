@@ -1,4 +1,4 @@
-import {Text, TextIterator} from "../../doc/src"
+import {Text, TextIterator} from "../../text/src"
 
 // Counts the column offset in a string, taking tabs into account.
 // Used mostly to find indentation.
