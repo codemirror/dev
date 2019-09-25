@@ -95,7 +95,7 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
   if (context == null) {
     for (let pos = start;; pos += dir) {
       if (dir < 0 && pos == 0 || dir > 0 && pos == doc.length) return pos
-      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)))) {
+      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)).charCodeAt(0))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
       }
@@ -110,7 +110,7 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
     }
     let inline = children[i]
     if (inline instanceof TextView) {
-      if (!isExtendingChar(inline.text.charAt(off - (dir < 0 ? 1 : 0)))) {
+      if (!isExtendingChar(inline.text.charCodeAt(off - (dir < 0 ? 1 : 0)))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
       }

@@ -1,4 +1,4 @@
-import {joinLines, splitLines, Text} from "../../text/src"
+import {Text} from "../../text/src"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Extension, Configuration, Behavior} from "../../extension/src/extension"
@@ -18,7 +18,7 @@ export interface EditorStateConfig {
   extensions?: ReadonlyArray<Extension>
 }
 
-const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4
+const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4, DEFAULT_SPLIT = /\r\n?|\n/
 
 export class EditorState {
   /// @internal
@@ -71,11 +71,11 @@ export class EditorState {
 
   /// Join an array of lines using the current [line
   /// separator](#state.EditorStateConfig.lineSeparator).
-  joinLines(text: ReadonlyArray<string>): string { return joinLines(text, this.behavior(EditorState.lineSeparator)) }
+  joinLines(text: ReadonlyArray<string>): string { return text.join(this.behavior(EditorState.lineSeparator) || "\n") }
 
   /// Split a string into lines using the current [line
   /// separator](#state.EditorStateConfig.lineSeparator).
-  splitLines(text: string): string[] { return splitLines(text, this.behavior(EditorState.lineSeparator)) }
+  splitLines(text: string): string[] { return text.split(this.behavior(EditorState.lineSeparator) || DEFAULT_SPLIT) }
 
   /// Get the value of a state behavior.
   behavior<Output>(behavior: Behavior<any, Output>): Output {
@@ -107,7 +107,7 @@ export class EditorState {
     let configuration = extendState.resolve(config.extensions || [])
     let values = Object.create(null)
     let doc = config.doc instanceof Text ? config.doc
-      : Text.of(config.doc || "", configuration.getBehavior(EditorState.lineSeparator))
+      : Text.of((config.doc || "").split(configuration.getBehavior(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
     if (!configuration.getBehavior(EditorState.allowMultipleSelections)) selection = selection.asSingle()
     let state = new EditorState(configuration, values, doc, selection)
