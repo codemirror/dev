@@ -1,4 +1,4 @@
-## The Editor View
+### The Editor View
 
 @EditorConfig
 
@@ -12,7 +12,7 @@
 
 @Slot
 
-## Extension
+### Extension
 
 @ViewPlugin
 
@@ -20,7 +20,7 @@
 
 @ViewUpdate
 
-## Decorations
+### Decorations
 
 @Decoration
 

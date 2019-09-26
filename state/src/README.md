@@ -1,4 +1,4 @@
-## Editor State
+### Editor State
 
 @EditorStateConfig
 
@@ -8,7 +8,7 @@
 
 @EditorSelection
 
-## Changes and Transactions
+### Changes and Transactions
 
 @ChangeDesc
 
@@ -24,7 +24,7 @@
 
 @ChangedRange
 
-## Extending
+### Extending
 
 @StateField
 

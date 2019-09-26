@@ -3,9 +3,17 @@ import {combineConfig, Slot} from "../../extension/src/extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = Slot.define<HistoryState>()
-export const closeHistorySlot = Slot.define<boolean>()
 
-export interface HistoryConfig {minDepth?: number, newGroupDelay?: number}
+const closeHistorySlot = Slot.define<boolean>()
+
+/// Options given when creating a history extension.
+export interface HistoryConfig {
+  /// The minimum depth (amount of events) to store. Defaults to 100.
+  minDepth?: number,
+  /// The maximum time (in milliseconds) that adjacent events can be
+  /// apart and still be grouped together. Defaults to 500.
+  newGroupDelay?: number
+}
 
 const historyField = new StateField({
   init(editorState: EditorState): HistoryState {
@@ -29,11 +37,12 @@ const historyField = new StateField({
 
 const historyConfig = EditorState.extend.behavior<Required<HistoryConfig>>()
 
+/// Create a history extension with the given configuration.
 export const history = EditorState.extend.unique<HistoryConfig>(configs => {
   let config = combineConfig(configs, {
     minDepth: 100,
     newGroupDelay: 500
-  }, {minDepth: Math.max})
+  }, {minDepth: Math.max, newGroupDelay: Math.min})
   return [
     historyField.extension,
     historyConfig(config)
@@ -53,14 +62,22 @@ function cmd(target: PopTarget, only: ItemFilter) {
   }
 }
 
+/// Undo a single group of history events. Returns false if no group
+/// was available.
 export const undo = cmd(PopTarget.Done, ItemFilter.OnlyChanges)
+/// Redo a group of history events. Returns false if no group was
+/// available.
 export const redo = cmd(PopTarget.Undone, ItemFilter.OnlyChanges)
+
+/// Undo a selection change.
 export const undoSelection = cmd(PopTarget.Done, ItemFilter.Any)
+
+/// Redo a selection change.
 export const redoSelection = cmd(PopTarget.Undone, ItemFilter.Any)
 
-// Set a flag on the given transaction that will prevent further steps
-// from being appended to an existing history event (so that they
-// require a separate undo command to undo).
+/// Set a flag on the given transaction that will prevent further steps
+/// from being appended to an existing history event (so that they
+/// require a separate undo command to undo).
 export function closeHistory(tr: Transaction): Transaction {
   return tr.addMeta(closeHistorySlot(true))
 }
@@ -72,11 +89,11 @@ function depth(target: PopTarget, only: ItemFilter) {
   }
 }
 
-// The amount of undoable change events available in a given state.
+/// The amount of undoable change events available in a given state.
 export const undoDepth = depth(PopTarget.Done, ItemFilter.OnlyChanges)
-// The amount of redoable change events available in a given state.
+/// The amount of redoable change events available in a given state.
 export const redoDepth = depth(PopTarget.Undone, ItemFilter.OnlyChanges)
-// The amount of undoable events available in a given state.
+/// The amount of undoable events available in a given state.
 export const redoSelectionDepth = depth(PopTarget.Done, ItemFilter.Any)
-// The amount of redoable events available in a given state.
+/// The amount of redoable events available in a given state.
 export const undoSelectionDepth = depth(PopTarget.Undone, ItemFilter.Any)

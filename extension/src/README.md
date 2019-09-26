@@ -1,10 +1,10 @@
-## Slots
+### Slots
 
 @Slot
 
 @SlotType
 
-## Extensions
+### Extensions
 
 @Extension
 
@@ -14,7 +14,7 @@
 
 @Configuration
 
-## Helpers
+### Helpers
 
 @combineConfig
 

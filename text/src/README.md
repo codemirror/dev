@@ -1,4 +1,4 @@
-## Text
+### Text
 
 @Text
 
@@ -6,13 +6,13 @@
 
 @TextIterator
 
-## Column Utilities
+### Column Utilities
 
 @countColumn
 
 @findColumn
 
-## Character Types
+### Character Types
 
 @isExtendingChar
 
