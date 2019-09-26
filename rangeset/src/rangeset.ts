@@ -2,30 +2,56 @@ import {ChangeSet, Change, ChangedRange} from "../../state/src"
 
 type A<T> = ReadonlyArray<T>
 
+/// Each range is associated with a value, which must inherit from
+/// this class.
 export abstract class RangeValue {
+  /// Map the range associated with this value through a position
+  /// mapping.
   abstract map(mapping: ChangeSet, from: number, to: number): Range<any> | null
+  /// Compare this value with another value. The default
+  /// implementation compares by identity.
   eq(other: RangeValue) { return this == other }
+  /// The bias value at the start of the range. Defaults to 0.
   startSide!: number
+  /// The bias value at the end of the range. Defaults to 0.
   endSide!: number
+  /// Whether this value marks a point range, which shadows the ranges
+  /// contained in it.
   point!: boolean
 }
 
 RangeValue.prototype.startSide = RangeValue.prototype.endSide = 0
 RangeValue.prototype.point = false
 
+/// Collection of methods used when comparing range sets.
 export interface RangeComparator<T extends RangeValue> {
+  /// Notifies the comparator that the given range has the given set
+  /// of values associated with it.
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
+  /// Notification for a point range.
+  // FIXME why can't byA be null?
   comparePoint(from: number, to: number, byA: T, byB: T | null): void
 }
 
+/// Methods used when iterating over a single range set. The entire
+/// iterated range will be covered with either `span` or `point`
+/// calls.
 export interface RangeIterator<T extends RangeValue> {
+  /// Called for any ranges not covered by point decorations. `active`
+  /// holds the values that the range is marked with (and may be
+  /// empty).
   span(from: number, to: number, active: A<T>): void
+  /// Called when going over a point decoration. `openStart` and
+  /// `openEnd` indicate whether the point decoration exceeded the
+  /// range we're iterating over at its start and end.
   point(from: number, to: number, value: T, openStart: boolean, openEnd: boolean): void
+  /// Can be used to selectively ignore some ranges in this iteration.
   ignore(from: number, to: number, value: T): boolean
 }
 
 interface Heapable { heapPos: number; heapSide: number }
 
+/// A range associates a value with a range of positions.
 export class Range<T extends RangeValue> {
   constructor(
     readonly from: number,
@@ -33,7 +59,7 @@ export class Range<T extends RangeValue> {
     readonly value: T
   ) {}
 
-  /** @internal */
+  /// @internal
   map(changes: ChangeSet, oldOffset: number, newOffset: number): Range<T> | null {
     let mapped = this.value.map(changes, this.from + oldOffset, this.to + oldOffset)
     if (mapped) {
@@ -43,15 +69,15 @@ export class Range<T extends RangeValue> {
     return mapped
   }
 
-  /** @internal */
+  /// @internal
   move(offset: number): Range<T> {
     return offset ? new Range(this.from + offset, this.to + offset, this.value) : this
   }
 
-  /** @internal Here so that we can put active ranges on a heap
-   * and take them off at their end */
+  /// @internal Here so that we can put active ranges on a heap and
+  /// take them off at their end
   get heapPos() { return this.to }
-  /* @internal */
+  /// @internal
   get heapSide() { return this.value.endSide }
 }
 
@@ -61,25 +87,33 @@ function maybeNone<T>(array: A<T>): A<T> { return array.length ? array : none }
 
 const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
-export type RangeFilter<T> = (from: number, to: number, value: T) => boolean
+type RangeFilter<T> = (from: number, to: number, value: T) => boolean
 
+/// A range set stores a collection of [ranges](#rangeset.Range) in a
+/// way that makes them efficient to [map](#rangeset.RangeSet.map) and
+/// [update](#rangeset.RangeSet.update). This is an immutable data
+/// structure.
 export class RangeSet<T extends RangeValue> {
-  // @internal
+  /// @internal
   constructor(
-    // @internal The text length covered by this set
+    /// @internal The text length covered by this set
     public length: number,
-    // The number of ranges in the set
+    /// The number of ranges in this set
     public size: number,
-    // @internal The locally stored ranges—which are all of them
-    // for leaf nodes, and the ones that don't fit in child sets for
-    // non-leaves. Sorted by start position, then side.
+    /// @internal The locally stored ranges—which are all of them for
+    /// leaf nodes, and the ones that don't fit in child sets for
+    /// non-leaves. Sorted by start position, then side.
     public local: A<Range<T>>,
-    // @internal The child sets, in position order. Their total
-    // length may be smaller than .length if the end is empty (never
-    // greater)
+    /// @internal The child sets, in position order. Their total
+    /// length may be smaller than .length if the end is empty (never
+    /// greater)
     public children: A<RangeSet<T>>
   ) {}
 
+  /// Update this set, returning the modified set. The range that gets
+  /// filtered can be limited with the `filterFrom` and `filterTo`
+  /// arguments (specifying a smaller range makes the operation
+  /// cheaper).
   update(added: A<Range<T>> = none,
          filter: RangeFilter<T> | null = null,
          filterFrom: number = 0,
@@ -97,7 +131,7 @@ export class RangeSet<T extends RangeValue> {
     return this.updateInner(added, filter, filterFrom, filterTo, 0, maxLen)
   }
 
-  /** @internal */
+  /// @internal
   updateInner(added: A<Range<T>>,
               filter: RangeFilter<T> | null,
               filterFrom: number, filterTo: number,
@@ -163,12 +197,13 @@ export class RangeSet<T extends RangeValue> {
     return new RangeSet<T>(length, size, maybeNone(local || this.local), maybeNone(children || this.children))
   }
 
+  /// Add empty size to the end of the set @internal
   grow(length: number): RangeSet<T> {
     return new RangeSet<T>(this.length + length, this.size, this.local, this.children)
   }
 
-  // Collect all ranges in this set into the target array,
-  // offsetting them by `offset`
+  /// Collect all ranges in this set into the target array, offsetting
+  /// them by `offset` @internal
   collect(target: Range<T>[], offset: number) {
     for (let range of this.local) target.push(range.move(offset))
     for (let child of this.children) {
@@ -177,6 +212,7 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
+  /// Map this range set through a set of changes, return the new set.
   map(changes: ChangeSet): RangeSet<T> {
     if (changes.length == 0 || this == RangeSet.empty) return this
     return this.mapInner(changes, 0, 0, changes.mapPos(this.length, 1)).set
@@ -249,15 +285,8 @@ export class RangeSet<T extends RangeValue> {
     return {set, escaped}
   }
 
-  forEach(f: (from: number, to: number, value: T) => void) { this.forEachInner(f, 0) }
-
-  private forEachInner(f: (from: number, to: number, value: T) => void, offset: number) {
-    for (let range of this.local) f(range.from + offset, range.to + offset, range.value)
-    for (let child of this.children) { child.forEachInner(f, offset); offset += child.length }
-  }
-
-  // Iterate over the ranges in the set that touch the area between
-  // from and to, ordered by their start position and side
+  /// Iterate over the ranges in the set that touch the area between
+  /// from and to, ordered by their start position and side.
   iter(from: number = 0, to: number = this.length): {next: () => Range<T> | void} {
     const heap: (Range<T> | LocalSet<T>)[] = []
     addIterToHeap(heap, [new IteratedSet(0, this)], from)
@@ -279,6 +308,10 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
+  /// Iterate over two range sets at the same time, calling methods on
+  /// `comparator` to notify it of possible differences. `textDiff`
+  /// indicates how the underlying data changed between these ranges,
+  /// and is needed to synchronize the iteration.
   compare(other: RangeSet<T>, textDiff: A<ChangedRange>, comparator: RangeComparator<T>, oldLen: number) {
     let oldPos = 0, newPos = 0
     for (let range of textDiff) {
@@ -291,6 +324,9 @@ export class RangeSet<T extends RangeValue> {
       new RangeSetComparison<T>(this, oldPos, other, newPos, newPos + (oldLen - oldPos), comparator).run()
   }
 
+  /// Iterate over a group of range sets at the same time, notifying
+  /// the iterator about the ranges covering every given piece of
+  /// content.
   static iterateSpans<T extends RangeValue>(sets: A<RangeSet<T>>, from: number, to: number, iterator: RangeIterator<T>) {
     let heap: Heapable[] = []
     let pos = from, posSide = -FAR
@@ -340,10 +376,12 @@ export class RangeSet<T extends RangeValue> {
     if (pos < to) iterator.span(pos, to, active)
   }
 
+  /// Create a range set for the given range or array of ranges.
   static of<T extends RangeValue>(ranges: A<Range<T>> | Range<T>): RangeSet<T> {
     return RangeSet.empty.update(ranges instanceof Range ? [ranges] : ranges)
   }
 
+  /// The empty set of ranges.
   static empty = new RangeSet<any>(0, 0, none, none)
 }
 
