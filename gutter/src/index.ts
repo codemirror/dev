@@ -4,46 +4,63 @@ import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
 import {ChangeSet, MapMode} from "../../state/src"
 import {StyleModule} from "style-mod"
 
-export abstract class GutterMarker<T = any> extends RangeValue {
-  constructor(readonly value: T) { super() }
-
-  eq(other: GutterMarker<T>) {
-    return this == other || this.constructor == other.constructor && this.value === other.value
+/// A gutter marker represents a bit of information attached to a line
+/// in a specific gutter. Your own custom markers have to extend this
+/// class.
+export abstract class GutterMarker extends RangeValue {
+  /// @internal
+  compare(other: GutterMarker) {
+    return this == other || this.constructor == other.constructor && this.eq(other)
   }
 
-  map(mapping: ChangeSet, pos: number): Range<GutterMarker<T>> | null {
+  /// Compare this marker to another marker of the same type.
+  abstract eq(other: GutterMarker): boolean
+
+  /// Map this marker through a position mapping.
+  map(mapping: ChangeSet, pos: number): Range<GutterMarker> | null {
     pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
 
+  /// Render the DOM node for this marker, if any.
   toDOM(): Node | null { return null }
 
-  elementClass!: string | null
+  /// Create a range that places this marker at the given position.
+  at(pos: number) { return new Range(pos, pos, this) }
 
-  static create<T>(pos: number, value: T): Range<GutterMarker<T>> {
-    return new Range(pos, pos, new (this as any)(value))
-  }
-
-  static set(of: Range<GutterMarker> | ReadonlyArray<Range<GutterMarker>>): GutterMarkerSet {
-    return RangeSet.of<GutterMarker>(of)
-  }
+  /// This property can be used to add CSS classes to the gutter
+  /// element that contains this marker.
+  elementClass!: string
 }
 
-GutterMarker.prototype.elementClass = null
+GutterMarker.prototype.elementClass = ""
 
-export type GutterMarkerSet = RangeSet<GutterMarker>
-
+/// Configuration options when creating a generic gutter.
 export interface GutterConfig {
+  /// The CSS class for the gutter's wrapping DOM element.
   class: string
+  /// Whether the gutter stays fixed during horizontal scrolling, or
+  /// scrolls along with the content. Defaults to true.
   fixed?: boolean
+  /// Controls whether empty gutter elements should be rendered.
+  /// Defaults to false.
   renderEmptyElements?: boolean
+  /// CSS classes to add to gutter elements (in addition to
+  /// `codemirror-gutter-element`).
   elementClass?: string
-  initialMarkers?: (view: EditorView) => GutterMarkerSet
-  updateMarkers?: (markers: GutterMarkerSet, update: ViewUpdate) => GutterMarkerSet
+  /// A function that computes the initial set of markers for the
+  /// gutter, if any. Defaults to the empty set.
+  initialMarkers?: (view: EditorView) => RangeSet<GutterMarker>
+  /// A function that updates the set of markers when the view
+  /// updates. This is where you could read transaction information to
+  /// add or remove markers, depending on the kind of gutter you are
+  /// implementing.
+  updateMarkers?: (markers: RangeSet<GutterMarker>, update: ViewUpdate) => RangeSet<GutterMarker>
+  /// Can be used to optionally add a single marker to every line.
   lineMarker?: (view: EditorView, line: BlockInfo, markers: ReadonlyArray<GutterMarker>) => GutterMarker | null
-  // @internal
+  /// @internal
   initialSpacer?: null | ((view: EditorView) => GutterMarker)
-  // @internal
+  /// @internal
   updateSpacer?: null | ((spacer: GutterMarker, update: ViewUpdate) => GutterMarker)
 }
 
@@ -52,12 +69,13 @@ const defaults = {
   renderEmptyElements: false,
   elementClass: "",
   initialMarkers: () => RangeSet.empty,
-  updateMarkers: (markers: GutterMarkerSet) => markers,
+  updateMarkers: (markers: RangeSet<GutterMarker>) => markers,
   lineMarker: () => null,
   initialSpacer: null,
   updateSpacer: null
 }
 
+/// Create a gutter extension.
 export function gutter<T>(config: GutterConfig) {
   let conf = fillConfig(config, defaults)
   // FIXME allow client code to preserve a gutter config
@@ -68,7 +86,7 @@ export function gutter<T>(config: GutterConfig) {
 class GutterView implements ViewPluginValue {
   dom: HTMLElement
   elements: GutterElement[] = []
-  markers: GutterMarkerSet
+  markers: RangeSet<GutterMarker>
   spacer: GutterElement | null = null
 
   constructor(public view: EditorView, public config: Required<GutterConfig>) {
@@ -177,39 +195,53 @@ class GutterElement {
   }
 }
 
-function sameMarkers<T>(a: ReadonlyArray<GutterMarker<T>>, b: ReadonlyArray<GutterMarker<T>>): boolean {
+function sameMarkers<T>(a: ReadonlyArray<GutterMarker>, b: ReadonlyArray<GutterMarker>): boolean {
   if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (!a[i].eq(b[i])) return false
+  for (let i = 0; i < a.length; i++) if (!a[i].compare(b[i])) return false
   return true
 }
 
+/// Configuration options when [creating](#gutter.lineNumbers) a line
+/// number gutter.
 export interface LineNumberConfig {
+  /// See [`GutterConfig`](#gutter.GutterConfig.fixed).
   fixed?: boolean,
+  /// How to display line numbers. Defaults to simply converting them
+  /// to string.
   formatNumber?: (lineNo: number) => string
 }
 
+/// Used to insert markers into the line number gutter.
+export const lineNumberMarkers = Slot.define<LineNumberMarkerUpdate>()
+
 export type LineNumberMarkerUpdate = {
+  /// When given, adds these markers.
   add?: Range<GutterMarker>[],
+  /// Filter the line number markers through this function.
   filter?: (from: number, to: number, marker: GutterMarker) => boolean
 }
 
-export const lineNumberMarkers = Slot.define<LineNumberMarkerUpdate>()
-
+/// Create a line number gutter extension. The order in which the
+/// gutters appear is determined by their extension priority.
 export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs => {
   let config = combineConfig(configs, {
     fixed: true,
     formatNumber: String
   })
-  class NumberMarker extends GutterMarker<number> {
+  class NumberMarker extends GutterMarker {
+    constructor(readonly number: number) { super() }
+
+    eq(other: NumberMarker) { return this.number == other.number }
+
     toDOM() {
-      return document.createTextNode(config.formatNumber(this.value))
+      return document.createTextNode(config.formatNumber(this.number))
     }
   }
   return gutter({
     class: "codemirror-line-numbers " + styles.lineNumberGutter,
     fixed: config.fixed,
     elementClass: styles.lineNumberGutterElement,
-    updateMarkers(markers: GutterMarkerSet, update: ViewUpdate) {
+    updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
       let slot = update.getMeta(lineNumberMarkers)
       if (slot) markers = markers.update(slot.add || [], slot.filter || null)
       return markers
@@ -224,7 +256,7 @@ export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs =>
     },
     updateSpacer(spacer: GutterMarker, update: ViewUpdate) {
       let max = maxLineNumber(update.view.state.doc.lines)
-      return max == spacer.value ? spacer : new NumberMarker(max)
+      return max == (spacer as NumberMarker).number ? spacer : new NumberMarker(max)
     }
   })
 }, {})
