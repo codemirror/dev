@@ -1,7 +1,21 @@
 import {EditorState, EditorSelection, SelectionRange, Transaction} from "../../state/src"
 import {EditorView} from "../../view/src"
 
-export type Command = (view: EditorView) => boolean
+/// Command functions are used in key bindings and other types of user
+/// actions. Given an editor state and a dispatch function, they check
+/// whether their effect can apply in the current editor state, and if
+/// it can, perform it as a side effect (which usually means
+/// dispatching a transaction) and return `true`.
+export type Command = (target: {state: EditorState, dispatch: (transaction: Transaction) => void}) => boolean
+
+/// Some commands need direct access to the [editor
+/// view](#view.EditorView). View commands are expect a view object as
+/// argument. `Command` is a subtype of `ViewCommand`, and code that
+/// expects any kind of command usually works with the `ViewCommand`
+/// type. (The distinction is mostly there because most commands do
+/// not need an entire view, and it is helpful to be able to test them
+/// in isolation, outside of the browser.)
+export type ViewCommand = (target: EditorView) => boolean
 
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "word" | "line" | "lineboundary"): boolean {
@@ -16,17 +30,26 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
   return true
 }
 
-export const moveCharLeft: Command = view => moveSelection(view, "left", "character")
-export const moveCharRight: Command = view => moveSelection(view, "right", "character")
+/// Move the selection one character to the left (which is backward in
+/// left-to-right text, forward in right-to-left text).
+export const moveCharLeft: ViewCommand = view => moveSelection(view, "left", "character")
+/// Move the selection one character to the right.
+export const moveCharRight: ViewCommand = view => moveSelection(view, "right", "character")
 
-export const moveWordLeft: Command = view => moveSelection(view, "left", "word")
-export const moveWordRight: Command = view => moveSelection(view, "right", "word")
+/// Move the selection one word to the left.
+export const moveWordLeft: ViewCommand = view => moveSelection(view, "left", "word")
+/// Move the selection one word to the right.
+export const moveWordRight: ViewCommand = view => moveSelection(view, "right", "word")
 
-export const moveLineUp: Command = view => moveSelection(view, "backward", "line")
-export const moveLineDown: Command = view => moveSelection(view, "forward", "line")
+/// Move the selection one line up.
+export const moveLineUp: ViewCommand = view => moveSelection(view, "backward", "line")
+/// Move the selection one line down.
+export const moveLineDown: ViewCommand = view => moveSelection(view, "forward", "line")
 
-export const moveLineStart: Command = view => moveSelection(view, "backward", "lineboundary")
-export const moveLineEnd: Command = view => moveSelection(view, "forward", "lineboundary")
+/// Move the selection to the start of the line.
+export const moveLineStart: ViewCommand = view => moveSelection(view, "backward", "lineboundary")
+/// Move the selection to the end of the line.
+export const moveLineEnd: ViewCommand = view => moveSelection(view, "forward", "lineboundary")
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "word" | "line" | "lineboundary"): boolean {
@@ -39,28 +62,40 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
   return true
 }
 
-export const extendCharLeft: Command = view => extendSelection(view, "left", "character")
-export const extendCharRight: Command = view => extendSelection(view, "right", "character")
+/// Move the selection head one character to the left, while leaving
+/// the anchor in place.
+export const extendCharLeft: ViewCommand = view => extendSelection(view, "left", "character")
+/// Move the selection head one character to the right.
+export const extendCharRight: ViewCommand = view => extendSelection(view, "right", "character")
 
-export const extendWordLeft: Command = view => extendSelection(view, "left", "word")
-export const extendWordRight: Command = view => extendSelection(view, "right", "word")
+/// Move the selection head one word to the left.
+export const extendWordLeft: ViewCommand = view => extendSelection(view, "left", "word")
+/// Move the selection head one word to the right.
+export const extendWordRight: ViewCommand = view => extendSelection(view, "right", "word")
 
-export const extendLineUp: Command = view => extendSelection(view, "backward", "line")
-export const extendLineDown: Command = view => extendSelection(view, "forward", "line")
+/// Move the selection head one line up.
+export const extendLineUp: ViewCommand = view => extendSelection(view, "backward", "line")
+/// Move the selection head one line down.
+export const extendLineDown: ViewCommand = view => extendSelection(view, "forward", "line")
 
-export const extendLineStart: Command = view => extendSelection(view, "backward", "lineboundary")
-export const extendLineEnd: Command = view => extendSelection(view, "forward", "lineboundary")
+/// Move the selection head to the start of the line.
+export const extendLineStart: ViewCommand = view => extendSelection(view, "backward", "lineboundary")
+/// Move the selection head to the end of the line.
+export const extendLineEnd: ViewCommand = view => extendSelection(view, "forward", "lineboundary")
 
+/// Move the selection to the start of the document.
 export const selectDocStart: Command = ({state, dispatch}) => {
   dispatch(state.t().setSelection(EditorSelection.single(0)).scrollIntoView())
   return true
 }
 
+/// Move the selection to the end of the document.
 export const selectDocEnd: Command = ({state, dispatch}) => {
   dispatch(state.t().setSelection(EditorSelection.single(state.doc.length)).scrollIntoView())
   return true
 }
 
+/// Select the entire document.
 export const selectAll: Command = ({state, dispatch}) => {
   dispatch(state.t().setSelection(EditorSelection.single(0, state.doc.length)))
   return true
@@ -83,8 +118,12 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
   return true
 }
 
-export const deleteCharBackward: Command = view => deleteText(view, "backward")
-export const deleteCharForward: Command = view => deleteText(view, "forward")
+/// Delete the character before the cursor (which is the one to left
+/// in left-to-right text, but the one to the right in right-to-left
+/// text).
+export const deleteCharBackward: ViewCommand = view => deleteText(view, "backward")
+/// Delete the character after the cursor.
+export const deleteCharForward: ViewCommand = view => deleteText(view, "forward")
 
 // FIXME support indenting by tab, configurable indent units
 
@@ -102,7 +141,9 @@ function getIndentation(state: EditorState, pos: number): number {
   return -1
 }
 
-export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
+/// Replace the selection with a newline and indent the newly created
+/// line(s).
+export const insertNewlineAndIndent: Command = ({state, dispatch}): boolean => {
   let i = 0, indentation = state.selection.ranges.map(r => {
     let indent = getIndentation(state, r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
@@ -116,10 +157,12 @@ export function insertNewlineAndIndent({state, dispatch}: EditorView): boolean {
   return true
 }
 
-// FIXME this will base all indentation on the same state, which is
-// wrong (indentation looks at the indent of previous lines, which may
-// be changed).
-export function indentSelection({state, dispatch}: EditorView): boolean {
+/// Auto-indent the selected lines. This uses the [indentation
+/// behavor](#state.EditorState^indentation) as source.
+export const indentSelection: Command = ({state, dispatch}): boolean => {
+  // FIXME this will base all indentation on the same state, which is
+  // wrong (indentation looks at the indent of previous lines, which may
+  // be changed).
   let lastLine = -1, positions = []
   for (let range of state.selection.ranges) {
     for (let {start, end} = state.doc.lineAt(range.from);;) {
@@ -145,7 +188,12 @@ export function indentSelection({state, dispatch}: EditorView): boolean {
   return true
 }
 
-export const pcBaseKeymap: {[key: string]: Command} = {
+/// The default keymap for Linux/Windows/non-Mac platforms. Binds the
+/// arrows for cursor motion, shift-arrow for selection extension,
+/// ctrl-arrows for by-word motion, home/end for line start/end,
+/// ctrl-home/end for document start/end, ctrl-a to select all,
+/// backspace/delete for deletion, and enter for newline-and-indent.
+export const pcBaseKeymap: {[key: string]: ViewCommand} = {
   "ArrowLeft": moveCharLeft,
   "ArrowRight": moveCharRight,
   "Shift-ArrowLeft": extendCharLeft,
@@ -170,7 +218,10 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "Enter": insertNewlineAndIndent
 }
 
-export const macBaseKeymap: {[key: string]: Command} = {
+/// The default keymap for Mac platforms. Includes the bindings from
+/// the [PC keymap](#commands.pcBaseKeymap) (using Cmd instead of
+/// Ctrl), and adds Mac-specific default bindings.
+export const macBaseKeymap: {[key: string]: ViewCommand} = {
   "Control-b": moveCharLeft,
   "Control-f": moveCharRight,
   "Shift-Control-b": extendCharLeft,
@@ -194,4 +245,5 @@ declare global { const os: any }
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform)
           : typeof os != "undefined" ? os.platform() == "darwin" : false
 
-export const baseKeymap: {[key: string]: Command} = mac ? macBaseKeymap : pcBaseKeymap
+/// The default keymap for the current platform.
+export const baseKeymap = mac ? macBaseKeymap : pcBaseKeymap
