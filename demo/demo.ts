@@ -1,4 +1,4 @@
-import {EditorState, EditorSelection} from "../state"
+import {EditorState} from "../state"
 import {EditorView} from "../view"
 import {keymap} from "../keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history"

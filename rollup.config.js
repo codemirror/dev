@@ -20,7 +20,8 @@ function config(module, format) {
       tsconfigOverride: {
         compilerOptions: {
           target: format == "esm" ? "es6" : "es5",
-          declarationDir: `./${base}/dist`
+          declarationDir: `./${base}/dist`,
+          declarationMap: true
         },
         include: [`./${base}/src/*.ts`]
       },
