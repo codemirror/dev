@@ -1,8 +1,8 @@
-import {RangeIterator, RangeSet} from "../../rangeset/src/rangeset"
+import {RangeIterator, RangeSet} from "../../rangeset"
 import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType, WidgetType} from "./decoration"
 import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
-import {Text, TextIterator} from "../../text/src"
+import {Text, TextIterator} from "../../text"
 
 export const enum Open { Start = 1, End = 2 }
 

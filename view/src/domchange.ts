@@ -1,7 +1,7 @@
 import {EditorView} from "./editorview"
 import {selectionCollapsed} from "./dom"
 import browser from "./browser"
-import {EditorSelection, Change, Transaction} from "../../state/src"
+import {EditorSelection, Change, Transaction} from "../../state"
 
 const LINE_SEP = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 

@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
-import {Decoration, EditorView, ViewPlugin, WidgetType} from "../src"
+import {EditorSelection} from "../../state"
+import {Decoration, EditorView, ViewPlugin, WidgetType} from ".."
 import ist from "ist"
 
 function flush(cm: EditorView) {

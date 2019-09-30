@@ -1,8 +1,8 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state/src/"
-import {Extension} from "../../extension/src/extension"
+import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
+import {Extension} from "../../extension"
 import {Tree, NodeType, NodeGroup} from "lezer-tree"
-import {styleNodeProp, Style} from "../../theme/src"
+import {styleNodeProp, Style} from "../../theme"
 
 export {StringStream}
 

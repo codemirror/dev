@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
-import {EditorView, ViewPlugin, ViewUpdate} from "../src/"
+import {EditorSelection} from "../../state"
+import {EditorView, ViewPlugin, ViewUpdate} from ".."
 import ist from "ist"
 
 describe("EditorView extension", () => {

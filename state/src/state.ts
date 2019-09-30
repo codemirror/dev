@@ -1,7 +1,7 @@
-import {Text} from "../../text/src"
+import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Extension, Configuration, Behavior} from "../../extension/src/extension"
+import {Extension, Configuration, Behavior} from "../../extension"
 import {extendState, Syntax, stateField, StateField, allowMultipleSelections} from "./extension"
 
 /// Options passed when [creating](#state.EditorState^create) an

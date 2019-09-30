@@ -11,8 +11,8 @@ import {Decoration, DecorationSet, joinRanges, findChangedRanges,
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
 import {ViewUpdate, decorations as decorationsBehavior, viewPlugin, ViewPluginValue} from "./extension"
 import {EditorView, UpdateState} from "./editorview"
-import {EditorState, ChangedRange} from "../../state/src"
-import {Text} from "../../text/src"
+import {EditorState, ChangedRange} from "../../state"
+import {Text} from "../../text"
 
 type A<T> = ReadonlyArray<T>
 const none = [] as any

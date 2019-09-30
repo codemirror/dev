@@ -1,7 +1,7 @@
-import {HeightMap, HeightOracle, MeasuredHeights, BlockInfo, QueryType} from "../src/heightmap"
-import {Decoration, WidgetType, BlockType} from "../src/decoration"
-import {Text} from "../../text/src"
-import {ChangedRange} from "../../state/src"
+import {HeightMap, HeightOracle, MeasuredHeights, BlockInfo, QueryType} from ".."
+import {Decoration, WidgetType, BlockType} from ".."
+import {Text} from "../../text"
+import {ChangedRange} from "../../state"
 const ist = require("ist")
 
 const byH = QueryType.ByHeight, byP = QueryType.ByPos

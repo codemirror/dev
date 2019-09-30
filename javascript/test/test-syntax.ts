@@ -1,6 +1,6 @@
 const ist = require("ist")
-import {EditorState} from "../../state/src"
-import {javascriptSyntax} from "../src/javascript"
+import {EditorState} from "../../state"
+import {javascriptSyntax} from ".."
 import {Tree} from "lezer"
 
 function s(doc: string) {

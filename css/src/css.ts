@@ -1,7 +1,7 @@
 import {parser} from "lezer-css"
 import {NodeType} from "lezer-tree"
-import {LezerSyntax, continuedIndent, indentNodeProp} from "../../syntax/src"
-import {styleNodeProp, Style as s} from "../../theme/src"
+import {LezerSyntax, continuedIndent, indentNodeProp} from "../../syntax"
+import {styleNodeProp, Style as s} from "../../theme"
 
 export const cssSyntax = new LezerSyntax(parser.withProps(
   indentNodeProp.add(NodeType.match({

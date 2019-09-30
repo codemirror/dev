@@ -1,4 +1,4 @@
-import {Text} from "../../text/src"
+import {Text} from "../../text"
 import {HeightMap, QueryType} from "./heightmap"
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): {top: number, bottom: number} {

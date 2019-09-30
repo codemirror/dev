@@ -1,7 +1,7 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType} from "../src"
-import {EditorState} from "../../state/src"
-import {Slot} from "../../extension/src/extension"
+import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType} from ".."
+import {EditorState} from "../../state"
+import {Slot} from "../../extension"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {

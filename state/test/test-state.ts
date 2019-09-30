@@ -1,6 +1,6 @@
 const ist = require("ist")
-import {EditorState, StateField, Change, EditorSelection, SelectionRange} from "../src"
-import {Slot} from "../../extension/src/extension"
+import {EditorState, StateField, Change, EditorSelection, SelectionRange} from ".."
+import {Slot} from "../../extension"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {

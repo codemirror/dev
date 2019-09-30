@@ -1,5 +1,5 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
+import {EditorSelection} from "../../state"
 import ist from "ist"
 
 function setDOMSel(node: Node, offset: number) {

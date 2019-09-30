@@ -1,5 +1,5 @@
-import {EditorState, Transaction, CancellablePromise} from "../../state/src"
-import {Configuration, Slot, Extension, Behavior} from "../../extension/src/extension"
+import {EditorState, Transaction, CancellablePromise} from "../../state"
+import {Configuration, Slot, Extension, Behavior} from "../../extension"
 import {StyleModule} from "style-mod"
 
 import {DocView} from "./docview"

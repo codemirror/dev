@@ -1,6 +1,6 @@
-import {Line} from "../../text/src"
+import {Line} from "../../text"
 import {NodeType, NodeProp, Subtree, Tree} from "lezer-tree"
-import {EditorState} from "../../state/src/"
+import {EditorState} from "../../state"
 
 /// A syntax tree node prop used to associate indentation strategies
 /// with node types. Such a strategy is a function from an indentation

@@ -1,7 +1,7 @@
-import {combineConfig, fillConfig, Slot} from "../../extension/src/extension"
-import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, BlockType, BlockInfo} from "../../view/src"
-import {Range, RangeValue, RangeSet} from "../../rangeset/src/rangeset"
-import {ChangeSet, MapMode} from "../../state/src"
+import {combineConfig, fillConfig, Slot} from "../../extension"
+import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, BlockType, BlockInfo} from "../../view"
+import {Range, RangeValue, RangeSet} from "../../rangeset"
+import {ChangeSet, MapMode} from "../../state"
 import {StyleModule} from "style-mod"
 
 /// A gutter marker represents a bit of information attached to a line

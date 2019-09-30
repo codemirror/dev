@@ -1,7 +1,7 @@
 import {ContentView, DOMPos} from "./contentview"
 import {WidgetType} from "./decoration"
 import {attrsEq} from "./attributes"
-import {Text} from "../../text/src"
+import {Text} from "../../text"
 import {Rect} from "./dom"
 import browser from "./browser"
 import {Open} from "./buildview"

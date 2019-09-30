@@ -1,4 +1,4 @@
-import {ChangeSet, Change, ChangedRange} from "../../state/src"
+import {ChangeSet, Change, ChangedRange} from "../../state"
 
 type A<T> = ReadonlyArray<T>
 

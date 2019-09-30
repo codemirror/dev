@@ -1,7 +1,7 @@
-import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, DecoratedRange} from "../src/"
+import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, DecoratedRange} from ".."
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
-import {Slot} from "../../extension/src/extension"
+import {EditorSelection} from "../../state"
+import {Slot} from "../../extension"
 import ist from "ist"
 
 const filterDeco = Slot.define<(from: number, to: number, spec: any) => boolean>()

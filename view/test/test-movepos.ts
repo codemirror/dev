@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection} from "../../state/src"
-import {Decoration, WidgetType, ViewPlugin} from "../src"
+import {EditorSelection} from "../../state"
+import {Decoration, WidgetType, ViewPlugin} from ".."
 import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)

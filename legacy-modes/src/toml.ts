@@ -1,4 +1,4 @@
-import {LegacyMode, StringStream} from "../../stream-syntax/src/stream-syntax"
+import {LegacyMode, StringStream} from "../../stream-syntax"
 
 class ParseState {
   constructor(public inString = false,

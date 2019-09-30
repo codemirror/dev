@@ -1,5 +1,5 @@
-import {EditorState, Transaction, StateField} from "../../state/src"
-import {combineConfig, Slot} from "../../extension/src/extension"
+import {EditorState, Transaction, StateField} from "../../state"
+import {combineConfig, Slot} from "../../extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateSlot = Slot.define<HistoryState>()

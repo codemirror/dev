@@ -1,5 +1,5 @@
-import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from "../src/rangeset"
-import {Change, ChangeSet, Mapping, MapMode, ChangedRange} from "../../state/src"
+import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from ".."
+import {Change, ChangeSet, Mapping, MapMode, ChangedRange} from "../../state"
 const ist = require("ist")
 
 class Value extends RangeValue {

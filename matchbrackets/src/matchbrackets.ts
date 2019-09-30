@@ -1,9 +1,9 @@
-import {EditorState} from "../../state/src"
-import {combineConfig} from "../../extension/src/extension"
-import {EditorView, ViewPlugin} from "../../view/src/"
-import {Decoration} from "../../view/src/decoration"
+import {EditorState} from "../../state"
+import {combineConfig} from "../../extension"
+import {EditorView, ViewPlugin} from "../../view"
+import {Decoration} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
-import {openNodeProp, closeNodeProp} from "../../syntax/src/"
+import {openNodeProp, closeNodeProp} from "../../syntax"
 
 export interface Config {
   afterCursor?: boolean,

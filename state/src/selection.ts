@@ -1,6 +1,6 @@
 import {Mapping} from "./change"
 import {EditorState} from "./state"
-import {charType} from "../../text/src"
+import {charType} from "../../text"
 
 /// A single selection range.
 export class SelectionRange {

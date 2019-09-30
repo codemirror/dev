@@ -1,8 +1,8 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state/src"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
 import {EditorView} from "./editorview"
 import {focusChange, handleDOMEvents, ViewUpdate,
         clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
-import {Slot} from "../../extension/src/extension"
+import {Slot} from "../../extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 
@@ -30,7 +30,7 @@ export class InputState {
   constructor(view: EditorView) {
     for (let type in handlers) {
       let handler = handlers[type]
-      view.contentDOM.addEventListener(type, event => {
+      view.contentDOM.addEventListener(type, (event: Event) => {
         if (!eventBelongsToEditor(view, event)) return
         if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         else handler(view, event)
@@ -38,7 +38,7 @@ export class InputState {
       this.registeredEvents.push(type)
     }
     // Must always run, even if a custom handler handled the event
-    view.contentDOM.addEventListener("keydown", event => {
+    view.contentDOM.addEventListener("keydown", (event: KeyboardEvent) => {
       view.inputState.lastKeyCode = event.keyCode
       view.inputState.lastKeyTime = Date.now()
     })
@@ -55,7 +55,7 @@ export class InputState {
     for (let set of handlers) {
       for (let type in set) if (this.registeredEvents.indexOf(type) < 0) {
         this.registeredEvents.push(type)
-        view.contentDOM.addEventListener(type, event => {
+        view.contentDOM.addEventListener(type, (event: Event) => {
           if (!eventBelongsToEditor(view, event)) return
           if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         })

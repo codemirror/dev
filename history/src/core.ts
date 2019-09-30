@@ -1,4 +1,4 @@
-import {ChangeSet, ChangeDesc, Transaction, EditorSelection} from "../../state/src"
+import {ChangeSet, ChangeDesc, Transaction, EditorSelection} from "../../state"
 
 class Item {
   constructor(readonly map: ChangeSet<ChangeDesc>,

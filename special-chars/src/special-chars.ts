@@ -1,8 +1,8 @@
 import {Decoration, DecorationSet, DecoratedRange, WidgetType, ViewPlugin, ViewPluginValue,
-        ViewUpdate, EditorView} from "../../view/src"
-import {ChangedRange} from "../../state/src"
-import {combineConfig} from "../../extension/src/extension"
-import {countColumn} from "../../text/src"
+        ViewUpdate, EditorView} from "../../view"
+import {ChangedRange} from "../../state"
+import {combineConfig} from "../../extension"
+import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
 
 export interface SpecialCharConfig {

@@ -1,4 +1,4 @@
-import {Text} from "../../text/src"
+import {Text} from "../../text"
 
 const empty: ReadonlyArray<any> = []
 

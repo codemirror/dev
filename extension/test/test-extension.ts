@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {Extension, ExtensionGroup} from "../src/extension"
+import {Extension, ExtensionGroup} from ".."
 
 let tp = new ExtensionGroup<{[id: number]: any}>(v => v), v = Object.create(null)
 

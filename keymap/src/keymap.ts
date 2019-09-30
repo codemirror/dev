@@ -1,5 +1,5 @@
 import {base, keyName} from "w3c-keyname"
-import {EditorView} from "../../view/src"
+import {EditorView} from "../../view"
 
 export type Command = (view: EditorView) => boolean
 export type Keymap = {[key: string]: Command | undefined}

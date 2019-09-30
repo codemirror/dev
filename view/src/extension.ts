@@ -1,8 +1,8 @@
-import {EditorState, Transaction, ChangeSet} from "../../state/src"
+import {EditorState, Transaction, ChangeSet} from "../../state"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet} from "./decoration"
-import {Extension, Behavior, ExtensionGroup, Slot, SlotType} from "../../extension/src/extension"
+import {Extension, Behavior, ExtensionGroup, Slot, SlotType} from "../../extension"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 

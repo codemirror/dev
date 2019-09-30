@@ -1,9 +1,9 @@
 import {configureHTML} from "lezer-html"
-import {cssSyntax} from "../../css/src/css"
-import {javascriptSyntax} from "../../javascript/src/javascript"
-import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../syntax/src"
+import {cssSyntax} from "../../css"
+import {javascriptSyntax} from "../../javascript"
+import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../syntax"
 import {NodeType} from "lezer-tree"
-import {Style as s, styleNodeProp} from "../../theme/src"
+import {Style as s, styleNodeProp} from "../../theme"
 
 export const htmlSyntax = new LezerSyntax(configureHTML([
   {tag: "script",

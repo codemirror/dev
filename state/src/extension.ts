@@ -1,6 +1,6 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
-import {Extension, ExtensionGroup} from "../../extension/src/extension"
+import {Extension, ExtensionGroup} from "../../extension"
 import {Tree} from "lezer-tree"
 
 export const extendState = new ExtensionGroup<EditorState>(state => state.values)

@@ -1,5 +1,5 @@
-import {EditorState, EditorSelection, SelectionRange, Transaction} from "../../state/src"
-import {EditorView} from "../../view/src"
+import {EditorState, EditorSelection, SelectionRange, Transaction} from "../../state"
+import {EditorView} from "../../view"
 
 /// Command functions are used in key bindings and other types of user
 /// actions. Given an editor state and a dispatch function, they check
@@ -241,7 +241,7 @@ export const macBaseKeymap: {[key: string]: ViewCommand} = {
 }
 for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key]
 
-declare global { const os: any }
+declare const os: any
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform)
           : typeof os != "undefined" ? os.platform() == "darwin" : false
 

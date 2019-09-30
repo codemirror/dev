@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts javascript/test/test-*.ts",
-    "watch-demo": "rollup -w -c rollup.demo.config.js",
-    "watch-view-tests": "rollup -w -c rollup.view-tests.config.js"
+    "prepare": "rollup -c",
+    "watch": "rollup -wc --environment NO_ESM,DEMO"
   },
   "keywords": [
     "editor",
@@ -27,13 +27,14 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "style-mod": "^2.0.0",
-    "w3c-keyname": "^2.1.0",
     "lezer": "^0.4.0",
-    "lezer-tree": "^0.4.0",
-    "lezer-javascript": "^0.4.0",
     "lezer-css": "^0.4.0",
-    "lezer-html": "^0.4.0"
+    "lezer-html": "^0.4.0",
+    "lezer-javascript": "^0.4.0",
+    "lezer-tree": "^0.4.0",
+    "rollup-plugin-ts": "^0.2.0",
+    "style-mod": "^2.0.0",
+    "w3c-keyname": "^2.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",

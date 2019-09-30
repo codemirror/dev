@@ -1,6 +1,6 @@
-import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, DecoratedRange} from "../../view/src"
+import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, DecoratedRange} from "../../view"
 import {themeData} from "./theme"
-import {Syntax, EditorState} from "../../state/src/"
+import {Syntax, EditorState} from "../../state"
 import {styleNodeProp} from "./styleprop"
 
 class Highlighter implements ViewPluginValue {

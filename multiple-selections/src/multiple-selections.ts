@@ -1,5 +1,5 @@
-import {EditorState} from "../../state/src"
-import {ViewPlugin, DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view/src"
+import {EditorState} from "../../state"
+import {ViewPlugin, DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view"
 import {StyleModule} from "style-mod"
 
 export interface Config {}

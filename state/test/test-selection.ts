@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorSelection, SelectionRange} from "../src"
+import {EditorSelection, SelectionRange} from ".."
 
 describe("EditorSelection", () => {
   it("stores ranges with a primary range", () => {

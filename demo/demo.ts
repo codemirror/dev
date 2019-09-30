@@ -1,16 +1,16 @@
-import {EditorState, EditorSelection} from "../state/src"
-import {EditorView} from "../view/src/"
-import {keymap} from "../keymap/src/keymap"
-import {history, redo, redoSelection, undo, undoSelection} from "../history/src/history"
-import {lineNumbers} from "../gutter/src/index"
-import {baseKeymap, indentSelection} from "../commands/src/commands"
-import {bracketMatching} from "../matchbrackets/src/matchbrackets"
-import {specialChars} from "../special-chars/src/special-chars"
-import {multipleSelections} from "../multiple-selections/src/multiple-selections"
-import {syntaxIndentation} from "../syntax/src"
+import {EditorState, EditorSelection} from "../state"
+import {EditorView} from "../view"
+import {keymap} from "../keymap"
+import {history, redo, redoSelection, undo, undoSelection} from "../history"
+import {lineNumbers} from "../gutter"
+import {baseKeymap, indentSelection} from "../commands"
+import {bracketMatching} from "../matchbrackets"
+import {specialChars} from "../special-chars"
+import {multipleSelections} from "../multiple-selections"
+import {syntaxIndentation} from "../syntax"
 
-import {html} from "../html/src/html"
-import {defaultTheme, highlight} from "../theme/src/"
+import {html} from "../html"
+import {defaultTheme, highlight} from "../theme"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>

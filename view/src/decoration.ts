@@ -1,5 +1,5 @@
-import {ChangeSet, ChangedRange, MapMode} from "../../state/src"
-import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset/src/rangeset"
+import {ChangeSet, ChangedRange, MapMode} from "../../state"
+import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset"
 import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
 

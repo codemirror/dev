@@ -1,5 +1,5 @@
 import {StyleModule, Style} from "style-mod"
-import {EditorView} from "../../view/src"
+import {EditorView} from "../../view"
 import {StyleNames} from "./styleprop"
 
 export type ThemeSpec = {[prop: string]: string | number | ThemeSpec}

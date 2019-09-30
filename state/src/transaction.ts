@@ -1,5 +1,5 @@
-import {Text} from "../../text/src"
-import {Slot, SlotType, Extension, Configuration} from "../../extension/src/extension"
+import {Text} from "../../text"
+import {Slot, SlotType, Extension, Configuration} from "../../extension"
 import {allowMultipleSelections, extendState} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"

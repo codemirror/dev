@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "lib": ["es2017", "dom"],
+    "lib": ["es5", "dom"],
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "sourceMap": true,
     "strict": true,
     "target": "es5",
-    "newLine": "lf"
+    "newLine": "lf",
+    "declaration": true
   },
   "include": ["*/src/*.ts", "*/test/*.ts", "browsertests/cases/*.ts"]
 }
