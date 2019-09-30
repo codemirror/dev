@@ -1,0 +1,4 @@
+{
+  "main": "dist/multiple-selections.js",
+  "types": "dist/multiple-selections.d.ts"
+}

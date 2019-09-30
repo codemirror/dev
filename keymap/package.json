@@ -1,1 +1,4 @@
-{"main": "dist/index.js"}
+{
+  "main": "dist/keymap.js",
+  "types": "dist/keymap.d.ts"
+}

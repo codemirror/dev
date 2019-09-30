@@ -1,30 +1,31 @@
-import typescript from "rollup-plugin-ts"
+import typescript from "rollup-plugin-typescript2"
 import commonjs from "rollup-plugin-commonjs"
 
-function mkTS(target) {
-  return typescript({
-    lib: ["es6", "dom"],
-    sourceMap: true,
-    target,
-    declaration: true
-  })
-}
-
-let cjs = commonjs(), ts5 = mkTS("es5"), ts6 = mkTS("es6")
+let cjs = commonjs()
 let result = []
 
 function config(module, format) {
   let base = /[^\/]+/.exec(module)[0]
   return {
     input: `./${module}`,
-    external: id => /^\.\./.test(id),
+    external: id => !/^\.?\//.test(id),
     output: {
-      format: format,
+      format,
       file: `./${base}/dist/index.${format == "cjs" ? "js" : "esm"}`,
       sourcemap: true,
       externalLiveBindings: false
     },
-    plugins: [format == "cjs" ? ts5 : ts6, cjs]
+    plugins: [typescript({
+      tsconfig: "./tsconfig.base.json",
+      tsconfigOverride: {
+        compilerOptions: {
+          target: format == "esm" ? "es6" : "es5",
+          declarationDir: `./${base}/dist`
+        },
+        include: [`./${base}/src/*.ts`]
+      },
+      useTsconfigDeclarationDir: true
+    }), cjs]
   }
 }
 
@@ -57,7 +58,12 @@ if (process.env.DEMO) result.push({
     file: "./demo/demo_built.js",
     sourcemap: true,
   },
-  plugins: [ts5, cjs]
+  plugins: [typescript({
+    tsconfigOverride: {
+      compilerOptions: {declaration: false},
+      include: [`./demo/*.ts`]
+    }
+  }), cjs]
 })
 
 export default result

@@ -1,1 +1,4 @@
-{"main": "dist/index.js"}
+{
+  "main": "dist/matchbrackets.js",
+  "types": "dist/matchbrackets.d.ts"
+}

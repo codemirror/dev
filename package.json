@@ -32,7 +32,6 @@
     "lezer-html": "^0.4.0",
     "lezer-javascript": "^0.4.0",
     "lezer-tree": "^0.4.0",
-    "rollup-plugin-ts": "^0.2.0",
     "style-mod": "^2.0.0",
     "w3c-keyname": "^2.1.0"
   },

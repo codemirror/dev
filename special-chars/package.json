@@ -1,1 +1,4 @@
-{"main": "dist/index.js"}
+{
+  "main": "dist/special-chars.js",
+  "types": "dist/special-chars.d.ts"
+}

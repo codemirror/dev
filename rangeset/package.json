@@ -1,1 +1,4 @@
-{"main": "dist/index.js"}
+{
+  "main": "dist/rangeset.js",
+  "types": "dist/rangeset.d.ts"
+}
