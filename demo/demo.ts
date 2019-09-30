@@ -1,16 +1,16 @@
-const {EditorState, EditorSelection} = require("../state")
-const {EditorView} = require("../view")
-const {keymap} = require("../keymap")
-const {history, redo, redoSelection, undo, undoSelection} = require("../history")
-const {lineNumbers} = require("../gutter")
-const {baseKeymap, indentSelection} = require("../commands")
-const {bracketMatching} = require("../matchbrackets")
-const {specialChars} = require("../special-chars")
-const {multipleSelections} = require("../multiple-selections")
-const {syntaxIndentation} = require("../syntax")
+import {EditorState, EditorSelection} from "../state"
+import {EditorView} from "../view"
+import {keymap} from "../keymap"
+import {history, redo, redoSelection, undo, undoSelection} from "../history"
+import {lineNumbers} from "../gutter"
+import {baseKeymap, indentSelection} from "../commands"
+import {bracketMatching} from "../matchbrackets"
+import {specialChars} from "../special-chars"
+import {multipleSelections} from "../multiple-selections"
+import {syntaxIndentation} from "../syntax"
 
-const {html} = require("../lang-html")
-const {defaultTheme, highlight} = require("../theme")
+import {html} from "../lang-html"
+import {defaultTheme, highlight} from "../theme"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
@@ -40,5 +40,5 @@ let state = EditorState.create({doc: `<script>
   keymap(baseKeymap),
 ]})
 
-let view = window.view = new EditorView({state})
+let view = (window as any).view = new EditorView({state})
 document.querySelector("#editor").appendChild(view.dom)

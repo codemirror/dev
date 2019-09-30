@@ -53,4 +53,22 @@ for (let module of ["text/src/index.ts",
   if (esm) result.push(config(module, "esm"))
 }
 
+
+if (process.env.DEMO) result.push({
+  input: `./demo/demo.ts`,
+  external: id => !/^\.?\//.test(id),
+  output: {
+    format: "cjs",
+    file: "./demo/demo.js",
+    sourcemap: true,
+  },
+  plugins: [typescript({
+    tsconfigOverride: {
+      compilerOptions: {declaration: false},
+      include: [`./demo/*.ts`]
+    }
+  }), cjs]
+})
+
+
 export default result
