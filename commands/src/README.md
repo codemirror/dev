@@ -1,7 +1,3 @@
-@Command
-
-@ViewCommand
-
 @pcBaseKeymap
 
 @macBaseKeymap

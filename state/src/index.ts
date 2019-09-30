@@ -1,5 +1,5 @@
 export {EditorStateConfig, EditorState} from "./state"
-export {Syntax, CancellablePromise, StateField} from "./extension"
+export {Command, Syntax, CancellablePromise, StateField} from "./extension"
 export {EditorSelection, SelectionRange} from "./selection"
 export {Change, ChangeDesc, ChangeSet, Mapping, MapMode, ChangedRange} from "./change"
 export {Transaction} from "./transaction"

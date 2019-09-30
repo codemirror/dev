@@ -1,21 +1,5 @@
-import {EditorState, EditorSelection, SelectionRange, Transaction} from "../../state"
-import {EditorView} from "../../view"
-
-/// Command functions are used in key bindings and other types of user
-/// actions. Given an editor state and a dispatch function, they check
-/// whether their effect can apply in the current editor state, and if
-/// it can, perform it as a side effect (which usually means
-/// dispatching a transaction) and return `true`.
-export type Command = (target: {state: EditorState, dispatch: (transaction: Transaction) => void}) => boolean
-
-/// Some commands need direct access to the [editor
-/// view](#view.EditorView). View commands are expect a view object as
-/// argument. `Command` is a subtype of `ViewCommand`, and code that
-/// expects any kind of command usually works with the `ViewCommand`
-/// type. (The distinction is mostly there because most commands do
-/// not need an entire view, and it is helpful to be able to test them
-/// in isolation, outside of the browser.)
-export type ViewCommand = (target: EditorView) => boolean
+import {EditorState, Command, EditorSelection, SelectionRange, Transaction} from "../../state"
+import {EditorView, ViewCommand} from "../../view"
 
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "word" | "line" | "lineboundary"): boolean {

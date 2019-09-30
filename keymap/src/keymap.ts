@@ -1,8 +1,7 @@
 import {base, keyName} from "w3c-keyname"
-import {EditorView} from "../../view"
+import {EditorView, ViewCommand} from "../../view"
 
-export type Command = (view: EditorView) => boolean
-export type Keymap = {[key: string]: Command | undefined}
+export type Keymap = {[key: string]: ViewCommand | undefined}
 
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false
 

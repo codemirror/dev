@@ -6,6 +6,16 @@ import {Extension, Behavior, ExtensionGroup, Slot, SlotType} from "../../extensi
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 
+/// Some [command functions](#state.Command) need direct access to the
+/// [editor view](#view.EditorView). View commands are expect a view
+/// object as argument. [`Command`](#state.Command) is a subtype of
+/// `ViewCommand`, and code that expects any kind of command usually
+/// works with the `ViewCommand` type. (The distinction is mostly
+/// there because most commands do not need an entire view, and it is
+/// helpful to be able to test them in isolation, outside of the
+/// browser.)
+export type ViewCommand = (target: EditorView) => boolean
+
 const none: readonly any[] = []
 
 export const extendView = new ExtensionGroup<EditorView>(view => view.plugins)

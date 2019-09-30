@@ -26,6 +26,8 @@
 
 ### Extending
 
+@Command
+
 @StateField
 
 @Slot
