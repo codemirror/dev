@@ -4,7 +4,7 @@
   "description": "Text/code editor component",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts javascript/test/test-*.ts",
+    "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts lang-javascript/test/test-*.ts",
     "prepare": "rollup -c",
     "watch": "rollup -wc --environment NO_ESM,DEMO"
   },
@@ -32,6 +32,7 @@
     "lezer-html": "^0.4.0",
     "lezer-javascript": "^0.4.0",
     "lezer-tree": "^0.4.0",
+    "moduleserve": "^0.8.5",
     "style-mod": "^2.0.0",
     "w3c-keyname": "^2.1.0"
   },

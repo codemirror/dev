@@ -5,13 +5,13 @@ let cjs = commonjs()
 let result = []
 
 function config(module, format) {
-  let base = /[^\/]+/.exec(module)[0]
+  let [_, base, file] = /^(.+?)\/src\/(.*?)\.ts/.exec(module)
   return {
     input: `./${module}`,
     external: id => !/^\.?\//.test(id),
     output: {
       format,
-      file: `./${base}/dist/index.${format == "cjs" ? "js" : "esm"}`,
+      file: `./${base}/dist/${file}.${format == "cjs" ? "js" : "esm"}`,
       sourcemap: true,
       externalLiveBindings: false
     },
@@ -45,25 +45,12 @@ for (let module of ["text/src/index.ts",
                     "keymap/src/keymap.ts",
                     "multiple-selections/src/multiple-selections.ts",
                     "theme/src/index.ts",
-                    "stream-syntax/src/stream-syntax.ts"]) { // FIXME languages
+                    "stream-syntax/src/stream-syntax.ts",
+                    "lang-javascript/src/javascript.ts",
+                    "lang-css/src/css.ts",
+                    "lang-html/src/html.ts"]) {
   result.push(config(module, "cjs"))
   if (esm) result.push(config(module, "esm"))
 }
-
-if (process.env.DEMO) result.push({
-  input: `./demo/demo.ts`,
-  external: id => /^\.\./.test(id),
-  output: {
-    format: "cjs",
-    file: "./demo/demo_built.js",
-    sourcemap: true,
-  },
-  plugins: [typescript({
-    tsconfigOverride: {
-      compilerOptions: {declaration: false},
-      include: [`./demo/*.ts`]
-    }
-  }), cjs]
-})
 
 export default result

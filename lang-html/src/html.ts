@@ -1,6 +1,6 @@
 import {configureHTML} from "lezer-html"
-import {cssSyntax} from "../../css"
-import {javascriptSyntax} from "../../javascript"
+import {cssSyntax} from "../../lang-css"
+import {javascriptSyntax} from "../../lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../syntax"
 import {NodeType} from "lezer-tree"
 import {Style as s, styleNodeProp} from "../../theme"

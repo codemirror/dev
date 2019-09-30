@@ -5,3 +5,4 @@ package-lock.json
 /.rpt2_cache
 /website
 /*/dist
+.tern-*
