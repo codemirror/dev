@@ -41,4 +41,4 @@ let state = EditorState.create({doc: `<script>
 ]})
 
 let view = (window as any).view = new EditorView({state})
-document.querySelector("#editor").appendChild(view.dom)
+document.querySelector("#editor")!.appendChild(view.dom)
