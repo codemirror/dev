@@ -104,7 +104,7 @@ export class BlockInfo {
   }
 }
 
-export const enum QueryType { ByPos, ByHeight, ByPosNoHeight }
+export enum QueryType { ByPos, ByHeight, ByPosNoHeight }
 
 const enum Flag { Break = 1, Outdated = 2 }
 

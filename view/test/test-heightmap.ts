@@ -1,8 +1,9 @@
-import {HeightMap, HeightOracle, MeasuredHeights, BlockInfo, QueryType} from ".."
-import {Decoration, WidgetType, BlockType} from ".."
+import {Decoration, WidgetType, BlockType, BlockInfo, __test} from ".."
 import {Text} from "../../text"
 import {ChangedRange} from "../../state"
 const ist = require("ist")
+
+const {HeightMap, HeightOracle, MeasuredHeights, QueryType} = __test
 
 const byH = QueryType.ByHeight, byP = QueryType.ByPos
 
@@ -131,7 +132,7 @@ describe("HeightMap", () => {
 
   it("materializes lines for measured heights", () => {
     let text = doc(10, 10, 10, 10), oracle = o(text)
-    let map: HeightMap = mk(text, [])
+    let map = mk(text, [])
       .updateHeight(oracle, 0, false, new MeasuredHeights(11, [28, 14, 5]))
     ist(map.toString(), "gap(10) line(10) line(10) line(10)")
     ist(map.height, 61)
@@ -147,8 +148,8 @@ describe("HeightMap", () => {
     ist(map.size, 100)
   })
 
-  function depth(heightMap: HeightMap): number {
-    let {left, right} = heightMap as any
+  function depth(heightMap: any): number {
+    let {left, right} = heightMap
     return left ? Math.max(depth(left), depth(right)) + 1 : 1
   }
 
