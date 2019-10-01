@@ -4,10 +4,18 @@ import {Text, TextIterator} from "../../text"
 import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
 
+/// A [syntax provider](#state.Syntax) based on a
+/// [Lezer](https://lezer.codemirror.net) parser.
 export class LezerSyntax implements Syntax {
   private field: StateField<SyntaxState>
+  /// The extension value to install this provider.
   readonly extension: Extension
 
+  /// Create a syntax instance for the given parser. You'll usually
+  /// want to use the
+  /// [`withProps`](https://lezer.codemirror.net/docs/ref/#lezer.Parser.withProps)
+  /// method to register CodeMirror-specific syntax node props in the
+  /// parser, before passing it to this constructor.
   constructor(readonly parser: Parser) {
     this.field = new StateField<SyntaxState>({
       init() { return new SyntaxState(Tree.empty) },
