@@ -20,32 +20,39 @@ function countColumn(string: string, end: number | null, tabSize: number, startI
 
 // STRING STREAM
 
-// Fed to the mode parsers, provides helper functions to make
-// parsers more succinct.
-
+/// Encapsulates a single line of input. Given to stream syntax code,
+/// which uses it to tokenize the content.
 export class StringStream {
-  pos: number
-  start: number
-  lineStart: number
-  lastColumnPos: number
-  lastColumnValue: number
+  /// The current position on the line.
+  pos: number = 0
+  /// The start position of the current token.
+  start: number = 0
+  private lineStart: number = 0
+  private lastColumnPos: number = 0
+  private lastColumnValue: number = 0
 
-  constructor(public string: string, public tabSize: number, private lineOracle: any) {
-    this.pos = this.start = 0
-    this.string = string
-    this.tabSize = tabSize || 8
-    this.lastColumnPos = this.lastColumnValue = 0
-    this.lineStart = 0
-    this.lineOracle = lineOracle
-  }
+  /// @internal
+  constructor(
+    /// The line.
+    public string: string,
+    /// Current tab size.
+    public tabSize: number
+  ) {}
 
+  /// True if we are at the end of the line.
   eol(): boolean {return this.pos >= this.string.length}
+  /// True if we are at the start of the line.
   sol(): boolean {return this.pos == this.lineStart}
+  /// Get the next code unit after the current position, or undefined
+  /// if we're at the end of the line.
   peek() {return this.string.charAt(this.pos) || undefined}
+  /// Read the next code unit and advance `this.pos`.
   next(): string | void {
     if (this.pos < this.string.length)
       return this.string.charAt(this.pos++)
   }
+  /// Match the next character against the given string, regular
+  /// expression, or predicate. Consume and return it if it matches.
   eat(match: string | RegExp | ((ch: string) => boolean)): string | void {
     let ch = this.string.charAt(this.pos)
     let ok
@@ -53,22 +60,32 @@ export class StringStream {
     else ok = ch && (match instanceof RegExp ? match.test(ch) : match(ch))
     if (ok) {++this.pos; return ch}
   }
+  /// Continue matching characters that match the given string,
+  /// regular expression, or predicate function. Return true if any
+  /// characters were consumed.
   eatWhile(match: string | RegExp | ((ch: string) => boolean)): boolean {
     let start = this.pos
     while (this.eat(match)){}
     return this.pos > start
   }
+  /// Consume whitespace ahead of `this.pos`. Return true if any was
+  /// found.
   eatSpace() {
     let start = this.pos
     while (/[\s\u00a0]/.test(this.string.charAt(this.pos))) ++this.pos
     return this.pos > start
   }
+  /// Move to the end of the line.
   skipToEnd() {this.pos = this.string.length}
+  /// Move to directly before the given character, if found on the
+  /// current line.
   skipTo(ch: string): boolean | void {
     let found = this.string.indexOf(ch, this.pos)
     if (found > -1) {this.pos = found; return true}
   }
+  /// Move back `n` characters.
   backUp(n: number) {this.pos -= n}
+  /// Get the column position at `this.pos`.
   column() {
     if (this.lastColumnPos < this.start) {
       this.lastColumnValue = countColumn(this.string, this.start, this.tabSize, this.lastColumnPos, this.lastColumnValue)
@@ -76,10 +93,20 @@ export class StringStream {
     }
     return this.lastColumnValue - (this.lineStart ? countColumn(this.string, this.lineStart, this.tabSize) : 0)
   }
+  /// Get the indentation column of the current line.
   indentation() {
     return countColumn(this.string, null, this.tabSize) -
       (this.lineStart ? countColumn(this.string, this.lineStart, this.tabSize) : 0)
   }
+  /// Match the input against the given string or regular expression
+  /// (which should start with a `^`). Return true or the regexp match
+  /// if it matches.
+  ///
+  /// Unless `consume` is set to `false`, this will move `this.pos`
+  /// past the matched text.
+  ///
+  /// When matching a string `caseInsensitive` can be set to true to
+  /// make the match case-insensitive.
   match(pattern: string | RegExp, consume?: boolean, caseInsensitive?: boolean): boolean | RegExpMatchArray | null {
     if (typeof pattern == "string") {
       let cased = (str: string) => caseInsensitive ? str.toLowerCase() : str
@@ -95,19 +122,14 @@ export class StringStream {
       return match
     }
   }
+  /// Get the current token.
   current(){return this.string.slice(this.start, this.pos)}
+  /// Hide the first `n` characters of the stream while running
+  /// `inner`. This can be useful for nesting modes.
   hideFirstChars(n: number, inner: () => void) {
     this.lineStart += n
     try { return inner() }
     finally { this.lineStart -= n }
-  }
-  lookAhead(n: number): string {
-    let oracle = this.lineOracle
-    return oracle && oracle.lookAhead(n)
-  }
-  baseToken() {
-    let oracle = this.lineOracle
-    return oracle && oracle.baseToken(this.pos)
   }
 }
 
@@ -123,7 +145,7 @@ export class StringStreamCursor {
   next() {
     let {value, done} = this.iter.next()
     if (done) throw new RangeError("Reached end of document")
-    const res = new StringStream(value, this.tabSize, null)
+    const res = new StringStream(value, this.tabSize)
     this.offset = this.curLineEnd + 1
     this.curLineEnd += value.length + 1
     return res

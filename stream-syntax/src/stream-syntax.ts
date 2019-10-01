@@ -6,16 +6,32 @@ import {styleNodeProp, Style} from "../../theme"
 
 export {StringStream}
 
-export type StreamParserSpec<State> = {
+/// A stream parser parses or tokenizes content from start to end,
+/// emitting tokens as it goes over it. It keeps a mutable (but
+/// copyable) object with state, in which it can store information
+/// about the current context.
+export type StreamParser<State> = {
+  /// Read one token, advancing the stream past it, and returning a
+  /// string with the token's style. It is okay to return an empty
+  /// token, but only if that updates the state so that the next call
+  /// will return a token again.
   token(stream: StringStream, state: State, editorState: EditorState): string | null
+  /// This notifies the parser of a blank line in the input. It can
+  /// update its state here if it needs to.
   blankLine?(state: State, editorState: EditorState): void
+  /// Produce a start state for the parser.
   startState?(editorState: EditorState): State
+  /// Copy a given state. By default, a shallow object copy is done
+  /// which also copies arrays held at the top level of the object.
   copyState?(state: State): State
+  /// Compute automatic indentation for the line that starts with the
+  /// given state and text.
   indent?(state: State, textAfter: string, editorState: EditorState): number
-  docTag?: string
+  // FIXME allow props to be specified here for an open-ended set of
+  // language metadata
 }
 
-export class StreamParser<State> {
+class StreamParserInstance<State> {
   token: (stream: StringStream, state: State, editorState: EditorState) => string | null
   blankLine: (state: State, editorState: EditorState) => void
   // FIXME maybe support passing something from the parent when nesting
@@ -24,13 +40,13 @@ export class StreamParser<State> {
   indent: (state: State, textAfter: string, editorState: EditorState) => number
   docType: number
   
-  constructor(spec: StreamParserSpec<State>) {
+  constructor(spec: StreamParser<State>) {
     this.token = spec.token
     this.blankLine = spec.blankLine || (() => {})
     this.startState = spec.startState || (() => (true as any))
     this.copyState = spec.copyState || defaultCopyState
     this.indent = spec.indent || (() => -1)
-    this.docType = tokenID(spec.docTag || "document")
+    this.docType = tokenID("document") // FIXME add parser props here
   }
 
   readToken(state: State, stream: StringStream, editorState: EditorState) {
@@ -53,8 +69,6 @@ function defaultCopyState<State>(state: State) {
   return newState
 }
 
-export type LegacyMode<State> = {name: string} & StreamParserSpec<State>
-
 class RequestInfo {
   promise: CancellablePromise<Tree>
   resolve!: (tree: Tree) => void
@@ -65,20 +79,27 @@ class RequestInfo {
   }
 }
 
+/// A syntax provider that uses a stream parser.
 export class StreamSyntax implements Syntax {
   private field: StateField<SyntaxState<any>>
+  /// The extension that installs this syntax provider.
   public extension: Extension
-  public indentation: Extension
+  private parser: StreamParserInstance<any>
 
-  constructor(readonly parser: StreamParser<any>) {
+  /// Create a stream syntax.
+  constructor(parser: StreamParser<any>) {
+    this.parser = new StreamParserInstance(parser)
     this.field = new StateField<SyntaxState<any>>({
-      init(state) { return new SyntaxState(Tree.empty, [parser.startState(state)], 1, 0, null) },
-      apply(tr, value) { return value.apply(tr) }
+      init: state => new SyntaxState(Tree.empty, [this.parser.startState(state)], 1, 0, null),
+      apply: (tr, value) => value.apply(tr)
     })
-    this.extension = [EditorState.syntax(this), this.field.extension]
-    this.indentation = EditorState.indentation((state: EditorState, pos: number) => {
-      return state.field(this.field).getIndent(this.parser, state, pos)
-    })
+    this.extension = [
+      EditorState.syntax(this),
+      this.field.extension,
+      EditorState.indentation((state: EditorState, pos: number) => {
+        return state.field(this.field).getIndent(this.parser, state, pos)
+      })
+    ]
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {
@@ -96,11 +117,6 @@ export class StreamSyntax implements Syntax {
     let field = state.field(this.field)
     field.updateTree(this.parser, state, to, false)
     return field.tree
-  }
-  
-  static legacy(mode: LegacyMode<any>): StreamSyntax {
-    if (!mode.docTag) mode.docTag = "document.lang=" + mode.name
-    return new StreamSyntax(new StreamParser(mode))
   }
 }
 
@@ -134,12 +150,12 @@ class SyntaxState<ParseState> {
     }
   }
 
-  maybeStoreState(parser: StreamParser<ParseState>, lineBefore: number, state: ParseState) {
+  maybeStoreState(parser: StreamParserInstance<ParseState>, lineBefore: number, state: ParseState) {
     if (lineBefore % CACHE_STEP == 0)
       this.cache[(lineBefore - 1) >> CACHE_STEP_SHIFT] = parser.copyState(state)
   }
 
-  findState(parser: StreamParser<ParseState>, editorState: EditorState, line: number) {
+  findState(parser: StreamParserInstance<ParseState>, editorState: EditorState, line: number) {
     let cacheIndex = Math.min(this.cache.length - 1, (line - 1) >> CACHE_STEP_SHIFT)
     let cachedLine = (cacheIndex << CACHE_STEP_SHIFT) + 1
     let startPos = editorState.doc.line(cachedLine).start
@@ -159,7 +175,7 @@ class SyntaxState<ParseState> {
     return state
   }
 
-  advanceFrontier(parser: StreamParser<ParseState>, editorState: EditorState, upto: number) {
+  advanceFrontier(parser: StreamParserInstance<ParseState>, editorState: EditorState, upto: number) {
     let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)!
     let sliceEnd = Date.now() + WORK_SLICE
     let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
@@ -187,7 +203,8 @@ class SyntaxState<ParseState> {
     this.frontierState = state
   }
 
-  updateTree(parser: StreamParser<ParseState>, state: EditorState, upto: number, rest: boolean): boolean | CancellablePromise<Tree> {
+  updateTree(parser: StreamParserInstance<ParseState>, state: EditorState, upto: number,
+             rest: boolean): boolean | CancellablePromise<Tree> {
     // FIXME make sure multiple calls in same frame don't keep doing work
     if (this.frontierPos >= upto) return true
     if (this.working == -1) this.advanceFrontier(parser, state, upto)
@@ -202,12 +219,12 @@ class SyntaxState<ParseState> {
     return req.promise
   }
 
-  scheduleWork(parser: StreamParser<ParseState>, state: EditorState) {
+  scheduleWork(parser: StreamParserInstance<ParseState>, state: EditorState) {
     if (this.working != -1) return
     this.working = setTimeout(() => this.work(parser, state), WORK_PAUSE) as any
   }
 
-  work(parser: StreamParser<ParseState>, state: EditorState) {
+  work(parser: StreamParserInstance<ParseState>, state: EditorState) {
     this.working = -1
     let upto = this.requests.reduce((max, req) => req.promise.canceled ? max : Math.max(max, req.upto), 0)
     if (upto > this.frontierPos) this.advanceFrontier(parser, state, upto)
@@ -220,7 +237,7 @@ class SyntaxState<ParseState> {
     if (this.requests.length) this.scheduleWork(parser, state)
   }
 
-  getIndent(parser: StreamParser<ParseState>, state: EditorState, pos: number) {
+  getIndent(parser: StreamParserInstance<ParseState>, state: EditorState, pos: number) {
     let line = state.doc.lineAt(pos)
     let parseState = this.findState(parser, state, line.number)
     if (parseState == null) return -1
@@ -254,10 +271,4 @@ function tokenID(tag: string) {
     }
   }
   return id
-}
-
-export function legacyMode(spec: LegacyMode<any>) {
-  let syntax = StreamSyntax.legacy(spec)
-  // FIXME add behavior for commenting, electric chars, etc
-  return [syntax.extension, syntax.indentation]
 }
