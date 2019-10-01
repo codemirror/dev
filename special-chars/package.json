@@ -1,4 +1,5 @@
 {
   "main": "dist/special-chars.js",
-  "types": "dist/special-chars.d.ts"
+  "types": "dist/special-chars.d.ts",
+  "module": "dist/special-chars.esm"
 }

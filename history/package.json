@@ -1,4 +1,5 @@
 {
   "main": "dist/history.js",
-  "types": "dist/history.d.ts"
+  "types": "dist/history.d.ts",
+  "module": "dist/history.esm"
 }

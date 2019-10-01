@@ -1,4 +1,5 @@
 {
   "main": "dist/stream-syntax.js",
-  "types": "dist/stream-syntax.d.ts"
+  "types": "dist/stream-syntax.d.ts",
+  "module": "dist/stream-syntax.esm"
 }

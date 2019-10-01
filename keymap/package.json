@@ -1,4 +1,5 @@
 {
   "main": "dist/keymap.js",
-  "types": "dist/keymap.d.ts"
+  "types": "dist/keymap.d.ts",
+  "module": "dist/keymap.esm"
 }

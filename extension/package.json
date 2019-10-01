@@ -1,4 +1,5 @@
 {
   "main": "dist/extension.js",
-  "types": "dist/extension.d.ts"
+  "types": "dist/extension.d.ts",
+  "module": "dist/extension.esm"
 }

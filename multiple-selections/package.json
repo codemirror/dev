@@ -1,4 +1,5 @@
 {
   "main": "dist/multiple-selections.js",
-  "types": "dist/multiple-selections.d.ts"
+  "types": "dist/multiple-selections.d.ts",
+  "module": "dist/multiple-selections.esm"
 }

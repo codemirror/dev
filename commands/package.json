@@ -1,4 +1,5 @@
 {
   "main": "dist/commands.js",
-  "types": "dist/commands.d.ts"
+  "types": "dist/commands.d.ts",
+  "module": "dist/commands.esm"
 }

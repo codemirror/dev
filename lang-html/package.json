@@ -1,3 +1,4 @@
 {
-  "main": "dist/html.js"
+  "main": "dist/html.js",
+  "module": "dist/html.esm"
 }
