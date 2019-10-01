@@ -1,6 +1,13 @@
 import {NodeType, NodeProp, NodePropSource} from "lezer-tree"
 
+/// A [node prop](https://lezer.codemirror.net/docs/ref#tree.NodeProp)
+/// used to associate styling information with syntax tree nodes.
 export const styleNodeProp = new class extends NodeProp<number> {
+  /// Helper that can be useful when assigning styles to syntax nodes.
+  /// Takes a function that returns a style for a given node (usually
+  /// created with
+  /// [`NodeType.match`](https://lezer.codemirror.net/docs/ref#tree.NodeType.match))
+  /// and returns a node prop source.
   styles(f: (type: NodeType) => StyleName | undefined): NodePropSource {
     return this.add(type => {
       let result = f(type)
@@ -9,8 +16,10 @@ export const styleNodeProp = new class extends NodeProp<number> {
   }
 }
 
+/// Highlighting styles are chosen from a fixed set of styles, which
+/// are objects of this type.
 export type StyleName = {
-  /// @internal
+  /// @internal FIXME use a unique symbol
   __id: number
 }
 
@@ -30,6 +39,8 @@ function bs() {
   return s({open: s(), close: s()})
 }
 
+/// The available styles that themes can target.
+// FIXME document and clean up
 export const Style = {
   comment: s({line: s(), block: s()}),
   literal: s({

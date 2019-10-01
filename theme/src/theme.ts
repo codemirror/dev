@@ -101,6 +101,8 @@ class Theme {
 // FIXME should probably be more generic
 export const themeData = EditorView.extend.behavior<Theme>()
 
+/// Create a theme from the given spec. Returns an extension that
+/// enables the theme.
 export function theme(rules: ThemeSpec) {
   let theme = parseTheme(rules), cache: {[tag: string]: string} = Object.create(null)
   return [
@@ -113,6 +115,7 @@ export function theme(rules: ThemeSpec) {
   ]
 }
 
+/// The default editor theme.
 export const defaultTheme = theme({
   token: {
     keyword: {

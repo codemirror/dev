@@ -5,12 +5,20 @@ import {combineConfig} from "../../extension"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
 
+/// Configure the special character highlighter.
 export interface SpecialCharConfig {
+  /// An optional function that renders the placeholder elements.
   render?: ((code: number, description: string | null, placeHolder: string) => HTMLElement) | null
+  /// Regular expression that matches the special characters to
+  /// highlight.
   specialChars?: RegExp
+  /// Regular expression that can be used to add characters to the
+  /// default set of characters to highlight.
   addSpecialChars?: RegExp | null
 }
 
+/// Returns an extension that installs highlighting of special
+/// characters.
 export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig[]) => {
   // FIXME make configurations compose properly
   let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {

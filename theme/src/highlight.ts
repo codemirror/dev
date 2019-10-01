@@ -101,6 +101,7 @@ class TokenContext {
               readonly parent: TokenContext | null) {}
 }
 
+/// Returns an extension that enables syntax highlighting.
 export function highlight() { // FIXME allow specifying syntax?
   let plugin = new ViewPlugin(view => new Highlighter(view), [
     ViewPlugin.behavior(EditorView.decorations, (p: Highlighter) => p.decorations)
