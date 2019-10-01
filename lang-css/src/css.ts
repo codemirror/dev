@@ -3,6 +3,9 @@ import {NodeType} from "lezer-tree"
 import {LezerSyntax, continuedIndent, indentNodeProp} from "../../syntax"
 import {styleNodeProp, Style as s} from "../../theme"
 
+/// A syntax provider based on the [Lezer CSS
+/// parser](https://github.com/lezer-parser/css), extended with
+/// highlighting and indentation information.
 export const cssSyntax = new LezerSyntax(parser.withProps(
   indentNodeProp.add(NodeType.match({
     Declaration: continuedIndent()
@@ -51,6 +54,5 @@ export const cssSyntax = new LezerSyntax(parser.withProps(
   }))
 ))
 
-export function css() {
-  return cssSyntax.extension
-}
+/// Returns an extension that installs the CSS syntax provider.
+export function css() { return cssSyntax.extension }

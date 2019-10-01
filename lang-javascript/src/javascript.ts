@@ -5,6 +5,9 @@ import {styleNodeProp, Style as s} from "../../theme"
 
 const statementIndent = continuedIndent({except: /^{/})
 
+/// A syntax provider based on the [Lezer JavaScript
+/// parser](https://github.com/lezer-parser/javascript), extended with
+/// highlighting and indentation information.
 export const javascriptSyntax = new LezerSyntax(parser.withProps(
   indentNodeProp.add(type => {
     if (type.name == "IfStatement") return continuedIndent({except: /^({|else\b)/})
@@ -61,4 +64,5 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
   }))
 ))
 
+/// Returns an extension that installs the JavaScript syntax provider.
 export function javascript() { return javascriptSyntax.extension }

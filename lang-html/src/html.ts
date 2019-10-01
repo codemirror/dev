@@ -5,6 +5,10 @@ import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeP
 import {NodeType} from "lezer-tree"
 import {Style as s, styleNodeProp} from "../../theme"
 
+/// A syntax provider based on the [Lezer HTML
+/// parser](https://github.com/lezer-parser/html), wired up with the
+/// JavaScript and CSS parsers to parse the content of `<script>` and
+/// `<style>` tags.
 export const htmlSyntax = new LezerSyntax(configureHTML([
   {tag: "script",
    attrs(attrs) {
@@ -52,6 +56,5 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
   }))
 ))
 
-export function html() {
-  return htmlSyntax.extension
-}
+/// Returns an extension that installs the HTML syntax provider.
+export function html() { return htmlSyntax.extension }
