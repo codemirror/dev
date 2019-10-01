@@ -6,7 +6,7 @@ let mode = process.env.DEVSERVER ? "devserver" : "build"
 let cjs = commonjs()
 let result = []
 
-function external(id) { return !/^\.?\//.test(id) }
+function external(id) { return id != "tslib" && !/^\.?\//.test(id) }
 
 function config(module, format) {
   let [_, base, file] = /^(.+?)\/src\/(.*?)\.ts/.exec(module)
