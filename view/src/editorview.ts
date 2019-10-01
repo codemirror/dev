@@ -19,7 +19,7 @@ import browser from "./browser"
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
   /// The view's initial state.
-  state: EditorState,
+  state?: EditorState,
   /// Extra extensions (beyond those associated with the state) to
   /// use.
   extensions?: Extension[],
@@ -115,7 +115,7 @@ export class EditorView {
   /// Construct a new view. You'll usually want to put `view.dom` into
   /// your document after creating a view, so that the user can see
   /// it.
-  constructor(config: EditorConfig) {
+  constructor(config: EditorConfig = {}) {
     this.contentDOM = document.createElement("div")
 
     this.dom = document.createElement("div")
@@ -126,12 +126,13 @@ export class EditorView {
 
     this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
 
+    let state = config.state || EditorState.create()
     this.extensions = config.extensions || []
-    this.configure(config.state.configuration.foreign)
+    this.configure(state.configuration.foreign)
     this.inputState = new InputState(this)
-    this.docView.init(config.state, viewport => {
+    this.docView.init(state, viewport => {
       this.viewport = viewport
-      this.state = config.state
+      this.state = state
       for (let plugin of this.behavior(viewPlugin))
         this.plugins[plugin.id] = plugin.create(this)
     })

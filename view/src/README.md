@@ -14,6 +14,8 @@
 
 ### Extension
 
+@ViewCommand
+
 @ViewPlugin
 
 @ViewPluginValue
