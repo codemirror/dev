@@ -2,10 +2,12 @@ import {EditorState} from "../../state"
 import {ViewPlugin, DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view"
 import {StyleModule} from "style-mod"
 
-export interface Config {}
-
-export const multipleSelections = EditorState.extend.unique((configs: Config[]) => {
-  let rangeConfig = {class: styles.secondarySelection} // FIXME configurable?
+/// Returns an extension that enables multiple selections for the
+/// editor. Secondary cursors and selected ranges are drawn with
+/// simple decorations, and might look the same as the primary native
+/// selection.
+export const multipleSelections = EditorState.extend.unique(() => {
+  let rangeConfig = {class: styles.secondarySelection}
 
   return [
     EditorState.allowMultipleSelections(true),

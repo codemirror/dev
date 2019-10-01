@@ -1,6 +1,24 @@
 import {base, keyName} from "w3c-keyname"
 import {EditorView, ViewCommand} from "../../view"
 
+/// A keymap associates key names with
+/// [command](#view.ViewCommand)-style functions.
+///
+/// Key names may be strings like `"Shift-Ctrl-Enter"`—a key identifier
+/// prefixed with zero or more modifiers. Key identifiers are based on
+/// the strings that can appear in
+/// [`KeyEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
+/// Use lowercase letters to refer to letter keys (or uppercase letters
+/// if you want shift to be held). You may use `"Space"` as an alias
+/// for the `" "` name.
+///
+/// Modifiers can be given in any order. `Shift-` (or `s-`), `Alt-` (or
+/// `a-`), `Ctrl-` (or `c-` or `Control-`) and `Cmd-` (or `m-` or
+/// `Meta-`) are recognized.
+///
+/// You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
+/// other platforms. So `Mod-b` is `Ctrl-b` on Linux but `Cmd-b` on
+/// macOS.
 export type Keymap = {[key: string]: ViewCommand | undefined}
 
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false
@@ -40,30 +58,12 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
   return name
 }
 
-// Behavior for defining keymaps
-//
-// Specs are objects that map key names to command-style functions,
-// which will be called with an editor view and should return true
-// when they've handled the key.
-//
-// Key names may be strings like `"Shift-Ctrl-Enter"`—a key identifier
-// prefixed with zero or more modifiers. Key identifiers are based on
-// the strings that can appear in
-// [`KeyEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
-// Use lowercase letters to refer to letter keys (or uppercase letters
-// if you want shift to be held). You may use `"Space"` as an alias
-// for the `" "` name.
-//
-// Modifiers can be given in any order. `Shift-` (or `s-`), `Alt-` (or
-// `a-`), `Ctrl-` (or `c-` or `Control-`) and `Cmd-` (or `m-` or
-// `Meta-`) are recognized.
-//
-// You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
-// other platforms.
-//
-// You can add multiple keymap behaviors to an editor. Their
-// priorities determine their precedence (the ones specified early or
-// with high priority get to dispatch first).
+/// Create a view extension that registers a keymap.
+///
+/// You can add multiple keymap behaviors to an editor. Their
+/// priorities determine their precedence (the ones specified early or
+/// with high priority get to dispatch first). When a handler has
+/// returned `true` for a given key, no further handlers are called.
 export const keymap = (map: Keymap) => EditorView.handleDOMEvents({
   keydown: keydownHandler(normalize(map))
 })
