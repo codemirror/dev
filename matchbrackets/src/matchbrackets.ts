@@ -5,14 +5,29 @@ import {Decoration} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
 import {openNodeProp, closeNodeProp} from "../../syntax"
 
+/// Configuration options
 export interface Config {
+  /// Whether the bracket matching should look at the character after
+  /// the cursor when matching (if the one before isn't a bracket).
+  /// Defaults to true.
   afterCursor?: boolean,
+  /// The bracket characters to match, as a string of pairs. Defaults
+  /// to `"()[]{}"`. Note that these are only used as fallback when
+  /// there is no [matching information](#syntax.openNodeProp) in the
+  /// syntax tree.
   brackets?: string,
+  /// The maximum distance to scan for matching brackets. This is only
+  /// relevant for brackets not encoded in the syntax tree. Defaults
+  /// to 10 000.
   maxScanDistance?: number
 }
 
 const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
+/// Create an extension that enables bracket matching. Whenever the
+/// cursor is next to a bracket, that bracket and the one it matches
+/// are highlighted. Or, when no matching bracket is found, another
+/// highlighting style is used to indicate this.
 export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
   let config = combineConfig(configs, {
     afterCursor: true,
@@ -53,8 +68,6 @@ function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: 
   return Tree.empty
 }
 
-type MatchResult = {start: {from: number, to: number}, end?: {from: number, to: number}, matched: boolean} | null
-
 function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string): null | readonly string[] {
   let byProp = node.prop(dir < 0 ? closeNodeProp : openNodeProp)
   if (byProp) return byProp
@@ -66,18 +79,34 @@ function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string): null | re
   return null
 }
 
-export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult {
+
+/// The result returned from `matchBrackets`.
+export interface MatchResult {
+  /// The extent of the bracket token found.
+  start: {from: number, to: number},
+  /// The extent of the matched token, if any was found.
+  end?: {from: number, to: number},
+  /// Whether the tokens match. This can be false even when `end` has
+  /// a value, if that token doesn't match the opening token.
+  matched: boolean
+}
+
+/// Find the matching bracket for the token at `pos`, scanning
+/// direction `dir`. Only the `brackets` and `maxScanDistance`
+/// properties are used from `config`, if given. Returns null if no
+/// bracket was found at `pos`, or a match result otherwise.
+export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult | null {
   let maxScanDistance = config.maxScanDistance || DEFAULT_SCAN_DIST, brackets = config.brackets || DEFAULT_BRACKETS
   let tree = getTree(state, pos, dir, maxScanDistance)
   let sub = tree.resolve(pos, dir), matches
   if (matches = matchingNodes(sub.type, dir, brackets))
-    return matchMarkedBrackets(state, pos, dir, sub, matches, maxScanDistance, brackets)
+    return matchMarkedBrackets(state, pos, dir, sub, matches, brackets)
   else
     return matchPlainBrackets(state, pos, dir, tree, sub.type, maxScanDistance, brackets)
 }
 
 function matchMarkedBrackets(state: EditorState, pos: number, dir: -1 | 1, token: Subtree,
-                             matching: readonly string[], maxScanDistance: number, brackets: string) {
+                             matching: readonly string[], brackets: string) {
   let parent = token.parent, firstToken = {from: token.start, to: token.end}
   let depth = 0
   return (parent && parent.iterate({
