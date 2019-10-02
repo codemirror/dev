@@ -1,6 +1,6 @@
 import {EditorState, Transaction, CancellablePromise} from "../../state"
 import {Configuration, Slot, Extension, Behavior} from "../../extension"
-import {StyleModule} from "style-mod"
+import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
@@ -9,7 +9,7 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
-import {extendView, ViewUpdate, styleModule, themeClass, handleDOMEvents, focusChange,
+import {extendView, ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, decorations, ViewPlugin, ViewPluginValue, notified} from "./extension"
 import {Attrs, updateAttrs} from "./attributes"
@@ -102,6 +102,8 @@ export class EditorView {
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
+  private themeCache: {[cls: string]: string} = Object.create(null)
+  private themeCacheFor: readonly StyleModule[] = []
 
   /// @internal
   updateState: UpdateState = UpdateState.Updating
@@ -265,13 +267,25 @@ export class EditorView {
   /// Query the active themes for the CSS class names associated with
   /// the given tag. (FIXME: this isn't a great system. Also doesn't
   /// invalidate when reconfiguring.)
-  themeClass(tag: string): string {
-    let result = ""
-    for (let theme of this.behavior(themeClass)) {
-      let cls = theme(tag)
-      if (cls) result += (result ? " " + cls : cls)
+  cssClass(classes: string): string {
+    let themes = this.behavior(theme)
+    if (themes != this.themeCacheFor) {
+      this.themeCache = Object.create(null)
+      this.themeCacheFor = themes
+    } else {
+      let known = this.themeCache[classes]
+      if (known != null) return known
     }
-    return result
+    let result = ""
+    for (let cls of classes.split(" ")) if (cls) {
+      if (result) result += " "
+      result += "codemirror-" + cls
+      for (let theme of themes) {
+        let has = theme[cls]
+        if (has) result += " " + has
+      }
+    }
+    return this.themeCache[classes] = result
   }
 
   /// Find the DOM parent node and offset (child offset if `node` is
@@ -413,7 +427,10 @@ export class EditorView {
 
   /// Behavior that provides CSS classes to add to elements identified
   /// by the given string.
-  static themeClass = themeClass
+  static theme(spec: {[name: string]: Style}): Extension {
+    let module = new StyleModule(spec)
+    return [theme(module), styleModule(module)]
+  }
 
   /// Behavior that provides editor DOM attributes for the editor's
   /// outer element. FIXME move to EditorView?
@@ -431,12 +448,12 @@ export class EditorView {
 
 const defaultAttrs: Extension = [
   extendView.dynamic(editorAttributes, view => ({
-    class: "codemirror " + styles.wrapper + (view.hasFocus ? " codemirror-focused " : " ") + view.themeClass("editor.wrapper")
+    class: "codemirror " + styles.wrapper + (view.hasFocus ? " codemirror-focused " : " ") + view.cssClass("wrap")
   })),
   extendView.dynamic(contentAttributes, view => ({
     spellcheck: "false",
     contenteditable: "true",
-    class: styles.content + " codemirror-content " + view.themeClass("editor.content"),
+    class: styles.content + " codemirror-content " + view.cssClass("content"),
     style: `${browser.tabSize}: ${view.state.tabSize}`
   }))
 ]

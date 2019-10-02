@@ -4,6 +4,7 @@ import {EditorView, ViewPlugin} from "../../view"
 import {Decoration} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
 import {openNodeProp, closeNodeProp} from "../../syntax"
+import {StyleModule} from "style-mod"
 
 /// Configuration options
 export interface Config {
@@ -22,6 +23,11 @@ export interface Config {
   maxScanDistance?: number
 }
 
+const defaultStyles = new StyleModule({
+  matchingBracket: {color: "#0b0"},
+  nonmatchingBracket: {color: "#a22"}
+})
+
 const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
 /// Create an extension that enables bracket matching. Whenever the
@@ -36,6 +42,7 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
   })
 
   return [
+    EditorView.extend.fallback(EditorView.styleModule(defaultStyles)),
     ViewPlugin.decoration({
       create() { return Decoration.none },
       update(deco, update) {
@@ -49,8 +56,8 @@ export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
                 (matchBrackets(state, range.head, 1, config) ||
                  (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
           if (!match) continue
-          let style = update.view.themeClass(match.matched ? "bracket.matching" : "bracket.nonmatching") +
-            ` codemirror-${match.matched ? "" : "non"}matching-bracket`
+          let styleName: "matchingBracket" | "nonmatchingBracket" = match.matched ? "matchingBracket" : "nonmatchingBracket"
+          let style = update.view.cssClass(styleName) + " " + defaultStyles[styleName]
           decorations.push(Decoration.mark(match.start.from, match.start.to, {class: style}))
           if (match.end) decorations.push(Decoration.mark(match.end.from, match.end.to, {class: style}))
         }

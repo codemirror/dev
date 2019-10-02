@@ -137,10 +137,6 @@ export const defaultTheme = theme({
     comment: {color: "#940"},
     meta: {color: "#555"},
     invalid: {color: "#f00"}
-  },
-  bracket: {
-    matching: {color: "#0b0"},
-    nonmatching: {color: "#a22"}
   }
 })
 

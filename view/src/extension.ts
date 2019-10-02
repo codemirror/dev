@@ -26,9 +26,6 @@ export const clickAddsSelectionRange = extendView.behavior<(event: MouseEvent) =
 
 export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boolean>()
 
-// FIXME this should work differently
-export const themeClass = extendView.behavior<(tag: string) => string>()
-
 declare const pluginBehavior: unique symbol
 
 /// View plugins are stateful objects that are associated with a view.
@@ -146,6 +143,8 @@ class DecorationPlugin implements ViewPluginValue {
 
 export const styleModule = extendView.behavior<StyleModule>()
 
+export const theme = extendView.behavior<StyleModule<{[key: string]: string}>>()
+
 export const focusChange = Slot.define<boolean>()
 
 export const notified = Slot.define<boolean>()
@@ -161,6 +160,7 @@ export class ViewUpdate {
   readonly prevState: EditorState
   /// The previous viewport range.
   readonly prevViewport: Viewport
+  private prevThemes: readonly StyleModule[]
 
   /// @internal
   constructor(
@@ -175,6 +175,7 @@ export class ViewUpdate {
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     this.prevState = view.state
     this.prevViewport = view.viewport
+    this.prevThemes = view.behavior(theme)
   }
 
   /// The new viewport range.
@@ -188,6 +189,10 @@ export class ViewUpdate {
   /// Whether the document changed in this update.
   get docChanged() {
     return this.transactions.some(tr => tr.docChanged)
+  }
+
+  get themeChanged() {
+    return this.prevThemes == this.view.behavior(theme)
   }
 
   /// Get the value of the given slot, if it was passed as a flag for
