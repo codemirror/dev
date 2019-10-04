@@ -1,0 +1,4 @@
+{
+  "main": "dist/highlight.js",
+  "module": "dist/highlight.esm"
+}

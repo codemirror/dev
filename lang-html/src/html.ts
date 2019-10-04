@@ -3,7 +3,7 @@ import {cssSyntax} from "../../lang-css"
 import {javascriptSyntax} from "../../lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, openNodeProp, closeNodeProp} from "../../syntax"
 import {NodeType} from "lezer-tree"
-import {Style as s, styleNodeProp} from "../../theme"
+import {styleTags} from "../../highlight"
 
 /// A syntax provider based on the [Lezer HTML
 /// parser](https://github.com/lezer-parser/html), wired up with the
@@ -34,26 +34,20 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
     "EndTag SelfCloseEndTag": ["StartTag", "StartCloseTag"],
     "CloseTag": ["OpenTag"]
   })),
-  styleNodeProp.styles(NodeType.match({
-    AttributeValue: s.literal.string,
-    RawText: s.markup.content,
-    StartTag: s.bracket.angle.open,
-    StartCloseTag: s.bracket.angle.open,
-    SelfCloserEndTag: s.bracket.angle.close,
-    EndTag: s.bracket.angle.close,
-    SelfCloseEndTag: s.bracket.angle.close,
-    TagName: s.name.type,
-    MismatchedTagName: s.invalid.unexpected,
-    AttributeName: s.name.property,
-    UnquotedAttributeValue: s.name.value,
-    Is: s.operator.define,
-    EntityReference: s.literal.character,
-    CharacterReference: s.literal.character,
-    Text: s.markup.content,
-    Comment: s.comment.block,
-    ProcessingInst: s.meta.instruction,
-    DoctypeDecl: s.meta.declaration
-  }))
+  styleTags({
+    AttributeValue: "string",
+    "Text RawText": "content",
+    "StartTag StartCloseTag SelfCloserEndTag EndTag SelfCloseEndTag": "angleBracket",
+    TagName: "typeName",
+    MismatchedTagName: "typeName invalid",
+    AttributeName: "propertyName",
+    UnquotedAttributeValue: "string",
+    Is: "operator definition",
+    "EntityReference CharacterReference": "character",
+    Comment: "blockComment",
+    ProcessingInst: "operator meta",
+    DoctypeDecl: "labelName meta"
+  })
 ))
 
 /// Returns an extension that installs the HTML syntax provider.

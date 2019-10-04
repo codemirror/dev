@@ -1,4 +1,4 @@
-import {LegacyMode, StringStream} from "../../stream-syntax"
+import {StreamSyntax, StringStream} from "../../stream-syntax"
 
 class ParseState {
   constructor(public inString = false,
@@ -9,9 +9,7 @@ class ParseState {
   copy() { return new ParseState(this.inString, this.stringType, this.lhs, this.inArray) }
 }
 
-const tomlMode: LegacyMode<ParseState> = {
-  name: "toml",
-
+export default new StreamSyntax({
   token(stream: StringStream, state: ParseState) {
     //check for state changes
     if (!state.inString && ((stream.peek() == '"') || (stream.peek() == "'"))) {
@@ -78,6 +76,4 @@ const tomlMode: LegacyMode<ParseState> = {
   indent(state: ParseState) {
     return state.inArray * 2 // FIXME
   }
-}
-
-export default tomlMode
+})

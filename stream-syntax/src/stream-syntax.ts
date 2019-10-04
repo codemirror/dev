@@ -2,7 +2,7 @@ import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
 import {Tree, NodeType, NodeGroup} from "lezer-tree"
-import {styleNodeProp, Style} from "../../theme"
+import {defaultTags} from "../../highlight"
 
 export {StringStream}
 
@@ -250,25 +250,12 @@ const tokenTable: {[name: string]: number} = Object.create(null)
 const typeArray: NodeType[] = [NodeType.none]
 const nodeGroup = new NodeGroup(typeArray)
 
-function resolveStyle(tag: string) {
-  let parts = tag.split("."), style = Style as any
-  for (let i = 0; i < parts.length; i++) {
-    style = style[parts[i]]
-    if (!style || style.__id == null) return null
-  }
-  return style.__id
-}
-
 function tokenID(tag: string) {
   let id = tokenTable[tag]
   if (id == null) {
-    let styleID = resolveStyle(tag)
-    if (styleID == null) {
-      id = 0
-    } else {
-      id = tokenTable[tag] = typeArray.length
-      typeArray.push(new NodeType(tag, styleNodeProp.set({}, id), id))
-    }
+    let tagID = defaultTags.get(tag)
+    id = tokenTable[tag] = typeArray.length
+    typeArray.push(new NodeType(tag, defaultTags.prop.set({}, tagID), id))
   }
   return id
 }

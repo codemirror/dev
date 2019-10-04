@@ -10,7 +10,7 @@ import {multipleSelections} from "../multiple-selections"
 import {syntaxIndentation} from "../syntax"
 
 import {html} from "../lang-html"
-import {defaultTheme, highlight} from "../theme"
+import {defaultHighlighter} from "../highlight"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
@@ -26,8 +26,7 @@ let state = EditorState.create({doc: `<script>
   multipleSelections(),
   html(),
   syntaxIndentation,
-  defaultTheme,
-  highlight(),
+  defaultHighlighter,
   bracketMatching(),
   keymap({
     "Mod-z": undo,
