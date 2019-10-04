@@ -76,7 +76,7 @@ var wordRE = /[\w$\xa1-\uffff]/;
 var keywords = function(){
   function kw(type) {return {type: type, style: "keyword"};}
   var A = kw("keyword a"), B = kw("keyword b"), C = kw("keyword c"), D = kw("keyword d");
-  var operator = kw("operator"), atom = {type: "atom", style: "keyword.expression"};
+  var operator = kw("operator"), atom = {type: "atom", style: "atom"};
 
   return {
     "if": kw("if"), "while": A, "with": A, "else": B, "do": B, "try": B, "finally": B,
@@ -119,36 +119,36 @@ function tokenBase(stream, state) {
     state.tokenize = tokenString(ch);
     return state.tokenize(stream, state);
   } else if (ch == "." && stream.match(/^\d+(?:[eE][+\-]?\d+)?/)) {
-    return ret("number", "literal.number");
+    return ret("number", "number");
   } else if (ch == "." && stream.match("..")) {
-    return ret("spread", "operator");
+    return ret("spread", "punctuation");
   } else if (/[\[\]{}\(\),;\:\.]/.test(ch)) {
     return ret(ch);
   } else if (ch == "=" && stream.eat(">")) {
-    return ret("=>", "punctuation.define");
+    return ret("=>", "punctuation definition");
   } else if (ch == "0" && stream.eat(/x/i)) {
     stream.eatWhile(/[\da-f]/i);
-    return ret("number", "literal.number");
+    return ret("number", "number");
   } else if (ch == "0" && stream.eat(/o/i)) {
     stream.eatWhile(/[0-7]/i);
-    return ret("number", "literal.number");
+    return ret("number", "number");
   } else if (ch == "0" && stream.eat(/b/i)) {
     stream.eatWhile(/[01]/i);
-    return ret("number", "literal.number");
+    return ret("number", "number");
   } else if (/\d/.test(ch)) {
     stream.match(/^\d*(?:\.\d*)?(?:[eE][+\-]?\d+)?/);
-    return ret("number", "literal.number");
+    return ret("number", "number");
   } else if (ch == "/") {
     if (stream.eat("*")) {
       state.tokenize = tokenComment;
       return tokenComment(stream, state);
     } else if (stream.eat("/")) {
       stream.skipToEnd();
-      return ret("comment", "comment.line");
+      return ret("comment", "lineComment");
     } else if (expressionAllowed(stream, state, 1)) {
       readRegexp(stream);
       stream.match(/^\b(([gimyu])(?![gimyu]*\2))+\b/);
-      return ret("regexp", "literal.regexp");
+      return ret("regexp", "regexp");
     } else {
       stream.eat("=");
       return ret("operator", "operator", stream.current());
@@ -180,7 +180,7 @@ function tokenBase(stream, state) {
       if (word == "async" && stream.match(/^(\s|\/\*.*?\*\/)*[\(\w]/, false))
         return ret("async", "keyword", word)
     }
-    return ret("variable", "name.variable", word)
+    return ret("variable", "variableName", word)
   }
 }
 
@@ -192,7 +192,7 @@ function tokenString(quote) {
       escaped = !escaped && next == "\\";
     }
     if (!escaped) state.tokenize = tokenBase;
-    return ret("string", "literal.string");
+    return ret("string", "string");
   };
 }
 
@@ -205,7 +205,7 @@ function tokenComment(stream, state) {
     }
     maybeEnd = (ch == "*");
   }
-  return ret("comment", "comment.block");
+  return ret("comment", "blockComment");
 }
 
 function tokenQuasi(stream, state) {
@@ -217,7 +217,7 @@ function tokenQuasi(stream, state) {
     }
     escaped = !escaped && next == "\\";
   }
-  return ret("quasi", "literal.string.special", stream.current());
+  return ret("quasi", "string type2", stream.current());
 }
 
 var brackets = "([{}])";
@@ -319,7 +319,7 @@ function register(varname) {
     return false;
   }
   var state = cx.state;
-  cx.marked = "name.variable.define";
+  cx.marked = "variableName definition";
   if (state.context) {
     if (inList(state.localVars)) return;
     state.localVars = {name: varname, next: state.localVars};
@@ -488,7 +488,7 @@ function quasi(type, value) {
 }
 function continueQuasi(type) {
   if (type == "}") {
-    cx.marked = "literal.string.special";
+    cx.marked = "string type2";
     cx.state.tokenize = tokenQuasi;
     return cont(quasi);
   }
@@ -519,14 +519,14 @@ function maybelabel(type) {
   return pass(maybeoperatorComma, expect(";"), poplex);
 }
 function property(type) {
-  if (type == "variable") {cx.marked = "name.property"; return cont();}
+  if (type == "variable") {cx.marked = "propertyName"; return cont();}
 }
 function objprop(type, value) {
   if (type == "async") {
-    cx.marked = "name.property";
+    cx.marked = "propertyName";
     return cont(objprop);
   } else if (type == "variable" || cx.style == "keyword") {
-    cx.marked = "name.property";
+    cx.marked = "propertyName";
     if (value == "get" || value == "set") return cont(getterSetter);
     var m // Work around fat-arrow-detection complication for detecting typescript typed arrow params
     if (cx.lang == "ts" && cx.state.fatArrowAt == cx.stream.start && (m = cx.stream.match(/^\s*:\s*/, false)))
@@ -550,7 +550,7 @@ function objprop(type, value) {
 }
 function getterSetter(type) {
   if (type != "variable") return pass(afterprop);
-  cx.marked = "name.property";
+  cx.marked = "propertyName";
   return cont(functiondef);
 }
 function afterprop(type) {
@@ -608,7 +608,7 @@ function typeexpr(type, value) {
     return cont(value == "keyof" ? typeexpr : expressionNoComma)
   }
   if (type == "variable" || value == "void") {
-    cx.marked = "name.type"
+    cx.marked = "typeName"
     return cont(afterType)
   }
   if (type == "string" || type == "number" || type == "atom") return cont(afterType);
@@ -622,7 +622,7 @@ function maybeReturnType(type) {
 }
 function typeprop(type, value) {
   if (type == "variable" || cx.style == "keyword") {
-    cx.marked = "name.property"
+    cx.marked = "propertyName"
     return cont(typeprop)
   } else if (value == "?") {
     return cont(typeprop)
@@ -668,7 +668,7 @@ function proppattern(type, value) {
     register(value);
     return cont(maybeAssign);
   }
-  if (type == "variable") cx.marked = "name.property";
+  if (type == "variable") cx.marked = "propertyName";
   if (type == "spread") return cont(pattern);
   if (type == "}") return pass();
   return cont(expect(":"), pattern, maybeAssign);
@@ -741,7 +741,7 @@ function classBody(type, value) {
     return cont(classBody);
   }
   if (type == "variable" || cx.style == "keyword") {
-    cx.marked = "name.property";
+    cx.marked = "propertyName";
     return cont(cx.lang == "ts" ? classfield : functiondef, classBody);
   }
   if (type == "[")

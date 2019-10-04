@@ -51,6 +51,7 @@ export class ViewPlugin<T extends ViewPluginValue> {
   constructor(
     /// @internal
     readonly create: (view: EditorView) => T,
+    // FIXME this is too awkward. Find another approach.
     behavior: readonly {[pluginBehavior]: T}[] = none
   ) {
     let behaviorSpecs = behavior as any as {behavior: Behavior<any, any>, read: (plugin: T) => any}[]

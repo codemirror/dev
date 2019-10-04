@@ -32,37 +32,37 @@ export default new StreamSyntax({
           stream.match(/^.[^\\\"\']*/)
         }
       }
-      return state.lhs ? "property.string" : "string" // Token style
+      return state.lhs ? "propertyName" : "string" // Token style
     } else if (state.inArray && stream.peek() === ']') {
       stream.next()
       state.inArray--
-      return "bracket.square.close"
+      return "squareBracket"
     } else if (state.lhs && stream.peek() === '[' && stream.skipTo(']')) {
       stream.next() //skip closing ]
       // array of objects has an extra open & close []
       if (stream.peek() === ']') stream.next()
-      return "keyword.expression"
+      return "atom"
     } else if (stream.peek() === "#") {
       stream.skipToEnd()
-      return "comment.line"
+      return "lineComment"
     } else if (stream.eatSpace()) {
       return null
     } else if (state.lhs && stream.eatWhile(/[^= ]/)) {
-      return "name.property"
+      return "propertyName"
     } else if (state.lhs && stream.peek() === "=") {
       stream.next()
       state.lhs = false
       return "operator"
     } else if (!state.lhs && stream.match(/^\d\d\d\d[\d\-\:\.T]*Z/)) {
-      return "keyword.expression"
+      return "atom"
     } else if (!state.lhs && (stream.match('true') || stream.match('false'))) {
-      return "keyword.expression"
+      return "atom"
     } else if (!state.lhs && stream.peek() === '[') {
       state.inArray++
       stream.next()
-      return "bracket.square.open"
+      return "squareBracket"
     } else if (!state.lhs && stream.match(/^\-?\d+(?:\.\d+)?/)) {
-      return "literal.number"
+      return "number"
     } else {
       stream.next()
       return null

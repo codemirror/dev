@@ -1,7 +1,7 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
-import {Tree, NodeType, NodeGroup} from "lezer-tree"
+import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
 
 export {StringStream}
@@ -27,8 +27,11 @@ export type StreamParser<State> = {
   /// Compute automatic indentation for the line that starts with the
   /// given state and text.
   indent?(state: State, textAfter: string, editorState: EditorState): number
-  // FIXME allow props to be specified here for an open-ended set of
-  // language metadata
+  /// Syntax [node
+  /// props](https://lezer.codemirror.net/docs/ref#tree.NodeProp) to
+  /// be added to the wrapper node created around syntax 'trees'
+  /// created by this syntax.
+  docProps?: readonly [NodeProp<any>, any][]
 }
 
 class StreamParserInstance<State> {
@@ -46,7 +49,7 @@ class StreamParserInstance<State> {
     this.startState = spec.startState || (() => (true as any))
     this.copyState = spec.copyState || defaultCopyState
     this.indent = spec.indent || (() => -1)
-    this.docType = tokenID("document") // FIXME add parser props here
+    this.docType = docID(spec.docProps || [])
   }
 
   readToken(state: State, stream: StringStream, editorState: EditorState) {
@@ -249,13 +252,33 @@ class SyntaxState<ParseState> {
 const tokenTable: {[name: string]: number} = Object.create(null)
 const typeArray: NodeType[] = [NodeType.none]
 const nodeGroup = new NodeGroup(typeArray)
+const warned: string[] = []
 
-function tokenID(tag: string) {
+function tokenID(tag: string): number {
   let id = tokenTable[tag]
   if (id == null) {
-    let tagID = defaultTags.get(tag)
+    let tagID = 0
+    try {
+      tagID = defaultTags.get(tag)
+    } catch(e) {
+      if (!(e instanceof RangeError)) throw e
+      if (warned.indexOf(tag) < 0) {
+        warned.push(tag)
+        console.warn(`'${tag}' is not a valid style tag`)
+      }
+      return tokenID("")
+    }
     id = tokenTable[tag] = typeArray.length
-    typeArray.push(new NodeType(tag, defaultTags.prop.set({}, tagID), id))
+    typeArray.push(new NodeType(tag ? tag.replace(/ /g, "_") : "_", defaultTags.prop.set({}, tagID), id))
   }
+  return id
+}
+
+function docID(props: readonly [NodeProp<any>, any][]) {
+  if (props.length == 0) return tokenID("")
+  let obj = Object.create(null)
+  for (let [prop, value] of props) prop.set(obj, value)
+  let id = typeArray.length
+  typeArray.push(new NodeType("document", obj, id))
   return id
 }
