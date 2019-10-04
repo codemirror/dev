@@ -5,11 +5,24 @@ import {Syntax, EditorState} from "../../state"
 
 const Inherit = 1
 
+/// A tag system defines a set of node (token) tags used for
+/// highlighting. You'll usually want to use the
+/// [default](#highlight.defaultTags) set, but it is possible to
+/// define your own custom system when that doesn't fit your use case.
 export class TagSystem {
+  /// The flags argument given when creating this system.
   flags: readonly string[]
+
+  /// The types argument given when creating this system.
+  types: readonly string[]
+
+  /// @internal
   flagMask: number
+  /// @internal
   typeShift: number
+  /// @internal
   typeNames: string[] = [""]
+  /// @internal
   parents: number[]
   
   /// A [node
@@ -17,8 +30,17 @@ export class TagSystem {
   /// to associate styling tag information with syntax tree nodes.
   prop = new NodeProp<number>()
 
+  /// Define a tag system. Each tag identifies a type of syntactic
+  /// element, which can have a single type and any number of flags.
+  /// The `flags` argument should be an array of flag names, and the
+  /// `types` argument an array of type names. Type names may have a
+  /// `"name=parentName"` format to specify that this type is an
+  /// instance of some other type, which means that, if no styling for
+  /// the type itself is provided, it'll fall back to the parent
+  /// type's styling.
   constructor(options: {flags: string[], types: string[]}) {
     this.flags = options.flags
+    this.types = options.types
     this.flagMask = Math.pow(2, this.flags.length) - 1
     this.typeShift = this.flags.length + 1
     let parentNames: (string | undefined)[] = [undefined]
@@ -38,6 +60,9 @@ export class TagSystem {
       throw new RangeError("Too many style tag flags to fit in a 30-bit integer")
   }
 
+  /// Parse a tag name into a numeric ID. Only necessary if you are
+  /// manually defining [node properties](#highlight.TagSystem.prop)
+  /// for this system.
   get(name: string) {
     let value = name.charCodeAt(0) == 43 ? 1 : 0 // Check for leading '+'
     for (let part of (value ? name.slice(1) : name).split(" ")) if (part) {
@@ -54,6 +79,12 @@ export class TagSystem {
     return value
   }
 
+  /// Create a
+  /// [`PropSource`](https://lezer.codemirror.net/docs/ref#tree.PropSource)
+  /// that adds node properties for this system. `tags` should map
+  /// node type
+  /// [selectors](https://lezer.codemirror.net/docs/ref#tree.NodeType^match)
+  /// to tag names.
   add(tags: {[selector: string]: string}) {
     let match = NodeType.match(tags)
     return this.prop.add((type: NodeType) => {
@@ -62,6 +93,8 @@ export class TagSystem {
     })
   }
 
+  /// Create a highlighter extension for this system, styling the
+  /// given tags using the given CSS objects.
   highlighter(spec: {[tag: string]: Style}) {
     let styling = new Styling(this, spec)
     let plugin = new ViewPlugin(view => new Highlighter(view, this.prop, styling),
@@ -79,6 +112,8 @@ export class TagSystem {
   }
 }
 
+/// The set of highlighting tags used by regular language packages and
+/// themes. See [the guide](FIXME) for a list of the tags it defines.
 export const defaultTags = new TagSystem({
   flags: ["invalid", "meta", "type2", "type3", "type4",
           "link", "strong", "emphasis", "heading", "list", "quote",
@@ -128,8 +163,18 @@ export const defaultTags = new TagSystem({
   ]
 })
 
+/// Used to add a set of tags to a language syntax via
+/// [`Parser.withProps`](https://lezer.codemirror.net/docs/ref#lezer.Parser.withProps).
+/// The argument object can use syntax node selectors (see
+/// [`NodeType.match`](https://lezer.codemirror.net/docs/ref#tree.NodeType^match))
+/// as property names, and tag names (in the [default tag
+/// system](#highlight.defaultTags)) as values.
 export const styleTags = (tags: {[selector: string]: string}) => defaultTags.add(tags)
 
+/// Create a highlighter theme that adds the given styles to the given
+/// tags. The spec's property names must be tag names, and the values
+/// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
+/// style objects that define the CSS for that tag.
 export const highlighter = (spec: {[tag: string]: Style}) => defaultTags.highlighter(spec)
 
 class StyleRule {
@@ -249,6 +294,7 @@ class Highlighter implements ViewPluginValue {
   }
 }
 
+/// A default highlighter (works well with light themes).
 export const defaultHighlighter = highlighter({
   invalid: {color: "#f00"},
   keyword: {color: "#708"},
