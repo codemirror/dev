@@ -318,7 +318,7 @@ const none: readonly any[] = []
 
 /// A configuration describes the fields and behaviors that exist in a
 /// given set of extensions. It is created with
-/// [`ExtensionGroup.resolve`](#state.ExtensionGroup.resolve).
+/// [`ExtensionGroup.resolve`](#extension.ExtensionGroup^resolve).
 export class Configuration<Context> {
   /// @internal
   constructor(

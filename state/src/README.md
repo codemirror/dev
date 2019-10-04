@@ -30,6 +30,8 @@
 
 @StateField
 
+@StateFieldSpec
+
 @Slot
 
 @Syntax

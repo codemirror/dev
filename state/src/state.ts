@@ -70,11 +70,11 @@ export class EditorState {
   }
 
   /// Join an array of lines using the current [line
-  /// separator](#state.EditorStateConfig.lineSeparator).
+  /// separator](#state.EditorState^lineSeparator).
   joinLines(text: ReadonlyArray<string>): string { return text.join(this.behavior(EditorState.lineSeparator) || "\n") }
 
   /// Split a string into lines using the current [line
-  /// separator](#state.EditorStateConfig.lineSeparator).
+  /// separator](#state.EditorState^lineSeparator).
   splitLines(text: string): string[] { return text.split(this.behavior(EditorState.lineSeparator) || DEFAULT_SPLIT) }
 
   /// Get the value of a state behavior.
@@ -115,7 +115,7 @@ export class EditorState {
     return state
   }
 
-  /// The [extension type](#extension.ExtensionType) for editor
+  /// The [extension group](#extension.ExtensionGroup) for editor
   /// states.
   static extend = extendState
 

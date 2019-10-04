@@ -69,9 +69,11 @@ export interface Syntax {
   /// can't be done quickly enough, `rest` will hold a promise that
   /// you can wait on to get the rest of the tree.
   getTree(state: EditorState, from: number, to: number): {tree: Tree, rest: CancellablePromise<Tree> | null}
+
   /// Get a syntax tree covering the given range, or null if that
   /// can't be done in reasonable time.
   tryGetTree(state: EditorState, from: number, to: number): Tree | null
+
   /// Get a syntax tree, preferably covering the given range, but less
   /// is also acceptable.
   getPartialTree(state: EditorState, from: number, to: number): Tree
