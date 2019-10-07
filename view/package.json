@@ -1,4 +1,4 @@
 {
-  "main": "dist/index.js",
-  "module": "dist/index.esm"
+  "main": "/home/marijn/src/cm6/view/dist/index.esm",
+  "types": "dist/index.d.ts"
 }

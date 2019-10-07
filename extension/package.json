@@ -1,5 +1,4 @@
 {
-  "main": "dist/extension.js",
-  "types": "dist/extension.d.ts",
-  "module": "dist/extension.esm"
+  "main": "/home/marijn/src/cm6/extension/dist/index.esm",
+  "types": "dist/extension.d.ts"
 }

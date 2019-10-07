@@ -1,5 +1,4 @@
 {
-  "main": "dist/matchbrackets.js",
-  "types": "dist/matchbrackets.d.ts",
-  "module": "dist/matchbrackets.esm"
+  "main": "/home/marijn/src/cm6/matchbrackets/dist/index.esm",
+  "types": "dist/matchbrackets.d.ts"
 }

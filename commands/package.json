@@ -1,5 +1,4 @@
 {
-  "main": "dist/commands.js",
-  "types": "dist/commands.d.ts",
-  "module": "dist/commands.esm"
+  "main": "/home/marijn/src/cm6/commands/dist/index.esm",
+  "types": "dist/commands.d.ts"
 }

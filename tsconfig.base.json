@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
-    "lib": ["es5", "dom"],
+    "lib": ["es6"],
+    "types": [],
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "sourceMap": true,
     "strict": true,
-    "target": "es5",
+    "target": "es6",
     "newLine": "lf",
-    "declaration": true
+    "declaration": true,
+    "moduleResolution": "node"
   },
   "include": []
 }

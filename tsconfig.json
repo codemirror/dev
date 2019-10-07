@@ -1,4 +1,8 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["*/src/*.ts", "*/test/*.ts", "browsertests/cases/*.ts"]
+  "compilerOptions": {
+    "lib": ["es6", "dom"],
+    "types": ["mocha", "node"]
+  },
+  "include": ["*/src/*.ts", "*/test/*.ts"]
 }

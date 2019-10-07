@@ -121,7 +121,7 @@ function matchMarkedBrackets(state: EditorState, pos: number, dir: -1 | 1, token
     to: dir < 0 ? parent.start : parent.end,
     enter(type, from, to) {
       if (dir < 0 ? to > token.start : from < token.end) return undefined
-      if (depth == 0 && matching.includes(type.name)) {
+      if (depth == 0 && matching.indexOf(type.name) > -1) {
         return {start: firstToken, end: {from, to}, matched: true}
       } else if (matchingNodes(type, dir, brackets)) {
         depth++

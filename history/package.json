@@ -1,5 +1,4 @@
 {
-  "main": "dist/history.js",
-  "types": "dist/history.d.ts",
-  "module": "dist/history.esm"
+  "main": "/home/marijn/src/cm6/history/dist/index.esm",
+  "types": "dist/history.d.ts"
 }

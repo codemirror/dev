@@ -1,4 +1,4 @@
 {
-  "main": "dist/highlight.js",
-  "module": "dist/highlight.esm"
+  "main": "/home/marijn/src/cm6/highlight/dist/index.esm",
+  "types": "dist/highlight.d.ts"
 }

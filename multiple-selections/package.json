@@ -1,5 +1,4 @@
 {
-  "main": "dist/multiple-selections.js",
-  "types": "dist/multiple-selections.d.ts",
-  "module": "dist/multiple-selections.esm"
+  "main": "/home/marijn/src/cm6/multiple-selections/dist/index.esm",
+  "types": "dist/multiple-selections.d.ts"
 }

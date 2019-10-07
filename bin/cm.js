@@ -1,0 +1,197 @@
+#!/usr/bin/env node
+
+const child = require("child_process"), fs = require("fs"), fsp = fs.promises, path = require("path")
+
+let root = path.join(__dirname, "..")
+
+class Pkg {
+  constructor(name, options = {}) {
+    this.name = name
+    this.entry = options.entry || "index"
+    this.dom = !!options.dom
+    this.dir = path.join(root, name)
+    this._dependencies = null
+  }
+
+  get sources() {
+    let src = path.join(this.dir, "src")
+    return fs.readdirSync(src).filter(file => /\.ts$/.test(file)).map(file => path.join(src, file))
+  }
+
+  get declarations() {
+    let dist = path.join(this.dir, "dist")
+    return !fs.existsSync(dist) ? [] :
+      fs.readdirSync(dist).filter(file => /\.d\.ts$/.test(file)).map(file => path.join(dist, file))
+  }
+
+  get entrySource() {
+    return path.join(this.dir, "src", this.entry + ".ts")
+  }
+
+  get distFile() {
+    return path.join(this.dir, "dist", "index.esm")
+  }
+
+  get dependencies() {
+    if (!this._dependencies) {
+      this._dependencies = []
+      for (let file of this.sources) {
+        let text = fs.readFileSync(file, "utf8")
+        let imp = /(?:^|\n)\s*import.* from "\.\.\/\.\.\/(\w+)"/g, m
+        while (m = imp.exec(text))
+          if (!this._dependencies.includes(m[1]) && packageNames[m[1]])
+            this._dependencies.push(packageNames[m[1]])
+      }
+    }
+    return this._dependencies
+  }
+}
+
+const packages = [
+  new Pkg("text"),
+  new Pkg("extension", {entry: "extension"}),
+  new Pkg("state"),
+  new Pkg("rangeset", {entry: "rangeset"}),
+  new Pkg("history", {entry: "history"}),
+  new Pkg("view", {dom: true}),
+  new Pkg("gutter", {dom: true}),
+  new Pkg("commands", {entry: "commands", dom: true}),
+  new Pkg("syntax", {dom: true}),
+  new Pkg("matchbrackets", {entry: "matchbrackets", dom: true}),
+  new Pkg("keymap", {entry: "keymap", dom: true}),
+  new Pkg("multiple-selections", {entry: "multiple-selections", dom: true}),
+  new Pkg("highlight", {entry: "highlight", dom: true}),
+  new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
+  new Pkg("lang-javascript", {entry: "javascript"}),
+  new Pkg("lang-css", {entry: "css"}),
+  new Pkg("lang-html", {entry: "html"})
+]
+const packageNames = Object.create(null)
+for (let pkg of packages) packageNames[pkg.name] = pkg
+
+function start() {
+  let command = process.argv[2]
+  let args = process.argv.slice(3)
+  let cmdFn = {
+    packages: listPackages,
+    build: build,
+    "--help": () => help(0)
+  }[command]
+  if (!cmdFn || cmdFn.length > args.length) help(1)
+  new Promise(r => r(cmdFn.apply(null, args))).catch(e => error(e))
+}
+
+function help(status) {
+  console.log(`Usage:
+  cm packages             Emit a list of all pkg names
+  cm build [-w]           Build the bundle files
+  cm --help`)
+  process.exit(status)
+}
+
+function error(message) {
+  console.log(message.stack || String(message))
+  process.exit(1)
+}
+
+function run(cmd, args, wd) {
+  return child.execFileSync(cmd, args, {cwd: wd, encoding: "utf8", stdio: ["ignore", "pipe", process.stderr]})
+}
+
+function listPackages() {
+  console.log(packages.map(p => p.name).join("\n"))
+}
+
+function rollupConfig(pkg) {
+  return {
+    input: pkg.entrySource,
+    external(id) { return id != "tslib" && !/^\.?\//.test(id) },
+    output: {
+      format: "esm",
+      file: pkg.distFile,
+      sourcemap: true,
+      externalLiveBindings: false
+    },
+    plugins: [require("rollup-plugin-typescript2")({
+      clean: true,
+      tsconfig: "./tsconfig.base.json",
+      tsconfigOverride: {
+        references: [],
+        compilerOptions: {lib: pkg.dom ? ["es6", "dom"] : ["es6"]},
+        include: []
+      }
+    })]
+  }
+}
+
+async function maybeWriteFile(path, content) {
+  let buffer = Buffer.from(content)
+  let size = -1
+  try {
+    size = (await fsp.stat(path)).size
+  } catch (e) {
+    if (e.code != "ENOENT") throw e
+  }
+  if (size != buffer.length || !buffer.equals(await fsp.readFile(path)))
+    await fsp.writeFile(path, buffer)
+}
+
+async function buildPkg(pkg) {
+  let config = rollupConfig(pkg)
+  let bundle = await require("rollup").rollup(config)
+  let result = await bundle.generate(config.output)
+  let dir = path.dirname(config.output.file)
+  await fsp.mkdir(dir, {recursive: true}).catch(() => null)
+  for (let file of result.output) {
+    if (/\.d\.ts$/.test(file.fileName))
+      await maybeWriteFile(path.join(dir, file.fileName), file.code || file.source)
+    else
+      await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
+    if (file.map)
+      await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
+  }
+  return config.output.file
+}
+
+function fileTime(path) {
+  try {
+    let stat = fs.statSync(path)
+    return stat.mtimeMs
+  } catch(e) {
+    if (e.code == "ENOENT") return -1
+    throw e
+  }
+}
+
+function mustRebuild(pkg) {
+  let buildTime = fileTime(pkg.distFile)
+  if (buildTime < 0) return true
+  for (let source of pkg.sources)
+    if (fileTime(source) >= buildTime) return true
+  for (let dep of pkg.dependencies)
+    for (let decl of dep.declarations)
+      if (fileTime(decl) >= buildTime) return true
+  return false
+}
+
+async function build(...args) {
+  let watch = args.includes("-w") // FIXME
+  for (let pkg of packages) {
+    if (!mustRebuild(pkg)) continue
+    console.log(`Building ${pkg.name}...`)
+    let t0 = Date.now()
+    await buildPkg(pkg)
+    console.log(`Done in ${Date.now() - t0}ms`)
+  }
+}
+
+function devServer() {
+  let moduleserver = new (require("moduleserve/moduleserver"))({root})
+  let ecstatic = require("ecstatic")({root})
+  require("http").createServer((req, resp) => {
+    moduleserver.handleRequest(req, resp) || ecstatic(req, resp)
+  }).listen(8090, process.env.OPEN ? undefined : "127.0.0.1")
+  console.log("Dev server listening on 8090")
+}
+
+start()

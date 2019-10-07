@@ -1,4 +1,4 @@
 {
-  "main": "dist/javascript.js",
-  "module": "dist/javascript.esm"
+  "main": "/home/marijn/src/cm6/lang-javascript/dist/index.esm",
+  "types": "dist/javascript.d.ts"
 }

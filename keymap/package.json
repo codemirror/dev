@@ -1,5 +1,4 @@
 {
-  "main": "dist/keymap.js",
-  "types": "dist/keymap.d.ts",
-  "module": "dist/keymap.esm"
+  "main": "/home/marijn/src/cm6/keymap/dist/index.esm",
+  "types": "dist/keymap.d.ts"
 }

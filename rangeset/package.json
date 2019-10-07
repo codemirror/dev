@@ -1,5 +1,4 @@
 {
-  "main": "dist/rangeset.js",
-  "types": "dist/rangeset.d.ts",
-  "module": "dist/rangeset.esm"
+  "main": "/home/marijn/src/cm6/rangeset/dist/index.esm",
+  "types": "dist/rangeset.d.ts"
 }

@@ -1,5 +1,4 @@
 {
-  "main": "dist/stream-syntax.js",
-  "types": "dist/stream-syntax.d.ts",
-  "module": "dist/stream-syntax.esm"
+  "main": "/home/marijn/src/cm6/stream-syntax/dist/index.esm",
+  "types": "dist/stream-syntax.d.ts"
 }

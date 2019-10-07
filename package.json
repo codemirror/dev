@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts lang-javascript/test/test-*.ts",
-    "prepare": "rollup -c",
-    "watch": "rollup -wc --environment DEVSERVER"
+    "prepare": "bin/cm.js build",
+    "watch": "bin/cm.js build -w"
   },
   "keywords": [
     "editor",
