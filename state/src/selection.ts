@@ -2,23 +2,25 @@ import {Mapping} from "./change"
 import {EditorState} from "./state"
 import {charType} from "../../text"
 
-/// A single selection range.
+/// A single selection range. When
+/// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)
+/// is enabled, a [selection](#state.EditorSelection) may hold
+/// multiple ranges. By default, selections hold exactly one range.
 export class SelectionRange {
-  /// Create a range.
+  /// Create a range. `head` defaults to `anchor` when not given.
   constructor(
     /// The anchor of the range—the side that doesn't move when you
     /// extend it.
     readonly anchor: number,
     /// The head of the range, which is moved when the range is
-    /// [extended](#state.SelectionRange.extend). Defaults to `anchor`
-    /// when not given.
+    /// [extended](#state.SelectionRange.extend).
     public readonly head: number = anchor) {}
 
   /// The lower side of the range.
   get from(): number { return Math.min(this.anchor, this.head) }
   /// The upper side of the range.
   get to(): number { return Math.max(this.anchor, this.head) }
-  /// True when `anchor` and `head` are the same.
+  /// True when `anchor` and `head` are at the same position.
   get empty(): boolean { return this.anchor == this.head }
 
   /// Map this range through a mapping.
@@ -78,7 +80,8 @@ export class EditorSelection {
     readonly primaryIndex: number = 0
   ) {}
 
-  /// Map a selection through a mapping.
+  /// Map a selection through a mapping. Mostly used to adjust the
+  /// selection position for changes.
   map(mapping: Mapping): EditorSelection {
     return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)
   }
@@ -92,7 +95,9 @@ export class EditorSelection {
     return true
   }
 
-  /// Get the primary selection range.
+  /// Get the primary selection range. Usually, you should make sure
+  /// your code applies to _all_ ranges, by using transaction methods
+  /// like [`forEachRange`])(#state.transaction.forEachRange).
   get primary(): SelectionRange { return this.ranges[this.primaryIndex] }
 
   /// Make sure the selection only has one range. Returns a selection
@@ -106,7 +111,8 @@ export class EditorSelection {
     return EditorSelection.create([range].concat(this.ranges), primary ? 0 : this.primaryIndex + 1)
   }
 
-  /// Replace a given range with another range.
+  /// Replace a given range with another range, and then normalize the
+  /// selection to merge and sort ranges if necessary.
   replaceRange(range: SelectionRange, which: number = this.primaryIndex) {
     let ranges = this.ranges.slice()
     ranges[which] = range

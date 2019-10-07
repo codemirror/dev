@@ -11,6 +11,12 @@ const enum Flag { SelectionSet = 1, ScrollIntoView = 2, Reconfigure = 4 }
 /// Usually, a user action creates a single transaction, which may
 /// contain zero or more document changes. Create a transaction by
 /// calling [`EditorState.t`](#state.EditorState.t).
+///
+/// Transactions are mutable, and usually built up piece by piece with
+/// updating methods and method chaining (most methods return the
+/// transaction itself). Once they are
+/// [applied](#state.Transaction.apply), they can't be updated
+/// anymore.
 export class Transaction {
   /// The document changes made by this transaction.
   changes: ChangeSet = ChangeSet.empty
@@ -41,7 +47,9 @@ export class Transaction {
     return last < 0 ? this.startState.doc : this.docs[last]
   }
 
-  /// Add metadata to this transaction.
+  /// Add metadata to this transaction. Metadata can be any value
+  /// tagged as a [slot](#extension.Slot), which can provide
+  /// additional information about the transaction.
   addMeta(...metadata: Slot[]): Transaction {
     this.ensureOpen()
     for (let slot of metadata) this.metadata.push(slot)
@@ -67,6 +75,11 @@ export class Transaction {
     return this
   }
 
+  /// Indicates whether the transaction changed the document.
+  get docChanged(): boolean {
+    return this.changes.length > 0
+  }
+
   /// Add a change replacing the given document range with the given
   /// content.
   replace(from: number, to: number, text: string | ReadonlyArray<string>): Transaction {
@@ -83,9 +96,11 @@ export class Transaction {
     })
   }
 
-  /// Run the given function for each selection range, mapping ranges
-  /// to reflect deletions/insertions that happen before them. At the
-  /// end, set the selection to the ranges returned by the function.
+  /// Run the given function for each selection range. The method will
+  /// map the ranges to reflect deletions/insertions that happen
+  /// before them. At the end, set the new selection to the ranges
+  /// returned by the function (again, automatically mapped to for
+  /// changes that happened after them).
   forEachRange(f: (range: SelectionRange, tr: Transaction) => SelectionRange): Transaction {
     let sel = this.selection, start = this.changes.length, newRanges: SelectionRange[] = []
     for (let range of sel.ranges) {
@@ -108,15 +123,11 @@ export class Transaction {
     return this
   }
 
-  /// Tells you whether this transaction set a new selection (as
-  /// opposed to just mapping the selection through changes).
+  /// Tells you whether this transaction explicitly sets a new
+  /// selection (as opposed to just mapping the selection through
+  /// changes).
   get selectionSet(): boolean {
     return (this.flags & Flag.SelectionSet) > 0
-  }
-
-  /// Indicates whether the transaction changed the document.
-  get docChanged(): boolean {
-    return this.changes.length > 0
   }
 
   /// Set a flag on this transaction that indicates that the editor
@@ -135,7 +146,7 @@ export class Transaction {
 
   /// Replace one or more [named
   /// extensions](#extension.ExtensionGroup.defineName) with new
-  /// instances.
+  /// instances, creating a new configuration for the new state.
   replaceExtensions(replace: readonly Extension[]) {
     this.ensureOpen()
     this.configuration = this.configuration.replaceExtensions(replace)
@@ -161,9 +172,8 @@ export class Transaction {
   }
 
   /// Apply this transaction, computing a new editor state. May be
-  /// called multiple times (the result is cached), but the
-  /// transaction may not be further modified after this has been
-  /// called.
+  /// called multiple times (the result is cached). The transaction
+  /// cannot be further modified after this has been called.
   apply(): EditorState {
     return this.state || (this.state = this.startState.applyTransaction(this))
   }
@@ -178,13 +188,14 @@ export class Transaction {
     return new ChangeSet(changes, set.mirror.length ? set.mirror.map(i => set.length - i - 1) : set.mirror)
   }
 
-  /// Slot used to store timestamps in transactions.
+  /// Slot used to store transaction timestamps.
   static time = Slot.define<number>()
 
   /// Slot used to indicate that this transaction shouldn't clear the
   /// goal column, which is used during vertical cursor motion (so
   /// that moving over short lines doesn't reset the horizontal
-  /// position to the end of the shortest line).
+  /// position to the end of the shortest line). Should generally only
+  /// be set by commands that perform vertical motion.
   static preserveGoalColumn = Slot.define<boolean>()
 
   /// Slot used to associate a transaction with a user interface

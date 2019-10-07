@@ -20,7 +20,9 @@ export const allowMultipleSelections = extendState.behavior<boolean, boolean>({
 })
 
 /// Parameters passed when creating a
-/// [`StateField`](#state.StateField).
+/// [`StateField`](#state.StateField). The `Value` type parameter
+/// refers to the content of the field. Since it will be stored in
+/// (immutable) state objects, it should be an immutable value itself.
 export interface StateFieldSpec<Value> {
   /// Creates the initial value for the field.
   init: (state: EditorState) => Value
@@ -29,7 +31,8 @@ export interface StateFieldSpec<Value> {
   apply: (tr: Transaction, value: Value, newState: EditorState) => Value
 }
 
-/// Fields can store additional information in an editor state.
+/// Fields can store additional information in an editor state, and
+/// keep it in sync with the rest of the state.
 export class StateField<Value> {
   /// The extension that can be used to
   /// [attach](#state.EditorStateConfig.extensions) this field to a
@@ -43,9 +46,9 @@ export class StateField<Value> {
   /// @internal
   readonly apply: (tr: Transaction, value: Value, state: EditorState) => Value
 
-  /// Declare a new field. The field instance is used as the
-  /// [key](#state.EditorState.field) when retrieving the field's value
-  /// from a state.
+  /// Declare a field. The field instance is used as the
+  /// [key](#state.EditorState.field) when retrieving the field's
+  /// value from a state.
   constructor(spec: StateFieldSpec<Value>) {
     this.init = spec.init
     this.apply = spec.apply

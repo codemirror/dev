@@ -7,19 +7,33 @@ import {extendState, Syntax, stateField, StateField, allowMultipleSelections} fr
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
 export interface EditorStateConfig {
-  /// The initial document. Defaults to an empty document.
+  /// The initial document. Defaults to an empty document. Can be
+  /// provided either as a plain string (which will be split into
+  /// lines according to the value of the [`lineSeparator`
+  /// behavior](#state.EditorState^lineSeparator)), or an instance of
+  /// the [`Text`](#text.Text) class (which is what the state will use
+  /// to represent the document).
   doc?: string | Text
   /// The starting selection. Defaults to a cursor at the very start
   /// of the document.
   selection?: EditorSelection
-  /// State and view extensions to associate with this state. The view
-  /// extensions only take effect when the state is put into an editor
-  /// view.
+  /// [State](#state.EditorState^extend) or
+  /// [view](#view.EditorView^extend) extensions to associate with
+  /// this state. View extensions provided here only take effect when
+  /// the state is put into an editor view.
   extensions?: ReadonlyArray<Extension>
 }
 
 const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4, DEFAULT_SPLIT = /\r\n?|\n/
 
+/// The editor state class is a persistent (immutable) data structure.
+/// To update a state, you [create](#state.EditorState.t) and
+/// [apply](#state.Transaction.apply) a
+/// [transaction](#state.Transaction), which produces a _new_ state
+/// instance, without modifying the original object.
+///
+/// As such, _never_ mutate properties of a state directly. That'll
+/// just break things.
 export class EditorState {
   /// @internal
   constructor(
@@ -44,6 +58,7 @@ export class EditorState {
   field<T>(field: StateField<T>, require: boolean = true): T | undefined {
     let value = this.values[field.id]
     if (value === undefined && !Object.prototype.hasOwnProperty.call(this.values, field.id)) {
+      // FIXME document or avoid this
       if (this.behavior(stateField).indexOf(field) > -1)
         throw new RangeError("Field hasn't been initialized yet")
       if (require)
@@ -64,20 +79,22 @@ export class EditorState {
     return newState
   }
 
-  /// Start a new transaction from this state.
-  t(time?: number): Transaction {
-    return new Transaction(this, time)
+  /// Start a new transaction from this state. When not given, the
+  /// timestamp defaults to
+  /// [`Date.now()`](https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Date/now).
+  t(timestamp?: number): Transaction {
+    return new Transaction(this, timestamp)
   }
 
-  /// Join an array of lines using the current [line
+  /// Join an array of lines using the state's [line
   /// separator](#state.EditorState^lineSeparator).
   joinLines(text: ReadonlyArray<string>): string { return text.join(this.behavior(EditorState.lineSeparator) || "\n") }
 
-  /// Split a string into lines using the current [line
+  /// Split a string into lines using the state's [line
   /// separator](#state.EditorState^lineSeparator).
   splitLines(text: string): string[] { return text.split(this.behavior(EditorState.lineSeparator) || DEFAULT_SPLIT) }
 
-  /// Get the value of a state behavior.
+  /// Get the value of a state [behavior](#extension.Behavior).
   behavior<Output>(behavior: Behavior<any, Output>): Output {
     return this.configuration.getBehavior(behavior, this)
   }
@@ -102,7 +119,9 @@ export class EditorState {
     })
   }
 
-  /// Create a new state.
+  /// Create a new state. You'll usually only need this when
+  /// initializing an editor—updated states are created by applying
+  /// transactions.
   static create(config: EditorStateConfig = {}): EditorState {
     let configuration = extendState.resolve(config.extensions || [])
     let values = Object.create(null)
@@ -116,15 +135,15 @@ export class EditorState {
   }
 
   /// The [extension group](#extension.ExtensionGroup) for editor
-  /// states.
+  /// states, mostly used to define state extensions and
+  /// [set](#extension.ExtensionGroup.fallback) their precedence.
   static extend = extendState
 
   /// A behavior that, when enabled, causes the editor to allow
   /// multiple ranges to be selected. You should probably not use this
   /// directly, but let a plugin like
   /// [multiple-selections](#multiple-selections) handle it (which
-  /// also makes sure the selections are drawn and new selections can
-  /// be created with the mouse).
+  /// also makes sure the selections are visible in the view.
   static allowMultipleSelections = allowMultipleSelections
 
   /// Behavior that defines a way to query for automatic indentation
@@ -137,8 +156,8 @@ export class EditorState {
     combine: values => values.length ? values[0] : DEFAULT_TABSIZE
   })
 
-  /// The size of a tab in the document, determined by the
-  /// [`tabSize`](#state.EditorState^tabSize) behavior.
+  /// The size (in columns) of a tab in the document, determined by
+  /// the [`tabSize`](#state.EditorState^tabSize) behavior.
   get tabSize() { return this.behavior(EditorState.tabSize) }
 
   /// The line separator to use. By default, any of `"\n"`, `"\r\n"`
@@ -153,7 +172,8 @@ export class EditorState {
     static: true
   })
 
-  /// Behavior for overriding the unit by which indentation happens.
+  /// Behavior for overriding the unit (in columns) by which
+  /// indentation happens. When not set, this defaults to 2.
   static indentUnit = extendState.behavior<number, number>({
     combine: values => values.length ? values[0] : DEFAULT_INDENT_UNIT
   })

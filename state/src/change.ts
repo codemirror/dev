@@ -40,7 +40,8 @@ export interface Mapping {
 /// to store change data without storing the replacement string
 /// content.
 export class ChangeDesc implements Mapping {
-  /// Create a description.
+  /// Create a description that replaces the text between positions
+  /// `from` and `to` with a new string of length `length`.
   constructor(
     /// The start position of the change.
     public readonly from: number,
@@ -79,11 +80,12 @@ export class ChangeDesc implements Mapping {
 
 /// Change objects describe changes to the document.
 export class Change extends ChangeDesc {
-  /// Create a new change.
+  /// Create a change that replaces `from` to `to` with `text`. The
+  /// text is given as an array of lines. When it doesn't span lines,
+  /// the array has a single element. When it does, a new element is
+  /// added for every line. It should never have zero elements.
   constructor(
-    /// @internal
     public readonly from: number,
-    /// @internal
     public readonly to: number,
     /// The replacement content.
     public readonly text: ReadonlyArray<string>
@@ -91,13 +93,15 @@ export class Change extends ChangeDesc {
     super(from, to, textLength(text))
   }
 
-  /// Create the inverse of this change if applied to the given
-  /// document.
+  /// Create the inverse of this change when applied to the given
+  /// document. `change.invert(doc).apply(change.apply(doc))` gets you
+  /// the same document as the original `doc`.
   invert(doc: Text): Change {
     return new Change(this.from, this.from + this.length, doc.sliceLines(this.from, this.to))
   }
 
-  /// Apply this change to the given content.
+  /// Apply this change to the given content, returning an updated
+  /// version of the document.
   apply(doc: Text): Text {
     return doc.replace(this.from, this.to, this.text)
   }
@@ -143,6 +147,7 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
     /// @internal
     readonly mirror: ReadonlyArray<number> = empty) {}
 
+  /// The number of changes in the set.
   get length(): number {
     return this.changes.length
   }
@@ -157,7 +162,9 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
     return null
   }
 
-  /// Append a change to this set, returning an extended set.
+  /// Append a change to this set, returning an extended set. `mirror`
+  /// may be the index of a change already in the set, which
+  /// [mirrors](#state.ChangeSet.getMirror) the new change.
   append(change: C, mirror?: number): ChangeSet<C> {
     return new ChangeSet(this.changes.concat(change),
                          mirror != null ? this.mirror.concat(this.length, mirror) : this.mirror)
@@ -223,7 +230,8 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
     return deleted ? -pos - 1 : pos
   }
 
-  /// Get a partial mapping covering part of this change set.
+  /// Get a partial [mapping](#state.Mapping) covering part of this
+  /// change set.
   partialMapping(from: number, to: number = this.length): Mapping {
     if (from == 0 && to == this.length) return this
     return new PartialMapping(this, from, to)
