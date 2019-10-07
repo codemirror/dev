@@ -8,8 +8,7 @@ const enum Tree {
   BranchShift = 3
 }
 
-/// A text iterator iterates over a sequence of strings, as stored in
-/// a `Tree`.
+/// A text iterator iterates over a sequence of strings.
 export interface TextIterator extends Iterator<string> {
   /// Retrieve the next string. Optionally skip a given number of
   /// positions after the current position. Always returns the object
@@ -25,11 +24,7 @@ export interface TextIterator extends Iterator<string> {
   lineBreak: boolean
 }
 
-// Note line numbers are 1-based
-
-/// This type provides an immutable tree-shaped format for
-/// representing long strings. It allows efficient updates, and
-/// indexes its content both by character offset and line number.
+/// The document tree type.
 export abstract class Text {
   /// The length of the string.
   abstract readonly length: number
@@ -49,7 +44,7 @@ export abstract class Text {
     return cacheLine(this, this.lineInner(pos, false, 1, 0).finish(this))
   }
 
-  /// Get the description for the given line number.
+  /// Get the description for the given (1-based) line number.
   line(n: number): Line {
     if (n < 1 || n > this.lines) throw new RangeError(`Invalid line number ${n} in ${this.lines}-line document`)
     for (let i = 0; i < lineCache.length; i += 2) {
@@ -124,7 +119,7 @@ export abstract class Text {
   protected constructor() {}
 
   /// Create a `Text` instance for the given array of lines.
-  static of(text: ReadonlyArray<string>, lineSeparator?: string | RegExp): Text {
+  static of(text: ReadonlyArray<string>): Text {
     if (text.length == 0) throw new RangeError("A document must have at least one line")
     let length = textLength(text)
     return length < Tree.MaxLeaf ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
@@ -563,7 +558,9 @@ class LineCursor implements TextIterator {
 }
 
 // FIXME rename start/end to from/to for consistency with other types?
-/// This type describes a line in the document.
+
+/// This type describes a line in the document. It is created
+/// on-demand when lines are [queried](#text.Text.lineAt).
 export class Line {
   /// @internal
   constructor(
@@ -582,10 +579,10 @@ export class Line {
   get length() { return this.end - this.start }
 
   /// Retrieve a part of the content of this line. This is a method,
-  /// rather than, say, a `content` property, to avoid concatenating
-  /// long lines whenever they are accessed. Try to write your code,
-  /// if it is going to be doing a lot of line-reading, to read only
-  /// the parts it needs.
+  /// rather than, say, a string property, to avoid concatenating long
+  /// lines whenever they are accessed. Try to write your code, if it
+  /// is going to be doing a lot of line-reading, to read only the
+  /// parts it needs.
   slice(from: number = 0, to: number = this.length) {
     if (typeof this.content == "string")
       return to == from + 1 ? this.content.charAt(from) : this.content.slice(from, to)
