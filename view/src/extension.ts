@@ -34,7 +34,7 @@ declare const pluginBehavior: unique symbol
 /// [dynamic behavior](#extension.ExtensionGroup.dynamic) to
 /// [add](#view.EditorView^decorations)
 /// [decorations](#view.Decoration) to the view.
-export class ViewPlugin<T extends ViewPluginValue> {
+export class ViewPlugin<T extends ViewPluginValue<any>> {
   /// @internal
   id = extendView.storageID()
 
@@ -67,13 +67,7 @@ export class ViewPlugin<T extends ViewPluginValue> {
   }
 
   /// Create a view plugin extension that only computes decorations.
-  /// When `map` is true, the set passed to `update` will already have
-  /// been mapped through the transactions in the `ViewUpdate`.
-  static decoration(spec: {
-    create: (view: EditorView) => DecorationSet,
-    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
-    map?: boolean
-  }) {
+  static decoration(spec: DecorationPluginSpec) {
     let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec), [
       ViewPlugin.behavior(decorations, (p: DecorationPlugin) => p.decorations)
     ])
@@ -81,9 +75,22 @@ export class ViewPlugin<T extends ViewPluginValue> {
   }
 }
 
-/// This is the interface to which plugins may conform.
+/// See [`PluginView.decoration`](#view.PluginView^decoration).
+export interface DecorationPluginSpec {
+  /// Compute the initial set of decorations.
+  create: (view: EditorView) => DecorationSet,
+  /// Update the decorations for a view update.
+  update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
+  /// When this is true, the set passed to `update` will already have
+  /// been mapped through the transactions in the `ViewUpdate`.
+  map?: boolean
+}
+
+/// This is the interface to which plugins conform. The optional type
+/// parameter is only useful when the plugin needs to
+/// [measure](#view.ViewPluginValue.measure) DOM layout.
 export interface ViewPluginValue<Measure = undefined> {
-  /// Notify the plugin of an update that happened in the view. This
+  /// Notifies the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
   /// that may be read by behaviors). It should _not_ change the DOM,
@@ -92,12 +99,13 @@ export interface ViewPluginValue<Measure = undefined> {
 
   /// This is called after the view updated (or initialized) its DOM
   /// structure. It may write to the DOM (outside of the editor
-  /// content). It should not trigger a DOM layout.
+  /// content). It should not trigger a DOM layout by reading DOM
+  /// positions or dimensions.
   draw?(): void
 
   /// This will be called in the layout-reading phase of an editor
   /// update. It should, if the plugin needs to read DOM layout
-  /// information, do this reading and wrap the information into a
+  /// information, do this reading and wrap the information in the
   /// value that it returns. It should not have side effects.
   measure?(): Measure
 
@@ -169,22 +177,22 @@ export class ViewUpdate {
     readonly view: EditorView,
     /// The transactions involved in the update. May be empty.
     readonly transactions: ReadonlyArray<Transaction> = none,
-    // @internal
+    /// @internal
     readonly metadata: ReadonlyArray<Slot> = none
   ) {
     this.state = transactions.length ? transactions[transactions.length - 1].apply() : view.state
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     this.prevState = view.state
-    this.prevViewport = view.viewport
+    this.prevViewport = view._viewport
     this.prevThemes = view.behavior(theme)
   }
 
   /// The new viewport range.
-  get viewport() { return this.view.viewport }
+  get viewport(): {from: number, to: number} { return this.view._viewport }
 
   /// Tells you whether the viewport changed in this update.
   get viewportChanged() {
-    return !this.prevViewport.eq(this.view.viewport)
+    return !this.prevViewport.eq(this.view._viewport)
   }
 
   /// Whether the document changed in this update.
@@ -192,6 +200,10 @@ export class ViewUpdate {
     return this.transactions.some(tr => tr.docChanged)
   }
 
+  /// Tells you whether the set of active [theme
+  /// extensions](#view.EditorView^theme) changed, which may require
+  /// plugins to update [CSS class names](#view.EditorView.cssClass)
+  /// on their DOM elements.
   get themeChanged() {
     return this.prevThemes == this.view.behavior(theme)
   }

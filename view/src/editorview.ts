@@ -18,7 +18,8 @@ import browser from "./browser"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
-  /// The view's initial state.
+  /// The view's initial state. Defaults to an extension-less state
+  /// with an empty document.
   state?: EditorState,
   /// Extra extensions (beyond those associated with the state) to
   /// use.
@@ -29,7 +30,7 @@ export interface EditorConfig {
   root?: Document | ShadowRoot,
   /// Override the transaction dispatch function for this editor view.
   /// Your implementation, if provided, should probably call the
-  /// view's `update` method.
+  /// view's [`update` method](#view.EditorView.update).
   dispatch?: (tr: Transaction) => void
 }
 
@@ -58,11 +59,18 @@ export const enum UpdateState {
 /// line number gutter. It handles events and dispatches state
 /// transactions for editing actions.
 export class EditorView {
+  private _state!: EditorState
   /// The current editor state.
-  public state!: EditorState
-  /// The part of the document (plus possibly a margin around it) that
-  /// is visible to the user.
-  public viewport!: Viewport
+  get state() { return this._state }
+
+  /// @internal
+  _viewport!: Viewport
+  /// To be able to display large documents without consuming too much
+  /// memory or overloading the browser, CodeMirror only draws the
+  /// code that is visible, plus a margin around it, to the DOM. This
+  /// property tells you the extent of the current drawn viewport, in
+  /// document positions.
+  get viewport(): {from: number, to: number} { return this._viewport }
 
   /// All regular editor state updates should go through this. It
   /// takes a transaction, applies it, and updates the view to show
@@ -133,8 +141,8 @@ export class EditorView {
     this.configure(state.configuration.foreign)
     this.inputState = new InputState(this)
     this.docView.init(state, viewport => {
-      this.viewport = viewport
-      this.state = state
+      this._viewport = viewport
+      this._state = state
       for (let plugin of this.behavior(viewPlugin))
         this.plugins[plugin.id] = plugin.create(this)
     })
@@ -246,8 +254,8 @@ export class EditorView {
 
   /// @internal
   updateInner(update: ViewUpdate, viewport: Viewport) {
-    this.viewport = viewport
-    this.state = update.state
+    this._viewport = viewport
+    this._state = update.state
     // FIXME separate plugins from behavior cache?
     let oldPlugins = this.plugins
     this.plugins = Object.create(null)
@@ -265,8 +273,7 @@ export class EditorView {
   }
 
   /// Query the active themes for the CSS class names associated with
-  /// the given tag. (FIXME: this isn't a great system. Also doesn't
-  /// invalidate when reconfiguring.)
+  /// the given tag.
   cssClass(classes: string): string {
     let themes = this.behavior(theme)
     if (themes != this.themeCacheFor) {
@@ -329,7 +336,7 @@ export class EditorView {
   /// Iterate over the height information of the lines in the
   /// viewport.
   viewportLines(f: (height: BlockInfo) => void, editorTop?: number) {
-    let {from, to} = this.viewport
+    let {from, to} = this._viewport
     this.docView.forEachLine(from, to, f, editorTop)
   }
 

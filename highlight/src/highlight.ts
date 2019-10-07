@@ -1,6 +1,6 @@
 import {NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
-import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, DecoratedRange} from "../../view"
+import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, Range} from "../../view"
 import {Syntax, EditorState} from "../../state"
 
 const Inherit = 1
@@ -247,7 +247,7 @@ class Highlighter implements ViewPluginValue {
     this.partialDeco = !rest
     if (rest) view.waitFor(rest)
 
-    let tokens: DecoratedRange[] = []
+    let tokens: Range<Decoration>[] = []
     let start = from
     function flush(pos: number, style: string) {
       if (pos > start && style)

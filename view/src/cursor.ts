@@ -315,10 +315,10 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   }
   let lineStart = block.from
   // If this is outside of the rendered viewport, we can't determine a position
-  if (lineStart < view.viewport.from)
-    return view.viewport.from == 0 ? 0 : -1
-  if (lineStart > view.viewport.to)
-    return view.viewport.to == view.state.doc.length ? view.state.doc.length : -1
+  if (lineStart < view._viewport.from)
+    return view._viewport.from == 0 ? 0 : -1
+  if (lineStart > view._viewport.to)
+    return view._viewport.to == view.state.doc.length ? view.state.doc.length : -1
   // Clip x to the viewport sides
   x = Math.max(content.left + 1, Math.min(content.right - 1, x))
   let root = view.root, element = root.elementFromPoint(x, y)

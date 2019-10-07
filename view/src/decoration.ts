@@ -11,7 +11,7 @@ export interface MarkDecorationSpec {
   /// part of the mark. Defaults to false.
   inclusive?: boolean
   /// Specify whether the start position of the marked range should be
-  /// inclusive.
+  /// inclusive. Overrides `inclusive`, when both are present.
   inclusiveStart?: boolean
   /// Whether the end should be inclusive.
   inclusiveEnd?: boolean
@@ -118,9 +118,6 @@ export abstract class WidgetType<T = any> {
 /// [`RangeSet`](#rangeset.RangeSet) for its methods.
 export type DecorationSet = RangeSet<Decoration>
 
-/// A decorated range (or point).
-export type DecoratedRange = Range<Decoration>
-
 const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8
 
 /// The different types of blocks that can occur in an editor view.
@@ -137,7 +134,7 @@ export enum BlockType {
 
 /// A decoration provides information on how to draw or style a piece
 /// of content. You'll usually use it wrapped in a
-/// [`DecoratedRange`](#view.DecoratedRange), which adds a start and
+/// [`Range`](#rangeset.Range), which adds a start and
 /// end position.
 export abstract class Decoration extends RangeValue {
   /// @internal
@@ -157,21 +154,20 @@ export abstract class Decoration extends RangeValue {
   /// @internal
   get heightRelevant() { return false }
 
-  /// Map this decoration through the given mapping.
-  abstract map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null
-  /// Compare this decoration to another one.
+  abstract map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null
+
   abstract eq(other: Decoration): boolean
 
   /// Create a mark decoration, which influences the styling of the
   /// text in its range.
-  static mark(from: number, to: number, spec: MarkDecorationSpec): DecoratedRange {
+  static mark(from: number, to: number, spec: MarkDecorationSpec): Range<Decoration> {
     if (from >= to) throw new RangeError("Mark decorations may not be empty")
     return new Range(from, to, new MarkDecoration(spec))
   }
 
   /// Create a widget decoration, which adds an element at the given
   /// position.
-  static widget(pos: number, spec: WidgetDecorationSpec): DecoratedRange {
+  static widget(pos: number, spec: WidgetDecorationSpec): Range<Decoration> {
     let side = spec.side || 0
     if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
     return new Range(pos, pos, new PointDecoration(spec, side, side, !!spec.block, spec.widget))
@@ -179,7 +175,7 @@ export abstract class Decoration extends RangeValue {
 
   /// Create a replace decoration which replaces the given range with
   /// a widget, or simply hides it.
-  static replace(from: number, to: number, spec: ReplaceDecorationSpec): DecoratedRange {
+  static replace(from: number, to: number, spec: ReplaceDecorationSpec): Range<Decoration> {
     let block = !!spec.block
     let {start, end} = getInclusive(spec)
     let startSide = block ? -BLOCK_BIG_SIDE * (start ? 2 : 1) : INLINE_BIG_SIDE * (start ? -1 : 1)
@@ -189,15 +185,15 @@ export abstract class Decoration extends RangeValue {
     return new Range(from, Math.max(from, to), new PointDecoration(spec, startSide, endSide, block, spec.widget || null))
   }
 
-  /// Create a line decoration, which can add attributes to the line
-  /// starting at the given position.
-  static line(start: number, spec: LineDecorationSpec): DecoratedRange {
+  /// Create a line decoration, which can add DOM attributes to the
+  /// line starting at the given position.
+  static line(start: number, spec: LineDecorationSpec): Range<Decoration> {
     return new Range(start, start, new LineDecoration(spec))
   }
 
   /// Build a [`DecorationSet`](#view.DecorationSet) from the given
   /// decorated range or ranges.
-  static set(of: DecoratedRange | ReadonlyArray<DecoratedRange>): DecorationSet {
+  static set(of: Range<Decoration> | readonly Range<Decoration>[]): DecorationSet {
     return RangeSet.of<Decoration>(of)
   }
 
@@ -230,7 +226,7 @@ export class MarkDecoration extends Decoration {
           null, spec)
   }
 
-  map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
+  map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null {
     return this.mapSimple(mapping, from, to)
   }
 
@@ -250,7 +246,7 @@ export class LineDecoration extends Decoration {
 
   get point() { return true }
 
-  map(mapping: ChangeSet, pos: number): DecoratedRange | null {
+  map(mapping: ChangeSet, pos: number): Range<Decoration> | null {
     pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
     return pos < 0 ? null : new Range(pos, pos, this)
   }
@@ -274,7 +270,7 @@ export class PointDecoration extends Decoration {
 
   get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
 
-  map(mapping: ChangeSet, from: number, to: number): DecoratedRange | null {
+  map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null {
     // FIXME make mapping behavior configurable?
     if (this.block) {
       let {type} = this

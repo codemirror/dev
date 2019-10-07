@@ -1,11 +1,11 @@
-import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, DecoratedRange} from ".."
+import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, Range} from ".."
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorSelection} from "../../state"
 import {Slot} from "../../extension"
 import ist from "ist"
 
 const filterDeco = Slot.define<(from: number, to: number, spec: any) => boolean>()
-const addDeco = Slot.define<DecoratedRange[]>()
+const addDeco = Slot.define<Range<Decoration>[]>()
 
 function decos(startState: DecorationSet = Decoration.none) {
   return [

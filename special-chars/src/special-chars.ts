@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet, DecoratedRange, WidgetType, ViewPlugin, ViewPluginValue,
+import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewPluginValue,
         ViewUpdate, EditorView} from "../../view"
 import {ChangedRange} from "../../state"
 import {combineConfig} from "../../extension"
@@ -63,7 +63,7 @@ class SpecialCharPlugin implements ViewPluginValue {
   }
 
   closeHoles(ranges: ReadonlyArray<ChangedRange>) {
-    let decorations: DecoratedRange[] = [], vp = this.view.viewport, replaced: number[] = []
+    let decorations: Range<Decoration>[] = [], vp = this.view.viewport, replaced: number[] = []
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]
       // Must redraw all tabs further on the line
@@ -87,7 +87,7 @@ class SpecialCharPlugin implements ViewPluginValue {
     let vp = this.view.viewport
     // Viewports match, don't do anything
     if (this.from == vp.from && this.to == vp.to) return
-    let decorations: DecoratedRange[] = []
+    let decorations: Range<Decoration>[] = []
     if (this.from >= vp.to || this.to <= vp.from) {
       this.getDecorationsFor(vp.from, vp.to, decorations)
       this.decorations = Decoration.set(decorations)
@@ -99,7 +99,7 @@ class SpecialCharPlugin implements ViewPluginValue {
     this.from = vp.from; this.to = vp.to
   }
 
-  getDecorationsFor(from: number, to: number, target: DecoratedRange[]) {
+  getDecorationsFor(from: number, to: number, target: Range<Decoration>[]) {
     let {doc} = this.view.state
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {

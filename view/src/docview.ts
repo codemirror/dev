@@ -62,7 +62,7 @@ export class DocView extends ContentView {
 
   get state() { return this.view.state }
 
-  get viewport() { return this.view.viewport }
+  get viewport() { return this.view._viewport }
 
   get root() { return this.view.root }
 
