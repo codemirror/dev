@@ -75,7 +75,7 @@ export class ViewPlugin<T extends ViewPluginValue<any>> {
   }
 }
 
-/// See [`PluginView.decoration`](#view.PluginView^decoration).
+/// See [`ViewPlugin.decoration`](#view.ViewPlugin^decoration).
 export interface DecorationPluginSpec {
   /// Compute the initial set of decorations.
   create: (view: EditorView) => DecorationSet,
