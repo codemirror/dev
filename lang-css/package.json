@@ -1,4 +1,5 @@
 {
-  "main": "/home/marijn/src/cm6/lang-css/dist/index.esm",
-  "types": "dist/css.d.ts"
+  "main": "dist/index.js",
+  "types": "dist/css.d.ts",
+  "module": "dist/index.esm"
 }

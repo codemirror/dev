@@ -28,8 +28,12 @@ class Pkg {
     return path.join(this.dir, "src", this.entry + ".ts")
   }
 
-  get distFile() {
+  get esmFile() {
     return path.join(this.dir, "dist", "index.esm")
+  }
+
+  get cjsFile() {
+    return path.join(this.dir, "dist", "index.js")
   }
 
   get dependencies() {
@@ -89,8 +93,8 @@ function help(status) {
   process.exit(status)
 }
 
-function error(message) {
-  console.log(message.stack || String(message))
+function error(err) {
+  console.error(err)
   process.exit(1)
 }
 
@@ -106,12 +110,17 @@ function rollupConfig(pkg) {
   return {
     input: pkg.entrySource,
     external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-    output: {
+    output: [{
       format: "esm",
-      file: pkg.distFile,
+      file: pkg.esmFile,
       sourcemap: true,
       externalLiveBindings: false
-    },
+    }, {
+      format: "cjs",
+      file: pkg.cjsFile,
+      sourcemap: true,
+      externalLiveBindings: false
+    }],
     plugins: [require("rollup-plugin-typescript2")({
       clean: true,
       tsconfig: "./tsconfig.base.json",
@@ -139,18 +148,19 @@ async function maybeWriteFile(path, content) {
 async function buildPkg(pkg) {
   let config = rollupConfig(pkg)
   let bundle = await require("rollup").rollup(config)
-  let result = await bundle.generate(config.output)
-  let dir = path.dirname(config.output.file)
-  await fsp.mkdir(dir, {recursive: true}).catch(() => null)
-  for (let file of result.output) {
-    if (/\.d\.ts$/.test(file.fileName))
-      await maybeWriteFile(path.join(dir, file.fileName), file.code || file.source)
-    else
-      await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
-    if (file.map)
-      await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
+  for (let output of config.output) {
+    let result = await bundle.generate(output)
+    let dir = path.dirname(output.file)
+    await fsp.mkdir(dir, {recursive: true}).catch(() => null)
+    for (let file of result.output) {
+      if (!/\.d\.ts$/.test(file.fileName))
+        await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
+      else if (output.format == "cjs") // Don't double-emit declaration files
+        await maybeWriteFile(path.join(dir, file.fileName), file.code || file.source)
+      if (file.map)
+        await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
+    }
   }
-  return config.output.file
 }
 
 function fileTime(path) {
@@ -164,7 +174,7 @@ function fileTime(path) {
 }
 
 function mustRebuild(pkg) {
-  let buildTime = fileTime(pkg.distFile)
+  let buildTime = fileTime(pkg.esmFile)
   if (buildTime < 0) return true
   for (let source of pkg.sources)
     if (fileTime(source) >= buildTime) return true
