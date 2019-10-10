@@ -37,7 +37,7 @@ class Pkg {
       this._dependencies = []
       for (let file of this.sources) {
         let text = fs.readFileSync(file, "utf8")
-        let imp = /(?:^|\n)\s*import.* from "\.\.\/\.\.\/(\w+)"/g, m
+        let imp = /(?:^|\n)\s*import.* from "\.\.\/\.\.\/([\w-]+)"/g, m
         while (m = imp.exec(text))
           if (!this._dependencies.includes(m[1]) && packageNames[m[1]])
             this._dependencies.push(packageNames[m[1]])
@@ -174,14 +174,60 @@ function mustRebuild(pkg) {
   return false
 }
 
+async function rebuild(pkg) {
+  if (!mustRebuild(pkg)) return
+  console.log(`Building ${pkg.name}...`)
+  let t0 = Date.now()
+  await buildPkg(pkg)
+  console.log(`Done in ${Date.now() - t0}ms`)
+}
+
+class Watcher {
+  constructor() {
+    this.work = []
+    this.working = false
+  }
+
+  watch(pkg) {
+    for (let source of pkg.sources)
+      fs.watch(source, () => this.trigger(pkg))
+    for (let dep of pkg.dependencies)
+      for (let decl of dep.declarations)
+        fs.watch(decl, () => this.trigger(pkg))
+  }
+
+  trigger(pkg) {
+    if (!this.work.includes(pkg)) {
+      this.work.push(pkg)
+      setTimeout(() => this.startWork(), 20)
+    }
+  }
+
+  startWork() {
+    if (this.working) return
+    this.working = true
+    this.run().then(() => this.working = false, e => console.log(e.stack || String(e)))
+  }
+
+  async run() {
+    while (this.work.length) {
+      for (let pkg of packages) {
+        let index = this.work.indexOf(pkg)
+        if (index < 0) continue
+        this.work.splice(index, 1)
+        await rebuild(pkg)
+      }
+    }
+  }
+}
+
 async function build(...args) {
   let watch = args.includes("-w") // FIXME
-  for (let pkg of packages) {
-    if (!mustRebuild(pkg)) continue
-    console.log(`Building ${pkg.name}...`)
-    let t0 = Date.now()
-    await buildPkg(pkg)
-    console.log(`Done in ${Date.now() - t0}ms`)
+  for (let pkg of packages) await rebuild(pkg)
+  if (watch) {
+    let watcher = new Watcher()
+    for (let pkg of packages) watcher.watch(pkg)
+    console.log("Watching...")
   }
 }
 
