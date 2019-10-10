@@ -49,6 +49,41 @@ class Pkg {
     }
     return this._dependencies
   }
+
+  get inputFiles() {
+    return this.sources.concat(this.dependencies.reduce((arr, dep) => arr.concat(dep.declarations), []))
+  }
+
+  get rollupConfig() {
+    return this._rollup || (this._rollup = {
+      input: this.entrySource,
+      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
+      output: [{
+        format: "esm",
+        file: this.esmFile,
+        sourcemap: true,
+        externalLiveBindings: false
+      }, {
+        format: "cjs",
+        file: this.cjsFile,
+        sourcemap: true,
+        externalLiveBindings: false
+      }],
+      plugins: [tsPlugin({lib: this.dom ? ["es6", "dom"] : ["es6"]})]
+    })
+  }
+}
+
+function tsPlugin(options) {
+  return require("rollup-plugin-typescript2")({
+    clean: true,
+    tsconfig: path.join(root, "tsconfig.base.json"),
+    tsconfigOverride: {
+      references: [],
+      compilerOptions: options,
+      include: []
+    }
+  })
 }
 
 const packages = [
@@ -73,6 +108,51 @@ const packages = [
 ]
 const packageNames = Object.create(null)
 for (let pkg of packages) packageNames[pkg.name] = pkg
+
+const demo = {
+  name: "demo",
+
+  cjsFile: path.join(root, "demo/demo.js"),
+
+  inputFiles: [path.join(root, "demo/demo.ts")],
+
+  get rollupConfig() {
+    return this._rollup || (this._rollup = {
+      input: path.join(root, "demo/demo.ts"),
+      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
+      output: [{
+        format: "cjs",
+        file: this.cjsFile
+      }],
+      plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false})]
+    })
+  }
+}
+
+const viewTests = {
+  name: "view-tests",
+
+  main: path.join(root, "view/test/test.ts"),
+
+  cjsFile: path.join(root, "demo/test/test.js"),
+
+  // FIXME derive automatically? move to separate dir?
+  inputFiles: ["test", "test-draw", "test-domchange", "test-selection", "test-draw-decoration",
+               "test-extension", "test-movepos", "test-composition"].map(f => path.join(root, "view/test", f + ".ts")),
+
+  get rollupConfig() {
+    return this._rollup || (this._rollup = {
+      input: this.main,
+      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
+      output: [{
+        format: "cjs",
+        file: this.cjsFile,
+        paths: id => id == ".." ? "../../view" : null
+      }],
+      plugins: [tsPlugin({lib: ["es6", "dom"], types: ["mocha", "node"], declaration: false})]
+    })
+  }
+}
 
 function start() {
   let command = process.argv[2]
@@ -109,37 +189,6 @@ function listPackages() {
   console.log(packages.map(p => p.name).join("\n"))
 }
 
-function tsPlugin(options) {
-  return require("rollup-plugin-typescript2")({
-    clean: true,
-    tsconfig: "./tsconfig.base.json",
-    tsconfigOverride: {
-      references: [],
-      compilerOptions: options,
-      include: []
-    }
-  })
-}
-
-function rollupConfig(pkg) {
-  return {
-    input: pkg.entrySource,
-    external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-    output: [{
-      format: "esm",
-      file: pkg.esmFile,
-      sourcemap: true,
-      externalLiveBindings: false
-    }, {
-      format: "cjs",
-      file: pkg.cjsFile,
-      sourcemap: true,
-      externalLiveBindings: false
-    }],
-    plugins: [tsPlugin({lib: pkg.dom ? ["es6", "dom"] : ["es6"]})]
-  }
-}
-
 async function maybeWriteFile(path, content) {
   let buffer = Buffer.from(content)
   let size = -1
@@ -169,23 +218,6 @@ async function runRollup(config) {
   }
 }
 
-async function buildPkg(pkg) {
-  return runRollup(rollupConfig(pkg))
-}
-
-async function buildDemo() {
-  if (fileTime("./demo/demo.js") > fileTime("./demo/demo.ts")) return
-  runRollup({
-    input: "./demo/demo.ts",
-    external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-    output: [{
-      format: "cjs",
-      file: "./demo/demo.js"
-    }],
-    plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false})]
-  })
-}
-
 function fileTime(path) {
   try {
     let stat = fs.statSync(path)
@@ -196,37 +228,23 @@ function fileTime(path) {
   }
 }
 
-function mustRebuild(pkg) {
-  let buildTime = fileTime(pkg.esmFile)
-  if (buildTime < 0) return true
-  for (let source of pkg.sources)
-    if (fileTime(source) >= buildTime) return true
-  for (let dep of pkg.dependencies)
-    for (let decl of dep.declarations)
-      if (fileTime(decl) >= buildTime) return true
-  return false
-}
-
 async function rebuild(pkg) {
-  if (!mustRebuild(pkg)) return
+  let time = fileTime(pkg.cjsFile)
+  if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
   console.log(`Building ${pkg.name}...`)
   let t0 = Date.now()
-  await buildPkg(pkg)
+  await runRollup(pkg.rollupConfig)
   console.log(`Done in ${Date.now() - t0}ms`)
 }
 
 class Watcher {
-  constructor() {
+  constructor(pkgs) {
     this.work = []
     this.working = false
-  }
-
-  watch(pkg) {
-    for (let source of pkg.sources)
-      fs.watch(source, () => this.trigger(pkg))
-    for (let dep of pkg.dependencies)
-      for (let decl of dep.declarations)
-        fs.watch(decl, () => this.trigger(pkg))
+    for (let pkg of pkgs) {
+      for (let file of pkg.inputFiles)
+        fs.watch(file, () => this.trigger(pkg))
+    }
   }
 
   trigger(pkg) {
@@ -255,12 +273,11 @@ class Watcher {
 }
 
 async function build(...args) {
+  let build = packages.concat([demo, viewTests])
+  for (let pkg of build) await rebuild(pkg)
   let watch = args.includes("-w")
-  for (let pkg of packages) await rebuild(pkg)
-  await buildDemo()
   if (watch) {
-    let watcher = new Watcher()
-    for (let pkg of packages) watcher.watch(pkg)
+    new Watcher(build)
     console.log("Watching...")
   }
 }
