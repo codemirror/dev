@@ -54,16 +54,16 @@ class Pkg {
     return this.sources.concat(this.dependencies.reduce((arr, dep) => arr.concat(dep.declarations), []))
   }
 
-  get rollupConfig() {
+  rollupConfig(options) {
     return this._rollup || (this._rollup = {
       input: this.entrySource,
       external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-      output: [{
+      output: [...options.esm ? [{
         format: "esm",
         file: this.esmFile,
         sourcemap: true,
         externalLiveBindings: false
-      }, {
+      }] : [], {
         format: "cjs",
         file: this.cjsFile,
         sourcemap: true,
@@ -116,7 +116,7 @@ const demo = {
 
   inputFiles: [path.join(root, "demo/demo.ts")],
 
-  get rollupConfig() {
+  rollupConfig() {
     return this._rollup || (this._rollup = {
       input: path.join(root, "demo/demo.ts"),
       external(id) { return id != "tslib" && !/^\.?\//.test(id) },
@@ -140,7 +140,7 @@ const viewTests = {
   inputFiles: ["test", "test-draw", "test-domchange", "test-selection", "test-draw-decoration",
                "test-extension", "test-movepos", "test-composition"].map(f => path.join(root, "view/test", f + ".ts")),
 
-  get rollupConfig() {
+  rollupConfig() {
     return this._rollup || (this._rollup = {
       input: this.main,
       external(id) { return id != "tslib" && !/^\.?\//.test(id) },
@@ -228,17 +228,21 @@ function fileTime(path) {
   }
 }
 
-async function rebuild(pkg) {
-  let time = fileTime(pkg.cjsFile)
-  if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
+async function rebuild(pkg, options) {
+  if (!options.always) {
+    let time = fileTime(pkg.cjsFile)
+    if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
+  }
   console.log(`Building ${pkg.name}...`)
   let t0 = Date.now()
-  await runRollup(pkg.rollupConfig)
+  await runRollup(pkg.rollupConfig(options))
   console.log(`Done in ${Date.now() - t0}ms`)
 }
 
 class Watcher {
-  constructor(pkgs) {
+  constructor(pkgs, options) {
+    this.pkgs = pkgs
+    this.options = options
     this.work = []
     this.working = false
     for (let pkg of pkgs) {
@@ -262,27 +266,22 @@ class Watcher {
 
   async run() {
     while (this.work.length) {
-      for (let pkg of packages) {
+      for (let pkg of this.pkgs) {
         let index = this.work.indexOf(pkg)
         if (index < 0) continue
         this.work.splice(index, 1)
-        await rebuild(pkg)
+        await rebuild(pkg, this.options)
+        break
       }
     }
   }
 }
 
-async function build(...args) {
-  let build = packages.concat([demo, viewTests])
-  for (let pkg of build) await rebuild(pkg)
-  let watch = args.includes("-w")
-  if (watch) {
-    new Watcher(build)
-    console.log("Watching...")
-  }
+async function build() {
+  for (let pkg of packages) await rebuild(pkg, {esm: true, always: true})
 }
 
-function devServer() {
+function startServer() {
   let serve = path.join(root, "demo")
   let moduleserver = new (require("moduleserve/moduleserver"))({root: serve})
   let ecstatic = require("ecstatic")({root: serve})
@@ -290,6 +289,14 @@ function devServer() {
     moduleserver.handleRequest(req, resp) || ecstatic(req, resp)
   }).listen(8090, process.env.OPEN ? undefined : "127.0.0.1")
   console.log("Dev server listening on 8090")
+}
+
+async function devServer() {
+  startServer()
+  let target = packages.concat([demo, viewTests])
+  for (let pkg of target) await rebuild(pkg, {esm: false})
+  new Watcher(target, {esm: false})
+  console.log("Watching...")
 }
 
 start()
