@@ -64,6 +64,7 @@ const packages = [
   new Pkg("matchbrackets", {entry: "matchbrackets", dom: true}),
   new Pkg("keymap", {entry: "keymap", dom: true}),
   new Pkg("multiple-selections", {entry: "multiple-selections", dom: true}),
+  new Pkg("special-chars", {entry: "special-chars", dom: true}),
   new Pkg("highlight", {entry: "highlight", dom: true}),
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
   new Pkg("lang-javascript", {entry: "javascript"}),
@@ -79,6 +80,7 @@ function start() {
   let cmdFn = {
     packages: listPackages,
     build: build,
+    devserver: devServer,
     "--help": () => help(0)
   }[command]
   if (!cmdFn || cmdFn.length > args.length) help(1)
@@ -89,6 +91,7 @@ function help(status) {
   console.log(`Usage:
   cm packages             Emit a list of all pkg names
   cm build [-w]           Build the bundle files
+  cm devserver            Start a dev server on port 8090
   cm --help`)
   process.exit(status)
 }
@@ -106,6 +109,18 @@ function listPackages() {
   console.log(packages.map(p => p.name).join("\n"))
 }
 
+function tsPlugin(options) {
+  return require("rollup-plugin-typescript2")({
+    clean: true,
+    tsconfig: "./tsconfig.base.json",
+    tsconfigOverride: {
+      references: [],
+      compilerOptions: options,
+      include: []
+    }
+  })
+}
+
 function rollupConfig(pkg) {
   return {
     input: pkg.entrySource,
@@ -121,15 +136,7 @@ function rollupConfig(pkg) {
       sourcemap: true,
       externalLiveBindings: false
     }],
-    plugins: [require("rollup-plugin-typescript2")({
-      clean: true,
-      tsconfig: "./tsconfig.base.json",
-      tsconfigOverride: {
-        references: [],
-        compilerOptions: {lib: pkg.dom ? ["es6", "dom"] : ["es6"]},
-        include: []
-      }
-    })]
+    plugins: [tsPlugin({lib: pkg.dom ? ["es6", "dom"] : ["es6"]})]
   }
 }
 
@@ -145,8 +152,7 @@ async function maybeWriteFile(path, content) {
     await fsp.writeFile(path, buffer)
 }
 
-async function buildPkg(pkg) {
-  let config = rollupConfig(pkg)
+async function runRollup(config) {
   let bundle = await require("rollup").rollup(config)
   for (let output of config.output) {
     let result = await bundle.generate(output)
@@ -161,6 +167,23 @@ async function buildPkg(pkg) {
         await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
     }
   }
+}
+
+async function buildPkg(pkg) {
+  return runRollup(rollupConfig(pkg))
+}
+
+async function buildDemo() {
+  if (fileTime("./demo/demo.js") > fileTime("./demo/demo.ts")) return
+  runRollup({
+    input: "./demo/demo.ts",
+    external(id) { return id != "tslib" && !/^\.?\//.test(id) },
+    output: [{
+      format: "cjs",
+      file: "./demo/demo.js"
+    }],
+    plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false})]
+  })
 }
 
 function fileTime(path) {
@@ -232,8 +255,9 @@ class Watcher {
 }
 
 async function build(...args) {
-  let watch = args.includes("-w") // FIXME
+  let watch = args.includes("-w")
   for (let pkg of packages) await rebuild(pkg)
+  await buildDemo()
   if (watch) {
     let watcher = new Watcher()
     for (let pkg of packages) watcher.watch(pkg)
@@ -242,8 +266,9 @@ async function build(...args) {
 }
 
 function devServer() {
-  let moduleserver = new (require("moduleserve/moduleserver"))({root})
-  let ecstatic = require("ecstatic")({root})
+  let serve = path.join(root, "demo")
+  let moduleserver = new (require("moduleserve/moduleserver"))({root: serve})
+  let ecstatic = require("ecstatic")({root: serve})
   require("http").createServer((req, resp) => {
     moduleserver.handleRequest(req, resp) || ecstatic(req, resp)
   }).listen(8090, process.env.OPEN ? undefined : "127.0.0.1")
