@@ -113,12 +113,12 @@ export class TagSystem {
 }
 
 /// The set of highlighting tags used by regular language packages and
-/// themes. See [the guide](FIXME) for a list of the tags it defines.
+/// themes.
 export const defaultTags = new TagSystem({
   flags: ["invalid", "meta", "type2", "type3", "type4",
           "link", "strong", "emphasis", "heading", "list", "quote",
           "changed", "inserted", "deleted",
-          "definition", "meta", "constant", "control"],
+          "definition", "constant", "control"],
   types: [
     "comment",
     "lineComment=comment",
@@ -130,14 +130,15 @@ export const defaultTags = new TagSystem({
     "className=name",
     "labelName=name",
     "namespace=name",
-    "regexp",
-    "string",
-    "number",
+    "literal",
+    "string=literal",
+    "character=string",
+    "number=literal",
     "integer=number",
     "float=number",
-    "character=string",
-    "escape",
-    "color",
+    "regexp=literal",
+    "escape=literal",
+    "color=literal",
     "content",
     "keyword",
     "self=keyword",
@@ -153,6 +154,7 @@ export const defaultTags = new TagSystem({
     "bitwiseOperator=operator",
     "compareOperator=operator",
     "updateOperator=operator",
+    "typeOperator=operator",
     "punctuation",
     "separator=punctuation",
     "bracket=punctuation",
