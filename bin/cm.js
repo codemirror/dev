@@ -251,9 +251,14 @@ class Watcher {
     this.options = options
     this.work = []
     this.working = false
+    let self = this
     for (let pkg of pkgs) {
-      for (let file of pkg.inputFiles)
-        fs.watch(file, () => this.trigger(pkg))
+      for (let file of pkg.inputFiles) fs.watch(file, function trigger(type) {
+        self.trigger(pkg)
+        if (type == "rename") setTimeout(() => {
+          try { fs.watch(file, trigger) } catch {}
+        }, 50)
+      }
     }
   }
 
