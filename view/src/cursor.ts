@@ -206,7 +206,7 @@ export class LineContext {
   }
 
   undoQueryPreparation(view: EditorView, toSync: {lines: LineView[]}) {
-    for (let line of toSync.lines) { line.dirty = Dirty.Node; line.sync() }
+    for (let line of toSync.lines) { line.dirty = Dirty.Node; line.sync(); line.dirty = Dirty.Not }
   }
 }
 

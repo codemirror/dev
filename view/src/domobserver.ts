@@ -1,5 +1,5 @@
 import browser from "./browser"
-import {ContentView} from "./contentview"
+import {ContentView, Dirty} from "./contentview"
 import {DocView} from "./docview"
 import {hasSelection, DOMSelection} from "./dom"
 
@@ -164,7 +164,10 @@ export class DOMObserver {
 
     let apply = from > -1 || newSel
     if (!apply || !this.onChange(from, to, typeOver)) {
-      if (this.docView.dirty) this.ignore(() => this.docView.sync())
+      if (this.docView.dirty) {
+        this.ignore(() => this.docView.sync())
+        this.docView.dirty = Dirty.Not
+      }
       this.docView.updateSelection()
     }
     this.clearSelection()
