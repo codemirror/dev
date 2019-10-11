@@ -2,8 +2,8 @@
 
 This is the prototype of the next version of [CodeMirror](https://codemirror.net), a complete rewrite.
 
-Eventually, the content of this repository will move into different packages. For now, to reduce friction during development, it is a monorepo.
+Eventually, the content of this repository will move into different packages. For now, to reduce friction during development, it is a monorepo. Its content is published as the `@codemirror/next` package on [npm](https://npmjs.com).
 
-Please see [our announcement](https://codemirror.net/6/) for more information.
+Please see [the website](https://codemirror.net/6/) for more information and [docs](https://codemirror.net/6/docs/ref).
 
 This code is dual-licensed under the MIT and GPL-v3 licenses. This means that you, as user, may choose one of these licenses to abide by. I.e. if complying with the GPL is problematic for you, you can choose the more liberal MIT license.
