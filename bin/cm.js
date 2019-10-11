@@ -277,8 +277,8 @@ class Watcher {
   }
 }
 
-async function build() {
-  for (let pkg of packages) await rebuild(pkg, {esm: true, always: true})
+async function build(...args) {
+  for (let pkg of packages) await rebuild(pkg, {esm: true, always: args.includes("--force")})
 }
 
 function startServer() {
