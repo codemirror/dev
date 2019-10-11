@@ -27,26 +27,22 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "ecstatic": "^4.1.2",
     "lezer": "^0.4.0",
     "lezer-css": "^0.4.0",
     "lezer-html": "^0.4.0",
     "lezer-javascript": "^0.4.0",
     "lezer-tree": "^0.4.0",
-    "moduleserve": "^0.8.5",
     "style-mod": "^2.0.0",
     "w3c-keyname": "^2.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
-    "@types/selenium-webdriver": "^3.0.14",
+    "ecstatic": "^4.1.2",
     "ist": "^1.1.1",
     "mocha": "^5.1.1",
+    "moduleserve": "^0.8.5",
     "rollup": "^1.19.4",
-    "rollup-plugin-commonjs": "^10.0.2",
-    "rollup-plugin-node-resolve": "^4.0.0",
     "rollup-plugin-typescript2": "^0.24.2",
-    "selenium-webdriver": "^4.0.0-alpha.1",
     "ts-node": "^8.2.0",
     "typescript": "^3.5.1"
   }
