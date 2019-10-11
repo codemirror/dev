@@ -258,7 +258,7 @@ class Watcher {
         if (type == "rename") setTimeout(() => {
           try { fs.watch(file, trigger) } catch {}
         }, 50)
-      }
+      })
     }
   }
 
