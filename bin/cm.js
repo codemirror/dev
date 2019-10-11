@@ -74,13 +74,19 @@ class Pkg {
   }
 }
 
+const baseCompilerOptions = {
+  noImplicitReturns: false,
+  noUnusedLocals: false,
+  sourceMap: true
+}
+
 function tsPlugin(options) {
   return require("rollup-plugin-typescript2")({
     clean: true,
     tsconfig: path.join(root, "tsconfig.base.json"),
     tsconfigOverride: {
       references: [],
-      compilerOptions: options,
+      compilerOptions: {...baseCompilerOptions, ...options},
       include: []
     }
   })
@@ -261,7 +267,7 @@ class Watcher {
   startWork() {
     if (this.working) return
     this.working = true
-    this.run().then(() => this.working = false, e => console.log(e.stack || String(e)))
+    this.run().catch(e => console.log(e.stack || String(e))).then(() => this.working = false)
   }
 
   async run() {
