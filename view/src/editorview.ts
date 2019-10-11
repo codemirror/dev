@@ -364,7 +364,10 @@ export class EditorView {
   }
 
   /// Get the screen coordinates at the given document position.
-  coordsAtPos(pos: number): Rect | null { return this.docView.coordsAt(pos) }
+  coordsAtPos(pos: number): Rect | null {
+    this.readingLayout()
+    return this.docView.coordsAt(pos)
+  }
 
   /// The default width of a character in the editor. May not
   /// accurately reflect the width of all characters.
