@@ -143,7 +143,7 @@ export class EditorState {
   /// multiple ranges to be selected. You should probably not use this
   /// directly, but let a plugin like
   /// [multiple-selections](#multiple-selections) handle it (which
-  /// also makes sure the selections are visible in the view.
+  /// also makes sure the selections are visible in the view).
   static allowMultipleSelections = allowMultipleSelections
 
   /// Behavior that defines a way to query for automatic indentation
