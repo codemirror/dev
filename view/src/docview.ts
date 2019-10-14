@@ -14,14 +14,13 @@ import {EditorView, UpdateState} from "./editorview"
 import {EditorState, ChangedRange} from "../../state"
 import {Text} from "../../text"
 
-type A<T> = ReadonlyArray<T>
 const none = [] as any
 
 export class DocView extends ContentView {
   children!: BlockView[]
   viewports: Viewport[] = none
 
-  decorations!: A<DecorationSet>
+  decorations!: readonly DecorationSet[]
   compositionDeco: DecorationSet = Decoration.none
   gapDeco: DecorationSet = Decoration.none
   selectionDirty: any = null
@@ -131,7 +130,7 @@ export class DocView extends ContentView {
 
   // Used both by update and checkLayout do perform the actual DOM
   // update
-  private updateInner(changes: A<ChangedRange>, oldLength: number) {
+  private updateInner(changes: readonly ChangedRange[], oldLength: number) {
     let visible = this.viewport, viewports: Viewport[] = [visible]
     let {head, anchor} = this.state.selection.primary
     if (head < visible.from || head > visible.to) {
@@ -161,7 +160,7 @@ export class DocView extends ContentView {
     })
   }
 
-  private updateChildren(changes: A<ChangedRange>, viewports: A<Viewport>, oldLength: number) {
+  private updateChildren(changes: readonly ChangedRange[], viewports: readonly Viewport[], oldLength: number) {
     let gapDeco = this.computeGapDeco(viewports, this.length)
     let gapChanges = findChangedRanges(this.gapDeco, gapDeco, changes, oldLength)
     this.gapDeco = gapDeco
@@ -303,7 +302,7 @@ export class DocView extends ContentView {
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
   computeUpdate(state: EditorState, update: ViewUpdate | null, initializing: null | ((viewport: Viewport) => void),
-                contentChanges: A<ChangedRange>, viewportBias: number, scrollIntoView: number): A<ChangedRange> {
+                contentChanges: readonly ChangedRange[], viewportBias: number, scrollIntoView: number): readonly ChangedRange[] {
     for (let i = 0;; i++) {
       let viewport = this.viewportState.getViewport(state.doc, this.heightMap, viewportBias, scrollIntoView)
       let viewportChange = this.viewport ? !viewport.eq(this.viewport) : true
@@ -523,7 +522,7 @@ export class DocView extends ContentView {
     return new ChildCursor(this.children, pos, i)
   }
 
-  computeGapDeco(viewports: A<Viewport>, docLength: number): DecorationSet {
+  computeGapDeco(viewports: readonly Viewport[], docLength: number): DecorationSet {
     let deco = []
     for (let pos = 0, i = 0;; i++) {
       let next = i == viewports.length ? null : viewports[i]
@@ -569,8 +568,8 @@ class GapWidget extends WidgetType<number> {
   get estimatedHeight() { return this.value }
 }
 
-function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
-                     oldDecorations: A<DecorationSet>, oldLength: number): {content: number[], height: number[]} {
+function decoChanges(diff: readonly ChangedRange[], decorations: readonly DecorationSet[],
+                     oldDecorations: readonly DecorationSet[], oldLength: number): {content: number[], height: number[]} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let i = decorations.length - 1; i >= 0; i--) {
     let deco = decorations[i], oldDeco = i < oldDecorations.length ? oldDecorations[i] : Decoration.none
@@ -582,7 +581,7 @@ function decoChanges(diff: A<ChangedRange>, decorations: A<DecorationSet>,
   return {content: contentRanges, height: heightRanges}
 }
 
-function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRange> {
+function extendWithRanges(diff: readonly ChangedRange[], ranges: number[]): readonly ChangedRange[] {
   if (ranges.length == 0) return diff
   let result: ChangedRange[] = []
   for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
@@ -601,13 +600,13 @@ function extendWithRanges(diff: A<ChangedRange>, ranges: number[]): A<ChangedRan
   }
 }
 
-function sameArray<T>(a: A<T>, b: A<T>) {
+function sameArray<T>(a: readonly T[], b: readonly T[]) {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
 }
 
-export function computeCompositionDeco(view: EditorView, changes: A<ChangedRange>): DecorationSet {
+export function computeCompositionDeco(view: EditorView, changes: readonly ChangedRange[]): DecorationSet {
   let sel = view.root.getSelection()!
   let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset)
   if (!textNode) return Decoration.none

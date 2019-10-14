@@ -23,7 +23,7 @@ export abstract class ContentView {
   abstract children: ContentView[]
   breakAfter!: number
 
-  get overrideDOMText(): ReadonlyArray<string> | null { return null }
+  get overrideDOMText(): readonly string[] | null { return null }
 
   get posAtStart(): number {
     return this.parent ? this.parent.posBefore(this) : 0
@@ -202,7 +202,7 @@ function syncNodeInto(parent: HTMLElement, pos: Node | null, dom: Node): Node | 
 export class ChildCursor {
   off: number = 0
 
-  constructor(public children: ReadonlyArray<ContentView>, public pos: number, public i: number) {}
+  constructor(public children: readonly ContentView[], public pos: number, public i: number) {}
 
   findPos(pos: number, bias: number = 1): this {
     for (;;) {

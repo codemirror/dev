@@ -7,7 +7,7 @@ const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElem
 let tempView: EditorView | null = null
 let hide: any = null
 
-export function tempEditor(doc = "", extensions: ReadonlyArray<Extension> = []): EditorView {
+export function tempEditor(doc = "", extensions: readonly Extension[] = []): EditorView {
   if (tempView) {
     tempView.destroy()
     tempView = null

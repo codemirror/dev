@@ -1,7 +1,5 @@
 import {ChangeSet, Change, ChangedRange} from "../../state"
 
-type A<T> = ReadonlyArray<T>
-
 /// Each range is associated with a value, which must inherit from
 /// this class.
 export abstract class RangeValue {
@@ -40,7 +38,7 @@ export interface RangeIterator<T extends RangeValue> {
   /// Called for any ranges not covered by point decorations. `active`
   /// holds the values that the range is marked with (and may be
   /// empty).
-  span(from: number, to: number, active: A<T>): void
+  span(from: number, to: number, active: readonly T[]): void
   /// Called when going over a point decoration. `openStart` and
   /// `openEnd` indicate whether the point decoration exceeded the
   /// range we're iterating over at its start and end.
@@ -81,9 +79,9 @@ export class Range<T extends RangeValue> {
   get heapSide() { return this.value.endSide }
 }
 
-const none: A<any> = []
+const none: readonly any[] = []
 
-function maybeNone<T>(array: A<T>): A<T> { return array.length ? array : none }
+function maybeNone<T>(array: readonly T[]): readonly T[] { return array.length ? array : none }
 
 const BASE_NODE_SIZE_SHIFT = 5, BASE_NODE_SIZE = 1 << BASE_NODE_SIZE_SHIFT
 
@@ -103,18 +101,18 @@ export class RangeSet<T extends RangeValue> {
     /// @internal The locally stored ranges—which are all of them for
     /// leaf nodes, and the ones that don't fit in child sets for
     /// non-leaves. Sorted by start position, then side.
-    public local: A<Range<T>>,
+    public local: readonly Range<T>[],
     /// @internal The child sets, in position order. Their total
     /// length may be smaller than .length if the end is empty (never
     /// greater)
-    public children: A<RangeSet<T>>
+    public children: readonly RangeSet<T>[]
   ) {}
 
   /// Update this set, returning the modified set. The range that gets
   /// filtered can be limited with the `filterFrom` and `filterTo`
   /// arguments (specifying a smaller range makes the operation
   /// cheaper).
-  update(added: A<Range<T>> = none,
+  update(added: readonly Range<T>[] = none,
          filter: RangeFilter<T> | null = null,
          filterFrom: number = 0,
          filterTo: number = this.length): RangeSet<T> {
@@ -132,7 +130,7 @@ export class RangeSet<T extends RangeValue> {
   }
 
   /// @internal
-  updateInner(added: A<Range<T>>,
+  updateInner(added: readonly Range<T>[],
               filter: RangeFilter<T> | null,
               filterFrom: number, filterTo: number,
               offset: number, length: number): RangeSet<T> {
@@ -312,7 +310,7 @@ export class RangeSet<T extends RangeValue> {
   /// `comparator` to notify it of possible differences. `textDiff`
   /// indicates how the underlying data changed between these ranges,
   /// and is needed to synchronize the iteration.
-  compare(other: RangeSet<T>, textDiff: A<ChangedRange>, comparator: RangeComparator<T>, oldLen: number) {
+  compare(other: RangeSet<T>, textDiff: readonly ChangedRange[], comparator: RangeComparator<T>, oldLen: number) {
     let oldPos = 0, newPos = 0
     for (let range of textDiff) {
       if (range.fromB > newPos && (this != other || oldPos != newPos))
@@ -327,7 +325,7 @@ export class RangeSet<T extends RangeValue> {
   /// Iterate over a group of range sets at the same time, notifying
   /// the iterator about the ranges covering every given piece of
   /// content.
-  static iterateSpans<T extends RangeValue>(sets: A<RangeSet<T>>, from: number, to: number, iterator: RangeIterator<T>) {
+  static iterateSpans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number, iterator: RangeIterator<T>) {
     let heap: Heapable[] = []
     let pos = from, posSide = -FAR
 
@@ -377,7 +375,7 @@ export class RangeSet<T extends RangeValue> {
   }
 
   /// Create a range set for the given range or array of ranges.
-  static of<T extends RangeValue>(ranges: A<Range<T>> | Range<T>): RangeSet<T> {
+  static of<T extends RangeValue>(ranges: readonly Range<T>[] | Range<T>): RangeSet<T> {
     return RangeSet.empty.update(ranges instanceof Range ? [ranges] : ranges)
   }
 
@@ -398,7 +396,7 @@ class IteratedSet<T extends RangeValue> {
 class LocalSet<T extends RangeValue> {
   public index: number = 0
   constructor(public offset: number,
-              public ranges: A<Range<T>>,
+              public ranges: readonly Range<T>[],
               public next: IteratedSet<T>[] | null = null) {}
 
   // Used to make this conform to Heapable
@@ -509,7 +507,7 @@ function insertSorted(target: Range<RangeValue>[], range: Range<RangeValue>) {
   target.splice(i, 0, range)
 }
 
-function filterRanges<T extends RangeValue>(ranges: A<Range<T>>,
+function filterRanges<T extends RangeValue>(ranges: readonly Range<T>[],
                                             filter: RangeFilter<T> | null,
                                             filterFrom: number, filterTo: number,
                                             offset: number): Range<T>[] | null {
@@ -527,8 +525,8 @@ function filterRanges<T extends RangeValue>(ranges: A<Range<T>>,
 }
 
 function collapseSet<T extends RangeValue>(
-  children: A<RangeSet<T>>, local: Range<T>[],
-  add: A<Range<T>>, start: number, offset: number, length: number
+  children: readonly RangeSet<T>[], local: Range<T>[],
+  add: readonly Range<T>[], start: number, offset: number, length: number
 ): RangeSet<T> {
   let mustSort = local.length > 0 && add.length > 0, off = 0
   for (let child of children) {
@@ -542,7 +540,7 @@ function collapseSet<T extends RangeValue>(
 }
 
 function appendRanges<T extends RangeValue>(local: Range<T>[], children: RangeSet<T>[],
-                                            ranges: A<Range<T>>, start: number,
+                                            ranges: readonly Range<T>[], start: number,
                                             offset: number, length: number, pos: number, childSize: number) {
   // Group added ranges after the current children into new
   // children (will usually only happen when initially creating a
@@ -827,7 +825,7 @@ function remove<T>(array: T[], index: number) {
 
 const enum Touched {Yes, No, Covered}
 
-function touchesChanges(from: number, to: number, changes: A<Change>): Touched {
+function touchesChanges(from: number, to: number, changes: readonly Change[]): Touched {
   let result = Touched.No
   for (let change of changes) {
     if (change.to >= from && change.from <= to) {

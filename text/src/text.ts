@@ -31,7 +31,7 @@ export abstract class Text {
   /// The number of lines in the string (always >= 1).
   abstract readonly lines: number
   /// @internal
-  abstract readonly children: ReadonlyArray<Text> | null
+  abstract readonly children: readonly Text[] | null
 
   /// Get the line description around the given position.
   lineAt(pos: number): Line {
@@ -60,16 +60,16 @@ export abstract class Text {
 
   /// Replace a range of the text with the given lines. `text` should
   /// have a length of at least one.
-  replace(from: number, to: number, text: ReadonlyArray<string>): Text {
+  replace(from: number, to: number, text: readonly string[]): Text {
     if (text.length == 0) throw new RangeError("An inserted range must have at least one line")
     return this.replaceInner(from, to, text, textLength(text))
   }
 
   /// @internal
-  abstract replaceInner(from: number, to: number, text: ReadonlyArray<string>, length: number): Text
+  abstract replaceInner(from: number, to: number, text: readonly string[], length: number): Text
 
   /// Retrieve the lines between the given points.
-  sliceLines(from: number, to: number = this.length): ReadonlyArray<string> {
+  sliceLines(from: number, to: number = this.length): readonly string[] {
     return this.sliceTo(from, to, [""])
   }
 
@@ -119,7 +119,7 @@ export abstract class Text {
   protected constructor() {}
 
   /// Create a `Text` instance for the given array of lines.
-  static of(text: ReadonlyArray<string>): Text {
+  static of(text: readonly string[]): Text {
     if (text.length == 0) throw new RangeError("A document must have at least one line")
     let length = textLength(text)
     return length < Tree.MaxLeaf ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
@@ -144,7 +144,7 @@ function cacheLine(text: Text, line: Line): Line {
 // a tree structure. Long lines will be broken into a number of
 // single-line leaves.
 class TextLeaf extends Text {
-  constructor(readonly text: ReadonlyArray<string>, readonly length: number = textLength(text)) {
+  constructor(readonly text: readonly string[], readonly length: number = textLength(text)) {
     super()
   }
 
@@ -152,7 +152,7 @@ class TextLeaf extends Text {
 
   get children() { return null }
 
-  replaceInner(from: number, to: number, text: ReadonlyArray<string>, length: number): Text {
+  replaceInner(from: number, to: number, text: readonly string[], length: number): Text {
     return Text.of(appendText(this.text, appendText(text, sliceText(this.text, 0, from)), to))
   }
 
@@ -182,7 +182,7 @@ class TextLeaf extends Text {
 
   firstLineLength(): number { return this.text[0].length }
 
-  static split(text: ReadonlyArray<string>, target: Text[]): Text[] {
+  static split(text: readonly string[], target: Text[]): Text[] {
     let part = [], length = -1
     for (let line of text) {
       for (;;) {
@@ -212,13 +212,13 @@ class TextLeaf extends Text {
 class TextNode extends Text {
   readonly lines: number;
 
-  constructor(readonly children: ReadonlyArray<Text>, readonly length: number) {
+  constructor(readonly children: readonly Text[], readonly length: number) {
     super()
     this.lines = 1
     for (let child of children) this.lines += child.lines - 1
   }
 
-  replaceInner(from: number, to: number, text: ReadonlyArray<string>, length: number): Text {
+  replaceInner(from: number, to: number, text: readonly string[], length: number): Text {
     let lengthDiff = length - (to - from), newLength = this.length + lengthDiff
     if (newLength <= Tree.BaseLeaf)
       return new TextLeaf(appendText(this.sliceLines(to), appendText(text, this.sliceTo(0, from, [""]))), newLength)
@@ -372,13 +372,13 @@ class TextNode extends Text {
 
 Text.empty = Text.of([""])
 
-function textLength(text: ReadonlyArray<string>) {
+function textLength(text: readonly string[]) {
   let length = -1
   for (let line of text) length += line.length + 1
   return length
 }
 
-function appendText(text: ReadonlyArray<string>, target: string[], from = 0, to = 1e9): string[] {
+function appendText(text: readonly string[], target: string[], from = 0, to = 1e9): string[] {
   for (let pos = 0, i = 0, first = true; i < text.length && pos <= to; i++) {
     let line = text[i], end = pos + line.length
     if (end >= from) {
@@ -392,7 +392,7 @@ function appendText(text: ReadonlyArray<string>, target: string[], from = 0, to 
   return target
 }
 
-function sliceText(text: ReadonlyArray<string>, from?: number, to?: number): string[] {
+function sliceText(text: readonly string[], from?: number, to?: number): string[] {
   return appendText(text, [""], from, to)
 }
 

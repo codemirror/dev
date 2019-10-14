@@ -57,7 +57,7 @@ export interface GutterConfig {
   /// implementing.
   updateMarkers?: (markers: RangeSet<GutterMarker>, update: ViewUpdate) => RangeSet<GutterMarker>
   /// Can be used to optionally add a single marker to every line.
-  lineMarker?: (view: EditorView, line: BlockInfo, markers: ReadonlyArray<GutterMarker>) => GutterMarker | null
+  lineMarker?: (view: EditorView, line: BlockInfo, markers: readonly GutterMarker[]) => GutterMarker | null
   /// @internal
   initialSpacer?: null | ((view: EditorView) => GutterMarker)
   /// @internal
@@ -140,7 +140,7 @@ class GutterView implements ViewPluginValue {
           this.elements.push(newElt)
           this.dom.appendChild(newElt.dom)
         } else {
-          let markers: ReadonlyArray<GutterMarker> = localMarkers, elt = this.elements[i]
+          let markers: readonly GutterMarker[] = localMarkers, elt = this.elements[i]
           if (sameMarkers(markers, elt.markers)) {
             markers = elt.markers
             localMarkers.length = 0
@@ -167,14 +167,14 @@ class GutterElement {
   dom: HTMLElement
   height: number = -1
   above: number = 0
-  markers!: ReadonlyArray<GutterMarker>
+  markers!: readonly GutterMarker[]
 
-  constructor(height: number, above: number, markers: ReadonlyArray<GutterMarker>, eltClass: string) {
+  constructor(height: number, above: number, markers: readonly GutterMarker[], eltClass: string) {
     this.dom = document.createElement("div")
     this.update(height, above, markers, eltClass)
   }
 
-  update(height: number, above: number, markers: ReadonlyArray<GutterMarker>, eltClass: string) {
+  update(height: number, above: number, markers: readonly GutterMarker[], eltClass: string) {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
@@ -195,7 +195,7 @@ class GutterElement {
   }
 }
 
-function sameMarkers<T>(a: ReadonlyArray<GutterMarker>, b: ReadonlyArray<GutterMarker>): boolean {
+function sameMarkers<T>(a: readonly GutterMarker[], b: readonly GutterMarker[]): boolean {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (!a[i].compare(b[i])) return false
   return true

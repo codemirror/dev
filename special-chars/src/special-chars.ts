@@ -62,7 +62,7 @@ class SpecialCharPlugin implements ViewPluginValue {
     this.updateForViewport()
   }
 
-  closeHoles(ranges: ReadonlyArray<ChangedRange>) {
+  closeHoles(ranges: readonly ChangedRange[]) {
     let decorations: Range<Decoration>[] = [], vp = this.view.viewport, replaced: number[] = []
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]

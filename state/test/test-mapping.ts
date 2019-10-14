@@ -11,7 +11,7 @@ function testMapping(mapping: ChangeSet<ChangeDesc>, ...cases: any[][]) {
   }
 }
 
-function mapThrough(changes: ReadonlyArray<ChangeDesc>, pos: number, bias: number): number {
+function mapThrough(changes: readonly ChangeDesc[], pos: number, bias: number): number {
   for (let change of changes) pos = change.mapPos(pos, bias)
   return pos
 }

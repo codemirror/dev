@@ -343,7 +343,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 }
 
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: ReadonlyArray<ChangedRange>, lengthA: number): Changes {
+export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: readonly ChangedRange[], lengthA: number): Changes {
   let comp = new DecorationComparator()
   a.compare(b, diff, comp, lengthA)
   return comp.changes
@@ -357,7 +357,7 @@ class HeightDecoScanner implements RangeIterator<Decoration> {
   ignore(from: number, to: number, value: Decoration) { return from == to && !value.heightRelevant }
 }
 
-export function heightRelevantDecorations(decorations: ReadonlyArray<DecorationSet>, ranges: ReadonlyArray<ChangedRange>): number[] {
+export function heightRelevantDecorations(decorations: readonly DecorationSet[], ranges: readonly ChangedRange[]): number[] {
   let scanner = new HeightDecoScanner
   for (let {fromB, toB} of ranges)
     RangeSet.iterateSpans(decorations, fromB, toB, scanner)

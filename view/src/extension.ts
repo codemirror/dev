@@ -176,9 +176,9 @@ export class ViewUpdate {
     /// The editor view that the update is associated with.
     readonly view: EditorView,
     /// The transactions involved in the update. May be empty.
-    readonly transactions: ReadonlyArray<Transaction> = none,
+    readonly transactions: readonly Transaction[] = none,
     /// @internal
-    readonly metadata: ReadonlyArray<Slot> = none
+    readonly metadata: readonly Slot[] = none
   ) {
     this.state = transactions.length ? transactions[transactions.length - 1].apply() : view.state
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)

@@ -82,12 +82,12 @@ export class Transaction {
 
   /// Add a change replacing the given document range with the given
   /// content.
-  replace(from: number, to: number, text: string | ReadonlyArray<string>): Transaction {
+  replace(from: number, to: number, text: string | readonly string[]): Transaction {
     return this.change(new Change(from, to, typeof text == "string" ? this.startState.splitLines(text) : text))
   }
 
   /// Replace all selection ranges with the given content.
-  replaceSelection(text: string | ReadonlyArray<string>): Transaction {
+  replaceSelection(text: string | readonly string[]): Transaction {
     let content = typeof text == "string" ? this.startState.splitLines(text) : text
     return this.forEachRange(range => {
       let change = new Change(range.from, range.to, content)

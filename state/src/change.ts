@@ -1,6 +1,6 @@
 import {Text} from "../../text"
 
-const empty: ReadonlyArray<any> = []
+const empty: readonly any[] = []
 
 /// Distinguishes different ways in which positions can be mapped.
 export enum MapMode {
@@ -88,7 +88,7 @@ export class Change extends ChangeDesc {
     public readonly from: number,
     public readonly to: number,
     /// The replacement content.
-    public readonly text: ReadonlyArray<string>
+    public readonly text: readonly string[]
   ) {
     super(from, to, textLength(text))
   }
@@ -132,7 +132,7 @@ export class Change extends ChangeDesc {
   }
 }
 
-function textLength(text: ReadonlyArray<string>) {
+function textLength(text: readonly string[]) {
   let length = -1
   for (let line of text) length += line.length + 1
   return length
@@ -143,9 +143,9 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   /// @internal
   constructor(
     /// The changes in this set.
-    readonly changes: ReadonlyArray<C>,
+    readonly changes: readonly C[],
     /// @internal
-    readonly mirror: ReadonlyArray<number> = empty) {}
+    readonly mirror: readonly number[] = empty) {}
 
   /// The number of changes in the set.
   get length(): number {
@@ -336,7 +336,7 @@ export class ChangedRange {
   get lenDiff() { return (this.toB - this.fromB) - (this.toA - this.fromA) }
 
   /// @internal
-  static mapPos(pos: number, bias: number, changes: ReadonlyArray<ChangedRange>): number {
+  static mapPos(pos: number, bias: number, changes: readonly ChangedRange[]): number {
     let off = 0
     for (let range of changes) {
       if (pos < range.fromA) break

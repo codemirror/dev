@@ -21,7 +21,7 @@ export interface EditorStateConfig {
   /// [view](#view.EditorView^extend) extensions to associate with
   /// this state. View extensions provided here only take effect when
   /// the state is put into an editor view.
-  extensions?: ReadonlyArray<Extension>
+  extensions?: readonly Extension[]
 }
 
 const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4, DEFAULT_SPLIT = /\r\n?|\n/
@@ -88,7 +88,7 @@ export class EditorState {
 
   /// Join an array of lines using the state's [line
   /// separator](#state.EditorState^lineSeparator).
-  joinLines(text: ReadonlyArray<string>): string { return text.join(this.behavior(EditorState.lineSeparator) || "\n") }
+  joinLines(text: readonly string[]): string { return text.join(this.behavior(EditorState.lineSeparator) || "\n") }
 
   /// Split a string into lines using the state's [line
   /// separator](#state.EditorState^lineSeparator).

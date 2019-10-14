@@ -161,7 +161,7 @@ export class WidgetView extends InlineView {
   ignoreMutation(): boolean { return true }
   ignoreEvent(event: Event): boolean { return this.widget.ignoreEvent(event) }
 
-  get overrideDOMText(): ReadonlyArray<string> | null {
+  get overrideDOMText(): readonly string[] | null {
     if (this.length == 0) return [""]
     let top: ContentView = this
     while (top.parent) top = top.parent

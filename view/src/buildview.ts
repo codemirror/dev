@@ -121,7 +121,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
 
   ignore(): boolean { return false }
 
-  static build(text: Text, from: number, to: number, decorations: ReadonlyArray<DecorationSet>):
+  static build(text: Text, from: number, to: number, decorations: readonly DecorationSet[]):
     {content: BlockView[], breakAtStart: number} {
     let builder = new ContentBuilder(text, from, to)
     RangeSet.iterateSpans(decorations, from, to, builder)

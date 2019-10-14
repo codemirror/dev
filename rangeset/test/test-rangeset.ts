@@ -28,7 +28,7 @@ class Value extends RangeValue {
   eq(other: RangeValue): boolean {
     return other instanceof Value && other.name == this.name
   }
-  static names(v: ReadonlyArray<Value>): string {
+  static names(v: readonly Value[]): string {
     let result = []
     for (let val of v) if (val.name || val.point) result.push(val.name || "POINT")
     return result.sort().join("/")
@@ -332,7 +332,7 @@ describe("RangeSet", () => {
 
   class Builder implements RangeIterator<Value> {
     spans: string[] = []
-    span(from: number, to: number, active: ReadonlyArray<Value>) {
+    span(from: number, to: number, active: readonly Value[]) {
       let name = Value.names(active)
       this.spans.push((to - from) + (name ? "=" + name : ""))
     }

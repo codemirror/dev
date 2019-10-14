@@ -74,7 +74,7 @@ export class EditorSelection {
   constructor(
     /// The ranges in the selection, sorted by position. Ranges cannot
     /// overlap (but they may touch, if they aren't empty).
-    readonly ranges: ReadonlyArray<SelectionRange>,
+    readonly ranges: readonly SelectionRange[],
     /// The index of the _primary_ range in the selection (which is
     /// usually the range that was added last).
     readonly primaryIndex: number = 0
@@ -143,7 +143,7 @@ export class EditorSelection {
 
   /// Sort and merge the given set of ranges, creating a valid
   /// selection.
-  static create(ranges: ReadonlyArray<SelectionRange>, primaryIndex: number = 0) {
+  static create(ranges: readonly SelectionRange[], primaryIndex: number = 0) {
     for (let pos = 0, i = 0; i < ranges.length; i++) {
       let range = ranges[i]
       if (range.empty ? range.from <= pos : range.from < pos) return normalized(ranges.slice(), primaryIndex)

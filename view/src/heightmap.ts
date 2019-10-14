@@ -87,7 +87,7 @@ export class BlockInfo {
     readonly height: number,
     /// The type of element this is. When querying lines, this may be
     /// an array of all the blocks that make up the line.
-    readonly type: BlockType | ReadonlyArray<BlockInfo>
+    readonly type: BlockType | readonly BlockInfo[]
   ) {}
 
   /// The end of the element as a document position.
@@ -145,8 +145,8 @@ export abstract class HeightMap {
   decomposeLeft(to: number, result: (HeightMap | null)[]) { result.push(this) }
   decomposeRight(from: number, result: (HeightMap | null)[]) { result.push(this) }
 
-  applyChanges(decorations: ReadonlyArray<DecorationSet>, oldDoc: Text, oracle: HeightOracle,
-               changes: ReadonlyArray<ChangedRange>): HeightMap {
+  applyChanges(decorations: readonly DecorationSet[], oldDoc: Text, oracle: HeightOracle,
+               changes: readonly ChangedRange[]): HeightMap {
     let me: HeightMap = this
     for (let i = changes.length - 1; i >= 0; i--) {
       let {fromA, toA, fromB, toB} = changes[i]
@@ -578,7 +578,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   // The returned array uses null to indicate line breaks, but never
   // starts or ends in a line break, or has multiple line breaks next
   // to each other.
-  static build(oracle: HeightOracle, decorations: ReadonlyArray<DecorationSet>,
+  static build(oracle: HeightOracle, decorations: readonly DecorationSet[],
                from: number, to: number): (HeightMap | null)[] {
     let builder = new NodeBuilder(from, oracle)
     RangeSet.iterateSpans(decorations, from, to, builder)

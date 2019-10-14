@@ -8,7 +8,7 @@ class Item {
 }
 export const enum ItemFilter { OnlyChanges, Any }
 
-type Branch = ReadonlyArray<Item>
+type Branch = readonly Item[]
 
 function updateBranch(branch: Branch, to: number, maxLen: number, newItem: Item) {
   let start = to + 1 > maxLen + 20 ? to - maxLen - 1 : 0
