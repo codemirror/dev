@@ -198,6 +198,12 @@ describe("EditorView decoration", () => {
       cm.dispatch(cm.state.t().addMeta(addDeco([w(0, new WordWidget("B"))])))
       ist(cm.contentDOM.querySelectorAll("strong").length, 2)
     })
+
+    it("doesn't duplicate widgets on line splitting", () => {
+      let cm = decoEditor("a", [w(1, new WordWidget("W"), 1)])
+      cm.dispatch(cm.state.t().replace(1, 1, "\n"))
+      ist(cm.contentDOM.querySelectorAll("strong").length, 1)
+    })
   })
 
   describe("replaced", () => {

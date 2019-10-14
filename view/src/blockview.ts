@@ -94,13 +94,14 @@ export class LineView extends ContentView implements BlockView {
     let end = new LineView
     end.breakAfter = this.breakAfter
     if (this.length == 0) return end
-    let {i, off} = this.childCursor().findPos(at)
+    let {i, off} = this.childPos(at)
     if (off) {
       end.append(this.children[i].slice(off))
       this.children[i].merge(off, undefined, null)
       i++
     }
     for (let j = i; j < this.children.length; j++) end.append(this.children[j])
+    while (i > 0 && this.children[i - 1].length == 0) { this.children[i - 1].parent = null; i-- }
     this.children.length = i
     this.markDirty()
     this.length = at

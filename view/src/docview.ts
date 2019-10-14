@@ -190,21 +190,32 @@ export class DocView extends ContentView {
       return
 
     let after = this.children[toI]
-    if (toOff < after.length) {
+    // Make sure the end of the line after the update is preserved in `after`
+    if (toOff < after.length || after.children.length && after.children[after.children.length - 1].length == 0) {
+      // If we're splitting a line, separate part of the start line to
+      // avoid that being mangled when updating the start line.
       if (fromI == toI) {
         after = after.split(toOff)
         toOff = 0
       }
+      // If the element after the replacement should be merged with
+      // the last replacing element, update `content`
       if (!breakAtEnd && last && after.merge(0, toOff, last, true)) {
         content[content.length - 1] = after
       } else {
-        if (toOff) after.merge(0, toOff, null, false)
+        // Remove the start of the after element, if necessary, and
+        // add it to `content`.
+        if (toOff || after.children.length && after.children[0].length == 0) after.merge(0, toOff, null, false)
         content.push(after)
       }
     } else if (after.breakAfter) {
+      // The element at `toI` is entirely covered by this range.
+      // Preserve its line break, if any.
       if (last) last.breakAfter = 1
       else breakAtStart = 1
     }
+    // Since we've handled the next element from the current elements
+    // now, make sure `toI` points after that.
     toI++
 
     before.breakAfter = breakAtStart
