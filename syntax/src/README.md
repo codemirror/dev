@@ -4,11 +4,11 @@
 
 @closeNodeProp
 
+@foldNodeProp
+
 ### Indentation
 
 @indentNodeProp
-
-@syntaxIndentation
 
 @IndentContext
 

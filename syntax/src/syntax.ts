@@ -3,6 +3,8 @@ import {Tree} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
 import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
+import {syntaxIndentation} from "./indent"
+import {syntaxFolding} from "./fold"
 
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
@@ -21,7 +23,7 @@ export class LezerSyntax implements Syntax {
       init() { return new SyntaxState(Tree.empty) },
       apply(tr, value) { return value.apply(tr) }
     })
-    this.extension = [EditorState.syntax(this), this.field.extension]
+    this.extension = [EditorState.syntax(this), this.field.extension, syntaxIndentation(this), syntaxFolding(this)]
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {

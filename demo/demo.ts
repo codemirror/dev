@@ -7,7 +7,6 @@ import {baseKeymap, indentSelection} from "../commands"
 import {bracketMatching} from "../matchbrackets"
 import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
-import {syntaxIndentation} from "../syntax"
 
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
@@ -25,7 +24,6 @@ let state = EditorState.create({doc: `<script>
   specialChars(),
   multipleSelections(),
   html(),
-  syntaxIndentation,
   defaultHighlighter,
   bracketMatching(),
   keymap({

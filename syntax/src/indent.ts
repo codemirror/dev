@@ -1,6 +1,6 @@
 import {Line} from "../../text"
 import {NodeType, NodeProp, Subtree, Tree} from "lezer-tree"
-import {EditorState} from "../../state"
+import {EditorState, Syntax} from "../../state"
 
 /// A syntax tree node prop used to associate indentation strategies
 /// with node types. Such a strategy is a function from an indentation
@@ -9,18 +9,11 @@ import {EditorState} from "../../state"
 /// which the given line should be indented.
 export const indentNodeProp = new NodeProp<(context: IndentContext) => number>()
 
-/// An extension that enables syntax-tree based indentation.
-export const syntaxIndentation = EditorState.extend.unique<null>(() => EditorState.indentation(indentationBehavior))(null)
-
-function indentationBehavior(state: EditorState, pos: number) {
-  for (let syntax of state.behavior(EditorState.syntax)) {
+export function syntaxIndentation(syntax: Syntax) {
+  return EditorState.indentation((state: EditorState, pos: number) => {
     let tree = syntax.getPartialTree(state, pos, pos)
-    if (tree) {
-      let result = computeIndentation(state, tree, pos)
-      if (result > -1) return result
-    }
-  }
-  return -1
+    return computeIndentation(state, tree, pos)
+  })
 }
 
 // Compute the indentation for a given position from the syntax tree.

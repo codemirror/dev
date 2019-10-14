@@ -1,6 +1,6 @@
 import {parser} from "lezer-css"
-import {NodeType} from "lezer-tree"
-import {LezerSyntax, continuedIndent, indentNodeProp} from "../../syntax"
+import {NodeType, Subtree} from "lezer-tree"
+import {LezerSyntax, continuedIndent, indentNodeProp, foldNodeProp} from "../../syntax"
 import {styleTags} from "../../highlight"
 
 /// A syntax provider based on the [Lezer CSS
@@ -9,6 +9,9 @@ import {styleTags} from "../../highlight"
 export const cssSyntax = new LezerSyntax(parser.withProps(
   indentNodeProp.add(NodeType.match({
     Declaration: continuedIndent()
+  })),
+  foldNodeProp.add(NodeType.match({
+    Block(subtree: Subtree) { return {from: subtree.start + 1, to: subtree.end - 1} }
   })),
   styleTags({
     "import charset namespace keyframes": "keyword definition",

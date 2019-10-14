@@ -1,5 +1,6 @@
 import {parser} from "lezer-javascript"
-import {flatIndent, continuedIndent, indentNodeProp, LezerSyntax} from "../../syntax"
+import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "../../syntax"
+import {NodeType, Subtree} from "lezer-tree"
 import {styleTags} from "../../highlight"
 
 const statementIndent = continuedIndent({except: /^{/})
@@ -20,6 +21,9 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     if (/(Statement|Declaration)$/.test(type.name) || type.name == "Property") return statementIndent
     return undefined
   }),
+  foldNodeProp.add(NodeType.match({
+    Block(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} }
+  })),
   styleTags({
     "get set async static": "modifier",
     "for while do if else switch try catch finally return throw break continue default case": "keyword control",

@@ -184,4 +184,10 @@ export class EditorState {
 
   /// Behavior that registers a parsing service for the state.
   static syntax = extendState.behavior<Syntax>()
+
+  /// A behavior that registers a code folding service. When called
+  /// with the extent of a line, it'll return a range object when a
+  /// foldable that starts on that line (but continues beyond it) can
+  /// be found.
+  static foldable = extendState.behavior<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 }
