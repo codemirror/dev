@@ -164,8 +164,8 @@ export abstract class ContentView {
   ignoreMutation(rec: MutationRecord): boolean { return false }
   ignoreEvent(event: Event): boolean { return false }
 
-  childCursor(pos: number = this.length, i: number = this.children.length) {
-    return new ChildCursor(this.children, pos, i)
+  childCursor(pos: number = this.length) {
+    return new ChildCursor(this.children, pos, this.children.length)
   }
 
   childPos(pos: number, bias: number = 1): {i: number, off: number} {
@@ -203,24 +203,6 @@ export class ChildCursor {
   off: number = 0
 
   constructor(public children: ReadonlyArray<ContentView>, public pos: number, public i: number) {}
-
-  findPos(pos: number, bias: number = 1): this {
-    for (;;) {
-      if (pos > this.pos || pos == this.pos && (bias > 0 || this.i == 0)) {
-        this.off = pos - this.pos
-        return this
-      }
-      this.pos -= this.children[--this.i].length
-    }
-  }
-}
-
-// FIXME merge back with ChildCursor again
-export class DocChildCursor extends ChildCursor {
-  constructor(children: ReadonlyArray<ContentView>, pos: number, i: number) {
-    if (i) super(children, pos - children[i - 1].length, i - 1)
-    else super(children, pos, i)
-  }
 
   findPos(pos: number, bias: number = 1): this {
     for (;;) {

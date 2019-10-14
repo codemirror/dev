@@ -1,4 +1,4 @@
-import {ContentView, ChildCursor, DocChildCursor, Dirty, DOMPos} from "./contentview"
+import {ContentView, ChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
@@ -503,8 +503,13 @@ export class DocView extends ContentView {
       this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
   }
 
-  childCursor(pos: number = this.length, i: number = this.children.length): ChildCursor {
-    return new DocChildCursor(this.children, pos, i)
+  childCursor(pos: number = this.length): ChildCursor {
+    // Move back to start of last element when possible, so that
+    // `ChildCursor.findPos` doesn't have to deal with the edge case
+    // of being after the last element.
+    let i = this.children.length
+    if (i) pos -= this.children[--i].length
+    return new ChildCursor(this.children, pos, i)
   }
 
   computeGapDeco(viewports: A<Viewport>, docLength: number): DecorationSet {
