@@ -302,6 +302,13 @@ export class EditorView {
     return this.docView.domAtPos(pos)
   }
 
+  /// Find the document position at the given DOM node. Can be useful
+  /// for associating positions with DOM events. Will raise an error
+  /// when `node` isn't part of the editor content.
+  posAtDOM(node: Node, offset: number = 0) {
+    return this.docView.posFromDOM(node, offset)
+  }
+
   private readingLayout() {
     if (this.updateState == UpdateState.Updating)
       throw new Error("Reading the editor layout isn't allowed during an update")
