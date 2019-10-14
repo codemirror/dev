@@ -16,7 +16,7 @@ export function syntaxFolding(syntax: Syntax) {
       let prop = cur.type.prop(foldNodeProp)
       if (prop) {
         let value = prop(cur)
-        if (value) found = value
+        if (value && value.to > end) found = value
       }
     }
     return found

@@ -1,0 +1,5 @@
+{
+  "main": "dist/index.js",
+  "types": "dist/fold.d.ts",
+  "module": "dist/index.esm"
+}

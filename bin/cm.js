@@ -102,6 +102,7 @@ const packages = [
   new Pkg("gutter", {dom: true}),
   new Pkg("commands", {entry: "commands", dom: true}),
   new Pkg("syntax", {dom: true}),
+  new Pkg("fold", {entry: "fold", dom: true}),
   new Pkg("matchbrackets", {entry: "matchbrackets", dom: true}),
   new Pkg("keymap", {entry: "keymap", dom: true}),
   new Pkg("multiple-selections", {entry: "multiple-selections", dom: true}),
