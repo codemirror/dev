@@ -338,7 +338,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
 
   comparePoint(from: number, to: number, byA: Decoration, byB: Decoration | null) {
     addRange(from, to, this.changes.content)
-    if (from > to || byA.heightRelevant || byB && byB.heightRelevant)
+    if (from < to || byA.heightRelevant || byB && byB.heightRelevant)
       addRange(from, to, this.changes.height)
   }
 }
