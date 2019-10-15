@@ -631,9 +631,10 @@ class ComparisonSide<T extends RangeValue> {
   heap: LocalSet<T>[] = []
   active: T[] = []
   activeTo: number[] = []
-  points: T[] = []
   tip: LocalSet<T> | null = null
+  // A currently active point range, if any
   point: T | null = null
+  // The end of the current point range
   pointTo: number = -FAR
 
   constructor(readonly stack: IteratedSet<T>[]) {}
@@ -771,7 +772,9 @@ class RangeSetComparison<T extends RangeValue> {
       }
 
       // Ignore ranges that fall entirely in a point on the other side
-      if (to < other.pointTo || to == other.pointTo && range.value.startSide < other.point!.endSide) return
+      // or were skipped by a point on this side
+      // FIXME should maybe also drop ranges when to == this.pos but their side < the point's side?
+      if (to < this.pos || to < other.pointTo || to == other.pointTo && range.value.startSide < other.point!.endSide) return
       // Otherwise, if the other side isn't a point, advance
       if (other.pointTo < 0) this.advancePos(from)
       if (range.value.point) {

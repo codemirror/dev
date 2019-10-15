@@ -156,6 +156,14 @@ describe("EditorView decoration", () => {
       ist(cm.contentDOM.textContent, "aYc")
     })
 
+    it("allows replacements to shadow inner replacements", () => {
+      let cm = decoEditor("one\ntwo\nthree\nfour", [
+        Decoration.replace(5, 12, {widget: new WordWidget("INNER")})
+      ])
+      cm.dispatch(cm.state.t().addMeta(addDeco([Decoration.replace(1, 17, {widget: new WordWidget("OUTER")})])))
+      ist(cm.contentDOM.textContent, "oOUTERr")
+    })
+
     it("doesn't consider different widgets types equivalent", () => {
       let cm = decoEditor("hello", [w(4, new WordWidget("hi"))])
       let elt = cm.contentDOM.querySelector("strong")
