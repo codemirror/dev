@@ -205,7 +205,7 @@ export class ViewUpdate {
   /// plugins to update [CSS class names](#view.EditorView.cssClass)
   /// on their DOM elements.
   get themeChanged() {
-    return this.prevThemes == this.view.behavior(theme)
+    return this.prevThemes != this.view.behavior(theme)
   }
 
   /// Get the value of the given slot, if it was passed as a flag for
