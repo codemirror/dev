@@ -1,0 +1,16 @@
+language:            node_js
+node_js:
+  - stable
+
+before_install:
+  - npm install -g npm@latest
+
+install:
+  - npm install
+
+script:
+  - npm run prepare
+  - npm run test
+
+notifications:
+  email:             false
