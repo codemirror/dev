@@ -143,8 +143,12 @@ export class EditorView {
     this.docView.init(state, viewport => {
       this._viewport = viewport
       this._state = state
-      for (let plugin of this.behavior(viewPlugin))
+      for (let plugin of this.behavior(viewPlugin)) {
+        let exists = this.plugins[plugin.id]
+        if (exists) throw new Error(`Duplicated view plugin${
+          (exists.constructor || Object) != Object && exists.constructor.name ? ` (${exists.constructor.name})` : ''}`)
         this.plugins[plugin.id] = plugin.create(this)
+      }
     })
     this.mountStyles()
     this.updateAttrs()

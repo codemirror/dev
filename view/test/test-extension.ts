@@ -58,4 +58,10 @@ describe("EditorView extension", () => {
     ist(cm.dom.classList.contains("something"))
     ist(cm.dom.classList.contains("codemirror"))
   })
+
+  it("errors on duplicate plugins", () => {
+    let plugin = ViewPlugin.create(() => ({}))
+    ist.throws(() => new EditorView({extensions: [plugin.extension, plugin.extension]}),
+               /Duplicated view plugin/)
+  })
 })

@@ -130,7 +130,12 @@ export class EditorState {
     let selection = config.selection || EditorSelection.single(0)
     if (!configuration.getBehavior(EditorState.allowMultipleSelections)) selection = selection.asSingle()
     let state = new EditorState(configuration, values, doc, selection)
-    for (let field of state.behavior(stateField)) values[field.id] = field.init(state)
+    for (let field of state.behavior(stateField)) {
+      let exists = values[field.id]
+      if (exists) throw new Error(`Duplicate use of state field${
+        (exists.constructor || Object) != Object && exists.constructor.name ? ` (${exists.constructor.name})` : ''}`)
+      values[field.id] = field.init(state)
+    }
     return state
   }
 
