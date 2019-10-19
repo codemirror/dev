@@ -26,52 +26,56 @@ export const clickAddsSelectionRange = extendView.behavior<(event: MouseEvent) =
 
 export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boolean>()
 
-declare const pluginBehavior: unique symbol
-
-/// View plugins are stateful objects that are associated with a view.
-/// They can influence the way the content is drawn, and are notified
-/// of things that happen in the view. They can be combined with
-/// [dynamic behavior](#extension.ExtensionGroup.dynamic) to
+/// View plugins associate stateful values with a view. They can
+/// influence the way the content is drawn, and are notified of things
+/// that happen in the view. They can be combined with [dynamic
+/// behavior](#extension.ExtensionGroup.dynamic) to
 /// [add](#view.EditorView^decorations)
-/// [decorations](#view.Decoration) to the view.
-export class ViewPlugin<T extends ViewPluginValue<any>> {
-  /// @internal
-  id = extendView.storageID()
+/// [decorations](#view.Decoration) to the view. Objects of this type
+/// serve as keys to [access](#view.EditorView.plugin) the value of
+/// the plugin.
+export class ViewPlugin<Value extends ViewPluginValue<any>> {
+  private constructor(
+    /// @internal
+    readonly create: (view: EditorView) => Value,
+    /// @internal
+    readonly id: number,
+    /// @internal
+    readonly behaviorExtensions: readonly Extension[]
+  ) {}
 
   /// An extension that can be used to install this plugin in a view.
-  readonly extension: Extension
+  get extension(): Extension {
+    if (!this.create)
+      throw new Error("Can't use a viewplugin that doesn't have a create function associated with it (use `.configure`)")
+    return [viewPlugin(this), ...this.behaviorExtensions]
+  }
 
   /// Declare a plugin. The `create` function will be called while
   /// initializing or reconfiguring an editor view to create the
-  /// actual plugin instance. You can optionally declare behavior
-  /// associated with this plugin by passing an array of behavior
-  /// declarations created through
-  /// [`ViewPlugin.behavior`](#view.ViewPlugin^behavior) as second
-  /// argument.
-  constructor(
-    /// @internal
-    readonly create: (view: EditorView) => T,
-    // FIXME this is too awkward. Find another approach.
-    behavior: readonly {[pluginBehavior]: T}[] = none
-  ) {
-    let behaviorSpecs = behavior as any as {behavior: Behavior<any, any>, read: (plugin: T) => any}[]
-    this.extension = [viewPlugin(this), ...behaviorSpecs.map(spec => {
-      return extendView.dynamic(spec.behavior, view => spec.read(view.plugin(this)!))
-    })]
+  /// actual plugin instance. You can leave it empty, in which case
+  /// you have to call `configure` before you are able to use the
+  /// plugin.
+  static create<Value extends ViewPluginValue<any>>(create: (view: EditorView) => Value) {
+    return new ViewPlugin<Value>(create, extendView.storageID(), [])
   }
 
-  /// Declare a behavior as a function of a view plugin. `read` maps
+  /// Declare a behavior as a function of this plugin. `read` maps
   /// from the plugin value to the behavior's input type.
-  static behavior<Plugin, Input>(behavior: Behavior<Input, any>, read: (plugin: Plugin) => Input): {[pluginBehavior]: Plugin} {
-    return {behavior, read} as any
+  behavior<Input>(behavior: Behavior<Input, any>, read: (plugin: Value) => Input): ViewPlugin<Value> {
+    return new ViewPlugin<Value>(this.create, this.id, this.behaviorExtensions.concat(
+      extendView.dynamic(behavior, view => read(view.plugin(this)!))
+    ))
+  }
+
+  /// Declare that this plugin provides [decorations](#view.EditorView^decorations).
+  decorations(read: (plugin: Value) => DecorationSet) {
+    return this.behavior(decorations, read)
   }
 
   /// Create a view plugin extension that only computes decorations.
   static decoration(spec: DecorationPluginSpec) {
-    let plugin = new ViewPlugin(view => new DecorationPlugin(view, spec), [
-      ViewPlugin.behavior(decorations, (p: DecorationPlugin) => p.decorations)
-    ])
-    return plugin.extension
+    return ViewPlugin.create(view => new DecorationPlugin(view, spec)).decorations(p => p.decorations).extension
   }
 }
 

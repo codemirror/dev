@@ -5,7 +5,7 @@ import ist from "ist"
 
 describe("EditorView extension", () => {
   it("calls update when the viewport changes", () => {
-    let plugin = new ViewPlugin(view => {
+    let plugin = ViewPlugin.create(view => {
       let {from, to} = view.viewport
       return {
         viewports: [[from, to]],
@@ -32,7 +32,7 @@ describe("EditorView extension", () => {
 
   it("calls update on plugins", () => {
     let updates = 0
-    let cm = tempEditor("xyz", [new ViewPlugin(view => ({
+    let cm = tempEditor("xyz", [ViewPlugin.create(view => ({
       update(update: ViewUpdate) {
         ist(update.prevState.doc, prevDoc)
         ist(update.state.doc, cm.state.doc)

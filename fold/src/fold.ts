@@ -58,9 +58,7 @@ const foldConfigBehavior = EditorView.extend.behavior<Required<FoldConfig>, Requ
 
 ;(window as any).beh = foldConfigBehavior
 
-const foldPlugin = new ViewPlugin(view => new FoldPlugin(view), [
-  ViewPlugin.behavior(EditorView.decorations, (plugin: FoldPlugin) => plugin.decorations)
-])
+const foldPlugin = ViewPlugin.create(view => new FoldPlugin(view)).decorations(p => p.decorations)
 
 export const codeFolding = EditorView.extend.unique((configs: FoldConfig[]) => {
   return [

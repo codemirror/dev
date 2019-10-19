@@ -97,8 +97,8 @@ export class TagSystem {
   /// given tags using the given CSS objects.
   highlighter(spec: {[tag: string]: Style}) {
     let styling = new Styling(this, spec)
-    let plugin = new ViewPlugin(view => new Highlighter(view, this.prop, styling),
-                                [ViewPlugin.behavior(EditorView.decorations, (h: Highlighter) => h.decorations)])
+    let plugin = ViewPlugin.create(view => new Highlighter(view, this.prop, styling))
+      .decorations(h => h.decorations)
     return [plugin.extension, EditorView.styleModule(styling.module)]
   }
 

@@ -78,7 +78,7 @@ const defaults = {
 export function gutter<T>(config: GutterConfig) {
   let conf = fillConfig(config, defaults)
   // FIXME allow client code to preserve a gutter config
-  let plugin = new ViewPlugin(view => new GutterView(view, conf))
+  let plugin = ViewPlugin.create(view => new GutterView(view, conf))
   return [plugin.extension, EditorView.extend.fallback(EditorView.theme(baseTheme))]
 }
 
