@@ -34,6 +34,8 @@ export abstract class GutterMarker extends RangeValue {
 
 GutterMarker.prototype.elementClass = ""
 
+type Handlers = {[event: string]: (view: EditorView, line: BlockInfo, event: any) => boolean}
+
 /// Configuration options when creating a generic gutter.
 export interface GutterConfig {
   /// The theme style for the gutter's wrapping DOM element (in
@@ -53,10 +55,12 @@ export interface GutterConfig {
   updateMarkers?: (markers: RangeSet<GutterMarker>, update: ViewUpdate) => RangeSet<GutterMarker>
   /// Can be used to optionally add a single marker to every line.
   lineMarker?: (view: EditorView, line: BlockInfo, markers: readonly GutterMarker[]) => GutterMarker | null
-  /// @internal
+  /// Use a spacer element that gives the gutter its base width.
   initialSpacer?: null | ((view: EditorView) => GutterMarker)
-  /// @internal
+  /// Update the spacer element when the view is updated.
   updateSpacer?: null | ((spacer: GutterMarker, update: ViewUpdate) => GutterMarker)
+  /// Supply event handlers for DOM events on this gutter.
+  handleDOMEvents?: Handlers
 }
 
 const defaults = {
@@ -67,7 +71,8 @@ const defaults = {
   updateMarkers: (markers: RangeSet<GutterMarker>) => markers,
   lineMarker: () => null,
   initialSpacer: null,
-  updateSpacer: null
+  updateSpacer: null,
+  handleDOMEvents: {}
 }
 
 const gutterBehavior = EditorView.extend.behavior<Gutter>()
@@ -203,6 +208,12 @@ class SingleGutterView {
 
   constructor(public view: EditorView, public config: Required<GutterConfig>) {
     this.dom = document.createElement("div")
+    for (let prop in config.handleDOMEvents) {
+      this.dom.addEventListener(prop, (event: Event) => {
+        let line = view.lineAtHeight((event as MouseEvent).clientY)
+        if (config.handleDOMEvents[prop](view, line, event)) event.preventDefault()
+      })
+    }
     this.markers = config.initialMarkers(view)
     if (config.initialSpacer) {
       this.spacer = new GutterElement(0, 0, [config.initialSpacer(view)], this.elementClass)
@@ -275,6 +286,8 @@ export interface LineNumberConfig {
   /// How to display line numbers. Defaults to simply converting them
   /// to string.
   formatNumber?: (lineNo: number) => string
+  /// Supply event handlers for DOM events on this gutter.
+  handleDOMEvents?: Handlers
 }
 
 /// Used to insert markers into the line number gutter.
@@ -290,7 +303,17 @@ export type LineNumberMarkerUpdate = {
 /// Create a line number gutter extension. The order in which the
 /// gutters appear is determined by their extension priority.
 export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs => {
-  let config = combineConfig(configs, {formatNumber: String})
+  let config = combineConfig<Required<LineNumberConfig>>(configs, {formatNumber: String, handleDOMEvents: {}}, {
+    handleDOMEvents(a: Handlers, b: Handlers) {
+      let result: Handlers = {}
+      for (let event in a) result[event] = a[event]
+      for (let event in b) {
+        let exists = result[event], add = b[event]
+        result[event] = exists ? (view, line, event) => exists(view, line, event) || add(view, line, event) : add
+      }
+      return result
+    }
+  })
   class NumberMarker extends GutterMarker {
     constructor(readonly number: number) { super() }
 
