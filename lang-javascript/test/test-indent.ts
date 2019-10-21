@@ -1,7 +1,6 @@
 const ist = require("ist")
 import {EditorState} from "../../state"
 import {javascript} from ".."
-import {syntaxIndentation} from "../../syntax"
 
 function getIndent(state: EditorState, pos: number): number {
   for (let f of state.behavior(EditorState.indentation)) {
@@ -14,7 +13,7 @@ function getIndent(state: EditorState, pos: number): number {
 function check(code: string) {
   return () => {
     code = /^\n*([^]*)/.exec(code)![1]
-    let state = EditorState.create({doc: code, extensions: [javascript(), syntaxIndentation]})
+    let state = EditorState.create({doc: code, extensions: [javascript()]})
     for (let pos = 0, lines = code.split("\n"), i = 0; i < lines.length; i++) {
       let line = lines[i], indent = /^\s*/.exec(line)![0].length
       ist(`${getIndent(state, pos)} (${i + 1})`, `${indent} (${i + 1})`)
