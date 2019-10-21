@@ -2,7 +2,7 @@ import {EditorState} from "../state"
 import {EditorView} from "../view"
 import {keymap} from "../keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history"
-import {foldCode, unfoldCode, codeFolding} from "../fold"
+import {foldCode, unfoldCode, codeFolding, foldGutter} from "../fold"
 import {lineNumbers} from "../gutter"
 import {baseKeymap, indentSelection} from "../commands"
 import {bracketMatching} from "../matchbrackets"
@@ -23,7 +23,7 @@ let state = EditorState.create({doc: `<script>
   lineNumbers(),
   history(),
   specialChars(),
-  codeFolding(),
+  foldGutter(),
   multipleSelections(),
   html(),
   defaultHighlighter,

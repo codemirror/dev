@@ -1,7 +1,7 @@
 import {EditorState} from "../../state"
 import {EditorView, BlockInfo, ViewCommand, ViewUpdate, ViewPlugin, Decoration, WidgetType} from "../../view"
 import {combineConfig, fillConfig, Slot} from "../../extension"
-import {gutter, GutterMarker} from "../../gutter"
+import {Gutter, GutterMarker} from "../../gutter"
 
 type Range = {from: number, to: number}
 
@@ -119,8 +119,8 @@ class FoldWidget extends WidgetType<WidgetConfig> {
     if (conf.placeholderDOM) return conf.placeholderDOM()
     let element = document.createElement("span")
     element.textContent = conf.placeholderText
-    element.setAttribute("aria-role", "button")
-    element.setAttribute("aria-label", "unfold code")
+    // FIXME should this have a role? does it make sense to allow focusing by keyboard?
+    element.setAttribute("aria-label", "folded code")
     element.title = "unfold"
     element.className = this.value.class
     element.onclick = event => {
@@ -160,7 +160,7 @@ class FoldMarker extends GutterMarker {
 export function foldGutter(config: FoldGutterConfig = {}) {
   let fullConfig = fillConfig(config, foldGutterDefaults)
   return [
-    gutter({
+    new Gutter({
       style: "foldGutter",
       lineMarker(view, line) {
         // FIXME optimize this. At least don't run it for updates that
@@ -175,7 +175,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
       initialSpacer() {
         return new FoldMarker(fullConfig, false)
       }
-    }),
+    }).extension,
     codeFolding()
   ]
 }
@@ -192,6 +192,7 @@ const defaultStyle = {
   },
 
   foldGutterElement: {
-    color: "#888"
+    padding: "0 1px",
+    cursor: "pointer"
   }
 }
