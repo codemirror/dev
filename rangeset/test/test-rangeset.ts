@@ -397,4 +397,17 @@ describe("RangeSet", () => {
       ist(count, 1003)
     })
   })
+
+  describe("between", () => {
+    it("iterates over ranges", () => {
+      let found = 0
+      set0().between(100, 200, (from, to, v) => {
+        ist(to, from + 1 + (from % 4))
+        ist(to, 100, ">=")
+        ist(from, 200, "<=")
+        found++
+      })
+      ist(found, 103)
+    })
+  })
 })

@@ -107,7 +107,9 @@ class FoldPlugin {
   }
 
   foldInside(from: number, to: number) {
-    return this.decorations.iter(from, to).next() // FIXME expensive
+    let found = null
+    this.decorations.between(from, to, (from, to) => found = ({from, to}))
+    return found
   }
 }
 
