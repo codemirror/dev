@@ -174,6 +174,23 @@ export function foldGutter(config: FoldGutterConfig = {}) {
       },
       initialSpacer() {
         return new FoldMarker(fullConfig, false)
+      },
+      handleDOMEvents: {
+        click: (view, line) => {
+          let plugin = view.plugin(foldPlugin)!
+          let folded = plugin.foldInside(line.from, line.to)
+          if (folded) {
+            view.dispatch(view.state.t().addMeta(foldSlot({unfold: [folded]})))
+            return true
+          }
+          let range = view.state.behavior(EditorState.foldable)
+            .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
+          if (range) {
+            view.dispatch(view.state.t().addMeta(foldSlot({fold: [range]})))
+            return true
+          }
+          return false
+        }
       }
     }).extension,
     codeFolding()
