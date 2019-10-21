@@ -1,7 +1,7 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Extension, ExtensionGroup} from "../../extension"
-import {Tree} from "lezer-tree"
+import {Tree, NodeType} from "lezer-tree"
 
 /// Command functions are used in key bindings and other types of user
 /// actions. Given an editor state and a dispatch function, they check
@@ -80,4 +80,9 @@ export interface Syntax {
   /// Get a syntax tree, preferably covering the given range, but less
   /// is also acceptable.
   getPartialTree(state: EditorState, from: number, to: number): Tree
+
+  /// Return the grammar-wrapping node type at the given location.
+  /// This'll be the grammar's top node, usually, but with nested
+  /// grammars it may be the top of some nested grammar.
+  docTypeAt(state: EditorState, pos: number): NodeType
 }

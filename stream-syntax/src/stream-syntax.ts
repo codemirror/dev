@@ -121,6 +121,10 @@ export class StreamSyntax implements Syntax {
     field.updateTree(this.parser, state, to, false)
     return field.tree
   }
+
+  docTypeAt(state: EditorState, pos: number) {
+    return typeArray[this.parser.docType]
+  }
 }
 
 const CACHE_STEP_SHIFT = 6, CACHE_STEP = 1 << CACHE_STEP_SHIFT

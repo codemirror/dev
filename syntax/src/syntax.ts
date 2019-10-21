@@ -1,5 +1,5 @@
 import {Parser, ParseContext, InputStream} from "lezer"
-import {Tree} from "lezer-tree"
+import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
 import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
@@ -41,6 +41,18 @@ export class LezerSyntax implements Syntax {
     let field = state.field(this.field)
     field.updateTree(this.parser, state.doc, from, to, false)
     return field.tree
+  }
+
+  docTypeAt(state: EditorState, pos: number) {
+    if (this.parser.hasNested) {
+      let tree = this.getPartialTree(state, pos, pos)
+      let target: Subtree | null = tree.resolve(pos)
+      while (target) {
+        if (target.type.prop(NodeProp.top)) return target.type
+        target = target.parent
+      }
+    }
+    return this.parser.group.types[1]
   }
 }
 
