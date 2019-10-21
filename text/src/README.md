@@ -32,3 +32,14 @@ and count each line break and UTF-16 code unit as one unit.
 @CharType
 
 @charType
+
+### Code Points
+
+If you support environments that don't yet have `String.fromCodePoint`
+and `codePointAt`, this package provides portable replacements for them.
+
+@codePointAt
+
+@fromCodePoint
+
+@minPairCodePoint
