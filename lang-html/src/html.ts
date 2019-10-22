@@ -2,7 +2,7 @@ import {configureHTML} from "lezer-html"
 import {cssSyntax} from "../../lang-css"
 import {javascriptSyntax} from "../../lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp, openNodeProp, closeNodeProp} from "../../syntax"
-import {NodeType, Subtree} from "lezer-tree"
+import {Subtree} from "lezer-tree"
 import {styleTags} from "../../highlight"
 
 /// A syntax provider based on the [Lezer HTML
@@ -26,21 +26,21 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
     if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
     return undefined
   }),
-  foldNodeProp.add(NodeType.match({
+  foldNodeProp.add({
     Element(subtree: Subtree) {
       let first = subtree.firstChild, last = subtree.lastChild!
       if (!first || first.name != "OpenTag") return null
       return {from: first.end, to: last.name == "CloseTag" ? last.start : subtree.end}
     }
-  })),
-  openNodeProp.add(NodeType.match({
+  }),
+  openNodeProp.add({
     "StartTag StartCloseTag": ["EndTag", "SelfCloseEndTag"],
     "OpenTag": ["CloseTag"]
-  })),
-  closeNodeProp.add(NodeType.match({
+  }),
+  closeNodeProp.add({
     "EndTag SelfCloseEndTag": ["StartTag", "StartCloseTag"],
     "CloseTag": ["OpenTag"]
-  })),
+  }),
   styleTags({
     AttributeValue: "string",
     "Text RawText": "content",
