@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Text/code editor component",
   "scripts": {
-    "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts lang-javascript/test/test-*.ts",
+    "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts lang-javascript/test/test-*.ts closebrackets/test/test-*.ts",
     "prepare": "bin/cm.js build --force",
     "dev": "bin/cm.js devserver"
   },

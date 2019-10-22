@@ -104,6 +104,7 @@ const packages = [
   new Pkg("syntax", {dom: true}),
   new Pkg("fold", {entry: "fold", dom: true}),
   new Pkg("matchbrackets", {entry: "matchbrackets", dom: true}),
+  new Pkg("closebrackets", {entry: "closebrackets", dom: true}),
   new Pkg("keymap", {entry: "keymap", dom: true}),
   new Pkg("multiple-selections", {entry: "multiple-selections", dom: true}),
   new Pkg("special-chars", {entry: "special-chars", dom: true}),

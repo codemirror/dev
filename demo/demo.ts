@@ -6,6 +6,7 @@ import {foldCode, unfoldCode, codeFolding, foldGutter} from "../fold"
 import {lineNumbers} from "../gutter"
 import {baseKeymap, indentSelection} from "../commands"
 import {bracketMatching} from "../matchbrackets"
+import {closeBrackets} from "../closebrackets"
 import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
 
@@ -28,6 +29,7 @@ let state = EditorState.create({doc: `<script>
   html(),
   defaultHighlighter,
   bracketMatching(),
+  closeBrackets(),
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,
