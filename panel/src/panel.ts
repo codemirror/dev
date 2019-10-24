@@ -1,7 +1,7 @@
 import {EditorView, ViewPlugin} from "../../view"
 
 export const panels = EditorView.extend.unique<null>(() => {
-  return panelPlugin.extension
+  return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
 }, null)
 
 const panelPlugin = ViewPlugin.create(view => new Panels(view))
@@ -20,8 +20,8 @@ class Panels {
   }
 
   draw() {
-    this.top.align()
-    this.bottom.align()
+    this.top.draw()
+    this.bottom.draw()
   }
 
   destroy() {
@@ -80,10 +80,9 @@ class PanelGroup {
 
     if (!this.dom) {
       this.dom = document.createElement("div")
-      this.dom.style.boxSizing = "border-box"
       this.dom.style[this.top ? "top" : "bottom"] = "0"
       this.dontFloat()
-      this.view.dom.appendChild(this.dom)
+      this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
       this.addListeners()
     }
 
@@ -145,6 +144,11 @@ class PanelGroup {
     }
   }
 
+  draw() {
+    this.align()
+    if (this.dom) this.dom.className = this.view.cssClass("panels")
+  }
+
   destroy() {
     this.removeListeners()
   }
@@ -166,4 +170,12 @@ export function openPanel(view: EditorView, spec: PanelSpec) {
   let plugin = view.plugin(panelPlugin)
   if (!plugin) throw new Error("View doesn't have the panel extension")
   return plugin.openPanel(spec.dom, !!spec.top, spec.pos || 0)
+}
+
+const defaultTheme = {
+  panels: {
+    background: "#f5f5f5",
+    borderTop: "1px solid silver",
+    boxSizing: "border-box"
+  }
 }
