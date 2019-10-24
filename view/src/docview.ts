@@ -242,7 +242,10 @@ export class DocView extends ContentView {
   // Sync the DOM selection to this.state.selection
   updateSelection(takeFocus: boolean = false) {
     this.clearSelectionDirty()
-    if (!takeFocus && this.root.activeElement != this.dom) return
+    if (this.root.activeElement != this.dom) {
+      if (!takeFocus) return
+      if (browser.gecko) this.dom.focus() // Avoids strange exceptions when setting the selection
+    }
 
     let primary = this.state.selection.primary
     // FIXME need to handle the case where the selection falls inside a block range
