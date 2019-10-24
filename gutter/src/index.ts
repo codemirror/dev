@@ -148,6 +148,7 @@ class GutterView implements ViewPluginValue {
       for (let cx of contexts) cx.line(this.view, text)
     }, 0)
     for (let cx of contexts) cx.finish(this.view)
+    this.dom.style.minHeight = this.view.contentHeight + "px"
   }
 }
 
@@ -195,7 +196,6 @@ class UpdateContext {
   finish(view: EditorView) {
     let gutter = this.gutter
     while (gutter.elements.length > this.i) gutter.dom.removeChild(gutter.elements.pop()!.dom)
-    gutter.dom.style.minHeight = view.contentHeight + "px"
   }
 }
 
