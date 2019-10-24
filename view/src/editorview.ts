@@ -284,26 +284,36 @@ export class EditorView {
   }
 
   /// Query the active themes for the CSS class names associated with
-  /// the given tag.
-  cssClass(classes: string): string {
+  /// the given name. Names can be single words or words separated by
+  /// dot characters. In the latter case, the returned classes combine
+  /// those that match the full name and those that match some
+  /// prefix—for example `cssClass("panel.search")` will match both
+  /// the theme styles specified as `"panel.search"` and those with
+  /// just `"panel"`. More specific theme styles (with more dots) take
+  /// precedence.
+  cssClass(selector: string): string {
     let themes = this.behavior(theme)
     if (themes != this.themeCacheFor) {
       this.themeCache = Object.create(null)
       this.themeCacheFor = themes
     } else {
-      let known = this.themeCache[classes]
+      let known = this.themeCache[selector]
       if (known != null) return known
     }
+
     let result = ""
-    for (let cls of classes.split(" ")) if (cls) {
-      if (result) result += " "
-      result += "codemirror-" + cls
+    for (let pos = 0;;) {
+      let dot = selector.indexOf(".", pos)
+      let cls = dot < 0 ? selector : selector.slice(0, dot)
+      result += (result ? " " : "") + "codemirror-" + (pos ? cls.replace(/\./g, "-") : cls)
       for (let theme of themes) {
         let has = theme[cls]
         if (has) result += " " + has
       }
+      if (dot < 0) break
+      pos = dot + 1
     }
-    return this.themeCache[classes] = result
+    return this.themeCache[selector] = result
   }
 
   /// Find the DOM parent node and offset (child offset if `node` is
@@ -456,6 +466,10 @@ export class EditorView {
   /// Behavior that provides CSS classes to add to elements identified
   /// by the given string.
   static theme(spec: {[name: string]: Style}): Extension {
+    for (let prop in spec) {
+      let specificity = prop.split(".").length - 1
+      if (specificity > 0) spec[prop].specificity = specificity
+    }
     let module = new StyleModule(spec)
     return [theme(module), styleModule(module)]
   }

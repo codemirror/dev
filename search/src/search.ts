@@ -1,4 +1,3 @@
-import {EditorState} from "../../state"
 import {EditorView, ViewPlugin, ViewCommand, Decoration} from "../../view"
 import {panels, openPanel} from "../../panel"
 
@@ -27,7 +26,6 @@ export const openSearchPanel: ViewCommand = view => {
   if (!plugin) throw new Error("Search plugin not enabled")
   if (!plugin.dialog) {
     plugin.dialog = buildDialog({
-      class: view.cssClass("panel search"),
       search: plugin.searchQuery,
       replace: plugin.replaceQuery,
       phrase(value: string) { return value }, // FIXME
@@ -43,7 +41,7 @@ export const openSearchPanel: ViewCommand = view => {
       searchNext() {},
       replaceNext() {}
     })
-    plugin.closeDialog = openPanel(view, {dom: plugin.dialog, pos: 80})
+    plugin.closeDialog = openPanel(view, {dom: plugin.dialog, pos: 80, style: "search"})
   }
   ;(plugin.dialog.querySelector("[name=search]") as HTMLInputElement).select()
   return true
@@ -57,8 +55,7 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
   return e
 }
 
-function buildDialog(conf: {class: string,
-                            search: string,
+function buildDialog(conf: {search: string,
                             replace: string,
                             phrase: (phrase: string) => string,
                             updateSearch: (search: string) => void,
@@ -70,7 +67,6 @@ function buildDialog(conf: {class: string,
     if (event.keyCode == 13) { event.preventDefault();  f() }
   }
   return elt("div", {
-    className: conf.class,
     onkeydown(e: KeyboardEvent) {
       if (e.keyCode == 27) {
         e.preventDefault()
@@ -103,7 +99,7 @@ function buildDialog(conf: {class: string,
 }
 
 const theme = {
-  search: { // FIXME panel.search
+  "panel.search": {
     padding: "2px 6px 4px",
     position: "relative",
     "& .close": {

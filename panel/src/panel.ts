@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin} from "../../view"
+import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
 
 export const panels = EditorView.extend.unique<null>(() => {
   return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
@@ -9,19 +9,25 @@ const panelPlugin = ViewPlugin.create(view => new Panels(view))
 class Panels {
   top: PanelGroup
   bottom: PanelGroup
+  themeChanged = false
 
   constructor(view: EditorView) {
     this.top = new PanelGroup(view, true)
     this.bottom = new PanelGroup(view, false)
   }
 
-  openPanel(dom: HTMLElement, top: boolean, pos: number) {
-    return (top ? this.top : this.bottom).openPanel(dom, pos)
+  openPanel(dom: HTMLElement, top: boolean, pos: number, style: string) {
+    return (top ? this.top : this.bottom).openPanel(dom, pos, style)
+  }
+
+  update(update: ViewUpdate) {
+    if (update.themeChanged) this.themeChanged = true
   }
 
   draw() {
-    this.top.draw()
-    this.bottom.draw()
+    this.top.draw(this.themeChanged)
+    this.bottom.draw(this.themeChanged)
+    this.themeChanged = false
   }
 
   destroy() {
@@ -33,7 +39,7 @@ class Panels {
 class PanelGroup {
   height = 0
   dom: HTMLElement | null = null
-  panels: {pos: number, dom: HTMLElement}[] = []
+  panels: {pos: number, dom: HTMLElement, style: string}[] = []
   scrollers: EventTarget[] = []
   floating = false
 
@@ -41,8 +47,9 @@ class PanelGroup {
     this.onScroll = this.onScroll.bind(this)
   }
 
-  openPanel(dom: HTMLElement, pos: number) {
-    let panel = {pos, dom}, i = 0
+  openPanel(dom: HTMLElement, pos: number, style: string) {
+    dom.className = this.view.cssClass("panel" + (style ? "." + style : ""))
+    let panel = {pos, dom, style}, i = 0
     while (i < this.panels.length && this.panels[i].pos <= pos) i++
     this.panels.splice(i, 0, panel)
     this.syncDOM()
@@ -80,6 +87,7 @@ class PanelGroup {
 
     if (!this.dom) {
       this.dom = document.createElement("div")
+      this.dom.className = this.view.cssClass("panels")
       this.dom.style[this.top ? "top" : "bottom"] = "0"
       this.dontFloat()
       this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
@@ -144,9 +152,13 @@ class PanelGroup {
     }
   }
 
-  draw() {
+  draw(themeChanged: boolean) {
     this.align()
-    if (this.dom) this.dom.className = this.view.cssClass("panels")
+    if (themeChanged && this.dom) {
+      this.dom.className = this.view.cssClass("panels")
+      for (let {dom, style} of this.panels)
+        dom.className = this.view.cssClass("panel" + (style ? "." + style : ""))
+    }
   }
 
   destroy() {
@@ -162,6 +174,7 @@ function rm(node: ChildNode) {
 
 export interface PanelSpec {
   dom: HTMLElement,
+  style?: string,
   top?: boolean
   pos?: number
 }
@@ -169,7 +182,7 @@ export interface PanelSpec {
 export function openPanel(view: EditorView, spec: PanelSpec) {
   let plugin = view.plugin(panelPlugin)
   if (!plugin) throw new Error("View doesn't have the panel extension")
-  return plugin.openPanel(spec.dom, !!spec.top, spec.pos || 0)
+  return plugin.openPanel(spec.dom, !!spec.top, spec.pos || 0, spec.style || "")
 }
 
 const defaultTheme = {

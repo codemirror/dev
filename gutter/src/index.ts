@@ -224,8 +224,8 @@ class SingleGutterView {
   }
 
   updateTheme() {
-    this.dom.className = this.view.cssClass("gutter " + this.config.style)
-    this.elementClass = this.view.cssClass("gutterElement" + (this.config.style ? ` ${this.config.style}Element` : ""))
+    this.dom.className = this.view.cssClass("gutter" + (this.config.style ? "." + this.config.style : ""))
+    this.elementClass = this.view.cssClass("gutterElement" + (this.config.style ? "." + this.config.style : ""))
     while (this.elements.length) this.dom.removeChild(this.elements.pop()!.dom)
   }
 
@@ -326,7 +326,7 @@ export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs =>
   // FIXME preserve markers across reconfigurations by somehow making
   // this gutter static
   return new Gutter({
-    style: "lineNumberGutter",
+    style: "lineNumber",
     updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
       let slot = update.getMeta(lineNumberMarkers)
       if (slot) markers = markers.update(slot.add || [], slot.filter || null)
@@ -377,7 +377,7 @@ const baseTheme = {
     boxSizing: "border-box"
   },
 
-  lineNumberGutterElement: {
+  "gutterElement.lineNumber": {
     padding: "0 3px 0 5px",
     minWidth: "20px",
     textAlign: "right",
