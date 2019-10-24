@@ -108,6 +108,7 @@ const packages = [
   new Pkg("keymap", {entry: "keymap", dom: true}),
   new Pkg("multiple-selections", {entry: "multiple-selections", dom: true}),
   new Pkg("special-chars", {entry: "special-chars", dom: true}),
+  new Pkg("panel", {entry: "panel", dom: true}),
   new Pkg("highlight", {entry: "highlight", dom: true}),
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
   new Pkg("lang-javascript", {entry: "javascript"}),
