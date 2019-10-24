@@ -122,7 +122,7 @@ class GutterView implements ViewPluginValue {
       // gutter (or just force fixed=false on IE11?)
       this.dom.style.position = "sticky"
     }
-    view.dom.insertBefore(this.dom, view.contentDOM)
+    view.scrollDOM.insertBefore(this.dom, view.contentDOM)
     this.updateTheme()
   }
 

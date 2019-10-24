@@ -3,11 +3,7 @@ import {StyleModule} from "style-mod"
 export const styles = new StyleModule({
   wrapper: {
     position: "relative !important",
-    display: "flex !important",
-    alignItems: "flex-start !important",
-    fontFamily: "monospace",
-    lineHeight: 1.4,
-
+    boxSizing: "border-box",
     "&.codemirror-focused": {
       // FIXME it would be great if we could directly use the browser's
       // default focus outline, but it appears we can't, so this tries to
@@ -15,6 +11,14 @@ export const styles = new StyleModule({
       outline_fallback: "1px dotted #212121",
       outline: "5px auto -webkit-focus-ring-color"
     }
+  },
+
+  scroller: {
+    display: "flex !important",
+    alignItems: "flex-start !important",
+    fontFamily: "monospace",
+    lineHeight: 1.4,
+    height: "100%"
   },
 
   content: {

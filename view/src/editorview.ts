@@ -88,6 +88,9 @@ export class EditorView {
   /// The DOM element that wraps the entire editor view.
   readonly dom: HTMLElement
 
+  /// The DOM element that can be made to scroll.
+  readonly scrollDOM: HTMLElement
+
   /// The editable DOM element holding the editor content. You should
   /// not, usually, interact with this content directly, though the
   /// DOM, since the editor will immediately undo most of the changes
@@ -128,8 +131,11 @@ export class EditorView {
   constructor(config: EditorConfig = {}) {
     this.contentDOM = document.createElement("div")
 
+    this.scrollDOM = document.createElement("div")
+    this.scrollDOM.appendChild(this.contentDOM)
+
     this.dom = document.createElement("div")
-    this.dom.appendChild(this.contentDOM)
+    this.dom.appendChild(this.scrollDOM)
 
     this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
     this.root = (config.root || document) as DocumentOrShadowRoot
@@ -211,6 +217,7 @@ export class EditorView {
     this.editorAttrs = editorAttrs
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs
+    this.scrollDOM.className = this.cssClass("scroller") + " " + styles.scroller
   }
 
   private configure(fromState: readonly Extension[]) {

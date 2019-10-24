@@ -85,7 +85,7 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
   if (prev && getComputedStyle(prev as HTMLElement).position == "sticky") gutterCover = dom.offsetLeft
 
   for (let cur: any = dom.parentNode; cur;) {
-    if (cur.nodeType == 1) { // Element or document
+    if (cur.nodeType == 1) { // Element
       let bounding: Rect, top = cur == document.body
       if (top) {
         bounding = windowRect(win)
