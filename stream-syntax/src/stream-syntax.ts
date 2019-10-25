@@ -212,6 +212,7 @@ class SyntaxState<ParseState> {
 
   updateTree(parser: StreamParserInstance<ParseState>, state: EditorState, upto: number,
              rest: boolean): boolean | CancellablePromise<Tree> {
+    upto = Math.min(upto + 100, state.doc.lineAt(upto).end)
     // FIXME make sure multiple calls in same frame don't keep doing work
     if (this.frontierPos >= upto) return true
     if (this.working == -1) this.advanceFrontier(parser, state, upto)
