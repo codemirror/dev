@@ -79,10 +79,8 @@ function windowRect(win: Window): Rect {
 }
 
 export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
-  let scrollThreshold = 0, scrollMargin = 5
+  let scrollMargin = 5
   let doc = dom.ownerDocument!, win = doc.defaultView!
-  let gutterCover = 0, prev = dom.previousSibling
-  if (prev && getComputedStyle(prev as HTMLElement).position == "sticky") gutterCover = dom.offsetLeft
 
   for (let cur: any = dom.parentNode; cur;) {
     if (cur.nodeType == 1) { // Element
@@ -100,20 +98,28 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
       }
 
       let moveX = 0, moveY = 0
-      if (rect.top < bounding.top + scrollThreshold)
+      if (rect.top < bounding.top)
         moveY = -(bounding.top - rect.top + scrollMargin)
-      else if (rect.bottom > bounding.bottom - scrollThreshold)
+      else if (rect.bottom > bounding.bottom)
         moveY = rect.bottom - bounding.bottom + scrollMargin
-      if (rect.left < bounding.left + gutterCover + scrollThreshold)
-        moveX = -(bounding.left + gutterCover - rect.left + scrollMargin)
-      else if (rect.right > bounding.right - scrollThreshold)
+      if (rect.left < bounding.left)
+        moveX = -(bounding.left - rect.left + scrollMargin)
+      else if (rect.right > bounding.right)
         moveX = rect.right - bounding.right + scrollMargin
       if (moveX || moveY) {
         if (top) {
           win.scrollBy(moveX, moveY)
         } else {
-          if (moveY) cur.scrollTop += moveY
-          if (moveX) cur.scrollLeft += moveX
+          if (moveY) {
+            let start = cur.scrollTop
+            cur.scrollTop += moveY
+            moveY = cur.scrollTop - start
+          }
+          if (moveX) {
+            let start = cur.scrollLeft
+            cur.scrollLeft += moveX
+            moveX = cur.scrollLeft - start
+          }
           rect = {left: rect.left - moveX, top: rect.top - moveY,
                   right: rect.right - moveX, bottom: rect.bottom - moveY} as ClientRect
         }

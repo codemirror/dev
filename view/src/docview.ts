@@ -9,7 +9,7 @@ import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./
 import {Decoration, DecorationSet, joinRanges, findChangedRanges,
         heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, decorations as decorationsBehavior, viewPlugin, ViewPluginValue} from "./extension"
+import {ViewUpdate, decorations as decorationsBehavior, scrollMargins, viewPlugin, ViewPluginValue} from "./extension"
 import {EditorView, UpdateState} from "./editorview"
 import {EditorState, ChangedRange} from "../../state"
 import {Text} from "../../text"
@@ -417,7 +417,10 @@ export class DocView extends ContentView {
 
   scrollPosIntoView(pos: number) {
     let rect = this.coordsAt(pos)
-    if (rect) scrollRectIntoView(this.dom, rect)
+    if (!rect) return
+    let margin = this.view.behavior(scrollMargins)
+    scrollRectIntoView(this.dom, {left: rect.left - margin.left, top: rect.top - margin.top,
+                                  right: rect.right + margin.right, bottom: rect.bottom + margin.bottom})
   }
 
   nearest(dom: Node): ContentView | null {

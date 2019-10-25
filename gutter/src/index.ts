@@ -102,7 +102,9 @@ export class Gutter {
 export const gutters = EditorView.extend.unique((config: {fixed?: boolean}[]): Extension => {
   let fixed = config.every(c => c.fixed !== false)
   return [
-    ViewPlugin.create(view => new GutterView(view, {fixed})).extension,
+    ViewPlugin.create(view => new GutterView(view, {fixed}))
+      .behavior(EditorView.scrollMargins, gutterView => gutterView.scrollMargins())
+      .extension,
     EditorView.theme(baseTheme)
   ]
 }, {})
@@ -111,7 +113,7 @@ class GutterView implements ViewPluginValue {
   gutters: SingleGutterView[]
   dom: HTMLElement
 
-  constructor(readonly view: EditorView, config: {fixed: boolean}) {
+  constructor(readonly view: EditorView, readonly config: {fixed: boolean}) {
     this.dom = document.createElement("div")
     this.dom.setAttribute("aria-hidden", "true")
     this.gutters = view.behavior(gutterBehavior).map(gutter => new SingleGutterView(view, gutter.config))
@@ -149,6 +151,11 @@ class GutterView implements ViewPluginValue {
     }, 0)
     for (let cx of contexts) cx.finish(this.view)
     this.dom.style.minHeight = this.view.contentHeight + "px"
+  }
+
+  scrollMargins() {
+    if (this.gutters.length == 0 || !this.config.fixed) return {}
+    return getComputedStyle(this.view.scrollDOM).direction == "ltr" ? {left: this.dom.offsetWidth} : {right: this.dom.offsetWidth}
   }
 }
 

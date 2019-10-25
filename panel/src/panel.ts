@@ -4,7 +4,7 @@ export const panels = EditorView.extend.unique<null>(() => {
   return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
 }, null)
 
-const panelPlugin = ViewPlugin.create(view => new Panels(view))
+const panelPlugin = ViewPlugin.create(view => new Panels(view)).behavior(EditorView.scrollMargins, p => p.scrollMargins())
 
 class Panels {
   top: PanelGroup
@@ -33,6 +33,10 @@ class Panels {
   destroy() {
     this.top.destroy()
     this.bottom.destroy()
+  }
+
+  scrollMargins() {
+    return {top: this.top.scrollMargin(), bottom: this.bottom.scrollMargin()}
   }
 }
 
@@ -79,6 +83,7 @@ class PanelGroup {
       if (this.dom) {
         this.dom.remove()
         this.dom = null
+        this.height = 0
         this.removeListeners()
       }
       this.align()
@@ -163,6 +168,10 @@ class PanelGroup {
 
   destroy() {
     this.removeListeners()
+  }
+
+  scrollMargin() {
+    return this.floating ? this.height : 0
   }
 }
 

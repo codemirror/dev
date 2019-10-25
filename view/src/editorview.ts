@@ -11,7 +11,8 @@ import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {extendView, ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, decorations, phrases, ViewPlugin, ViewPluginValue, notified} from "./extension"
+        viewPlugin, decorations, phrases, scrollMargins,
+        ViewPlugin, ViewPluginValue, notified} from "./extension"
 import {Attrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
@@ -489,6 +490,12 @@ export class EditorView {
   /// objects registered with this behavior to find translations for
   /// its argument.
   static phrases = phrases
+
+  /// This behavior can be used to indicate that, when scrolling
+  /// something into view, certain parts at the side of the editor
+  /// should be scrolled past (for example because there is a gutter
+  /// or panel blocking them from view).
+  static scrollMargins = scrollMargins
 
   /// Behavior that provides editor DOM attributes for the editor's
   /// outer element. FIXME move to EditorView?

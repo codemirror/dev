@@ -5,6 +5,7 @@ import {DecorationSet} from "./decoration"
 import {Extension, Behavior, ExtensionGroup, Slot, SlotType} from "../../extension"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
+import {Rect} from "./dom"
 
 /// Some [command functions](#state.Command) need direct access to the
 /// [editor view](#view.EditorView). View commands are expect a view
@@ -159,6 +160,19 @@ export const styleModule = extendView.behavior<StyleModule>()
 export const theme = extendView.behavior<StyleModule<{[key: string]: string}>>()
 
 export const phrases = extendView.behavior<{[key: string]: string}>()
+
+export const scrollMargins = extendView.behavior<{left?: number, top?: number, right?: number, bottom?: number}, Rect>({
+  combine(rects) {
+    let result = {left: 0, top: 0, right: 0, bottom: 0}
+    for (let r of rects) {
+      result.left = Math.max(result.left, r.left || 0)
+      result.top = Math.max(result.top, r.top || 0)
+      result.right = Math.max(result.right, r.right || 0)
+      result.bottom = Math.max(result.bottom, r.bottom || 0)
+    }
+    return result
+  }
+})
 
 export const focusChange = Slot.define<boolean>()
 
