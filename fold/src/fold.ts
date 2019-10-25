@@ -1,12 +1,12 @@
-import {EditorState} from "../../state"
+import {EditorState, Annotation} from "../../state"
 import {EditorView, BlockInfo, ViewCommand, ViewUpdate, ViewPlugin, Decoration, WidgetType} from "../../view"
-import {combineConfig, fillConfig, Slot} from "../../extension"
+import {combineConfig, fillConfig} from "../../extension"
 import {Gutter, GutterMarker} from "../../gutter"
 
 type Range = {from: number, to: number}
 
-const foldSlot = Slot.define<{fold?: readonly Range[],
-                              unfold?: readonly Range[]}>()
+const foldAnnotation = Annotation.define<{fold?: readonly Range[],
+                                          unfold?: readonly Range[]}>()
 
 function selectedLines(view: EditorView) {
   let lines: BlockInfo[] = []
@@ -26,7 +26,7 @@ export const foldCode: ViewCommand = view => {
     if (range) fold.push(range)
   }
   if (!fold.length) return false
-  view.dispatch(view.state.t().addMeta(foldSlot({fold})))
+  view.dispatch(view.state.t().annotate(foldAnnotation({fold})))
   return true
 }
 
@@ -38,7 +38,7 @@ export const unfoldCode: ViewCommand = view => {
     if (folded) unfold.push(folded)
   }
   if (!unfold.length) return false
-  view.dispatch(view.state.t().addMeta(foldSlot({unfold})))
+  view.dispatch(view.state.t().annotate(foldAnnotation({unfold})))
   return true
 }
 
@@ -86,8 +86,8 @@ class FoldPlugin {
   update(update: ViewUpdate) {
     this.decorations = this.decorations.map(update.changes)
     for (let tr of update.transactions) {
-      let slot = tr.getMeta(foldSlot)
-      if (slot) this.updateRanges(slot.fold || [], slot.unfold || [])
+      let ann = tr.annotation(foldAnnotation)
+      if (ann) this.updateRanges(ann.fold || [], ann.unfold || [])
     }
     // Make sure widgets are redrawn with up-to-date classes
     if (update.themeChanged && this.placeholderClass != this.widgetConfig.class) {
@@ -128,7 +128,7 @@ class FoldWidget extends WidgetType<WidgetConfig> {
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
       let folded = view.plugin(foldPlugin)!.foldInside(line.from, line.to)
-      if (folded) view.dispatch(view.state.t().addMeta(foldSlot({unfold: [folded]})))
+      if (folded) view.dispatch(view.state.t().annotate(foldAnnotation({unfold: [folded]})))
       event.preventDefault()
     }
     return element
@@ -182,13 +182,13 @@ export function foldGutter(config: FoldGutterConfig = {}) {
           let plugin = view.plugin(foldPlugin)!
           let folded = plugin.foldInside(line.from, line.to)
           if (folded) {
-            view.dispatch(view.state.t().addMeta(foldSlot({unfold: [folded]})))
+            view.dispatch(view.state.t().annotate(foldAnnotation({unfold: [folded]})))
             return true
           }
           let range = view.state.behavior(EditorState.foldable)
             .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
           if (range) {
-            view.dispatch(view.state.t().addMeta(foldSlot({fold: [range]})))
+            view.dispatch(view.state.t().annotate(foldAnnotation({fold: [range]})))
             return true
           }
           return false

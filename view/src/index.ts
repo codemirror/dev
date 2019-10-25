@@ -3,7 +3,6 @@ export {ViewCommand, ViewPlugin, DecorationPluginSpec, ViewPluginValue, ViewUpda
 export {Decoration, DecorationSet, WidgetType,
         MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec, BlockType} from "./decoration"
 export {BlockInfo} from "./heightmap"
-export {Slot} from "../../extension"
 export {Range} from "../../rangeset"
 
 import {HeightMap, HeightOracle, MeasuredHeights, QueryType} from "./heightmap"

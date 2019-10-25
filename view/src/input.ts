@@ -1,8 +1,7 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change, Annotation} from "../../state"
 import {EditorView} from "./editorview"
 import {focusChange, handleDOMEvents, ViewUpdate,
         clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
-import {Slot} from "../../extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 
@@ -167,7 +166,7 @@ class MouseSelection {
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.t().setSelection(selection)
-                         .addMeta(Transaction.userEvent("pointer")))
+                         .annotate(Transaction.userEvent("pointer")))
   }
 
   map(changes: ChangeSet) {
@@ -239,7 +238,7 @@ function capturePaste(view: EditorView) {
 
 function doPaste(view: EditorView, text: string) {
   view.dispatch(view.state.t().replaceSelection(text)
-                .addMeta(Transaction.userEvent("paste")).scrollIntoView())
+                .annotate(Transaction.userEvent("paste")).scrollIntoView())
 }
 
 function mustCapture(event: KeyboardEvent): boolean {
@@ -326,7 +325,7 @@ handlers.drop = (view, event: DragEvent) => {
   let change = new Change(dropPos, dropPos, view.state.splitLines(text))
   tr.change(change)
     .setSelection(EditorSelection.single(dropPos, dropPos + change.length))
-    .addMeta(Transaction.userEvent("drop"))
+    .annotate(Transaction.userEvent("drop"))
   view.focus()
   view.dispatch(tr)
 }
@@ -373,7 +372,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut") {
-    view.dispatch(view.state.t().replaceSelection([""]).scrollIntoView().addMeta(Transaction.userEvent("cut")))
+    view.dispatch(view.state.t().replaceSelection([""]).scrollIntoView().annotate(Transaction.userEvent("cut")))
   }
 }
 
@@ -389,12 +388,12 @@ handlers.beforeprint = view => {
   view.docView.checkLayout(true)
 }
 
-// Dummy slot to force a display update in the absence of other triggers
-const compositionEndSlot = Slot.define<null>()
+// Dummy annotation to force a display update in the absence of other triggers
+const compositionEndAnnotation = Annotation.define<null>()
 
 function forceClearComposition(view: EditorView) {
   if (view.docView.compositionDeco.size)
-    view.update([], [compositionEndSlot(null)])
+    view.update([], [compositionEndAnnotation(null)])
 }
 
 handlers.compositionstart = handlers.compositionupdate = view => {

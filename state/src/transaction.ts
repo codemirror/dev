@@ -1,6 +1,6 @@
 import {Text} from "../../text"
-import {Slot, SlotType, Extension, Configuration} from "../../extension"
-import {allowMultipleSelections, extendState} from "./extension"
+import {Extension, Configuration} from "../../extension"
+import {Annotation, allowMultipleSelections, extendState} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
@@ -24,7 +24,7 @@ export class Transaction {
   docs: Text[] = []
   /// The selection at the end of the transaction.
   selection: EditorSelection
-  private metadata: Slot[]
+  private _annotations: Annotation<any>[]
   private flags: number = 0
   /// @internal
   configuration: Configuration<EditorState>
@@ -37,7 +37,7 @@ export class Transaction {
     time: number = Date.now()
   ) {
     this.selection = startState.selection
-    this.metadata = [Transaction.time(time)]
+    this._annotations = [Transaction.time(time)]
     this.configuration = startState.configuration
   }
 
@@ -47,18 +47,32 @@ export class Transaction {
     return last < 0 ? this.startState.doc : this.docs[last]
   }
 
-  /// Add metadata to this transaction. Metadata can be any value
-  /// tagged as a [slot](#extension.Slot), which can provide
+  /// Add annotations to this transaction. Annotations can provide
   /// additional information about the transaction.
-  addMeta(...metadata: Slot[]): Transaction {
+  annotate(...annotations: Annotation<any>[]): Transaction {
     this.ensureOpen()
-    for (let slot of metadata) this.metadata.push(slot)
+    for (let ann of annotations) this._annotations.push(ann)
     return this
   }
 
-  /// Get the value of the given metdata slot type, if any.
-  getMeta<T>(type: SlotType<T>): T | undefined {
-    return Slot.get(type, this.metadata)
+  /// Get the value of the given annotation type, if any.
+  annotation<T>(type: (value: T) => Annotation<T>): T | undefined {
+    for (let i = this._annotations.length - 1; i >= 0; i--)
+      if (this._annotations[i].type == type) return this._annotations[i].value as T
+    return undefined
+  }
+
+  /// Get all values associated with the given annotation in this
+  /// transaction.
+  annotations<T>(type: (value: T) => Annotation<T>): readonly T[] {
+    let found = none as T[]
+    for (let ann of this._annotations) {
+      if (ann.type == type) {
+        if (found == none) found = []
+        found.push(ann.value as T)
+      }
+    }
+    return found
   }
 
   /// Add a change to this transaction. If `mirror` is given, it
@@ -188,17 +202,17 @@ export class Transaction {
     return new ChangeSet(changes, set.mirror.length ? set.mirror.map(i => set.length - i - 1) : set.mirror)
   }
 
-  /// Slot used to store transaction timestamps.
-  static time = Slot.define<number>()
+  /// Annotation used to store transaction timestamps.
+  static time = Annotation.define<number>()
 
-  /// Slot used to indicate that this transaction shouldn't clear the
-  /// goal column, which is used during vertical cursor motion (so
-  /// that moving over short lines doesn't reset the horizontal
-  /// position to the end of the shortest line). Should generally only
-  /// be set by commands that perform vertical motion.
-  static preserveGoalColumn = Slot.define<boolean>()
+  /// Annotation used to indicate that this transaction shouldn't
+  /// clear the goal column, which is used during vertical cursor
+  /// motion (so that moving over short lines doesn't reset the
+  /// horizontal position to the end of the shortest line). Should
+  /// generally only be set by commands that perform vertical motion.
+  static preserveGoalColumn = Annotation.define<boolean>()
 
-  /// Slot used to associate a transaction with a user interface
+  /// Annotation used to associate a transaction with a user interface
   /// event. The view will set this to...
   ///
   ///  - `"paste"` when pasting content
@@ -206,9 +220,11 @@ export class Transaction {
   ///  - `"drop"` when content is inserted via drag-and-drop
   ///  - `"keyboard"` when moving the selection via the keyboard
   ///  - `"pointer"` when moving the selection through the pointing device
-  static userEvent = Slot.define<string>()
+  static userEvent = Annotation.define<string>()
 
-  /// Slot indicating whether a transaction should be added to the
-  /// undo history or not.
-  static addToHistory = Slot.define<boolean>()
+  /// Annotation indicating whether a transaction should be added to
+  /// the undo history or not.
+  static addToHistory = Annotation.define<boolean>()
 }
+
+const none: readonly any[] = []

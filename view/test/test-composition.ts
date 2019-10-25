@@ -1,7 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType} from ".."
-import {EditorState} from "../../state"
-import {Slot} from "../../extension"
+import {EditorState, Annotation} from "../../state"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
@@ -19,7 +18,7 @@ function hasCompositionDeco(cm: EditorView) {
   return cm.docView.compositionDeco.size > 0
 }
 
-const dummySlot = Slot.define<null>() // Crude kludge to be able to flush the doc view
+const dummyAnnotation = Annotation.define<null>() // Crude kludge to be able to flush the doc view
 
 function compose(cm: EditorView, start: () => Text,
                  update: ((node: Text) => void)[],
@@ -44,7 +43,7 @@ function compose(cm: EditorView, start: () => Text,
   event(cm, "compositionend")
   if (options.end) options.end(node)
   cm.docView.observer.flush()
-  cm.update([], [dummySlot(null)])
+  cm.update([], [dummyAnnotation(null)])
   ist(!cm.inputState.composing)
   ist(!hasCompositionDeco(cm))
 }

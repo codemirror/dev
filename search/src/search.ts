@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewCommand, ViewUpdate, Decoration} from "../../view"
-import {EditorState, Slot, EditorSelection} from "../../state"
+import {EditorState, Annotation, EditorSelection} from "../../state"
 import {panels, openPanel} from "../../panel"
 import {Text} from "../../text"
 import {SearchCursor} from "./cursor"
@@ -21,7 +21,7 @@ class Query {
 
 const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
 
-const querySlot = Slot.define<Query>()
+const queryAnnotation = Annotation.define<Query>()
 
 class SearchPlugin {
   dialog: null | HTMLElement = null
@@ -32,7 +32,7 @@ class SearchPlugin {
   constructor(readonly view: EditorView) {}
 
   update(update: ViewUpdate) {
-    let query = update.getMeta(querySlot), changed = query && query.search != this.query.search
+    let query = update.annotation(queryAnnotation), changed = query && query.search != this.query.search
     if (query) this.query = query
     if (!this.query.search || !this.dialog)
       this.decorations = Decoration.none
@@ -74,7 +74,7 @@ export const openSearchPanel: ViewCommand = view => {
       },
       updateQuery(query: Query) {
         if (!query.eq(plugin.query))
-          view.dispatch(view.state.t().addMeta(querySlot(query)))
+          view.dispatch(view.state.t().annotate(queryAnnotation(query)))
       },
       searchNext() {
         let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()

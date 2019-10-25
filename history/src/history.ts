@@ -1,10 +1,10 @@
-import {EditorState, Transaction, StateField, Command} from "../../state"
-import {combineConfig, Slot} from "../../extension"
+import {EditorState, Transaction, StateField, Command, Annotation} from "../../state"
+import {combineConfig} from "../../extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
-const historyStateSlot = Slot.define<HistoryState>()
+const historyStateAnnotation = Annotation.define<HistoryState>()
 
-const closeHistorySlot = Slot.define<boolean>()
+const closeHistoryAnnotation = Annotation.define<boolean>()
 
 /// Options given when creating a history extension.
 export interface HistoryConfig {
@@ -21,16 +21,16 @@ const historyField = new StateField({
   },
 
   apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
-    const fromMeta = tr.getMeta(historyStateSlot)
+    const fromMeta = tr.annotation(historyStateAnnotation)
     if (fromMeta) return fromMeta
-    if (tr.getMeta(closeHistorySlot)) state = state.resetTime()
+    if (tr.annotation(closeHistoryAnnotation)) state = state.resetTime()
     if (!tr.changes.length && !tr.selectionSet) return state
 
     let config = editorState.behavior(historyConfig)[0]
-    if (tr.getMeta(Transaction.addToHistory) !== false)
+    if (tr.annotation(Transaction.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
-                              tr.startState.selection, tr.getMeta(Transaction.time)!,
-                              tr.getMeta(Transaction.userEvent), config.newGroupDelay, config.minDepth)
+                              tr.startState.selection, tr.annotation(Transaction.time)!,
+                              tr.annotation(Transaction.userEvent), config.newGroupDelay, config.minDepth)
     return state.addMapping(tr.changes.desc, config.minDepth)
   }
 })
@@ -57,7 +57,7 @@ function cmd(target: PopTarget, only: ItemFilter): Command {
     let historyState = state.field(historyField)
     if (!historyState.canPop(target, only)) return false
     const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
-    dispatch(transaction.addMeta(historyStateSlot(newState)))
+    dispatch(transaction.annotate(historyStateAnnotation(newState)))
     return true
   }
 }
@@ -79,7 +79,7 @@ export const redoSelection = cmd(PopTarget.Undone, ItemFilter.Any)
 /// from being appended to an existing history event (so that they
 /// require a separate undo command to undo).
 export function closeHistory(tr: Transaction): Transaction {
-  return tr.addMeta(closeHistorySlot(true))
+  return tr.annotate(closeHistoryAnnotation(true))
 }
 
 function depth(target: PopTarget, only: ItemFilter) {

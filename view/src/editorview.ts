@@ -1,5 +1,5 @@
-import {EditorState, Transaction, CancellablePromise} from "../../state"
-import {Configuration, Slot, Extension, Behavior} from "../../extension"
+import {EditorState, Transaction, CancellablePromise, Annotation} from "../../state"
+import {Configuration, Extension, Behavior} from "../../extension"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
@@ -166,7 +166,7 @@ export class EditorView {
   /// update the visible document and selection to match the state
   /// produced by the transactions, and notify view plugins of the
   /// change.
-  update(transactions: Transaction[] = [], metadata: Slot[] = []) {
+  update(transactions: Transaction[] = [], annotations: Annotation<any>[] = []) {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
     this.updateState = UpdateState.Updating
@@ -183,8 +183,8 @@ export class EditorView {
       this.configure(curForeign)
       this.updatePlugins()
     }
-    let update = transactions.length > 0 || metadata.length > 0 ? new ViewUpdate(this, transactions, metadata) : null
-    if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.getMeta(Transaction.preserveGoalColumn)))
+    let update = transactions.length > 0 || annotations.length > 0 ? new ViewUpdate(this, transactions, annotations) : null
+    if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.annotation(Transaction.preserveGoalColumn)))
       this.inputState.goalColumns.length = 0
     this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
     if (update) {
@@ -505,9 +505,9 @@ export class EditorView {
   /// element.
   static editorAttributes = editorAttributes
 
-  /// A slot that is used as a flag in view updates caused by changes to
-  /// the view's focus state. Its value will be `true` when the view is
-  /// being focused, `false` when it's losing focus.
+  /// An annotation that is used as a flag in view updates caused by
+  /// changes to the view's focus state. Its value will be `true` when
+  /// the view is being focused, `false` when it's losing focus.
   static focusChange = focusChange
 }
 

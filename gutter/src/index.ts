@@ -1,7 +1,7 @@
-import {combineConfig, fillConfig, Slot, Extension} from "../../extension"
+import {combineConfig, fillConfig, Extension} from "../../extension"
 import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, BlockType, BlockInfo} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {ChangeSet, MapMode} from "../../state"
+import {ChangeSet, MapMode, Annotation} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -298,7 +298,7 @@ export interface LineNumberConfig {
 }
 
 /// Used to insert markers into the line number gutter.
-export const lineNumberMarkers = Slot.define<LineNumberMarkerUpdate>()
+export const lineNumberMarkers = Annotation.define<LineNumberMarkerUpdate>()
 
 export type LineNumberMarkerUpdate = {
   /// When given, adds these markers.
@@ -335,8 +335,8 @@ export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs =>
   return new Gutter({
     style: "lineNumber",
     updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
-      let slot = update.getMeta(lineNumberMarkers)
-      if (slot) markers = markers.update(slot.add || [], slot.filter || null)
+      let ann = update.annotation(lineNumberMarkers)
+      if (ann) markers = markers.update(ann.add || [], ann.filter || null)
       return markers
     },
     lineMarker(view, line, others) {

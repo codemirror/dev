@@ -1,6 +1,5 @@
 const ist = require("ist")
-import {EditorState, StateField, Change, EditorSelection, SelectionRange} from ".."
-import {Slot} from "../../extension"
+import {EditorState, StateField, Change, EditorSelection, SelectionRange, Annotation} from ".."
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -25,11 +24,11 @@ describe("EditorState", () => {
     ist(newState.selection.ranges.map(r => r.from).join("/"), "1/6/11")
   })
 
-  const someSlot = Slot.define<number>()
+  const someAnnotation = Annotation.define<number>()
 
-  it("can store slots on transactions", () => {
-    let tr = EditorState.create({doc: "foo"}).t().addMeta(someSlot(55))
-    ist(tr.getMeta(someSlot), 55)
+  it("can store annotations on transactions", () => {
+    let tr = EditorState.create({doc: "foo"}).t().annotate(someAnnotation(55))
+    ist(tr.annotation(someAnnotation), 55)
   })
 
   it("throws when a change's bounds are invalid", () => {

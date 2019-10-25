@@ -1,31 +1,3 @@
-/// A slot is tagged value, where its tag determines its role and
-/// type. These are used, for example, to allow adding open-ended
-/// metadata to transactions.
-export class Slot<T = any> {
-  /// @internal
-  constructor(/** @internal */ public type: SlotType<T>,
-              /** @internal */ public value: T) {}
-
-  /// Define a new type of slot. Returns a function that you can call
-  /// with a content value to create an instance of this type.
-  static define<T>(): SlotType<T> {
-    let type: SlotType<T> = (value: T) => new Slot<T>(type, value)
-    return type
-  }
-
-  /// Retrieve the value of the (first) slot with the given type in an
-  /// array of slots, or return undefined when no such slot is found.
-  static get<T>(type: SlotType<T>, slots: readonly Slot[]): T | undefined {
-    for (let i = slots.length - 1; i >= 0; i--)
-      if (slots[i].type == type) return slots[i].value as T
-    return undefined
-  }
-}
-
-/// A slot type is both the key used to identify that type of slot,
-/// and a function used to create instances of it.
-export type SlotType<T> = (value: T) => Slot<T>
-
 declare const extensionBrand: unique symbol
 
 /// Extensions can either be values created by behaviors or unique

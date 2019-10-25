@@ -119,7 +119,7 @@ export class DocView extends ContentView {
     if (this.dirty == Dirty.Not && contentChanges.length == 0 &&
         this.state.selection.primary.from >= this.viewport.from &&
         this.state.selection.primary.to <= this.viewport.to &&
-        (!update || update.metadata.length == 0)) {
+        (!update || update._annotations.length == 0)) {
       this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
     } else {

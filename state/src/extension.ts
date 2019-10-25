@@ -56,6 +56,21 @@ export class StateField<Value> {
   }
 }
 
+/// A slot is tagged value, where its tag determines its role and
+/// type. These are used, for example, to allow adding open-ended
+/// metadata to transactions.
+export class Annotation<T> {
+  /// @internal
+  constructor(/** @internal */ public type: (value: T) => Annotation<T>,
+              /** @internal */ public value: T) {}
+
+  /// Define a new type of slot. Returns a function that you can call
+  /// with a content value to create an instance of this type.
+  static define<T>(): (value: T) => Annotation<T> {
+    return function type(value: T) { return new Annotation<T>(type, value) }
+  }
+}
+
 /// This is a
 /// [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
 /// with an additional field that can be used to indicate you are no

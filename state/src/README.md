@@ -38,6 +38,8 @@ let newState = transaction.apply()
 
 @Transaction
 
+@Annotation
+
 @MapMode
 
 @Mapping
@@ -54,8 +56,6 @@ extensions for the editor state.
 @StateField
 
 @StateFieldSpec
-
-@Slot
 
 @Syntax
 

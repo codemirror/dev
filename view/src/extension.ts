@@ -1,8 +1,8 @@
-import {EditorState, Transaction, ChangeSet} from "../../state"
+import {EditorState, Transaction, ChangeSet, Annotation} from "../../state"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet} from "./decoration"
-import {Extension, Behavior, ExtensionGroup, Slot, SlotType} from "../../extension"
+import {Extension, Behavior, ExtensionGroup} from "../../extension"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 import {Rect} from "./dom"
@@ -174,9 +174,9 @@ export const scrollMargins = extendView.behavior<{left?: number, top?: number, r
   }
 })
 
-export const focusChange = Slot.define<boolean>()
+export const focusChange = Annotation.define<boolean>()
 
-export const notified = Slot.define<boolean>()
+export const notified = Annotation.define<boolean>()
 
 /// View [plugins](#view.ViewPlugin) are given instances of this
 /// class, which describe what happened, whenever the view is updated.
@@ -198,7 +198,7 @@ export class ViewUpdate {
     /// The transactions involved in the update. May be empty.
     readonly transactions: readonly Transaction[] = none,
     /// @internal
-    readonly metadata: readonly Slot[] = none
+    readonly _annotations: readonly Annotation<any>[] = none
   ) {
     this.state = transactions.length ? transactions[transactions.length - 1].apply() : view.state
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
@@ -228,14 +228,31 @@ export class ViewUpdate {
     return this.prevThemes != this.view.behavior(theme)
   }
 
-  /// Get the value of the given slot, if it was passed as a flag for
-  /// the update or present in any of the transactions involved in the
-  /// update.
-  getMeta<T>(type: SlotType<T>): T | undefined {
-    for (let i = this.transactions.length; i >= 0; i--) {
-      let found = i == this.transactions.length ? Slot.get(type, this.metadata) : this.transactions[i].getMeta(type)
-      if (found !== undefined) return found
+  /// Get the value of the given annotation, if it was passed directly
+  /// for the update or present in any of the transactions involved in
+  /// the update.
+  annotation<T>(type: (value: T) => Annotation<T>): T | undefined {
+    for (let ann of this._annotations)
+      if (ann.type == type) return ann.value as T
+    for (let i = this.transactions.length - 1; i >= 0; i--) {
+      let value = this.transactions[i].annotation(type)
+      if (value) return value
     }
     return undefined
+  }
+
+  /// Get the values of all instances of the given annotation type
+  /// present in the transactions or passed directly to
+  /// [`update`](#view.EditorView.update).
+  annotations<T>(type: (value: T) => Annotation<T>): readonly T[] {
+    let result = none
+    for (let tr of this.transactions) {
+      let ann = tr.annotations(type)
+      if (ann.length) result = result.concat(ann)
+    }
+    for (let ann of this._annotations) {
+      if (ann.type == type) result = result.concat([ann.value as T])
+    }
+    return result
   }
 }

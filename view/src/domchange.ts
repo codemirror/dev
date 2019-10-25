@@ -74,7 +74,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     let tr = view.state.t().setSelection(newSel)
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
       if (view.inputState.lastSelectionOrigin == "keyboard") tr.scrollIntoView()
-      else tr.addMeta(Transaction.userEvent(view.inputState.lastSelectionOrigin!))
+      else tr.annotate(Transaction.userEvent(view.inputState.lastSelectionOrigin!))
     }
     view.dispatch(tr)
     return true

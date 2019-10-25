@@ -1,11 +1,3 @@
-### Slots
-
-@Slot
-
-@SlotType
-
-### Extensions
-
 @Extension
 
 @Behavior
