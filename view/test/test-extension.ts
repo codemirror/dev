@@ -18,14 +18,14 @@ describe("EditorView extension", () => {
     ist(cm.plugin(plugin)!.viewports.length, 1)
     ist(cm.plugin(plugin)!.viewports[0][0], 0)
     cm.dom.style.height = "300px"
-    cm.dom.style.overflow = "auto"
-    cm.dom.scrollTop = 300
+    cm.scrollDOM.style.overflow = "auto"
+    cm.scrollDOM.scrollTop = 300
     cm.docView.checkLayout()
     let val = cm.plugin(plugin)!.viewports
     ist(val.length, 2)
     ist(val[1][0], 0, ">")
     ist(val[1][1], val[0][0], ">")
-    cm.dom.scrollTop = 1000
+    cm.scrollDOM.scrollTop = 1000
     cm.docView.checkLayout()
     ist(cm.plugin(plugin)!.viewports.length, 3)
   })

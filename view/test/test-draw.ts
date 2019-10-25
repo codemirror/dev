@@ -83,8 +83,8 @@ describe("EditorView drawing", () => {
   it("only draws visible content", () => {
     let cm = tempEditor("a\n".repeat(500) + "b\n".repeat(500))
     cm.dom.style.height = "300px"
-    cm.dom.style.overflow = "auto"
-    cm.dom.scrollTop = 0
+    cm.scrollDOM.style.overflow = "auto"
+    cm.scrollDOM.scrollTop = 0
     cm.docView.checkLayout()
     ist(cm.contentDOM.childNodes.length, 500, "<")
     ist(cm.contentDOM.scrollHeight, 10000, ">")
@@ -92,7 +92,7 @@ describe("EditorView drawing", () => {
     let gap = cm.contentDOM.lastChild
     cm.dispatch(cm.state.t().replace(2000, 2000, "\n\n"))
     ist(cm.contentDOM.lastChild, gap) // Make sure gap nodes are reused when resized
-    cm.dom.scrollTop = cm.dom.scrollHeight / 2
+    cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2
     cm.docView.checkLayout()
     ist(cm.contentDOM.textContent!.match(/b/))
   })
@@ -100,8 +100,8 @@ describe("EditorView drawing", () => {
   it("keeps a drawn area around selection ends", () => {
     let cm = tempEditor("\nsecond\n" + "x\n".repeat(500) + "last")
     cm.dom.style.height = "300px"
-    cm.dom.style.overflow = "auto"
-    cm.dom.scrollTop = 3000
+    cm.scrollDOM.style.overflow = "auto"
+    cm.scrollDOM.scrollTop = 3000
     cm.dispatch(cm.state.t().setSelection(EditorSelection.single(1, cm.state.doc.length)))
     cm.docView.checkLayout()
     cm.focus()
