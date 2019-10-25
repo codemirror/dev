@@ -1,8 +1,20 @@
 import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
+import {Annotation} from "../../state"
 
 export const panels = EditorView.extend.unique<null>(() => {
   return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
 }, null)
+
+export interface PanelSpec {
+  dom: HTMLElement,
+  style?: string,
+  top?: boolean
+  pos?: number
+}
+
+export const openPanel = Annotation.define<PanelSpec>()
+
+export const closePanel = Annotation.define<HTMLElement>()
 
 const panelPlugin = ViewPlugin.create(view => new Panels(view)).behavior(EditorView.scrollMargins, p => p.scrollMargins())
 
@@ -16,12 +28,14 @@ class Panels {
     this.bottom = new PanelGroup(view, false)
   }
 
-  openPanel(dom: HTMLElement, top: boolean, pos: number, style: string) {
-    return (top ? this.top : this.bottom).openPanel(dom, pos, style)
-  }
-
   update(update: ViewUpdate) {
     if (update.themeChanged) this.themeChanged = true
+    for (let open of update.annotations(openPanel))
+      (open.top ? this.top : this.bottom).addPanel(open.dom, open.pos || 0, open.style || "")
+    for (let close of update.annotations(closePanel)) {
+      this.top.removePanel(close)
+      this.bottom.removePanel(close)
+    }
   }
 
   draw() {
@@ -46,22 +60,27 @@ class PanelGroup {
   panels: {pos: number, dom: HTMLElement, style: string}[] = []
   scrollers: EventTarget[] = []
   floating = false
+  needsSync = false
 
   constructor(readonly view: EditorView, readonly top: boolean) {
     this.onScroll = this.onScroll.bind(this)
   }
 
-  openPanel(dom: HTMLElement, pos: number, style: string) {
+  addPanel(dom: HTMLElement, pos: number, style: string) {
+    // FIXME coexist with already-assigned classes?
     dom.className = this.view.cssClass("panel" + (style ? "." + style : ""))
     let panel = {pos, dom, style}, i = 0
     while (i < this.panels.length && this.panels[i].pos <= pos) i++
     this.panels.splice(i, 0, panel)
-    this.syncDOM()
-    return () => {
-      let found = this.panels.indexOf(panel)
-      if (found > -1) {
-        this.panels.splice(found, 1)
-        this.syncDOM()
+    this.needsSync = true
+  }
+
+  removePanel(dom: HTMLElement) {
+    for (let i = 0; i < this.panels.length; i++) {
+      if (this.panels[i].dom == dom) {
+        this.panels.splice(i, 1)
+        this.needsSync = true
+        return
       }
     }
   }
@@ -83,7 +102,6 @@ class PanelGroup {
       if (this.dom) {
         this.dom.remove()
         this.dom = null
-        this.height = 0
         this.removeListeners()
       }
       this.align()
@@ -158,6 +176,10 @@ class PanelGroup {
   }
 
   draw(themeChanged: boolean) {
+    if (this.needsSync) {
+      this.syncDOM()
+      this.needsSync = false
+    }
     this.align()
     if (themeChanged && this.dom) {
       this.dom.className = this.view.cssClass("panels")
@@ -179,19 +201,6 @@ function rm(node: ChildNode) {
   let next = node.nextSibling
   node.remove()
   return next
-}
-
-export interface PanelSpec {
-  dom: HTMLElement,
-  style?: string,
-  top?: boolean
-  pos?: number
-}
-
-export function openPanel(view: EditorView, spec: PanelSpec) {
-  let plugin = view.plugin(panelPlugin)
-  if (!plugin) throw new Error("View doesn't have the panel extension")
-  return plugin.openPanel(spec.dom, !!spec.top, spec.pos || 0, spec.style || "")
 }
 
 const defaultTheme = {

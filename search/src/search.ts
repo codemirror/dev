@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewCommand, ViewUpdate, Decoration} from "../../view"
 import {EditorState, Annotation, EditorSelection} from "../../state"
-import {panels, openPanel} from "../../panel"
+import {panels, openPanel, closePanel} from "../../panel"
 import {Text} from "../../text"
 import {SearchCursor} from "./cursor"
 export {SearchCursor}
@@ -25,7 +25,6 @@ const queryAnnotation = Annotation.define<Query>()
 
 class SearchPlugin {
   dialog: null | HTMLElement = null
-  closeDialog: () => void = () => null
   query = new Query("", "", false)
   decorations = Decoration.none
 
@@ -68,8 +67,9 @@ export const openSearchPanel: ViewCommand = view => {
       close() {
         if (plugin.dialog) {
           if (plugin.dialog.contains(view.root.activeElement)) view.focus()
-          plugin.closeDialog()
+          let close = closePanel(plugin.dialog)
           plugin.dialog = null
+          view.dispatch(view.state.t().annotate(close))
         }
       },
       updateQuery(query: Query) {
@@ -86,7 +86,7 @@ export const openSearchPanel: ViewCommand = view => {
       },
       replaceNext() {}
     })
-    plugin.closeDialog = openPanel(view, {dom: plugin.dialog, pos: 80, style: "search"})
+    view.dispatch(view.state.t().annotate(openPanel({dom: plugin.dialog, pos: 80, style: "search"})))
   }
   ;(plugin.dialog.querySelector("[name=search]") as HTMLInputElement).select()
   return true
