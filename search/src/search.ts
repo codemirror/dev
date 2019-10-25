@@ -1,15 +1,32 @@
 import {EditorView, ViewPlugin, ViewCommand, ViewUpdate, Decoration} from "../../view"
-import {EditorState, Slot} from "../../state"
+import {EditorState, Slot, EditorSelection} from "../../state"
 import {panels, openPanel} from "../../panel"
+import {Text} from "../../text"
+import {SearchCursor} from "./cursor"
+export {SearchCursor}
+
+class Query {
+  constructor(readonly search: string,
+              readonly replace: string,
+              readonly caseInsensitive: boolean) {}
+
+  eq(other: Query) {
+    return this.search == other.search && this.replace == other.replace && this.caseInsensitive == other.caseInsensitive
+  }
+
+  cursor(doc: Text, from = 0, to = doc.length) {
+    return new SearchCursor(doc, this.search, from, to, this.caseInsensitive ? x => x.toLowerCase() : undefined)
+  }
+}
 
 const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
 
-const querySlot = Slot.define<{search: string, replace: string}>()
+const querySlot = Slot.define<Query>()
 
 class SearchPlugin {
   dialog: null | HTMLElement = null
   closeDialog: () => void = () => null
-  query = {search: "", replace: ""}
+  query = new Query("", "", false)
   decorations = Decoration.none
 
   constructor(readonly view: EditorView) {}
@@ -20,19 +37,16 @@ class SearchPlugin {
     if (!this.query.search || !this.dialog)
       this.decorations = Decoration.none
     else if (changed || update.docChanged || update.transactions.some(tr => tr.selectionSet))
-      this.decorations = this.highlight(this.query.search, update.state, update.viewport)
+      this.decorations = this.highlight(this.query, update.state, update.viewport)
   }
 
-  highlight(query: string, state: EditorState, viewport: {from: number, to: number}) {
-    let deco = []
-    for (let pos = viewport.from, cursor = state.doc.iterRange(pos, viewport.to); !(cursor.next().done);) {
-      let found = cursor.value.indexOf(query) // FIXME matches on chunk boundaries
-      if (found >= 0) {
-        let from = found + pos, to = from + query.length
-        let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
-        deco.push(Decoration.mark(from, to, {class: this.view.cssClass(selected ? "searchMatch.selected" : "searchMatch")}))
-      }
-      pos += cursor.value.length
+  highlight(query: Query, state: EditorState, viewport: {from: number, to: number}) {
+    let deco = [], cursor = query.cursor(state.doc, Math.max(0, viewport.from - query.search.length),
+                                         Math.min(viewport.to + query.search.length, state.doc.length))
+    while (!cursor.next().done) {
+      let {from, to} = cursor.value
+      let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
+      deco.push(Decoration.mark(from, to, {class: this.view.cssClass(selected ? "searchMatch.selected" : "searchMatch")}))
     }
     return Decoration.set(deco)
   }
@@ -58,15 +72,18 @@ export const openSearchPanel: ViewCommand = view => {
           plugin.dialog = null
         }
       },
-      updateSearch(value: string) {
-        if (value != plugin.query.search)
-          view.dispatch(view.state.t().addMeta(querySlot({search: value, replace: plugin.query.replace})))
+      updateQuery(query: Query) {
+        if (!query.eq(plugin.query))
+          view.dispatch(view.state.t().addMeta(querySlot(query)))
       },
-      updateReplace(value: string) {
-        if (value != plugin.query.replace)
-          view.dispatch(view.state.t().addMeta(querySlot({search: plugin.query.search, replace: value})))
+      searchNext() {
+        let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
+        if (cursor.done) {
+          cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
+          if (cursor.done) return
+        }
+        view.dispatch(view.state.t().setSelection(EditorSelection.single(cursor.value.from, cursor.value.to)).scrollIntoView())
       },
-      searchNext() {},
       replaceNext() {}
     })
     plugin.closeDialog = openPanel(view, {dom: plugin.dialog, pos: 80, style: "search"})
@@ -85,16 +102,33 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
 
 function buildDialog(conf: {query: {search: string, replace: string},
                             phrase: (phrase: string) => string,
-                            updateSearch: (search: string) => void,
-                            updateReplace: (replace: string) => void,
+                            updateQuery: (query: Query) => void,
                             searchNext: () => void,
                             replaceNext: () => void,
                             close: () => void}) {
   let onEnter = (f: () => void) => (event: KeyboardEvent) => {
     if (event.keyCode == 13) { event.preventDefault();  f() }
   }
-  let update = (f: (value: string) => void) => (event: Event) => f((event.target as HTMLInputElement).value)
-  return elt("div", {
+  let searchField = elt("input", {
+    value: conf.query.search,
+    placeholder: conf.phrase("Find"),
+    name: "search",
+    onkeydown: onEnter(conf.searchNext),
+    onchange: update,
+    onkeyup: update
+  }) as HTMLInputElement
+  let replaceField = elt("input", {
+    value: conf.query.replace,
+    placeholder: conf.phrase("Replace"),
+    name: "replace",
+    onkeydown: onEnter(conf.replaceNext),
+    onchange: update,
+    onkeyup: update
+  }) as HTMLInputElement
+  function update() {
+    conf.updateQuery(new Query(searchField.value, replaceField.value, false))
+  }
+  let panel = elt("div", {
     onkeydown(e: KeyboardEvent) {
       if (e.keyCode == 27) {
         e.preventDefault()
@@ -102,29 +136,12 @@ function buildDialog(conf: {query: {search: string, replace: string},
       }
     }
   }, [
-    elt("input", {
-      value: conf.query.search,
-      placeholder: conf.phrase("Find"),
-      name: "search",
-      onkeydown: onEnter(conf.searchNext),
-      onchange: update(conf.updateSearch),
-      onkeyup: update(conf.updateSearch)
-    }),
-    " ",
-    elt("button", {onclick: conf.searchNext}, [conf.phrase("Next")]),
+    searchField, " ", elt("button", {onclick: conf.searchNext}, [conf.phrase("Next")]),
     elt("br"),
-    elt("input", {
-      value: conf.query.replace,
-      placeholder: conf.phrase("Replace"),
-      name: "replace",
-      onkeydown: onEnter(conf.replaceNext),
-      onchange: update(conf.updateReplace),
-      onkeyup: update(conf.updateReplace)
-    }),      
-    " ",
-    elt("button", {onclick: conf.replaceNext}, [conf.phrase("Replace")]),
+    replaceField, " ", elt("button", {onclick: conf.replaceNext}, [conf.phrase("Replace")]),
     elt("button", {className: "close", onclick: conf.close}, ["×"]) // FIXME accessible, styling
   ])
+  return panel
 }
 
 const theme = {
@@ -133,7 +150,7 @@ const theme = {
     position: "relative",
     "& .close": {
       position: "absolute",
-      top: "2px",
+      top: "0",
       right: "2px",
       background: "inherit",
       border: "none",
