@@ -1,18 +1,41 @@
-import {EditorView, ViewPlugin, ViewCommand, Decoration} from "../../view"
+import {EditorView, ViewPlugin, ViewCommand, ViewUpdate, Decoration} from "../../view"
+import {EditorState, Slot} from "../../state"
 import {panels, openPanel} from "../../panel"
 
 const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
 
+const querySlot = Slot.define<{search: string, replace: string}>()
+
 class SearchPlugin {
   dialog: null | HTMLElement = null
   closeDialog: () => void = () => null
-  searchQuery = ""
-  replaceQuery = ""
+  query = {search: "", replace: ""}
   decorations = Decoration.none
 
   constructor(readonly view: EditorView) {}
 
-  update() {}
+  update(update: ViewUpdate) {
+    let query = update.getMeta(querySlot), changed = query && query.search != this.query.search
+    if (query) this.query = query
+    if (!this.query.search || !this.dialog)
+      this.decorations = Decoration.none
+    else if (changed || update.docChanged || update.transactions.some(tr => tr.selectionSet))
+      this.decorations = this.highlight(this.query.search, update.state, update.viewport)
+  }
+
+  highlight(query: string, state: EditorState, viewport: {from: number, to: number}) {
+    let deco = []
+    for (let pos = viewport.from, cursor = state.doc.iterRange(pos, viewport.to); !(cursor.next().done);) {
+      let found = cursor.value.indexOf(query) // FIXME matches on chunk boundaries
+      if (found >= 0) {
+        let from = found + pos, to = from + query.length
+        let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
+        deco.push(Decoration.mark(from, to, {class: this.view.cssClass(selected ? "searchMatch.selected" : "searchMatch")}))
+      }
+      pos += cursor.value.length
+    }
+    return Decoration.set(deco)
+  }
 }
 
 export const search = EditorView.extend.unique<null>(() => [
@@ -26,8 +49,7 @@ export const openSearchPanel: ViewCommand = view => {
   if (!plugin) throw new Error("Search plugin not enabled")
   if (!plugin.dialog) {
     plugin.dialog = buildDialog({
-      search: plugin.searchQuery,
-      replace: plugin.replaceQuery,
+      query: plugin.query,
       phrase(value: string) { return value }, // FIXME
       close() {
         if (plugin.dialog) {
@@ -36,8 +58,14 @@ export const openSearchPanel: ViewCommand = view => {
           plugin.dialog = null
         }
       },
-      updateSearch(value: string) { plugin.searchQuery = value },
-      updateReplace(value: string) { plugin.replaceQuery = value },
+      updateSearch(value: string) {
+        if (value != plugin.query.search)
+          view.dispatch(view.state.t().addMeta(querySlot({search: value, replace: plugin.query.replace})))
+      },
+      updateReplace(value: string) {
+        if (value != plugin.query.replace)
+          view.dispatch(view.state.t().addMeta(querySlot({search: plugin.query.search, replace: value})))
+      },
       searchNext() {},
       replaceNext() {}
     })
@@ -55,8 +83,7 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
   return e
 }
 
-function buildDialog(conf: {search: string,
-                            replace: string,
+function buildDialog(conf: {query: {search: string, replace: string},
                             phrase: (phrase: string) => string,
                             updateSearch: (search: string) => void,
                             updateReplace: (replace: string) => void,
@@ -66,6 +93,7 @@ function buildDialog(conf: {search: string,
   let onEnter = (f: () => void) => (event: KeyboardEvent) => {
     if (event.keyCode == 13) { event.preventDefault();  f() }
   }
+  let update = (f: (value: string) => void) => (event: Event) => f((event.target as HTMLInputElement).value)
   return elt("div", {
     onkeydown(e: KeyboardEvent) {
       if (e.keyCode == 27) {
@@ -75,22 +103,23 @@ function buildDialog(conf: {search: string,
     }
   }, [
     elt("input", {
-      value: conf.search,
+      value: conf.query.search,
       placeholder: conf.phrase("Find"),
       name: "search",
       onkeydown: onEnter(conf.searchNext),
-      onchange(e: Event) {
-        conf.updateSearch((e.target as HTMLInputElement).value)
-      }
+      onchange: update(conf.updateSearch),
+      onkeyup: update(conf.updateSearch)
     }),
     " ",
     elt("button", {onclick: conf.searchNext}, [conf.phrase("Next")]),
     elt("br"),
     elt("input", {
-      value: conf.replace,
+      value: conf.query.replace,
       placeholder: conf.phrase("Replace"),
       name: "replace",
-      onkeydown: onEnter(conf.replaceNext)
+      onkeydown: onEnter(conf.replaceNext),
+      onchange: update(conf.updateReplace),
+      onkeyup: update(conf.updateReplace)
     }),      
     " ",
     elt("button", {onclick: conf.replaceNext}, [conf.phrase("Replace")]),
@@ -114,5 +143,13 @@ const theme = {
     "& input, & button": {
       verticalAlign: "middle"
     }
+  },
+
+  searchMatch: {
+    background: "#ffa"
+  },
+
+  "searchMatch.selected": {
+    background: "#fca"
   }
 }
