@@ -11,7 +11,7 @@ import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {extendView, ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, decorations, ViewPlugin, ViewPluginValue, notified} from "./extension"
+        viewPlugin, decorations, phrases, ViewPlugin, ViewPluginValue, notified} from "./extension"
 import {Attrs, updateAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
@@ -316,6 +316,16 @@ export class EditorView {
     return this.themeCache[selector] = result
   }
 
+  /// Look up a translation for the given phrase (via the
+  /// [`phrases`](#view.EditorView^phrases) behavior), or return the
+  /// original string if no translation is found.
+  phrase(phrase: string): string {
+    for (let map of this.behavior(phrases)) {
+      if (Object.prototype.hasOwnProperty.call(map, phrase)) return map[phrase]
+    }
+    return phrase
+  }
+
   /// Find the DOM parent node and offset (child offset if `node` is
   /// an element, character offset when it is a text node) at the
   /// given document position.
@@ -473,6 +483,12 @@ export class EditorView {
     let module = new StyleModule(spec)
     return [theme(module), styleModule(module)]
   }
+
+  /// Registers translation phrases. The
+  /// [`phrase`](#view.EditorView.phrase) method will look through all
+  /// objects registered with this behavior to find translations for
+  /// its argument.
+  static phrases = phrases
 
   /// Behavior that provides editor DOM attributes for the editor's
   /// outer element. FIXME move to EditorView?

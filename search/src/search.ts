@@ -50,7 +50,7 @@ export const openSearchPanel: ViewCommand = view => {
   if (!plugin.dialog) {
     plugin.dialog = buildDialog({
       query: plugin.query,
-      phrase(value: string) { return value }, // FIXME
+      phrase(value: string) { return view.phrase(value) },
       close() {
         if (plugin.dialog) {
           if (plugin.dialog.contains(view.root.activeElement)) view.focus()

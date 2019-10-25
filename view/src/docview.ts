@@ -65,7 +65,9 @@ export class DocView extends ContentView {
 
   get root() { return this.view.root }
 
-  constructor(private view: EditorView, onDOMChange: (from: number, to: number, typeOver: boolean) => boolean) {
+  get editorView() { return this.view }
+
+  constructor(readonly view: EditorView, onDOMChange: (from: number, to: number, typeOver: boolean) => boolean) {
     super()
     this.setDOM(view.contentDOM)
 

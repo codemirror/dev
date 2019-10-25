@@ -128,7 +128,7 @@ export class WidgetView extends InlineView {
 
   sync() {
     if (!this.dom || !this.widget.updateDOM(this.dom)) {
-      this.setDOM(this.widget.toDOM())
+      this.setDOM(this.widget.toDOM(this.editorView))
       this.dom!.contentEditable = "false"
     }
   }
@@ -188,7 +188,7 @@ export class WidgetView extends InlineView {
 export class CompositionView extends WidgetView {
   domAtPos(pos: number) { return new DOMPos(this.widget.value.text, pos) }
 
-  sync() { if (!this.dom) this.setDOM(this.widget.toDOM()) }
+  sync() { if (!this.dom) this.setDOM(this.widget.toDOM(this.editorView)) }
 
   ignoreMutation(): boolean { return false }
 

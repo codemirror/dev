@@ -158,6 +158,8 @@ export const styleModule = extendView.behavior<StyleModule>()
 
 export const theme = extendView.behavior<StyleModule<{[key: string]: string}>>()
 
+export const phrases = extendView.behavior<{[key: string]: string}>()
+
 export const focusChange = Slot.define<boolean>()
 
 export const notified = Slot.define<boolean>()

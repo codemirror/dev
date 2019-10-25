@@ -22,7 +22,7 @@ export abstract class GutterMarker extends RangeValue {
   }
 
   /// Render the DOM node for this marker, if any.
-  toDOM(): Node | null { return null }
+  toDOM(view: EditorView): Node | null { return null }
 
   /// Create a range that places this marker at the given position.
   at(pos: number) { return new Range(pos, pos, this) }
@@ -178,7 +178,7 @@ class UpdateContext {
 
     let above = line.top - this.height
     if (this.i == gutter.elements.length) {
-      let newElt = new GutterElement(line.height, above, this.localMarkers, gutter.elementClass)
+      let newElt = new GutterElement(view, line.height, above, this.localMarkers, gutter.elementClass)
       gutter.elements.push(newElt)
       gutter.dom.appendChild(newElt.dom)
     } else {
@@ -187,7 +187,7 @@ class UpdateContext {
         markers = elt.markers
         this.localMarkers.length = 0
       }
-      elt.update(line.height, above, markers, gutter.elementClass)
+      elt.update(view, line.height, above, markers, gutter.elementClass)
     }
     this.height = line.bottom
     this.i++
@@ -216,7 +216,7 @@ class SingleGutterView {
     }
     this.markers = config.initialMarkers(view)
     if (config.initialSpacer) {
-      this.spacer = new GutterElement(0, 0, [config.initialSpacer(view)], this.elementClass)
+      this.spacer = new GutterElement(view, 0, 0, [config.initialSpacer(view)], this.elementClass)
       this.dom.appendChild(this.spacer.dom)
       this.spacer.dom.style.cssText += "visibility: hidden; pointer-events: none"
     }
@@ -234,7 +234,7 @@ class SingleGutterView {
     this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
     if (this.spacer && this.config.updateSpacer) {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
-      if (updated != this.spacer.markers[0]) this.spacer.update(0, 0, [updated], this.elementClass)
+      if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)
     }
   }
 
@@ -249,12 +249,12 @@ class GutterElement {
   above: number = 0
   markers!: readonly GutterMarker[]
 
-  constructor(height: number, above: number, markers: readonly GutterMarker[], eltClass: string) {
+  constructor(view: EditorView, height: number, above: number, markers: readonly GutterMarker[], eltClass: string) {
     this.dom = document.createElement("div")
-    this.update(height, above, markers, eltClass)
+    this.update(view, height, above, markers, eltClass)
   }
 
-  update(height: number, above: number, markers: readonly GutterMarker[], cssClass: string) {
+  update(view: EditorView, height: number, above: number, markers: readonly GutterMarker[], cssClass: string) {
     if (this.height != height)
       this.dom.style.height = (this.height = height) + "px"
     if (this.above != above)
@@ -264,7 +264,7 @@ class GutterElement {
       for (let ch; ch = this.dom.lastChild;) ch.remove()
       let cls = cssClass
       for (let m of markers) {
-        let dom = m.toDOM()
+        let dom = m.toDOM(view)
         if (dom) this.dom.appendChild(dom)
         let c = m.elementClass
         if (c) cls += " " + c

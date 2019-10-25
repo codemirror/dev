@@ -68,7 +68,7 @@ export const codeFolding = EditorView.extend.unique((configs: FoldConfig[]) => {
   ]
 }, {})
 
-type WidgetConfig = {config: Required<FoldConfig>, class: string, view: EditorView}
+type WidgetConfig = {config: Required<FoldConfig>, class: string}
 
 class FoldPlugin {
   decorations = Decoration.none
@@ -76,7 +76,7 @@ class FoldPlugin {
 
   constructor(readonly view: EditorView) {
     let config = view.behavior(foldConfigBehavior)
-    this.widgetConfig = {config, class: this.placeholderClass, view}
+    this.widgetConfig = {config, class: this.placeholderClass}
   }
 
   get placeholderClass() {
@@ -91,7 +91,7 @@ class FoldPlugin {
     }
     // Make sure widgets are redrawn with up-to-date classes
     if (update.themeChanged && this.placeholderClass != this.widgetConfig.class) {
-      this.widgetConfig = {config: this.widgetConfig.config, class: this.placeholderClass, view: this.view}
+      this.widgetConfig = {config: this.widgetConfig.config, class: this.placeholderClass}
       let deco = [], iter = this.decorations.iter(), next
       while (next = iter.next()) deco.push(Decoration.replace(next.from, next.to, {widget: new FoldWidget(this.widgetConfig)}))
       this.decorations = Decoration.set(deco)
@@ -116,17 +116,16 @@ class FoldPlugin {
 class FoldWidget extends WidgetType<WidgetConfig> {
   ignoreEvents() { return false }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     let conf = this.value.config
     if (conf.placeholderDOM) return conf.placeholderDOM()
     let element = document.createElement("span")
     element.textContent = conf.placeholderText
     // FIXME should this have a role? does it make sense to allow focusing by keyboard?
-    element.setAttribute("aria-label", "folded code")
-    element.title = "unfold"
+    element.setAttribute("aria-label", view.phrase("folded code"))
+    element.title = view.phrase("unfold")
     element.className = this.value.class
     element.onclick = event => {
-      let {view} = this.value
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
       let folded = view.plugin(foldPlugin)!.foldInside(line.from, line.to)
       if (folded) view.dispatch(view.state.t().addMeta(foldSlot({unfold: [folded]})))
@@ -152,9 +151,10 @@ class FoldMarker extends GutterMarker {
 
   eq(other: FoldMarker) { return this.config == other.config && this.open == other.open }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     let span = document.createElement("span")
     span.textContent = this.open ? this.config.openText : this.config.closedText
+    span.title = view.phrase(this.open ? "Fold line" : "Unfold line")
     return span
   }
 }

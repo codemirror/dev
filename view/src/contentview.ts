@@ -1,4 +1,5 @@
 import {Rect, maxOffset, domIndex} from "./dom"
+import {EditorView} from "./editorview"
 
 declare global {
   interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
@@ -22,6 +23,11 @@ export abstract class ContentView {
   abstract length: number
   abstract children: ContentView[]
   breakAfter!: number
+
+  get editorView(): EditorView {
+    if (!this.parent) throw new Error("Accessing view in orphan content view")
+    return this.parent.editorView
+  }
 
   get overrideDOMText(): readonly string[] | null { return null }
 

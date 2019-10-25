@@ -249,7 +249,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
 
   sync() {
     if (!this.dom || !this.widget.updateDOM(this.dom)) {
-      this.setDOM(this.widget.toDOM())
+      this.setDOM(this.widget.toDOM(this.editorView))
       this.dom!.contentEditable = "false"
     }
   }

@@ -2,6 +2,7 @@ import {ChangeSet, ChangedRange, MapMode} from "../../state"
 import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset"
 import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
+import {EditorView} from "./editorview"
 
 /// Options passed when [creating](#view.Decoration^mark) a mark
 /// decoration.
@@ -82,7 +83,7 @@ export abstract class WidgetType<T = any> {
     readonly value: T
   ) {}
   /// Build the DOM structure for this widget instance.
-  abstract toDOM(): HTMLElement
+  abstract toDOM(view: EditorView): HTMLElement
   /// Compare this instance to another instance of the same class. By
   /// default, it'll compare the instances' parameters with `===`.
   eq(value: T): boolean { return this.value === value }
