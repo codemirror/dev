@@ -160,6 +160,8 @@ export class EditorView {
     this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
+
+    ensureGlobalHandler()
   }
 
   /// Update the view for the given array of transactions. This will
@@ -518,7 +520,25 @@ const defaultAttrs: Extension = [
   extendView.dynamic(contentAttributes, view => ({
     spellcheck: "false",
     contenteditable: "true",
-    class: styles.content + " codemirror-content " + view.cssClass("content"),
+    class: styles.content + " " + view.cssClass("content"),
     style: `${browser.tabSize}: ${view.state.tabSize}`
   }))
 ]
+
+let registeredGlobalHandler = false, resizeDebounce = -1
+
+function ensureGlobalHandler() {
+  if (registeredGlobalHandler) return
+  window.addEventListener("resize", () => {
+    if (resizeDebounce == -1) resizeDebounce = setTimeout(handleResize, 50)
+  })
+}
+
+function handleResize() {
+  resizeDebounce = -1
+  let found = document.querySelectorAll(".codemirror-content")
+  for (let i = 0; i < found.length; i++) {
+    let docView = found[i].cmView
+    if (docView) docView.editorView.update([], [notified(true)]) // FIXME remove need to pass an annotation?
+  }
+}
