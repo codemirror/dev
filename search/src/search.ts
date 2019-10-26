@@ -21,7 +21,7 @@ class Query {
 
 const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
 
-const queryAnnotation = Annotation.define<Query>()
+const searchAnnotation = Annotation.define<{query?: Query, dialog?: HTMLElement | false}>()
 
 class SearchPlugin {
   dialog: null | HTMLElement = null
@@ -31,8 +31,11 @@ class SearchPlugin {
   constructor(readonly view: EditorView) {}
 
   update(update: ViewUpdate) {
-    let query = update.annotation(queryAnnotation), changed = query && query.search != this.query.search
-    if (query) this.query = query
+    let ann = update.annotation(searchAnnotation)
+    let changed = ann && (ann.dialog != null || ann.query && ann.query.search != this.query.search)
+    if (ann && ann.query) this.query = ann.query
+    if (ann && ann.dialog && !this.dialog) this.dialog = ann.dialog
+    if (ann && ann.dialog == false) this.dialog = null
     if (!this.query.search || !this.dialog)
       this.decorations = Decoration.none
     else if (changed || update.docChanged || update.transactions.some(tr => tr.selectionSet))
@@ -61,20 +64,18 @@ export const openSearchPanel: ViewCommand = view => {
   let plugin = view.plugin(searchPlugin)!
   if (!plugin) throw new Error("Search plugin not enabled")
   if (!plugin.dialog) {
-    plugin.dialog = buildDialog({
+    let dialog = buildDialog({
       query: plugin.query,
       phrase(value: string) { return view.phrase(value) },
       close() {
         if (plugin.dialog) {
           if (plugin.dialog.contains(view.root.activeElement)) view.focus()
-          let close = closePanel(plugin.dialog)
-          plugin.dialog = null
-          view.dispatch(view.state.t().annotate(close))
+          view.dispatch(view.state.t().annotate(closePanel(plugin.dialog), searchAnnotation({dialog: false})))
         }
       },
       updateQuery(query: Query) {
         if (!query.eq(plugin.query))
-          view.dispatch(view.state.t().annotate(queryAnnotation(query)))
+          view.dispatch(view.state.t().annotate(searchAnnotation({query})))
       },
       searchNext() {
         let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
@@ -84,11 +85,17 @@ export const openSearchPanel: ViewCommand = view => {
         }
         view.dispatch(view.state.t().setSelection(EditorSelection.single(cursor.value.from, cursor.value.to)).scrollIntoView())
       },
-      replaceNext() {}
+      searchPrev() {
+        
+      },
+      replaceNext() {},
+      replaceAll() {}
     })
-    view.dispatch(view.state.t().annotate(openPanel({dom: plugin.dialog, pos: 80, style: "search"})))
+    view.dispatch(view.state.t().annotate(openPanel({dom: dialog, pos: 80, style: "search"}),
+                                          searchAnnotation({dialog})))
   }
-  ;(plugin.dialog.querySelector("[name=search]") as HTMLInputElement).select()
+  if (plugin.dialog)
+    (plugin.dialog.querySelector("[name=search]") as HTMLInputElement).select()
   return true
 }
 
@@ -108,7 +115,9 @@ function buildDialog(conf: {query: {search: string, replace: string},
                             phrase: (phrase: string) => string,
                             updateQuery: (query: Query) => void,
                             searchNext: () => void,
+                            searchPrev: () => void,
                             replaceNext: () => void,
+                            replaceAll: () => void,
                             close: () => void}) {
   let onEnter = (f: () => void) => (event: KeyboardEvent) => {
     if (event.keyCode == 13) { event.preventDefault();  f() }
@@ -142,9 +151,12 @@ function buildDialog(conf: {query: {search: string, replace: string},
       }
     }
   }, [
-    searchField, " ", elt("button", {name: "search", onclick: conf.searchNext}, [conf.phrase("Next")]),
-    elt("br"),
-    replaceField, " ", elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("Replace")]),
+    searchField, " ",
+    elt("button", {name: "next", onclick: conf.searchNext}, [conf.phrase("next")]), " ",
+    elt("button", {name: "prev", onclick: conf.searchPrev}, [conf.phrase("previous")]), elt("br"),
+    replaceField, " ",
+    elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("replace")]), " ",
+    elt("button", {name: "replaceAll", onclick: conf.replaceAll}, [conf.phrase("replace all")]),
     elt("button", {name: "close", onclick: conf.close, "aria-label": conf.phrase("Close")}, ["×"])
   ])
   return panel
