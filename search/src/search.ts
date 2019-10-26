@@ -34,13 +34,14 @@ class SearchPlugin {
 
   update(update: ViewUpdate) {
     let ann = update.annotation(searchAnnotation)
-    let changed = ann && (ann.dialog != null || ann.query && ann.query.search != this.query.search)
-    if (ann && ann.query) this.query = ann.query
-    if (ann && ann.dialog && !this.dialog) this.dialog = ann.dialog
-    if (ann && ann.dialog == false) this.dialog = null
+    if (ann) {
+      if (ann.query) this.query = ann.query
+      if (ann.dialog && !this.dialog) this.dialog = ann.dialog
+      if (ann.dialog == false) this.dialog = null
+    }
     if (!this.query.search || !this.dialog)
       this.decorations = Decoration.none
-    else if (changed || update.docChanged || update.transactions.some(tr => tr.selectionSet))
+    else if (ann || update.docChanged || update.transactions.some(tr => tr.selectionSet))
       this.decorations = this.highlight(this.query, update.state, update.viewport)
   }
 
@@ -153,7 +154,7 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
   return e
 }
 
-function buildDialog(conf: {query: {search: string, replace: string},
+function buildDialog(conf: {query: Query,
                             phrase: (phrase: string) => string,
                             updateQuery: (query: Query) => void,
                             findNext: () => void,
@@ -182,8 +183,14 @@ function buildDialog(conf: {query: {search: string, replace: string},
     onchange: update,
     onkeyup: update
   }) as HTMLInputElement
+  let caseField = elt("input", {
+    type: "checkbox",
+    name: "case",
+    checked: !conf.query.caseInsensitive,
+    onchange: update
+  }) as HTMLInputElement
   function update() {
-    conf.updateQuery(new Query(searchField.value, replaceField.value, false))
+    conf.updateQuery(new Query(searchField.value, replaceField.value, !caseField.checked))
   }
   let panel = elt("div", {
     onkeydown(e: KeyboardEvent) {
@@ -195,7 +202,9 @@ function buildDialog(conf: {query: {search: string, replace: string},
   }, [
     searchField,
     elt("button", {name: "next", onclick: conf.findNext}, [conf.phrase("next")]),
-    elt("button", {name: "prev", onclick: conf.findPrev}, [conf.phrase("previous")]), elt("br"),
+    elt("button", {name: "prev", onclick: conf.findPrev}, [conf.phrase("previous")]),
+    elt("label", null, [caseField, "match case"]),
+    elt("br"),
     replaceField,
     elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("replace")]),
     elt("button", {name: "replaceAll", onclick: conf.replaceAll}, [conf.phrase("replace all")]),
