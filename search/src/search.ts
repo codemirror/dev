@@ -60,6 +60,21 @@ export const search = EditorView.extend.unique<null>(() => [
   EditorView.extend.fallback(EditorView.theme(theme))
 ], null)
 
+const FindPrevChunkSize = 10000
+
+// Searching in reverse is, rather than implementing inverted search
+// cursor, done by scanning chunk after chunk forward.
+function findPrev(query: Query, doc: Text, from: number, to: number) {
+  for (let pos = to;;) {
+    let start = Math.max(from, pos - FindPrevChunkSize - query.search.length)
+    let cursor = query.cursor(doc, start, pos), range: {from: number, to: number} | null = null
+    while (!cursor.next().done) range = cursor.value
+    if (range) return range
+    if (start == from) return null
+    pos -= FindPrevChunkSize
+  }
+}
+
 export const openSearchPanel: ViewCommand = view => {
   let plugin = view.plugin(searchPlugin)!
   if (!plugin) throw new Error("Search plugin not enabled")
@@ -77,7 +92,8 @@ export const openSearchPanel: ViewCommand = view => {
         if (!query.eq(plugin.query))
           view.dispatch(view.state.t().annotate(searchAnnotation({query})))
       },
-      searchNext() {
+      findNext() {
+        if (!plugin.query.search) return
         let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
         if (cursor.done) {
           cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
@@ -85,8 +101,13 @@ export const openSearchPanel: ViewCommand = view => {
         }
         view.dispatch(view.state.t().setSelection(EditorSelection.single(cursor.value.from, cursor.value.to)).scrollIntoView())
       },
-      searchPrev() {
-        
+      findPrev() {
+        let {state} = view, {query} = plugin
+        if (!query.search) return
+        let range = findPrev(query, state.doc, 0, state.selection.primary.to - 1) ||
+          findPrev(query, state.doc, state.selection.primary.from + 1, state.doc.length)
+        if (range)
+          view.dispatch(state.t().setSelection(EditorSelection.single(range.from, range.to)).scrollIntoView())
       },
       replaceNext() {},
       replaceAll() {}
@@ -114,8 +135,8 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
 function buildDialog(conf: {query: {search: string, replace: string},
                             phrase: (phrase: string) => string,
                             updateQuery: (query: Query) => void,
-                            searchNext: () => void,
-                            searchPrev: () => void,
+                            findNext: () => void,
+                            findPrev: () => void,
                             replaceNext: () => void,
                             replaceAll: () => void,
                             close: () => void}) {
@@ -127,7 +148,7 @@ function buildDialog(conf: {query: {search: string, replace: string},
     placeholder: conf.phrase("Find"),
     "aria-label": conf.phrase("Find"),
     name: "search",
-    onkeydown: onEnter(conf.searchNext),
+    onkeydown: onEnter(conf.findNext),
     onchange: update,
     onkeyup: update
   }) as HTMLInputElement
@@ -151,11 +172,11 @@ function buildDialog(conf: {query: {search: string, replace: string},
       }
     }
   }, [
-    searchField, " ",
-    elt("button", {name: "next", onclick: conf.searchNext}, [conf.phrase("next")]), " ",
-    elt("button", {name: "prev", onclick: conf.searchPrev}, [conf.phrase("previous")]), elt("br"),
-    replaceField, " ",
-    elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("replace")]), " ",
+    searchField,
+    elt("button", {name: "next", onclick: conf.findNext}, [conf.phrase("next")]),
+    elt("button", {name: "prev", onclick: conf.findPrev}, [conf.phrase("previous")]), elt("br"),
+    replaceField,
+    elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("replace")]),
     elt("button", {name: "replaceAll", onclick: conf.replaceAll}, [conf.phrase("replace all")]),
     elt("button", {name: "close", onclick: conf.close, "aria-label": conf.phrase("Close")}, ["×"])
   ])
@@ -176,7 +197,8 @@ const theme = {
       padding: 0
     },
     "& input, & button": {
-      verticalAlign: "middle"
+      verticalAlign: "middle",
+      marginRight: ".5em"
     }
   },
 
