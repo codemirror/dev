@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewCommand, ViewUpdate, Decoration} from "../../view"
-import {EditorState, Annotation, EditorSelection} from "../../state"
+import {EditorState, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, openPanel, closePanel} from "../../panel"
 import {Text} from "../../text"
 import {SearchCursor} from "./cursor"
@@ -112,6 +112,13 @@ export const openSearchPanel: ViewCommand = view => {
         if (range)
           view.dispatch(state.t().setSelection(EditorSelection.single(range.from, range.to)).scrollIntoView())
       },
+      select() {
+        if (!plugin.query.valid) return
+        let cursor = plugin.query.cursor(view.state.doc), ranges: SelectionRange[] = []
+        while (!cursor.next().done) ranges.push(new SelectionRange(cursor.value.from, cursor.value.to))
+        if (ranges.length)
+          view.dispatch(view.state.t().setSelection(EditorSelection.create(ranges)))
+      },
       replaceNext() {
         if (!plugin.query.valid) return
         let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.to).next()
@@ -159,6 +166,7 @@ function buildDialog(conf: {query: Query,
                             updateQuery: (query: Query) => void,
                             findNext: () => void,
                             findPrev: () => void,
+                            select: () => void,
                             replaceNext: () => void,
                             replaceAll: () => void,
                             close: () => void}) {
@@ -203,12 +211,13 @@ function buildDialog(conf: {query: Query,
     searchField,
     elt("button", {name: "next", onclick: conf.findNext}, [conf.phrase("next")]),
     elt("button", {name: "prev", onclick: conf.findPrev}, [conf.phrase("previous")]),
+    elt("button", {name: "select", onclick: conf.select}, [conf.phrase("all")]),
     elt("label", null, [caseField, "match case"]),
     elt("br"),
     replaceField,
     elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("replace")]),
     elt("button", {name: "replaceAll", onclick: conf.replaceAll}, [conf.phrase("replace all")]),
-    elt("button", {name: "close", onclick: conf.close, "aria-label": conf.phrase("Close")}, ["×"])
+    elt("button", {name: "close", onclick: conf.close, "aria-label": conf.phrase("close")}, ["×"])
   ])
   return panel
 }
@@ -220,15 +229,19 @@ const theme = {
     "& [name=close]": {
       position: "absolute",
       top: "0",
-      right: "2px",
+      right: "4px",
       background: "inherit",
       border: "none",
       font: "inherit",
-      padding: 0
+      padding: 0,
+      margin: 0
     },
     "& input, & button": {
       verticalAlign: "middle",
       marginRight: ".5em"
+    },
+    "& label": {
+      fontSize: "80%"
     }
   },
 
