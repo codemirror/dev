@@ -17,6 +17,8 @@ class Query {
   cursor(doc: Text, from = 0, to = doc.length) {
     return new SearchCursor(doc, this.search, from, to, this.caseInsensitive ? x => x.toLowerCase() : undefined)
   }
+
+  get valid() { return !!search }
 }
 
 const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
@@ -93,7 +95,7 @@ export const openSearchPanel: ViewCommand = view => {
           view.dispatch(view.state.t().annotate(searchAnnotation({query})))
       },
       findNext() {
-        if (!plugin.query.search) return
+        if (!plugin.query.valid) return
         let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
         if (cursor.done) {
           cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
@@ -103,14 +105,33 @@ export const openSearchPanel: ViewCommand = view => {
       },
       findPrev() {
         let {state} = view, {query} = plugin
-        if (!query.search) return
+        if (!query.valid) return
         let range = findPrev(query, state.doc, 0, state.selection.primary.to - 1) ||
           findPrev(query, state.doc, state.selection.primary.from + 1, state.doc.length)
         if (range)
           view.dispatch(state.t().setSelection(EditorSelection.single(range.from, range.to)).scrollIntoView())
       },
-      replaceNext() {},
-      replaceAll() {}
+      replaceNext() {
+        if (!plugin.query.valid) return
+        let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.to).next()
+        if (cursor.done) {
+          cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
+          if (cursor.done) return
+        }
+        view.dispatch(view.state.t()
+                      .replace(cursor.value.from, cursor.value.to, plugin.query.replace)
+                      .setSelection(EditorSelection.single(cursor.value.from, cursor.value.from + plugin.query.replace.length))
+                      .scrollIntoView())
+      },
+      replaceAll() {
+        if (!plugin.query.valid) return
+        let cursor = plugin.query.cursor(view.state.doc), tr = view.state.t()
+        while (!cursor.next().done) {
+          let {from, to} = cursor.value
+          tr.replace(tr.changes.mapPos(from, 1), tr.changes.mapPos(to, -1), plugin.query.replace)
+        }
+        if (tr.docChanged) view.dispatch(tr)
+      }
     })
     view.dispatch(view.state.t().annotate(openPanel({dom: dialog, pos: 80, style: "search"}),
                                           searchAnnotation({dialog})))
