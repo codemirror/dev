@@ -110,7 +110,7 @@ class PanelGroup {
 
     if (!this.dom) {
       this.dom = document.createElement("div")
-      this.dom.className = this.view.cssClass("panels")
+      this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
       this.dom.style[this.top ? "top" : "bottom"] = "0"
       this.dontFloat()
       this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
@@ -182,7 +182,7 @@ class PanelGroup {
     }
     this.align()
     if (themeChanged && this.dom) {
-      this.dom.className = this.view.cssClass("panels")
+      this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
       for (let {dom, style} of this.panels)
         dom.className = this.view.cssClass("panel" + (style ? "." + style : ""))
     }
@@ -206,7 +206,12 @@ function rm(node: ChildNode) {
 const defaultTheme = {
   panels: {
     background: "#f5f5f5",
-    borderTop: "1px solid silver",
     boxSizing: "border-box"
+  },
+  "panels.top": {
+    borderBottom: "1px solid silver"
+  },
+  "panels.bottom": {
+    borderTop: "1px solid silver"
   }
 }

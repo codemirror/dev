@@ -94,7 +94,11 @@ export const openSearchPanel: ViewCommand = view => {
 
 function elt(name: string, props: null | {[prop: string]: any} = null, children: (Node | string)[] = []) {
   let e = document.createElement(name)
-  if (props) for (let prop in props) (e as any)[prop] = props[prop]
+  if (props) for (let prop in props) {
+    let value = props[prop]
+    if (typeof value == "string") e.setAttribute(prop, value)
+    else (e as any)[prop] = value
+  }
   for (let child of children)
     e.appendChild(typeof child == "string" ? document.createTextNode(child) : child)
   return e
@@ -112,6 +116,7 @@ function buildDialog(conf: {query: {search: string, replace: string},
   let searchField = elt("input", {
     value: conf.query.search,
     placeholder: conf.phrase("Find"),
+    "aria-label": conf.phrase("Find"),
     name: "search",
     onkeydown: onEnter(conf.searchNext),
     onchange: update,
@@ -120,6 +125,7 @@ function buildDialog(conf: {query: {search: string, replace: string},
   let replaceField = elt("input", {
     value: conf.query.replace,
     placeholder: conf.phrase("Replace"),
+    "aria-label": conf.phrase("Replace"),
     name: "replace",
     onkeydown: onEnter(conf.replaceNext),
     onchange: update,
@@ -136,10 +142,10 @@ function buildDialog(conf: {query: {search: string, replace: string},
       }
     }
   }, [
-    searchField, " ", elt("button", {onclick: conf.searchNext}, [conf.phrase("Next")]),
+    searchField, " ", elt("button", {name: "search", onclick: conf.searchNext}, [conf.phrase("Next")]),
     elt("br"),
-    replaceField, " ", elt("button", {onclick: conf.replaceNext}, [conf.phrase("Replace")]),
-    elt("button", {className: "close", onclick: conf.close}, ["×"]) // FIXME accessible, styling
+    replaceField, " ", elt("button", {name: "replace", onclick: conf.replaceNext}, [conf.phrase("Replace")]),
+    elt("button", {name: "close", onclick: conf.close, "aria-label": conf.phrase("Close")}, ["×"])
   ])
   return panel
 }
@@ -148,7 +154,7 @@ const theme = {
   "panel.search": {
     padding: "2px 6px 4px",
     position: "relative",
-    "& .close": {
+    "& [name=close]": {
       position: "absolute",
       top: "0",
       right: "2px",
