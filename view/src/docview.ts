@@ -352,8 +352,6 @@ export class DocView extends ContentView {
       // iteration and the document changed, also include decorations
       // for inserted ranges.
       let heightChanges = extendWithRanges(invalidHeightMap || none, height)
-//      if (update) FIXME remove?
-//        heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
       this.heightMap = this.heightMap.applyChanges(decorations, oldDoc, this.heightOracle.setDoc(state.doc), heightChanges)
       invalidHeightMap = null
       oldDoc = state.doc
