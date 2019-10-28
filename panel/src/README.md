@@ -1,0 +1,4 @@
+@panels
+@PanelSpec
+@openPanel
+@closePanel

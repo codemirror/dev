@@ -1,19 +1,35 @@
 import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
 import {Annotation} from "../../state"
 
+/// Enables the panel-managing extension.
 export const panels = EditorView.extend.unique<null>(() => {
   return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
 }, null)
 
+/// Describe a newly created panel.
 export interface PanelSpec {
+  /// The DOM element that the panel should display.
   dom: HTMLElement,
+  /// An optional theme style. By default, panels are themed as
+  /// `"panel"`. If you pass `"foo"` here, your panel is themed as
+  /// `"panel.foo"`.
   style?: string,
+  /// Whether the panel should be at the top or bottom of the editor.
+  /// Defaults to false.
   top?: boolean
+  /// An optional number that is used to determine the ordering when
+  /// there are multiple panels. Those with a lower `pos` value will
+  /// come first. Defaults to 0.
   pos?: number
 }
 
+/// Opening a panel is done by dispatching a transaction with this
+/// annotation.
 export const openPanel = Annotation.define<PanelSpec>()
 
+/// To close an open panel, dispatch a transaction with this
+/// annotation pointing at the panel's DOM element. Closing a panel
+/// that isn't open is ignored.
 export const closePanel = Annotation.define<HTMLElement>()
 
 const panelPlugin = ViewPlugin.create(view => new Panels(view)).behavior(EditorView.scrollMargins, p => p.scrollMargins())
@@ -57,7 +73,7 @@ class Panels {
 class PanelGroup {
   height = 0
   dom: HTMLElement | null = null
-  panels: {pos: number, dom: HTMLElement, style: string}[] = []
+  panels: {pos: number, dom: HTMLElement, style: string, baseClass: string}[] = []
   scrollers: EventTarget[] = []
   floating = false
   needsSync = false
@@ -67,9 +83,8 @@ class PanelGroup {
   }
 
   addPanel(dom: HTMLElement, pos: number, style: string) {
-    // FIXME coexist with already-assigned classes?
-    dom.className = this.view.cssClass("panel" + (style ? "." + style : ""))
-    let panel = {pos, dom, style}, i = 0
+    let panel = {pos, dom, style, baseClass: dom.className}, i = 0
+    dom.className += " " + this.view.cssClass("panel" + (style ? "." + style : ""))
     while (i < this.panels.length && this.panels[i].pos <= pos) i++
     this.panels.splice(i, 0, panel)
     this.needsSync = true
@@ -121,7 +136,7 @@ class PanelGroup {
     for (let panel of this.panels) {
       if (panel.dom.parentNode == this.dom) {
         while (curDOM != panel.dom) curDOM = rm(curDOM!)
-        curDOM = curDOM.nextSibling
+        curDOM = curDOM!.nextSibling
       } else {
         this.dom.insertBefore(panel.dom, curDOM)
       }
@@ -183,8 +198,8 @@ class PanelGroup {
     this.align()
     if (themeChanged && this.dom) {
       this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
-      for (let {dom, style} of this.panels)
-        dom.className = this.view.cssClass("panel" + (style ? "." + style : ""))
+      for (let {dom, style, baseClass} of this.panels)
+        dom.className = baseClass + " " + this.view.cssClass("panel" + (style ? "." + style : ""))
     }
   }
 
