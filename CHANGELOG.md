@@ -4,7 +4,7 @@
 
 `syntaxIndentation` no longer has to be registered separately as an extension. It is now implied when registering a tree syntax.
 
-The configutation passed to `gutter` no longer takes direct class names, but a `style` option that determines the theme fields used for the gutter.
+The configuration passed to `gutter` no longer takes direct class names, but a `style` option that determines the theme fields used for the gutter.
 
 `ViewPlugin` instances are now created with a static `create` method, instead of the constructor.
 
@@ -46,9 +46,9 @@ Gutters can now be themed.
 
 `ViewPlugin` instances can be extended with dynamic behavior using their `behavior` and `decorations` methods.
 
-Gutters can now be passed a handleDOMEvents option that allows client code to register event handlers on them.
+Gutters can now be passed a `handleDOMEvents` option that allows client code to register event handlers on them.
 
-You can no iterate over a `RangeSet` more cheaply with an (internal) iterator using the `between` method.
+You can now iterate over a `RangeSet` more cheaply with an (internal) iterator using the `between` method.
 
 Syntax services now have a `docTypeAt` method that gives you the grammar node around the given point (which may be part of a nesting grammar).
 
