@@ -9,7 +9,7 @@ import {bracketMatching} from "../matchbrackets"
 import {closeBrackets} from "../closebrackets"
 import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
-import {search, openSearchPanel} from "../search"
+import {search, defaultSearchKeymap} from "../search"
 
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
@@ -28,7 +28,7 @@ let state = EditorState.create({doc: `<script>
   foldGutter(),
   multipleSelections(),
   html(),
-  search(),
+  search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
   bracketMatching(),
   closeBrackets(),
@@ -40,8 +40,7 @@ let state = EditorState.create({doc: `<script>
     "Ctrl-y": isMac ? undefined : redo,
     "Shift-Tab": indentSelection,
     "Mod-Alt-[": foldCode,
-    "Mod-Alt-]": unfoldCode,
-    "Mod-f": openSearchPanel
+    "Mod-Alt-]": unfoldCode
   }),
   keymap(baseKeymap),
 ]})
