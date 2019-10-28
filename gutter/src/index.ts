@@ -77,6 +77,7 @@ const defaults = {
 
 const gutterBehavior = EditorView.extend.behavior<Gutter>()
 
+/// Defines an editor gutter.
 export class Gutter {
   /// @internal
   config: Required<GutterConfig>
@@ -85,6 +86,7 @@ export class Gutter {
     this.config = fillConfig(config, defaults)
   }
 
+  /// The extension that installs this gutter.
   get extension() {
     return [
       gutters(),
