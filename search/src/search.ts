@@ -24,10 +24,10 @@ class Query {
 
 const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
 
-const searchAnnotation = Annotation.define<{query?: Query, dialog?: HTMLElement | false}>()
+const searchAnnotation = Annotation.define<{query?: Query, panel?: HTMLElement | false}>()
 
 class SearchPlugin {
-  dialog: null | HTMLElement = null
+  panel: null | HTMLElement = null
   query = new Query("", "", false)
   decorations = Decoration.none
 
@@ -37,10 +37,10 @@ class SearchPlugin {
     let ann = update.annotation(searchAnnotation)
     if (ann) {
       if (ann.query) this.query = ann.query
-      if (ann.dialog && !this.dialog) this.dialog = ann.dialog
-      if (ann.dialog == false) this.dialog = null
+      if (ann.panel && !this.panel) this.panel = ann.panel
+      if (ann.panel == false) this.panel = null
     }
-    if (!this.query.search || !this.dialog)
+    if (!this.query.search || !this.panel)
       this.decorations = Decoration.none
     else if (ann || update.docChanged || update.transactions.some(tr => tr.selectionSet))
       this.decorations = this.highlight(this.query, update.state, update.viewport)
@@ -58,36 +58,67 @@ class SearchPlugin {
   }
 }
 
+/// The configuration options passed to [`search`](#search.search).
 export interface SearchConfig {
+  /// A keymap with search-related bindings that should be enabled in
+  /// the editor. You can pass
+  /// [`defaultSearchKeymap`](#search.defaultSearchKeymap) here.
+  ///
+  /// Configuring bindings like this differs from just passing the
+  /// keymap as a separate extension in that the bindings in this
+  /// keymap are also available when the search panel is focused.
   keymap?: Keymap
+
+  /// Additional key bindings to enable only in the search panel.
+  panelKeymap?: Keymap
 }
 
-const dialogKeymap = EditorView.extend.behavior<NormalizedKeymap<ViewCommand>>()
+const panelKeymap = EditorView.extend.behavior<NormalizedKeymap<ViewCommand>>()
 
+/// Create an extension that enables search/replace functionality.
+/// This needs to be enabled for any of the search-related commands to
+/// work.
 export const search = EditorView.extend.unique<SearchConfig>((configs: SearchConfig[]) => {
-  let keys = Object.create(null), dialogKeys = Object.create(null)
-  for (let conf of configs) if (conf.keymap) {
-    for (let key of Object.keys(conf.keymap)) {
+  let keys = Object.create(null), panelKeys = Object.create(null)
+  for (let conf of configs) {
+    if (conf.keymap) for (let key of Object.keys(conf.keymap)) {
       let value = conf.keymap[key]
       if (keys[key] && keys[key] != value)
         throw new Error("Conflicting keyss for search extension")
       keys[key] = value
-      if (searchCommands.indexOf(value!) > -1) dialogKeys[key] = value
+      panelKeys[key] = value
+    }
+    if (conf.panelKeymap) for (let key of Object.keys(conf.panelKeymap)) {
+      panelKeys[key] = conf.panelKeymap[key]
     }
   }
   return [
     keymap(keys),
-    dialogKeymap(new NormalizedKeymap(dialogKeys)),
+    panelKeymap(new NormalizedKeymap(panelKeys)),
     searchPlugin.extension,
     panels(),
     EditorView.extend.fallback(EditorView.theme(theme))
   ]
 }, {})
 
-export const findNext: ViewCommand = view => {
+function beforeCommand(view: EditorView): boolean | SearchPlugin {
   let plugin = view.plugin(searchPlugin)
   if (!plugin) return false
-  if (!plugin.query.valid) return openSearchPanel(view)
+  if (!plugin.panel) {
+    openSearchPanel(view)
+    return true
+  }
+  if (!plugin.query.valid) return false
+  return plugin
+}
+
+/// Open the search panel if it isn't already open, and move the
+/// selection to the first match after the current primary selection.
+/// Will wrap around to the start of the document when it reaches the
+/// end.
+export const findNext: ViewCommand = view => {
+  let plugin = beforeCommand(view)
+  if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
   if (cursor.done) {
     cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
@@ -112,10 +143,12 @@ function findPrevInRange(query: Query, doc: Text, from: number, to: number) {
   }
 }
 
+/// Move the selection to the previous instance of the search query,
+/// before the current primary selection. Will wrap past the start
+/// of the document to start searching at the end again.
 export const findPrevious: ViewCommand = view => {
-  let plugin = view.plugin(searchPlugin)
-  if (!plugin) return false
-  if (!plugin.query.valid) return openSearchPanel(view)
+  let plugin = beforeCommand(view)
+  if (typeof plugin == "boolean") return plugin
   let {state} = view, {query} = plugin
   let range = findPrevInRange(query, state.doc, 0, state.selection.primary.to - 1) ||
     findPrevInRange(query, state.doc, state.selection.primary.from + 1, state.doc.length)
@@ -124,10 +157,10 @@ export const findPrevious: ViewCommand = view => {
   return true
 }
 
+/// Select all instances of the search query.
 export const selectMatches: ViewCommand = view => {
-  let plugin = view.plugin(searchPlugin)
-  if (!plugin) return false
-  if (!plugin.query.valid) return openSearchPanel(view)
+  let plugin = beforeCommand(view)
+  if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc), ranges: SelectionRange[] = []
   while (!cursor.next().done) ranges.push(new SelectionRange(cursor.value.from, cursor.value.to))
   if (!ranges.length) return false
@@ -135,10 +168,10 @@ export const selectMatches: ViewCommand = view => {
   return true
 }
 
+/// Replace the next instance of the search query.
 export const replaceNext: ViewCommand = view => {
-  let plugin = view.plugin(searchPlugin)
-  if (!plugin) return false
-  if (!plugin.query.valid || !plugin.dialog) return openSearchPanel(view)
+  let plugin = beforeCommand(view)
+  if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.to).next()
   if (cursor.done) {
     cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
@@ -151,10 +184,11 @@ export const replaceNext: ViewCommand = view => {
   return true
 }
 
+/// Replace all instances of the search query with the given
+/// replacement.
 export const replaceAll: ViewCommand = view => {
-  let plugin = view.plugin(searchPlugin)
-  if (!plugin) return false
-  if (!plugin.query.valid || !plugin.dialog) return openSearchPanel(view)
+  let plugin = beforeCommand(view)
+  if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc), tr = view.state.t()
   while (!cursor.next().done) {
     let {from, to} = cursor.value
@@ -165,8 +199,12 @@ export const replaceAll: ViewCommand = view => {
   return true
 }
 
-const searchCommands = [findNext, findPrevious, selectMatches, replaceNext, replaceAll]
-
+/// Default search-related bindings.
+///
+///  * Mod-f: [`findNext`](#search.findNext)
+///  * Mod-h: [`replaceNext`](#search.replaceNext)
+///  * F3: [`findNext`](#search.findNext)
+///  * Shift-F3: [`findPrevious`](#search.findPrevious)
 export const defaultSearchKeymap = {
   "Mod-f": findNext,
   "Mod-h": replaceNext,
@@ -174,32 +212,34 @@ export const defaultSearchKeymap = {
   "Shift-F3": findPrevious
 }
 
+/// Make sure the search panel is open and focused.
 export const openSearchPanel: ViewCommand = view => {
   let plugin = view.plugin(searchPlugin)!
   if (!plugin) return false
-  if (!plugin.dialog) {
-    let dialog = buildDialog({
+  if (!plugin.panel) {
+    let panel = buildPanel({
       view,
-      keymap: view.behavior(dialogKeymap)[0],
+      keymap: view.behavior(panelKeymap)[0],
       query: plugin.query,
       updateQuery(query: Query) {
         if (!query.eq(plugin.query))
           view.dispatch(view.state.t().annotate(searchAnnotation({query})))
       }
     })
-    view.dispatch(view.state.t().annotate(openPanel({dom: dialog, pos: 80, style: "search"}),
-                                          searchAnnotation({dialog})))
+    view.dispatch(view.state.t().annotate(openPanel({dom: panel, pos: 80, style: "search"}),
+                                          searchAnnotation({panel})))
   }
-  if (plugin.dialog)
-    (plugin.dialog.querySelector("[name=search]") as HTMLInputElement).select()
+  if (plugin.panel)
+    (plugin.panel.querySelector("[name=search]") as HTMLInputElement).select()
   return true
 }
 
+/// Close the search panel.
 export const closeSearchPanel: ViewCommand = view => {
   let plugin = view.plugin(searchPlugin)
-  if (!plugin || !plugin.dialog) return false
-  if (plugin.dialog.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.t().annotate(closePanel(plugin.dialog), searchAnnotation({dialog: false})))
+  if (!plugin || !plugin.panel) return false
+  if (plugin.panel.contains(view.root.activeElement)) view.focus()
+  view.dispatch(view.state.t().annotate(closePanel(plugin.panel), searchAnnotation({panel: false})))
   return true
 }
 
@@ -215,25 +255,18 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
   return e
 }
 
-function buildDialog(conf: {
+function buildPanel(conf: {
   keymap: NormalizedKeymap<ViewCommand>,
   view: EditorView,
   query: Query,
   updateQuery: (query: Query) => void
 }) {
-  let onEnter = (cmd: (view: EditorView) => boolean, shiftCmd?: (view: EditorView) => boolean) => (event: KeyboardEvent) => {
-    if (event.keyCode == 13) {
-      if (!event.shiftKey) { event.preventDefault();  cmd(conf.view) }
-      else if (shiftCmd) { event.preventDefault(); shiftCmd(conf.view) }
-    }
-  }
   function p(phrase: string) { return conf.view.phrase(phrase) }
   let searchField = elt("input", {
     value: conf.query.search,
     placeholder: p("Find"),
     "aria-label": p("Find"),
     name: "search",
-    onkeydown: onEnter(findNext, findPrevious),
     onchange: update,
     onkeyup: update
   }) as HTMLInputElement
@@ -242,7 +275,6 @@ function buildDialog(conf: {
     placeholder: p("Replace"),
     "aria-label": p("Replace"),
     name: "replace",
-    onkeydown: onEnter(replaceNext),
     onchange: update,
     onkeyup: update
   }) as HTMLInputElement
@@ -255,17 +287,22 @@ function buildDialog(conf: {
   function update() {
     conf.updateQuery(new Query(searchField.value, replaceField.value, !caseField.checked))
   }
-  let panel = elt("div", {
-    onkeydown(e: KeyboardEvent) {
-      let mapped = conf.keymap.get(e)
-      if (mapped && mapped(conf.view)) {
-        e.preventDefault()
-      } else if (e.keyCode == 27) {
-        e.preventDefault()
-        closeSearchPanel(conf.view)
-      }
+  function keydown(e: KeyboardEvent) {
+    let mapped = conf.keymap.get(e)
+    if (mapped && mapped(conf.view)) {
+      e.preventDefault()
+    } else if (e.keyCode == 27) {
+      e.preventDefault()
+      closeSearchPanel(conf.view)
+    } else if (e.keyCode == 13 && e.target == searchField) {
+      e.preventDefault()
+      ;(e.shiftKey ? findPrevious : findNext)(conf.view)
+    } else if (e.keyCode == 13 && e.target == replaceField) {
+      e.preventDefault()
+      replaceNext(conf.view)
     }
-  }, [
+  }
+  let panel = elt("div", {onkeydown: keydown}, [
     searchField,
     elt("button", {name: "next", onclick: () => findNext(conf.view)}, [p("next")]),
     elt("button", {name: "prev", onclick: () => findPrevious(conf.view)}, [p("previous")]),

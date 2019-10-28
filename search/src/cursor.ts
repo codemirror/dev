@@ -2,9 +2,15 @@ import {Text, TextIterator, isExtendingChar} from "../../text"
 
 const basicNormalize: (string: string) => string = String.prototype.normalize ? x => x.normalize("NFKD") : x => x
 
-export class SearchCursor {
+/// A search cursor provides an iterator over text matches in a
+/// document.
+export class SearchCursor implements Iterator<{from: number, to: number}>{
   private iter: TextIterator
+  /// The current match (only holds a meaningful value after
+  /// [`next`](#search.SearchCursor.next) has been called and when
+  /// `done` is true).
   value = {from: 0, to: 0}
+  /// Whether the end of the iterated region has been reached.
   done = false
   private matches: number[] = []
   private buffer = ""
@@ -13,6 +19,17 @@ export class SearchCursor {
   private normalize: (string: string) => string
   private query: string
 
+  /// Create a text cursor. The query is the search string, `from` to
+  /// `to` provides the region to search.
+  ///
+  /// When `normalize` is given, it will be called, on both the query
+  /// string and the content it is matched against, before comparing.
+  /// You can, for example, create a case-insensitive search by
+  /// passing `s => s.toLowerCase()`.
+  ///
+  /// Text is always normalized with
+  /// [`.normalize("NFKD")`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)
+  /// (when supported).
   constructor(readonly text: Text, query: string,
               from: number = 0, to: number = text.length,
               normalize?: (string: string) => string) {
@@ -22,7 +39,7 @@ export class SearchCursor {
     this.query = this.normalize(query)
   }
 
-  peek() {
+  private peek() {
     if (this.bufferPos == this.buffer.length) {
       this.bufferStart += this.buffer.length
       this.iter.next()
@@ -33,6 +50,10 @@ export class SearchCursor {
     return this.buffer.charCodeAt(this.bufferPos)
   }
 
+  /// Look for the next match. Updates the iterator's
+  /// [`value`](#search.SearchCursor.value) and
+  /// [`done`](#search.SearchCursor.done) properties. Should be called
+  /// at least once before using the cursor.
   next() {
     for (;;) {
       let next = this.peek()
@@ -62,7 +83,7 @@ export class SearchCursor {
     }
   }
 
-  match(code: number, pos: number) {
+  private match(code: number, pos: number) {
     let match: null | {from: number, to: number} = null
     for (let i = 0; i < this.matches.length; i += 2) {
       let index = this.matches[i], keep = false
