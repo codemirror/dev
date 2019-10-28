@@ -7,7 +7,7 @@ import browser from "./browser"
 import {DOMObserver} from "./domobserver"
 import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./heightmap"
 import {Decoration, DecorationSet, joinRanges, findChangedRanges,
-        heightRelevantDecorations, WidgetType, BlockType} from "./decoration"
+        WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
 import {ViewUpdate, decorations as decorationsBehavior, scrollMargins, viewPlugin, ViewPluginValue} from "./extension"
 import {EditorView, UpdateState} from "./editorview"
@@ -29,7 +29,7 @@ export class DocView extends ContentView {
   forceSelectionUpdate: boolean = false
 
   viewportState: ViewportState
-  heightMap!: HeightMap
+  heightMap: HeightMap = HeightMap.empty()
   heightOracle: HeightOracle = new HeightOracle
 
   layoutCheckScheduled: number = -1
@@ -76,15 +76,15 @@ export class DocView extends ContentView {
   }
 
   init(state: EditorState, initialize: (viewport: Viewport) => void) {
-    let changedRanges = [new ChangedRange(0, 0, 0, state.doc.length)]
-    this.heightMap = HeightMap.empty().applyChanges(none, Text.empty, this.heightOracle.setDoc(state.doc), changedRanges)
     this.children = [new LineView]
     this.children[0].setParent(this)
     this.viewports = this.decorations = none
     this.minWidth = 0
     this.compositionDeco = Decoration.none
-    let contentChanges = this.computeUpdate(state, null, initialize, changedRanges, 0, -1)
-    this.updateInner(contentChanges, 0)
+    let changedRanges = [new ChangedRange(0, 0, 0, state.doc.length)]
+    this.heightMap = this.heightMap.applyChanges(none, Text.empty, this.heightOracle.setDoc(state.doc), changedRanges)
+    this.computeUpdate(state, state.doc, null, initialize, none, 0, -1)
+    this.updateInner(changedRanges, 0)
     this.cancelLayoutCheck()
     this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
@@ -105,9 +105,8 @@ export class DocView extends ContentView {
         this.minWidthTo = ChangedRange.mapPos(this.minWidthTo, 1, changedRanges)
       }
     }
-    this.heightMap = this.heightMap.applyChanges(none, prevDoc, this.heightOracle.setDoc(state.doc), changedRanges)
 
-    let contentChanges = this.computeUpdate(state, update, null, changedRanges, 0, scrollIntoView)
+    let contentChanges = this.computeUpdate(state, prevDoc, update, null, changedRanges, 0, scrollIntoView)
     // When the DOM nodes around the selection are moved to another
     // parent, Chrome sometimes reports a different selection through
     // getSelection than the one that it actually shows to the user.
@@ -306,13 +305,27 @@ export class DocView extends ContentView {
   // Compute the new viewport and set of decorations, while giving
   // plugin views the opportunity to respond to state and viewport
   // changes. Might require more than one iteration to become stable.
-  computeUpdate(state: EditorState, update: ViewUpdate | null, initializing: null | ((viewport: Viewport) => void),
-                contentChanges: readonly ChangedRange[], viewportBias: number, scrollIntoView: number): readonly ChangedRange[] {
+  computeUpdate(state: EditorState, oldDoc: Text,
+                update: ViewUpdate | null, initializing: null | ((viewport: Viewport) => void),
+                contentChanges: readonly ChangedRange[],
+                viewportBias: number, scrollIntoView: number): readonly ChangedRange[] {
+    let invalidHeightMap = contentChanges.length ? contentChanges : null, prevViewport = this.viewport || new Viewport(0, 0)
     for (let i = 0;; i++) {
-      let viewport = this.viewportState.getViewport(state.doc, this.heightMap, viewportBias, scrollIntoView)
-      let viewportChange = this.viewport ? !viewport.eq(this.viewport) : true
+      let viewport
+      if (invalidHeightMap) {
+        // FIXME this is a terrible kludge (see #128) to get around
+        // the fact that plugins need a viewport to update, but the
+        // heightmap update needs the current decorations, which are
+        // produced by the plugins
+        let from = ChangedRange.mapPos(prevViewport.from, -1, contentChanges)
+        viewport = new Viewport(from, Math.min(from + (prevViewport.to - prevViewport.from) + 1000,
+                                               ChangedRange.mapPos(prevViewport.to, 1, contentChanges)))
+      } else {
+        viewport = this.viewportState.getViewport(state.doc, this.heightMap, viewportBias, scrollIntoView)
+      }
+      let viewportChange = prevViewport ? !viewport.eq(prevViewport) : true
       // When the viewport is stable and no more iterations are needed, return
-      if (!viewportChange && !update && !initializing) return contentChanges
+      if (!viewportChange && !invalidHeightMap && !update && !initializing) return contentChanges
       // After 5 tries, give up
       if (i == 5) {
         console.warn("Viewport and decorations failed to converge")
@@ -321,6 +334,7 @@ export class DocView extends ContentView {
       let prevState = this.state || state
       if (initializing) initializing(viewport)
       else this.view.updateInner(update || new ViewUpdate(this.view), viewport)
+      prevViewport = viewport
 
       // For the composition decoration, use none on init, recompute
       // when handling transactions, and use the previous value
@@ -337,10 +351,12 @@ export class DocView extends ContentView {
       // Update the heightmap with these changes. If this is the first
       // iteration and the document changed, also include decorations
       // for inserted ranges.
-      let heightChanges = extendWithRanges(none, height)
-      if (update)
-        heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
-      this.heightMap = this.heightMap.applyChanges(decorations, this.state.doc, this.heightOracle, heightChanges)
+      let heightChanges = extendWithRanges(invalidHeightMap || none, height)
+//      if (update) FIXME remove?
+//        heightChanges = extendWithRanges(heightChanges, heightRelevantDecorations(decorations, contentChanges))
+      this.heightMap = this.heightMap.applyChanges(decorations, oldDoc, this.heightOracle.setDoc(state.doc), heightChanges)
+      invalidHeightMap = null
+      oldDoc = state.doc
       // Accumulate content changes so that they can be redrawn
       contentChanges = extendWithRanges(contentChanges, content)
       // Make sure only one iteration is marked as required / state changing
@@ -397,7 +413,7 @@ export class DocView extends ContentView {
       this.view.updateState = UpdateState.Updating
       update = true
       if (i > 10) throw new Error("Layout failed to converge") // FIXME warn and break?
-      let contentChanges = covered ? none : this.computeUpdate(this.state, null, null, none, scrollBias, -1)
+      let contentChanges = covered ? none : this.computeUpdate(this.state, this.state.doc, null, null, none, scrollBias, -1)
       this.updateInner(contentChanges, this.length)
       lineHeights = null
       refresh = false

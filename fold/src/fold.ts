@@ -210,7 +210,7 @@ const defaultStyle = {
     cursor: "pointer"
   },
 
-  foldGutterElement: {
+  "gutterElement.foldGutter": {
     padding: "0 1px",
     cursor: "pointer"
   }

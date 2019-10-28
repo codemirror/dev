@@ -246,7 +246,7 @@ class Highlighter implements ViewPluginValue {
 
     let {from, to} = view.viewport
     let {tree, rest} = this.syntax.getTree(view.state, from, to)
-    this.partialDeco = !rest
+    this.partialDeco = !!rest
     if (rest) view.waitFor(rest)
 
     let tokens: Range<Decoration>[] = []

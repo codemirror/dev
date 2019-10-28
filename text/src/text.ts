@@ -35,7 +35,8 @@ export abstract class Text {
 
   /// Get the line description around the given position.
   lineAt(pos: number): Line {
-    if (pos < 0 || pos > this.length) throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
+    if (pos < 0 || pos > this.length)
+      throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
     for (let i = 0; i < lineCache.length; i += 2) {
       if (lineCache[i] != this) continue
       let line = lineCache[i + 1]
