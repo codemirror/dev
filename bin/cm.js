@@ -171,6 +171,7 @@ function start() {
     packages: listPackages,
     build: build,
     devserver: devServer,
+    release: release,
     "--help": () => help(0)
   }[command]
   if (!cmdFn || cmdFn.length > args.length) help(1)
@@ -182,6 +183,7 @@ function help(status) {
   cm packages             Emit a list of all pkg names
   cm build [-w]           Build the bundle files
   cm devserver            Start a dev server on port 8090
+  cm release              Create commits to tag a release
   cm --help`)
   process.exit(status)
 }
@@ -191,7 +193,7 @@ function error(err) {
   process.exit(1)
 }
 
-function run(cmd, args, wd) {
+function run(cmd, args, wd = root) {
   return child.execFileSync(cmd, args, {cwd: wd, encoding: "utf8", stdio: ["ignore", "pipe", process.stderr]})
 }
 
@@ -312,6 +314,60 @@ async function devServer() {
   for (let pkg of target) await rebuild(pkg, {esm: false})
   new Watcher(target, {esm: false})
   console.log("Watching...")
+}
+
+function changelog(since) {
+  let commits = run("git", ["log", "--format=%B", "--reverse", since + "..master"])
+  let result = {fix: [], feature: [], breaking: []}
+  let re = /\n\r?\n(BREAKING|FIX|FEATURE):\s*([^]*?)(?=\r?\n\r?\n|\r?\n?$)/g, match
+  while (match = re.exec(commits)) result[match[1].toLowerCase()].push(match[2].replace(/\r?\n/g, " "))
+  return result
+}
+
+function bumpVersion(version, changes) {
+  let [major, minor, patch] = version.split(".")
+  if (changes.breaking.length && major != "0") return `${Number(major) + 1}.0.0`
+  if (changes.feature.length || changes.breaking.length) return `${major}.${Number(minor) + 1}.0`
+  if (changes.fix.length) return `${major}.${minor}.${Number(patch) + 1}`
+  throw new Error("No new release notes!")
+}
+
+function releaseNotes(changes, version) {
+  let pad = n => n < 10 ? "0" + n : n
+  let d = new Date, date = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+
+  let types = {breaking: "Breaking changes", fix: "Bug fixes", feature: "New features"}
+
+  let refTarget = "https://codemirror.net/6/docs/ref/"
+  let head = `## ${version} (${date})\n\n`, body = ""
+  for (let type in types) {
+    let messages = changes[type]
+    if (messages.length) body += `### ${types[type]}\n\n`
+    messages.forEach(message => body += message.replace(/\]\(##/g, "](" + refTarget + "#") + "\n\n")
+  }
+  return {head, body}
+}
+
+function setModuleVersion(version) {
+  let file = path.join(root, "package.json")
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/"version":\s*".*?"/, `"version": "${version}"`))
+}
+
+function release() {
+  let currentVersion = require(path.join(root, "package.json")).version
+  let changes = changelog(currentVersion)
+  let newVersion = bumpVersion(currentVersion, changes)
+  console.log(`Creating @codemirror/next ${newVersion}`)
+
+  let notes = releaseNotes(changes, newVersion)
+
+  setModuleVersion(newVersion)
+  let log = path.join(root, "CHANGELOG.md")
+  fs.writeFileSync(log, notes.head + notes.body + fs.readFileSync(log, "utf8"))
+  run("git", ["add", "package.json"])
+  run("git", ["add", "CHANGELOG.md"])
+  run("git", ["commit", "-m", `Mark version ${newVersion}`])
+  run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"])
 }
 
 start()
