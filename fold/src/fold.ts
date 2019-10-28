@@ -1,5 +1,5 @@
 import {EditorState, Annotation} from "../../state"
-import {EditorView, BlockInfo, ViewCommand, ViewUpdate, ViewPlugin, Decoration, WidgetType} from "../../view"
+import {EditorView, BlockInfo, Command, ViewUpdate, ViewPlugin, Decoration, WidgetType} from "../../view"
 import {combineConfig, fillConfig} from "../../extension"
 import {Gutter, GutterMarker} from "../../gutter"
 
@@ -17,7 +17,7 @@ function selectedLines(view: EditorView) {
   return lines
 }
 
-export const foldCode: ViewCommand = view => {
+export const foldCode: Command = view => {
   if (!view.plugin(foldPlugin)) return false
   let fold = []
   for (let line of selectedLines(view)) {
@@ -30,7 +30,7 @@ export const foldCode: ViewCommand = view => {
   return true
 }
 
-export const unfoldCode: ViewCommand = view => {
+export const unfoldCode: Command = view => {
   let unfold: Range[] = [], plugin = view.plugin(foldPlugin)
   if (!plugin) return false
   for (let line of selectedLines(view)) {

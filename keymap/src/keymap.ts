@@ -1,8 +1,8 @@
 import {base, keyName} from "w3c-keyname"
-import {EditorView, ViewCommand} from "../../view"
+import {EditorView, Command} from "../../view"
 
 /// A keymap associates key names with
-/// [command](#view.ViewCommand)-style functions.
+/// [command](#view.Command)-style functions.
 ///
 /// Key names may be strings like `"Shift-Ctrl-Enter"`—a key identifier
 /// prefixed with zero or more modifiers. Key identifiers are based on
@@ -19,7 +19,7 @@ import {EditorView, ViewCommand} from "../../view"
 /// You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
 /// other platforms. So `Mod-b` is `Ctrl-b` on Linux but `Cmd-b` on
 /// macOS.
-export type Keymap = {[key: string]: ViewCommand | undefined}
+export type Keymap = {[key: string]: Command | undefined}
 
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform) : false
 

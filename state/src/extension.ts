@@ -3,12 +3,10 @@ import {Transaction} from "./transaction"
 import {Extension, ExtensionGroup} from "../../extension"
 import {Tree, NodeType} from "lezer-tree"
 
-/// Command functions are used in key bindings and other types of user
-/// actions. Given an editor state and a dispatch function, they check
-/// whether their effect can apply in the current editor state, and if
-/// it can, perform it as a side effect (which usually means
-/// dispatching a transaction) and return `true`.
-export type Command = (target: {state: EditorState, dispatch: (transaction: Transaction) => void}) => boolean
+/// Subtype of [`Command`](#view.Command) that doesn't require access
+/// to the actual editor view. Mostly useful to define commands that
+/// can be run and tested outside of a browser environment.
+export type StateCommand = (target: {state: EditorState, dispatch: (transaction: Transaction) => void}) => boolean
 
 export const extendState = new ExtensionGroup<EditorState>(state => state.values)
 

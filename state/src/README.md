@@ -51,7 +51,7 @@ let newState = transaction.apply()
 The following are some types and mechanisms used when writing
 extensions for the editor state.
 
-@Command
+@StateCommand
 
 @StateField
 

@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewCommand, ViewUpdate, Decoration} from "../../view"
+import {EditorView, ViewPlugin, Command, ViewUpdate, Decoration} from "../../view"
 import {EditorState, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, openPanel, closePanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
@@ -73,7 +73,7 @@ export interface SearchConfig {
   panelKeymap?: Keymap
 }
 
-const panelKeymap = EditorView.extend.behavior<NormalizedKeymap<ViewCommand>>()
+const panelKeymap = EditorView.extend.behavior<NormalizedKeymap<Command>>()
 
 /// Create an extension that enables search/replace functionality.
 /// This needs to be enabled for any of the search-related commands to
@@ -116,7 +116,7 @@ function beforeCommand(view: EditorView): boolean | SearchPlugin {
 /// selection to the first match after the current primary selection.
 /// Will wrap around to the start of the document when it reaches the
 /// end.
-export const findNext: ViewCommand = view => {
+export const findNext: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
@@ -146,7 +146,7 @@ function findPrevInRange(query: Query, doc: Text, from: number, to: number) {
 /// Move the selection to the previous instance of the search query,
 /// before the current primary selection. Will wrap past the start
 /// of the document to start searching at the end again.
-export const findPrevious: ViewCommand = view => {
+export const findPrevious: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
   let {state} = view, {query} = plugin
@@ -158,7 +158,7 @@ export const findPrevious: ViewCommand = view => {
 }
 
 /// Select all instances of the search query.
-export const selectMatches: ViewCommand = view => {
+export const selectMatches: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc), ranges: SelectionRange[] = []
@@ -169,7 +169,7 @@ export const selectMatches: ViewCommand = view => {
 }
 
 /// Replace the next instance of the search query.
-export const replaceNext: ViewCommand = view => {
+export const replaceNext: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.to).next()
@@ -186,7 +186,7 @@ export const replaceNext: ViewCommand = view => {
 
 /// Replace all instances of the search query with the given
 /// replacement.
-export const replaceAll: ViewCommand = view => {
+export const replaceAll: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc), tr = view.state.t()
@@ -213,7 +213,7 @@ export const defaultSearchKeymap = {
 }
 
 /// Make sure the search panel is open and focused.
-export const openSearchPanel: ViewCommand = view => {
+export const openSearchPanel: Command = view => {
   let plugin = view.plugin(searchPlugin)!
   if (!plugin) return false
   if (!plugin.panel) {
@@ -235,7 +235,7 @@ export const openSearchPanel: ViewCommand = view => {
 }
 
 /// Close the search panel.
-export const closeSearchPanel: ViewCommand = view => {
+export const closeSearchPanel: Command = view => {
   let plugin = view.plugin(searchPlugin)
   if (!plugin || !plugin.panel) return false
   if (plugin.panel.contains(view.root.activeElement)) view.focus()
@@ -256,7 +256,7 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
 }
 
 function buildPanel(conf: {
-  keymap: NormalizedKeymap<ViewCommand>,
+  keymap: NormalizedKeymap<Command>,
   view: EditorView,
   query: Query,
   updateQuery: (query: Query) => void

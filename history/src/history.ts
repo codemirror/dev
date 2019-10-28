@@ -1,4 +1,4 @@
-import {EditorState, Transaction, StateField, Command, Annotation} from "../../state"
+import {EditorState, Transaction, StateField, StateCommand, Annotation} from "../../state"
 import {combineConfig} from "../../extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
@@ -49,7 +49,7 @@ export const history = EditorState.extend.unique<HistoryConfig>(configs => {
   ]
 }, {})
 
-function cmd(target: PopTarget, only: ItemFilter): Command {
+function cmd(target: PopTarget, only: ItemFilter): StateCommand {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
     let behavior = state.behavior(historyConfig)
     if (!behavior.length) return false
