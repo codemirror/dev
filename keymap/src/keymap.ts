@@ -44,12 +44,6 @@ function normalizeKeyName(name: string): string {
   return result
 }
 
-function normalize(map: Keymap): Keymap {
-  const copy = Object.create(null)
-  for (const prop in map) copy[normalizeKeyName(prop)] = map[prop]
-  return copy
-}
-
 function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
   if (event.altKey) name = "Alt-" + name
   if (event.ctrlKey) name = "Ctrl-" + name
@@ -64,21 +58,39 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 /// priorities determine their precedence (the ones specified early or
 /// with high priority get to dispatch first). When a handler has
 /// returned `true` for a given key, no further handlers are called.
-export const keymap = (map: Keymap) => EditorView.handleDOMEvents({
-  keydown: keydownHandler(normalize(map))
-})
+export const keymap = (map: Keymap) => {
+  let set = new NormalizedKeymap(map)
+  return EditorView.handleDOMEvents({
+    keydown(view: EditorView, event: KeyboardEvent) {
+      let handler = set.get(event)
+      return handler ? handler(view) : false
+    }
+  })
+}
 
-function keydownHandler(map: Keymap): (view: EditorView, event: KeyboardEvent) => boolean {
-  return function(view, event) {
+/// Stores a set of keybindings in normalized form, and helps looking
+/// up the binding for a keyboard event. Only needed when binding keys
+/// in some custom way.
+export class NormalizedKeymap<T> {
+  private map: {[key: string]: T} = Object.create(null)
+
+  /// Create a normalized map.
+  constructor(map: {[key: string]: T}) {
+    for (const prop in map) this.map[normalizeKeyName(prop)] = map[prop]
+  }
+
+  /// Look up the binding for the given keyboard event, or `undefined`
+  /// if none is found.
+  get(event: KeyboardEvent): T | undefined {
     const name = keyName(event), isChar = name.length == 1 && name != " "
-    const direct = map[modifiers(name, event, !isChar)]
+    const direct = this.map[modifiers(name, event, !isChar)]
+    if (direct) return direct
     let baseName
-    if (direct && direct(view)) return true
     if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
         (baseName = base[event.keyCode]) && baseName != name) {
-      const fromCode = map[modifiers(baseName, event, true)]
-      if (fromCode && fromCode(view)) return true
+      const fromCode = this.map[modifiers(baseName, event, true)]
+      if (fromCode) return fromCode
     }
-    return false
+    return undefined
   }
 }
