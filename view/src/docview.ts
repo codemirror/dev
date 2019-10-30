@@ -421,7 +421,10 @@ export class DocView extends ContentView {
       measure = toMeasure.map(plugin => plugin.measure!())
     }
     this.view.updateState = UpdateState.Updating
-    toMeasure.forEach((plugin, i) => plugin.drawMeasured!(measure![i]))
+    while (toMeasure.length) {
+      toMeasure = toMeasure.filter((plugin, i) => plugin.drawMeasured!(measure![i]))
+      measure = toMeasure.map(plugin => plugin.measure!())
+    }
     if (update) {
       this.observer.listenForScroll()
       this.view.drawPlugins()

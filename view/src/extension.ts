@@ -114,10 +114,13 @@ export interface ViewPluginValue<Measure = undefined> {
   /// called at the end of the DOM-writing phase after a layout
   /// reading phase, with the result from the `measure` method as
   /// argument. Called before `draw`, in cases where both are called.
-  drawMeasured?(measured: Measure): void
+  ///
+  /// May return `true` to request another cycle of
+  /// `measure`/`drawMeasured` calls.
+  drawMeasured?(measured: Measure): boolean
 
-  /// Called when the plugin is no longer going to be used. Should, at
-  /// the very least, undo any changes the plugin made to the DOM.
+  /// Called when the plugin is no longer going to be used. Should
+  /// revert any changes the plugin made to the DOM.
   destroy?(): void
 }
 
