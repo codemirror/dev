@@ -350,6 +350,15 @@ export class EditorView {
       this.docView.checkLayout()
   }
 
+  /// Make sure plugins get a chance to measure the DOM before the
+  /// next frame. Calling this is preferable to messing with the DOM
+  /// directly from, for example, an even handler, because it'll make
+  /// sure measuring and drawing done by other components is
+  /// synchronized, avoiding unnecessary DOM layout computations.
+  requireMeasure() {
+    this.docView.scheduleLayoutCheck()
+  }
+
   /// Find the line or block widget at the given vertical position.
   /// `editorTop`, if given, provides the vertical position of the top
   /// of the editor. It defaults to the editor's screen position

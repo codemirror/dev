@@ -85,8 +85,7 @@ export class DocView extends ContentView {
     this.heightMap = this.heightMap.applyChanges(none, Text.empty, this.heightOracle.setDoc(state.doc), changedRanges)
     this.computeUpdate(state, state.doc, null, initialize, none, 0, -1)
     this.updateInner(changedRanges, 0)
-    this.cancelLayoutCheck()
-    this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
+    this.scheduleLayoutCheck()
   }
 
   // Update the document view to a given state. scrollIntoView can be
@@ -125,8 +124,12 @@ export class DocView extends ContentView {
       this.updateInner(contentChanges, prevDoc.length)
       this.cancelLayoutCheck()
       if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
-      this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
+      this.scheduleLayoutCheck()
     }
+  }
+
+  scheduleLayoutCheck() {
+    this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
   // Used both by update and checkLayout do perform the actual DOM
