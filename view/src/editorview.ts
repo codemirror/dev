@@ -408,6 +408,7 @@ export class EditorView {
   }
 
   /// Get the document position at the given screen coordinates.
+  /// Returns -1 if no valid position could be found.
   posAtCoords(coords: {x: number, y: number}): number {
     this.readingLayout()
     return posAtCoords(this, coords)
