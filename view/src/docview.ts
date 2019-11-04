@@ -411,9 +411,12 @@ export class DocView extends ContentView {
         this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
       let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
       if (covered && !this.heightOracle.heightChanged) break
+      if (i > 10) {
+        console.warn("Layout failed to converge")
+        break
+      }
       this.view.updateState = UpdateState.Updating
       update = true
-      if (i > 10) throw new Error("Layout failed to converge") // FIXME warn and break?
       let contentChanges = covered ? none : this.computeUpdate(this.state, this.state.doc, null, null, none, scrollBias, -1)
       this.updateInner(contentChanges, this.length)
       lineHeights = null
