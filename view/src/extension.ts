@@ -43,16 +43,12 @@ export class ViewPlugin<Value extends ViewPluginValue<any>> {
 
   /// An extension that can be used to install this plugin in a view.
   get extension(): Extension {
-    if (!this.create)
-      throw new Error("Can't use a viewplugin that doesn't have a create function associated with it (use `.configure`)")
     return [viewPlugin(this), ...this.behaviorExtensions]
   }
 
   /// Declare a plugin. The `create` function will be called while
   /// initializing or reconfiguring an editor view to create the
-  /// actual plugin instance. You can leave it empty, in which case
-  /// you have to call `configure` before you are able to use the
-  /// plugin.
+  /// actual plugin instance.
   static create<Value extends ViewPluginValue<any>>(create: (view: EditorView) => Value) {
     return new ViewPlugin<Value>(create, extendView.storageID(), [])
   }
@@ -140,7 +136,7 @@ export const decorations = extendView.behavior<DecorationSet>()
 
 class DecorationPlugin implements ViewPluginValue {
   decorations: DecorationSet
-  
+
   constructor(view: EditorView, readonly spec: {
     create: (view: EditorView) => DecorationSet,
     update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,

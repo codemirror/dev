@@ -95,7 +95,7 @@ export function handleInsertion(state: EditorState, ch: string): Transaction | n
   for (let tok of tokens) {
     let closed = closing(codePointAt(tok, 0))
     if (ch == tok)
-      return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1) 
+      return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1)
         : handleOpen(state, tok, closed, conf.closeBefore || defaults.closeBefore)
     if (ch == closed)
       return handleClose(state, tok, closed)

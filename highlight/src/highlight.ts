@@ -24,7 +24,7 @@ export class TagSystem {
   typeNames: string[] = [""]
   /// @internal
   parents: number[]
-  
+
   /// A [node
   /// prop](https://lezer.codemirror.net/docs/ref#tree.NodeProp) used
   /// to associate styling tag information with syntax tree nodes.

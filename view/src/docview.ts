@@ -404,7 +404,7 @@ export class DocView extends ContentView {
       let value = this.view.plugin(plugin)!
       if (value.measure && value.drawMeasured) toMeasure.push(value)
     }
-    
+
     let update = false, measure = toMeasure.map(plugin => plugin.measure!())
     for (let i = 0;; i++) {
       this.heightOracle.heightChanged = false

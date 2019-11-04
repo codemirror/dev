@@ -42,7 +42,7 @@ class StreamParserInstance<State> {
   copyState: (state: State) => State
   indent: (state: State, textAfter: string, editorState: EditorState) => number
   docType: number
-  
+
   constructor(spec: StreamParser<State>) {
     this.token = spec.token
     this.blankLine = spec.blankLine || (() => {})

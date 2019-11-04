@@ -11,7 +11,7 @@ const enum Kind { Behavior, Array, Unique, Name }
 class BehaviorData {
   empty: any
   static: boolean
-  
+
   constructor(readonly combine: (values: readonly any[]) => any,
               isStatic: boolean,
               readonly id: number) {

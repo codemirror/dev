@@ -19,7 +19,7 @@ export function syntaxIndentation(syntax: Syntax) {
 // Compute the indentation for a given position from the syntax tree.
 function computeIndentation(state: EditorState, ast: Tree, pos: number) {
   let tree: Subtree | null = ast.resolve(pos)
-    
+
   // Enter previous nodes that end in empty error terms, which means
   // they were broken off by error recovery, so that indentation
   // works even if the constructs haven't been finished.

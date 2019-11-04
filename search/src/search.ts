@@ -84,7 +84,7 @@ export const search = EditorView.extend.unique<SearchConfig>((configs: SearchCon
     if (conf.keymap) for (let key of Object.keys(conf.keymap)) {
       let value = conf.keymap[key]
       if (keys[key] && keys[key] != value)
-        throw new Error("Conflicting keyss for search extension")
+        throw new Error("Conflicting keys for search extension")
       keys[key] = value
       panelKeys[key] = value
     }

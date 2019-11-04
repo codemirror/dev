@@ -193,6 +193,6 @@ export class CompositionView extends WidgetView {
   ignoreMutation(): boolean { return false }
 
   get overrideDOMText() { return null }
-  
+
   coordsAt(pos: number) { return textCoords(this.widget.value.text, pos) }
 }

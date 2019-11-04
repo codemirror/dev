@@ -154,7 +154,7 @@ export class LineView extends ContentView implements BlockView {
     }
     return new DOMPos(this.dom!, 0)
   }
-  
+
   // FIXME might need another hack to work around Firefox's behavior
   // of not actually displaying the cursor even though it's there in
   // the DOM
