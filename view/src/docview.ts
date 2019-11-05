@@ -120,6 +120,7 @@ export class DocView extends ContentView {
         (!update || update._annotations.length == 0)) {
       this.updateSelection()
       if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
+      if (update) this.scheduleLayoutCheck()
     } else {
       this.updateInner(contentChanges, prevDoc.length)
       this.cancelLayoutCheck()

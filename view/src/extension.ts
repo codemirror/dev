@@ -235,7 +235,7 @@ export class ViewUpdate {
       if (ann.type == type) return ann.value as T
     for (let i = this.transactions.length - 1; i >= 0; i--) {
       let value = this.transactions[i].annotation(type)
-      if (value) return value
+      if (value !== undefined) return value
     }
     return undefined
   }
