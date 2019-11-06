@@ -2,7 +2,7 @@ declare const extensionBrand: unique symbol
 
 /// Extensions can either be values created by behaviors or unique
 /// extensions, or arrays of extension values.
-export type Extension = {[extensionBrand]: true} | ExtensionArray
+export type Extension = {[extensionBrand]: true} | readonly Extension[]
 
 const enum Prec { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
 
@@ -189,10 +189,6 @@ export class ExtensionGroup<Context> {
   /// `extend` precedences.
   override = setPrec(Prec.Override)
 }
-
-// FIXME this is a hack to get around TypeScript's lack of recursive
-// type aliases, and should be unnnecessary in TS 3.7
-interface ExtensionArray extends ReadonlyArray<Extension> {}
 
 function setPrec(prec: Prec): (extension: Extension) => Extension {
   return (extension: Extension) => extension instanceof ExtensionValue
