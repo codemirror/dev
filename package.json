@@ -40,8 +40,8 @@
     "ist": "^1.1.1",
     "mocha": "^5.1.1",
     "moduleserve": "^0.8.5",
-    "rollup": "^1.25.1",
-    "rollup-plugin-typescript2": "^0.24.3",
+    "rollup": "^1.25.3",
+    "rollup-plugin-typescript2": "^0.25.2",
     "ts-node": "^8.2.0",
     "typescript": "^3.5.1"
   }
