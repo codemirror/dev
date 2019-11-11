@@ -23,14 +23,16 @@ export interface PanelSpec {
   pos?: number
 }
 
-/// Opening a panel is done by dispatching a transaction with this
-/// annotation.
-export const openPanel = Annotation.define<PanelSpec>()
-
-/// To close an open panel, dispatch a transaction with this
-/// annotation pointing at the panel's DOM element. Closing a panel
-/// that isn't open is ignored.
-export const closePanel = Annotation.define<HTMLElement>()
+/// Opening a panel is done by providing an object describing the
+/// panel through this behavior.
+export const openPanel = EditorView.extend.behavior<PanelSpec | null, {top: readonly PanelSpec[], bottom: readonly PanelSpec[]}>({
+  combine(specs) {
+    let top: PanelSpec[] = [], bottom: PanelSpec[] = []
+    for (let spec of specs) if (spec) (spec.top ? top : bottom).push(spec)
+    return {top: top.sort((a, b) => (a.pos || 0) - (b.pos || 0)),
+            bottom: bottom.sort((a, b) => (a.pos || 0) - (b.pos || 0))}
+  }
+})
 
 const panelPlugin = ViewPlugin.create(view => new Panels(view)).behavior(EditorView.scrollMargins, p => p.scrollMargins())
 
@@ -40,18 +42,16 @@ class Panels {
   themeChanged = false
 
   constructor(view: EditorView) {
-    this.top = new PanelGroup(view, true)
-    this.bottom = new PanelGroup(view, false)
+    let {top, bottom} = view.behavior(openPanel)
+    this.top = new PanelGroup(view, true, top)
+    this.bottom = new PanelGroup(view, false, bottom)
   }
 
   update(update: ViewUpdate) {
+    let {top, bottom} = update.view.behavior(openPanel)
+    this.top.update(top)
+    this.bottom.update(bottom)
     if (update.themeChanged) this.themeChanged = true
-    for (let open of update.annotations(openPanel))
-      (open.top ? this.top : this.bottom).addPanel(open.dom, open.pos || 0, open.style || "")
-    for (let close of update.annotations(closePanel)) {
-      this.top.removePanel(close)
-      this.bottom.removePanel(close)
-    }
   }
 
   draw() {
@@ -70,33 +70,37 @@ class Panels {
   }
 }
 
+class Panel {
+  dom: HTMLElement
+  style: string
+  baseClass: string
+
+  constructor(spec: PanelSpec) {
+    this.dom = spec.dom
+    this.style = spec.style || ""
+    this.baseClass = spec.dom.className
+  }
+}
+
 class PanelGroup {
   height = 0
   dom: HTMLElement | null = null
-  panels: {pos: number, dom: HTMLElement, style: string, baseClass: string}[] = []
+  panels: Panel[]
   scrollers: EventTarget[] = []
   floating = false
-  needsSync = false
+  needsSync: boolean
 
-  constructor(readonly view: EditorView, readonly top: boolean) {
+  constructor(readonly view: EditorView, readonly top: boolean, private specs: readonly PanelSpec[]) {
     this.onScroll = this.onScroll.bind(this)
+    this.panels = specs.map(s => new Panel(s))
+    this.needsSync = this.panels.length > 0
   }
 
-  addPanel(dom: HTMLElement, pos: number, style: string) {
-    let panel = {pos, dom, style, baseClass: dom.className}, i = 0
-    dom.className += " " + this.view.cssClass("panel" + (style ? "." + style : ""))
-    while (i < this.panels.length && this.panels[i].pos <= pos) i++
-    this.panels.splice(i, 0, panel)
-    this.needsSync = true
-  }
-
-  removePanel(dom: HTMLElement) {
-    for (let i = 0; i < this.panels.length; i++) {
-      if (this.panels[i].dom == dom) {
-        this.panels.splice(i, 1)
-        this.needsSync = true
-        return
-      }
+  update(specs: readonly PanelSpec[]) {
+    if (specs != this.specs) {
+      this.panels = specs.map(s => new Panel(s))
+      this.specs = specs
+      this.needsSync = true
     }
   }
 

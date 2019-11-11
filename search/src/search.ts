@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Command, ViewUpdate, Decoration} from "../../view"
 import {EditorState, Annotation, EditorSelection, SelectionRange} from "../../state"
-import {panels, openPanel, closePanel} from "../../panel"
+import {panels, PanelSpec, openPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text} from "../../text"
 import {SearchCursor} from "./cursor"
@@ -22,12 +22,14 @@ class Query {
   get valid() { return !!this.search }
 }
 
-const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view)).decorations(p => p.decorations)
+const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view))
+  .decorations(p => p.decorations)
+  .behavior(openPanel, p => p.panel)
 
-const searchAnnotation = Annotation.define<{query?: Query, panel?: HTMLElement | false}>()
+const searchAnnotation = Annotation.define<{query?: Query, panel?: PanelSpec | null}>()
 
 class SearchPlugin {
-  panel: null | HTMLElement = null
+  panel: null | PanelSpec = null
   query = new Query("", "", false)
   decorations = Decoration.none
 
@@ -37,8 +39,7 @@ class SearchPlugin {
     let ann = update.annotation(searchAnnotation)
     if (ann) {
       if (ann.query) this.query = ann.query
-      if (ann.panel && !this.panel) this.panel = ann.panel
-      if (ann.panel == false) this.panel = null
+      if (ann.panel !== undefined) this.panel = ann.panel
     }
     if (!this.query.search || !this.panel)
       this.decorations = Decoration.none
@@ -226,11 +227,10 @@ export const openSearchPanel: Command = view => {
           view.dispatch(view.state.t().annotate(searchAnnotation({query})))
       }
     })
-    view.dispatch(view.state.t().annotate(openPanel({dom: panel, pos: 80, style: "search"}),
-                                          searchAnnotation({panel})))
+    view.dispatch(view.state.t().annotate(searchAnnotation({panel: {dom: panel, pos: 80, style: "search"}})))
   }
   if (plugin.panel)
-    (plugin.panel.querySelector("[name=search]") as HTMLInputElement).select()
+    (plugin.panel.dom.querySelector("[name=search]") as HTMLInputElement).select()
   return true
 }
 
@@ -238,8 +238,8 @@ export const openSearchPanel: Command = view => {
 export const closeSearchPanel: Command = view => {
   let plugin = view.plugin(searchPlugin)
   if (!plugin || !plugin.panel) return false
-  if (plugin.panel.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.t().annotate(closePanel(plugin.panel), searchAnnotation({panel: false})))
+  if (plugin.panel.dom.contains(view.root.activeElement)) view.focus()
+  view.dispatch(view.state.t().annotate(searchAnnotation({panel: null})))
   return true
 }
 
