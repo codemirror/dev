@@ -1,7 +1,7 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Extension, ExtensionGroup} from "../../extension"
-import {Tree, NodeType} from "lezer-tree"
+import {Tree, NodeType, NodeProp} from "lezer-tree"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that
@@ -77,6 +77,12 @@ export class Annotation<T> {
 /// queries).
 export type CancellablePromise<T> = Promise<T> & {canceled?: boolean}
 
+/// A node prop that can be stored on a grammar's top node to
+/// associate information with the language. Different extension might
+/// use different properties from this object (which they typically
+/// export as an interface).
+export const languageData = new NodeProp<{}>()
+
 /// Syntax [parsing services](#state.EditorState^syntax) must provide
 /// this interface.
 export interface Syntax {
@@ -93,8 +99,8 @@ export interface Syntax {
   /// is also acceptable.
   getPartialTree(state: EditorState, from: number, to: number): Tree
 
-  /// Return the grammar-wrapping node type at the given location.
-  /// This'll be the grammar's top node, usually, but with nested
-  /// grammars it may be the top of some nested grammar.
-  docTypeAt(state: EditorState, pos: number): NodeType
+  /// Return the language data object for the given position. This'll
+  /// usually be the be the data for the grammar's top node, but with
+  /// nested grammars it may be the data of some nested grammar.
+  languageDataAt<Interface = any>(state: EditorState, pos: number): Interface
 }

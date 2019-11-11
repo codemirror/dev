@@ -3,28 +3,23 @@ import {EditorState, SelectionRange, Transaction} from "../../state"
 import {Text, isWordChar} from "../../text"
 import {codePointAt, fromCodePoint, minPairCodePoint} from "../../text"
 import {keyName} from "w3c-keyname"
-import {NodeProp} from "lezer-tree"
 
 /// Configures bracket closing behavior for a syntax (via
-/// [`closeBracketsNodeProp`](#closebrackets.closeBracketsNodeProp)).
-export interface CloseBracketConfig {
+/// [`languabeData`](#state.languageData)).
+export interface CloseBracketData {
   /// The opening brackets to close. Defaults to `["(", "[", "{", "'",
   /// '"']`. Brackets may be single characters or a triple of quotes
   /// (as in `"''''"`).
-  close?: string[],
+  closeBrackets?: string[],
   /// Characters in front of which newly opened brackets are
   /// automatically closed. Closing always happens in front of
   /// whitespace. Defaults to `")]}'\":;>"`.
-  closeBefore?: string
+  closeBracketsBefore?: string
 }
 
-/// The node prop used to configure bracket closing behavior in a
-/// syntax. Should be attached to the syntax's top node type.
-export const closeBracketsNodeProp = new NodeProp<CloseBracketConfig>()
-
 const defaults = {
-  close: ["(", "[", "{", "'", '"'],
-  closeBefore: ")]}'\":;>"
+  closeBrackets: ["(", "[", "{", "'", '"'],
+  closeBracketsBefore: ")]}'\":;>"
 }
 
 /// Extension to enable bracket-closing behavior. When a closeable
@@ -47,8 +42,7 @@ function closing(ch: number) {
 function config(state: EditorState, pos: number) {
   let syntax = state.behavior(EditorState.syntax)
   if (syntax.length == 0) return defaults
-  let prop = syntax[0].docTypeAt(state, pos).prop(closeBracketsNodeProp)
-  return prop || defaults
+  return syntax[0].languageDataAt<CloseBracketData>(state, pos)
 }
 
 function keydown(view: EditorView, event: KeyboardEvent) {
@@ -71,7 +65,7 @@ function keydown(view: EditorView, event: KeyboardEvent) {
 /// Exported mostly for testing purposes.
 export function handleBackspace(state: EditorState) {
   let conf = config(state, state.selection.primary.head)
-  let tokens = conf.close || defaults.close
+  let tokens = conf.closeBrackets || defaults.closeBrackets
   let tr = state.t(), dont = null
   tr.forEachRange(range => {
     if (!range.empty) return dont = range
@@ -91,12 +85,12 @@ export function handleBackspace(state: EditorState) {
 /// exported mostly for testing.
 export function handleInsertion(state: EditorState, ch: string): Transaction | null {
   let conf = config(state, state.selection.primary.head)
-  let tokens = conf.close || defaults.close
+  let tokens = conf.closeBrackets || defaults.closeBrackets
   for (let tok of tokens) {
     let closed = closing(codePointAt(tok, 0))
     if (ch == tok)
-      return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1)
-        : handleOpen(state, tok, closed, conf.closeBefore || defaults.closeBefore)
+      return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1) 
+        : handleOpen(state, tok, closed, conf.closeBracketsBefore || defaults.closeBracketsBefore)
     if (ch == closed)
       return handleClose(state, tok, closed)
   }

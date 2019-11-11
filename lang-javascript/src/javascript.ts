@@ -1,8 +1,9 @@
 import {parser} from "lezer-javascript"
 import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "../../syntax"
+import {languageData} from "../../state"
 import {Subtree} from "lezer-tree"
 import {styleTags} from "../../highlight"
-import {closeBracketsNodeProp} from "../../closebrackets"
+import {CloseBracketData} from "../../closebrackets"
 
 const statementIndent = continuedIndent({except: /^{/})
 
@@ -25,8 +26,8 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
   foldNodeProp.add({
     Block(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} }
   }),
-  closeBracketsNodeProp.add({
-    Script: {close: ["(", "[", "{", "'", '"', "`"]}
+  languageData.add({
+    Script: {closeBrackets: ["(", "[", "{", "'", '"', "`"]} as CloseBracketData
   }),
   styleTags({
     "get set async static": "modifier",

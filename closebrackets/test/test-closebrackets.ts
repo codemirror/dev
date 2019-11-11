@@ -1,6 +1,6 @@
 const ist = require("ist")
-import {handleInsertion, handleBackspace, closeBracketsNodeProp} from ".."
-import {EditorState, EditorSelection} from "../../state"
+import {handleInsertion, handleBackspace} from ".."
+import {EditorState, EditorSelection, languageData} from "../../state"
 import {Text} from "../../text"
 import {StreamSyntax} from "../../stream-syntax"
 
@@ -72,7 +72,7 @@ describe("closeBrackets", () => {
   })
 
   const syntax = new StreamSyntax({
-    docProps: [[closeBracketsNodeProp, {close: ["(", "'", "'''"]}]],
+    docProps: [[languageData, {close: ["(", "'", "'''"]}]],
     token(stream) {
       if (stream.match("'''")) {
         while (!stream.match("'''") && !stream.eol()) stream.next()

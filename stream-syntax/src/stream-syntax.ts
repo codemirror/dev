@@ -1,5 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
+import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
@@ -122,8 +122,8 @@ export class StreamSyntax implements Syntax {
     return field.tree
   }
 
-  docTypeAt(state: EditorState, pos: number) {
-    return typeArray[this.parser.docType]
+  languageDataAt<Interface = any>(state: EditorState, pos: number) {
+    return (typeArray[this.parser.docType].prop(languageData) || {}) as Interface
   }
 }
 

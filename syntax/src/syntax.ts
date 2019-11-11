@@ -1,7 +1,7 @@
 import {Parser, ParseContext, InputStream} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
-import {EditorState, StateField, Transaction, Syntax, CancellablePromise} from "../../state"
+import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise} from "../../state"
 import {Extension} from "../../extension"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
@@ -43,18 +43,24 @@ export class LezerSyntax implements Syntax {
     return field.tree
   }
 
-  docTypeAt(state: EditorState, pos: number) {
+  languageDataAt<Interface = any>(state: EditorState, pos: number) {
+    let type = this.parser.group.types[1]
     if (this.parser.hasNested) {
       let tree = this.getPartialTree(state, pos, pos)
       let target: Subtree | null = tree.resolve(pos)
       while (target) {
-        if (target.type.prop(NodeProp.top)) return target.type
+        if (target.type.prop(NodeProp.top)) {
+          type = target.type
+          break
+        }
         target = target.parent
       }
     }
-    return this.parser.group.types[1]
+    return (type.prop(languageData) || nothing) as Interface
   }
 }
+
+const nothing = {}
 
 class DocStream implements InputStream {
   cursor: TextIterator

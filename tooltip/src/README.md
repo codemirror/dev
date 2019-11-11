@@ -4,8 +4,6 @@
 
 @showTooltip
 
-@hideTooltip
-
 @HoverTooltip
 
 @hoverTooltip

@@ -1,4 +1,3 @@
 @panels
 @PanelSpec
 @openPanel
-@closePanel

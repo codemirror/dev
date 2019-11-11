@@ -59,4 +59,6 @@ extensions for the editor state.
 
 @Syntax
 
+@languageData
+
 @CancellablePromise
