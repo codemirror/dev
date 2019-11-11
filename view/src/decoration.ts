@@ -1,5 +1,5 @@
 import {ChangeSet, ChangedRange, MapMode} from "../../state"
-import {RangeValue, Range, RangeSet, RangeComparator, RangeIterator} from "../../rangeset"
+import {RangeValue, Range, RangeSet, RangeComparator} from "../../rangeset"
 import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
 import {EditorView} from "./editorview"

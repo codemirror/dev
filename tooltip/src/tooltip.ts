@@ -26,18 +26,10 @@ export interface Tooltip {
   /// position. If not specified, it will be shown below unless there
   /// isn't enough space there.
   above?: boolean
-  /// Whether to automatically hide the tooltip when the editor
-  /// selection or content changes. Defaults to false.
-  hideOnChange?: boolean
 }
 
-/// Transaction annotation that causes a new tooltip to be shown.
-export const showTooltip = Annotation.define<Tooltip>()
-
-/// Transaction annotation that hides a tooltip. Should contain the
-/// DOM element previously passed to
-/// [`showTooltip`](#tooltip.showTooltip).
-export const hideTooltip = Annotation.define<HTMLElement>()
+// Behavior by which an extension can provide a tooltip to be shown.
+export const showTooltip = EditorView.extend.behavior<Tooltip | null>()
 
 /// Hover tooltips are associated with a range, rather than a single
 /// position.
@@ -45,6 +37,9 @@ export interface HoverTooltip extends Tooltip {
   /// The end of the target range. The tooltip will be hidden when the
   /// pointer is no longer over this range.
   end: number
+  /// Whether to automatically hide the tooltip when the editor
+  /// selection or content changes. Defaults to false.
+  hideOnChange?: boolean
 }
 
 /// Enable a hover tooltip, which shows up when the pointer hovers
@@ -52,7 +47,7 @@ export interface HoverTooltip extends Tooltip {
 /// range, call its `check` argument to see if that range is being
 /// hovered over, and return a tooltip description when it is.
 export function hoverTooltip(source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null) {
-  let plugin = ViewPlugin.create(view => new HoverPlugin(view, source))
+  let plugin = ViewPlugin.create(view => new HoverPlugin(view, source)).behavior(showTooltip, p => p.active)
   return [
     plugin.extension,
     tooltips()
@@ -96,8 +91,7 @@ class HoverPlugin {
     let open = pos < 0 ? null : this.source(this.view, (from, to) => {
       return from <= pos && to >= pos && isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY)
     })
-    if (open)
-      this.view.dispatch(this.view.state.t().annotate(showTooltip(open), this.setHover(open)))
+    if (open) this.view.dispatch(this.view.state.t().annotate(this.setHover(open)))
   }
 
   mousemove(event: MouseEvent) {
@@ -105,7 +99,7 @@ class HoverPlugin {
     if (this.hoverTimeout < 0) this.hoverTimeout = setTimeout(this.checkHover, HoverTime)
     if (this.active && !this.active.dom.contains(event.target as HTMLElement) &&
         !isOverRange(this.view, this.active.pos, this.active.end, event.clientX, event.clientY, HoverMaxDist))
-      this.view.dispatch(this.view.state.t().annotate(hideTooltip(this.active.dom), this.setHover(null)))
+      this.view.dispatch(this.view.state.t().annotate(this.setHover(null)))
   }
 
   mouseenter() {
@@ -115,7 +109,7 @@ class HoverPlugin {
   mouseleave() {
     this.mouseInside = false
     if (this.active)
-      this.view.dispatch(this.view.state.t().annotate(hideTooltip(this.active.dom), this.setHover(null)))
+      this.view.dispatch(this.view.state.t().annotate(this.setHover(null)))
   }
 
   destroy() {
@@ -139,7 +133,9 @@ type Measured = {
 
 class TooltipPlugin {
   tooltips: Tooltip[] = []
-  elements: HTMLElement[] = []
+  sourceArray: readonly (Tooltip | null)[] = []
+  added: HTMLElement[] = []
+
   mustSync = false
   themeChanged = false
   mustMeasure = false
@@ -149,23 +145,13 @@ class TooltipPlugin {
   }
 
   update(update: ViewUpdate) {
-    for (let tip of update.annotations(showTooltip)) {
-      this.tooltips.push(tip)
+    let source = update.view.behavior(showTooltip)
+    if (source != this.sourceArray) {
+      this.sourceArray = source
+      this.tooltips = source.filter(x => x) as Tooltip[]
       this.mustSync = true
     }
-    for (let dom of update.annotations(hideTooltip)) {
-      for (let i = 0; i < this.tooltips.length; i++) if (this.tooltips[i].dom == dom) {
-        this.tooltips.splice(i--, 1)
-        this.mustSync = true
-      }
-    }
     if (update.docChanged) this.mustMeasure = true
-    if (this.tooltips.length && (update.docChanged || update.transactions.some(t => t.selectionSet))) {
-      for (let i = 0; i < this.tooltips.length; i++) if (this.tooltips[i].hideOnChange) {
-        this.tooltips.splice(i--, 1)
-        this.mustSync = true
-      }
-    }
     if (update.themeChanged) this.themeChanged = true
   }
 
@@ -183,17 +169,17 @@ class TooltipPlugin {
     if (!this.mustSync) return
     this.mustSync = false
     for (let tooltip of this.tooltips) {
-      if (this.elements.indexOf(tooltip.dom) < 0) {
+      if (this.added.indexOf(tooltip.dom) < 0) {
         tooltip.dom.className = this.view.cssClass("tooltip" + (tooltip.style ? "." + tooltip.style : ""))
         this.view.dom.appendChild(tooltip.dom)
-        this.elements.push(tooltip.dom)
+        this.added.push(tooltip.dom)
       }
     }
-    for (let i = 0; i < this.elements.length; i++) {
-      let element = this.elements[i]
+    for (let i = 0; i < this.added.length; i++) {
+      let element = this.added[i]
       if (!this.tooltips.some(t => t.dom == element)) {
         element.remove()
-        this.elements.splice(i--, 1)
+        this.added.splice(i--, 1)
       }
     }
     this.mustMeasure = true
