@@ -1,0 +1,5 @@
+{
+  "main": "dist/index.js",
+  "types": "dist/lint.d.ts",
+  "module": "dist/index.esm"
+}

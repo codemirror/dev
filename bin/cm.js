@@ -111,6 +111,7 @@ const packages = [
   new Pkg("panel", {entry: "panel", dom: true}),
   new Pkg("tooltip", {entry: "tooltip", dom: true}),
   new Pkg("search", {entry: "search", dom: true}),
+  new Pkg("lint", {entry: "lint", dom: true}),
   new Pkg("highlight", {entry: "highlight", dom: true}),
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
   new Pkg("lang-javascript", {entry: "javascript"}),
