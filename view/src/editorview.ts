@@ -254,7 +254,7 @@ export class EditorView {
 
   /// Get an instance of the given plugin class, or `undefined` if
   /// none exists in this view.
-  plugin<T extends ViewPluginValue>(plugin: ViewPlugin<T>): T | undefined {
+  plugin<T extends ViewPluginValue<any>>(plugin: ViewPlugin<T>): T | undefined {
     let result = this.plugins[plugin.id]
     if (result === undefined && this.behavior(viewPlugin).indexOf(plugin) > -1)
       throw new Error("Accessing a plugin from another plugin with higher precedence")
