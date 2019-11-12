@@ -5,7 +5,7 @@ import {codePointAt, fromCodePoint, minPairCodePoint} from "../../text"
 import {keyName} from "w3c-keyname"
 
 /// Configures bracket closing behavior for a syntax (via
-/// [`languabeData`](#state.languageData)).
+/// [`languageData`](#state.languageData)).
 export interface CloseBracketData {
   /// The opening brackets to close. Defaults to `["(", "[", "{", "'",
   /// '"']`. Brackets may be single characters or a triple of quotes
