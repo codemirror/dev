@@ -7,7 +7,11 @@ const tooltipPlugin = ViewPlugin.create(view => new TooltipPlugin(view))
 /// [`showTooltip`](#tooltip.showTooltip) and
 /// [`hideTooltip`](#tooltip.hideTooltip) to be used to control
 /// tooltips.
-export const tooltips = EditorView.extend.unique<null>(() => [
+export function tooltips() {
+  return EditorView.extend.fallback(tooltipExt())
+}
+
+const tooltipExt = EditorView.extend.unique<null>(() => [
   tooltipPlugin.extension,
   EditorView.theme(theme)
 ], null)

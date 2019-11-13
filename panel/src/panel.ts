@@ -2,7 +2,12 @@ import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
 import {Annotation} from "../../state"
 
 /// Enables the panel-managing extension.
-export const panels = EditorView.extend.unique<null>(() => {
+export function panels() {
+  // FIXME indirection to work around plugin ordering issues
+  return EditorView.extend.fallback(panelExt())
+}
+
+const panelExt = EditorView.extend.unique<null>(() => {
   return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
 }, null)
 
