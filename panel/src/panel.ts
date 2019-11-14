@@ -80,10 +80,15 @@ class Panel {
   style: string
   baseClass: string
 
-  constructor(spec: PanelSpec) {
+  constructor(view: EditorView, spec: PanelSpec) {
     this.dom = spec.dom
     this.style = spec.style || ""
     this.baseClass = spec.dom.className
+    this.setTheme(view)
+  }
+
+  setTheme(view: EditorView) {
+    this.dom.className = this.baseClass + " " + view.cssClass("panel" + (this.style ? "." + this.style : ""))
   }
 }
 
@@ -97,13 +102,13 @@ class PanelGroup {
 
   constructor(readonly view: EditorView, readonly top: boolean, private specs: readonly PanelSpec[]) {
     this.onScroll = this.onScroll.bind(this)
-    this.panels = specs.map(s => new Panel(s))
+    this.panels = specs.map(s => new Panel(view, s))
     this.needsSync = this.panels.length > 0
   }
 
   update(specs: readonly PanelSpec[]) {
     if (specs != this.specs) {
-      this.panels = specs.map(s => new Panel(s))
+      this.panels = specs.map(s => new Panel(this.view, s))
       this.specs = specs
       this.needsSync = true
     }
@@ -207,8 +212,7 @@ class PanelGroup {
     this.align()
     if (themeChanged && this.dom) {
       this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
-      for (let {dom, style, baseClass} of this.panels)
-        dom.className = baseClass + " " + this.view.cssClass("panel" + (style ? "." + style : ""))
+      for (let panel of this.panels) panel.setTheme(this.view)
     }
   }
 
