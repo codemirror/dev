@@ -1,5 +1,4 @@
 import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
-import {Annotation} from "../../state"
 
 /// Enables the panel-managing extension.
 export function panels() {
@@ -65,11 +64,6 @@ class Panels {
     this.themeChanged = false
   }
 
-  destroy() {
-    this.top.destroy()
-    this.bottom.destroy()
-  }
-
   scrollMargins() {
     return {top: this.top.scrollMargin(), bottom: this.bottom.scrollMargin()}
   }
@@ -93,15 +87,12 @@ class Panel {
 }
 
 class PanelGroup {
-  height = 0
   dom: HTMLElement | null = null
   panels: Panel[]
-  scrollers: EventTarget[] = []
   floating = false
   needsSync: boolean
 
   constructor(readonly view: EditorView, readonly top: boolean, private specs: readonly PanelSpec[]) {
-    this.onScroll = this.onScroll.bind(this)
     this.panels = specs.map(s => new Panel(view, s))
     this.needsSync = this.panels.length > 0
   }
@@ -114,26 +105,12 @@ class PanelGroup {
     }
   }
 
-  removeListeners() {
-    for (let target; target = this.scrollers.pop();)
-      target.removeEventListener("scroll", this.onScroll)
-  }
-
-  addListeners() {
-    this.scrollers = [window]
-    for (let cur: Node | null = this.view.dom; cur; cur = cur.parentNode)
-      this.scrollers.push(cur)
-    for (let target of this.scrollers) target.addEventListener("scroll", this.onScroll)
-  }
-
   syncDOM() {
     if (this.panels.length == 0) {
       if (this.dom) {
         this.dom.remove()
         this.dom = null
-        this.removeListeners()
       }
-      this.align()
       return
     }
 
@@ -141,9 +118,7 @@ class PanelGroup {
       this.dom = document.createElement("div")
       this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
       this.dom.style[this.top ? "top" : "bottom"] = "0"
-      this.dontFloat()
       this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
-      this.addListeners()
     }
 
     let curDOM = this.dom.firstChild
@@ -156,52 +131,6 @@ class PanelGroup {
       }
     }
     while (curDOM) curDOM = rm(curDOM)
-    this.align()
-  }
-
-  onScroll() {
-    if (!this.dom) return
-
-    // Check if the parents that have DOM listeners match the current parents
-    for (let i = this.scrollers.length - 1, node: Node | null = this.view.dom; !(i == 1 && !node); i--, node = node.parentNode) {
-      if (i == 1 || this.scrollers[i] != node) { // Mismatch
-        this.removeListeners()
-        if (document.contains(this.view.dom)) this.addListeners()
-        break
-      }
-    }
-
-    this.align()
-  }
-
-  dontFloat() {
-    this.floating = false
-    this.dom!.style.position = "absolute"
-    this.dom!.style.left = this.dom!.style.right = "0"
-    this.dom!.style.width = ""
-  }
-
-  align() {
-    let height = this.dom ? this.dom.offsetHeight : 0
-    if (height != this.height) {
-      this.height = height
-      this.view.dom.style[this.top ? "paddingTop" : "paddingBottom"] = height + "px"
-    }
-    if (!this.dom) return
-
-    let editorRect = this.view.dom.getBoundingClientRect()
-    let editorVisible = editorRect.top <= window.innerHeight - height && editorRect.bottom >= height
-    let shouldFloat = editorVisible && (this.top ? editorRect.top < 0 : editorRect.bottom > window.innerHeight)
-    if (this.floating && !shouldFloat) {
-      this.dontFloat()
-    } else if (!this.floating && shouldFloat) {
-      this.floating = true
-      this.dom.style.position = "fixed"
-      let {left, width} = this.view.scrollDOM.getBoundingClientRect() // Without outer borders
-      this.dom.style.left = left + "px"
-      this.dom.style.right = ""
-      this.dom.style.width = width + "px"
-    }
   }
 
   draw(themeChanged: boolean) {
@@ -209,19 +138,16 @@ class PanelGroup {
       this.syncDOM()
       this.needsSync = false
     }
-    this.align()
     if (themeChanged && this.dom) {
       this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
       for (let panel of this.panels) panel.setTheme(this.view)
     }
   }
 
-  destroy() {
-    this.removeListeners()
-  }
-
   scrollMargin() {
-    return this.floating ? this.height : 0
+    return !this.dom ? 0 : Math.max(0, this.top
+                                    ? this.dom.getBoundingClientRect().bottom - this.view.scrollDOM.getBoundingClientRect().top
+                                    : this.view.scrollDOM.getBoundingClientRect().bottom - this.dom.getBoundingClientRect().top)
   }
 }
 
@@ -234,7 +160,10 @@ function rm(node: ChildNode) {
 const defaultTheme = {
   panels: {
     background: "#f5f5f5",
-    boxSizing: "border-box"
+    boxSizing: "border-box",
+    position: "sticky",
+    left: 0,
+    right: 0
   },
   "panels.top": {
     borderBottom: "1px solid silver"

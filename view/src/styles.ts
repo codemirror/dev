@@ -10,7 +10,9 @@ export const styles = new StyleModule({
       // approximate that
       outline_fallback: "1px dotted #212121",
       outline: "5px auto -webkit-focus-ring-color"
-    }
+    },
+    display: "flex !important",
+    flexDirection: "column"
   },
 
   scroller: {
