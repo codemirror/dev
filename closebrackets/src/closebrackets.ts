@@ -46,6 +46,8 @@ function config(state: EditorState, pos: number) {
 }
 
 function keydown(view: EditorView, event: KeyboardEvent) {
+  if (event.ctrlKey || event.metaKey) return false
+
   if (event.keyCode == 8) { // Backspace
     let tr = handleBackspace(view.state)
     if (!tr) return false
