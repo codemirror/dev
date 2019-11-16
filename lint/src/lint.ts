@@ -50,6 +50,35 @@ export function closeLintPanel(view: EditorView) {
   return true
 }
 
+const LintDelay = 500
+
+export function fullLint(source: (view: EditorView) => readonly Diagnostic[]) {
+  return [
+    ViewPlugin.create(view => {
+      let lintTime = Date.now() + LintDelay, set = true
+      function run() {
+        let now = Date.now()
+        if (now < lintTime - 10) return setTimeout(run, lintTime - now)
+        set = false
+        view.dispatch(view.state.t().annotate(setDiagnostics(source(view))))
+      }
+      setTimeout(run, LintDelay)
+      return {
+        update(update: ViewUpdate) {
+          if (update.docChanged) {
+            lintTime = Date.now() + LintDelay
+            if (!set) {
+              set = true
+              setTimeout(run, LintDelay)
+            }
+          }
+        }
+      }
+    }).extension,
+    lint()
+  ]
+}
+
 class LintPlugin {
   diagnostics = Decoration.none
   panel: LintPanel | null = null
