@@ -3,3 +3,4 @@ export {StateCommand, Syntax, languageData, CancellablePromise, StateField, Stat
 export {EditorSelection, SelectionRange} from "./selection"
 export {Change, ChangeDesc, ChangeSet, Mapping, MapMode, ChangedRange} from "./change"
 export {Transaction} from "./transaction"
+export {Text} from "../../text"

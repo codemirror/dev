@@ -15,6 +15,8 @@ object.
 
 @EditorSelection
 
+@Text
+
 ### Changes and Transactions
 
 CodeMirror treats changes to the document as [objects](#state.Change),
