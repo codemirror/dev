@@ -1,5 +1,5 @@
 import {EditorState, Transaction, StateField, StateCommand, Annotation} from "../../state"
-import {combineConfig} from "../../extension"
+import {combineConfig, Extension} from "../../extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateAnnotation = Annotation.define<HistoryState>()
@@ -26,7 +26,7 @@ const historyField = new StateField({
     if (tr.annotation(closeHistoryAnnotation)) state = state.resetTime()
     if (!tr.changes.length && !tr.selectionSet) return state
 
-    let config = editorState.behavior(historyConfig)[0]
+    let config = editorState.behavior(historyConfig)
     if (tr.annotation(Transaction.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
                               tr.startState.selection, tr.annotation(Transaction.time)!,
@@ -35,27 +35,28 @@ const historyField = new StateField({
   }
 })
 
-const historyConfig = EditorState.extend.behavior<Required<HistoryConfig>>()
+const historyConfig = EditorState.extend.behavior<HistoryConfig, Required<HistoryConfig>>({
+  combine(configs) {
+    return combineConfig(configs, {
+      minDepth: 100,
+      newGroupDelay: 500
+    }, {minDepth: Math.max, newGroupDelay: Math.min})
+  }
+})
 
 /// Create a history extension with the given configuration.
-export const history = EditorState.extend.unique<HistoryConfig>(configs => {
-  let config = combineConfig(configs, {
-    minDepth: 100,
-    newGroupDelay: 500
-  }, {minDepth: Math.max, newGroupDelay: Math.min})
+export function history(config: HistoryConfig = {}): Extension {
   return [
     historyField.extension,
     historyConfig(config)
   ]
-}, {})
+}
 
 function cmd(target: PopTarget, only: ItemFilter): StateCommand {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let behavior = state.behavior(historyConfig)
-    if (!behavior.length) return false
-    let config = behavior[0]
-    let historyState = state.field(historyField)
-    if (!historyState.canPop(target, only)) return false
+    let config = state.behavior(historyConfig)
+    let historyState = state.field(historyField, false)
+    if (!historyState || !historyState.canPop(target, only)) return false
     const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
     dispatch(transaction.annotate(historyStateAnnotation(newState)))
     return true

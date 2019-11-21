@@ -3,12 +3,24 @@ import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
 /// Enables the panel-managing extension.
 export function panels() {
   // FIXME indirection to work around plugin ordering issues
-  return EditorView.extend.fallback(panelExt())
+  return EditorView.extend.fallback(panelExt)
 }
 
-const panelExt = EditorView.extend.unique<null>(() => {
-  return [panelPlugin.extension, EditorView.extend.fallback(EditorView.theme(defaultTheme))]
-}, null)
+const defaultTheme = EditorView.theme({
+  panels: {
+    background: "#f5f5f5",
+    boxSizing: "border-box",
+    position: "sticky",
+    left: 0,
+    right: 0
+  },
+  "panels.top": {
+    borderBottom: "1px solid silver"
+  },
+  "panels.bottom": {
+    borderTop: "1px solid silver"
+  }
+})
 
 /// Describe a newly created panel.
 export interface PanelSpec {
@@ -39,6 +51,8 @@ export const openPanel = EditorView.extend.behavior<PanelSpec | null, {top: read
 })
 
 const panelPlugin = ViewPlugin.create(view => new Panels(view)).behavior(EditorView.scrollMargins, p => p.scrollMargins())
+
+const panelExt = [panelPlugin.extension, EditorView.extend.fallback(defaultTheme)]
 
 class Panels {
   top: PanelGroup
@@ -155,20 +169,4 @@ function rm(node: ChildNode) {
   let next = node.nextSibling
   node.remove()
   return next
-}
-
-const defaultTheme = {
-  panels: {
-    background: "#f5f5f5",
-    boxSizing: "border-box",
-    position: "sticky",
-    left: 0,
-    right: 0
-  },
-  "panels.top": {
-    borderBottom: "1px solid silver"
-  },
-  "panels.bottom": {
-    borderTop: "1px solid silver"
-  }
 }

@@ -30,42 +30,49 @@ const defaultStyles = new StyleModule({
 
 const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
+const bracketMatchingConfig = EditorView.extend.behavior<Config, Required<Config>>({
+  combine(configs) {
+    return combineConfig(configs, {
+      afterCursor: true,
+      brackets: DEFAULT_BRACKETS,
+      maxScanDistance: DEFAULT_SCAN_DIST
+    })
+  }
+})
+
+const bracketMatchingUnique = [
+  EditorView.extend.fallback(EditorView.styleModule(defaultStyles)),
+  ViewPlugin.decoration({
+    create() { return Decoration.none },
+    update(deco, update) {
+      if (!update.transactions.length) return deco
+      let {state} = update, decorations = []
+      let config = update.view.behavior(bracketMatchingConfig)
+      for (let range of state.selection.ranges) {
+        if (!range.empty) continue
+        let match = matchBrackets(state, range.head, -1, config)
+          || (range.head > 0 && matchBrackets(state, range.head - 1, 1, config))
+          || (config.afterCursor &&
+              (matchBrackets(state, range.head, 1, config) ||
+               (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
+        if (!match) continue
+        let styleName: "matchingBracket" | "nonmatchingBracket" = match.matched ? "matchingBracket" : "nonmatchingBracket"
+        let style = update.view.cssClass(styleName) + " " + defaultStyles[styleName]
+        decorations.push(Decoration.mark(match.start.from, match.start.to, {class: style}))
+        if (match.end) decorations.push(Decoration.mark(match.end.from, match.end.to, {class: style}))
+      }
+      return Decoration.set(decorations)
+    }
+  })
+]
+
 /// Create an extension that enables bracket matching. Whenever the
 /// cursor is next to a bracket, that bracket and the one it matches
 /// are highlighted. Or, when no matching bracket is found, another
 /// highlighting style is used to indicate this.
-export const bracketMatching = EditorView.extend.unique((configs: Config[]) => {
-  let config = combineConfig(configs, {
-    afterCursor: true,
-    brackets: DEFAULT_BRACKETS,
-    maxScanDistance: DEFAULT_SCAN_DIST
-  })
-
-  return [
-    EditorView.extend.fallback(EditorView.styleModule(defaultStyles)),
-    ViewPlugin.decoration({
-      create() { return Decoration.none },
-      update(deco, update) {
-        if (!update.transactions.length) return deco
-        let {state} = update, decorations = []
-        for (let range of state.selection.ranges) {
-          if (!range.empty) continue
-          let match = matchBrackets(state, range.head, -1, config)
-            || (range.head > 0 && matchBrackets(state, range.head - 1, 1, config))
-            || (config.afterCursor &&
-                (matchBrackets(state, range.head, 1, config) ||
-                 (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
-          if (!match) continue
-          let styleName: "matchingBracket" | "nonmatchingBracket" = match.matched ? "matchingBracket" : "nonmatchingBracket"
-          let style = update.view.cssClass(styleName) + " " + defaultStyles[styleName]
-          decorations.push(Decoration.mark(match.start.from, match.start.to, {class: style}))
-          if (match.end) decorations.push(Decoration.mark(match.end.from, match.end.to, {class: style}))
-        }
-        return Decoration.set(decorations)
-      }
-    })
-  ]
-}, {})
+export function bracketMatching(config: Config = {}) {
+  return [bracketMatchingConfig(config), bracketMatchingUnique]
+}
 
 function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {
   for (let syntax of state.behavior(EditorState.syntax)) {

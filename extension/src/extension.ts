@@ -1,7 +1,7 @@
 declare const extensionBrand: unique symbol
 
-/// Extensions can either be values created by behaviors or unique
-/// extensions, or arrays of extension values.
+/// Extensions can either be values created by behaviors, or arrays of
+/// extension values.
 export type Extension = {[extensionBrand]: true} | readonly Extension[]
 
 const enum Prec { None = -2, Fallback = -1, Default = 0, Extend = 1, Override = 2 }
@@ -151,9 +151,7 @@ function setPrec(prec: Prec): (extension: Extension) => Extension {
 }
 
 /// And extension is a value that describes a way in which something
-/// is to be extended. It can be produced by instantiating a behavior,
-/// calling unique extension function, or grouping extensions with
-/// `Extension.all`.
+/// is to be extended. FIXME simplify or split
 class ExtensionValue {
   /// @internal
   constructor(
@@ -161,8 +159,8 @@ class ExtensionValue {
     readonly kind: Kind,
     /// @internal
     readonly id: any,
-    /// Holds the field for behaviors, the spec for unique extensions,
-    /// and the array of extensions for multi extensions. @internal
+    /// Holds the field for behaviors, and the array of extensions for
+    /// multi extensions. @internal
     readonly value: any,
     /// @internal
     readonly type: ExtensionGroup<any> | null,
@@ -231,6 +229,10 @@ export class Configuration<Context> {
   /// Replace one or more extensions with new ones, producing a new
   /// configuration.
   replaceExtensions(replace: readonly [Extension, Extension][]) {
+    // FIXME this isn't great yet—have to track the current value to
+    // be able to replace it Do we need it at all anymore? Or can we
+    // just expect client code to store instantiated extensions and
+    // reshuffle them as needed?
     let extensions = this.extensions.map(e => {
       for (let [from, to] of replace) if (e == from) return to
       return e

@@ -19,19 +19,9 @@ export interface Action {
 
 export const setDiagnostics = Annotation.define<readonly Diagnostic[]>()
 
-export const lint = EditorView.extend.unique<null>(() => {
-  return [
-    lintPlugin.extension,
-    hoverTooltip((view, check) => view.plugin(lintPlugin)!.hoverTooltip(view, check)),
-    panels(),
-    EditorView.theme(defaultTheme)
-  ]
-}, null)
-
-const lintPlugin = ViewPlugin.create(view => new LintPlugin(view))
-  .decorations(p => p.diagnostics)
-  .decorations(p => p.activeDiagnostic)
-  .behavior(openPanel, p => p.panel)
+export function lint() {
+  return lintExtension
+}
 
 const lintPanel = Annotation.define<boolean>()
 
@@ -300,7 +290,7 @@ function underline(color: string) {
   return `url('data:image/svg+xml;base64,${btoa(svg)}')`
 }
 
-const defaultTheme = {
+const defaultTheme = EditorView.theme({
   diagnostic: {
     padding: "3px 6px 3px 8px",
     marginLeft: "-1px",
@@ -353,4 +343,16 @@ const defaultTheme = {
     padding: 0,
     margin: 0
   }
-}
+})
+
+const lintPlugin = ViewPlugin.create(view => new LintPlugin(view))
+  .decorations(p => p.diagnostics)
+  .decorations(p => p.activeDiagnostic)
+  .behavior(openPanel, p => p.panel)
+
+const lintExtension = [
+  lintPlugin.extension,
+  hoverTooltip((view, check) => view.plugin(lintPlugin)!.hoverTooltip(view, check)),
+  panels(),
+  defaultTheme
+]

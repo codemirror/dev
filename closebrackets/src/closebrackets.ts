@@ -27,9 +27,7 @@ const defaults = {
 /// after the cursor. When closing a bracket directly in front of that
 /// closing bracket, the cursor moves over the existing bracket. When
 /// backspacing in between brackets, both are removed.
-export const closeBrackets = EditorView.extend.unique<null>(() => {
-  return EditorView.handleDOMEvents({keydown})
-}, null)
+export const closeBrackets = EditorView.handleDOMEvents({keydown})
 
 const definedClosing = "()[]{}<>"
 

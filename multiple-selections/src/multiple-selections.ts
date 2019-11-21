@@ -2,25 +2,45 @@ import {EditorState} from "../../state"
 import {ViewPlugin, DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view"
 import {StyleModule} from "style-mod"
 
+const styles = new StyleModule({
+  secondarySelection: {
+    backgroundColor_fallback: "#3297FD",
+    color_fallback: "white !important",
+    backgroundColor: "Highlight",
+    color: "HighlightText !important"
+  },
+
+  secondaryCursor: {
+    display: "inline-block",
+    verticalAlign: "text-top",
+    borderLeft: "1px solid #555",
+    width: 0,
+    height: "1.15em",
+    margin: "0 -0.5px -.5em"
+  }
+})
+
+const rangeConfig = {class: styles.secondarySelection}
+
+const multipleSelectionExtension = [
+  EditorState.allowMultipleSelections(true),
+  ViewPlugin.decoration({
+    create(view) { return decorateSelections(view.state, rangeConfig) },
+    update(deco, {prevState, state}) {
+      return prevState.doc == state.doc && prevState.selection.eq(state.selection)
+        ? deco : decorateSelections(state, rangeConfig)
+    }
+  }),
+  EditorView.styleModule(styles)
+]
+
 /// Returns an extension that enables multiple selections for the
 /// editor. Secondary cursors and selected ranges are drawn with
 /// simple decorations, and might look the same as the primary native
 /// selection.
-export const multipleSelections = EditorState.extend.unique(() => {
-  let rangeConfig = {class: styles.secondarySelection}
-
-  return [
-    EditorState.allowMultipleSelections(true),
-    ViewPlugin.decoration({
-      create(view) { return decorateSelections(view.state, rangeConfig) },
-      update(deco, {prevState, state}) {
-        return prevState.doc == state.doc && prevState.selection.eq(state.selection)
-          ? deco : decorateSelections(state, rangeConfig)
-      }
-    }),
-    EditorView.styleModule(styles)
-  ]
-}, {})
+export function multipleSelections() {
+  return multipleSelectionExtension
+}
 
 class CursorWidget extends WidgetType<null> {
   toDOM() {
@@ -41,21 +61,3 @@ function decorateSelections(state: EditorState, rangeConfig: MarkDecorationSpec)
   }
   return Decoration.set(deco)
 }
-
-const styles = new StyleModule({
-  secondarySelection: {
-    backgroundColor_fallback: "#3297FD",
-    color_fallback: "white !important",
-    backgroundColor: "Highlight",
-    color: "HighlightText !important"
-  },
-
-  secondaryCursor: {
-    display: "inline-block",
-    verticalAlign: "text-top",
-    borderLeft: "1px solid #555",
-    width: 0,
-    height: "1.15em",
-    margin: "0 -0.5px -.5em"
-  }
-})

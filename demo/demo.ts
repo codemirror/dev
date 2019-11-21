@@ -31,7 +31,7 @@ let state = EditorState.create({doc: `<script>
   search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
   bracketMatching(),
-  closeBrackets(),
+  closeBrackets,
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,

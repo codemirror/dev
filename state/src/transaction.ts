@@ -161,7 +161,7 @@ export class Transaction {
   /// Replace one or more [named
   /// extensions](#extension.ExtensionGroup.defineName) with new
   /// instances, creating a new configuration for the new state.
-  replaceExtensions(replace: readonly Extension[]) {
+  replaceExtensions(replace: readonly [Extension, Extension][]) {
     this.ensureOpen()
     this.configuration = this.configuration.replaceExtensions(replace)
     this.flags |= Flag.Reconfigure

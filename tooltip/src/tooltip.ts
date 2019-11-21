@@ -8,13 +8,21 @@ const tooltipPlugin = ViewPlugin.create(view => new TooltipPlugin(view))
 /// [`hideTooltip`](#tooltip.hideTooltip) to be used to control
 /// tooltips.
 export function tooltips() {
-  return EditorView.extend.fallback(tooltipExt())
+  return EditorView.extend.fallback(tooltipExt)
 }
 
-const tooltipExt = EditorView.extend.unique<null>(() => [
+const theme = EditorView.theme({
+  tooltip: {
+    position: "absolute",
+    border: "1px solid silver",
+    background: "#f5f5f5"
+  }
+})
+
+const tooltipExt = [
   tooltipPlugin.extension,
-  EditorView.theme(theme)
-], null)
+  theme
+]
 
 /// Describes a tooltip.
 export interface Tooltip {
@@ -225,14 +233,6 @@ class TooltipPlugin {
       this.mustMeasure = true
       this.view.requireMeasure()
     }
-  }
-}
-
-const theme = {
-  tooltip: {
-    position: "absolute",
-    border: "1px solid silver",
-    background: "#f5f5f5"
   }
 }
 

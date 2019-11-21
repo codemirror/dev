@@ -74,33 +74,32 @@ export interface SearchConfig {
   panelKeymap?: Keymap
 }
 
-const panelKeymap = EditorView.extend.behavior<NormalizedKeymap<Command>>()
+const panelKeymap = EditorView.extend.behavior<Keymap, NormalizedKeymap<Command>>({
+  combine(keymaps) {
+    let result = Object.create(null)
+    for (let map of keymaps) for (let prop of Object.keys(map)) result[prop] = map[prop]
+    return new NormalizedKeymap(result)
+  }
+})
 
 /// Create an extension that enables search/replace functionality.
 /// This needs to be enabled for any of the search-related commands to
 /// work.
-export const search = EditorView.extend.unique<SearchConfig>((configs: SearchConfig[]) => {
+export const search = function(config: SearchConfig) {
+  // FIXME make multiple instances of this combine, somehow
   let keys = Object.create(null), panelKeys = Object.create(null)
-  for (let conf of configs) {
-    if (conf.keymap) for (let key of Object.keys(conf.keymap)) {
-      let value = conf.keymap[key]
-      if (keys[key] && keys[key] != value)
-        throw new Error("Conflicting keys for search extension")
-      keys[key] = value
-      panelKeys[key] = value
-    }
-    if (conf.panelKeymap) for (let key of Object.keys(conf.panelKeymap)) {
-      panelKeys[key] = conf.panelKeymap[key]
-    }
+  if (config.keymap) for (let key of Object.keys(config.keymap)) {
+    panelKeys[key] = keys[key] = config.keymap[key]
+  }
+  if (config.panelKeymap) for (let key of Object.keys(config.panelKeymap)) {
+    panelKeys[key] = config.panelKeymap[key]
   }
   return [
     keymap(keys),
-    panelKeymap(new NormalizedKeymap(panelKeys)),
-    searchPlugin.extension,
-    panels(),
-    EditorView.extend.fallback(EditorView.theme(theme))
+    panelKeymap(panelKeys),
+    searchExtension
   ]
-}, {})
+}
 
 function beforeCommand(view: EditorView): boolean | SearchPlugin {
   let plugin = view.plugin(searchPlugin)
@@ -220,7 +219,7 @@ export const openSearchPanel: Command = view => {
   if (!plugin.panel) {
     let panel = buildPanel({
       view,
-      keymap: view.behavior(panelKeymap)[0],
+      keymap: view.behavior(panelKeymap),
       query: plugin.query,
       updateQuery(query: Query) {
         if (!query.eq(plugin.query))
@@ -317,7 +316,7 @@ function buildPanel(conf: {
   return panel
 }
 
-const theme = {
+const theme = EditorView.theme({
   "panel.search": {
     padding: "2px 6px 4px",
     position: "relative",
@@ -347,4 +346,11 @@ const theme = {
   "searchMatch.selected": {
     background: "#fca"
   }
-}
+})
+
+const searchExtension = [
+  searchPlugin.extension,
+  panels(),
+  EditorView.extend.fallback(theme)
+]
+

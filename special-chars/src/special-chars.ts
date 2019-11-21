@@ -17,37 +17,65 @@ export interface SpecialCharConfig {
   addSpecialChars?: RegExp | null
 }
 
+const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
+
+const NAMES: {[key: number]: string} = {
+  0: "null",
+  7: "bell",
+  8: "backspace",
+  10: "newline",
+  11: "vertical tab",
+  13: "carriage return",
+  27: "escape",
+  8203: "zero width space",
+  8204: "zero width non-joiner",
+  8205: "zero width joiner",
+  8206: "left-to-right mark",
+  8207: "right-to-left mark",
+  8232: "line separator",
+  8233: "paragraph separator",
+  65279: "zero width no-break space",
+  65532: "object replacement"
+}
+
+const specialCharConfig = EditorView.extend.behavior<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
+  combine(configs) {
+    // FIXME make configurations compose properly
+    let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
+      render: null,
+      specialChars: SPECIALS,
+      addSpecialChars: null
+    })
+
+    let styles = document.body.style as any
+    config.replaceTabs = (styles.tabSize || styles.MozTabSize) == null
+    if (config.replaceTabs)
+      config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
+
+    if (config.addSpecialChars)
+      config.specialChars = new RegExp(config.specialChars.source + "|" + config.addSpecialChars.source, "gu")
+
+    return config
+  }
+})
+
+const specialCharPlugin = ViewPlugin.create(view => new SpecialCharPlugin(view))
+  .decorations(plugin => plugin.decorations)
+
 /// Returns an extension that installs highlighting of special
 /// characters.
-export const specialChars = EditorView.extend.unique((configs: SpecialCharConfig[]) => {
-  // FIXME make configurations compose properly
-  let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
-    render: null,
-    specialChars: SPECIALS,
-    addSpecialChars: null
-  })
-
-  let styles = document.body.style as any
-  config.replaceTabs = (styles.tabSize || styles.MozTabSize) == null
-  if (config.replaceTabs)
-    config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
-
-  let plugin = ViewPlugin.create(view => new SpecialCharPlugin(view, config))
-    .decorations(plugin => plugin.decorations)
-  return config.replaceTabs ? [plugin.extension, EditorView.styleModule(style)] : plugin.extension
-}, {})
+export function specialChars(config: SpecialCharConfig = {}) {
+  return [specialCharConfig(config), specialCharPlugin.extension, styleExt]
+}
 
 const JOIN_GAP = 10
 
 class SpecialCharPlugin implements ViewPluginValue {
   from = 0
   to = 0
-  specials: RegExp
   decorations: DecorationSet = Decoration.none
 
-  constructor(public view: EditorView, readonly options: Required<SpecialCharConfig> & {replaceTabs?: boolean}) {
-    this.specials = options.specialChars
-    if (options.addSpecialChars) this.specials = new RegExp(this.specials.source + "|" + options.addSpecialChars.source, "gu")
+  constructor(public view: EditorView) {
     this.updateForViewport()
   }
 
@@ -63,10 +91,11 @@ class SpecialCharPlugin implements ViewPluginValue {
 
   closeHoles(ranges: readonly ChangedRange[]) {
     let decorations: Range<Decoration>[] = [], vp = this.view.viewport, replaced: number[] = []
+    let config = this.view.behavior(specialCharConfig)
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]
       // Must redraw all tabs further on the line
-      if (this.options.replaceTabs) to = this.view.state.doc.lineAt(to).end
+      if (config.replaceTabs) to = this.view.state.doc.lineAt(to).end
       while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JOIN_GAP) to = Math.max(to, ranges[++i].toB)
       // Clip to current viewport, to avoid doing work for invisible text
       from = Math.max(vp.from, from); to = Math.min(vp.to, to)
@@ -99,10 +128,12 @@ class SpecialCharPlugin implements ViewPluginValue {
   }
 
   getDecorationsFor(from: number, to: number, target: Range<Decoration>[]) {
+    let config = this.view.behavior(specialCharConfig)
+
     let {doc} = this.view.state
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {
-        while (m = this.specials.exec(cursor.value)) {
+        while (m = config.specialChars.exec(cursor.value)) {
           let code = m[0].codePointAt ? m[0].codePointAt(0) : m[0].charCodeAt(0), widget
           if (code == null) continue
           if (code == 9) {
@@ -110,7 +141,7 @@ class SpecialCharPlugin implements ViewPluginValue {
             let size = this.view.state.tabSize, col = countColumn(doc.slice(line.start, pos + m.index), 0, size)
             widget = new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth)
           } else {
-            widget = new SpecialCharWidget(this.options, code)
+            widget = new SpecialCharWidget(config, code)
           }
           target.push(Decoration.replace(pos + m.index, pos + m.index + m[0].length, {widget}))
         }
@@ -118,27 +149,6 @@ class SpecialCharPlugin implements ViewPluginValue {
       pos += cursor.value.length
     }
   }
-}
-
-const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
-
-const NAMES: {[key: number]: string} = {
-  0: "null",
-  7: "bell",
-  8: "backspace",
-  10: "newline",
-  11: "vertical tab",
-  13: "carriage return",
-  27: "escape",
-  8203: "zero width space",
-  8204: "zero width non-joiner",
-  8205: "zero width joiner",
-  8206: "left-to-right mark",
-  8207: "right-to-left mark",
-  8232: "line separator",
-  8233: "paragraph separator",
-  65279: "zero width no-break space",
-  65532: "object replacement"
 }
 
 // Assigns placeholder characters from the Control Pictures block to
@@ -189,3 +199,4 @@ const style = new StyleModule({
     verticalAlign: "bottom"
   }
 })
+const styleExt = EditorView.styleModule(style)

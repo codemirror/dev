@@ -32,6 +32,9 @@ export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boo
 /// serve as keys to [access](#view.EditorView.plugin) the value of
 /// the plugin.
 export class ViewPlugin<Value extends ViewPluginValue<any>> {
+  /// An extension that can be used to install this plugin in a view.
+  extension: Extension
+
   private constructor(
     /// @internal
     readonly create: (view: EditorView) => Value,
@@ -39,11 +42,8 @@ export class ViewPlugin<Value extends ViewPluginValue<any>> {
     readonly id: number,
     /// @internal
     readonly behaviorExtensions: readonly Extension[]
-  ) {}
-
-  /// An extension that can be used to install this plugin in a view.
-  get extension(): Extension {
-    return [viewPlugin(this), ...this.behaviorExtensions]
+  ) {
+    this.extension = [viewPlugin(this), ...this.behaviorExtensions]
   }
 
   /// Declare a plugin. The `create` function will be called while

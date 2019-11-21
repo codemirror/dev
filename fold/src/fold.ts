@@ -52,21 +52,19 @@ const defaultConfig: Required<FoldConfig> = {
   placeholderText: "…"
 }
 
-const foldConfigBehavior = EditorView.extend.behavior<Required<FoldConfig>, Required<FoldConfig>>({
-  combine(values) { return values.length ? values[0] : defaultConfig }
+const foldConfigBehavior = EditorView.extend.behavior<FoldConfig, Required<FoldConfig>>({
+  combine(values) { return combineConfig(values, defaultConfig) }
 })
-
-;(window as any).beh = foldConfigBehavior
 
 const foldPlugin = ViewPlugin.create(view => new FoldPlugin(view)).decorations(p => p.decorations)
 
-export const codeFolding = EditorView.extend.unique((configs: FoldConfig[]) => {
+export function codeFolding(config: FoldConfig = {}) {
   return [
+    foldConfigBehavior(config),
     foldPlugin.extension,
-    foldConfigBehavior(combineConfig(configs, defaultConfig)),
-    EditorView.extend.fallback(EditorView.theme(defaultStyle))
+    EditorView.extend.fallback(defaultTheme)
   ]
-}, {})
+}
 
 type WidgetConfig = {config: Required<FoldConfig>, class: string}
 
@@ -199,7 +197,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
   ]
 }
 
-const defaultStyle = {
+const defaultTheme = EditorView.theme({
   foldPlaceholder: {
     background: "#eee",
     border: "1px solid silver",
@@ -214,4 +212,4 @@ const defaultStyle = {
     padding: "0 1px",
     cursor: "pointer"
   }
-}
+})

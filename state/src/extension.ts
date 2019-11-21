@@ -1,7 +1,7 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Extension, ExtensionGroup} from "../../extension"
-import {Tree, NodeType, NodeProp} from "lezer-tree"
+import {Tree, NodeProp} from "lezer-tree"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that

@@ -95,32 +95,38 @@ export class Gutter {
   }
 }
 
+const unfixGutters = EditorView.extend.behavior<boolean>()
+
+let viewPlugin = ViewPlugin.create(view => new GutterView(view))
+  .behavior(EditorView.scrollMargins, gutterView => gutterView.scrollMargins())
+
 /// The gutter-drawing plugin is automatically enabled when you add a
 /// gutter, but you can use this function to explicitly configure it.
 ///
 /// Unless `fixed` is explicitly set to `false`, the gutters are
 /// fixed, meaning they don't scroll along with the content
 /// horizontally.
-export const gutters = EditorView.extend.unique((config: {fixed?: boolean}[]): Extension => {
-  let fixed = config.every(c => c.fixed !== false)
-  return [
-    ViewPlugin.create(view => new GutterView(view, {fixed}))
-      .behavior(EditorView.scrollMargins, gutterView => gutterView.scrollMargins())
-      .extension,
-    EditorView.theme(baseTheme)
+export function gutters(config?: {fixed?: boolean}) {
+  let result = [
+    viewPlugin.extension,
+    baseTheme
   ]
-}, {})
+  if (config && config.fixed === false) result.push(unfixGutters(true))
+  return result
+}
 
 class GutterView implements ViewPluginValue {
   gutters: SingleGutterView[]
   dom: HTMLElement
+  fixed: boolean
 
-  constructor(readonly view: EditorView, readonly config: {fixed: boolean}) {
+  constructor(readonly view: EditorView) {
     this.dom = document.createElement("div")
     this.dom.setAttribute("aria-hidden", "true")
     this.gutters = view.behavior(gutterBehavior).map(gutter => new SingleGutterView(view, gutter.config))
     for (let gutter of this.gutters) this.dom.appendChild(gutter.dom)
-    if (config.fixed) {
+    this.fixed = !view.behavior(unfixGutters) // FIXME dynamic?
+    if (this.fixed) {
       // FIXME IE11 fallback, which doesn't support position: sticky,
       // by using position: relative + event handlers that realign the
       // gutter (or just force fixed=false on IE11?)
@@ -156,7 +162,7 @@ class GutterView implements ViewPluginValue {
   }
 
   scrollMargins() {
-    if (this.gutters.length == 0 || !this.config.fixed) return {}
+    if (this.gutters.length == 0 || !this.fixed) return {}
     return getComputedStyle(this.view.scrollDOM).direction == "ltr" ? {left: this.dom.offsetWidth} : {right: this.dom.offsetWidth}
   }
 }
@@ -309,52 +315,62 @@ export type LineNumberMarkerUpdate = {
   filter?: (from: number, to: number, marker: GutterMarker) => boolean
 }
 
+const lineNumberConfig = EditorView.extend.behavior<LineNumberConfig, Required<LineNumberConfig>>({
+  combine(values) {
+    return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, handleDOMEvents: {}}, {
+      handleDOMEvents(a: Handlers, b: Handlers) {
+        let result: Handlers = {}
+        for (let event in a) result[event] = a[event]
+        for (let event in b) {
+          let exists = result[event], add = b[event]
+          result[event] = exists ? (view, line, event) => exists(view, line, event) || add(view, line, event) : add
+        }
+        return result
+      }
+    })
+  }
+})
+
+class NumberMarker extends GutterMarker {
+  constructor(readonly number: number) { super() }
+
+  eq(other: NumberMarker) { return this.number == other.number }
+
+  toDOM(view: EditorView) {
+    let config = view.behavior(lineNumberConfig)
+    return document.createTextNode(config.formatNumber(this.number))
+  }
+}
+
+const lineNumberGutter = new Gutter({
+  style: "lineNumber",
+  updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
+    let ann = update.annotation(lineNumberMarkers)
+    if (ann) markers = markers.update(ann.add || [], ann.filter || null)
+    return markers
+  },
+  lineMarker(view, line, others) {
+    if (others.length) return null
+    // FIXME try to make the line number queries cheaper?
+    return new NumberMarker(view.state.doc.lineAt(line.from).number)
+  },
+  initialSpacer(view: EditorView) {
+    return new NumberMarker(maxLineNumber(view.state.doc.lines))
+  },
+  updateSpacer(spacer: GutterMarker, update: ViewUpdate) {
+    let max = maxLineNumber(update.view.state.doc.lines)
+    return max == (spacer as NumberMarker).number ? spacer : new NumberMarker(max)
+  }
+})
+
 /// Create a line number gutter extension. The order in which the
 /// gutters appear is determined by their extension priority.
-export const lineNumbers = EditorView.extend.unique<LineNumberConfig>(configs => {
-  let config = combineConfig<Required<LineNumberConfig>>(configs, {formatNumber: String, handleDOMEvents: {}}, {
-    handleDOMEvents(a: Handlers, b: Handlers) {
-      let result: Handlers = {}
-      for (let event in a) result[event] = a[event]
-      for (let event in b) {
-        let exists = result[event], add = b[event]
-        result[event] = exists ? (view, line, event) => exists(view, line, event) || add(view, line, event) : add
-      }
-      return result
-    }
-  })
-  class NumberMarker extends GutterMarker {
-    constructor(readonly number: number) { super() }
-
-    eq(other: NumberMarker) { return this.number == other.number }
-
-    toDOM() {
-      return document.createTextNode(config.formatNumber(this.number))
-    }
-  }
-  // FIXME preserve markers across reconfigurations by somehow making
-  // this gutter static
-  return new Gutter({
-    style: "lineNumber",
-    updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
-      let ann = update.annotation(lineNumberMarkers)
-      if (ann) markers = markers.update(ann.add || [], ann.filter || null)
-      return markers
-    },
-    lineMarker(view, line, others) {
-      if (others.length) return null
-      // FIXME try to make the line number queries cheaper?
-      return new NumberMarker(view.state.doc.lineAt(line.from).number)
-    },
-    initialSpacer(view: EditorView) {
-      return new NumberMarker(maxLineNumber(view.state.doc.lines))
-    },
-    updateSpacer(spacer: GutterMarker, update: ViewUpdate) {
-      let max = maxLineNumber(update.view.state.doc.lines)
-      return max == (spacer as NumberMarker).number ? spacer : new NumberMarker(max)
-    }
-  }).extension
-}, {})
+export function lineNumbers(config: LineNumberConfig = {}): Extension {
+  return [
+    lineNumberConfig(config),
+    lineNumberGutter.extension
+  ]
+}
 
 function maxLineNumber(lines: number) {
   let last = 9
@@ -362,7 +378,7 @@ function maxLineNumber(lines: number) {
   return last
 }
 
-const baseTheme = {
+const baseTheme = EditorView.theme({
   gutters: {
     background: "#f5f5f5",
     borderRight: "1px solid silver",
@@ -392,4 +408,4 @@ const baseTheme = {
     textAlign: "right",
     whiteSpace: "nowrap"
   }
-}
+})
