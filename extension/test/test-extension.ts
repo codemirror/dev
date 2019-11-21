@@ -23,10 +23,10 @@ describe("EditorState behavior", () => {
     ist(set.getBehavior(num, v).join(), "5,2,20,40,3,100")
   })
 
-  it("only includes sub-behaviors of unique extensions once", () => {
-    let e = tp.unique<number>(ns => num(ns.reduce((a, b) => a + b, 0)))
-    let set = mk(num(1), e(2), num(4), e(8))
-    ist(set.getBehavior(num, v).join(), "1,10,4")
+  it("only includes duplicated extensions once", () => {
+    let e = num(50)
+    let set = mk(num(1), e, num(4), e)
+    ist(set.getBehavior(num, v).join(), "1,50,4")
   })
 
   it("returns an empty array for absent behavior", () => {
@@ -48,26 +48,16 @@ describe("EditorState behavior", () => {
     ist(set.getBehavior(num, v).join(), "2,1,4")
   })
 
-  it("uses default specs", () => {
-    let e = tp.unique((specs: number[]) => num(specs.reduce((a, b) => a + b)), 10)
-    let set = mk(e(), e(5))
-    ist(set.getBehavior(num, v).join(), "15")
-  })
-
-  it("only allows omitting use argument when there's a default", () => {
-    let e = tp.unique((specs: number[]) => num(0))
-    ist.throws(() => e())
-  })
-
-  it("can reconfigure a named extension", () => {
-    let name = tp.defineName()
-    let set = mk(num(1), name([num(2), num(3)]))
+  it("can replace an extension", () => {
+    let first = [num(2), num(3)]
+    let set = mk(num(1), first)
     ist(set.getBehavior(num, v).join(), "1,2,3")
-    let newSet = set.replaceExtensions([name(tp.override(num(4)))])
+    let second = tp.override(num(4))
+    let newSet = set.replaceExtensions([[first, second]])
     ist(newSet.getBehavior(num, v).join(), "4,1")
     ist(newSet.replaceExtensions([]).getBehavior(num, v).join(), "4,1")
-    ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")
-    ist(newSet.replaceExtensions([name(num(2))]).getBehavior(num, v).join(), "1,2")
+    ist(newSet.replaceExtensions([[second, num(2)]]).getBehavior(num, v).join(), "1,2")
+    ist(newSet.replaceExtensions([[first, num(2)]]).getBehavior(num, v).join(), "4,1")
   })
 
   it("supports dynamic behavior", () => {
