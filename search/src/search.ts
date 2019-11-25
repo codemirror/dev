@@ -2,7 +2,7 @@ import {EditorView, ViewPlugin, Command, ViewUpdate, Decoration} from "../../vie
 import {EditorState, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, PanelSpec, openPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
-import {Text} from "../../text"
+import {Text, isWordChar} from "../../text"
 import {SearchCursor} from "./cursor"
 export {SearchCursor}
 
@@ -125,6 +125,7 @@ export const findNext: Command = view => {
     if (cursor.done) return false
   }
   view.dispatch(view.state.t().setSelection(EditorSelection.single(cursor.value.from, cursor.value.to)).scrollIntoView())
+  maybeAnnounceMatch(view)
   return true
 }
 
@@ -154,6 +155,7 @@ export const findPrevious: Command = view => {
     findPrevInRange(query, state.doc, state.selection.primary.from + 1, state.doc.length)
   if (!range) return false
   view.dispatch(state.t().setSelection(EditorSelection.single(range.from, range.to)).scrollIntoView())
+  maybeAnnounceMatch(view)
   return true
 }
 
@@ -311,9 +313,37 @@ function buildPanel(conf: {
     replaceField,
     elt("button", {name: "replace", onclick: () => replaceNext(conf.view)}, [p("replace")]),
     elt("button", {name: "replaceAll", onclick: () => replaceAll(conf.view)}, [p("replace all")]),
-    elt("button", {name: "close", onclick: () => closeSearchPanel(conf.view), "aria-label": p("close")}, ["×"])
+    elt("button", {name: "close", onclick: () => closeSearchPanel(conf.view), "aria-label": p("close")}, ["×"]),
+    elt("div", {style: "position: absolute; top: -10000px", "aria-live": "polite", "aria-label": p("current match")})
   ])
   return panel
+}
+
+const AnnounceMargin = 30
+
+// FIXME this is a kludge
+function maybeAnnounceMatch(view: EditorView) {
+  let {doc} = view.state, {from, to} = view.state.selection.primary
+  let lineStart = doc.lineAt(from).start, lineEnd = doc.lineAt(to).end
+  let start = Math.max(lineStart, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin)
+  let text = doc.slice(start, end)
+  if (start != lineStart) {
+    for (let i = 0; i < AnnounceMargin; i++) if (isWordChar(text[i + 1]) && !isWordChar(text[i])) {
+      text = text.slice(i)
+      break
+    }
+  }
+  if (end != lineEnd) {
+    for (let i = text.length - 1; i > text.length - AnnounceMargin; i--) if (isWordChar(text[i - 1]) && !isWordChar(text[i])) {
+      text = text.slice(0, i)
+      break
+    }
+  }
+
+  let plugin = view.plugin(searchPlugin)!
+  if (!plugin.panel || !plugin.panel.dom.contains(document.activeElement)) return
+  let live = plugin.panel.dom.querySelector("div[aria-live]")!
+  live.textContent = text
 }
 
 const theme = EditorView.theme({
