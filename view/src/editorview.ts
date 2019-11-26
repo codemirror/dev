@@ -509,12 +509,12 @@ export class EditorView {
   /// or panel blocking them from view).
   static scrollMargins = scrollMargins
 
-  /// Behavior that provides editor DOM attributes for the editor's
-  /// outer element. FIXME move to EditorView?
-  static contentAttributes = contentAttributes
-
   /// Behavior that provides attributes for the editor's editable DOM
   /// element.
+  static contentAttributes = contentAttributes
+
+  /// Behavior that provides editor DOM attributes for the editor's
+  /// outer element.
   static editorAttributes = editorAttributes
 
   /// An annotation that is used as a flag in view updates caused by
