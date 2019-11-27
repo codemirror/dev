@@ -104,12 +104,20 @@ export const search = function(config: SearchConfig) {
 function beforeCommand(view: EditorView): boolean | SearchPlugin {
   let plugin = view.plugin(searchPlugin)
   if (!plugin) return false
-  if (!plugin.panel) {
+  if (!plugin.query.valid) {
     openSearchPanel(view)
     return true
   }
-  if (!plugin.query.valid) return false
   return plugin
+}
+
+function findNextMatch(doc: Text, from: number, query: Query) {
+  let cursor = query.cursor(doc, from).next()
+  if (cursor.done) {
+    cursor = query.cursor(doc, 0, from + query.search.length - 1).next()
+    if (cursor.done) return null
+  }
+  return cursor.value
 }
 
 /// Open the search panel if it isn't already open, and move the
@@ -119,12 +127,10 @@ function beforeCommand(view: EditorView): boolean | SearchPlugin {
 export const findNext: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
-  let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.from + 1).next()
-  if (cursor.done) {
-    cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
-    if (cursor.done) return false
-  }
-  view.dispatch(view.state.t().setSelection(EditorSelection.single(cursor.value.from, cursor.value.to)).scrollIntoView())
+  let {from, to} = view.state.selection.primary
+  let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, plugin.query)
+  if (!next || next.from == from && next.to == to) return false
+  view.dispatch(view.state.t().setSelection(EditorSelection.single(next.from, next.to)).scrollIntoView())
   maybeAnnounceMatch(view)
   return true
 }
@@ -170,19 +176,20 @@ export const selectMatches: Command = view => {
   return true
 }
 
-/// Replace the next instance of the search query.
+/// Replace the current match of the search query.
 export const replaceNext: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
-  let cursor = plugin.query.cursor(view.state.doc, view.state.selection.primary.to).next()
-  if (cursor.done) {
-    cursor = plugin.query.cursor(view.state.doc, 0, view.state.selection.primary.from).next()
-    if (cursor.done) return false
+
+  let next = findNextMatch(view.state.doc, view.state.selection.primary.from, plugin.query)
+  if (!next) return false
+  let {from, to} = view.state.selection.primary, tr = view.state.t()
+  if (next.from == from && next.to == to) {
+    tr.replace(next.from, next.to, plugin.query.replace)
+    next = findNextMatch(tr.doc, tr.changes.mapPos(next.to), plugin.query)
   }
-  view.dispatch(view.state.t()
-                .replace(cursor.value.from, cursor.value.to, plugin.query.replace)
-                .setSelection(EditorSelection.single(cursor.value.from, cursor.value.from + plugin.query.replace.length))
-                .scrollIntoView())
+  if (next) tr.setSelection(EditorSelection.single(next.from, next.to)).scrollIntoView()
+  view.dispatch(tr)
   return true
 }
 
@@ -199,19 +206,6 @@ export const replaceAll: Command = view => {
   if (!tr.docChanged) return false
   view.dispatch(tr)
   return true
-}
-
-/// Default search-related bindings.
-///
-///  * Mod-f: [`findNext`](#search.findNext)
-///  * Mod-h: [`replaceNext`](#search.replaceNext)
-///  * F3: [`findNext`](#search.findNext)
-///  * Shift-F3: [`findPrevious`](#search.findPrevious)
-export const defaultSearchKeymap = {
-  "Mod-f": findNext,
-  "Mod-h": replaceNext,
-  "F3": findNext,
-  "Shift-F3": findPrevious
 }
 
 /// Make sure the search panel is open and focused.
@@ -233,6 +227,17 @@ export const openSearchPanel: Command = view => {
   if (plugin.panel)
     (plugin.panel.dom.querySelector("[name=search]") as HTMLInputElement).select()
   return true
+}
+
+/// Default search-related bindings.
+///
+///  * Mod-f: [`openSearchPanel`](#search.openSearchPanel)
+///  * F3: [`findNext`](#search.findNext)
+///  * Shift-F3: [`findPrevious`](#search.findPrevious)
+export const defaultSearchKeymap = {
+  "Mod-f": openSearchPanel,
+  "F3": findNext,
+  "Shift-F3": findPrevious
 }
 
 /// Close the search panel.
@@ -314,7 +319,7 @@ function buildPanel(conf: {
     elt("button", {name: "replace", onclick: () => replaceNext(conf.view)}, [p("replace")]),
     elt("button", {name: "replaceAll", onclick: () => replaceAll(conf.view)}, [p("replace all")]),
     elt("button", {name: "close", onclick: () => closeSearchPanel(conf.view), "aria-label": p("close")}, ["×"]),
-    elt("div", {style: "position: absolute; top: -10000px", "aria-live": "polite", "aria-label": p("current match")})
+    elt("div", {style: "position: absolute; top: -10000px", "aria-live": "polite"})
   ])
   return panel
 }
@@ -343,7 +348,7 @@ function maybeAnnounceMatch(view: EditorView) {
   let plugin = view.plugin(searchPlugin)!
   if (!plugin.panel || !plugin.panel.dom.contains(document.activeElement)) return
   let live = plugin.panel.dom.querySelector("div[aria-live]")!
-  live.textContent = text
+  live.textContent = view.phrase("current match") + ". " + text
 }
 
 const theme = EditorView.theme({
