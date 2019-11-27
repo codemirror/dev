@@ -190,6 +190,7 @@ export const replaceNext: Command = view => {
   }
   if (next) tr.setSelection(EditorSelection.single(next.from, next.to)).scrollIntoView()
   view.dispatch(tr)
+  if (next) maybeAnnounceMatch(view)
   return true
 }
 
