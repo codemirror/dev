@@ -1,4 +1,5 @@
-import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, ViewUpdate} from "../../view"
+import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
+        WidgetType, ViewUpdate} from "../../view"
 import {Annotation, EditorSelection} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, openPanel} from "../../panel"
@@ -42,7 +43,7 @@ export function closeLintPanel(view: EditorView) {
 
 const LintDelay = 500
 
-export function fullLint(source: (view: EditorView) => readonly Diagnostic[]) {
+export function linter(source: (view: EditorView) => readonly Diagnostic[]) {
   return [
     ViewPlugin.create(view => {
       let lintTime = Date.now() + LintDelay, set = true
@@ -78,10 +79,17 @@ class LintPlugin {
   update(update: ViewUpdate) {
     let diagnostics = update.annotation(setDiagnostics)
     if (diagnostics) {
-      this.diagnostics = Decoration.set(diagnostics.map(d => Decoration.mark(d.from, d.to, {
-        attributes: {class: this.view.cssClass("diagnosticRange." + d.severity)},
-        diagnostic: d
-      } as MarkDecorationSpec)))
+      this.diagnostics = Decoration.set(diagnostics.map(d => {
+        return d.from < d.to
+          ? Decoration.mark(d.from, d.to, {
+            attributes: {class: this.view.cssClass("diagnosticRange." + d.severity)},
+            diagnostic: d
+          } as MarkDecorationSpec)
+          : Decoration.widget(d.from, {
+            widget: new DiagnosticWidget(d),
+            diagnostic: d
+          } as WidgetDecorationSpec)
+      }))
       if (this.panel) this.panel.update(this.diagnostics)
     } else if (update.docChanged) {
       this.diagnostics = this.diagnostics.map(update.changes)
@@ -140,6 +148,14 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
   // FIXME render actions
   // FIXME render source?
   return dom
+}
+
+class DiagnosticWidget extends WidgetType<Diagnostic> {
+  toDOM(view: EditorView) {
+    let elt = document.createElement("span")
+    elt.className = view.cssClass("diagnosticPoint." + this.value.severity)
+    return elt
+  }
 }
 
 class PanelItem {
@@ -278,7 +294,8 @@ class LintPanel {
 
   get activeDiagnostic() {
     let found = this.selectedItem < 0 ? null : this.parent.findDiagnostic(this.items[this.selectedItem].diagnostic)
-    return found ? Decoration.set(Decoration.mark(found.from, found.to, {class: this.view.cssClass("diagnosticRange.active")}))
+    return found && found.to > found.from
+      ? Decoration.set(Decoration.mark(found.from, found.to, {class: this.view.cssClass("diagnosticRange.active")}))
       : Decoration.none
   }
 }
@@ -309,6 +326,27 @@ const defaultTheme = EditorView.theme({
   "diagnosticRange.warning": { backgroundImage: underline("orange") },
   "diagnosticRange.info": { backgroundImage: underline("#999") },
   "diagnosticRange.active": { backgroundColor: "#fec" },
+
+  diagnosticPoint: {
+    position: "relative",
+
+    "&:after": {
+      content: '""',
+      position: "absolute",
+      bottom: 0,
+      left: "-2px",
+      borderLeft: "3px solid transparent",
+      borderRight: "3px solid transparent",
+      borderBottom: "4px solid #d11"
+    }
+  },
+
+  "diagnosticPoint.warning": {
+    "&:after": { borderBottomColor: "orange" }
+  },
+  "diagnosticPoint.info": {
+    "&:after": { borderBottomColor: "#999" }
+  },
 
   "panel.lint": {
     position: "relative",

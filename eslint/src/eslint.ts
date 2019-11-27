@@ -1,8 +1,8 @@
 import Linter from "./eslint4b"
-import {fullLint} from "../../lint"
+import {linter} from "../../lint"
 import {Text} from "../../state"
 
-let linter = new Linter
+let eslint = new Linter
 
 export const defaultConfig: any = {
   parserOptions: {ecmaVersion: 2019},
@@ -10,13 +10,13 @@ export const defaultConfig: any = {
   rules: {}
 }
 
-linter.getRules().forEach((desc: any, name: string) => {
+eslint.getRules().forEach((desc: any, name: string) => {
   if (desc.meta.docs.recommended) defaultConfig.rules[name] = 2
 })
 
 export function esLint(config: any = defaultConfig) {
-  return fullLint(view => linter.verify(view.state.doc.toString(), config)
-                  .map((val: any) => translateDiagnostic(val, view.state.doc)))
+  return linter(view => eslint.verify(view.state.doc.toString(), config)
+                .map((val: any) => translateDiagnostic(val, view.state.doc)))
 }
 
 function mapPos(line: number, col: number, doc: Text) {
