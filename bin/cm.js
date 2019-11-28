@@ -57,7 +57,7 @@ class Pkg {
   rollupConfig(options) {
     return this._rollup || (this._rollup = {
       input: this.entrySource,
-      external(id) { return /eslint4b/.test(id) || id != "tslib" && !/^\.?\//.test(id) },
+      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
       output: [...options.esm ? [{
         format: "esm",
         file: this.esmFile,
@@ -115,7 +115,6 @@ const packages = [
   new Pkg("highlight", {entry: "highlight", dom: true}),
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
   new Pkg("lang-javascript", {entry: "javascript"}),
-  new Pkg("eslint", {entry: "eslint"}),
   new Pkg("lang-css", {entry: "css"}),
   new Pkg("lang-html", {entry: "html"})
 ]

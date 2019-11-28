@@ -1,5 +1,0 @@
-{
-  "main": "dist/index.js",
-  "types": "dist/eslint.d.ts",
-  "module": "dist/index.esm"
-}

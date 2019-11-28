@@ -37,6 +37,7 @@
   "devDependencies": {
     "@types/mocha": "^5.2.0",
     "ecstatic": "^4.1.2",
+    "eslint4b-prebuilt": "^6.7.1",
     "ist": "^1.1.1",
     "mocha": "^5.1.1",
     "moduleserve": "^0.8.5",
