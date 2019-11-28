@@ -5,7 +5,7 @@ import {Text} from "../../state"
 let eslint = new Linter
 
 export const defaultConfig: any = {
-  parserOptions: {ecmaVersion: 2019},
+  parserOptions: {ecmaVersion: 2019, sourceType: "module"},
   env: {browser: true, node: true, es6: true, es2015: true, es2017: true, es2020: true},
   rules: {}
 }
