@@ -139,8 +139,8 @@ export interface FoldGutterConfig {
 }
 
 const foldGutterDefaults: Required<FoldGutterConfig> = {
-  openText: "▼",
-  closedText: "▶"
+  openText: "⌄",
+  closedText: "›"
 }
 
 class FoldMarker extends GutterMarker {
