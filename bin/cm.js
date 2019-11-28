@@ -222,10 +222,12 @@ async function runRollup(config) {
     let dir = path.dirname(output.file)
     await fsp.mkdir(dir, {recursive: true}).catch(() => null)
     for (let file of result.output) {
-      if (!/\.d\.ts$/.test(file.fileName))
-        await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
+      let code = file.code || file.source
+      if (!/\.d\.ts/.test(file.fileName))
+        await fsp.writeFile(path.join(dir, file.fileName), code)
       else if (output.format == "cjs") // Don't double-emit declaration files
-        await maybeWriteFile(path.join(dir, file.fileName), file.code || file.source)
+        await maybeWriteFile(path.join(dir, file.fileName),
+                             /\.d\.ts\.map/.test(file.fileName) ? code.replace(/"sourceRoot":""/, '"sourceRoot":"../.."') : code)
       if (file.map)
         await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
     }

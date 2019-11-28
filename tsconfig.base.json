@@ -8,6 +8,7 @@
     "target": "es6",
     "newLine": "lf",
     "declaration": true,
+    "declarationMap": true,
     "moduleResolution": "node"
   },
   "include": []
