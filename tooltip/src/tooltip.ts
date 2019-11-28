@@ -223,7 +223,7 @@ class TooltipPlugin {
       }
       let width = size.right - size.left, height = size.bottom - size.top
       let align = pos.left + width < measured.innerWidth
-      let above = tooltip.above != null ? tooltip.above : pos.bottom + (size.bottom - size.top) > measured.innerHeight
+      let above = tooltip.above != null ? tooltip.above : pos.bottom * 2 > measured.innerHeight && pos.bottom + (size.bottom - size.top) > measured.innerHeight
       tooltip.dom.style.left = ((align ? pos.left : measured.innerWidth - width) - editor.left) + "px"
       tooltip.dom.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
     }
