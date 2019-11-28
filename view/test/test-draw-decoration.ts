@@ -211,6 +211,12 @@ describe("EditorView decoration", () => {
       cm.dispatch(cm.state.t().replace(1, 1, "\n"))
       ist(cm.contentDOM.querySelectorAll("strong").length, 1)
     })
+
+    it("can remove widgets at the end of a line", () => { // Issue #139
+      let cm = decoEditor("one\ntwo", [w(3, new WordWidget("A"))])
+      cm.dispatch(cm.state.t().annotate(addDeco([w(5, new WordWidget("B"))]), filterDeco(() => false)))
+      ist(cm.contentDOM.querySelectorAll("strong").length, 1)
+    })
   })
 
   describe("replaced", () => {

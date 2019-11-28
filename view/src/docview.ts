@@ -226,7 +226,7 @@ export class DocView extends ContentView {
     if (fromOff > 0) {
       if (!breakAtStart && content.length && before.merge(fromOff, before.length, content[0], false)) {
         before.breakAfter = content.shift()!.breakAfter
-      } else if (fromOff < before.length) {
+      } else if (fromOff < before.length || before.children.length && before.children[before.children.length - 1].length == 0) {
         before.merge(fromOff, before.length, null, false)
       }
       fromI++
