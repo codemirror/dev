@@ -4,8 +4,7 @@ import {Annotation} from "../../state"
 const tooltipPlugin = ViewPlugin.create(view => new TooltipPlugin(view))
 
 /// Supporting extension for displaying tooltips. Allows
-/// [`showTooltip`](#tooltip.showTooltip) and
-/// [`hideTooltip`](#tooltip.hideTooltip) to be used to control
+/// [`showTooltip`](#tooltip.showTooltip) to be used to define
 /// tooltips.
 export function tooltips() {
   return EditorView.extend.fallback(tooltipExt)
