@@ -114,7 +114,7 @@ const packages = [
   new Pkg("lint", {entry: "lint", dom: true}),
   new Pkg("highlight", {entry: "highlight", dom: true}),
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
-  new Pkg("lang-javascript", {entry: "javascript"}),
+  new Pkg("lang-javascript"),
   new Pkg("lang-css", {entry: "css"}),
   new Pkg("lang-html", {entry: "html"})
 ]

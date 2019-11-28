@@ -5,8 +5,6 @@ import {Subtree} from "lezer-tree"
 import {styleTags} from "../../highlight"
 import {CloseBracketData} from "../../closebrackets"
 
-export {esLint} from "./eslint"
-
 const statementIndent = continuedIndent({except: /^{/})
 
 /// A syntax provider based on the [Lezer JavaScript
