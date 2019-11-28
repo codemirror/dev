@@ -116,7 +116,8 @@ const packages = [
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
   new Pkg("lang-javascript"),
   new Pkg("lang-css", {entry: "css"}),
-  new Pkg("lang-html", {entry: "html"})
+  new Pkg("lang-html", {entry: "html"}),
+  new Pkg("autocomplete", {dom: true}),
 ]
 const packageNames = Object.create(null)
 for (let pkg of packages) packageNames[pkg.name] = pkg
