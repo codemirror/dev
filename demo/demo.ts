@@ -14,6 +14,11 @@ import {search, defaultSearchKeymap} from "../search"
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
 
+import {esLint, javascript} from "../lang-javascript"
+// @ts-ignore
+import Linter from "eslint4b-prebuilt"
+import {linter} from "../lint"
+
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
   const {readFile} = require("fs");
@@ -28,6 +33,7 @@ let state = EditorState.create({doc: `<script>
   foldGutter(),
   multipleSelections(),
   html(),
+  linter(esLint(new Linter)),
   search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
   bracketMatching(),
