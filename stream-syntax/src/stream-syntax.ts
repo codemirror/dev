@@ -122,6 +122,8 @@ export class StreamSyntax implements Syntax {
     return field.tree
   }
 
+  get docNodeType() { return typeArray[this.parser.docType] }
+
   languageDataAt<Interface = any>(state: EditorState, pos: number) {
     return (typeArray[this.parser.docType].prop(languageData) || {}) as Interface
   }

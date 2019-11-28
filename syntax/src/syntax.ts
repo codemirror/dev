@@ -43,6 +43,8 @@ export class LezerSyntax implements Syntax {
     return field.tree
   }
 
+  get docNodeType() { return this.parser.group.types[1] }
+
   languageDataAt<Interface = any>(state: EditorState, pos: number) {
     let type = this.parser.group.types[1]
     if (this.parser.hasNested) {

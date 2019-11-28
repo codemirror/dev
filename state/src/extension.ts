@@ -1,7 +1,7 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Extension, ExtensionGroup} from "../../extension"
-import {Tree, NodeProp} from "lezer-tree"
+import {Tree, NodeType, NodeProp} from "lezer-tree"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that
@@ -98,6 +98,9 @@ export interface Syntax {
   /// Get a syntax tree, preferably covering the given range, but less
   /// is also acceptable.
   getPartialTree(state: EditorState, from: number, to: number): Tree
+
+  /// The node type at the root of trees produced by this syntax.
+  docNodeType: NodeType
 
   /// Return the language data object for the given position. This'll
   /// usually be the be the data for the grammar's top node, but with
