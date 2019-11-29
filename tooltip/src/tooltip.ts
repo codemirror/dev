@@ -34,9 +34,12 @@ export interface Tooltip {
   /// to style it as `"tooltip.mine"` instead.
   style?: string
   /// Whether the tooltip should be shown above or below the target
-  /// position. If not specified, it will be shown below unless there
-  /// isn't enough space there.
+  /// position. Defaults to false.
   above?: boolean
+  /// Whether the `above` option should be honored when there isn't
+  /// enough space on that side to show the tooltip inside the
+  /// viewport. Defaults to false.
+  strictSide?: boolean
 }
 
 // Behavior by which an extension can provide a tooltip to be shown.
@@ -222,7 +225,10 @@ class TooltipPlugin {
       }
       let width = size.right - size.left, height = size.bottom - size.top
       let align = pos.left + width < measured.innerWidth
-      let above = tooltip.above != null ? tooltip.above : pos.bottom * 2 > measured.innerHeight && pos.bottom + (size.bottom - size.top) > measured.innerHeight
+      let above = !!tooltip.above
+      if (!tooltip.strictSide &&
+          (above ? pos.top - (size.bottom - size.top) < 0 : pos.bottom + (size.bottom - size.top) > measured.innerHeight))
+        above = !above
       tooltip.dom.style.left = ((align ? pos.left : measured.innerWidth - width) - editor.left) + "px"
       tooltip.dom.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
     }
