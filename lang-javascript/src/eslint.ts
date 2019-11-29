@@ -29,9 +29,9 @@ export function esLint(eslint: any, config?: any) {
   }
 
   function range(state: EditorState, from: number = 0, to: number = state.doc.length) {
-    let fromLine = state.doc.lineAt(from)
+    let fromLine = state.doc.lineAt(from), offset = {line: fromLine.number - 1, col: from - fromLine.start, pos: from}
     return eslint.verify(state.doc.slice(from, to), config)
-      .map((val: any) => translateDiagnostic(val, state.doc, fromLine.number - 1, from - fromLine.start))
+      .map((val: any) => translateDiagnostic(val, state.doc, offset))
   }
 
   return (view: EditorView) => {
@@ -52,17 +52,27 @@ export function esLint(eslint: any, config?: any) {
   }
 }
 
-function mapPos(line: number, col: number, doc: Text, lineOffset: number, colOffset: number) {
-  return doc.line(line + lineOffset).start + col + (line == 1 ? colOffset - 1 : -1)
+function mapPos(line: number, col: number, doc: Text, offset: {line: number, col: number, pos: number}) {
+  return doc.line(line + offset.line).start + col + (line == 1 ? offset.col - 1 : -1)
 }
 
-function translateDiagnostic(input: any, doc: Text, lineOffset: number, colOffset: number): Diagnostic {
-  let start = mapPos(input.line, input.column, doc, lineOffset, colOffset)
-  return {
+function translateDiagnostic(input: any, doc: Text, offset: {line: number, col: number, pos: number}): Diagnostic {
+  let start = mapPos(input.line, input.column, doc, offset)
+  let result: Diagnostic = {
     from: start,
-    to: input.endLine != null ? mapPos(input.endLine, input.endColumn, doc, lineOffset, colOffset) : start,
+    to: input.endLine != null && input.endColumn != 1 ? mapPos(input.endLine, input.endColumn, doc, offset) : start,
     message: input.message,
     source: input.ruleId ? "jshint:" + input.ruleId : "jshint",
-    severity: input.severity == 1 ? "warning" : "error"
-  } // FIXME actions
+    severity: input.severity == 1 ? "warning" : "error",
+  }
+  if (input.fix) {
+    let {range, text} = input.fix, from = range[0] + offset.pos - start, to = range[1] + offset.pos - start
+    result.actions = [{
+      name: "fix",
+      apply(view: EditorView, start: number, end: number) {
+        view.dispatch(view.state.t().replace(Math.min(start + from, end), Math.min(start + to, end), text).scrollIntoView())
+      }
+    }]
+  }
+  return result
 }

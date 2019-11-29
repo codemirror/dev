@@ -172,7 +172,17 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
   let dom = document.createElement("li")
   dom.textContent = diagnostic.message
   dom.className = view.cssClass("diagnostic." + diagnostic.severity)
-  // FIXME render actions
+  if (diagnostic.actions) for (let action of diagnostic.actions) {
+    let button = dom.appendChild(document.createElement("button"))
+    button.className = view.cssClass("diagnosticAction")
+    button.textContent = action.name
+    button.onclick = button.onmousedown = e => {
+      e.preventDefault()
+      let plugin = view.plugin(lintPlugin)
+      let found = plugin && plugin.findDiagnostic(diagnostic)
+      if (found) action.apply(view, found.from, found.to)
+    }
+  }
   // FIXME render source?
   return dom
 }
@@ -343,6 +353,16 @@ const defaultTheme = EditorView.theme({
   "diagnostic.error": { borderLeft: "5px solid #d11" },
   "diagnostic.warning": { borderLeft: "5px solid orange" },
   "diagnostic.info": { borderLeft: "5px solid #999" },
+
+  diagnosticAction: {
+    font: "inherit",
+    border: "none",
+    padding: "2px 4px",
+    background: "#444",
+    color: "white",
+    borderRadius: "3px",
+    marginLeft: "8px"
+  },
 
   diagnosticRange: {
     backgroundPosition: "left bottom",
