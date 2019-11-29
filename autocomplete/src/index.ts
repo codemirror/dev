@@ -138,9 +138,9 @@ class Autocomplete implements ViewPluginValue {
       const ul = this.dom.firstChild as any as HTMLElement
       ul.children[this._state.selected].className = ""
       this._state = this._state.moveSelection(selectionMoved)
-      const li = ul.children[this._state.selected]
+      const li = ul.children[this._state.selected] as HTMLElement
       li.className = "selected"
-      li.scrollIntoView()
+      scrollIntoView(this.dom, li)
       return
     }
 
@@ -204,6 +204,13 @@ class Autocomplete implements ViewPluginValue {
     this.dom = null as any
     this._state = null as any
   }
+}
+
+function scrollIntoView(container: HTMLElement, element: HTMLElement) {
+  let parent = container.getBoundingClientRect()
+  let self = element.getBoundingClientRect()
+  if (self.top < parent.top) container.scrollTop -= parent.top - self.top
+  else if (self.bottom > parent.bottom) container.scrollTop += self.bottom - parent.bottom
 }
 
 const style = EditorView.theme({
