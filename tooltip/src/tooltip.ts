@@ -14,7 +14,8 @@ const theme = EditorView.theme({
   tooltip: {
     position: "absolute",
     border: "1px solid silver",
-    background: "#f5f5f5"
+    background: "#f5f5f5",
+    zIndex: 100
   }
 })
 

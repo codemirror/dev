@@ -29,7 +29,7 @@ class Pkg {
   }
 
   get esmFile() {
-    return path.join(this.dir, "dist", "index.esm")
+    return path.join(this.dir, "dist", "index.es.js")
   }
 
   get cjsFile() {
@@ -247,7 +247,7 @@ function fileTime(path) {
 
 async function rebuild(pkg, options) {
   if (!options.always) {
-    let time = fileTime(pkg.cjsFile)
+    let time = Math.min(fileTime(pkg.cjsFile), options.esm ? fileTime(pkg.esmFile) : Infinity)
     if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
   }
   console.log(`Building ${pkg.name}...`)
