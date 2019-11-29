@@ -137,7 +137,7 @@ const demo = {
         format: "cjs",
         file: this.cjsFile
       }],
-      plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false})]
+      plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false, declarationMap: false})]
     })
   }
 }
@@ -162,7 +162,7 @@ const viewTests = {
         file: this.cjsFile,
         paths: id => id == ".." ? "../../view" : null
       }],
-      plugins: [tsPlugin({lib: ["es6", "dom"], types: ["mocha", "node"], declaration: false})]
+      plugins: [tsPlugin({lib: ["es6", "dom"], types: ["mocha", "node"], declaration: false, declarationMap: false})]
     })
   }
 }
