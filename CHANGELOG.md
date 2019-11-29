@@ -1,3 +1,37 @@
+## 0.3.0 (2019-11-29)
+
+### Breaking changes
+
+Language-wide configuration is no longer stored in per-extension node props, but in a single `languageData` object held in a prop defined in the state package. The `Syntax` method `languageDataAt` is used to read it.
+
+Unique extensions no longer exist. Instead, extensions are deduplicated by identity. Merging configurations for an extension should now be done in a behavior.
+
+### Bug fixes
+
+Fix issue where starting with an empty editor would break height estimates.
+
+Fix an issue where widgets at the end of a line could stay around after being deleted in some cases.
+
+Fix rendering of lines that are empty except for a widget.
+
+### New features
+
+A plugin's `drawMeasured` method may now return true to request another measure/draw cycle.
+
+The editor view now has a `requireMeasure` method to schedule a layout check that'll allow plugins to measure and update the DOM.
+
+The state package now re-exports the `Text` type.
+
+Add an adaptor for connecting ESLint output to the CodeMirror linter package to the lang-javascript package.
+
+The [`tooltip`](https://codemirror.net/6/docs/ref/#tooltip) package provides a way to show tooltip over the editor.
+
+The new [`autocomplete`](https://codemirror.net/6/docs/ref/#autocomplete) package implements an autocompletion interface.
+
+The new [`lint`](https://codemirror.net/6/docs/ref/#lint) package integrates linting with the editor by underlining issues and providing a list of problems that you can scroll through.
+
+The `lang-javascript` package now exports an [`esLint`](https://codemirror.net/6/docs/ref/#lang-javascript.esLint) function that can be used to wire up [ESLint](https://eslint.org/) to the CodeMirror lint integration.
+
 ## 0.2.0 (2019-10-28)
 
 ### Breaking changes

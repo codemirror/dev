@@ -1,6 +1,6 @@
 {
   "name": "@codemirror/next",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Text/code editor component",
   "scripts": {
     "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts extension/test/test-*.ts view/test/test-heightmap.ts lang-javascript/test/test-*.ts closebrackets/test/test-*.ts search/test/test-*.ts",
