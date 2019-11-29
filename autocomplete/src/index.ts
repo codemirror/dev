@@ -28,8 +28,9 @@ export function completeFromSyntax(state: EditorState, pos: number): CompletionR
 export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<CompletionResultItem>) {
   const startMatch = [], inMatch = []
   for (const item of items) {
+    if (item.label == substr) continue
     // FIXME: separate key
-    if (item.label.startsWith(substr)) startMatch.push(item)
+    else if (item.label.startsWith(substr)) startMatch.push(item)
     else if (item.label.includes(substr)) inMatch.push(item)
   }
   return startMatch.concat(inMatch)
