@@ -1,32 +1,55 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
-        WidgetType, ViewUpdate} from "../../view"
+        WidgetType, ViewUpdate, Command} from "../../view"
 import {Annotation, EditorSelection} from "../../state"
+import {Extension} from "../../extension"
 import {hoverTooltip} from "../../tooltip"
 import {panels, openPanel} from "../../panel"
 
+/// Describes a problem or hint for a piece of code.
 export interface Diagnostic {
+  /// The start position of the relevant text.
   from: number
+  /// The end position. May be equal to `from`, though actually
+  /// covering text is preferable.
   to: number
+  /// The severity of the problem. This will influence how it is
+  /// displayed.
   severity: "info" | "warning" | "error"
+  /// An optional source string indicating where the diagnostic is
+  /// coming from. You can put the name of your linter here, if
+  /// applicable.
   source?: string
+  /// The message associated with this diagnostic.
   message: string
+  /// An optional array of actions that can be taken on this
+  /// diagnostic.
   actions?: readonly Action[]
 }
 
+/// An action associated with a diagnostic.
 export interface Action {
+  /// The label to show to the user. Should be relatively short.
   name: string
+  /// The function to call when the user activates this action. Is
+  /// given the diagnostic's _current_ position, which may have
+  /// changed since the creation of the diagnostic due to editing.
   apply: (view: EditorView, from: number, to: number) => void
 }
 
+/// Transaction annotation that is used to update the current set of
+/// diagnostics.
 export const setDiagnostics = Annotation.define<readonly Diagnostic[]>()
 
-export function lint() {
+/// Returns an extension that enables the linting functionality.
+/// Implicitly enabled by the [`linter`](#lint.linter) function.
+export function linting(): Extension {
   return lintExtension
 }
 
 const lintPanel = Annotation.define<boolean>()
 
-export function openLintPanel(view: EditorView) {
+/// Command to open and focus the lint panel.
+export const openLintPanel: Command = (view: EditorView) => {
   let plugin = view.plugin(lintPlugin)
   if (!plugin) return false
   if (!plugin.panel) view.dispatch(view.state.t().annotate(lintPanel(true)))
@@ -34,7 +57,8 @@ export function openLintPanel(view: EditorView) {
   return true
 }
 
-export function closeLintPanel(view: EditorView) {
+/// Command to close the lint panel, when open.
+export const closeLintPanel: Command = (view: EditorView) => {
   let plugin = view.plugin(lintPlugin)
   if (!plugin || !plugin.panel) return false
   view.dispatch(view.state.t().annotate(lintPanel(false)))
@@ -43,7 +67,10 @@ export function closeLintPanel(view: EditorView) {
 
 const LintDelay = 500
 
-export function linter(source: (view: EditorView) => readonly Diagnostic[]) {
+/// Given a diagnostic source, this function returns an extension that
+/// enables linting with that source. It will be called whenever the
+/// editor is idle (after its content changed).
+export function linter(source: (view: EditorView) => readonly Diagnostic[]): Extension {
   return [
     ViewPlugin.create(view => {
       let lintTime = Date.now() + LintDelay, set = true
@@ -66,7 +93,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]) {
         }
       }
     }).extension,
-    lint()
+    linting()
   ]
 }
 

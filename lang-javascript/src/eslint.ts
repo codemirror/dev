@@ -4,6 +4,18 @@ import {EditorView} from "../../view"
 import {javascriptSyntax} from "./javascript"
 import {LezerSyntax} from "../../syntax"
 
+/// Connects an [ESLint](https://eslint.org/) linter to CodeMirror's
+/// [lint](#lint) integration. `eslint` should be an instance of the
+/// [`Linter`](https://eslint.org/docs/developer-guide/nodejs-api#linter)
+/// class, and `config` an optional ESLint configuration. The return
+/// value of this function can be passed to [`linter`](#lint.linter)
+/// to create a JavaScript linting extension.
+///
+/// Note that ESLint targets node, and is tricky to run in the
+/// browser. The [eslint4b](https://github.com/mysticatea/eslint4b)
+/// and
+/// [eslint4b-prebuilt](https://github.com/marijnh/eslint4b-prebuilt/)
+/// packages may help with that.
 export function esLint(eslint: any, config?: any) {
   if (!config) {
     config = {

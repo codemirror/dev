@@ -1,6 +1,4 @@
-@CloseBracketConfig
-
-@closeBracketsNodeProp
+@CloseBracketData
 
 @closeBrackets
 
