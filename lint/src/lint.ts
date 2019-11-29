@@ -190,7 +190,7 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
 class DiagnosticWidget extends WidgetType<Diagnostic> {
   toDOM(view: EditorView) {
     let elt = document.createElement("span")
-    elt.className = view.cssClass("diagnosticPoint." + this.value.severity)
+    elt.className = view.cssClass("lintPoint." + this.value.severity)
     return elt
   }
 }
@@ -308,6 +308,7 @@ class LintPanel {
   }
 
   moveSelection(selectedItem: number) {
+    // FIXME make actions accessible
     if (this.items.length == 0) return
     this.selectedItem = selectedItem
     this.syncSelection()
@@ -332,7 +333,7 @@ class LintPanel {
   get activeDiagnostic() {
     let found = this.selectedItem < 0 ? null : this.parent.findDiagnostic(this.items[this.selectedItem].diagnostic)
     return found && found.to > found.from
-      ? Decoration.set(Decoration.mark(found.from, found.to, {class: this.view.cssClass("diagnosticRange.active")}))
+      ? Decoration.set(Decoration.mark(found.from, found.to, {class: this.view.cssClass("lintRange.active")}))
       : Decoration.none
   }
 }
@@ -364,17 +365,17 @@ const defaultTheme = EditorView.theme({
     marginLeft: "8px"
   },
 
-  diagnosticRange: {
+  lintRange: {
     backgroundPosition: "left bottom",
     backgroundRepeat: "repeat-x"
   },
 
-  "diagnosticRange.error": { backgroundImage: underline("#d11") },
-  "diagnosticRange.warning": { backgroundImage: underline("orange") },
-  "diagnosticRange.info": { backgroundImage: underline("#999") },
-  "diagnosticRange.active": { backgroundColor: "#fec" },
+  "lintRange.error": { backgroundImage: underline("#d11") },
+  "lintRange.warning": { backgroundImage: underline("orange") },
+  "lintRange.info": { backgroundImage: underline("#999") },
+  "lintRange.active": { backgroundColor: "#fec" },
 
-  diagnosticPoint: {
+  lintPoint: {
     position: "relative",
 
     "&:after": {
@@ -388,10 +389,10 @@ const defaultTheme = EditorView.theme({
     }
   },
 
-  "diagnosticPoint.warning": {
+  "lintPoint.warning": {
     "&:after": { borderBottomColor: "orange" }
   },
-  "diagnosticPoint.info": {
+  "lintPoint.info": {
     "&:after": { borderBottomColor: "#999" }
   },
 
