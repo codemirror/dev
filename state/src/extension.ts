@@ -1,6 +1,6 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
-import {Extension, ExtensionGroup} from "../../extension"
+import {Facet} from "./facet"
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
@@ -8,51 +8,10 @@ import {Tree, NodeType, NodeProp} from "lezer-tree"
 /// can be run and tested outside of a browser environment.
 export type StateCommand = (target: {state: EditorState, dispatch: (transaction: Transaction) => void}) => boolean
 
-export const extendState = new ExtensionGroup<EditorState>(state => state.values)
-
-export const stateField = extendState.behavior<StateField<any>>({static: true})
-
-export const allowMultipleSelections = extendState.behavior<boolean, boolean>({
+export const allowMultipleSelections = Facet.define<boolean, boolean>({
   combine: values => values.some(v => v),
   static: true
 })
-
-/// Parameters passed when creating a
-/// [`StateField`](#state.StateField). The `Value` type parameter
-/// refers to the content of the field. Since it will be stored in
-/// (immutable) state objects, it should be an immutable value itself.
-export interface StateFieldSpec<Value> {
-  /// Creates the initial value for the field.
-  init: (state: EditorState) => Value
-  /// Compute a new value from the previous value and a
-  /// [transaction](#state.Transaction).
-  apply: (tr: Transaction, value: Value, newState: EditorState) => Value
-}
-
-/// Fields can store additional information in an editor state, and
-/// keep it in sync with the rest of the state.
-export class StateField<Value> {
-  /// The extension that can be used to
-  /// [attach](#state.EditorStateConfig.extensions) this field to a
-  /// state.
-  readonly extension: Extension
-
-  /// @internal
-  readonly id = extendState.storageID()
-  /// @internal
-  readonly init: (state: EditorState) => Value
-  /// @internal
-  readonly apply: (tr: Transaction, value: Value, state: EditorState) => Value
-
-  /// Declare a field. The field instance is used as the
-  /// [key](#state.EditorState.field) when retrieving the field's
-  /// value from a state.
-  constructor(spec: StateFieldSpec<Value>) {
-    this.init = spec.init
-    this.apply = spec.apply
-    this.extension = stateField(this)
-  }
-}
 
 /// Annotations are tagged values that are used to add metadata to
 /// transactions in an extensible way.
