@@ -1,11 +1,11 @@
 import {Text} from "../../text"
-import {Extension, Configuration} from "../../extension"
-import {Annotation, allowMultipleSelections, extendState} from "./extension"
+import {Annotation, allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
+import {Configuration, Extension} from "./facet"
 
-const enum Flag { SelectionSet = 1, ScrollIntoView = 2, Reconfigure = 4 }
+const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
 
 /// Changes to the editor state are grouped into transactions.
 /// Usually, a user action creates a single transaction, which may
@@ -27,7 +27,7 @@ export class Transaction {
   private _annotations: Annotation<any>[]
   private flags: number = 0
   /// @internal
-  configuration: Configuration<EditorState>
+  configuration: Configuration
   private state: EditorState | null = null
 
   /// @internal
@@ -38,7 +38,7 @@ export class Transaction {
   ) {
     this.selection = startState.selection
     this._annotations = [Transaction.time(time)]
-    this.configuration = startState.configuration
+    this.configuration = startState.config
   }
 
   /// The document at the end of the transaction.
@@ -132,7 +132,7 @@ export class Transaction {
   /// Update the selection.
   setSelection(selection: EditorSelection): Transaction {
     this.ensureOpen()
-    this.selection = this.startState.behavior(allowMultipleSelections) ? selection : selection.asSingle()
+    this.selection = this.startState.facet(allowMultipleSelections) ? selection : selection.asSingle()
     this.flags |= Flag.SelectionSet
     return this
   }
@@ -158,27 +158,16 @@ export class Transaction {
     return (this.flags & Flag.ScrollIntoView) > 0
   }
 
-  /// Replace one or more [named
-  /// extensions](#extension.ExtensionGroup.defineName) with new
-  /// instances, creating a new configuration for the new state.
-  replaceExtensions(replace: readonly [Extension, Extension][]) {
-    this.ensureOpen()
-    this.configuration = this.configuration.replaceExtensions(replace)
-    this.flags |= Flag.Reconfigure
-    return this
-  }
-
   /// Move to an entirely new state configuration.
-  reconfigure(extensions: readonly Extension[]) {
+  reconfigure(extensions: Extension) {
     this.ensureOpen()
-    this.configuration = extendState.resolve(extensions)
-    this.flags |= Flag.Reconfigure
+    this.configuration = Configuration.resolve(extensions)
     return this
   }
 
   /// Indicates whether the transaction reconfigures the state.
   get reconfigured(): boolean {
-    return (this.flags & Flag.Reconfigure) > 0
+    return this.configuration != this.startState.config
   }
 
   private ensureOpen() {
