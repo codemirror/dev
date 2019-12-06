@@ -78,8 +78,9 @@ function windowRect(win: Window): Rect {
           top: 0, bottom: win.innerHeight}
 }
 
+const ScrollSpace = 5
+
 export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
-  let scrollMargin = 5
   let doc = dom.ownerDocument!, win = doc.defaultView!
 
   for (let cur: any = dom.parentNode; cur;) {
@@ -93,19 +94,20 @@ export function scrollRectIntoView(dom: HTMLElement, rect: Rect) {
           continue
         }
         let rect = cur.getBoundingClientRect()
+        // Make sure scrollbar width isn't included in the rectangle
         bounding = {left: rect.left, right: rect.left + cur.clientWidth,
                     top: rect.top, bottom: rect.top + cur.clientHeight}
       }
 
       let moveX = 0, moveY = 0
       if (rect.top < bounding.top)
-        moveY = -(bounding.top - rect.top + scrollMargin)
+        moveY = -(bounding.top - rect.top + ScrollSpace)
       else if (rect.bottom > bounding.bottom)
-        moveY = rect.bottom - bounding.bottom + scrollMargin
+        moveY = rect.bottom - bounding.bottom + ScrollSpace
       if (rect.left < bounding.left)
-        moveX = -(bounding.left - rect.left + scrollMargin)
+        moveX = -(bounding.left - rect.left + ScrollSpace)
       else if (rect.right > bounding.right)
-        moveX = rect.right - bounding.right + scrollMargin
+        moveX = rect.right - bounding.right + ScrollSpace
       if (moveX || moveY) {
         if (top) {
           win.scrollBy(moveX, moveY)
