@@ -9,7 +9,7 @@ import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./
 import {Decoration, DecorationSet, joinRanges, findChangedRanges,
         WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, decorations as decorationsBehavior, scrollMargins, viewPlugin, ViewPluginValue} from "./extension"
+import {ViewUpdate, decorations as decorationsFacet, scrollMargins, ViewPlugin} from "./extension"
 import {EditorView, UpdateState} from "./editorview"
 import {EditorState, ChangedRange} from "../../state"
 import {Text} from "../../text"
@@ -343,9 +343,9 @@ export class DocView extends ContentView {
       // For the composition decoration, use none on init, recompute
       // when handling transactions, and use the previous value
       // otherwise.
-      if (!this.view.inputState.composing) this.compositionDeco = Decoration.none
+      if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
       else if (update && update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, contentChanges)
-      let decorations = this.view.behavior(decorationsBehavior).concat(this.compositionDeco)
+      let decorations = this.state.facet(decorationsFacet).concat(this.compositionDeco)
       // If the decorations are stable, stop.
       if (!update && !initializing && sameArray(decorations, this.decorations)) return contentChanges
       // Compare the decorations (between document changes)
@@ -399,11 +399,7 @@ export class DocView extends ContentView {
 
     if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
 
-    let toMeasure: ViewPluginValue[] = []
-    for (let plugin of this.view.behavior(viewPlugin)) {
-      let value = this.view.plugin(plugin)!
-      if (value.measure && value.drawMeasured) toMeasure.push(value)
-    }
+    let toMeasure: ViewPlugin[] = this.view.plugins.filter(p => p.measure && p.drawMeasured)
 
     let update = false, measure = toMeasure.map(plugin => plugin.measure!())
     for (let i = 0;; i++) {
@@ -434,7 +430,7 @@ export class DocView extends ContentView {
     }
     if (update) {
       this.observer.listenForScroll()
-      this.view.drawPlugins()
+      // FIXME update plugins again?
     }
     this.view.updateState = UpdateState.Idle
   }
@@ -442,7 +438,7 @@ export class DocView extends ContentView {
   scrollPosIntoView(pos: number) {
     let rect = this.coordsAt(pos)
     if (!rect) return
-    let margin = this.view.behavior(scrollMargins)
+    let margin = this.state.facet(scrollMargins)
     scrollRectIntoView(this.dom, {left: rect.left - margin.left, top: rect.top - margin.top,
                                   right: rect.right + margin.right, bottom: rect.bottom + margin.bottom})
   }

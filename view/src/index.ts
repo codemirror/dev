@@ -1,5 +1,5 @@
 export {EditorView, EditorConfig} from "./editorview"
-export {Command, ViewPlugin, DecorationPluginSpec, ViewPluginValue, ViewUpdate} from "./extension"
+export {Command, ViewPlugin, ViewUpdate} from "./extension"
 export {Decoration, DecorationSet, WidgetType,
         MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec, BlockType} from "./decoration"
 export {BlockInfo} from "./heightmap"

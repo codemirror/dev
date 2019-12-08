@@ -1,6 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise} from "../../state"
-import {Extension} from "../../extension"
+import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise, Extension} from "../../state"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
 
@@ -20,7 +19,7 @@ export type StreamParser<State> = {
   /// update its state here if it needs to.
   blankLine?(state: State, editorState: EditorState): void
   /// Produce a start state for the parser.
-  startState?(editorState: EditorState): State
+  startState?(): State
   /// Copy a given state. By default, a shallow object copy is done
   /// which also copies arrays held at the top level of the object.
   copyState?(state: State): State
@@ -38,7 +37,7 @@ class StreamParserInstance<State> {
   token: (stream: StringStream, state: State, editorState: EditorState) => string | null
   blankLine: (state: State, editorState: EditorState) => void
   // FIXME maybe support passing something from the parent when nesting
-  startState: (editorState: EditorState) => State
+  startState: () => State
   copyState: (state: State) => State
   indent: (state: State, textAfter: string, editorState: EditorState) => number
   docType: number
@@ -92,14 +91,14 @@ export class StreamSyntax implements Syntax {
   /// Create a stream syntax.
   constructor(parser: StreamParser<any>) {
     this.parser = new StreamParserInstance(parser)
-    this.field = new StateField<SyntaxState<any>>({
-      init: state => new SyntaxState(Tree.empty, [this.parser.startState(state)], 1, 0, null),
-      apply: (tr, value) => value.apply(tr)
+    this.field = StateField.define<SyntaxState<any>>({
+      create: state => new SyntaxState(Tree.empty, [this.parser.startState()], 1, 0, null),
+      update: (value, tr) => value.apply(tr)
     })
     this.extension = [
-      EditorState.syntax(this),
-      this.field.extension,
-      EditorState.indentation((state: EditorState, pos: number) => {
+      EditorState.syntax.of(this),
+      this.field,
+      EditorState.indentation.of((state: EditorState, pos: number) => {
         return state.field(this.field).getIndent(this.parser, state, pos)
       })
     ]

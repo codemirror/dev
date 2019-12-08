@@ -43,8 +43,8 @@ export class Facet<Input, Output> {
   ): Extension {
     if (this.isStatic) throw new Error("Can't derive a static facet")
     let map = depMap(deps)
-    return new FacetProvider<Input>(depList(deps), this, (values, output) => {
-      map._values = values
+    return new FacetProvider<Input>(depList(deps), this, (state, output) => {
+      map._state = state
       output.push(get(map))
     })
   }
@@ -55,8 +55,8 @@ export class Facet<Input, Output> {
   ) {
     if (this.isStatic) throw new Error("Can't derive a static facet")
     let map = depMap(deps)
-    return new FacetProvider<Input>(depList(deps), this, (values, output) => {
-      map._values = values
+    return new FacetProvider<Input>(depList(deps), this, (state, output) => {
+      map._state = state
       for (let v of get(map)) output.push(v)
     })
   }
@@ -68,12 +68,13 @@ function sameArray<T>(a: readonly T[], b: readonly T[]) {
 
 type Slot<T> = Facet<any, T> | StateField<T>
 
+/// Marks a value as an [`Extension`](#state.Extension).
 declare const isExtension: unique symbol
 
 class FacetProvider<Input> {
   constructor(readonly dependencies: readonly Slot<any>[],
               readonly facet: Facet<Input, any>,
-              readonly get: (values: EditorState, gather: Input[]) => void) {}
+              readonly get: (state: EditorState, gather: Input[]) => void) {}
 
   [isExtension]!: true
 }
@@ -81,11 +82,11 @@ class FacetProvider<Input> {
 export type DepMap<Deps extends {[name: string]: Slot<any>}> = {[id in keyof Deps]: Deps[id] extends Slot<infer T> ? T : never}
 
 function slotGetter(id: number) {
-  return function(this: any) { return this._values.get(id) }
+  return function(this: any) { return this._state.getID(id) }
 }
 
 function slotChanged(id: number) {
-  return function(this: any) { return this._values[id].idHasChanged(id) }
+  return function(this: any) { return this._state[id].idHasChanged(id) }
 }
 
 function depList(deps: {[name: string]: Slot<any>}) {
@@ -132,8 +133,8 @@ export class StateField<Value> {
   private constructor(
     /// @internal
     readonly dependencies: readonly Slot<any>[],
-    private createF: (doc: Text, selection: EditorSelection, values: EditorState) => Value,
-    private readonly updateF: (value: Value, tr: Transaction, values: EditorState) => Value,
+    private createF: (doc: Text, selection: EditorSelection, state: EditorState) => Value,
+    private readonly updateF: (value: Value, tr: Transaction, state: EditorState) => Value,
     private compareF: (a: Value, b: Value) => boolean
   ) {}
 
@@ -150,21 +151,21 @@ export class StateField<Value> {
     let map = depMap(dependencies)
     return <Value>({create, update, compare}: StateFieldSpec<Value, DepMap<Deps>>) => new StateField<Value>(
       depList(dependencies),
-      (doc, sel, values) => { map._values = values; return create(doc, sel, map) },
-      (value, tr, values) => { map._values = values; return update(value, tr, map) },
+      (doc, sel, state) => { map._state = state; return create(doc, sel, map) },
+      (value, tr, state) => { map._state = state; return update(value, tr, map) },
       compare || ((a, b) => a === b)
     )
   }
 
   /// @internal
-  init(values: EditorState, doc: Text, selection: EditorSelection, prev?: EditorState) {
-    values.setID(this.id, prev && prev.config.address[this.id] != null ? prev.getID(this.id) : this.createF(doc, selection, values))
+  init(state: EditorState, doc: Text, selection: EditorSelection, prev?: EditorState) {
+    state.setID(this.id, prev && prev.config.address[this.id] != null ? prev.getID(this.id) : this.createF(doc, selection, state))
   }
 
   /// @internal
-  update(values: EditorState, prev: EditorState, tr: Transaction) {
-    let oldVal = prev.getID(this.id), newVal = this.updateF(oldVal, tr, values)
-    if (!this.compareF(oldVal, newVal)) values.setID(this.id, newVal)
+  update(state: EditorState, prev: EditorState, tr: Transaction) {
+    let oldVal = prev.getID(this.id), newVal = this.updateF(oldVal, tr, state)
+    if (!this.compareF(oldVal, newVal)) state.setID(this.id, newVal)
   }
 
   [isExtension]!: true
@@ -183,21 +184,22 @@ class FacetInstance<Input> {
     this.dependencies = deps
   }
 
-  recompute(values: EditorState) {
+  recompute(state: EditorState) {
     let result: Input[] = []
-    for (let p of this.providers) p.get(values, result)
+    for (let p of this.providers) p.get(state, result)
     return this.facet.combine(result)
   }
 
-  init(values: EditorState) {
-    values.setID(this.id, this.recompute(values))
+  init(state: EditorState) {
+    state.setID(this.id, this.recompute(state))
   }
 
-  update(values: EditorState, prev: EditorState) {
-    if (this.dependencies.some(d => values.idHasChanged(d.id))) {
-      let newVal = this.recompute(values)
+  update(state: EditorState, prev: EditorState) {
+    // FIXME make this more incremental, probably by storing individual provider's values
+    if (this.dependencies.some(d => state.idHasChanged(d.id))) {
+      let newVal = this.recompute(state)
       if (!this.facet.compare(newVal, prev.getID(this.id)))
-        values.setID(this.id, newVal)
+        state.setID(this.id, newVal)
     }
   }
 
@@ -225,10 +227,10 @@ export class Configuration {
               readonly address: {[id: number]: number},
               readonly staticValues: readonly any[]) {}
 
-  init(doc: Text, selection: EditorSelection, prev?: EditorState): EditorState {
-    let values = new EditorState(this, doc, selection, [])
-    for (let slot of this.dynamicSlots) slot.init(values, doc, selection, prev)
-    return values
+  init(doc: Text, selection: EditorSelection, Ctor: typeof EditorState, prev?: EditorState): EditorState {
+    let state = new Ctor(this, doc, selection, [])
+    for (let slot of this.dynamicSlots) slot.init(state, doc, selection, prev)
+    return state
   }
 
   staticFacet<Output>(facet: Facet<any, Output>) {
@@ -236,7 +238,7 @@ export class Configuration {
     return addr == null ? facet.default : this.staticValues[addr >> 1]
   }
 
-  static resolve(extension: Extension) {
+  static resolve(extension: Extension, Ctor: typeof EditorState) {
     let providers: {[id: number]: FacetProvider<any>[]} = Object.create(null)
     let slots: {[id: number]: {value: Slot<any>, deps: Slot<any>[], mark: number}} = Object.create(null)
 
@@ -287,9 +289,9 @@ export class Configuration {
       }
     }
 
-    let tempValues = new EditorState(new Configuration(staticSlots, tempAddress, none), Text.empty, EditorSelection.single(0), [])
-    for (let slot of staticSlots) slot.init(tempValues)
-    return new Configuration(dynamicSlots, address, tempValues.values)
+    let tempState = new Ctor(new Configuration(staticSlots, tempAddress, none), Text.empty, EditorSelection.single(0), [])
+    for (let slot of staticSlots) slot.init(tempState)
+    return new Configuration(dynamicSlots, address, tempState.values)
   }
 }
 

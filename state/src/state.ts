@@ -1,8 +1,8 @@
 import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax, allowMultipleSelections} from "./extension"
-import {Extension, StateField, Facet, Configuration} from "./facet"
+import {Syntax} from "./extension"
+import {Configuration, Facet, Extension, StateField} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -80,8 +80,11 @@ export class EditorState {
 
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
-    let start: EditorState = this, config = tr.configuration
-    if (config != this.config) start = config.init(this.doc, this.selection, this)
+    let start: EditorState = this, config = this.config
+    if (tr.reconfigureExt) {
+      config = Configuration.resolve(tr.reconfigureExt, EditorState)
+      start = config.init(this.doc, this.selection, EditorState, this)
+    }
     let state = new EditorState(config, tr.doc, tr.selection, start.values.slice())
     for (let slot of config.dynamicSlots) slot.update(state, start, tr)
     return state
@@ -147,12 +150,12 @@ export class EditorState {
   /// initializing an editor—updated states are created by applying
   /// transactions.
   static create(config: EditorStateConfig = {}): EditorState {
-    let configuration = Configuration.resolve(config.extensions || [])
+    let configuration = Configuration.resolve(config.extensions || [], EditorState)
     let doc = config.doc instanceof Text ? config.doc
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
     if (!configuration.staticFacet(EditorState.allowMultipleSelections)) selection = selection.asSingle()
-    return configuration.init(doc, selection)
+    return configuration.init(doc, selection, EditorState)
   }
 
   /// A facet that, when enabled, causes the editor to allow multiple
@@ -160,7 +163,10 @@ export class EditorState {
   /// directly, but let a plugin like
   /// [multiple-selections](#multiple-selections) handle it (which
   /// also makes sure the selections are visible in the view).
-  static allowMultipleSelections = allowMultipleSelections
+  static allowMultipleSelections = Facet.define<boolean, boolean>({
+    combine: values => values.some(v => v),
+    static: true
+  })
 
   /// Facet that defines a way to query for automatic indentation
   /// depth at the start of a given line.

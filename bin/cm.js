@@ -300,7 +300,17 @@ class Watcher {
 }
 
 async function build(...args) {
-  for (let pkg of packages) await rebuild(pkg, {esm: true, always: args.includes("--force")})
+  let filter = args.filter(a => a[0] != "-"), always = args.includes("--force")
+  if (filter.length) {
+    let targets = packages.concat([demo, viewTests])
+    for (let name of filter) {
+      let found = targets.find(t => t.name == name)
+      if (!found) throw new Error(`Unknown package ${name}`)
+      await rebuild(found, {esm: !["demo", "view-tests"].includes(name), always})
+    }
+  } else {
+    for (let pkg of packages) await rebuild(pkg, {esm: true, always})
+  }
 }
 
 function startServer() {
@@ -316,7 +326,10 @@ function startServer() {
 async function devServer() {
   startServer()
   let target = packages.concat([demo, viewTests])
-  for (let pkg of target) await rebuild(pkg, {esm: false})
+  for (let pkg of target) {
+    try { await rebuild(pkg, {esm: false}) }
+    catch(e) { console.log(e) }
+  }
   new Watcher(target, {esm: false})
   console.log("Watching...")
 }

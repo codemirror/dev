@@ -1,5 +1,5 @@
-import {EditorState} from "../../state"
-import {ViewPlugin, DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view"
+import {EditorState, StateField, EditorSelection} from "../../state"
+import {DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view"
 import {StyleModule} from "style-mod"
 
 const styles = new StyleModule({
@@ -22,16 +22,20 @@ const styles = new StyleModule({
 
 const rangeConfig = {class: styles.secondarySelection}
 
+const field = StateField.define<DecorationSet>({
+  create(_, selection) {
+    return decorateSelections(selection, rangeConfig)
+  },
+  update(deco, tr) {
+    return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection, rangeConfig) : deco
+  }
+})
+
 const multipleSelectionExtension = [
-  EditorState.allowMultipleSelections(true),
-  ViewPlugin.decoration({
-    create(view) { return decorateSelections(view.state, rangeConfig) },
-    update(deco, {prevState, state}) {
-      return prevState.doc == state.doc && prevState.selection.eq(state.selection)
-        ? deco : decorateSelections(state, rangeConfig)
-    }
-  }),
-  EditorView.styleModule(styles)
+  EditorState.allowMultipleSelections.of(true),
+  field,
+  EditorView.decorations.derive({field}, ({field}) => field),
+  EditorView.styleModule.of(styles)
 ]
 
 /// Returns an extension that enables multiple selections for the
@@ -50,8 +54,8 @@ class CursorWidget extends WidgetType<null> {
   }
 }
 
-function decorateSelections(state: EditorState, rangeConfig: MarkDecorationSpec): DecorationSet {
-  let {ranges, primaryIndex} = state.selection
+function decorateSelections(selection: EditorSelection, rangeConfig: MarkDecorationSpec): DecorationSet {
+  let {ranges, primaryIndex} = selection
   if (ranges.length == 1) return Decoration.none
   let deco = []
   for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {

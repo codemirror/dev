@@ -35,7 +35,7 @@ export function esLint(eslint: any, config?: any) {
   }
 
   return (view: EditorView) => {
-    let [syntax] = view.state.behavior(EditorState.syntax)
+    let [syntax] = view.state.facet(EditorState.syntax)
     if (syntax == javascriptSyntax) return range(view.state)
     if (!syntax || !(syntax instanceof LezerSyntax && syntax.parser.hasNested)) return []
     let found: Diagnostic[] = []

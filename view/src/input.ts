@@ -46,7 +46,7 @@ export class InputState {
   }
 
   ensureHandlers(view: EditorView) {
-    let handlers = view.behavior(handleDOMEvents)
+    let handlers = view.state.facet(handleDOMEvents)
     if (handlers == this.customHandlers ||
         (handlers.length == this.customHandlers.length && handlers.every((h, i) => h == this.customHandlers[i])))
       return
@@ -114,7 +114,7 @@ class MouseSelection {
     doc.addEventListener("mouseup", this.up = this.up.bind(this))
 
     this.extend = event.shiftKey
-    this.multiple = view.state.behavior(EditorState.allowMultipleSelections) && addsSelectionRange(view, event)
+    this.multiple = view.state.facet(EditorState.allowMultipleSelections) && addsSelectionRange(view, event)
     this.dragMove = dragMovesSelection(view, event)
 
     this.startSelection = view.state.selection
@@ -180,13 +180,13 @@ class MouseSelection {
 }
 
 function addsSelectionRange(view: EditorView, event: MouseEvent) {
-  let behavior = view.behavior(clickAddsSelectionRange)
-  return behavior.length ? behavior[0](event) : browser.mac ? event.metaKey : event.ctrlKey
+  let facet = view.state.facet(clickAddsSelectionRange)
+  return facet.length ? facet[0](event) : browser.mac ? event.metaKey : event.ctrlKey
 }
 
 function dragMovesSelection(view: EditorView, event: MouseEvent) {
-  let behavior = view.behavior(dragBehavior)
-  return behavior.length ? behavior[0](event) : browser.mac ? !event.altKey : !event.ctrlKey
+  let facet = view.state.facet(dragBehavior)
+  return facet.length ? facet[0](event) : browser.mac ? !event.altKey : !event.ctrlKey
 }
 
 function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) {
