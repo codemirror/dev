@@ -1,5 +1,5 @@
-import {EditorState, Transaction, StateField, StateCommand, Annotation} from "../../state"
-import {combineConfig, Extension} from "../../extension"
+import {EditorState, Transaction, StateField, StateCommand, Annotation, Facet, Extension} from "../../state"
+import {combineConfig} from "../../extension"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateAnnotation = Annotation.define<HistoryState>()
@@ -15,27 +15,7 @@ export interface HistoryConfig {
   newGroupDelay?: number
 }
 
-const historyField = new StateField({
-  init(editorState: EditorState): HistoryState {
-    return HistoryState.empty
-  },
-
-  apply(tr: Transaction, state: HistoryState, editorState: EditorState): HistoryState {
-    const fromMeta = tr.annotation(historyStateAnnotation)
-    if (fromMeta) return fromMeta
-    if (tr.annotation(closeHistoryAnnotation)) state = state.resetTime()
-    if (!tr.changes.length && !tr.selectionSet) return state
-
-    let config = editorState.behavior(historyConfig)
-    if (tr.annotation(Transaction.addToHistory) !== false)
-      return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
-                              tr.startState.selection, tr.annotation(Transaction.time)!,
-                              tr.annotation(Transaction.userEvent), config.newGroupDelay, config.minDepth)
-    return state.addMapping(tr.changes.desc, config.minDepth)
-  }
-})
-
-const historyConfig = EditorState.extend.behavior<HistoryConfig, Required<HistoryConfig>>({
+const historyConfig = Facet.define<HistoryConfig, Required<HistoryConfig>>({
   combine(configs) {
     return combineConfig(configs, {
       minDepth: 100,
@@ -44,17 +24,36 @@ const historyConfig = EditorState.extend.behavior<HistoryConfig, Required<Histor
   }
 })
 
+const historyField = StateField.defineDeps({historyConfig})({
+  create() {
+    return HistoryState.empty
+  },
+
+  update(state: HistoryState, tr: Transaction, {historyConfig}): HistoryState {
+    const fromMeta = tr.annotation(historyStateAnnotation)
+    if (fromMeta) return fromMeta
+    if (tr.annotation(closeHistoryAnnotation)) state = state.resetTime()
+    if (!tr.changes.length && !tr.selectionSet) return state
+
+    if (tr.annotation(Transaction.addToHistory) !== false)
+      return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
+                              tr.startState.selection, tr.annotation(Transaction.time)!,
+                              tr.annotation(Transaction.userEvent), historyConfig.newGroupDelay, historyConfig.minDepth)
+    return state.addMapping(tr.changes.desc, historyConfig.minDepth)
+  }
+})
+
 /// Create a history extension with the given configuration.
 export function history(config: HistoryConfig = {}): Extension {
   return [
-    historyField.extension,
-    historyConfig(config)
+    historyField,
+    historyConfig.of(config)
   ]
 }
 
 function cmd(target: PopTarget, only: ItemFilter): StateCommand {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let config = state.behavior(historyConfig)
+    let config = state.facet(historyConfig)
     let historyState = state.field(historyField, false)
     if (!historyState || !historyState.canPop(target, only)) return false
     const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)

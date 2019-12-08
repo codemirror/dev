@@ -21,7 +21,7 @@ export const foldCode: Command = view => {
   if (!view.plugin(foldPlugin)) return false
   let fold = []
   for (let line of selectedLines(view)) {
-    let range = view.state.behavior(EditorState.foldable)
+    let range = view.state.facet(EditorState.foldable)
       .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
     if (range) fold.push(range)
   }
@@ -168,7 +168,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
         let plugin = view.plugin(foldPlugin)!
         let folded = plugin.foldInside(line.from, line.to)
         if (folded) return new FoldMarker(fullConfig, false)
-        if (view.state.behavior(EditorState.foldable).some(f => f(view.state, line.from, line.to)))
+        if (view.state.facet(EditorState.foldable).some(f => f(view.state, line.from, line.to)))
           return new FoldMarker(fullConfig, true)
         return null
       },
@@ -183,7 +183,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
             view.dispatch(view.state.t().annotate(foldAnnotation({unfold: [folded]})))
             return true
           }
-          let range = view.state.behavior(EditorState.foldable)
+          let range = view.state.facet(EditorState.foldable)
             .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
           if (range) {
             view.dispatch(view.state.t().annotate(foldAnnotation({fold: [range]})))

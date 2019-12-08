@@ -229,7 +229,7 @@ class Highlighter implements ViewPluginValue {
   decorations = Decoration.none
 
   constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
-    for (let s of view.state.behavior(EditorState.syntax)) {
+    for (let s of view.state.facet(EditorState.syntax)) {
       this.syntax = s
       break
     }

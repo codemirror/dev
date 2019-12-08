@@ -27,7 +27,7 @@ export class Transaction {
   private _annotations: Annotation<any>[]
   private flags: number = 0
   /// @internal
-  configuration: Configuration
+  reconfigureExt: Extension | null = null
   private state: EditorState | null = null
 
   /// @internal
@@ -38,7 +38,6 @@ export class Transaction {
   ) {
     this.selection = startState.selection
     this._annotations = [Transaction.time(time)]
-    this.configuration = startState.config
   }
 
   /// The document at the end of the transaction.
@@ -159,15 +158,15 @@ export class Transaction {
   }
 
   /// Move to an entirely new state configuration.
-  reconfigure(extensions: Extension) {
+  reconfigure(extension: Extension) {
     this.ensureOpen()
-    this.configuration = Configuration.resolve(extensions)
+    this.reconfigureExt = extension
     return this
   }
 
   /// Indicates whether the transaction reconfigures the state.
   get reconfigured(): boolean {
-    return this.configuration != this.startState.config
+    return this.reconfigureExt != null
   }
 
   private ensureOpen() {

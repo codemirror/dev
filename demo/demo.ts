@@ -2,23 +2,23 @@ import {EditorState} from "../state"
 import {EditorView} from "../view"
 import {keymap} from "../keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history"
-import {foldCode, unfoldCode, codeFolding, foldGutter} from "../fold"
-import {lineNumbers} from "../gutter"
+//import {foldCode, unfoldCode, codeFolding, foldGutter} from "../fold"
+//import {lineNumbers} from "../gutter"
 import {baseKeymap, indentSelection} from "../commands"
-import {bracketMatching} from "../matchbrackets"
+//import {bracketMatching} from "../matchbrackets"
 import {closeBrackets} from "../closebrackets"
-import {specialChars} from "../special-chars"
+//import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
-import {search, defaultSearchKeymap} from "../search"
-import {autocomplete, sortAndFilterCompletion} from "../autocomplete"
+//import {search, defaultSearchKeymap} from "../search"
+//import {autocomplete, sortAndFilterCompletion} from "../autocomplete"
 
-import {html} from "../lang-html"
-import {defaultHighlighter} from "../highlight"
+//import {html} from "../lang-html"
+//import {defaultHighlighter} from "../highlight"
 
-import {esLint, javascript} from "../lang-javascript"
+//import {esLint, javascript} from "../lang-javascript"
 // @ts-ignore
-import Linter from "eslint4b-prebuilt"
-import {linter} from "../lint"
+//import Linter from "eslint4b-prebuilt"
+//import {linter} from "../lint"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
@@ -28,18 +28,17 @@ let state = EditorState.create({doc: `<script>
     console.log(data);
   });
 </script>`, extensions: [
-  lineNumbers(),
+//  lineNumbers(),
   history(),
-  specialChars(),
-  foldGutter(),
+//  foldGutter(),
   multipleSelections(),
-  html(),
-  linter(esLint(new Linter)),
-  search({keymap: defaultSearchKeymap}),
-  defaultHighlighter,
-  bracketMatching(),
+//  html(),
+//  linter(esLint(new Linter)),
+//  search({keymap: defaultSearchKeymap}),
+//  defaultHighlighter,
+//  bracketMatching(),
   closeBrackets,
-  autocomplete({completeAt(state: EditorState, pos: number) {
+/*  autocomplete({completeAt(state: EditorState, pos: number) {
     return new Promise(resolve => {
       let syntax = state.behavior(EditorState.syntax)[0]!
       let tree = syntax.getPartialTree(state, pos, pos).resolve(pos, -1)
@@ -70,7 +69,7 @@ let state = EditorState.create({doc: `<script>
         items: sortAndFilterCompletion(state.doc.slice(start, pos), items)
       }), 100)
     })
-  }}),
+  }}),*/
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,
@@ -78,8 +77,8 @@ let state = EditorState.create({doc: `<script>
     [isMac ? "Mod-Shift-u" : "Alt-u"]: redoSelection,
     "Ctrl-y": isMac ? undefined : redo,
     "Shift-Tab": indentSelection,
-    "Mod-Alt-[": foldCode,
-    "Mod-Alt-]": unfoldCode
+//    "Mod-Alt-[": foldCode,
+//    "Mod-Alt-]": unfoldCode
   }),
   keymap(baseKeymap),
 ]})

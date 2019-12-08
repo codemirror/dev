@@ -27,7 +27,7 @@ const defaults = {
 /// after the cursor. When closing a bracket directly in front of that
 /// closing bracket, the cursor moves over the existing bracket. When
 /// backspacing in between brackets, both are removed.
-export const closeBrackets = EditorView.handleDOMEvents({keydown})
+export const closeBrackets = EditorView.handleDOMEvents.of({keydown})
 
 const definedClosing = "()[]{}<>"
 
@@ -38,7 +38,7 @@ function closing(ch: number) {
 }
 
 function config(state: EditorState, pos: number) {
-  let syntax = state.behavior(EditorState.syntax)
+  let syntax = state.facet(EditorState.syntax)
   if (syntax.length == 0) return defaults
   return syntax[0].languageDataAt<CloseBracketData>(state, pos)
 }
@@ -171,7 +171,7 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
 }
 
 function nodeStart(state: EditorState, pos: number) {
-  let syntax = state.behavior(EditorState.syntax)
+  let syntax = state.facet(EditorState.syntax)
   if (syntax.length == 0) return false
   let tree = syntax[0].getPartialTree(state, pos, pos).resolve(pos + 1)
   return tree.parent && tree.start == pos

@@ -1,8 +1,7 @@
 import {Parser, ParseContext, InputStream} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
-import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise} from "../../state"
-import {Extension} from "../../extension"
+import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise, Extension} from "../../state"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
 
@@ -19,11 +18,11 @@ export class LezerSyntax implements Syntax {
   /// method to register CodeMirror-specific syntax node props in the
   /// parser, before passing it to this constructor.
   constructor(readonly parser: Parser) {
-    this.field = new StateField<SyntaxState>({
-      init() { return new SyntaxState(Tree.empty) },
-      apply(tr, value) { return value.apply(tr) }
+    this.field = StateField.define<SyntaxState>({
+      create() { return new SyntaxState(Tree.empty) },
+      update(value, tr) { return value.apply(tr) }
     })
-    this.extension = [EditorState.syntax(this), this.field.extension, syntaxIndentation(this), syntaxFolding(this)]
+    this.extension = [EditorState.syntax.of(this), this.field, syntaxIndentation(this), syntaxFolding(this)]
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {

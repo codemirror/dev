@@ -1,5 +1,4 @@
-import {EditorState, Transaction, CancellablePromise, Annotation} from "../../state"
-import {Configuration, Extension, Behavior} from "../../extension"
+import {EditorState, Transaction, CancellablePromise, Annotation, Extension} from "../../state"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
@@ -9,11 +8,11 @@ import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
-import {extendView, ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
+import {ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, decorations, phrases, scrollMargins,
-        ViewPlugin, ViewPluginValue, notified} from "./extension"
-import {Attrs, updateAttrs} from "./attributes"
+        viewPlugin, ViewPlugin, decorations, phrases, scrollMargins,
+        notified} from "./extension"
+import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
 
@@ -22,9 +21,6 @@ export interface EditorConfig {
   /// The view's initial state. Defaults to an extension-less state
   /// with an empty document.
   state?: EditorState,
-  /// Extra extensions (beyond those associated with the state) to
-  /// use.
-  extensions?: Extension[],
   /// If the view is going to be mounted in a shadow root or document
   /// other than the one held by the global variable `document` (the
   /// default), you should pass it here.
@@ -105,12 +101,8 @@ export class EditorView {
   /// @internal
   readonly docView: DocView
 
-  private extensions: readonly Extension[]
   /// @internal
-  configuration!: Configuration<EditorView>
-
-  /// @internal
-  plugins: {[id: number]: any} = Object.create(null)
+  plugins: ViewPlugin<any>[] = []
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
@@ -122,9 +114,6 @@ export class EditorView {
 
   /// @internal
   waiting: CancellablePromise<any>[] = []
-
-  /// The view extension group, used to define new view extensions.
-  static extend = extendView
 
   /// Construct a new view. You'll usually want to put `view.dom` into
   /// your document after creating a view, so that the user can see
@@ -144,19 +133,12 @@ export class EditorView {
     this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
 
     let state = config.state || EditorState.create()
-    this.extensions = config.extensions || []
-    this.configure(state.configuration.foreign)
-    this.inputState = new InputState(this)
     this.docView.init(state, viewport => {
       this._viewport = viewport
       this._state = state
-      for (let plugin of this.behavior(viewPlugin)) {
-        let exists = this.plugins[plugin.id]
-        if (exists) throw new Error(`Duplicated view plugin${
-          (exists.constructor || Object) != Object && exists.constructor.name ? ` (${exists.constructor.name})` : ''}`)
-        this.plugins[plugin.id] = plugin.create(this)
-      }
+      this.plugins = this.state.facet(viewPlugin).map(create => create(this))
     })
+    this.inputState = new InputState(this)
     this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
@@ -174,16 +156,11 @@ export class EditorView {
     this.updateState = UpdateState.Updating
 
     this.clearWaiting()
-    let state = this.state, prevForeign = state.configuration.foreign
+    let state = this.state
     for (let tr of transactions) {
       if (tr.startState != state)
         throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
       state = tr.apply()
-    }
-    let curForeign = state.configuration.foreign
-    if (curForeign != prevForeign) {
-      this.configure(curForeign)
-      this.updatePlugins()
     }
     let update = transactions.length > 0 || annotations.length > 0 ? new ViewUpdate(this, transactions, annotations) : null
     if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.annotation(Transaction.preserveGoalColumn)))
@@ -191,8 +168,7 @@ export class EditorView {
     this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
     if (update) {
       this.inputState.ensureHandlers(this)
-      this.drawPlugins()
-      if (this.behavior(styleModule) != this.styleModules) this.mountStyles()
+      if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     }
     this.updateAttrs()
     this.updateState = UpdateState.Idle
@@ -215,74 +191,52 @@ export class EditorView {
 
   /// @internal
   updateAttrs() {
-    let editorAttrs = this.behavior(editorAttributes), contentAttrs = this.behavior(contentAttributes)
+    let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
+      class: "codemirror " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") + this.cssClass("wrap")
+    })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
     this.editorAttrs = editorAttrs
+    let contentAttrs = combineAttrs(this.state.facet(contentAttributes), {
+      spellcheck: "false",
+      contenteditable: "true",
+      class: styles.content + " " + this.cssClass("content"),
+      style: `${browser.tabSize}: ${this.state.tabSize}`
+    })
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs
     this.scrollDOM.className = this.cssClass("scroller") + " " + styles.scroller
   }
 
-  private configure(fromState: readonly Extension[]) {
-    this.configuration = extendView.resolve([defaultAttrs].concat(this.extensions).concat(fromState))
-    if (this.configuration.foreign.length) throw new Error("Non-view extensions found in view")
-  }
-
-  private updatePlugins() {
-    let old = this.plugins
-    this.plugins = Object.create(null)
-    for (let plugin of this.behavior(viewPlugin))
-      this.plugins[plugin.id] = Object.prototype.hasOwnProperty.call(old, plugin.id) ? old[plugin.id] : plugin.create(this)
-  }
-
   private mountStyles() {
-    this.styleModules = this.behavior(styleModule)
+    this.styleModules = this.state.facet(styleModule)
     StyleModule.mount(this.root, this.styleModules.concat(styles).reverse())
-  }
-
-  /// @internal
-  drawPlugins() {
-    for (let plugin of this.behavior(viewPlugin)) {
-      let value = this.plugins[plugin.id]
-      if (value.draw) {
-        try { value.draw() }
-        catch(e) { console.error(e) }
-      }
-    }
-    this.updateAttrs()
-  }
-
-  /// Get an instance of the given plugin class, or `undefined` if
-  /// none exists in this view.
-  plugin<T extends ViewPluginValue<any>>(plugin: ViewPlugin<T>): T | undefined {
-    let result = this.plugins[plugin.id]
-    if (result === undefined && this.behavior(viewPlugin).indexOf(plugin) > -1)
-      throw new Error("Accessing a plugin from another plugin with higher precedence")
-    return result
-  }
-
-  /// Get the value of a view behavior.
-  behavior<Output>(behavior: Behavior<any, Output>): Output {
-    return this.configuration.getBehavior(behavior, this)
   }
 
   /// @internal
   updateInner(update: ViewUpdate, viewport: Viewport) {
     this._viewport = viewport
+    let prevSpecs = this.state.facet(viewPlugin), specs = update.state.facet(viewPlugin)
     this._state = update.state
-    // FIXME separate plugins from behavior cache?
-    let oldPlugins = this.plugins
-    this.plugins = Object.create(null)
-    for (let plugin of this.behavior(viewPlugin)) {
-      let value = this.plugins[plugin.id] = oldPlugins[plugin.id]
-      if (value.update) {
-        try {
-          value.update(update)
-        } catch(e) {
-          console.error(e)
-          this.plugins[plugin.id] = {update() {}}
+    // FIXME try/catch and replace crashers with dummy plugins
+    // FIXME get the DOM read/white ordering correct again
+    if (prevSpecs != specs) {
+      let newPlugins = [], reused = []
+      for (let spec of specs) {
+        let found = prevSpecs.indexOf(spec)
+        if (found < 0) {
+          newPlugins.push(spec(this))
+        } else {
+          let plugin = this.plugins[found]
+          reused.push(plugin)
+          if (plugin.update) plugin.update(update)
+          newPlugins.push(plugin)
         }
       }
+      for (let plugin of this.plugins)
+        if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
+      this.plugins = newPlugins
+    } else {
+      for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
     }
   }
 
@@ -295,7 +249,7 @@ export class EditorView {
   /// just `"panel"`. More specific theme styles (with more dots) take
   /// precedence.
   cssClass(selector: string): string {
-    let themes = this.behavior(theme)
+    let themes = this.state.facet(theme)
     if (themes != this.themeCacheFor) {
       this.themeCache = Object.create(null)
       this.themeCacheFor = themes
@@ -320,10 +274,10 @@ export class EditorView {
   }
 
   /// Look up a translation for the given phrase (via the
-  /// [`phrases`](#view.EditorView^phrases) behavior), or return the
+  /// [`phrases`](#view.EditorView^phrases) facet), or return the
   /// original string if no translation is found.
   phrase(phrase: string): string {
-    for (let map of this.behavior(phrases)) {
+    for (let map of this.state.facet(phrases)) {
       if (Object.prototype.hasOwnProperty.call(map, phrase)) return map[phrase]
     }
     return phrase
@@ -444,13 +398,12 @@ export class EditorView {
 
   /// Clean up this editor view, removing its element from the
   /// document, unregistering event handlers, and notifying
-  /// extensions. The view instance can no longer be used after
+  /// plugins. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    for (let plugin of this.behavior(viewPlugin)) {
-      let value = this.plugins[plugin.id]
-      if (value.destroy) {
-        try { value.destroy() }
+    for (let plugin of this.plugins) {
+      if (plugin.destroy) {
+        try { plugin.destroy() }
         catch(e) { console.error(e) }
       }
     }
@@ -459,34 +412,34 @@ export class EditorView {
     this.docView.destroy()
   }
 
-  /// Behavior to add a [style
+  /// Facet to add a [style
   /// module](https://github.com/marijnh/style-mod#readme) to an editor
   /// view. The view will ensure that the module is registered in its
   /// [document root](#view.EditorConfig.root).
   static styleModule = styleModule
 
-  /// Behavior that can be used to add DOM event handlers. The value
+  /// Facet that can be used to add DOM event handlers. The value
   /// should be an object mapping event names to handler functions. The
   /// first such function to return true will be assumed to have handled
   /// that event, and no other handlers or built-in behavior will be
   /// activated for it.
   static handleDOMEvents = handleDOMEvents
 
-  /// Behavior used to configure whether a given selection drag event
+  /// Facet used to configure whether a given selection drag event
   /// should move or copy the selection. The given predicate will be
   /// called with the `mousedown` event, and can return `true` when
   /// the drag should move the content.
   static dragMovesSelection = dragMovesSelection
 
-  /// Behavior used to configure whether a given selecting click adds
+  /// Facet used to configure whether a given selecting click adds
   /// a new range to the existing selection or replaces it entirely.
   static clickAddsSelectionRange = clickAddsSelectionRange
 
-  /// A behavior that determines which [decorations](#view.Decoration)
+  /// A facet that determines which [decorations](#view.Decoration)
   /// are shown in the view.
   static decorations = decorations
 
-  /// Behavior that provides CSS classes to add to elements identified
+  /// Facet that provides CSS classes to add to elements identified
   /// by the given string.
   static theme(spec: {[name: string]: Style}): Extension {
     for (let prop in spec) {
@@ -494,26 +447,26 @@ export class EditorView {
       if (specificity > 0) spec[prop].specificity = specificity
     }
     let module = new StyleModule(spec)
-    return [theme(module), styleModule(module)]
+    return [theme.of(module), styleModule.of(module)]
   }
 
   /// Registers translation phrases. The
   /// [`phrase`](#view.EditorView.phrase) method will look through all
-  /// objects registered with this behavior to find translations for
+  /// objects registered with this facet to find translations for
   /// its argument.
   static phrases = phrases
 
-  /// This behavior can be used to indicate that, when scrolling
+  /// This facet can be used to indicate that, when scrolling
   /// something into view, certain parts at the side of the editor
   /// should be scrolled past (for example because there is a gutter
   /// or panel blocking them from view).
   static scrollMargins = scrollMargins
 
-  /// Behavior that provides attributes for the editor's editable DOM
+  /// Facet that provides attributes for the editor's editable DOM
   /// element.
   static contentAttributes = contentAttributes
 
-  /// Behavior that provides editor DOM attributes for the editor's
+  /// Facet that provides editor DOM attributes for the editor's
   /// outer element.
   static editorAttributes = editorAttributes
 
@@ -522,18 +475,6 @@ export class EditorView {
   /// the view is being focused, `false` when it's losing focus.
   static focusChange = focusChange
 }
-
-const defaultAttrs: Extension = [
-  extendView.dynamic(editorAttributes, view => ({
-    class: "codemirror " + styles.wrapper + (view.hasFocus ? " codemirror-focused " : " ") + view.cssClass("wrap")
-  })),
-  extendView.dynamic(contentAttributes, view => ({
-    spellcheck: "false",
-    contenteditable: "true",
-    class: styles.content + " " + view.cssClass("content"),
-    style: `${browser.tabSize}: ${view.state.tabSize}`
-  }))
-]
 
 let registeredGlobalHandler = false, resizeDebounce = -1
 

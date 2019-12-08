@@ -1,6 +1,6 @@
 import {ViewPlugin, ViewPluginValue, ViewUpdate, EditorView} from "../../view"
-import {Annotation, CancellablePromise, EditorSelection, EditorState, Transaction} from "../../state"
-import {combineConfig, Extension} from "../../extension"
+import {Annotation, CancellablePromise, EditorSelection, EditorState, Transaction, Extension, ve} from "../../state"
+import {combineConfig} from "../../extension"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
@@ -19,7 +19,7 @@ export interface CompletionResultItem {
 }
 
 export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | CancellablePromise<CompletionResult> | null {
-  let syntax = state.behavior(EditorState.syntax)
+  let syntax = state.facet(EditorState.syntax)
   if (syntax.length == 0) return null
   let {completeAt} = syntax[0].languageDataAt<AutocompleteData>(state, pos)
   return completeAt ? completeAt(state, pos) : null
@@ -49,7 +49,7 @@ const autocompleteConfig = EditorView.extend.behavior<Partial<AutocompleteData>,
 export function autocomplete(config: Partial<AutocompleteData> = {}): Extension {
   const autocompletePlugin = ViewPlugin.create(view => new Autocomplete(view))
     .behavior(showTooltip, p => p.tooltip)
-  return [
+  return ve.of([
     autocompleteConfig(config),
     autocompletePlugin.extension,
     EditorView.extend.fallback(style),
@@ -67,8 +67,8 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
         let autocomplete = view.plugin(autocompletePlugin)
         return autocomplete ? autocomplete.accept() : false
       }
-    }),
-  ]
+    })
+  ])
 }
 
 const moveSelection = Annotation.define<-1 | 1>()

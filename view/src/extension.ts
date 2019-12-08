@@ -1,8 +1,7 @@
-import {EditorState, Transaction, ChangeSet, Annotation} from "../../state"
+import {EditorState, Transaction, ChangeSet, Annotation, Facet} from "../../state"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {DecorationSet} from "./decoration"
-import {Extension, Behavior, ExtensionGroup} from "../../extension"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 import {Rect} from "./dom"
@@ -15,78 +14,16 @@ export type Command = (target: EditorView) => boolean
 
 const none: readonly any[] = []
 
-export const extendView = new ExtensionGroup<EditorView>(view => view.plugins)
+export const handleDOMEvents = Facet.define<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
-export const handleDOMEvents = extendView.behavior<{[key: string]: (view: EditorView, event: any) => boolean}>()
+export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boolean>()
 
-export const clickAddsSelectionRange = extendView.behavior<(event: MouseEvent) => boolean>()
-
-export const dragMovesSelection = extendView.behavior<(event: MouseEvent) => boolean>()
+export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
 
 /// View plugins associate stateful values with a view. They can
 /// influence the way the content is drawn, and are notified of things
-/// that happen in the view. They can be combined with [dynamic
-/// behavior](#extension.ExtensionGroup.dynamic) to
-/// [add](#view.EditorView^decorations)
-/// [decorations](#view.Decoration) to the view. Objects of this type
-/// serve as keys to [access](#view.EditorView.plugin) the value of
-/// the plugin.
-export class ViewPlugin<Value extends ViewPluginValue<any>> {
-  /// An extension that can be used to install this plugin in a view.
-  extension: Extension
-
-  private constructor(
-    /// @internal
-    readonly create: (view: EditorView) => Value,
-    /// @internal
-    readonly id: number,
-    /// @internal
-    readonly behaviorExtensions: readonly Extension[]
-  ) {
-    this.extension = [viewPlugin(this), ...this.behaviorExtensions]
-  }
-
-  /// Declare a plugin. The `create` function will be called while
-  /// initializing or reconfiguring an editor view to create the
-  /// actual plugin instance.
-  static create<Value extends ViewPluginValue<any>>(create: (view: EditorView) => Value) {
-    return new ViewPlugin<Value>(create, extendView.storageID(), [])
-  }
-
-  /// Declare a behavior as a function of this plugin. `read` maps
-  /// from the plugin value to the behavior's input type.
-  behavior<Input>(behavior: Behavior<Input, any>, read: (plugin: Value) => Input): ViewPlugin<Value> {
-    return new ViewPlugin<Value>(this.create, this.id, this.behaviorExtensions.concat(
-      extendView.dynamic(behavior, view => read(view.plugin(this)!))
-    ))
-  }
-
-  /// Declare that this plugin provides [decorations](#view.EditorView^decorations).
-  decorations(read: (plugin: Value) => DecorationSet) {
-    return this.behavior(decorations, read)
-  }
-
-  /// Create a view plugin extension that only computes decorations.
-  static decoration(spec: DecorationPluginSpec) {
-    return ViewPlugin.create(view => new DecorationPlugin(view, spec)).decorations(p => p.decorations).extension
-  }
-}
-
-/// See [`ViewPlugin.decoration`](#view.ViewPlugin^decoration).
-export interface DecorationPluginSpec {
-  /// Compute the initial set of decorations.
-  create: (view: EditorView) => DecorationSet,
-  /// Update the decorations for a view update.
-  update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
-  /// When this is true, the set passed to `update` will already have
-  /// been mapped through the transactions in the `ViewUpdate`.
-  map?: boolean
-}
-
-/// This is the interface to which plugins conform. The optional type
-/// parameter is only useful when the plugin needs to
-/// [measure](#view.ViewPluginValue.measure) DOM layout.
-export interface ViewPluginValue<Measure = undefined> {
+/// that happen in the view.
+export interface ViewPlugin<Measure = undefined> {
   /// Notifies the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
@@ -120,43 +57,26 @@ export interface ViewPluginValue<Measure = undefined> {
   destroy?(): void
 }
 
-export const editorAttributes = extendView.behavior<Attrs, Attrs>({
+export const viewPlugin = Facet.define<(view: EditorView) => ViewPlugin<any>>()
+
+export const editorAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
 })
 
-export const contentAttributes = extendView.behavior<Attrs, Attrs>({
+export const contentAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
 })
-
-// Registers view plugins.
-export const viewPlugin = extendView.behavior<ViewPlugin<any>>({static: true})
 
 // Provide decorations
-export const decorations = extendView.behavior<DecorationSet>()
+export const decorations = Facet.define<DecorationSet>()
 
-class DecorationPlugin implements ViewPluginValue {
-  decorations: DecorationSet
+export const styleModule = Facet.define<StyleModule>()
 
-  constructor(view: EditorView, readonly spec: {
-    create: (view: EditorView) => DecorationSet,
-    update: (deco: DecorationSet, update: ViewUpdate) => DecorationSet,
-    map?: boolean
-  }) {
-    this.decorations = spec.create(view)
-  }
+export const theme = Facet.define<StyleModule<{[key: string]: string}>>()
 
-  update(update: ViewUpdate) {
-    this.decorations = this.spec.update(this.spec.map ? this.decorations.map(update.changes) : this.decorations, update)
-  }
-}
+export const phrases = Facet.define<{[key: string]: string}>()
 
-export const styleModule = extendView.behavior<StyleModule>()
-
-export const theme = extendView.behavior<StyleModule<{[key: string]: string}>>()
-
-export const phrases = extendView.behavior<{[key: string]: string}>()
-
-export const scrollMargins = extendView.behavior<{left?: number, top?: number, right?: number, bottom?: number}, Rect>({
+export const scrollMargins = Facet.define<{left?: number, top?: number, right?: number, bottom?: number}, Rect>({
   combine(rects) {
     let result = {left: 0, top: 0, right: 0, bottom: 0}
     for (let r of rects) {
@@ -184,7 +104,6 @@ export class ViewUpdate {
   readonly prevState: EditorState
   /// The previous viewport range.
   readonly prevViewport: Viewport
-  private prevThemes: readonly StyleModule[]
 
   /// @internal
   constructor(
@@ -199,7 +118,6 @@ export class ViewUpdate {
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     this.prevState = view.state
     this.prevViewport = view._viewport
-    this.prevThemes = view.behavior(theme)
   }
 
   /// The new viewport range.
@@ -220,7 +138,7 @@ export class ViewUpdate {
   /// plugins to update [CSS class names](#view.EditorView.cssClass)
   /// on their DOM elements.
   get themeChanged() {
-    return this.prevThemes != this.view.behavior(theme)
+    return this.prevState.facet(theme) != this.view.state.facet(theme)
   }
 
   /// Get the value of the given annotation, if it was passed directly
