@@ -10,8 +10,7 @@ import {BlockInfo} from "./heightmap"
 import {Viewport} from "./viewport"
 import {ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, ViewPlugin, decorations, phrases, scrollMargins,
-        notified} from "./extension"
+        viewPlugin, ViewPlugin, decorations, phrases, notified} from "./extension"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import {styles} from "./styles"
 import browser from "./browser"
@@ -136,7 +135,7 @@ export class EditorView {
     this.docView.init(state, viewport => {
       this._viewport = viewport
       this._state = state
-      this.plugins = this.state.facet(viewPlugin).map(create => create(this))
+      this.plugins = this.state.facet(viewPlugin).map(Ctor => new Ctor(this))
     })
     this.inputState = new InputState(this)
     this.mountStyles()
@@ -221,10 +220,10 @@ export class EditorView {
     // FIXME get the DOM read/white ordering correct again
     if (prevSpecs != specs) {
       let newPlugins = [], reused = []
-      for (let spec of specs) {
-        let found = prevSpecs.indexOf(spec)
+      for (let Ctor of specs) {
+        let found = prevSpecs.indexOf(Ctor)
         if (found < 0) {
-          newPlugins.push(spec(this))
+          newPlugins.push(new Ctor(this))
         } else {
           let plugin = this.plugins[found]
           reused.push(plugin)
@@ -455,12 +454,6 @@ export class EditorView {
   /// objects registered with this facet to find translations for
   /// its argument.
   static phrases = phrases
-
-  /// This facet can be used to indicate that, when scrolling
-  /// something into view, certain parts at the side of the editor
-  /// should be scrolled past (for example because there is a gutter
-  /// or panel blocking them from view).
-  static scrollMargins = scrollMargins
 
   /// Facet that provides attributes for the editor's editable DOM
   /// element.

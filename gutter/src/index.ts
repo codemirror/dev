@@ -1,7 +1,7 @@
-import {combineConfig, fillConfig, Extension} from "../../extension"
-import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, BlockType, BlockInfo} from "../../view"
+import {combineConfig, fillConfig} from "../../extension"
+import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {ChangeSet, MapMode, Annotation} from "../../state"
+import {ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -75,7 +75,7 @@ const defaults = {
   handleDOMEvents: {}
 }
 
-const gutterBehavior = EditorView.extend.behavior<Gutter>()
+const activeGutters = Facet.define<Gutter>()
 
 /// Defines an editor gutter.
 export class Gutter {
@@ -90,15 +90,12 @@ export class Gutter {
   get extension() {
     return [
       gutters(),
-      gutterBehavior(this)
+      activeGutters.of(this)
     ]
   }
 }
 
-const unfixGutters = EditorView.extend.behavior<boolean>()
-
-let viewPlugin = ViewPlugin.create(view => new GutterView(view))
-  .behavior(EditorView.scrollMargins, gutterView => gutterView.scrollMargins())
+const unfixGutters = Facet.define<boolean>()
 
 /// The gutter-drawing plugin is automatically enabled when you add a
 /// gutter, but you can use this function to explicitly configure it.
@@ -108,24 +105,25 @@ let viewPlugin = ViewPlugin.create(view => new GutterView(view))
 /// horizontally.
 export function gutters(config?: {fixed?: boolean}) {
   let result = [
-    viewPlugin.extension,
+    GutterView.extension,
     baseTheme
   ]
-  if (config && config.fixed === false) result.push(unfixGutters(true))
+  if (config && config.fixed === false) result.push(unfixGutters.of(true))
   return result
 }
 
-class GutterView implements ViewPluginValue {
+class GutterView extends ViewPlugin {
   gutters: SingleGutterView[]
   dom: HTMLElement
   fixed: boolean
 
   constructor(readonly view: EditorView) {
+    super()
     this.dom = document.createElement("div")
     this.dom.setAttribute("aria-hidden", "true")
-    this.gutters = view.behavior(gutterBehavior).map(gutter => new SingleGutterView(view, gutter.config))
+    this.gutters = view.state.facet(activeGutters).map(gutter => new SingleGutterView(view, gutter.config))
     for (let gutter of this.gutters) this.dom.appendChild(gutter.dom)
-    this.fixed = !view.behavior(unfixGutters) // FIXME dynamic?
+    this.fixed = !view.state.facet(unfixGutters) // FIXME dynamic?
     if (this.fixed) {
       // FIXME IE11 fallback, which doesn't support position: sticky,
       // by using position: relative + event handlers that realign the
@@ -144,9 +142,6 @@ class GutterView implements ViewPluginValue {
   update(update: ViewUpdate) {
     if (update.themeChanged) this.updateTheme()
     for (let gutter of this.gutters) gutter.update(update)
-  }
-
-  draw() {
     // FIXME would be nice to be able to recognize updates that didn't redraw
     let contexts = this.gutters.map(gutter => new UpdateContext(gutter, this.view.viewport))
     this.view.viewportLines(line => {
@@ -161,8 +156,8 @@ class GutterView implements ViewPluginValue {
     this.dom.style.minHeight = this.view.contentHeight + "px"
   }
 
-  scrollMargins() {
-    if (this.gutters.length == 0 || !this.fixed) return {}
+  get scrollMargins() {
+    if (this.gutters.length == 0 || !this.fixed) return null
     return getComputedStyle(this.view.scrollDOM).direction == "ltr" ? {left: this.dom.offsetWidth} : {right: this.dom.offsetWidth}
   }
 }
@@ -315,7 +310,7 @@ export type LineNumberMarkerUpdate = {
   filter?: (from: number, to: number, marker: GutterMarker) => boolean
 }
 
-const lineNumberConfig = EditorView.extend.behavior<LineNumberConfig, Required<LineNumberConfig>>({
+const lineNumberConfig = Facet.define<LineNumberConfig, Required<LineNumberConfig>>({
   combine(values) {
     return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, handleDOMEvents: {}}, {
       handleDOMEvents(a: Handlers, b: Handlers) {
@@ -337,7 +332,7 @@ class NumberMarker extends GutterMarker {
   eq(other: NumberMarker) { return this.number == other.number }
 
   toDOM(view: EditorView) {
-    let config = view.behavior(lineNumberConfig)
+    let config = view.state.facet(lineNumberConfig)
     return document.createTextNode(config.formatNumber(this.number))
   }
 }
@@ -367,7 +362,7 @@ const lineNumberGutter = new Gutter({
 /// gutters appear is determined by their extension priority.
 export function lineNumbers(config: LineNumberConfig = {}): Extension {
   return [
-    lineNumberConfig(config),
+    lineNumberConfig.of(config),
     lineNumberGutter.extension
   ]
 }

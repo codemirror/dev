@@ -1,7 +1,7 @@
-import {EditorState, Transaction, ChangeSet, Annotation, Facet} from "../../state"
+import {EditorState, Transaction, ChangeSet, Annotation, Facet, Extension} from "../../state"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
-import {DecorationSet} from "./decoration"
+import {Decoration, DecorationSet} from "./decoration"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 import {Rect} from "./dom"
@@ -23,25 +23,19 @@ export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
 /// View plugins associate stateful values with a view. They can
 /// influence the way the content is drawn, and are notified of things
 /// that happen in the view.
-export interface ViewPlugin<Measure = undefined> {
+export class ViewPlugin<Measure = undefined> {
   /// Notifies the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
   /// that may be read by behaviors). It should _not_ change the DOM,
   /// or read the DOM in a way that triggers a layout recomputation.
-  update?(update: ViewUpdate): void
-
-  /// This is called after the view updated (or initialized) its DOM
-  /// structure. It may write to the DOM (outside of the editor
-  /// content). It should not trigger a DOM layout by reading DOM
-  /// positions or dimensions.
-  draw?(): void
+  update(update: ViewUpdate): void {}
 
   /// This will be called in the layout-reading phase of an editor
   /// update. It should, if the plugin needs to read DOM layout
   /// information, do this reading and wrap the information in the
   /// value that it returns. It should not have side effects.
-  measure?(): Measure
+  measure(): Measure { return undefined as any } // FIXME replace with measure-scheduling mechanism
 
   /// If the plugin also has a `measure` method, this method will be
   /// called at the end of the DOM-writing phase after a layout
@@ -50,14 +44,29 @@ export interface ViewPlugin<Measure = undefined> {
   ///
   /// May return `true` to request another cycle of
   /// `measure`/`drawMeasured` calls.
-  drawMeasured?(measured: Measure): boolean
+  drawMeasured(measured: Measure): boolean { return false }
 
   /// Called when the plugin is no longer going to be used. Should
   /// revert any changes the plugin made to the DOM.
-  destroy?(): void
+  destroy(): void {}
+
+  decorations!: DecorationSet
+
+  scrollMargins!: Partial<Rect> | null
+
+  private static _extension: Extension | null = null
+
+  static get extension() {
+    return this._extension || (this._extension = viewPlugin.of(this))
+  }
+
+  // FIXME attrs
 }
 
-export const viewPlugin = Facet.define<(view: EditorView) => ViewPlugin<any>>()
+ViewPlugin.prototype.decorations = Decoration.none
+ViewPlugin.prototype.scrollMargins = null
+
+export const viewPlugin = Facet.define<{new (view: EditorView): ViewPlugin<any>}>()
 
 export const editorAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
@@ -75,19 +84,6 @@ export const styleModule = Facet.define<StyleModule>()
 export const theme = Facet.define<StyleModule<{[key: string]: string}>>()
 
 export const phrases = Facet.define<{[key: string]: string}>()
-
-export const scrollMargins = Facet.define<{left?: number, top?: number, right?: number, bottom?: number}, Rect>({
-  combine(rects) {
-    let result = {left: 0, top: 0, right: 0, bottom: 0}
-    for (let r of rects) {
-      result.left = Math.max(result.left, r.left || 0)
-      result.top = Math.max(result.top, r.top || 0)
-      result.right = Math.max(result.right, r.right || 0)
-      result.bottom = Math.max(result.bottom, r.bottom || 0)
-    }
-    return result
-  }
-})
 
 export const focusChange = Annotation.define<boolean>()
 
