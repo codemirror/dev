@@ -78,6 +78,7 @@ const defaults = {
 const activeGutters = Facet.define<Gutter>()
 
 /// Defines an editor gutter.
+// FIXME replace with a regular extension value
 export class Gutter {
   /// @internal
   config: Required<GutterConfig>
@@ -142,6 +143,7 @@ class GutterView extends ViewPlugin {
   update(update: ViewUpdate) {
     if (update.themeChanged) this.updateTheme()
     for (let gutter of this.gutters) gutter.update(update)
+    // FIXME support gutter reconfiguring
     // FIXME would be nice to be able to recognize updates that didn't redraw
     let contexts = this.gutters.map(gutter => new UpdateContext(gutter, this.view.viewport))
     this.view.viewportLines(line => {
