@@ -60,6 +60,11 @@ export class Facet<Input, Output> {
       for (let v of get(map)) output.push(v)
     })
   }
+
+  static fallback(e: Extension): Extension { return new PrecExtension(e, P.Fallback) }
+  static default(e: Extension): Extension { return new PrecExtension(e, P.Default) }
+  static extend(e: Extension): Extension { return new PrecExtension(e, P.Extend) }
+  static override(e: Extension): Extension { return new PrecExtension(e, P.Override) }
 }
 
 function sameArray<T>(a: readonly T[], b: readonly T[]) {
@@ -208,17 +213,10 @@ class FacetInstance<Input> {
 
 type SlotInstance = StateField<any> | FacetInstance<any>
 
-const enum Prec { Override, Extend, Default, Fallback }
-
-export const prec = {
-  fallback(e: Extension): Extension { return new PrecExtension(e, Prec.Fallback) },
-  default(e: Extension): Extension { return new PrecExtension(e, Prec.Default) },
-  extend(e: Extension): Extension { return new PrecExtension(e, Prec.Extend) },
-  override(e: Extension): Extension { return new PrecExtension(e, Prec.Override) }
-}
+const enum P { Override, Extend, Default, Fallback }
 
 class PrecExtension {
-  constructor(readonly e: Extension, readonly prec: Prec) {}
+  constructor(readonly e: Extension, readonly prec: P) {}
   [isExtension]!: true
 }
 
@@ -297,10 +295,13 @@ export class Configuration {
 
 function flatten(extension: Extension) {
   let result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], []]
-  ;(function inner(ext, prec: Prec) {
+  let seen = new Set<Extension>()
+  ;(function inner(ext, prec: P) {
+    if (seen.has(ext)) return
+    seen.add(ext)
     if (Array.isArray(ext)) for (let e of ext) inner(e, prec)
     else if (ext instanceof PrecExtension) inner(ext.e, ext.prec)
     else result[prec].push(ext as any)
-  })(extension, Prec.Default)
+  })(extension, P.Default)
   return result.reduce((a, b) => a.concat(b))
 }
