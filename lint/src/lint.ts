@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
-        WidgetType, ViewUpdate, Command} from "../../view"
+        WidgetType, ViewUpdate, Command, themeClass} from "../../view"
 import {Annotation, EditorSelection} from "../../state"
 import {Extension} from "../../extension"
 import {hoverTooltip} from "../../tooltip"
@@ -109,7 +109,7 @@ class LintPlugin {
       this.diagnostics = Decoration.set(diagnostics.map(d => {
         return d.from < d.to
           ? Decoration.mark(d.from, d.to, {
-            attributes: {class: this.view.cssClass("diagnosticRange." + d.severity)},
+            attributes: {class: themeClass(this.view.state, "diagnosticRange." + d.severity)},
             diagnostic: d
           } as MarkDecorationSpec)
           : Decoration.widget(d.from, {
@@ -171,10 +171,10 @@ class LintPlugin {
 function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
   let dom = document.createElement("li")
   dom.textContent = diagnostic.message
-  dom.className = view.cssClass("diagnostic." + diagnostic.severity)
+  dom.className = themeClass(view.state, "diagnostic." + diagnostic.severity)
   if (diagnostic.actions) for (let action of diagnostic.actions) {
     let button = dom.appendChild(document.createElement("button"))
-    button.className = view.cssClass("diagnosticAction")
+    button.className = themeClass(view.state, "diagnosticAction")
     button.textContent = action.name
     button.onclick = button.onmousedown = e => {
       e.preventDefault()
@@ -190,7 +190,7 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
 class DiagnosticWidget extends WidgetType<Diagnostic> {
   toDOM(view: EditorView) {
     let elt = document.createElement("span")
-    elt.className = view.cssClass("lintPoint." + this.value.severity)
+    elt.className = themeClass(view.state, "lintPoint." + this.value.severity)
     return elt
   }
 }
@@ -333,7 +333,7 @@ class LintPanel {
   get activeDiagnostic() {
     let found = this.selectedItem < 0 ? null : this.parent.findDiagnostic(this.items[this.selectedItem].diagnostic)
     return found && found.to > found.from
-      ? Decoration.set(Decoration.mark(found.from, found.to, {class: this.view.cssClass("lintRange.active")}))
+      ? Decoration.set(Decoration.mark(found.from, found.to, {class: themeClass(this.view.state, "lintRange.active")}))
       : Decoration.none
   }
 }

@@ -1,8 +1,10 @@
-import {ViewPlugin, ViewPluginValue, ViewUpdate, EditorView} from "../../view"
-import {Annotation, CancellablePromise, EditorSelection, EditorState, Transaction, Extension, ve} from "../../state"
+import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
+import {Annotation, CancellablePromise, EditorSelection, EditorState, Transaction, Extension, StateField, Facet} from "../../state"
 import {combineConfig} from "../../extension"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
+
+// FIXME finish porting this
 
 export interface AutocompleteData {
   completeAt: (state: EditorState, pos: number) => CompletionResult | CancellablePromise<CompletionResult>
@@ -36,7 +38,7 @@ export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<Com
   return startMatch.concat(inMatch)
 }
 
-const autocompleteConfig = EditorView.extend.behavior<Partial<AutocompleteData>, AutocompleteData>({
+const autocompleteConfig = Facet.define<Partial<AutocompleteData>, AutocompleteData>({
   combine(configs) {
     return combineConfig(configs, {
       completeAt(state: EditorState, pos: number) {
@@ -47,12 +49,11 @@ const autocompleteConfig = EditorView.extend.behavior<Partial<AutocompleteData>,
 })
 
 export function autocomplete(config: Partial<AutocompleteData> = {}): Extension {
-  const autocompletePlugin = ViewPlugin.create(view => new Autocomplete(view))
-    .behavior(showTooltip, p => p.tooltip)
-  return ve.of([
-    autocompleteConfig(config),
-    autocompletePlugin.extension,
-    EditorView.extend.fallback(style),
+  return [
+    autocompletionField,
+    autocompleteConfig.of(config),
+    Autocomplete.extension,
+    Facet.fallback(style),
     tooltips(),
     keymap({
       ArrowDown(view: EditorView) {
@@ -68,10 +69,35 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
         return autocomplete ? autocomplete.accept() : false
       }
     })
-  ])
+  ]
 }
 
 const moveSelection = Annotation.define<-1 | 1>()
+
+const autocompletionField = StateField.define<AutocompletionState | null>({
+  dependencies: [autocompleteConfig],
+  create() { return null },
+  update(prev, tr, state) {
+    let selectionMoved = tr.annotation(moveSelection)
+    if (selectionMoved)
+      return prev && prev.moveSelection(selectionMoved)
+
+    if (!tr.docChanged) return tr.selectionSet ? null : prev
+
+    const source = tr.annotation(Transaction.userEvent)
+    if (source != "keyboard" && typeof source != "undefined") return null
+
+    const end = tr.selection.primary.anchor
+    let result = state.facet(autocompleteConfig).completeAt(this.view.state, end)
+    if ("then" in result) {
+      result.then(res => {
+        if (!(result as CancellablePromise<CompletionResult>).canceled) this.handleResult(res, end)
+      })
+      this.view.waitFor(result)
+    } else this.handleResult(result, end)
+    return prev
+  }
+})
 
 class AutocompletionState {
   private constructor(
@@ -116,16 +142,14 @@ class AutocompletionState {
   }
 }
 
-class Autocomplete implements ViewPluginValue {
-  private readonly config: AutocompleteData;
+class Autocomplete extends ViewPlugin {
   private dom: HTMLElement;
   private _state: AutocompletionState | null = null;
 
   get tooltip() { return this._state && this._state.tooltip }
 
-  constructor(
-    private readonly view: EditorView) {
-    this.config = view.behavior(autocompleteConfig)
+  constructor(private readonly view: EditorView) {
+    super()
     this.dom = document.createElement("div")
     const ul = document.createElement("ul")
     ul.setAttribute("role", "listbox")
@@ -157,7 +181,7 @@ class Autocomplete implements ViewPluginValue {
     }
 
     const end = update.state.selection.primary.anchor
-    let result = this.config.completeAt(this.view.state, end)
+    let result = this.view.state.facet(autocompleteConfig).completeAt(this.view.state, end)
     if ("then" in result) {
       result.then(res => {
         if (!(result as CancellablePromise<CompletionResult>).canceled) this.handleResult(res, end)
@@ -199,11 +223,6 @@ class Autocomplete implements ViewPluginValue {
       li.addEventListener("click", e => this._state!.accept(this.view, i))
       ul.appendChild(li)
     }
-  }
-
-  destroy() {
-    this.dom = null as any
-    this._state = null as any
   }
 }
 

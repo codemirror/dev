@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, Command, ViewUpdate, Decoration} from "../../view"
+import {EditorView, ViewPlugin, Command, ViewUpdate, Decoration, themeClass} from "../../view"
 import {EditorState, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, PanelSpec, openPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
@@ -53,7 +53,7 @@ class SearchPlugin {
     while (!cursor.next().done) {
       let {from, to} = cursor.value
       let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
-      deco.push(Decoration.mark(from, to, {class: this.view.cssClass(selected ? "searchMatch.selected" : "searchMatch")}))
+      deco.push(Decoration.mark(from, to, {class: themeClass(this.view.state, selected ? "searchMatch.selected" : "searchMatch")}))
     }
     return Decoration.set(deco)
   }

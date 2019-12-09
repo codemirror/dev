@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
+import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
 
 /// Enables the panel-managing extension.
 export function panels() {
@@ -96,7 +96,7 @@ class Panel {
   }
 
   setTheme(view: EditorView) {
-    this.dom.className = this.baseClass + " " + view.cssClass("panel" + (this.style ? "." + this.style : ""))
+    this.dom.className = this.baseClass + " " + themeClass(view.state, "panel" + (this.style ? "." + this.style : ""))
   }
 }
 
@@ -130,7 +130,7 @@ class PanelGroup {
 
     if (!this.dom) {
       this.dom = document.createElement("div")
-      this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
+      this.dom.className = themeClass(this.view.state, this.top ? "panels.top" : "panels.bottom")
       this.dom.style[this.top ? "top" : "bottom"] = "0"
       this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
     }
@@ -153,7 +153,7 @@ class PanelGroup {
       this.needsSync = false
     }
     if (themeChanged && this.dom) {
-      this.dom.className = this.view.cssClass(this.top ? "panels.top" : "panels.bottom")
+      this.dom.className = themeClass(this.view.state, this.top ? "panels.top" : "panels.bottom")
       for (let panel of this.panels) panel.setTheme(this.view)
     }
   }

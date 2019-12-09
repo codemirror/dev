@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
+import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
 import {Annotation} from "../../state"
 
 const tooltipPlugin = ViewPlugin.create(view => new TooltipPlugin(view))
@@ -180,14 +180,14 @@ class TooltipPlugin {
     if (this.themeChanged) {
       this.themeChanged = false
       for (let tooltip of this.tooltips)
-        tooltip.dom.className = this.view.cssClass("tooltip" + (tooltip.style ? "." + tooltip.style : ""))
+        tooltip.dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
     }
 
     if (!this.mustSync) return
     this.mustSync = false
     for (let tooltip of this.tooltips) {
       if (this.added.indexOf(tooltip.dom) < 0) {
-        tooltip.dom.className = this.view.cssClass("tooltip" + (tooltip.style ? "." + tooltip.style : ""))
+        tooltip.dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
         this.view.dom.appendChild(tooltip.dom)
         this.added.push(tooltip.dom)
       }

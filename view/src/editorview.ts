@@ -13,6 +13,7 @@ import {ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
         viewPlugin, ViewPlugin, decorations, phrases, notified} from "./extension"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import {styles} from "./styles"
+import {themeClass} from "./theme"
 import browser from "./browser"
 
 /// Configuration parameters passed when creating an editor view.
@@ -105,8 +106,6 @@ export class EditorView {
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
-  private themeCache: {[cls: string]: string} = Object.create(null)
-  private themeCacheFor: readonly StyleModule[] = []
 
   /// @internal
   updateState: UpdateState = UpdateState.Updating
@@ -191,19 +190,19 @@ export class EditorView {
   /// @internal
   updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
-      class: "codemirror " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") + this.cssClass("wrap")
+      class: "codemirror " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") + themeClass(this.state, "wrap")
     })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
     this.editorAttrs = editorAttrs
     let contentAttrs = combineAttrs(this.state.facet(contentAttributes), {
       spellcheck: "false",
       contenteditable: "true",
-      class: styles.content + " " + this.cssClass("content"),
+      class: styles.content + " " + themeClass(this.state, "content"),
       style: `${browser.tabSize}: ${this.state.tabSize}`
     })
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs
-    this.scrollDOM.className = this.cssClass("scroller") + " " + styles.scroller
+    this.scrollDOM.className = themeClass(this.state, "scroller") + " " + styles.scroller
   }
 
   private mountStyles() {
@@ -237,39 +236,6 @@ export class EditorView {
     } else {
       for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
     }
-  }
-
-  /// Query the active themes for the CSS class names associated with
-  /// the given name. Names can be single words or words separated by
-  /// dot characters. In the latter case, the returned classes combine
-  /// those that match the full name and those that match some
-  /// prefix—for example `cssClass("panel.search")` will match both
-  /// the theme styles specified as `"panel.search"` and those with
-  /// just `"panel"`. More specific theme styles (with more dots) take
-  /// precedence.
-  cssClass(selector: string): string {
-    let themes = this.state.facet(theme)
-    if (themes != this.themeCacheFor) {
-      this.themeCache = Object.create(null)
-      this.themeCacheFor = themes
-    } else {
-      let known = this.themeCache[selector]
-      if (known != null) return known
-    }
-
-    let result = ""
-    for (let pos = 0;;) {
-      let dot = selector.indexOf(".", pos)
-      let cls = dot < 0 ? selector : selector.slice(0, dot)
-      result += (result ? " " : "") + "codemirror-" + (pos ? cls.replace(/\./g, "-") : cls)
-      for (let theme of themes) {
-        let has = theme[cls]
-        if (has) result += " " + has
-      }
-      if (dot < 0) break
-      pos = dot + 1
-    }
-    return this.themeCache[selector] = result
   }
 
   /// Look up a translation for the given phrase (via the
