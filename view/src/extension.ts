@@ -131,7 +131,7 @@ export class ViewUpdate {
 
   /// Tells you whether the set of active [theme
   /// extensions](#view.EditorView^theme) changed, which may require
-  /// plugins to update [CSS class names](#view.EditorView.cssClass)
+  /// plugins to update [CSS class names](#view.themeClass)
   /// on their DOM elements.
   get themeChanged() {
     return this.prevState.facet(theme) != this.view.state.facet(theme)

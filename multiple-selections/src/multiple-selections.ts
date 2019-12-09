@@ -23,8 +23,8 @@ const styles = new StyleModule({
 const rangeConfig = {class: styles.secondarySelection}
 
 const field = StateField.define<DecorationSet>({
-  create(_, selection) {
-    return decorateSelections(selection, rangeConfig)
+  create(state) {
+    return decorateSelections(state.selection, rangeConfig)
   },
   update(deco, tr) {
     return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection, rangeConfig) : deco
@@ -34,7 +34,7 @@ const field = StateField.define<DecorationSet>({
 const multipleSelectionExtension = [
   EditorState.allowMultipleSelections.of(true),
   field,
-  EditorView.decorations.derive({field}, ({field}) => field),
+  EditorView.decorations.derive([field], s => s.field(field)),
   EditorView.styleModule.of(styles)
 ]
 

@@ -24,22 +24,25 @@ const historyConfig = Facet.define<HistoryConfig, Required<HistoryConfig>>({
   }
 })
 
-const historyField = StateField.defineDeps({historyConfig})({
+const historyField = StateField.define({
+  dependencies: [historyConfig],
+
   create() {
     return HistoryState.empty
   },
 
-  update(state: HistoryState, tr: Transaction, {historyConfig}): HistoryState {
+  update(state: HistoryState, tr: Transaction, newState: EditorState): HistoryState {
     const fromMeta = tr.annotation(historyStateAnnotation)
     if (fromMeta) return fromMeta
     if (tr.annotation(closeHistoryAnnotation)) state = state.resetTime()
     if (!tr.changes.length && !tr.selectionSet) return state
 
+    let config = newState.facet(historyConfig)
     if (tr.annotation(Transaction.addToHistory) !== false)
       return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
                               tr.startState.selection, tr.annotation(Transaction.time)!,
-                              tr.annotation(Transaction.userEvent), historyConfig.newGroupDelay, historyConfig.minDepth)
-    return state.addMapping(tr.changes.desc, historyConfig.minDepth)
+                              tr.annotation(Transaction.userEvent), config.newGroupDelay, config.minDepth)
+    return state.addMapping(tr.changes.desc, config.minDepth)
   }
 })
 

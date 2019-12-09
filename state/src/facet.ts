@@ -37,27 +37,15 @@ export class Facet<Input, Output> {
     return new FacetProvider<Input>(none, this, (_, output) => output.push(value))
   }
 
-  derive<Deps extends {[name: string]: Slot<any>}>(
-    deps: Deps,
-    get: (deps: DepMap<Deps>) => Input
-  ): Extension {
+  derive(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
     if (this.isStatic) throw new Error("Can't derive a static facet")
-    let map = depMap(deps)
-    return new FacetProvider<Input>(depList(deps), this, (state, output) => {
-      map._state = state
-      output.push(get(map))
-    })
+    return new FacetProvider<Input>(deps, this, (state, output) => output.push(get(state)))
   }
 
-  deriveN<Deps extends {[name: string]: Slot<any>}>(
-    deps: Deps,
-    get: (deps: DepMap<Deps>) => readonly Input[]
-  ) {
+  deriveN(deps: readonly Slot<any>[], get: (state: EditorState) => readonly Input[]) {
     if (this.isStatic) throw new Error("Can't derive a static facet")
-    let map = depMap(deps)
-    return new FacetProvider<Input>(depList(deps), this, (state, output) => {
-      map._state = state
-      for (let v of get(map)) output.push(v)
+    return new FacetProvider<Input>(deps, this, (state, output) => {
+      for (let v of get(state)) output.push(v)
     })
   }
 
@@ -84,49 +72,30 @@ class FacetProvider<Input> {
   [isExtension]!: true
 }
 
-export type DepMap<Deps extends {[name: string]: Slot<any>}> = {[id in keyof Deps]: Deps[id] extends Slot<infer T> ? T : never}
-
-function slotGetter(id: number) {
-  return function(this: any) { return this._state.getID(id) }
-}
-
-function slotChanged(id: number) {
-  return function(this: any) { return this._state[id].idHasChanged(id) }
-}
-
-function depList(deps: {[name: string]: Slot<any>}) {
-  let result = []
-  for (let name in deps) result.push(deps[name])
-  return result
-}
-
-function depMap<Deps extends {[name: string]: Slot<any>}>(deps: Deps): any {
-  let map: any = Object.create(null)
-  for (let name in deps) {
-    Object.defineProperty(map, name, {get: slotGetter(deps[name].id)})
-    Object.defineProperty(map, name + "_changed", {get: slotChanged(deps[name].id)})
-  }
-  return map
-}
-
 /// Parameters passed when creating a
 /// [`StateField`](#state.StateField^define). The `Value` type
 /// parameter refers to the content of the field. Since it will be
 /// stored in (immutable) state objects, it should be an immutable
 /// value itself. The `Deps` type parameter is used only for fields
 /// with [dependencies](#state.StateField^defineDeps).
-export type StateFieldSpec<Value, Deps> = {
+export type StateFieldSpec<Value> = {
+  /// The facets and fields that this field's `create` and `update`
+  /// methods read. It is important to specify all such inputs, so
+  /// that the library can schedule the computation of fields and
+  /// facets in the right order.
+  dependencies?: readonly Slot<any>[]
+
   /// Creates the initial value for the field when a state is created.
-  create: (doc: Text, sel: EditorSelection, deps: Deps) => Value,
+  create: (state: EditorState) => Value,
 
   /// Compute a new value from the field's previous value and a
   /// [transaction](#state.Transaction).
-  update: (value: Value, transaction: Transaction, deps: Deps) => Value,
+  update: (value: Value, transaction: Transaction, newState: EditorState) => Value,
 
   /// Compare two values of the field, returning `true` when they are
   /// the same. This is used to avoid recomputing facets that depend
   /// on the field when its value did not change.
-  compare?: (a: Value, b: Value) => boolean
+  compare?: (a: Value, b: Value) => boolean,
 }
 
 /// Fields can store additional information in an editor state, and
@@ -138,33 +107,21 @@ export class StateField<Value> {
   private constructor(
     /// @internal
     readonly dependencies: readonly Slot<any>[],
-    private createF: (doc: Text, selection: EditorSelection, state: EditorState) => Value,
+    private createF: (state: EditorState) => Value,
     private readonly updateF: (value: Value, tr: Transaction, state: EditorState) => Value,
     private compareF: (a: Value, b: Value) => boolean
   ) {}
 
   /// Define a state field.
-  static define<Value>(config: StateFieldSpec<Value, {}>): StateField<Value> {
-    return new StateField<Value>(none, config.create, config.update,
+  static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
+    return new StateField<Value>(config.dependencies || none,
+                                 config.create, config.update,
                                  config.compare || ((a, b) => a === b))
   }
 
-  /// Define a state field that depends on other fields or facets.
-  /// These must be explicitly defined to make sure that fields and
-  /// facets are computed in the correct order.
-  static defineDeps<Deps extends {[name: string]: Slot<any>}>(dependencies: Deps) {
-    let map = depMap(dependencies)
-    return <Value>({create, update, compare}: StateFieldSpec<Value, DepMap<Deps>>) => new StateField<Value>(
-      depList(dependencies),
-      (doc, sel, state) => { map._state = state; return create(doc, sel, map) },
-      (value, tr, state) => { map._state = state; return update(value, tr, map) },
-      compare || ((a, b) => a === b)
-    )
-  }
-
   /// @internal
-  init(state: EditorState, doc: Text, selection: EditorSelection, prev?: EditorState) {
-    state.setID(this.id, prev && prev.config.address[this.id] != null ? prev.getID(this.id) : this.createF(doc, selection, state))
+  init(state: EditorState, prev?: EditorState) {
+    state.setID(this.id, prev && prev.config.address[this.id] != null ? prev.getID(this.id) : this.createF(state))
   }
 
   /// @internal
@@ -211,7 +168,7 @@ class FacetInstance<Input> {
   get id() { return this.facet.id }
 }
 
-type SlotInstance = StateField<any> | FacetInstance<any>
+export type SlotInstance = StateField<any> | FacetInstance<any>
 
 const enum P { Override, Extend, Default, Fallback }
 
@@ -219,23 +176,17 @@ class PrecExtension {
   constructor(readonly e: Extension, readonly prec: P) {}
   [isExtension]!: true
 }
-
 export class Configuration {
   constructor(readonly dynamicSlots: SlotInstance[],
               readonly address: {[id: number]: number},
               readonly staticValues: readonly any[]) {}
-
-  init(doc: Text, selection: EditorSelection, Ctor: typeof EditorState, prev?: EditorState): EditorState {
-    let state = new Ctor(this, doc, selection, [])
-    for (let slot of this.dynamicSlots) slot.init(state, doc, selection, prev)
-    return state
-  }
 
   staticFacet<Output>(facet: Facet<any, Output>) {
     let addr = this.address[facet.id]
     return addr == null ? facet.default : this.staticValues[addr >> 1]
   }
 
+  // Passing `EditorState` as a value here to avoid a cyclic dependency issue
   static resolve(extension: Extension, Ctor: typeof EditorState) {
     let providers: {[id: number]: FacetProvider<any>[]} = Object.create(null)
     let slots: {[id: number]: {value: Slot<any>, deps: Slot<any>[], mark: number}} = Object.create(null)
@@ -288,7 +239,7 @@ export class Configuration {
     }
 
     let tempState = new Ctor(new Configuration(staticSlots, tempAddress, none), Text.empty, EditorSelection.single(0), [])
-    for (let slot of staticSlots) slot.init(tempState)
+      .initSlots(staticSlots)
     return new Configuration(dynamicSlots, address, tempState.values)
   }
 }

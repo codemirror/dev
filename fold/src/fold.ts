@@ -1,5 +1,5 @@
 import {EditorState, Annotation, Facet, StateField} from "../../state"
-import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType} from "../../view"
+import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
 import {combineConfig, fillConfig} from "../../extension"
 import {Gutter, GutterMarker} from "../../gutter"
 
@@ -17,11 +17,11 @@ function selectedLines(view: EditorView) {
   return lines
 }
 
-const foldState = StateField.defineDeps({})<DecorationSet>({
+const foldState = StateField.define<DecorationSet>({
   create() {
     return Decoration.none
   },
-  update(folded, tr, {}) {
+  update(folded, tr) {
     folded = folded.map(tr.changes)
     let ann = tr.annotation(foldAnnotation)
     if (ann) {
@@ -102,7 +102,7 @@ class FoldWidget extends WidgetType<null> {
     // FIXME should this have a role? does it make sense to allow focusing by keyboard?
     element.setAttribute("aria-label", view.phrase("folded code"))
     element.title = view.phrase("unfold")
-    element.className = view.cssClass("foldPlaceholder")
+    element.className = themeClass("foldPlaceholder")
 
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))

@@ -1,5 +1,5 @@
 import {combineConfig, fillConfig} from "../../extension"
-import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo} from "../../view"
+import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
 import {ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
 
@@ -136,7 +136,7 @@ class GutterView extends ViewPlugin {
   }
 
   updateTheme() {
-    this.dom.className = this.view.cssClass("gutters")
+    this.dom.className = themeClass(this.view.state, "gutters")
     for (let gutter of this.gutters) gutter.updateTheme()
   }
 
@@ -236,8 +236,8 @@ class SingleGutterView {
   }
 
   updateTheme() {
-    this.dom.className = this.view.cssClass("gutter" + (this.config.style ? "." + this.config.style : ""))
-    this.elementClass = this.view.cssClass("gutterElement" + (this.config.style ? "." + this.config.style : ""))
+    this.dom.className = themeClass(this.view.state, "gutter" + (this.config.style ? "." + this.config.style : ""))
+    this.elementClass = themeClass(this.view.state, "gutterElement" + (this.config.style ? "." + this.config.style : ""))
     while (this.elements.length) this.dom.removeChild(this.elements.pop()!.dom)
   }
 

@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax} from "./extension"
-import {Configuration, Facet, Extension, StateField} from "./facet"
+import {Configuration, Facet, Extension, StateField, SlotInstance} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -38,7 +38,9 @@ const enum Changed { Shift = 4, Mask = (1 << Changed.Shift) - 1 }
 /// just break things.
 export class EditorState {
   private changed: number[] = []
+  private initialized = 0
 
+  /// @internal
   constructor(
     /// @internal
     readonly config: Configuration,
@@ -83,10 +85,13 @@ export class EditorState {
     let start: EditorState = this, config = this.config
     if (tr.reconfigureExt) {
       config = Configuration.resolve(tr.reconfigureExt, EditorState)
-      start = config.init(this.doc, this.selection, EditorState, this)
+      start = new EditorState(config, this.doc, this.selection, []).initSlots(undefined, this)
     }
     let state = new EditorState(config, tr.doc, tr.selection, start.values.slice())
-    for (let slot of config.dynamicSlots) slot.update(state, start, tr)
+    for (let slot of config.dynamicSlots) {
+      slot.update(state, start, tr)
+      this.initialized++
+    }
     return state
   }
 
@@ -101,6 +106,7 @@ export class EditorState {
       if (require) throw new RangeError("Field is not present in this state")
       return undefined
     }
+    if ((addr & 1) == 0 && (addr >> 1) >= this.initialized) initError("Field")
     return this.getAddr(addr)
   }
 
@@ -123,6 +129,7 @@ export class EditorState {
   facet<Output>(facet: Facet<any, Output>): Output {
     let addr = this.config.address[facet.id]
     if (addr == null) return facet.default
+    if ((addr & 1) == 0 && (addr >> 1) >= this.initialized) initError("Facet" + addr + "/" + this.initialized)
     return this.getAddr(addr)
   }
 
@@ -155,7 +162,7 @@ export class EditorState {
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
     if (!configuration.staticFacet(EditorState.allowMultipleSelections)) selection = selection.asSingle()
-    return configuration.init(doc, selection, EditorState)
+    return new EditorState(configuration, doc, selection, []).initSlots()
   }
 
   /// A facet that, when enabled, causes the editor to allow multiple
@@ -212,4 +219,17 @@ export class EditorState {
   /// foldable that starts on that line (but continues beyond it) can
   /// be found.
   static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
+
+  /// @internal
+  initSlots(slots: readonly SlotInstance[] = this.config.dynamicSlots, prev?: EditorState) {
+    for (let slot of slots) {
+      slot.init(this, prev)
+      this.initialized++
+    }
+    return this
+  }
+}
+
+function initError(type: string) {
+  throw new RangeError(`${type} accessed before it has been computed. Make sure to declare dependencies between fields and facets.`)
 }
