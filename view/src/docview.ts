@@ -9,7 +9,7 @@ import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./
 import {Decoration, DecorationSet, joinRanges, findChangedRanges,
         WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, decorations as decorationsFacet, scrollMargins, ViewPlugin} from "./extension"
+import {ViewUpdate, decorations as decorationsFacet, ViewPlugin} from "./extension"
 import {EditorView, UpdateState} from "./editorview"
 import {EditorState, ChangedRange} from "../../state"
 import {Text} from "../../text"
@@ -438,9 +438,16 @@ export class DocView extends ContentView {
   scrollPosIntoView(pos: number) {
     let rect = this.coordsAt(pos)
     if (!rect) return
-    let margin = this.state.facet(scrollMargins)
-    scrollRectIntoView(this.dom, {left: rect.left - margin.left, top: rect.top - margin.top,
-                                  right: rect.right + margin.right, bottom: rect.bottom + margin.bottom})
+    let mLeft = 0, mRight = 0, mTop = 0, mBottom = 0
+    for (let plugin of this.view.plugins) if (plugin.scrollMargins) {
+      let {left, right, top, bottom} = plugin.scrollMargins
+      if (left != null) mLeft = Math.max(mLeft, left)
+      if (right != null) mRight = Math.max(mRight, right)
+      if (top != null) mTop = Math.max(mTop, top)
+      if (bottom != null) mBottom = Math.max(mBottom, bottom)
+    }
+    scrollRectIntoView(this.dom, {left: rect.left - mLeft, top: rect.top - mTop,
+                                  right: rect.right + mRight, bottom: rect.bottom + mBottom})
   }
 
   nearest(dom: Node): ContentView | null {
