@@ -80,7 +80,7 @@ class FacetProvider<Input> {
     for (let dep of this.dependencies) {
       if (dep == "doc") depDoc = true
       else if (dep == "selection") depSel = true
-      else if (addresses[dep.id] & 1) depAddrs.push(addresses[dep.id])
+      else if ((addresses[dep.id] & 1) == 0) depAddrs.push(addresses[dep.id])
     }
 
     return (state: EditorState, tr: Transaction | null) => {
@@ -215,7 +215,7 @@ export class Configuration {
   }
 
   // Passing EditorState as argument to avoid cyclic dependency
-  static resolve(extension: Extension) {
+  static resolve(extension: Extension, oldState?: EditorState) {
     let fields: StateField<any>[] = []
     let facets: {[id: number]: FacetProvider<any>[]} = Object.create(null)
     for (let ext of flatten(extension)) {
@@ -234,7 +234,13 @@ export class Configuration {
       let providers = facets[id], facet = providers[0].facet
       if (providers.every(p => p.type == Provider.Static)) {
         address[facet.id] = (staticValues.length << 1) | 1
-        staticValues.push(facet.combine(providers.map(p => p.value)))
+        let value = facet.combine(providers.map(p => p.value))
+        let oldAddr = oldState ? oldState.config.address[facet.id] : null
+        if (oldAddr != null) {
+          let oldVal = getAddr(oldState!, oldAddr)
+          if (facet.compare(value, oldVal)) value = oldVal
+        }
+        staticValues.push(value)
       } else {
         for (let p of providers) {
           if (p.type == Provider.Static) {

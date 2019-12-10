@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorState, StateField, Change, EditorSelection, SelectionRange, Annotation} from ".."
+import {EditorState, StateField, Facet, Change, EditorSelection, SelectionRange, Annotation} from ".."
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -74,5 +74,18 @@ describe("EditorState", () => {
     ist(start.field(field), 1)
     ist(start.t().reconfigure([field]).apply().field(field), 2)
     ist(start.t().reconfigure([]).apply().field(field, false), undefined)
+  })
+
+  it("allows facets derived from fields", () => {
+    let field = StateField.define({create: () => [0], update: (v, tr) => tr.docChanged ? [tr.doc.length] : v})
+    let facet = Facet.define<number>()
+    let state = EditorState.create({
+      extensions: [field, facet.derive([field], state => state.field(field)[0]), facet.of(1)]
+    })
+    ist(state.facet(facet).join(), "0,1")
+    let state2 = state.t().apply()
+    ist(state2.facet(facet), state.facet(facet))
+    let state3 = state.t().replace(0, 0, "hi").apply()
+    ist(state3.facet(facet).join(), "2,1")
   })
 })

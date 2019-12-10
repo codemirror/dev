@@ -105,4 +105,15 @@ describe("EditorState facets", () => {
     ist(st.facet(num), st2.facet(num))
     ist(st2.facet(str).length, 0)
   })
+
+  it("preserves static facets across reconfiguration", () => {
+    let st = mk(num.of(1), num.of(2), str.of("3"))
+    let st2 = st.t().reconfigure([num.of(1), num.of(2)]).apply()
+    ist(st.facet(num), st2.facet(num))
+  })
+
+  it("errors on cyclic dependencies", () => {
+    ist.throws(() => mk(num.derive([str], s => s.facet(str).length), str.derive([num], s => s.facet(num).join())),
+               /cyclic/i)
+  })
 })

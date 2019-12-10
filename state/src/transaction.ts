@@ -160,7 +160,7 @@ export class Transaction {
   /// Move to an entirely new state configuration.
   reconfigure(extension: Extension) {
     this.ensureOpen()
-    this.reconfigureConfig = Configuration.resolve(extension)
+    this.reconfigureConfig = Configuration.resolve(extension, this.startState)
     return this
   }
 
