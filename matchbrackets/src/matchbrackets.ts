@@ -41,7 +41,6 @@ const bracketMatchingConfig = Facet.define<Config, Required<Config>>({
 })
 
 const bracketMatchingState = StateField.define<DecorationSet>({
-  dependencies: [bracketMatchingConfig],
   create() { return Decoration.none },
   update(deco, tr, state) {
     if (!tr.docChanged && !tr.selectionSet) return deco

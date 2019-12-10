@@ -3,7 +3,7 @@ import {Annotation, allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
-import {Configuration, Extension} from "./facet"
+import {Extension} from "./facet"
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
 

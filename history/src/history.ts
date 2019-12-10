@@ -25,8 +25,6 @@ const historyConfig = Facet.define<HistoryConfig, Required<HistoryConfig>>({
 })
 
 const historyField = StateField.define({
-  dependencies: [historyConfig],
-
   create() {
     return HistoryState.empty
   },
