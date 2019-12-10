@@ -69,7 +69,7 @@ class Pkg {
         sourcemap: true,
         externalLiveBindings: false
       }],
-      plugins: [tsPlugin({lib: this.dom ? ["es6", "dom"] : ["es6"]})]
+      plugins: [tsPlugin({lib: this.dom ? ["es6", "dom"] : ["es6"], types: this.dom ? [] : ["console"]})]
     })
   }
 }

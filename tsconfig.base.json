@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "lib": ["es6"],
+    "lib": ["es6", "scripthost"],
     "types": [],
+    "typeRoots": ["./node_modules/@types", "./bin"],
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "strict": true,
