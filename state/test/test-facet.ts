@@ -1,5 +1,5 @@
 const ist = require("ist")
-import {EditorState, Facet, Extension} from ".."
+import {EditorState, EditorSelection, Facet, Extension} from ".."
 
 function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
@@ -54,5 +54,48 @@ describe("EditorState facets", () => {
     let array = st.facet(num)
     ist(array.join(), "1,5")
     ist(st.t().apply().facet(num), array)
+  })
+
+  it("can specify a dependency on the document", () => {
+    let count = 0
+    let st = mk(num.derive(["doc"], s => count++))
+    ist(st.facet(num).join(), "0")
+    st = st.t().replace(0, 0, "hello").apply()
+    ist(st.facet(num).join(), "1")
+    st = st.t().apply()
+    ist(st.facet(num).join(), "1")
+  })
+
+  it("can specify a dependency on the selection", () => {
+    let count = 0
+    let st = mk(num.derive(["selection"], s => count++))
+    ist(st.facet(num).join(), "0")
+    st = st.t().replace(0, 0, "hello").apply()
+    ist(st.facet(num).join(), "1")
+    st = st.t().setSelection(EditorSelection.single(2)).apply()
+    ist(st.facet(num).join(), "2")
+    st = st.t().apply()
+    ist(st.facet(num).join(), "2")
+  })
+
+  it("can provide multiple values at once", () => {
+    let st = mk(num.deriveN(["doc"], s => s.doc.length % 2 ? [100, 10] : []), num.of(1))
+    ist(st.facet(num).join(), "1")
+    st = st.t().replace(0, 0, "hello").apply()
+    ist(st.facet(num).join(), "100,10,1")
+  })
+
+  it("works with a static combined facet", () => {
+    let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
+    let st = mk(f.of(1), f.of(2), f.of(3))
+    ist(st.facet(f), 6)
+  })
+
+  it("works with a dynamic combined facet", () => {
+    let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
+    let st = mk(f.of(1), f.derive(["doc"], s => s.doc.length), f.of(3))
+    ist(st.facet(f), 4)
+    st = st.t().replace(0, 0, "hello").apply()
+    ist(st.facet(f), 9)
   })
 })

@@ -57,7 +57,7 @@ function sameArray<T>(a: readonly T[], b: readonly T[]) {
   return a == b || a.length == b.length && a.every((e, i) => e === b[i])
 }
 
-type Slot<T> = Facet<any, T> | StateField<T>
+type Slot<T> = Facet<any, T> | StateField<T> | "doc" | "selection"
 
 /// Marks a value as an [`Extension`](#state.Extension).
 declare const isExtension: unique symbol
@@ -74,11 +74,18 @@ class FacetProvider<Input> {
 
   dynamicSlot(addresses: {[id: number]: number}) {
     let getter: (state: EditorState) => any = this.value as any
-    let idx = addresses[this.id] >> 1
-    let deps = this.dependencies.map(d => addresses[d.id]).filter(addr => !(addr & 1))
     let compare = this.facet.compareInput
+    let idx = addresses[this.id] >> 1
+    let depDoc = false, depSel = false, depAddrs: number[] = []
+    for (let dep of this.dependencies) {
+      if (dep == "doc") depDoc = true
+      else if (dep == "selection") depSel = true
+      else if (addresses[dep.id] & 1) depAddrs.push(addresses[dep.id])
+    }
+
     return (state: EditorState, tr: Transaction | null) => {
-      if (!tr || deps.some(addr => { ensureAddr(state, addr); return (state.status[addr >> 1] & SlotStatus.Changed) > 0 })) {
+      if (!tr || (depDoc && tr.docChanged) || (depSel && (tr.docChanged || tr.selectionSet)) || 
+          depAddrs.some(addr => { ensureAddr(state, addr); return (state.status[addr >> 1] & SlotStatus.Changed) > 0 })) {
         let newVal = getter(state)
         if (!tr || !compare(newVal, tr.startState.values[idx])) {
           state.values[idx] = newVal
