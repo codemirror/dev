@@ -3,7 +3,7 @@ import {Annotation, allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange} from "./selection"
 import {Change, ChangeSet} from "./change"
-import {Extension} from "./facet"
+import {Extension, Configuration} from "./facet"
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
 
@@ -27,7 +27,7 @@ export class Transaction {
   private _annotations: Annotation<any>[]
   private flags: number = 0
   /// @internal
-  reconfigureExt: Extension | null = null
+  reconfigureConfig: Configuration | null = null
   private state: EditorState | null = null
 
   /// @internal
@@ -160,13 +160,13 @@ export class Transaction {
   /// Move to an entirely new state configuration.
   reconfigure(extension: Extension) {
     this.ensureOpen()
-    this.reconfigureExt = extension
+    this.reconfigureConfig = Configuration.resolve(extension)
     return this
   }
 
   /// Indicates whether the transaction reconfigures the state.
   get reconfigured(): boolean {
-    return this.reconfigureExt != null
+    return this.reconfigureConfig != null
   }
 
   private ensureOpen() {

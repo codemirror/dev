@@ -98,4 +98,11 @@ describe("EditorState facets", () => {
     st = st.t().replace(0, 0, "hello").apply()
     ist(st.facet(f), 9)
   })
+
+  it("survives reconfiguration", () => {
+    let st = mk(num.derive(["doc"], s => s.doc.length), num.of(2), str.of("3"))
+    let st2 = st.t().reconfigure([num.derive(["doc"], s => s.doc.length), num.of(2)]).apply()
+    ist(st.facet(num), st2.facet(num))
+    ist(st2.facet(str).length, 0)
+  })
 })
