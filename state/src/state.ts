@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax} from "./extension"
-import {Configuration, Facet, Extension, StateField, SlotStatus, ensureID, setID, getAddr, initState} from "./facet"
+import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr, initState} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -54,7 +54,7 @@ export class EditorState {
   ) {
     for (let range of selection.ranges)
       if (range.to > doc.length) throw new RangeError("Selection points outside of document")
-    this.status = config.dynamicSlots.map(_ => SlotStatus.Unknown)
+    this.status = config.dynamicSlots.map(_ => SlotStatus.Uninitialized)
     this.values = values ? values.slice() : config.dynamicSlots.map(_ => null)
   }
 
@@ -64,11 +64,12 @@ export class EditorState {
   field<T>(field: StateField<T>): T
   field<T>(field: StateField<T>, require: false): T | undefined
   field<T>(field: StateField<T>, require: boolean = true): T | undefined {
-    let addr = ensureID(this, field.id)
+    let addr = this.config.address[field.id]
     if (addr == null) {
       if (require) throw new RangeError("Field is not present in this state")
       return undefined
     }
+    ensureAddr(this, addr)
     return getAddr(this, addr)
   }
 
@@ -89,8 +90,9 @@ export class EditorState {
 
   /// Get the value of a state [behavior](#extension.Behavior).
   facet<Output>(facet: Facet<any, Output>): Output {
-    let addr = ensureID(this, facet.id)
+    let addr = this.config.address[facet.id]
     if (addr == null) return facet.default
+    ensureAddr(this, addr)
     return getAddr(this, addr)
   }
 
@@ -117,14 +119,9 @@ export class EditorState {
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
     let start: EditorState = this, config = start.config
-    if (tr.reconfigureExt) { // FIXME this leads to incorrect 'changed' values for facets
-      config = Configuration.resolve(tr.reconfigureExt, EditorState)
-      start = new EditorState(config, start.doc, start.selection)
-      for (let slot of config.dynamicSlots) if (slot instanceof StateField) {
-        let known = this.config.address[slot.id]
-        if (known != null) setID(start, slot.id, getAddr(this, known))
-      }
-      for (let slot of config.dynamicSlots) ensureID(start, slot.id)
+    if (tr.reconfigureExt) { // FIXME this is broken
+      let config = Configuration.resolve(tr.reconfigureExt)
+      start = initState(new EditorState(config, start.doc, start.selection), null)
     }
     return initState(new EditorState(config, tr.doc, tr.selection, start.values), tr)
   }
@@ -133,7 +130,7 @@ export class EditorState {
   /// initializing an editor—updated states are created by applying
   /// transactions.
   static create(config: EditorStateConfig = {}): EditorState {
-    let configuration = Configuration.resolve(config.extensions || [], EditorState)
+    let configuration = Configuration.resolve(config.extensions || [])
     let doc = config.doc instanceof Text ? config.doc
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
