@@ -17,7 +17,7 @@ describe("EditorState", () => {
 
   it("maps selection through changes", () => {
     let state = EditorState.create({doc: "abcdefgh",
-                                    extensions: [EditorState.allowMultipleSelections(true)],
+                                    extensions: [EditorState.allowMultipleSelections.of(true)],
                                     selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
     let newState = state.t().replaceSelection("Q").apply()
     ist(newState.doc.toString(), "QabcdQefghQ")
@@ -39,28 +39,28 @@ describe("EditorState", () => {
   })
 
   it("stores and updates tab size", () => {
-    let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize(2)]})
+    let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize.of(2)]})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.t().reconfigure([EditorState.tabSize(8)]).apply()
+    let updated = deflt.t().reconfigure([EditorState.tabSize.of(8)]).apply()
     ist(updated.tabSize, 8)
   })
 
   it("stores and updates the line separator", () => {
-    let deflt = EditorState.create({}), crlf = EditorState.create({extensions: [EditorState.lineSeparator("\r\n")]})
+    let deflt = EditorState.create({}), crlf = EditorState.create({extensions: [EditorState.lineSeparator.of("\r\n")]})
     ist(deflt.joinLines(["a", "b"]), "a\nb")
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.t().reconfigure([EditorState.lineSeparator("\n")]).apply()
+    let updated = crlf.t().reconfigure([EditorState.lineSeparator.of("\n")]).apply()
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })
 
   it("stores and updates fields", () => {
-    let field1 = new StateField<number>({init: () => 0, apply: (tr, val) => val + 1})
-    let field2 = new StateField<number>({init: state => state.field(field1) + 10, apply: (tr, val) => val})
-    let state = EditorState.create({extensions: [field1.extension, field2.extension]})
+    let field1 = StateField.define<number>({create: () => 0, update: (val, tr) => val + 1})
+    let field2 = StateField.define<number>({create: state => state.field(field1) + 10, update: (val, tr) => val})
+    let state = EditorState.create({extensions: [field1, field2]})
     ist(state.field(field1), 0)
     ist(state.field(field2), 10)
     let newState = state.t().apply()
@@ -69,10 +69,10 @@ describe("EditorState", () => {
   })
 
   it("can preserve fields across reconfiguration", () => {
-    let field = new StateField({init: () => 0, apply: (tr, val) => val + 1})
-    let start = EditorState.create({extensions: [field.extension]}).t().apply()
+    let field = StateField.define({create: () => 0, update: (val, tr) => val + 1})
+    let start = EditorState.create({extensions: [field]}).t().apply()
     ist(start.field(field), 1)
-    ist(start.t().reconfigure([field.extension]).apply().field(field), 2)
+    ist(start.t().reconfigure([field]).apply().field(field), 2)
     ist(start.t().reconfigure([]).apply().field(field, false), undefined)
   })
 })

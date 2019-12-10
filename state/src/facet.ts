@@ -79,12 +79,6 @@ class FacetProvider<Input> {
 /// value itself. The `Deps` type parameter is used only for fields
 /// with [dependencies](#state.StateField^defineDeps).
 export type StateFieldSpec<Value> = {
-  /// The facets and fields that this field's `create` and `update`
-  /// methods read. It is important to specify all such inputs, so
-  /// that the library can schedule the computation of fields and
-  /// facets in the right order.
-  dependencies?: readonly Slot<any>[]
-
   /// Creates the initial value for the field when a state is created.
   create: (state: EditorState) => Value,
 
@@ -105,8 +99,6 @@ export class StateField<Value> {
   readonly id = nextID++
 
   private constructor(
-    /// @internal
-    readonly dependencies: readonly Slot<any>[],
     private createF: (state: EditorState) => Value,
     private readonly updateF: (value: Value, tr: Transaction, state: EditorState) => Value,
     private compareF: (a: Value, b: Value) => boolean
@@ -114,20 +106,19 @@ export class StateField<Value> {
 
   /// Define a state field.
   static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
-    return new StateField<Value>(config.dependencies || none,
-                                 config.create, config.update,
+    return new StateField<Value>(config.create, config.update,
                                  config.compare || ((a, b) => a === b))
   }
 
   /// @internal
-  init(state: EditorState, prev?: EditorState) {
-    state.setID(this.id, prev && prev.config.address[this.id] != null ? prev.getID(this.id) : this.createF(state))
-  }
-
-  /// @internal
-  update(state: EditorState, prev: EditorState, tr: Transaction) {
-    let oldVal = prev.getID(this.id), newVal = this.updateF(oldVal, tr, state)
-    if (!this.compareF(oldVal, newVal)) state.setID(this.id, newVal)
+  compute(state: EditorState, tr: Transaction | null) {
+    if (tr) {
+      let oldVal = getID(tr.startState, this.id), newVal = this.updateF(oldVal, tr, state)
+      if (!this.compareF(oldVal, newVal)) setID(state, this.id, newVal)
+      else setIDComputed(state, this.id)
+    } else {
+      setID(state, this.id, this.createF(state))
+    }
   }
 
   [isExtension]!: true
@@ -136,15 +127,10 @@ export class StateField<Value> {
 export type Extension = {[isExtension]: true} | readonly Extension[]
 
 class FacetInstance<Input> {
-  dependencies: readonly Slot<any>[]
+  dependencies: Slot<any>[] = []
+  providers: FacetProvider<Input>[] = []
 
-  constructor(readonly facet: Facet<Input, any>,
-              readonly providers: readonly FacetProvider<Input>[]) {
-    let deps = []
-    for (let prov of providers) for (let dep of prov.dependencies)
-      if (deps.indexOf(dep) < 0) deps.push(dep)
-    this.dependencies = deps
-  }
+  constructor(readonly facet: Facet<Input, any>) {}
 
   recompute(state: EditorState) {
     let result: Input[] = []
@@ -152,23 +138,25 @@ class FacetInstance<Input> {
     return this.facet.combine(result)
   }
 
-  init(state: EditorState) {
-    state.setID(this.id, this.recompute(state))
-  }
-
-  update(state: EditorState, prev: EditorState) {
-    // FIXME make this more incremental, probably by storing individual provider's values
-    if (this.dependencies.some(d => state.idHasChanged(d.id))) {
-      let newVal = this.recompute(state)
-      if (!this.facet.compare(newVal, prev.getID(this.id)))
-        state.setID(this.id, newVal)
+  compute(state: EditorState, tr: Transaction | null) {
+    if (tr) {
+      if (this.dependencies.some(d => idHasChanged(state, d.id))) {
+        let newVal = this.recompute(state)
+        if (!this.facet.compare(newVal, getID(tr.startState, this.id))) {
+          setID(state, this.id, newVal)
+          return
+        }
+      }
+      setIDComputed(state, this.id)
+    } else {
+      setID(state, this.id, this.recompute(state))
     }
   }
 
   get id() { return this.facet.id }
 }
 
-export type SlotInstance = StateField<any> | FacetInstance<any>
+type SlotInstance = StateField<any> | FacetInstance<any>
 
 const enum P { Override, Extend, Default, Fallback }
 
@@ -176,6 +164,7 @@ class PrecExtension {
   constructor(readonly e: Extension, readonly prec: P) {}
   [isExtension]!: true
 }
+
 export class Configuration {
   constructor(readonly dynamicSlots: SlotInstance[],
               readonly address: {[id: number]: number},
@@ -186,48 +175,29 @@ export class Configuration {
     return addr == null ? facet.default : this.staticValues[addr >> 1]
   }
 
-  // Passing `EditorState` as a value here to avoid a cyclic dependency issue
+  // Passing EditorState as argument to avoid cyclic dependency
   static resolve(extension: Extension, Ctor: typeof EditorState) {
-    let providers: {[id: number]: FacetProvider<any>[]} = Object.create(null)
-    let slots: {[id: number]: {value: Slot<any>, deps: Slot<any>[], mark: number}} = Object.create(null)
+    let facets: {[id: number]: FacetInstance<any>} = Object.create(null)
+    let slots: SlotInstance[] = []
 
     for (let ext of flatten(extension)) {
       if (ext instanceof StateField) {
-        slots[ext.id] = {value: ext, deps: ext.dependencies as Slot<any>[], mark: 0}
+        slots.push(ext)
       } else {
-        let slot = slots[ext.facet.id] || (slots[ext.facet.id] = {value: ext.facet, deps: [], mark: 0})
-        for (let dep of ext.dependencies) if (slot.deps.indexOf(dep) < 0) slot.deps.push(dep)
-        ;(providers[ext.facet.id] || (providers[ext.facet.id] = [])).push(ext)
+        let inst = facets[ext.facet.id]
+        if (!inst) slots.push(inst = facets[ext.facet.id] = new FacetInstance(ext.facet))
+        inst.providers.push(ext)
+        for (let dep of ext.dependencies) if (inst.dependencies.indexOf(dep) < 0) inst.dependencies.push(dep)
       }
     }
-
-    let ordered: SlotInstance[] = []
-    function visit(slot: {value: Slot<any>, deps: Slot<any>[], mark: number}) {
-      if (slot.mark) {
-        if (slot.mark == 1) throw new Error("Cyclic dependency in facets and fields")
-        return
-      }
-      slot.mark = 1
-      for (let dep of slot.deps) {
-        let found = slots[dep.id]
-        if (!found) {
-          if (dep instanceof StateField) throw new Error("Dependency on unavailable field")
-          continue
-        }
-        visit(found)
-      }
-      slot.mark = 2
-      ordered.push(slot.value instanceof Facet ? new FacetInstance(slot.value, providers[slot.value.id]) : slot.value)
-    }
-    for (let id in slots) visit(slots[id])
 
     function isStatic(slot: Slot<any>) {
-      return slot instanceof Facet && providers[slot.id].every(prov => prov.dependencies.every(isStatic))
+      return slot instanceof Facet && facets[slot.id].dependencies.every(isStatic)
     }
     let address: {[id: number]: number} = Object.create(null), tempAddress: {[id: number]: number} = Object.create(null)
     let staticSlots: FacetInstance<any>[] = []
     let dynamicSlots: SlotInstance[] = []
-    for (let slot of ordered) {
+    for (let slot of slots) {
       if (slot instanceof FacetInstance && isStatic(slot.facet)) {
         address[slot.facet.id] = 1 | (staticSlots.length << 1)
         tempAddress[slot.facet.id] = staticSlots.length << 1
@@ -238,8 +208,8 @@ export class Configuration {
       }
     }
 
-    let tempState = new Ctor(new Configuration(staticSlots, tempAddress, none), Text.empty, EditorSelection.single(0), [])
-      .initSlots(staticSlots)
+    let tempState = initState(new Ctor(new Configuration(staticSlots, tempAddress, none), Text.empty, EditorSelection.single(0)),
+                              null)
     return new Configuration(dynamicSlots, address, tempState.values)
   }
 }
@@ -255,4 +225,59 @@ function flatten(extension: Extension) {
     else result[prec].push(ext as any)
   })(extension, P.Default)
   return result.reduce((a, b) => a.concat(b))
+}
+
+export const enum SlotStatus {
+  Unknown = 0,
+  Changed = 1,
+  Computed = 2,
+  Computing = 4
+}
+
+export function ensureID(state: EditorState, id: number): number | undefined {
+  let addr = state.config.address[id]
+  if (addr == null || (addr & 1)) return addr
+  let idx = addr >> 1
+  let status = state.status[idx]
+  if (status == SlotStatus.Computing) throw new Error("Cyclic dependency between fields and/or facets")
+  if ((status & SlotStatus.Computed) == 0) {
+    state.status[idx] = SlotStatus.Computing
+    state.config.dynamicSlots[idx].compute(state, state.applying)
+  }
+  return addr
+}
+
+function getID(state: EditorState, id: number) {
+  return getAddr(state, ensureID(state, id)!)
+}
+
+export function getAddr(state: EditorState, addr: number) {
+  return addr & 1 ? state.config.staticValues[addr >> 1] : state.values[addr >> 1]
+}
+
+function addrStatus(state: EditorState, addr: number) {
+  return addr & 1 ? SlotStatus.Computed : state.status[addr >> 1]
+}
+
+function idHasChanged(state: EditorState, id: number) {
+  let found = ensureID(state, id)
+  return found == null ? false : (addrStatus(state, found) & SlotStatus.Changed) > 0
+}
+
+export function setID(state: EditorState, id: number, value: any) {
+  let addr = state.config.address[id] >> 1
+  state.values[addr] = value
+  state.status[addr] = SlotStatus.Computed | SlotStatus.Changed
+}
+
+function setIDComputed(state: EditorState, id: number) {
+  let addr = state.config.address[id] >> 1
+  state.status[addr] = SlotStatus.Computed
+}
+
+export function initState(state: EditorState, tr: Transaction | null) {
+  state.applying = tr
+  for (let slot of state.config.dynamicSlots) ensureID(state, slot.id)
+  state.applying = null
+  return state
 }

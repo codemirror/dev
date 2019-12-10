@@ -102,7 +102,7 @@ class FoldWidget extends WidgetType<null> {
     // FIXME should this have a role? does it make sense to allow focusing by keyboard?
     element.setAttribute("aria-label", view.phrase("folded code"))
     element.title = view.phrase("unfold")
-    element.className = themeClass("foldPlaceholder")
+    element.className = themeClass(view.state, "foldPlaceholder")
 
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))

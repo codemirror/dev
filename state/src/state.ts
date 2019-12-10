@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax} from "./extension"
-import {Configuration, Facet, Extension, StateField, SlotInstance} from "./facet"
+import {Configuration, Facet, Extension, StateField, SlotStatus, ensureID, setID, getAddr, initState} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -26,8 +26,6 @@ export interface EditorStateConfig {
 
 const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4, DEFAULT_SPLIT = /\r\n?|\n/
 
-const enum Changed { Shift = 4, Mask = (1 << Changed.Shift) - 1 }
-
 /// The editor state class is a persistent (immutable) data structure.
 /// To update a state, you [create](#state.EditorState.t) and
 /// [apply](#state.Transaction.apply) a
@@ -37,8 +35,12 @@ const enum Changed { Shift = 4, Mask = (1 << Changed.Shift) - 1 }
 /// As such, _never_ mutate properties of a state directly. That'll
 /// just break things.
 export class EditorState {
-  private changed: number[] = []
-  private initialized = 0
+  /// @internal
+  readonly values: any[]
+  /// @internal
+  readonly status: SlotStatus[]
+  /// @internal
+  applying: null | Transaction = null
 
   /// @internal
   constructor(
@@ -48,51 +50,12 @@ export class EditorState {
     readonly doc: Text,
     /// The current selection.
     readonly selection: EditorSelection,
-    /// @internal
-    readonly values: any[]
+    values?: any[]
   ) {
-    for (let i = config.dynamicSlots.length >> Changed.Shift; i >= 0; i--) this.changed.push(0)
     for (let range of selection.ranges)
       if (range.to > doc.length) throw new RangeError("Selection points outside of document")
-  }
-
-  /// @internal
-  getID(id: number) {
-    return this.getAddr(this.config.address[id])
-  }
-
-  /// @internal
-  getAddr(addr: number) {
-    return addr & 1 ? this.config.staticValues[addr >> 1] : this.values[addr >> 1]
-  }
-
-  /// @internal
-  idHasChanged(id: number) {
-    let addr = this.config.address[id]
-    if (addr == null || (addr & 1)) return false
-    addr >>= 1
-    return (this.changed[addr >> Changed.Shift] & (1 >> (addr & Changed.Mask))) > 0
-  }
-
-  setID(id: number, value: any) {
-    let addr = this.config.address[id] >> 1
-    this.values[addr] = value
-    this.changed[addr >> Changed.Shift] |= 1 >> (addr & Changed.Mask)
-  }
-
-  /// @internal
-  applyTransaction(tr: Transaction): EditorState {
-    let start: EditorState = this, config = this.config
-    if (tr.reconfigureExt) {
-      config = Configuration.resolve(tr.reconfigureExt, EditorState)
-      start = new EditorState(config, this.doc, this.selection, []).initSlots(undefined, this)
-    }
-    let state = new EditorState(config, tr.doc, tr.selection, start.values.slice())
-    for (let slot of config.dynamicSlots) {
-      slot.update(state, start, tr)
-      this.initialized++
-    }
-    return state
+    this.status = config.dynamicSlots.map(_ => SlotStatus.Unknown)
+    this.values = values ? values.slice() : config.dynamicSlots.map(_ => null)
   }
 
   /// Retrieve the value of a [state field](#state.StateField). Throws
@@ -101,13 +64,12 @@ export class EditorState {
   field<T>(field: StateField<T>): T
   field<T>(field: StateField<T>, require: false): T | undefined
   field<T>(field: StateField<T>, require: boolean = true): T | undefined {
-    let addr = this.config.address[field.id]
+    let addr = ensureID(this, field.id)
     if (addr == null) {
       if (require) throw new RangeError("Field is not present in this state")
       return undefined
     }
-    if ((addr & 1) == 0 && (addr >> 1) >= this.initialized) initError("Field")
-    return this.getAddr(addr)
+    return getAddr(this, addr)
   }
 
   /// Start a new transaction from this state. When not given, the
@@ -127,10 +89,9 @@ export class EditorState {
 
   /// Get the value of a state [behavior](#extension.Behavior).
   facet<Output>(facet: Facet<any, Output>): Output {
-    let addr = this.config.address[facet.id]
+    let addr = ensureID(this, facet.id)
     if (addr == null) return facet.default
-    if ((addr & 1) == 0 && (addr >> 1) >= this.initialized) initError("Facet" + addr + "/" + this.initialized)
-    return this.getAddr(addr)
+    return getAddr(this, addr)
   }
 
   /// Convert this state to a JSON-serializable object.
@@ -153,6 +114,21 @@ export class EditorState {
     })
   }
 
+  /// @internal
+  applyTransaction(tr: Transaction): EditorState {
+    let start: EditorState = this, config = start.config
+    if (tr.reconfigureExt) { // FIXME this leads to incorrect 'changed' values for facets
+      config = Configuration.resolve(tr.reconfigureExt, EditorState)
+      start = new EditorState(config, start.doc, start.selection)
+      for (let slot of config.dynamicSlots) if (slot instanceof StateField) {
+        let known = this.config.address[slot.id]
+        if (known != null) setID(start, slot.id, getAddr(this, known))
+      }
+      for (let slot of config.dynamicSlots) ensureID(start, slot.id)
+    }
+    return initState(new EditorState(config, tr.doc, tr.selection, start.values), tr)
+  }
+
   /// Create a new state. You'll usually only need this when
   /// initializing an editor—updated states are created by applying
   /// transactions.
@@ -162,7 +138,7 @@ export class EditorState {
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
     if (!configuration.staticFacet(EditorState.allowMultipleSelections)) selection = selection.asSingle()
-    return new EditorState(configuration, doc, selection, []).initSlots()
+    return initState(new EditorState(configuration, doc, selection), null)
   }
 
   /// A facet that, when enabled, causes the editor to allow multiple
@@ -219,17 +195,4 @@ export class EditorState {
   /// foldable that starts on that line (but continues beyond it) can
   /// be found.
   static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
-
-  /// @internal
-  initSlots(slots: readonly SlotInstance[] = this.config.dynamicSlots, prev?: EditorState) {
-    for (let slot of slots) {
-      slot.init(this, prev)
-      this.initialized++
-    }
-    return this
-  }
-}
-
-function initError(type: string) {
-  throw new RangeError(`${type} accessed before it has been computed. Make sure to declare dependencies between fields and facets.`)
 }
