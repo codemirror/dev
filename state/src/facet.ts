@@ -84,16 +84,17 @@ class FacetProvider<Input> {
     }
 
     return (state: EditorState, tr: Transaction | null) => {
-      if (!tr || (depDoc && tr.docChanged) || (depSel && (tr.docChanged || tr.selectionSet)) || 
-          depAddrs.some(addr => { ensureAddr(state, addr); return (state.status[addr >> 1] & SlotStatus.Changed) > 0 })) {
-        let newVal = getter(state)
-        if (!tr || !compare(newVal, tr.startState.values[idx])) {
-          state.values[idx] = newVal
-          state.status[idx] = SlotStatus.Computed | SlotStatus.Changed
-          return
-        }
+      if (!tr || tr.reconfigured) {
+        state.values[idx] = getter(state)
+        return SlotStatus.Changed
+      } else {
+        let newVal
+        let depChanged = (depDoc && tr!.docChanged) || (depSel && (tr!.docChanged || tr!.selectionSet)) || 
+          depAddrs.some(addr => (ensureAddr(state, addr) & SlotStatus.Changed) > 0)
+        if (!depChanged || compare(newVal = getter(state), tr!.startState.values[idx])) return 0
+        state.values[idx] = newVal
+        return SlotStatus.Changed
       }
-      state.status[idx] = SlotStatus.Computed
     }
   }
 
@@ -111,26 +112,22 @@ function dynamicFacetSlot<Input, Output>(
   let idx = addresses[facet.id] >> 1
 
   return (state: EditorState, tr: Transaction | null) => {
-    let changed = !tr
+    let oldAddr = !tr ? null : tr.reconfigured ? tr.startState.config.address[facet.id] : idx << 1
+    let changed = oldAddr == null
     for (let dynAddr of dynamic) {
-      ensureAddr(state, dynAddr)
-      if (!changed && (state.status[dynAddr >> 1] & SlotStatus.Changed)) changed = true
+      if (ensureAddr(state, dynAddr) & SlotStatus.Changed) changed = true
     }
-    if (changed) {
-      let values: Input[] = []
-      for (let i = 0; i < providerAddrs.length; i++) {
-        let value = getAddr(state, providerAddrs[i])
-        if (providerTypes[i] == Provider.Multi) for (let val of value) values.push(val)
-        else values.push(value)
-      }
-      let newVal = facet.combine(values)
-      if (!tr || !facet.compare(newVal, tr.startState.values[idx])) {
-        state.values[idx] = newVal
-        state.status[idx] = SlotStatus.Computed | SlotStatus.Changed
-        return
-      }
+    if (!changed) return 0
+    let values: Input[] = []
+    for (let i = 0; i < providerAddrs.length; i++) {
+      let value = getAddr(state, providerAddrs[i])
+      if (providerTypes[i] == Provider.Multi) for (let val of value) values.push(val)
+      else values.push(value)
     }
-    state.status[idx] = SlotStatus.Computed
+    let newVal = facet.combine(values)
+    if (oldAddr != null && facet.compare(newVal, getAddr(tr!.startState, oldAddr))) return 0
+    state.values[idx] = newVal
+    return SlotStatus.Changed
   }
 }
 
@@ -175,16 +172,15 @@ export class StateField<Value> {
   slot(addresses: {[id: number]: number}) {
     let idx = addresses[this.id] >> 1
     return (state: EditorState, tr: Transaction | null) => {
-      if (!tr) {
+      let oldIdx = !tr ? null : tr.reconfigured ? tr.startState.config.address[this.id] >> 1 : idx
+      if (oldIdx == null) {
         state.values[idx] = this.createF(state)
-        state.status[idx] = SlotStatus.Computed | SlotStatus.Changed
+        return SlotStatus.Changed
       } else {
-        let value = this.updateF(tr.startState.values[idx], tr, state), status = SlotStatus.Computed
-        if (!this.compareF(tr.startState.values[idx], value)) {
-          state.values[idx] = value
-          status |= SlotStatus.Changed
-        }
-        state.status[idx] = status
+        let oldVal = tr!.startState.values[oldIdx], value = this.updateF(oldVal, tr!, state)
+        if (this.compareF(oldVal, value)) return 0
+        state.values[idx] = value
+        return SlotStatus.Changed
       }
     }
   }
@@ -194,7 +190,7 @@ export class StateField<Value> {
 
 export type Extension = {[isExtension]: true} | readonly Extension[]
 
-type DynamicSlot = (state: EditorState, tr: Transaction | null) => void
+type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
 
 const enum P { Override, Extend, Default, Fallback }
 
@@ -204,9 +200,14 @@ class PrecExtension {
 }
 
 export class Configuration {
+  readonly statusTemplate: SlotStatus[] = []
+
   constructor(readonly dynamicSlots: DynamicSlot[],
               readonly address: {[id: number]: number},
-              readonly staticValues: readonly any[]) {}
+              readonly staticValues: readonly any[]) {
+    while (this.statusTemplate.length < staticValues.length)
+      this.statusTemplate.push(SlotStatus.Uninitialized)
+  }
 
   staticFacet<Output>(facet: Facet<any, Output>) {
     let addr = this.address[facet.id]
@@ -274,23 +275,16 @@ export const enum SlotStatus {
 }
 
 export function ensureAddr(state: EditorState, addr: number) {
-  if (addr & 1) return
+  if (addr & 1) return SlotStatus.Computed
   let idx = addr >> 1
   let status = state.status[idx]
   if (status == SlotStatus.Computing) throw new Error("Cyclic dependency between fields and/or facets")
-  if ((status & SlotStatus.Computed) == 0) {
-    state.status[idx] = SlotStatus.Computing
-    state.config.dynamicSlots[idx](state, state.applying)
-  }
+  if (status & SlotStatus.Computed) return status
+  state.status[idx] = SlotStatus.Computing
+  let changed = state.config.dynamicSlots[idx](state, state.applying)
+  return state.status[idx] = SlotStatus.Computed | changed
 }
 
 export function getAddr(state: EditorState, addr: number) {
   return addr & 1 ? state.config.staticValues[addr >> 1] : state.values[addr >> 1]
-}
-
-export function initState(state: EditorState, tr: Transaction | null) {
-  state.applying = tr
-  for (let i = 0; i < state.config.dynamicSlots.length; i++) ensureAddr(state, i << 1)
-  state.applying = null
-  return state
 }

@@ -1,8 +1,8 @@
 import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax} from "./extension"
-import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr, initState} from "./facet"
+import {Syntax, allowMultipleSelections} from "./extension"
+import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -50,12 +50,25 @@ export class EditorState {
     readonly doc: Text,
     /// The current selection.
     readonly selection: EditorSelection,
-    values?: any[]
+    tr: Transaction | null = null
   ) {
     for (let range of selection.ranges)
       if (range.to > doc.length) throw new RangeError("Selection points outside of document")
-    this.status = config.dynamicSlots.map(_ => SlotStatus.Uninitialized)
-    this.values = values ? values.slice() : config.dynamicSlots.map(_ => null)
+    this.status = config.statusTemplate.slice()
+    if (tr && !tr.reconfigured) {
+      this.values = tr.startState.values.slice()
+    } else {
+      this.values = config.dynamicSlots.map(_ => null)
+      // Copy over old values for shared facets/fields if this is a reconfigure
+      if (tr) for (let id in config.address) {
+        let cur = config.address[id], prev = tr.startState.config.address[id]
+        if (prev != null && (cur & 1) == 0) this.values[cur >> 1] = getAddr(tr.startState, prev)
+      }
+    }
+
+    this.applying = tr
+    for (let i = 0; i < this.config.dynamicSlots.length; i++) ensureAddr(this, i << 1)
+    this.applying = null
   }
 
   /// Retrieve the value of a [state field](#state.StateField). Throws
@@ -118,12 +131,7 @@ export class EditorState {
 
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
-    let start: EditorState = this, config = start.config
-    if (tr.reconfigureExt) { // FIXME this is broken
-      let config = Configuration.resolve(tr.reconfigureExt)
-      start = initState(new EditorState(config, start.doc, start.selection), null)
-    }
-    return initState(new EditorState(config, tr.doc, tr.selection, start.values), tr)
+    return new EditorState(tr.reconfigureConfig || this.config, tr.doc, tr.selection, tr)
   }
 
   /// Create a new state. You'll usually only need this when
@@ -134,8 +142,8 @@ export class EditorState {
     let doc = config.doc instanceof Text ? config.doc
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
-    if (!configuration.staticFacet(EditorState.allowMultipleSelections)) selection = selection.asSingle()
-    return initState(new EditorState(configuration, doc, selection), null)
+    if (!configuration.staticFacet(allowMultipleSelections)) selection = selection.asSingle()
+    return new EditorState(configuration, doc, selection)
   }
 
   /// A facet that, when enabled, causes the editor to allow multiple
@@ -143,10 +151,7 @@ export class EditorState {
   /// directly, but let a plugin like
   /// [multiple-selections](#multiple-selections) handle it (which
   /// also makes sure the selections are visible in the view).
-  static allowMultipleSelections = Facet.define<boolean, boolean>({
-    combine: values => values.some(v => v),
-    static: true
-  })
+  static allowMultipleSelections = allowMultipleSelections
 
   /// Facet that defines a way to query for automatic indentation
   /// depth at the start of a given line.
