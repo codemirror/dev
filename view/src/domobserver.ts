@@ -1,6 +1,6 @@
 import browser from "./browser"
 import {ContentView, Dirty} from "./contentview"
-import {DocView} from "./docview"
+import {EditorView} from "./editorview"
 import {hasSelection, DOMSelection} from "./dom"
 
 const observeOptions = {
@@ -31,10 +31,10 @@ export class DOMObserver {
   intersection: IntersectionObserver | null = null
   intersecting: boolean = false
 
-  constructor(private docView: DocView,
+  constructor(private view: EditorView,
               private onChange: (from: number, to: number, typeOver: boolean) => boolean,
               private onScrollChanged: () => void) {
-    this.dom = docView.dom
+    this.dom = view.contentDOM
     this.observer = new MutationObserver(mutations => this.flush(mutations))
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {
@@ -44,7 +44,7 @@ export class DOMObserver {
         if (this.charDataTimeout == null) this.charDataTimeout = setTimeout(() => this.flush(), 20)
       }
     this.onSelectionChange = () => {
-      if (this.docView.root.activeElement == this.dom) this.flush()
+      if (this.view.root.activeElement == this.dom) this.flush()
     }
     this.start()
 
@@ -69,6 +69,7 @@ export class DOMObserver {
     }
   }
 
+  // FIXME schedule calls to this
   listenForScroll() {
     let i = 0, changed: HTMLElement[] | null = null
     for (let dom = this.dom as any; dom;) {
@@ -131,7 +132,7 @@ export class DOMObserver {
   }
 
   clearSelection() {
-    this.ignoreSelection.set(this.docView.root.getSelection()!)
+    this.ignoreSelection.set(this.view.root.getSelection()!)
   }
 
   // Throw away any pending changes
@@ -145,7 +146,7 @@ export class DOMObserver {
   flush(records: MutationRecord[] = this.observer.takeRecords()) {
     if (this.charDataQueue.length)
       records = records.concat(this.takeCharRecords())
-    let selection = this.docView.root.getSelection()!
+    let selection = this.view.root.getSelection()!
     let newSel = !this.ignoreSelection.eq(selection) && hasSelection(this.dom, selection)
     if (records.length == 0 && !newSel) return
 
@@ -164,17 +165,17 @@ export class DOMObserver {
 
     let apply = from > -1 || newSel
     if (!apply || !this.onChange(from, to, typeOver)) {
-      if (this.docView.dirty) {
-        this.ignore(() => this.docView.sync())
-        this.docView.dirty = Dirty.Not
+      if (this.view.docView.dirty) {
+        this.ignore(() => this.view.docView.sync())
+        this.view.docView.dirty = Dirty.Not
       }
-      this.docView.updateSelection()
+      this.view.docView.updateSelection()
     }
     this.clearSelection()
   }
 
   readMutation(rec: MutationRecord): {from: number, to: number, typeOver: boolean} | null {
-    let cView = this.docView.nearest(rec.target)
+    let cView = this.view.docView.nearest(rec.target)
     if (!cView || cView.ignoreMutation(rec)) return null
     cView.markDirty()
 

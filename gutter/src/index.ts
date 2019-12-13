@@ -342,8 +342,10 @@ class NumberMarker extends GutterMarker {
 const lineNumberGutter = new Gutter({
   style: "lineNumber",
   updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
-    let ann = update.annotation(lineNumberMarkers)
-    if (ann) markers = markers.update(ann.add || [], ann.filter || null)
+    for (let tr of update.transactions) {
+      let ann = tr.annotation(lineNumberMarkers)
+      if (ann) markers = markers.update(ann.add || [], ann.filter || null)
+    }
     return markers
   },
   lineMarker(view, line, others) {

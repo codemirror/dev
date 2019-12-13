@@ -1,20 +1,21 @@
-import {EditorState, Transaction, CancellablePromise, Annotation, Extension} from "../../state"
+import {EditorState, Transaction, CancellablePromise, Extension} from "../../state"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
-import {Rect} from "./dom"
-import {applyDOMChange} from "./domchange"
+import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
-import {Viewport} from "./viewport"
-import {ViewUpdate, styleModule, theme, handleDOMEvents, focusChange,
+import {ViewState} from "./viewport"
+import {ViewUpdate, styleModule, theme, handleDOMEvents,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, ViewPlugin, decorations, phrases, notified} from "./extension"
+        viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest} from "./extension"
+import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import {styles} from "./styles"
 import {themeClass} from "./theme"
 import browser from "./browser"
+import {applyDOMChange} from "./domchange"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
@@ -56,18 +57,15 @@ export const enum UpdateState {
 /// line number gutter. It handles events and dispatches state
 /// transactions for editing actions.
 export class EditorView {
-  private _state!: EditorState
   /// The current editor state.
-  get state() { return this._state }
+  get state() { return this.viewState.state }
 
-  /// @internal
-  _viewport!: Viewport
   /// To be able to display large documents without consuming too much
   /// memory or overloading the browser, CodeMirror only draws the
   /// code that is visible, plus a margin around it, to the DOM. This
   /// property tells you the extent of the current drawn viewport, in
   /// document positions.
-  get viewport(): {from: number, to: number} { return this._viewport }
+  get viewport(): {from: number, to: number} { return this.viewState.viewport }
 
   /// All regular editor state updates should go through this. It
   /// takes a transaction, applies it, and updates the view to show
@@ -80,7 +78,7 @@ export class EditorView {
   /// relevant when inspecting the DOM selection, where you'll want to
   /// call `getSelection` on this, rather than the global `document`
   /// or `window` objects, to ensure you get the right selection.
-  readonly root: DocumentOrShadowRoot
+  readonly root: DocumentOrShadowRoot // FIXME provide portable local getSelection
 
   /// The DOM element that wraps the entire editor view.
   readonly dom: HTMLElement
@@ -99,10 +97,12 @@ export class EditorView {
   inputState!: InputState
 
   /// @internal
+  readonly viewState: ViewState
+  /// @internal
   readonly docView: DocView
 
   /// @internal
-  plugins: ViewPlugin<any>[] = []
+  plugins: ViewPlugin[] = []
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
@@ -112,6 +112,14 @@ export class EditorView {
 
   /// @internal
   waiting: CancellablePromise<any>[] = []
+
+  /// @internal
+  observer: DOMObserver
+
+  /// @internal
+  measureScheduled: number = -1
+  /// @internal
+  measureRequests: MeasureRequest<any>[] = []
 
   /// Construct a new view. You'll usually want to put `view.dom` into
   /// your document after creating a view, so that the user can see
@@ -128,14 +136,12 @@ export class EditorView {
     this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
     this.root = (config.root || document) as DocumentOrShadowRoot
 
-    this.docView = new DocView(this, (start, end, typeOver) => applyDOMChange(this, start, end, typeOver))
+    this.viewState = new ViewState(config.state || EditorState.create())
+    this.plugins = this.state.facet(viewPlugin).map(Ctor => new Ctor(this))
+    this.observer = new DOMObserver(this, (from, to, typeOver) => applyDOMChange(this, from, to, typeOver),
+                                    () => this.measure())
+    this.docView = new DocView(this)
 
-    let state = config.state || EditorState.create()
-    this.docView.init(state, viewport => {
-      this._viewport = viewport
-      this._state = state
-      this.plugins = this.state.facet(viewPlugin).map(Ctor => new Ctor(this))
-    })
     this.inputState = new InputState(this)
     this.mountStyles()
     this.updateAttrs()
@@ -148,10 +154,10 @@ export class EditorView {
   /// update the visible document and selection to match the state
   /// produced by the transactions, and notify view plugins of the
   /// change.
-  update(transactions: Transaction[] = [], annotations: Annotation<any>[] = []) {
+  update(transactions: Transaction[]) {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
-    this.updateState = UpdateState.Updating
+    this.updateState = UpdateState.Updating // FIXME make sure this is maintained correctly
 
     this.clearWaiting()
     let state = this.state
@@ -160,16 +166,67 @@ export class EditorView {
         throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
       state = tr.apply()
     }
-    let update = transactions.length > 0 || annotations.length > 0 ? new ViewUpdate(this, transactions, annotations) : null
+    let update = new ViewUpdate(this, state, transactions)
     if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.annotation(Transaction.preserveGoalColumn)))
       this.inputState.goalColumns.length = 0
-    this.docView.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
-    if (update) {
-      this.inputState.ensureHandlers(this)
-      if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
-    }
+
+    let ranges = this.viewState.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+    if (!update.empty) this.updatePlugins(update)
+    this.docView.update(update, ranges)
+    this.inputState.ensureHandlers(this)
+    if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
+    if (update.docChanged) this.requestMeasure()
+  }
+
+  updatePlugins(update: ViewUpdate) {
+    let prevSpecs = update.prevState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
+    // FIXME try/catch and replace crashers with dummy plugins
+    if (prevSpecs != specs) {
+      let newPlugins = [], reused = []
+      for (let Ctor of specs) {
+        let found = prevSpecs.indexOf(Ctor)
+        if (found < 0) {
+          newPlugins.push(new Ctor(this))
+        } else {
+          let plugin = this.plugins[found]
+          reused.push(plugin)
+          if (plugin.update) plugin.update(update)
+          newPlugins.push(plugin)
+        }
+      }
+      for (let plugin of this.plugins)
+        if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
+      this.plugins = newPlugins
+    } else {
+      for (let plugin of this.plugins) plugin.update(update)
+    }
+  }
+
+  measure() {
+    if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
+    this.measureScheduled = 1 // Prevent requestMeasure calls from scheduling another animation frame
+
+    for (let i = 0;; i++) {
+      this.updateState = UpdateState.Measuring
+      let changed = this.viewState.measure(this.docView, i > 0)
+      let measuring = this.measureRequests
+      if (!changed && !measuring.length) break
+      if (i > 5) {
+        console.warn("Viewport failed to stabilize")
+        break
+      }
+      let update = new ViewUpdate(this, this.state)
+      update.flags |= changed
+      this.updateState = UpdateState.Updating
+      this.updatePlugins(update)
+      if (changed) this.docView.update(update, [])
+      else if (this.measureRequests.length == 0) break
+    }
+
+    this.updateState = UpdateState.Idle
+    this.measureScheduled = -1
   }
 
   /// Wait for the given promise to resolve, and then run an update.
@@ -177,7 +234,7 @@ export class EditorView {
   /// `canceled` property to true and ignore it.
   waitFor(promise: CancellablePromise<any>) {
     promise.then(() => {
-      if (!promise.canceled) this.update([], [notified(true)])
+      if (!promise.canceled) this.update([])
     })
     this.waiting.push(promise)
   }
@@ -210,34 +267,6 @@ export class EditorView {
     StyleModule.mount(this.root, this.styleModules.concat(styles).reverse())
   }
 
-  /// @internal
-  updateInner(update: ViewUpdate, viewport: Viewport) {
-    this._viewport = viewport
-    let prevSpecs = this.state.facet(viewPlugin), specs = update.state.facet(viewPlugin)
-    this._state = update.state
-    // FIXME try/catch and replace crashers with dummy plugins
-    // FIXME get the DOM read/white ordering correct again
-    if (prevSpecs != specs) {
-      let newPlugins = [], reused = []
-      for (let Ctor of specs) {
-        let found = prevSpecs.indexOf(Ctor)
-        if (found < 0) {
-          newPlugins.push(new Ctor(this))
-        } else {
-          let plugin = this.plugins[found]
-          reused.push(plugin)
-          if (plugin.update) plugin.update(update)
-          newPlugins.push(plugin)
-        }
-      }
-      for (let plugin of this.plugins)
-        if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
-      this.plugins = newPlugins
-    } else {
-      for (let plugin of this.plugins) if (plugin.update) plugin.update(update)
-    }
-  }
-
   /// Look up a translation for the given phrase (via the
   /// [`phrases`](#view.EditorView^phrases) facet), or return the
   /// original string if no translation is found.
@@ -262,11 +291,10 @@ export class EditorView {
     return this.docView.posFromDOM(node, offset)
   }
 
-  private readingLayout() {
+  private readMeasured() {
     if (this.updateState == UpdateState.Updating)
       throw new Error("Reading the editor layout isn't allowed during an update")
-    if (this.updateState == UpdateState.Idle && this.docView.layoutCheckScheduled > -1)
-      this.docView.checkLayout()
+    if (this.updateState == UpdateState.Idle && this.measureScheduled > -1) this.measure()
   }
 
   /// Make sure plugins get a chance to measure the DOM before the
@@ -274,8 +302,18 @@ export class EditorView {
   /// directly from, for example, an even handler, because it'll make
   /// sure measuring and drawing done by other components is
   /// synchronized, avoiding unnecessary DOM layout computations.
-  requireMeasure() {
-    this.docView.scheduleLayoutCheck()
+  requestMeasure(request?: MeasureRequest<any>) {
+    if (this.measureScheduled < 0)
+      this.measureScheduled = requestAnimationFrame(() => this.measure())
+    if (request) {
+      if (request.key != null) for (let i = 0; i < this.measureRequests.length; i++) {
+        if (this.measureRequests[i].key === request.key) {
+          this.measureRequests[i] = request
+          return
+        }
+      }
+      this.measureRequests.push(request)
+    }
   }
 
   /// Find the line or block widget at the given vertical position.
@@ -283,8 +321,8 @@ export class EditorView {
   /// of the editor. It defaults to the editor's screen position
   /// (which will force a DOM layout).
   blockAtHeight(height: number, editorTop?: number) {
-    this.readingLayout()
-    return this.docView.blockAtHeight(height, editorTop)
+    this.readMeasured()
+    return this.viewState.blockAtHeight(height, ensureTop(editorTop, this.contentDOM))
   }
 
   /// Find information for the line at the given vertical position.
@@ -292,26 +330,26 @@ export class EditorView {
   /// structs in its `type` field if this line consists of more than
   /// one block.
   lineAtHeight(height: number, editorTop?: number): BlockInfo {
-    this.readingLayout()
-    return this.docView.lineAtHeight(height, editorTop)
+    this.readMeasured()
+    return this.viewState.lineAtHeight(height, ensureTop(editorTop, this.contentDOM))
   }
 
   /// Find the height information for the given line.
   lineAt(pos: number, editorTop?: number): BlockInfo {
-    this.readingLayout()
-    return this.docView.lineAt(pos, editorTop)
+    this.readMeasured()
+    return this.viewState.lineAt(pos, ensureTop(editorTop, this.contentDOM))
   }
 
   /// Iterate over the height information of the lines in the
   /// viewport.
   viewportLines(f: (height: BlockInfo) => void, editorTop?: number) {
-    let {from, to} = this._viewport
-    this.docView.forEachLine(from, to, f, editorTop)
+    let {from, to} = this.viewport
+    this.viewState.forEachLine(from, to, f, ensureTop(editorTop, this.contentDOM))
   }
 
   /// The editor's total content height.
   get contentHeight() {
-    return this.docView.heightMap.height + this.docView.paddingTop + this.docView.paddingBottom
+    return this.viewState.heightMap.height + this.viewState.paddingTop + this.viewState.paddingBottom
   }
 
   /// Compute cursor motion from the given position, in the given
@@ -329,21 +367,21 @@ export class EditorView {
   /// Get the document position at the given screen coordinates.
   /// Returns -1 if no valid position could be found.
   posAtCoords(coords: {x: number, y: number}): number {
-    this.readingLayout()
+    this.readMeasured()
     return posAtCoords(this, coords)
   }
 
   /// Get the screen coordinates at the given document position.
   coordsAtPos(pos: number): Rect | null {
-    this.readingLayout()
+    this.readMeasured()
     return this.docView.coordsAt(pos)
   }
 
   /// The default width of a character in the editor. May not
   /// accurately reflect the width of all characters.
-  get defaultCharacterWidth() { return this.docView.heightOracle.charWidth }
+  get defaultCharacterWidth() { return this.viewState.heightOracle.charWidth }
   /// The default height of a line in the editor.
-  get defaultLineHeight() { return this.docView.heightOracle.lineHeight }
+  get defaultLineHeight() { return this.viewState.heightOracle.lineHeight }
 
   /// Start a custom mouse selection event.
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
@@ -358,7 +396,10 @@ export class EditorView {
 
   /// Put focus on the editor.
   focus() {
-    this.docView.focus()
+    this.observer.ignore(() => {
+      focusPreventScroll(this.contentDOM)
+      this.docView.updateSelection()
+    })
   }
 
   /// Clean up this editor view, removing its element from the
@@ -374,7 +415,8 @@ export class EditorView {
     }
     this.inputState.destroy()
     this.dom.remove()
-    this.docView.destroy()
+    this.observer.destroy()
+    if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
   }
 
   /// Facet to add a [style
@@ -428,11 +470,10 @@ export class EditorView {
   /// Facet that provides editor DOM attributes for the editor's
   /// outer element.
   static editorAttributes = editorAttributes
+}
 
-  /// An annotation that is used as a flag in view updates caused by
-  /// changes to the view's focus state. Its value will be `true` when
-  /// the view is being focused, `false` when it's losing focus.
-  static focusChange = focusChange
+function ensureTop(given: number | undefined, dom: HTMLElement) {
+  return given == null ? dom.getBoundingClientRect().top : given
 }
 
 let registeredGlobalHandler = false, resizeDebounce = -1
@@ -449,6 +490,6 @@ function handleResize() {
   let found = document.querySelectorAll(".codemirror-content")
   for (let i = 0; i < found.length; i++) {
     let docView = found[i].cmView
-    if (docView) docView.editorView.update([], [notified(true)]) // FIXME remove need to pass an annotation?
+    if (docView) docView.editorView.requestMeasure() // FIXME remove need to pass an annotation?
   }
 }

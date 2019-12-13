@@ -166,7 +166,7 @@ export abstract class HeightMap {
     return me.updateHeight(oracle, 0)
   }
 
-  static empty() { return new HeightMapText(0, 0) }
+  static empty(): HeightMap { return new HeightMapText(0, 0) }
 
   // nodes uses null values to indicate the position of line breaks.
   // There are never line breaks at the start or end of the array, or

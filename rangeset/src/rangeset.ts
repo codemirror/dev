@@ -95,17 +95,17 @@ export class RangeSet<T extends RangeValue> {
   /// @internal
   constructor(
     /// @internal The text length covered by this set
-    public length: number,
+    readonly length: number,
     /// The number of ranges in this set
-    public size: number,
+    readonly size: number,
     /// @internal The locally stored ranges—which are all of them for
     /// leaf nodes, and the ones that don't fit in child sets for
     /// non-leaves. Sorted by start position, then side.
-    public local: readonly Range<T>[],
+    readonly local: readonly Range<T>[],
     /// @internal The child sets, in position order. Their total
     /// length may be smaller than .length if the end is empty (never
     /// greater)
-    public children: readonly RangeSet<T>[]
+    readonly children: readonly RangeSet<T>[]
   ) {}
 
   /// Update this set, returning the modified set. The range that gets
@@ -644,7 +644,9 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
   }
 }
 
-const SIDE_A = 1, SIDE_B = 2, FAR = 1e9
+const enum Side { A, B }
+
+const FAR = 1e9
 
 class ComparisonSide<T extends RangeValue> {
   heap: LocalSet<T>[] = []
@@ -709,12 +711,12 @@ class RangeSetComparison<T extends RangeValue> {
     this.b = new ComparisonSide<T>([new IteratedSet<T>(0, b)])
     this.pos = startB
     this.end = endB
-    this.forwardIter(SIDE_A | SIDE_B)
+    this.forwardIter(Side.A | Side.B)
   }
 
   // Move the iteration over the tree structure forward until all of
-  // the sides included in `side` (bitmask of `SIDE_A` and/or
-  // `SIDE_B`) have added new nodes to their heap, or there is nothing
+  // the sides included in `side` (bitmask of `Side.A` and/or
+  // `Side.B`) have added new nodes to their heap, or there is nothing
   // further to iterate over. This is basically used to ensure the
   // heaps are stocked with nodes from the stacks that track the
   // iteration.
@@ -722,12 +724,12 @@ class RangeSetComparison<T extends RangeValue> {
     for (; side > 0;) {
       let nextA = this.a.stack.length ? this.a.stack[this.a.stack.length - 1] : null
       let nextB = this.b.stack.length ? this.b.stack[this.b.stack.length - 1] : null
-      if (!nextA && (side & SIDE_A)) {
+      if (!nextA && (side & Side.A)) {
         // If there's no next node for A, we're done there
-        side &= ~SIDE_A
-      } else if (!nextB && (side & SIDE_B)) {
+        side &= ~Side.A
+      } else if (!nextB && (side & Side.B)) {
         // No next node for B
-        side &= ~SIDE_B
+        side &= ~Side.B
       } else if (nextA && nextB && nextA.offset == nextB.offset && nextA.set == nextB.set) {
         // Both next nodes are the same—skip them
         iterRangeSet<T>(this.a.stack, this.pos)
@@ -737,10 +739,10 @@ class RangeSetComparison<T extends RangeValue> {
                                                                        nextA.set.length >= nextB.set.length)))) {
         // If there no next B, or it comes after the next A, or it
         // sits at the same position and is smaller, move A forward.
-        if (this.a.forward(this.pos, nextA)) side &= ~SIDE_A
+        if (this.a.forward(this.pos, nextA)) side &= ~Side.A
       } else {
         // Otherwise move B forward
-        if (this.b.forward(this.pos, nextB!)) side &= ~SIDE_B
+        if (this.b.forward(this.pos, nextB!)) side &= ~Side.B
       }
     }
   }
@@ -787,7 +789,7 @@ class RangeSetComparison<T extends RangeValue> {
         addToHeap(side.heap, next)
       } else {
         // Otherwise, move the iterator forward (making sure this side is advanced)
-        this.forwardIter(side == this.a ? SIDE_A : SIDE_B)
+        this.forwardIter(side == this.a ? Side.A : Side.B)
       }
 
       // Ignore ranges that fall entirely in a point on the other side
