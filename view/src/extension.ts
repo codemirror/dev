@@ -1,4 +1,4 @@
-import {EditorState, Transaction, ChangeSet, Annotation, Facet, Extension} from "../../state"
+import {EditorState, Transaction, ChangeSet, Facet, Extension} from "../../state"
 import {StyleModule} from "style-mod"
 import {Viewport} from "./viewport"
 import {Decoration, DecorationSet} from "./decoration"
@@ -23,7 +23,7 @@ export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
 /// View plugins associate stateful values with a view. They can
 /// influence the way the content is drawn, and are notified of things
 /// that happen in the view.
-export class ViewPlugin<Measure = undefined> {
+export class ViewPlugin {
   /// Notifies the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
@@ -31,25 +31,11 @@ export class ViewPlugin<Measure = undefined> {
   /// or read the DOM in a way that triggers a layout recomputation.
   update(update: ViewUpdate): void {}
 
-  /// This will be called in the layout-reading phase of an editor
-  /// update. It should, if the plugin needs to read DOM layout
-  /// information, do this reading and wrap the information in the
-  /// value that it returns. It should not have side effects.
-  measure(): Measure { return undefined as any } // FIXME replace with measure-scheduling mechanism
-
-  /// If the plugin also has a `measure` method, this method will be
-  /// called at the end of the DOM-writing phase after a layout
-  /// reading phase, with the result from the `measure` method as
-  /// argument. Called before `draw`, in cases where both are called.
-  ///
-  /// May return `true` to request another cycle of
-  /// `measure`/`drawMeasured` calls.
-  drawMeasured(measured: Measure): boolean { return false }
-
   /// Called when the plugin is no longer going to be used. Should
   /// revert any changes the plugin made to the DOM.
   destroy(): void {}
 
+  // FIXME somehow ensure that no replacing decorations end up in here
   decorations!: DecorationSet
 
   scrollMargins!: Partial<Rect> | null
@@ -59,14 +45,18 @@ export class ViewPlugin<Measure = undefined> {
   static get extension() {
     return this._extension || (this._extension = viewPlugin.of(this))
   }
-
-  // FIXME attrs
 }
 
 ViewPlugin.prototype.decorations = Decoration.none
 ViewPlugin.prototype.scrollMargins = null
 
-export const viewPlugin = Facet.define<{new (view: EditorView): ViewPlugin<any>}>()
+export interface MeasureRequest<T> {
+  key: any
+  read(view: EditorView): T
+  write(view: EditorView, measure: T): void
+}
+
+export const viewPlugin = Facet.define<{new (view: EditorView): ViewPlugin}>()
 
 export const editorAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
@@ -85,43 +75,50 @@ export const theme = Facet.define<StyleModule<{[key: string]: string}>>()
 
 export const phrases = Facet.define<{[key: string]: string}>()
 
-export const focusChange = Annotation.define<boolean>()
-
-export const notified = Annotation.define<boolean>()
+export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, Oracle = 8 }
 
 /// View [plugins](#view.ViewPlugin) are given instances of this
 /// class, which describe what happened, whenever the view is updated.
 export class ViewUpdate {
-  /// The new editor state.
-  readonly state: EditorState
   /// The changes made to the document by this update.
   readonly changes: ChangeSet
   /// The previous editor state.
   readonly prevState: EditorState
-  /// The previous viewport range.
-  readonly prevViewport: Viewport
+  /// @internal
+  flags = 0
 
   /// @internal
   constructor(
     /// The editor view that the update is associated with.
     readonly view: EditorView,
+  /// The new editor state.
+    readonly state: EditorState,
     /// The transactions involved in the update. May be empty.
-    readonly transactions: readonly Transaction[] = none,
-    /// @internal
-    readonly _annotations: readonly Annotation<any>[] = none
+    readonly transactions: readonly Transaction[] = none
   ) {
-    this.state = transactions.length ? transactions[transactions.length - 1].apply() : view.state
     this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     this.prevState = view.state
-    this.prevViewport = view._viewport
+    let focus = view.hasFocus
+    if (focus != view.inputState.notifiedFocused) {
+      view.inputState.notifiedFocused = focus
+      this.flags != UpdateFlag.Focus
+    }
+    if (this.docChanged) this.flags |= UpdateFlag.Height
   }
-
-  /// The new viewport range.
-  get viewport(): {from: number, to: number} { return this.view._viewport }
 
   /// Tells you whether the viewport changed in this update.
   get viewportChanged() {
-    return !this.prevViewport.eq(this.view._viewport)
+    return (this.flags & UpdateFlag.Viewport) > 0
+  }
+
+  /// Indicates whether the line height in the editor changed in this update.
+  get heightChanged() {
+    return (this.flags & UpdateFlag.Height) > 0
+  }
+
+  /// True when this update indicates a focus change.
+  get focusChanged() {
+    return (this.flags & UpdateFlag.Focus) > 0
   }
 
   /// Whether the document changed in this update.
@@ -137,31 +134,6 @@ export class ViewUpdate {
     return this.prevState.facet(theme) != this.view.state.facet(theme)
   }
 
-  /// Get the value of the given annotation, if it was passed directly
-  /// for the update or present in any of the transactions involved in
-  /// the update.
-  annotation<T>(type: (value: T) => Annotation<T>): T | undefined {
-    for (let ann of this._annotations)
-      if (ann.type == type) return ann.value as T
-    for (let i = this.transactions.length - 1; i >= 0; i--) {
-      let value = this.transactions[i].annotation(type)
-      if (value !== undefined) return value
-    }
-    return undefined
-  }
-
-  /// Get the values of all instances of the given annotation type
-  /// present in the transactions or passed directly to
-  /// [`update`](#view.EditorView.update).
-  annotations<T>(type: (value: T) => Annotation<T>): readonly T[] {
-    let result = none
-    for (let tr of this.transactions) {
-      let ann = tr.annotations(type)
-      if (ann.length) result = result.concat(ann)
-    }
-    for (let ann of this._annotations) {
-      if (ann.type == type) result = result.concat([ann.value as T])
-    }
-    return result
-  }
+  /// @internal
+  get empty() { return this.flags == 0 && this.transactions.length == 0 }
 }

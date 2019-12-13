@@ -255,7 +255,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
   }
 
   get overrideDOMText() {
-    return this.parent ? this.parent!.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
+    return this.parent ? this.parent!.view.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
   }
 
   domBoundsAround() { return null }

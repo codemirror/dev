@@ -152,3 +152,31 @@ export class DOMSelection {
     this.focusNode = domSel.focusNode; this.focusOffset = domSel.focusOffset
   }
 }
+
+let preventScrollSupported: null | false | {preventScroll: boolean} = null
+// Feature-detects support for .focus({preventScroll: true}), and uses
+// a fallback kludge when not supported.
+export function focusPreventScroll(dom: HTMLElement) {
+  if ((dom as any).setActive) return (dom as any).setActive() // in IE
+  if (preventScrollSupported) return dom.focus(preventScrollSupported)
+
+  let stack = []
+  for (let cur: Node | null = dom; cur; cur = cur.parentNode) {
+    stack.push(cur, dom.scrollTop, dom.scrollLeft)
+    if (cur == cur.ownerDocument) break
+  }
+  dom.focus(preventScrollSupported == null ? {
+    get preventScroll() {
+      preventScrollSupported = {preventScroll: true}
+      return true
+    }
+  } : undefined)
+  if (!preventScrollSupported) {
+    preventScrollSupported = false
+    for (let i = 0; i < stack.length;) {
+      let elt = stack[i++] as HTMLElement, top = stack[i++] as number, left = stack[i++] as number
+      if (elt.scrollTop != top) elt.scrollTop = top
+      if (elt.scrollLeft != left) elt.scrollLeft = left
+    }
+  }
+}

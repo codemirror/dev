@@ -2,17 +2,14 @@ import {ContentView, ChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
-import {Viewport, ViewportState} from "./viewport"
+import {Viewport, decoChanges} from "./viewport"
 import browser from "./browser"
-import {DOMObserver} from "./domobserver"
-import {HeightMap, QueryType, HeightOracle, MeasuredHeights, BlockInfo} from "./heightmap"
-import {Decoration, DecorationSet, joinRanges, findChangedRanges,
-        WidgetType, BlockType} from "./decoration"
-import {clientRectsFor, isEquivalentPosition, scrollRectIntoView, maxOffset, Rect} from "./dom"
-import {ViewUpdate, decorations as decorationsFacet, ViewPlugin} from "./extension"
-import {EditorView, UpdateState} from "./editorview"
-import {EditorState, ChangedRange} from "../../state"
-import {Text} from "../../text"
+import {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
+import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView} from "./dom"
+import {ViewUpdate, decorations as decorationsFacet} from "./extension"
+import {EditorView} from "./editorview"
+import {ChangedRange} from "../../state"
+import {extendWithRanges} from "./viewport"
 
 const none = [] as any
 
@@ -20,24 +17,9 @@ export class DocView extends ContentView {
   children!: BlockView[]
   viewports: Viewport[] = none
 
-  decorations!: readonly DecorationSet[]
-  compositionDeco: DecorationSet = Decoration.none
-  gapDeco: DecorationSet = Decoration.none
+  compositionDeco = Decoration.none
+  localDeco: readonly DecorationSet[] = []
   selectionDirty: any = null
-
-  observer: DOMObserver
-  forceSelectionUpdate: boolean = false
-
-  viewportState: ViewportState
-  heightMap: HeightMap = HeightMap.empty()
-  heightOracle: HeightOracle = new HeightOracle
-
-  layoutCheckScheduled: number = -1
-  // A document position that has to be scrolled into view at the next layout check
-  scrollIntoView: number = -1
-
-  paddingTop: number = 0
-  paddingBottom: number = 0
 
   // Track a minimum width for the editor. When measuring sizes in
   // checkLayout, this is updated to point at the width of a given
@@ -57,46 +39,27 @@ export class DocView extends ContentView {
 
   dom!: HTMLElement
 
-  get length() { return this.state.doc.length }
-
-  get state() { return this.view.state }
-
-  get viewport() { return this.view._viewport }
-
   get root() { return this.view.root }
 
   get editorView() { return this.view }
 
-  constructor(readonly view: EditorView, onDOMChange: (from: number, to: number, typeOver: boolean) => boolean) {
+  get length() { return this.view.state.doc.length }
+
+  constructor(readonly view: EditorView) {
     super()
     this.setDOM(view.contentDOM)
-
-    this.viewportState = new ViewportState
-    this.observer = new DOMObserver(this, onDOMChange, () => this.checkLayout())
-  }
-
-  init(state: EditorState, initialize: (viewport: Viewport) => void) {
     this.children = [new LineView]
     this.children[0].setParent(this)
-    this.viewports = this.decorations = none
-    this.minWidth = 0
-    this.compositionDeco = Decoration.none
-    let changedRanges = [new ChangedRange(0, 0, 0, state.doc.length)]
-    this.heightMap = this.heightMap.applyChanges(none, Text.empty, this.heightOracle.setDoc(state.doc), changedRanges)
-    this.computeUpdate(state, state.doc, null, initialize, none, 0, -1)
-    this.updateInner(changedRanges, 0)
-    this.scheduleLayoutCheck()
+    let deco = this.gatherLocalDeco().concat(view.state.facet(decorationsFacet))
+    this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], deco, 0)
   }
 
   // Update the document view to a given state. scrollIntoView can be
   // used as a hint to compute a new viewport that includes that
   // position, if we know the editor is going to scroll that position
   // into view.
-  update(update: ViewUpdate | null, scrollIntoView: number = -1) {
-    let prevDoc = this.state.doc
-    let state = update ? update.state : this.state
-    let changedRanges: ChangedRange[] = update ? update.changes.changedRanges() : none
-    if (this.minWidth > 0 && changedRanges.length) {
+  update(update: ViewUpdate, changedRanges: readonly ChangedRange[]) {
+     if (this.minWidth > 0 && changedRanges.length) {
       if (!changedRanges.every(({fromA, toA}) => toA < this.minWidthFrom || fromA > this.minWidthTo)) {
         this.minWidth = 0
       } else {
@@ -105,79 +68,58 @@ export class DocView extends ContentView {
       }
     }
 
-    let contentChanges = this.computeUpdate(state, prevDoc, update, null, changedRanges, 0, scrollIntoView)
     // When the DOM nodes around the selection are moved to another
     // parent, Chrome sometimes reports a different selection through
     // getSelection than the one that it actually shows to the user.
     // This forces a selection update when lines are joined to work
     // around that. Issue #54
-    if (browser.chrome && !this.compositionDeco.size && update && update.changes.changes.some(ch => ch.text.length > 1))
-      this.forceSelectionUpdate = true
+    let forceSelection = browser.chrome && !this.compositionDeco.size && update &&
+      update.changes.changes.some(ch => ch.text.length > 1)
 
-    if (this.dirty == Dirty.Not && contentChanges.length == 0 &&
-        this.state.selection.primary.from >= this.viewport.from &&
-        this.state.selection.primary.to <= this.viewport.to &&
-        (!update || update._annotations.length == 0)) {
-      this.updateSelection()
-      if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
-      if (update) this.scheduleLayoutCheck()
+    if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
+    else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, changedRanges)
+
+    let prevLocal = this.localDeco, localDeco = this.gatherLocalDeco()
+    let decoDiff = decoChanges(changedRanges, localDeco, prevLocal, update.prevState.doc.length).content
+    changedRanges = extendWithRanges(changedRanges, decoDiff)
+    
+    if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
+        update.state.selection.primary.from >= this.view.viewport.from &&
+        update.state.selection.primary.to <= this.view.viewport.to) {
+      this.updateSelection(forceSelection)
     } else {
-      this.updateInner(contentChanges, prevDoc.length)
-      this.cancelLayoutCheck()
-      if (scrollIntoView > -1) this.scrollIntoView = scrollIntoView
-      this.scheduleLayoutCheck()
+      this.updateInner(changedRanges, localDeco.concat(this.view.state.facet(decorationsFacet)),
+                       update.prevState.doc.length, forceSelection)
     }
-  }
-
-  scheduleLayoutCheck() {
-    this.layoutCheckScheduled = requestAnimationFrame(() => this.checkLayout())
   }
 
   // Used both by update and checkLayout do perform the actual DOM
   // update
-  private updateInner(changes: readonly ChangedRange[], oldLength: number) {
-    let visible = this.viewport, viewports: Viewport[] = [visible]
-    let {head, anchor} = this.state.selection.primary
-    if (head < visible.from || head > visible.to) {
-      let {from, to} = this.lineAt(head, 0)
-      viewports.push(new Viewport(from, to))
-    }
-    if (!viewports.some(({from, to}) => anchor >= from && anchor <= to)) {
-      let {from, to} = this.lineAt(anchor, 0)
-      viewports.push(new Viewport(from, to))
-    }
-    viewports.sort((a, b) => a.from - b.from)
+  private updateInner(changes: readonly ChangedRange[], deco: readonly DecorationSet[],
+                      oldLength: number, forceSelection = false) {
+    this.updateChildren(changes, deco, oldLength)
 
-    this.updateChildren(changes, viewports, oldLength)
-
-    this.viewports = viewports
-    this.observer.ignore(() => {
+    this.view.observer.ignore(() => {
       // Lock the height during redrawing, since Chrome sometimes
       // messes with the scroll position during DOM mutation (though
       // no relayout is triggered and I cannot imagine how it can
       // recompute the scroll position without a layout)
-      this.dom.style.height = this.heightMap.height + "px"
+      this.dom.style.height = this.view.viewState.heightMap.height + "px"
       this.dom.style.minWidth = this.minWidth + "px"
       this.sync()
       this.dirty = Dirty.Not
-      this.updateSelection()
+      this.updateSelection(forceSelection)
       this.dom.style.height = ""
     })
   }
 
-  private updateChildren(changes: readonly ChangedRange[], viewports: readonly Viewport[], oldLength: number) {
-    let gapDeco = this.computeGapDeco(viewports, this.length)
-    let gapChanges = findChangedRanges(this.gapDeco, gapDeco, changes, oldLength)
-    this.gapDeco = gapDeco
-    changes = extendWithRanges(changes, gapChanges.content)
-
-    let allDeco = [gapDeco].concat(this.decorations)
+  private updateChildren(changes: readonly ChangedRange[], deco: readonly DecorationSet[], oldLength: number) {
     let cursor = this.childCursor(oldLength)
     for (let i = changes.length - 1;; i--) {
       let next = i >= 0 ? changes[i] : null
       if (!next) break
       let {fromA, toA, fromB, toB} = next
-      let {content, breakAtStart} = ContentBuilder.build(this.state.doc, fromB, toB, allDeco)
+      let {content, breakAtStart} = ContentBuilder.build(this.view.state.doc, fromB, toB, deco)
       let {i: toI, off: toOff} = cursor.findPos(toA, 1)
       let {i: fromI, off: fromOff} = cursor.findPos(fromA, -1)
       this.replaceRange(fromI, fromOff, toI, toOff, content, breakAtStart)
@@ -245,26 +187,21 @@ export class DocView extends ContentView {
   }
 
   // Sync the DOM selection to this.state.selection
-  updateSelection(takeFocus: boolean = false) {
+  updateSelection(force = false) {
     this.clearSelectionDirty()
-    if (this.root.activeElement != this.dom) {
-      if (!takeFocus) return
-      if (browser.gecko) this.dom.focus() // Avoids strange exceptions when setting the selection
-    }
+    if (this.root.activeElement != this.dom) return
 
-    let primary = this.state.selection.primary
+    let primary = this.view.state.selection.primary
     // FIXME need to handle the case where the selection falls inside a block range
     let anchor = this.domAtPos(primary.anchor)
     let head = this.domAtPos(primary.head)
 
     let domSel = this.root.getSelection()!
     // If the selection is already here, or in an equivalent position, don't touch it
-    if (this.forceSelectionUpdate ||
+    if (force ||
         !isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) ||
         !isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {
-      this.forceSelectionUpdate = false
-
-      this.observer.ignore(() => {
+      this.view.observer.ignore(() => {
         // Selection.extend can be used to create an 'inverted' selection
         // (one where the focus is before the anchor), but not all
         // browsers support it yet.
@@ -284,170 +221,6 @@ export class DocView extends ContentView {
 
     this.impreciseAnchor = anchor.precise ? null : new DOMPos(domSel.anchorNode!, domSel.anchorOffset)
     this.impreciseHead = head.precise ? null: new DOMPos(domSel.focusNode!, domSel.focusOffset)
-  }
-
-  lineAt(pos: number, editorTop?: number): BlockInfo {
-    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
-    return this.heightMap.lineAt(pos, QueryType.ByPos, this.state.doc, editorTop + this.paddingTop, 0)
-  }
-
-  lineAtHeight(height: number, editorTop?: number): BlockInfo {
-    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
-    return this.heightMap.lineAt(height, QueryType.ByHeight, this.state.doc, editorTop + this.paddingTop, 0)
-  }
-
-  blockAtHeight(height: number, editorTop?: number): BlockInfo {
-    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
-    return this.heightMap.blockAt(height, this.state.doc, editorTop + this.paddingTop, 0)
-  }
-
-  forEachLine(from: number, to: number, f: (line: BlockInfo) => void, editorTop?: number) {
-    if (editorTop == null) editorTop = this.dom.getBoundingClientRect().top
-    return this.heightMap.forEachLine(from, to, this.state.doc, editorTop + this.paddingTop, 0, f)
-  }
-
-  // Compute the new viewport and set of decorations, while giving
-  // plugin views the opportunity to respond to state and viewport
-  // changes. Might require more than one iteration to become stable.
-  computeUpdate(state: EditorState, oldDoc: Text,
-                update: ViewUpdate | null, initializing: null | ((viewport: Viewport) => void),
-                contentChanges: readonly ChangedRange[],
-                viewportBias: number, scrollIntoView: number): readonly ChangedRange[] {
-    let invalidHeightMap = contentChanges.length ? contentChanges : null, prevViewport = this.viewport || new Viewport(0, 0)
-    for (let i = 0;; i++) {
-      let viewport
-      if (invalidHeightMap) {
-        // FIXME this is a terrible kludge (see #128) to get around
-        // the fact that plugins need a viewport to update, but the
-        // heightmap update needs the current decorations, which are
-        // produced by the plugins
-        let from = ChangedRange.mapPos(prevViewport.from, -1, contentChanges)
-        viewport = new Viewport(from, Math.min(from + (prevViewport.to - prevViewport.from) + 1000,
-                                               ChangedRange.mapPos(prevViewport.to, 1, contentChanges)))
-      } else {
-        viewport = this.viewportState.getViewport(state.doc, this.heightMap, viewportBias, scrollIntoView)
-      }
-      let viewportChange = prevViewport ? !viewport.eq(prevViewport) : true
-      // When the viewport is stable and no more iterations are needed, return
-      if (!viewportChange && !invalidHeightMap && !update && !initializing) return contentChanges
-      // After 5 tries, give up
-      if (i == 5) {
-        console.warn("Viewport and decorations failed to converge")
-        return contentChanges
-      }
-      let prevState = this.state || state
-      if (initializing) initializing(viewport)
-      else this.view.updateInner(update || new ViewUpdate(this.view), viewport)
-      prevViewport = viewport
-
-      // For the composition decoration, use none on init, recompute
-      // when handling transactions, and use the previous value
-      // otherwise.
-      if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
-      else if (update && update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, contentChanges)
-      let decorations = this.state.facet(decorationsFacet).concat(this.compositionDeco)
-      // If the decorations are stable, stop.
-      if (!update && !initializing && sameArray(decorations, this.decorations)) return contentChanges
-      // Compare the decorations (between document changes)
-      let {content, height} = decoChanges(update ? contentChanges : none,
-                                          decorations, this.decorations, prevState.doc.length)
-      this.decorations = decorations
-      // Update the heightmap with these changes. If this is the first
-      // iteration and the document changed, also include decorations
-      // for inserted ranges.
-      let heightChanges = extendWithRanges(invalidHeightMap || none, height)
-      this.heightMap = this.heightMap.applyChanges(decorations, oldDoc, this.heightOracle.setDoc(state.doc), heightChanges)
-      invalidHeightMap = null
-      oldDoc = state.doc
-      // Accumulate content changes so that they can be redrawn
-      contentChanges = extendWithRanges(contentChanges, content)
-      // Make sure only one iteration is marked as required / state changing
-      update = null
-      initializing = null
-    }
-  }
-
-  focus() {
-    this.updateSelection(true)
-  }
-
-  cancelLayoutCheck() {
-    if (this.layoutCheckScheduled > -1) {
-      cancelAnimationFrame(this.layoutCheckScheduled)
-      this.layoutCheckScheduled = -1
-    }
-  }
-
-  checkLayout(forceFull = false) {
-    this.cancelLayoutCheck()
-    this.measureVerticalPadding()
-    let scrollIntoView = Math.min(this.scrollIntoView, this.state.doc.length)
-    this.scrollIntoView = -1
-    let scrollBias = 0
-    if (forceFull) this.viewportState.coverEverything()
-    else scrollBias = this.viewportState.updateFromDOM(this.dom, this.paddingTop)
-    if (this.viewportState.top >= this.viewportState.bottom) return // We're invisible!
-
-    this.view.updateState = UpdateState.Measuring
-    let lineHeights: number[] | null = this.measureVisibleLineHeights(), refresh = false
-    if (this.heightOracle.mustRefresh(lineHeights)) {
-      let {lineHeight, charWidth} = this.measureTextSize()
-      refresh = this.heightOracle.refresh(getComputedStyle(this.dom).whiteSpace!,
-                                          lineHeight, charWidth, (this.dom).clientWidth / charWidth, lineHeights)
-      if (refresh) this.minWidth = 0
-    }
-
-    if (scrollIntoView > -1) this.scrollPosIntoView(scrollIntoView)
-
-    let toMeasure: ViewPlugin[] = this.view.plugins.filter(p => p.measure && p.drawMeasured)
-
-    let update = false, measure = toMeasure.map(plugin => plugin.measure!())
-    for (let i = 0;; i++) {
-      this.heightOracle.heightChanged = false
-      this.heightMap = this.heightMap.updateHeight(
-        this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights || this.measureVisibleLineHeights()))
-      let covered = this.viewportState.coveredBy(this.state.doc, this.viewport, this.heightMap, scrollBias)
-      if (covered && !this.heightOracle.heightChanged) break
-      if (i > 10) {
-        console.warn("Layout failed to converge")
-        break
-      }
-      this.view.updateState = UpdateState.Updating
-      update = true
-      let contentChanges = covered ? none : this.computeUpdate(this.state, this.state.doc, null, null, none, scrollBias, -1)
-      this.updateInner(contentChanges, this.length)
-      lineHeights = null
-      refresh = false
-      scrollBias = 0
-      this.view.updateState = UpdateState.Measuring
-      this.viewportState.updateFromDOM(this.dom, this.paddingTop)
-      measure = toMeasure.map(plugin => plugin.measure!())
-    }
-    this.view.updateState = UpdateState.Updating
-    while (toMeasure.length) {
-      toMeasure = toMeasure.filter((plugin, i) => plugin.drawMeasured!(measure![i]))
-      measure = toMeasure.map(plugin => plugin.measure!())
-    }
-    if (update) {
-      this.observer.listenForScroll()
-      // FIXME update plugins again?
-    }
-    this.view.updateState = UpdateState.Idle
-  }
-
-  scrollPosIntoView(pos: number) {
-    let rect = this.coordsAt(pos)
-    if (!rect) return
-    let mLeft = 0, mRight = 0, mTop = 0, mBottom = 0
-    for (let plugin of this.view.plugins) if (plugin.scrollMargins) {
-      let {left, right, top, bottom} = plugin.scrollMargins
-      if (left != null) mLeft = Math.max(mLeft, left)
-      if (right != null) mRight = Math.max(mRight, right)
-      if (top != null) mTop = Math.max(mTop, top)
-      if (bottom != null) mBottom = Math.max(mBottom, bottom)
-    }
-    scrollRectIntoView(this.dom, {left: rect.left - mLeft, top: rect.top - mTop,
-                                  right: rect.right + mRight, bottom: rect.bottom + mBottom})
   }
 
   nearest(dom: Node): ContentView | null {
@@ -484,7 +257,7 @@ export class DocView extends ContentView {
   }
 
   measureVisibleLineHeights() {
-    let result = [], {from, to} = this.viewport
+    let result = [], {from, to} = this.view.viewState.viewport
     let minWidth = Math.max(this.dom.clientWidth, this.minWidth) + 1
     for (let pos = 0, i = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
@@ -503,12 +276,6 @@ export class DocView extends ContentView {
     return result
   }
 
-  measureVerticalPadding() {
-    let style = window.getComputedStyle(this.dom)
-    this.paddingTop = parseInt(style.paddingTop!) || 0
-    this.paddingBottom = parseInt(style.paddingBottom!) || 0
-  }
-
   measureTextSize(): {lineHeight: number, charWidth: number} {
     for (let child of this.children) {
       if (child instanceof LineView) {
@@ -520,7 +287,7 @@ export class DocView extends ContentView {
     let dummy = document.createElement("div"), lineHeight!: number, charWidth!: number
     dummy.className = "codemirror-line"
     dummy.textContent = "abc def ghi jkl mno pqr stu"
-    this.observer.ignore(() => {
+    this.view.observer.ignore(() => {
       this.dom.appendChild(dummy)
       let rect = clientRectsFor(dummy.firstChild!)[0]
       lineHeight = dummy.getBoundingClientRect().height
@@ -528,11 +295,6 @@ export class DocView extends ContentView {
       dummy.remove()
     })
     return {lineHeight, charWidth}
-  }
-
-  destroy() {
-    cancelAnimationFrame(this.layoutCheckScheduled)
-    this.observer.destroy()
   }
 
   clearSelectionDirty() {
@@ -543,7 +305,7 @@ export class DocView extends ContentView {
   }
 
   setSelectionDirty() {
-    this.observer.clearSelection()
+    this.view.observer.clearSelection()
     if (this.selectionDirty == null)
       this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
   }
@@ -557,19 +319,54 @@ export class DocView extends ContentView {
     return new ChildCursor(this.children, pos, i)
   }
 
-  computeGapDeco(viewports: readonly Viewport[], docLength: number): DecorationSet {
+  computeGapDeco(): DecorationSet {
+    let visible = this.view.viewState.viewport, viewports: Viewport[] = [visible]
+    let {head, anchor} = this.view.state.selection.primary
+    if (head < visible.from || head > visible.to) {
+      let {from, to} = this.view.viewState.lineAt(head, 0) // FIXME ugh
+      viewports.push(new Viewport(from, to))
+    }
+    if (!viewports.some(({from, to}) => anchor >= from && anchor <= to)) {
+      let {from, to} = this.view.viewState.lineAt(anchor, 0)
+      viewports.push(new Viewport(from, to))
+    }
+    this.viewports = viewports.sort((a, b) => a.from - b.from)
+
     let deco = []
     for (let pos = 0, i = 0;; i++) {
       let next = i == viewports.length ? null : viewports[i]
-      let end = next ? next.from - 1 : docLength
+      let end = next ? next.from - 1 : this.length
       if (end > pos) {
-        let height = this.lineAt(end, 0).bottom - this.lineAt(pos, 0).top
+        let height = this.view.viewState.lineAt(end, 0).bottom - this.view.viewState.lineAt(pos, 0).top
         deco.push(Decoration.replace(pos, end, {widget: new GapWidget(height), block: true, inclusive: true}))
       }
       if (!next) break
       pos = next.to + 1
     }
     return Decoration.set(deco)
+  }
+
+  gatherLocalDeco() {
+    let deco = [this.computeGapDeco(), this.compositionDeco]
+    for (let plugin of this.view.plugins) deco.push(plugin.decorations)
+    return this.localDeco = deco
+  }
+
+  scrollPosIntoView(pos: number) {
+    let rect = this.coordsAt(pos)
+    if (!rect) return
+    let mLeft = 0, mRight = 0, mTop = 0, mBottom = 0
+    for (let plugin of this.view.plugins) if (plugin.scrollMargins) {
+      let {left, right, top, bottom} = plugin.scrollMargins
+      if (left != null) mLeft = Math.max(mLeft, left)
+      if (right != null) mRight = Math.max(mRight, right)
+      if (top != null) mTop = Math.max(mTop, top)
+      if (bottom != null) mBottom = Math.max(mBottom, bottom)
+    }
+    scrollRectIntoView(this.dom, {
+      left: rect.left - mLeft, top: rect.top - mTop,
+      right: rect.right + mRight, bottom: rect.bottom + mBottom
+    })
   }
 }
 
@@ -601,44 +398,6 @@ class GapWidget extends WidgetType<number> {
   }
 
   get estimatedHeight() { return this.value }
-}
-
-function decoChanges(diff: readonly ChangedRange[], decorations: readonly DecorationSet[],
-                     oldDecorations: readonly DecorationSet[], oldLength: number): {content: number[], height: number[]} {
-  let contentRanges: number[] = [], heightRanges: number[] = []
-  for (let i = decorations.length - 1; i >= 0; i--) {
-    let deco = decorations[i], oldDeco = i < oldDecorations.length ? oldDecorations[i] : Decoration.none
-    if (deco.size == 0 && oldDeco.size == 0) continue
-    let newRanges = findChangedRanges(oldDeco, deco, diff, oldLength)
-    contentRanges = joinRanges(contentRanges, newRanges.content)
-    heightRanges = joinRanges(heightRanges, newRanges.height)
-  }
-  return {content: contentRanges, height: heightRanges}
-}
-
-function extendWithRanges(diff: readonly ChangedRange[], ranges: number[]): readonly ChangedRange[] {
-  if (ranges.length == 0) return diff
-  let result: ChangedRange[] = []
-  for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
-    let next = dI == diff.length ? null : diff[dI], off = posA - posB
-    let end = next ? next.fromB : 1e9
-    while (rI < ranges.length && ranges[rI] < end) {
-      let from = ranges[rI], to = ranges[rI + 1]
-      let fromB = Math.max(posB, from), toB = Math.min(end, to)
-      if (fromB <= toB) new ChangedRange(fromB + off, toB + off, fromB, toB).addToSet(result)
-      if (to > end) break
-      else rI += 2
-    }
-    if (!next) return result
-    new ChangedRange(next.fromA, next.toA, next.fromB, next.toB).addToSet(result)
-    posA = next.toA; posB = next.toB
-  }
-}
-
-function sameArray<T>(a: readonly T[], b: readonly T[]) {
-  if (a.length != b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
-  return true
 }
 
 export function computeCompositionDeco(view: EditorView, changes: readonly ChangedRange[]): DecorationSet {

@@ -1,7 +1,6 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change, Annotation} from "../../state"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
 import {EditorView} from "./editorview"
-import {focusChange, handleDOMEvents, ViewUpdate,
-        clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
+import {handleDOMEvents, ViewUpdate, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 
@@ -20,6 +19,8 @@ export class InputState {
   goalColumns: {pos: number, column: number}[] = []
 
   mouseSelection: MouseSelection | null = null
+
+  notifiedFocused: boolean
 
   setSelectionOrigin(origin: string) {
     this.lastSelectionOrigin = origin
@@ -42,14 +43,13 @@ export class InputState {
       view.inputState.lastKeyTime = Date.now()
     })
     if (view.root.activeElement == view.contentDOM) view.dom.classList.add("codemirror-focused")
+    this.notifiedFocused = view.hasFocus
     this.ensureHandlers(view)
   }
 
   ensureHandlers(view: EditorView) {
     let handlers = view.state.facet(handleDOMEvents)
-    if (handlers == this.customHandlers ||
-        (handlers.length == this.customHandlers.length && handlers.every((h, i) => h == this.customHandlers[i])))
-      return
+    if (handlers == this.customHandlers) return
     this.customHandlers = handlers
     for (let set of handlers) {
       for (let type in set) if (this.registeredEvents.indexOf(type) < 0) {
@@ -331,7 +331,7 @@ handlers.drop = (view, event: DragEvent) => {
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
-  view.docView.observer.flush()
+  view.observer.flush()
   let data = brokenClipboardAPI ? null : event.clipboardData
   let text = data && data.getData("text/plain")
   if (text) {
@@ -376,30 +376,25 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
   }
 }
 
-handlers.focus = view => {
-  view.update([], [focusChange(true)])
-}
-
-handlers.blur = view => {
-  view.update([], [focusChange(false)])
+handlers.focus = handlers.blur = view => {
+  setTimeout(() => {
+    if (view.hasFocus != view.inputState.notifiedFocused) view.update([])
+  }, 10)
 }
 
 handlers.beforeprint = view => {
-  view.docView.checkLayout(true)
+  // FIXME restore
+  // view.docView.checkLayout(true)
 }
 
-// Dummy annotation to force a display update in the absence of other triggers
-const compositionEndAnnotation = Annotation.define<null>()
-
 function forceClearComposition(view: EditorView) {
-  if (view.docView.compositionDeco.size)
-    view.update([], [compositionEndAnnotation(null)])
+  if (view.docView.compositionDeco.size) view.update([])
 }
 
 handlers.compositionstart = handlers.compositionupdate = view => {
   if (!view.inputState.composing) {
     if (view.docView.compositionDeco.size) {
-      view.docView.observer.flush()
+      view.observer.flush()
       forceClearComposition(view)
     }
     // FIXME possibly set a timeout to clear it again on Android
