@@ -4,30 +4,29 @@ import {combineConfig} from "../../extension"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
-// FIXME finish porting this
-
 export interface AutocompleteData {
   completeAt: (state: EditorState, pos: number) => CompletionResult | CancellablePromise<CompletionResult>
 }
 
 export interface CompletionResult {
-  start: number,
-  items: ReadonlyArray<CompletionResultItem>
+  items: readonly Completion[]
 }
 
-export interface CompletionResultItem {
+export interface Completion {
   label: string,
-  insertText?: string
+  start: number,
+  end: number,
+  apply?: string | ((view: EditorView) => void)
 }
 
-export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | CancellablePromise<CompletionResult> | null {
+export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | CancellablePromise<CompletionResult> {
   let syntax = state.facet(EditorState.syntax)
-  if (syntax.length == 0) return null
+  if (syntax.length == 0) return {items: []}
   let {completeAt} = syntax[0].languageDataAt<AutocompleteData>(state, pos)
-  return completeAt ? completeAt(state, pos) : null
+  return completeAt ? completeAt(state, pos) : {items: []}
 }
 
-export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<CompletionResultItem>) {
+export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<Completion>) {
   const startMatch = [], inMatch = []
   for (const item of items) {
     if (item.label == substr) continue
@@ -50,180 +49,113 @@ const autocompleteConfig = Facet.define<Partial<AutocompleteData>, AutocompleteD
 
 export function autocomplete(config: Partial<AutocompleteData> = {}): Extension {
   return [
-    autocompletionField,
+    activeCompletion,
     autocompleteConfig.of(config),
+    showTooltip.derive([activeCompletion], state => {
+      let active = state.field(activeCompletion)
+      return active instanceof ActiveCompletion ? active.tooltip : null
+    }),
     Autocomplete.extension,
     Facet.fallback(style),
     tooltips(),
-    keymap({
-      ArrowDown(view: EditorView) {
-        let autocomplete = view.plugin(autocompletePlugin)
-        return autocomplete ? autocomplete.moveSelection(1) : false
-      },
-      ArrowUp(view: EditorView) {
-        let autocomplete = view.plugin(autocompletePlugin)
-        return autocomplete ? autocomplete.moveSelection(-1) : false
-      },
-      Enter(view: EditorView) {
-        let autocomplete = view.plugin(autocompletePlugin)
-        return autocomplete ? autocomplete.accept() : false
-      }
-    })
+    Facet.override(keymap({
+      ArrowDown: moveCompletion("down"),
+      ArrowUp: moveCompletion("up"),
+      Enter: acceptCompletion
+    }))
   ]
 }
 
-const moveSelection = Annotation.define<-1 | 1>()
-
-const autocompletionField = StateField.define<AutocompletionState | null>({
-  dependencies: [autocompleteConfig],
-  create() { return null },
-  update(prev, tr, state) {
-    let selectionMoved = tr.annotation(moveSelection)
-    if (selectionMoved)
-      return prev && prev.moveSelection(selectionMoved)
-
-    if (!tr.docChanged) return tr.selectionSet ? null : prev
-
-    const source = tr.annotation(Transaction.userEvent)
-    if (source != "keyboard" && typeof source != "undefined") return null
-
-    const end = tr.selection.primary.anchor
-    let result = state.facet(autocompleteConfig).completeAt(this.view.state, end)
-    if ("then" in result) {
-      result.then(res => {
-        if (!(result as CancellablePromise<CompletionResult>).canceled) this.handleResult(res, end)
-      })
-      this.view.waitFor(result)
-    } else this.handleResult(result, end)
-    return prev
-  }
-})
-
-class AutocompletionState {
-  private constructor(
-    private readonly start: number,
-    private readonly end: number,
-    readonly items: ReadonlyArray<CompletionResultItem>,
-    readonly tooltip: Tooltip,
-    private readonly _selected: number | null = null
-  ) {}
-
-  get selected() { return this._selected !== null ? this._selected : 0 }
-
-  accept(view: EditorView, i: number = this.selected) {
-    let item = this.items[i]
-    let text = item.insertText || item.label
-    view.dispatch(view.state.t().replace(this.start, this.end, text).setSelection(EditorSelection.single(this.start + text.length)))
-    view.focus()
-  }
-
-  update(newStart: number, newEnd: number, newItems: ReadonlyArray<CompletionResultItem>, newTooltip: Tooltip) {
-    let selected = null
-    if (this._selected !== null) {
-      let target = this.items[this._selected].label
-      let i = 0
-      for (; i < newItems.length; ++i) {
-        if (newItems[i].label == target) break
-      }
-      if (i < newItems.length) selected = i
-    }
-    return new AutocompletionState(newStart, newEnd, newItems, newTooltip, selected)
-  }
-
-  moveSelection(dir: -1 | 1) {
-    let next = this.selected + dir
-    if (dir == 1 && next > this.items.length - 1) next = 0
-    else if (dir == -1 && next < 0) next = this.items.length - 1
-    return new AutocompletionState(this.start, this.end, this.items, this.tooltip, next)
-  }
-
-  static fromOrNew(oldState: AutocompletionState | null, start: number, end: number, items: ReadonlyArray<CompletionResultItem>, tooltip: Tooltip) {
-    return oldState ? oldState.update(start, end, items, tooltip) : new AutocompletionState(start, end, items, tooltip)
+function moveCompletion(dir: string) {
+  return (view: EditorView) => {
+    let active = view.state.field(activeCompletion)
+    if (!(active instanceof ActiveCompletion)) return false
+    let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
+    view.dispatch(view.state.t().annotate(setActiveCompletion(new ActiveCompletion(active.options, selected, active.tooltip))))
+    return true
   }
 }
 
-class Autocomplete extends ViewPlugin {
-  private dom: HTMLElement;
-  private _state: AutocompletionState | null = null;
+function acceptCompletion(view: EditorView) {
+  let active = view.state.field(activeCompletion)
+  if (!(active instanceof ActiveCompletion)) return false
+  applyCompletion(view, active.options[active.selected])
+  return true
+}
 
-  get tooltip() { return this._state && this._state.tooltip }
-
-  constructor(private readonly view: EditorView) {
-    super()
-    this.dom = document.createElement("div")
-    const ul = document.createElement("ul")
-    ul.setAttribute("role", "listbox")
-    this.dom.appendChild(ul)
+function applyCompletion(view: EditorView, option: Completion) {
+  let apply = option.apply || option.label
+  // FIXME make sure option.start/end still point at the current
+  // doc, or keep a mapping in an active completion
+  if (typeof apply == "string") {
+    view.dispatch(view.state.t().replace(option.start, option.end, apply)
+                  .setSelection(EditorSelection.single(option.start + apply.length)))
+  } else {
+    apply(view)
   }
+}
 
-  update(update: ViewUpdate) {
-    let selectionMoved = update.annotation(moveSelection)
-    if (selectionMoved) {
-      if (!this._state) return
-      const ul = this.dom.firstChild as any as HTMLElement
-      ul.children[this._state.selected].className = ""
-      this._state = this._state.moveSelection(selectionMoved)
-      const li = ul.children[this._state.selected] as HTMLElement
-      li.className = "selected"
-      scrollIntoView(this.dom, li)
-      return
-    }
+const setActiveCompletion = Annotation.define<ActiveCompletion | null | "pending">()
 
-    if (!update.docChanged) {
-      if (update.transactions.some(tr => tr.selectionSet)) this._state = null
-      return
-    }
+const activeCompletion = StateField.define<ActiveCompletion | null | "pending">({
+  create() { return null },
+  update(prev, tr, state) {
+    let set = tr.annotation(setActiveCompletion)
+    if (set !== undefined) return set
 
-    const source = update.annotation(Transaction.userEvent)
-    if (source != "keyboard" && typeof source != "undefined") {
-      this._state = null
-      return
-    }
-
-    const end = update.state.selection.primary.anchor
-    let result = this.view.state.facet(autocompleteConfig).completeAt(this.view.state, end)
-    if ("then" in result) {
-      result.then(res => {
-        if (!(result as CancellablePromise<CompletionResult>).canceled) this.handleResult(res, end)
-      })
-      this.view.waitFor(result)
-    } else this.handleResult(result, end)
+    return tr.annotation(Transaction.userEvent) == "input" ? "pending"
+      : tr.docChanged || tr.selectionSet ? null
+      : prev
   }
+})
 
-  private handleResult({items, start}: CompletionResult, end: number) {
-    if (items.length == 0) {
-      this._state = null
-      return
-    }
-    const tooltip = {dom: this.dom, pos: start, style: "autocomplete"}
-    this._state = AutocompletionState.fromOrNew(this._state, start, end, items, tooltip)
-    this.updateList()
+class ActiveCompletion {
+  constructor(readonly options: readonly Completion[],
+              readonly selected: number,
+              readonly tooltip: Tooltip) {} // FIXME this should not directly hold the tooltip
+}
+
+// FIXME firefox 'remembers' the scroll position an element like this
+// from the last time it saw it, and will reset it. We should make
+// sure the initially selected element is visible.
+function createListBox(options: readonly Completion[]) {
+  const ul = document.createElement("ul")
+  ul.setAttribute("role", "listbox") // FIXME this won't be focused, so the aria attributes aren't really useful
+  for (let option of options) {
+    const li = ul.appendChild(document.createElement("li"))
+    li.innerText = option.label
+    li.setAttribute("role", "option")
   }
+  return ul
+}
 
-  moveSelection(dir: -1 | 1) {
-    if (!this._state) return false
-    this.view.dispatch(this.view.state.t().annotate(moveSelection(dir)))
-    return true
-  }
+function buildTooltip(options: readonly Completion[], view: EditorView) {
+  let list = createListBox(options), start = options.reduce((m, o) => Math.min(m, o.start), 1e9)
+  list.addEventListener("click", (e: MouseEvent) => {
+    let index = 0, dom = e.target as HTMLElement | null
+    for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
+    let active = view.state.field(activeCompletion)
+    if (active instanceof ActiveCompletion && index < active.options.length)
+      applyCompletion(view, active.options[index])
+  })
+  return {dom: list, pos: start, style: "autocomplete"}
+}
 
-  accept() {
-    if (!this._state) return false
-    this._state.accept(this.view)
-    return true
-  }
-
-  private updateList() {
-    const ul = this.dom.firstChild as any as HTMLUListElement
-    while (ul.lastChild) ul.lastChild.remove()
-    for (const [i, v] of this._state!.items.entries()) {
-      const li = document.createElement("li")
-      li.innerText = v.label
-      li.setAttribute("role", "option")
-      if (i === this._state!.selected) li.className = "selected"
-      li.addEventListener("click", e => this._state!.accept(this.view, i))
-      ul.appendChild(li)
+function updateSelectedOption(tooltip: Tooltip, selected: number) {
+  let set: null | HTMLElement = null
+  for (let opt = tooltip.dom.firstChild as (HTMLElement | null), i = 0; opt;
+       opt = opt.nextSibling as (HTMLElement | null), i++) {
+    if (i == selected) {
+      if (!opt.hasAttribute("aria-selected")) {
+        opt.setAttribute("aria-selected", "true")
+        set = opt
+      }
+    } else {
+      if (opt.hasAttribute("aria-selected")) opt.removeAttribute("aria-selected")
     }
   }
+  console.log("updated w/", set)
+  if (set) scrollIntoView(tooltip.dom, set)
 }
 
 function scrollIntoView(container: HTMLElement, element: HTMLElement) {
@@ -233,26 +165,61 @@ function scrollIntoView(container: HTMLElement, element: HTMLElement) {
   else if (self.bottom > parent.bottom) container.scrollTop += self.bottom - parent.bottom
 }
 
+const DebounceTime = 200
+
+class Autocomplete extends ViewPlugin {
+  stateVersion = 0
+  debounce = -1
+
+  constructor(readonly view: EditorView) {
+    super()
+  }
+
+  update(update: ViewUpdate) {
+    let cur = update.state.field(activeCompletion)
+    if (cur instanceof ActiveCompletion) updateSelectedOption(cur.tooltip, cur.selected)
+
+    let {docChanged, selectionSet} = update
+    if (!docChanged && !selectionSet) return
+    this.stateVersion++
+
+    clearTimeout(this.debounce)
+    this.debounce = -1
+    if (cur == "pending")
+      this.debounce = setTimeout(() => this.startUpdate(), DebounceTime)
+  }
+
+  startUpdate() {
+    this.debounce = -1
+    let version = this.stateVersion, state = this.view.state
+    let config = state.facet(autocompleteConfig)
+    Promise.resolve(config.completeAt(state, state.selection.primary.head)).then(result => {
+      if (this.stateVersion != version || result.items.length == 0) return
+      let tooltip = buildTooltip(result.items, this.view)
+      this.view.dispatch(this.view.state.t().annotate(setActiveCompletion(new ActiveCompletion(result.items, 0, tooltip))))
+    })
+  }
+}
+
 const style = EditorView.theme({
   "tooltip.autocomplete": {
     fontFamily: "monospace",
-    margin: "-2px 0px 0px -2px",
-    maxHeight: "10em",
     overflowY: "auto",
+    maxHeight: "10em",
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
 
-    "& > ul": {
-      listStyle: "none",
-      margin: 0,
-      padding: 0,
+    "& > li": {
+      cursor: "pointer",
+      paddingRight: "1em"
+    },
 
-      "& > li": {
-        paddingRight: "1em", // For a scrollbar
-        cursor: "pointer",
-      },
-
-      "& > li.selected": {
-        backgroundColor: "lightblue"
-      },
+    "& > li[aria-selected]": {
+      background_fallback: "#bdf",
+      background: "Highlight",
+      color_fallback: "white",
+      color: "HighlightText"
     }
   }
 })
