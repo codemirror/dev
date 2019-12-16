@@ -137,7 +137,7 @@ export class EditorView {
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.viewState = new ViewState(config.state || EditorState.create())
-    this.plugins = this.state.facet(viewPlugin).map(Ctor => new Ctor(this))
+    this.plugins = this.state.facet(viewPlugin).map(ctor => ctor(this))
     this.observer = new DOMObserver(this, (from, to, typeOver) => applyDOMChange(this, from, to, typeOver),
                                     () => this.measure())
     this.docView = new DocView(this)
@@ -185,10 +185,10 @@ export class EditorView {
     // FIXME try/catch and replace crashers with dummy plugins
     if (prevSpecs != specs) {
       let newPlugins = [], reused = []
-      for (let Ctor of specs) {
-        let found = prevSpecs.indexOf(Ctor)
+      for (let ctor of specs) {
+        let found = prevSpecs.indexOf(ctor)
         if (found < 0) {
-          newPlugins.push(new Ctor(this))
+          newPlugins.push(ctor(this))
         } else {
           let plugin = this.plugins[found]
           reused.push(plugin)
@@ -217,12 +217,15 @@ export class EditorView {
         console.warn("Viewport failed to stabilize")
         break
       }
+      let measured = measuring.map(m => m.read(this))
       let update = new ViewUpdate(this, this.state)
       update.flags |= changed
       this.updateState = UpdateState.Updating
       this.updatePlugins(update)
       if (changed) this.docView.update(update, [])
-      else if (this.measureRequests.length == 0) break
+      for (let i = 0; i < measuring.length; i++) measuring[i].write(measured[i], this)
+
+      if (!changed && this.measureRequests.length == 0) break
     }
 
     this.updateState = UpdateState.Idle
@@ -445,6 +448,9 @@ export class EditorView {
   /// A facet that determines which [decorations](#view.Decoration)
   /// are shown in the view.
   static decorations = decorations
+
+  
+  static viewPlugin = viewPlugin
 
   /// Facet that provides CSS classes to add to elements identified
   /// by the given string.

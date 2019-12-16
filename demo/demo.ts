@@ -10,10 +10,10 @@ import {closeBrackets} from "../closebrackets"
 //import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
 //import {search, defaultSearchKeymap} from "../search"
-//import {autocomplete, sortAndFilterCompletion} from "../autocomplete"
+import {autocomplete, sortAndFilterCompletion} from "../autocomplete"
 
-//import {html} from "../lang-html"
-//import {defaultHighlighter} from "../highlight"
+import {html} from "../lang-html"
+import {defaultHighlighter} from "../highlight"
 
 //import {esLint, javascript} from "../lang-javascript"
 // @ts-ignore
@@ -32,18 +32,22 @@ let state = EditorState.create({doc: `<script>
   history(),
   foldGutter(),
   multipleSelections(),
-//  html(),
+  html(),
 //  linter(esLint(new Linter)),
 //  search({keymap: defaultSearchKeymap}),
-//  defaultHighlighter,
+  defaultHighlighter,
 //  bracketMatching(),
   closeBrackets,
-/*  autocomplete({completeAt(state: EditorState, pos: number) {
+  autocomplete({completeAt(state: EditorState, pos: number) {
     return new Promise(resolve => {
-      let syntax = state.behavior(EditorState.syntax)[0]!
+      let syntax = state.facet(EditorState.syntax)[0]!
       let tree = syntax.getPartialTree(state, pos, pos).resolve(pos, -1)
-      // FIXME nvda in einer VM ausprobieren
       let start = pos
+      // FIXME for StartCloseTag, only suggest open tags
+      // FIXME also "Text" if previous sibling is StartCloseTag
+      if (tree.name == "TagName" || tree.name == "MismatchedTagName") start = tree.start
+      else if (tree.name != "StartTag" && tree.name != "StartCloseTag") return resolve({items: []})
+      // FIXME nvda in einer VM ausprobieren
       let items = [
         "a", "abbr", "address", "alu", "area", "article", "aside", "audio", "b",
         "base", "bdi", "bdo", "blockquote", "body", "br", "button", "canvas",
@@ -58,18 +62,10 @@ let state = EditorState.create({doc: `<script>
         "small", "source", "span", "strong", "style", "sub", "summary", "sup",
         "svg", "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "time",
         "title", "tr", "track", "u", "ul", "var", "video", "wbr", "yp"
-      ].map(s => ({label: s, insertText: s + ">"}))
-      // FIXME for StartCloseTag, only suggest open tags
-      if (tree.name == "StartTag" || tree.name == "StartCloseTag") return resolve({start, items})
-      // FIXME also "Text" if previous sibling is StartCloseTag
-      if (tree.name != "TagName" && tree.name != "MismatchedTagName") return resolve({start, items: []})
-      start = tree.start
-      setTimeout(() => resolve({
-        start,
-        items: sortAndFilterCompletion(state.doc.slice(start, pos), items)
-      }), 100)
+      ].map(s => ({label: s, apply: s + ">", start: start, end: pos}))
+      setTimeout(() => resolve({items: sortAndFilterCompletion(state.doc.slice(start, pos), items)}), 100)
     })
-  }}),*/
+  }}),
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,

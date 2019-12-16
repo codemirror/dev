@@ -68,7 +68,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       if (newSel && !tr.selection.primary.eq(newSel.primary))
         tr.setSelection(tr.selection.replaceRange(newSel.primary))
     }
-    view.dispatch(tr.scrollIntoView())
+    view.dispatch(tr.scrollIntoView().annotate(Transaction.userEvent("input")))
     return true
   } else if (newSel && !newSel.primary.eq(sel)) {
     let tr = view.state.t().setSelection(newSel)

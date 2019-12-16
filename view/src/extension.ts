@@ -43,7 +43,7 @@ export class ViewPlugin {
   private static _extension: Extension | null = null
 
   static get extension() {
-    return this._extension || (this._extension = viewPlugin.of(this))
+    return this._extension || (this._extension = viewPlugin.of(view => new (this as any)(view)))
   }
 }
 
@@ -53,10 +53,10 @@ ViewPlugin.prototype.scrollMargins = null
 export interface MeasureRequest<T> {
   key: any
   read(view: EditorView): T
-  write(view: EditorView, measure: T): void
+  write(measure: T, view: EditorView): void
 }
 
-export const viewPlugin = Facet.define<{new (view: EditorView): ViewPlugin}>()
+export const viewPlugin = Facet.define<(view: EditorView) => ViewPlugin>()
 
 export const editorAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
@@ -124,6 +124,11 @@ export class ViewUpdate {
   /// Whether the document changed in this update.
   get docChanged() {
     return this.transactions.some(tr => tr.docChanged)
+  }
+
+  /// Whether the selection was explicitly set in this update.
+  get selectionSet() {
+    return this.transactions.some(tr => tr.selectionSet)
   }
 
   /// Tells you whether the set of active [theme

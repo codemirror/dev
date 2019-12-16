@@ -1,7 +1,7 @@
 import {NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
-import {EditorView, ViewPlugin, ViewPluginValue, ViewUpdate, Decoration, Range} from "../../view"
-import {Syntax, EditorState} from "../../state"
+import {EditorView, ViewPlugin, ViewUpdate, Decoration, Range} from "../../view"
+import {EditorState} from "../../state"
 
 const Inherit = 1
 
@@ -97,9 +97,10 @@ export class TagSystem {
   /// given tags using the given CSS objects.
   highlighter(spec: {[tag: string]: Style}) {
     let styling = new Styling(this, spec)
-    let plugin = ViewPlugin.create(view => new Highlighter(view, this.prop, styling))
-      .decorations(h => h.decorations)
-    return [plugin.extension, EditorView.styleModule(styling.module)]
+    return [
+      EditorView.viewPlugin.of(view => new Highlighter(view, this.prop, styling)),
+      EditorView.styleModule.of(styling.module)
+    ]
   }
 
   /// @internal
@@ -223,16 +224,11 @@ class Styling {
   }
 }
 
-class Highlighter implements ViewPluginValue {
+class Highlighter extends ViewPlugin {
   partialDeco = false
-  readonly syntax: Syntax | null = null
-  decorations = Decoration.none
 
   constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
-    for (let s of view.state.facet(EditorState.syntax)) {
-      this.syntax = s
-      break
-    }
+    super()
     this.buildDeco(view)
   }
 
@@ -242,10 +238,11 @@ class Highlighter implements ViewPluginValue {
   }
 
   buildDeco(view: EditorView) {
-    if (!this.syntax) return
+    let syntax = view.state.facet(EditorState.syntax)[0]
+    if (!syntax) return
 
     let {from, to} = view.viewport
-    let {tree, rest} = this.syntax.getTree(view.state, from, to)
+    let {tree, rest} = syntax.getTree(view.state, from, to)
     this.partialDeco = !!rest
     if (rest) view.waitFor(rest)
 
