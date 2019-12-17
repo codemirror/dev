@@ -217,6 +217,7 @@ export class EditorView {
         console.warn("Viewport failed to stabilize")
         break
       }
+      if (measuring.length) this.measureRequests = []
       let measured = measuring.map(m => m.read(this))
       let update = new ViewUpdate(this, this.state)
       update.flags |= changed
