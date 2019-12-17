@@ -102,7 +102,7 @@ export const search = function(config: SearchConfig) {
   }
   return [
     searchState,
-    openPanel.compute([searchState], state => state.field(searchState).panel), // FIXME use field methods
+    searchState.facet(openPanel, s => s.panel),
     keymap(keys),
     panelKeymap.of(panelKeys),
     SearchHighlighter.extension,
