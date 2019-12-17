@@ -5,7 +5,7 @@ import {history, redo, redoSelection, undo, undoSelection} from "../history"
 import {foldCode, unfoldCode, codeFolding, foldGutter} from "../fold"
 import {lineNumbers} from "../gutter"
 import {baseKeymap, indentSelection} from "../commands"
-//import {bracketMatching} from "../matchbrackets"
+import {bracketMatching} from "../matchbrackets"
 import {closeBrackets} from "../closebrackets"
 //import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
@@ -36,7 +36,7 @@ let state = EditorState.create({doc: `<script>
 //  linter(esLint(new Linter)),
   search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
-//  bracketMatching(),
+  bracketMatching(),
   closeBrackets,
   autocomplete({completeAt(state: EditorState, pos: number) {
     return new Promise(resolve => {

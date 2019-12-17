@@ -34,7 +34,7 @@ const field = StateField.define<DecorationSet>({
 const multipleSelectionExtension = [
   EditorState.allowMultipleSelections.of(true),
   field,
-  EditorView.decorations.derive([field], s => s.field(field)),
+  EditorView.decorations.compute([field], s => s.field(field)),
   EditorView.styleModule.of(styles)
 ]
 

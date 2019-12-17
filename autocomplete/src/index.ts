@@ -51,7 +51,7 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
   return [
     activeCompletion,
     autocompleteConfig.of(config),
-    showTooltip.derive([activeCompletion], state => {
+    showTooltip.compute([activeCompletion], state => {
       let active = state.field(activeCompletion)
       return active instanceof ActiveCompletion ? active.tooltip : null
     }),

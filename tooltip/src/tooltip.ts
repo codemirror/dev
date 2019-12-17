@@ -273,7 +273,7 @@ export function hoverTooltip(source: (view: EditorView, check: (from: number, to
 
   return [
     hoverState,
-    showTooltip.derive([hoverState], state => state.field(hoverState)),
+    showTooltip.compute([hoverState], state => state.field(hoverState)),
     EditorView.viewPlugin.of(view => new HoverPlugin(view, source, hoverState, setHover)),
     tooltips()
   ]

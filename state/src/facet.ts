@@ -37,13 +37,13 @@ export class Facet<Input, Output> {
     return new FacetProvider<Input>([], this, Provider.Static, value)
   }
 
-  derive(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
-    if (this.isStatic) throw new Error("Can't derive a static facet")
+  compute(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
+    if (this.isStatic) throw new Error("Can't compute a static facet")
     return new FacetProvider<Input>(deps, this, Provider.Single, get)
   }
 
-  deriveN(deps: readonly Slot<any>[], get: (state: EditorState) => readonly Input[]): Extension {
-    if (this.isStatic) throw new Error("Can't derive a static facet")
+  computeN(deps: readonly Slot<any>[], get: (state: EditorState) => readonly Input[]): Extension {
+    if (this.isStatic) throw new Error("Can't compute a static facet")
     return new FacetProvider<Input>(deps, this, Provider.Multi, get)
   }
 
