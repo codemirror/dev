@@ -306,7 +306,7 @@ export class EditorView {
   /// directly from, for example, an even handler, because it'll make
   /// sure measuring and drawing done by other components is
   /// synchronized, avoiding unnecessary DOM layout computations.
-  requestMeasure(request?: MeasureRequest<any>) {
+  requestMeasure<T>(request?: MeasureRequest<T>) {
     if (this.measureScheduled < 0)
       this.measureScheduled = requestAnimationFrame(() => this.measure())
     if (request) {
