@@ -144,21 +144,31 @@ function createListBox(options: readonly Completion[]) {
   return ul
 }
 
-function buildTooltip(options: readonly Completion[], view: EditorView) {
-  let list = createListBox(options), start = options.reduce((m, o) => Math.min(m, o.start), 1e9)
-  list.addEventListener("click", (e: MouseEvent) => {
-    let index = 0, dom = e.target as HTMLElement | null
-    for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-    let active = view.state.field(activeCompletion)
-    if (active instanceof ActiveCompletion && index < active.options.length)
-      applyCompletion(view, active.options[index])
-  })
-  return {dom: list, pos: start, style: "autocomplete"}
+function buildTooltip(options: readonly Completion[]) {
+  return {
+    create(view: EditorView) {
+      let list = createListBox(options)
+      list.addEventListener("click", (e: MouseEvent) => {
+        let index = 0, dom = e.target as HTMLElement | null
+        for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
+        let active = view.state.field(activeCompletion)
+        if (active instanceof ActiveCompletion && index < active.options.length)
+          applyCompletion(view, active.options[index])
+      })
+      return list
+    },
+    update(update: ViewUpdate, dom: HTMLElement) {
+      let cur = update.state.field(activeCompletion)
+      if (cur instanceof ActiveCompletion) updateSelectedOption(dom, cur.selected)
+    },
+    pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
+    style: "autocomplete"
+  }
 }
 
-function updateSelectedOption(tooltip: Tooltip, selected: number) {
+function updateSelectedOption(list: HTMLElement, selected: number) {
   let set: null | HTMLElement = null
-  for (let opt = tooltip.dom.firstChild as (HTMLElement | null), i = 0; opt;
+  for (let opt = list.firstChild as (HTMLElement | null), i = 0; opt;
        opt = opt.nextSibling as (HTMLElement | null), i++) {
     if (i == selected) {
       if (!opt.hasAttribute("aria-selected")) {
@@ -169,7 +179,7 @@ function updateSelectedOption(tooltip: Tooltip, selected: number) {
       if (opt.hasAttribute("aria-selected")) opt.removeAttribute("aria-selected")
     }
   }
-  if (set) scrollIntoView(tooltip.dom, set)
+  if (set) scrollIntoView(list, set)
 }
 
 function scrollIntoView(container: HTMLElement, element: HTMLElement) {
@@ -190,14 +200,12 @@ class Autocomplete extends ViewPlugin {
   }
 
   update(update: ViewUpdate) {
-    let cur = update.state.field(activeCompletion)
-    if (cur instanceof ActiveCompletion) updateSelectedOption(cur.tooltip, cur.selected)
-
     if (!(update.docChanged || update.selectionSet ||
           update.transactions.some(t => t.annotation(setActiveCompletion) !== undefined))) return
     this.stateVersion++
     if (this.debounce > -1) clearTimeout(this.debounce)
-    this.debounce = cur == "pending" ? setTimeout(() => this.startUpdate(), DebounceTime) : -1
+    let active = update.state.field(activeCompletion)
+    this.debounce = active == "pending" ? setTimeout(() => this.startUpdate(), DebounceTime) : -1
   }
 
   startUpdate() {
@@ -206,7 +214,7 @@ class Autocomplete extends ViewPlugin {
     let config = state.facet(autocompleteConfig)
     Promise.resolve(config.completeAt(state, state.selection.primary.head)).then(result => {
       if (this.stateVersion != version || result.items.length == 0) return
-      let tooltip = buildTooltip(result.items, this.view)
+      let tooltip = buildTooltip(result.items)
       this.view.dispatch(this.view.state.t().annotate(setActiveCompletion(new ActiveCompletion(result.items, 0, tooltip))))
     })
   }

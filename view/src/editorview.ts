@@ -213,11 +213,11 @@ export class EditorView {
       let changed = this.viewState.measure(this.docView, i > 0)
       let measuring = this.measureRequests
       if (!changed && !measuring.length) break
+      this.measureRequests = []
       if (i > 5) {
         console.warn("Viewport failed to stabilize")
         break
       }
-      if (measuring.length) this.measureRequests = []
       let measured = measuring.map(m => m.read(this))
       let update = new ViewUpdate(this, this.state)
       update.flags |= changed
