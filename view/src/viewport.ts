@@ -41,9 +41,6 @@ export class ViewState {
   paddingTop = 0
   paddingBottom = 0
 
-  // The current decorations, used to compare against updated decorations
-  decorations: readonly DecorationSet[] // FIXME do we need to store there or can we get them from prev state?
-
   heightOracle: HeightOracle = new HeightOracle
   heightMap: HeightMap = HeightMap.empty()
 
@@ -53,8 +50,7 @@ export class ViewState {
 
   // FIXME move view.state here
   constructor(public state: EditorState) {
-    this.decorations = state.facet(decorations)
-    this.heightMap = this.heightMap.applyChanges(this.decorations, Text.empty, this.heightOracle.setDoc(state.doc),
+    this.heightMap = this.heightMap.applyChanges(state.facet(decorations), Text.empty, this.heightOracle.setDoc(state.doc),
                                                  [new ChangedRange(0, 0, 0, state.doc.length)])
     this.viewport = this.getViewport(0, -1)
   }
@@ -64,7 +60,9 @@ export class ViewState {
     this.state = update.state
     let newDeco = this.state.facet(decorations)
     let contentChanges = update.changes.changedRanges()
-    let {content, height} = decoChanges(update ? contentChanges : none, newDeco, this.decorations, prev.doc.length)
+    let {content, height} = decoChanges(update ? contentChanges : none,
+                                        newDeco, update.prevState.facet(decorations),
+                                        prev.doc.length)
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc),
                                                  extendWithRanges(contentChanges, height))
     if (height.length) {

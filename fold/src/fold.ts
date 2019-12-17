@@ -37,12 +37,12 @@ const foldState = StateField.define<DecorationSet>({
 })
 
 function foldInside(state: EditorState, from: number, to: number) {
-  let found = null
-  state.field(foldState, false)?.between(from, to, (from, to) => found = ({from, to}))
+  let found: {from: number, to: number} | null = null
+  state.field(foldState, false)?.between(from, to, (from, to) => {
+    if (!found || found.from > from) found = ({from, to})
+  })
   return found
 }
-
-
 
 export const foldCode: Command = view => {
   if (!view.state.field(foldState, false)) return false
@@ -87,6 +87,7 @@ export function codeFolding(config: FoldConfig = {}) {
   return [
     foldConfig.of(config),
     foldState,
+    EditorView.decorations.derive([foldState], state => state.field(foldState)),
     Facet.fallback(defaultTheme)
   ]
 }
