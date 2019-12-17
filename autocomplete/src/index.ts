@@ -130,9 +130,6 @@ class ActiveCompletion {
               readonly tooltip: Tooltip) {} // FIXME this should not directly hold the tooltip
 }
 
-// FIXME firefox 'remembers' the scroll position an element like this
-// from the last time it saw it, and will reset it. We should make
-// sure the initially selected element is visible.
 function createListBox(options: readonly Completion[]) {
   const ul = document.createElement("ul")
   ul.setAttribute("role", "listbox") // FIXME this won't be focused, so the aria attributes aren't really useful
@@ -144,7 +141,11 @@ function createListBox(options: readonly Completion[]) {
   return ul
 }
 
-function buildTooltip(options: readonly Completion[]) {
+function buildTooltip(options: readonly Completion[]): Tooltip {
+  function updateSel(view: EditorView, dom: HTMLElement) {
+    let cur = view.state.field(activeCompletion)
+    if (cur instanceof ActiveCompletion) updateSelectedOption(dom, cur.selected)
+  }
   return {
     create(view: EditorView) {
       let list = createListBox(options)
@@ -157,9 +158,9 @@ function buildTooltip(options: readonly Completion[]) {
       })
       return list
     },
+    mount: updateSel,
     update(update: ViewUpdate, dom: HTMLElement) {
-      let cur = update.state.field(activeCompletion)
-      if (cur instanceof ActiveCompletion) updateSelectedOption(dom, cur.selected)
+      if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion)) updateSel(update.view, dom)
     },
     pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
     style: "autocomplete"
