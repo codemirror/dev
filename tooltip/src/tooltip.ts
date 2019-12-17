@@ -65,6 +65,7 @@ class TooltipPlugin extends ViewPlugin {
     let dom = tooltip.create(this.view)
     dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
     this.view.dom.appendChild(dom)
+    if (tooltip.mount) tooltip.mount(this.view, dom)
     return dom
   }
 
@@ -138,8 +139,10 @@ export function tooltips() {
 export interface Tooltip {
   /// Create the DOM element to position over the editor.
   create(view: EditorView): HTMLElement
+  /// Called after the tooltip is added to the DOM for the first time.
+  mount?(view: EditorView, dom: HTMLElement): void
   /// Update the DOM element for a change in the view's state.
-  update?(update: ViewUpdate, dom: HTMLElement) :void
+  update?(update: ViewUpdate, dom: HTMLElement): void
   /// The document position at which to show the tooltip.
   pos: number
   /// An extra theme style to use for the tooltip. By default, it'll
