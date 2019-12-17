@@ -87,7 +87,7 @@ export function codeFolding(config: FoldConfig = {}) {
   return [
     foldConfig.of(config),
     foldState,
-    EditorView.decorations.derive([foldState], state => state.field(foldState)),
+    EditorView.decorations.compute([foldState], state => state.field(foldState)),
     Facet.fallback(defaultTheme)
   ]
 }

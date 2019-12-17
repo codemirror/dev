@@ -1,6 +1,6 @@
 import {EditorState, Facet, StateField} from "../../state"
 import {combineConfig} from "../../extension"
-import {EditorView, ViewPlugin, themeClass} from "../../view"
+import {EditorView, themeClass} from "../../view"
 import {Decoration, DecorationSet} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
 import {openNodeProp, closeNodeProp} from "../../syntax"
@@ -65,7 +65,7 @@ const bracketMatchingState = StateField.define<DecorationSet>({
 
 const bracketMatchingUnique = [
   bracketMatchingState,
-  EditorView.decorations.derive([bracketMatchingState], s => s.field(bracketMatchingState)),
+  EditorView.decorations.compute([bracketMatchingState], s => s.field(bracketMatchingState)),
   Facet.fallback(EditorView.styleModule.of(defaultStyles)), // FIXME use a theme?
 ]
 

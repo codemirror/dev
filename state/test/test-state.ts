@@ -76,11 +76,11 @@ describe("EditorState", () => {
     ist(start.t().reconfigure([]).apply().field(field, false), undefined)
   })
 
-  it("allows facets derived from fields", () => {
+  it("allows facets computed from fields", () => {
     let field = StateField.define({create: () => [0], update: (v, tr) => tr.docChanged ? [tr.doc.length] : v})
     let facet = Facet.define<number>()
     let state = EditorState.create({
-      extensions: [field, facet.derive([field], state => state.field(field)[0]), facet.of(1)]
+      extensions: [field, facet.compute([field], state => state.field(field)[0]), facet.of(1)]
     })
     ist(state.facet(facet).join(), "0,1")
     let state2 = state.t().apply()

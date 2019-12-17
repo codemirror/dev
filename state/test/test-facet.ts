@@ -45,12 +45,12 @@ describe("EditorState facets", () => {
   })
 
   it("supports dynamic facet", () => {
-    let st = mk(num.of(1), num.derive([], () => 88))
+    let st = mk(num.of(1), num.compute([], () => 88))
     ist(st.facet(num).join(), "1,88")
   })
 
   it("only recomputes a facet value when necessary", () => {
-    let st = mk(num.of(1), num.derive([str], s => s.facet(str).join().length), str.of("hello"))
+    let st = mk(num.of(1), num.compute([str], s => s.facet(str).join().length), str.of("hello"))
     let array = st.facet(num)
     ist(array.join(), "1,5")
     ist(st.t().apply().facet(num), array)
@@ -58,7 +58,7 @@ describe("EditorState facets", () => {
 
   it("can specify a dependency on the document", () => {
     let count = 0
-    let st = mk(num.derive(["doc"], s => count++))
+    let st = mk(num.compute(["doc"], s => count++))
     ist(st.facet(num).join(), "0")
     st = st.t().replace(0, 0, "hello").apply()
     ist(st.facet(num).join(), "1")
@@ -68,7 +68,7 @@ describe("EditorState facets", () => {
 
   it("can specify a dependency on the selection", () => {
     let count = 0
-    let st = mk(num.derive(["selection"], s => count++))
+    let st = mk(num.compute(["selection"], s => count++))
     ist(st.facet(num).join(), "0")
     st = st.t().replace(0, 0, "hello").apply()
     ist(st.facet(num).join(), "1")
@@ -79,7 +79,7 @@ describe("EditorState facets", () => {
   })
 
   it("can provide multiple values at once", () => {
-    let st = mk(num.deriveN(["doc"], s => s.doc.length % 2 ? [100, 10] : []), num.of(1))
+    let st = mk(num.computeN(["doc"], s => s.doc.length % 2 ? [100, 10] : []), num.of(1))
     ist(st.facet(num).join(), "1")
     st = st.t().replace(0, 0, "hello").apply()
     ist(st.facet(num).join(), "100,10,1")
@@ -93,15 +93,15 @@ describe("EditorState facets", () => {
 
   it("works with a dynamic combined facet", () => {
     let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
-    let st = mk(f.of(1), f.derive(["doc"], s => s.doc.length), f.of(3))
+    let st = mk(f.of(1), f.compute(["doc"], s => s.doc.length), f.of(3))
     ist(st.facet(f), 4)
     st = st.t().replace(0, 0, "hello").apply()
     ist(st.facet(f), 9)
   })
 
   it("survives reconfiguration", () => {
-    let st = mk(num.derive(["doc"], s => s.doc.length), num.of(2), str.of("3"))
-    let st2 = st.t().reconfigure([num.derive(["doc"], s => s.doc.length), num.of(2)]).apply()
+    let st = mk(num.compute(["doc"], s => s.doc.length), num.of(2), str.of("3"))
+    let st2 = st.t().reconfigure([num.compute(["doc"], s => s.doc.length), num.of(2)]).apply()
     ist(st.facet(num), st2.facet(num))
     ist(st2.facet(str).length, 0)
   })
@@ -113,7 +113,7 @@ describe("EditorState facets", () => {
   })
 
   it("errors on cyclic dependencies", () => {
-    ist.throws(() => mk(num.derive([str], s => s.facet(str).length), str.derive([num], s => s.facet(num).join())),
+    ist.throws(() => mk(num.compute([str], s => s.facet(str).length), str.compute([num], s => s.facet(num).join())),
                /cyclic/i)
   })
 })
