@@ -1,5 +1,5 @@
-import {EditorView, ViewPlugin, Command, ViewUpdate, Decoration, themeClass} from "../../view"
-import {EditorState, Annotation, EditorSelection, SelectionRange} from "../../state"
+import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
+import {StateField, Facet, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, PanelSpec, openPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
@@ -22,38 +22,44 @@ class Query {
   get valid() { return !!this.search }
 }
 
-const searchPlugin = ViewPlugin.create(view => new SearchPlugin(view))
-  .decorations(p => p.decorations)
-  .behavior(openPanel, p => p.panel)
-
 const searchAnnotation = Annotation.define<{query?: Query, panel?: PanelSpec | null}>()
 
-class SearchPlugin {
-  panel: null | PanelSpec = null
-  query = new Query("", "", false)
-  decorations = Decoration.none
+const searchState = StateField.define<SearchState>({
+  create() {
+    return new SearchState(new Query("", "", false), null)
+  },
+  update(search, tr) {
+    let ann = tr.annotation(searchAnnotation)
+    return ann ? new SearchState(ann.query || search.query, ann.panel === undefined ? search.panel : ann.panel) : search
+  }
+})
 
-  constructor(readonly view: EditorView) {}
+class SearchState {
+  constructor(readonly query: Query, readonly panel: null | PanelSpec) {}
+}
 
-  update(update: ViewUpdate) {
-    let ann = update.annotation(searchAnnotation)
-    if (ann) {
-      if (ann.query) this.query = ann.query
-      if (ann.panel !== undefined) this.panel = ann.panel
-    }
-    if (!this.query.search || !this.panel)
-      this.decorations = Decoration.none
-    else if (ann || update.docChanged || update.transactions.some(tr => tr.selectionSet))
-      this.decorations = this.highlight(this.query, update.state, update.viewport)
+class SearchHighlighter extends ViewPlugin {
+  decorations: DecorationSet
+
+  constructor(readonly view: EditorView) {
+    super()
+    this.decorations = this.highlight(view.state.field(searchState).query)
   }
 
-  highlight(query: Query, state: EditorState, viewport: {from: number, to: number}) {
+  update(update: ViewUpdate) {
+    let state = update.state.field(searchState)
+    if (state != update.prevState.field(searchState) || update.docChanged || update.selectionSet)
+      this.decorations = this.highlight(state.query)
+  }
+
+  highlight(query: Query) {
+    let state = this.view.state, viewport = this.view.viewport
     let deco = [], cursor = query.cursor(state.doc, Math.max(0, viewport.from - query.search.length),
                                          Math.min(viewport.to + query.search.length, state.doc.length))
     while (!cursor.next().done) {
       let {from, to} = cursor.value
       let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
-      deco.push(Decoration.mark(from, to, {class: themeClass(this.view.state, selected ? "searchMatch.selected" : "searchMatch")}))
+      deco.push(Decoration.mark(from, to, {class: themeClass(state, selected ? "searchMatch.selected" : "searchMatch")}))
     }
     return Decoration.set(deco)
   }
@@ -74,7 +80,7 @@ export interface SearchConfig {
   panelKeymap?: Keymap
 }
 
-const panelKeymap = EditorView.extend.behavior<Keymap, NormalizedKeymap<Command>>({
+const panelKeymap = Facet.define<Keymap, NormalizedKeymap<Command>>({
   combine(keymaps) {
     let result = Object.create(null)
     for (let map of keymaps) for (let prop of Object.keys(map)) result[prop] = map[prop]
@@ -95,20 +101,24 @@ export const search = function(config: SearchConfig) {
     panelKeys[key] = config.panelKeymap[key]
   }
   return [
+    searchState,
+    openPanel.derive([searchState], state => state.field(searchState).panel), // FIXME use field methods
     keymap(keys),
-    panelKeymap(panelKeys),
-    searchExtension
+    panelKeymap.of(panelKeys),
+    SearchHighlighter.extension,
+    panels(),
+    theme
   ]
 }
 
-function beforeCommand(view: EditorView): boolean | SearchPlugin {
-  let plugin = view.plugin(searchPlugin)
-  if (!plugin) return false
-  if (!plugin.query.valid) {
+function beforeCommand(view: EditorView): boolean | SearchState {
+  let state = view.state.field(searchState)
+  if (!state) return false
+  if (!state.query.valid) {
     openSearchPanel(view)
     return true
   }
-  return plugin
+  return state
 }
 
 function findNextMatch(doc: Text, from: number, query: Query) {
@@ -125,10 +135,10 @@ function findNextMatch(doc: Text, from: number, query: Query) {
 /// Will wrap around to the start of the document when it reaches the
 /// end.
 export const findNext: Command = view => {
-  let plugin = beforeCommand(view)
-  if (typeof plugin == "boolean") return plugin
+  let state = beforeCommand(view)
+  if (typeof state == "boolean") return state
   let {from, to} = view.state.selection.primary
-  let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, plugin.query)
+  let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, state.query)
   if (!next || next.from == from && next.to == to) return false
   view.dispatch(view.state.t().setSelection(EditorSelection.single(next.from, next.to)).scrollIntoView())
   maybeAnnounceMatch(view)
@@ -211,22 +221,30 @@ export const replaceAll: Command = view => {
 
 /// Make sure the search panel is open and focused.
 export const openSearchPanel: Command = view => {
-  let plugin = view.plugin(searchPlugin)!
-  if (!plugin) return false
-  if (!plugin.panel) {
-    let panel = buildPanel({
-      view,
-      keymap: view.behavior(panelKeymap),
-      query: plugin.query,
-      updateQuery(query: Query) {
-        if (!query.eq(plugin.query))
-          view.dispatch(view.state.t().annotate(searchAnnotation({query})))
+  let state = view.state.field(searchState)!
+  if (!state) return false
+  if (!state.panel) {
+    view.dispatch(view.state.t().annotate(searchAnnotation({
+      panel: {
+        create(view) {
+          return buildPanel({
+            view,
+            keymap: view.state.facet(panelKeymap),
+            query: state.query,
+            updateQuery(query: Query) {
+              if (!query.eq(state.query))
+                view.dispatch(view.state.t().annotate(searchAnnotation({query})))
+            }
+          })
+        },
+        mount(_, dom) {
+          ;(dom.querySelector("[name=search]") as HTMLInputElement).select()
+        },
+        pos: 80,
+        style: "search"
       }
-    })
-    view.dispatch(view.state.t().annotate(searchAnnotation({panel: {dom: panel, pos: 80, style: "search"}})))
+    })))
   }
-  if (plugin.panel)
-    (plugin.panel.dom.querySelector("[name=search]") as HTMLInputElement).select()
   return true
 }
 
@@ -243,9 +261,10 @@ export const defaultSearchKeymap = {
 
 /// Close the search panel.
 export const closeSearchPanel: Command = view => {
-  let plugin = view.plugin(searchPlugin)
-  if (!plugin || !plugin.panel) return false
-  if (plugin.panel.dom.contains(view.root.activeElement)) view.focus()
+  let state = view.state.field(searchState)
+  if (!state || !state.panel) return false
+  let panel = view.dom.querySelector(".codemirror-panel-search")
+  if (panel && panel.contains(view.root.activeElement)) view.focus()
   view.dispatch(view.state.t().annotate(searchAnnotation({panel: null})))
   return true
 }
@@ -262,6 +281,7 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
   return e
 }
 
+// FIXME sync when search state changes independently
 function buildPanel(conf: {
   keymap: NormalizedKeymap<Command>,
   view: EditorView,
@@ -346,13 +366,14 @@ function maybeAnnounceMatch(view: EditorView) {
     }
   }
 
-  let plugin = view.plugin(searchPlugin)!
-  if (!plugin.panel || !plugin.panel.dom.contains(document.activeElement)) return
-  let live = plugin.panel.dom.querySelector("div[aria-live]")!
+  let state = view.state.field(searchState)
+  let panel = state.panel && view.dom.querySelector(".codemirror-panel-search")
+  if (!panel || !panel.contains(view.root.activeElement)) return
+  let live = panel.querySelector("div[aria-live]")!
   live.textContent = view.phrase("current match") + ". " + text
 }
 
-const theme = EditorView.theme({
+const theme = Facet.fallback(EditorView.theme({
   "panel.search": {
     padding: "2px 6px 4px",
     position: "relative",
@@ -382,11 +403,4 @@ const theme = EditorView.theme({
   "searchMatch.selected": {
     background: "#fca"
   }
-})
-
-const searchExtension = [
-  searchPlugin.extension,
-  panels(),
-  EditorView.extend.fallback(theme)
-]
-
+}))

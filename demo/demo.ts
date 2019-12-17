@@ -9,7 +9,7 @@ import {baseKeymap, indentSelection} from "../commands"
 import {closeBrackets} from "../closebrackets"
 //import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
-//import {search, defaultSearchKeymap} from "../search"
+import {search, defaultSearchKeymap} from "../search"
 import {autocomplete, startCompletion, sortAndFilterCompletion} from "../autocomplete"
 
 import {html} from "../lang-html"
@@ -34,7 +34,7 @@ let state = EditorState.create({doc: `<script>
   multipleSelections(),
   html(),
 //  linter(esLint(new Linter)),
-//  search({keymap: defaultSearchKeymap}),
+  search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
 //  bracketMatching(),
   closeBrackets,
