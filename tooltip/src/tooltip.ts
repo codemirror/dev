@@ -14,61 +14,77 @@ type Measured = {
 }
 
 class TooltipPlugin extends ViewPlugin {
-  tooltips: Tooltip[] = []
-  sourceArray: readonly (Tooltip | null)[] = []
-  added: HTMLElement[] = []
+  sourceArray: readonly (Tooltip | null)[]
+  tooltips: Tooltip[]
+  elements: HTMLElement[]
   measureReq: {read: () => Measured, write: (m: Measured) => void, key: TooltipPlugin}
 
   constructor(readonly view: EditorView) {
     super()
     view.scrollDOM.addEventListener("scroll", this.onscroll = this.onscroll.bind(this))
     this.measureReq = {read: this.readMeasure.bind(this), write: this.writeMeasure.bind(this), key: this}
-    this.sync()
+    this.sourceArray = view.state.facet(showTooltip)
+    this.tooltips = this.sourceArray.filter(x => x) as Tooltip[]
+    this.elements = this.tooltips.map(t => this.createTooltip(t))
   }
 
   update(update: ViewUpdate) {
     let source = update.state.facet(showTooltip)
-    if (source != this.sourceArray) {
+    if (source == this.sourceArray) {
+      for (let i = 0; i < this.tooltips.length; i++) {
+        let tooltip = this.tooltips[i]
+        if (tooltip.update) tooltip.update(update, this.elements[i])
+      }
+    } else {
+      let tooltips = source.filter(x => x) as Tooltip[]
+      let elements: HTMLElement[] = []
+      for (let i = 0; i < tooltips.length; i++) {
+        let tooltip = tooltips[i], known = this.tooltips.indexOf(tooltip)
+        if (known < 0) {
+          elements[i] = this.createTooltip(tooltip)
+        } else {
+          elements[i] = this.elements[known]
+          if (tooltip.update) tooltip.update(update, elements[i])
+        }
+      }
+      for (let i = 0; i < this.elements.length; i++) {
+        let element = this.elements[i]
+        if (!elements.some(e => e == element)) element.remove()
+      }
       this.sourceArray = source
-      this.tooltips = source.filter(x => x) as Tooltip[]
-      this.sync()
+      this.tooltips = tooltips
+      this.elements = elements
+      if (this.tooltips.length) this.view.requestMeasure(this.measureReq)
     }
+
     if (update.docChanged && this.tooltips.length) this.view.requestMeasure(this.measureReq)
     if (update.themeChanged) this.themeChanged()
   }
 
+  createTooltip(tooltip: Tooltip) {
+    let dom = tooltip.create(this.view)
+    dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
+    this.view.dom.appendChild(dom)
+    return dom
+  }
+
   destroy() {
     this.view.scrollDOM.removeEventListener("scroll", this.onscroll)
+    for (let elt of this.elements) elt.remove()
   }
 
   themeChanged() {
-    for (let tooltip of this.tooltips)
-      tooltip.dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
-  }
-
-  sync() {
-    for (let tooltip of this.tooltips) {
-      if (this.added.indexOf(tooltip.dom) < 0) {
-        tooltip.dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
-        this.view.dom.appendChild(tooltip.dom)
-        this.added.push(tooltip.dom)
-      }
+    for (let i = 0; i < this.tooltips.length; i++) {
+      let elt = this.elements[i], tooltip = this.tooltips[i]
+      elt.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
     }
-    for (let i = 0; i < this.added.length; i++) {
-      let element = this.added[i]
-      if (!this.tooltips.some(t => t.dom == element)) {
-        element.remove()
-        this.added.splice(i--, 1)
-      }
-    }
-    if (this.tooltips.length) this.view.requestMeasure(this.measureReq)
   }
 
   readMeasure() {
     return {
       editor: this.view.dom.getBoundingClientRect(),
       pos: this.tooltips.map(tooltip => this.view.coordsAtPos(tooltip.pos)),
-      size: this.tooltips.map(tooltip => tooltip.dom.getBoundingClientRect()),
+      size: this.elements.map(elt => elt.getBoundingClientRect()),
       innerWidth: window.innerWidth,
       innerHeight: window.innerHeight
     }
@@ -77,10 +93,10 @@ class TooltipPlugin extends ViewPlugin {
   writeMeasure(measured: Measured) {
     let {editor} = measured
     for (let i = 0; i < this.tooltips.length; i++) {
-      let tooltip = this.tooltips[i], pos = measured.pos[i], size = measured.size[i]
+      let tooltip = this.tooltips[i], elt = this.elements[i], pos = measured.pos[i], size = measured.size[i]
       // Hide tooltips that are outside of the editor.
       if (!pos || pos.bottom <= editor.top || pos.top >= editor.bottom || pos.right <= editor.left || pos.left >= editor.right) {
-        tooltip.dom.style.top = "-10000px"
+        elt.style.top = "-10000px"
         continue
       }
       let width = size.right - size.left, height = size.bottom - size.top
@@ -89,8 +105,8 @@ class TooltipPlugin extends ViewPlugin {
       if (!tooltip.strictSide &&
           (above ? pos.top - (size.bottom - size.top) < 0 : pos.bottom + (size.bottom - size.top) > measured.innerHeight))
         above = !above
-      tooltip.dom.style.left = ((align ? pos.left : measured.innerWidth - width) - editor.left) + "px"
-      tooltip.dom.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
+      elt.style.left = ((align ? pos.left : measured.innerWidth - width) - editor.left) + "px"
+      elt.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
     }
   }
 
@@ -120,8 +136,10 @@ export function tooltips() {
 
 /// Describes a tooltip.
 export interface Tooltip {
-  /// The DOM element to position over the editor.
-  dom: HTMLElement
+  /// Create the DOM element to position over the editor.
+  create(view: EditorView): HTMLElement
+  /// Update the DOM element for a change in the view's state.
+  update?(update: ViewUpdate, dom: HTMLElement) :void
   /// The document position at which to show the tooltip.
   pos: number
   /// An extra theme style to use for the tooltip. By default, it'll
@@ -190,7 +208,7 @@ class HoverPlugin extends ViewPlugin {
   mousemove(event: MouseEvent) {
     this.lastMouseMove = event
     if (this.hoverTimeout < 0) this.hoverTimeout = setTimeout(this.checkHover, HoverTime)
-    if (this.active && !this.active.dom.contains(event.target as HTMLElement) &&
+    if (this.active && isInTooltip(event.target as HTMLElement) &&
         (this.active.pos == this.active.end
          ? this.view.posAtCoords({x: event.clientX, y: event.clientY}) != this.active.pos
          : !isOverRange(this.view, this.active.pos, this.active.end, event.clientX, event.clientY, HoverMaxDist)))
@@ -212,6 +230,12 @@ class HoverPlugin extends ViewPlugin {
     this.view.dom.removeEventListener("mouseleave", this.mouseleave.bind(this))
     this.view.dom.removeEventListener("mousemove", this.mousemove.bind(this))
   }
+}
+
+function isInTooltip(elt: HTMLElement) {
+  for (let cur: Node | null = elt; cur; cur = cur.parentNode)
+    if (cur.nodeType == 1 && (cur as HTMLElement).classList.contains("codemirror-tooltip")) return true
+  return false
 }
 
 function isOverRange(view: EditorView, from: number, to: number, x: number, y: number, margin = 0) {
