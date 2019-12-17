@@ -10,7 +10,7 @@ import {closeBrackets} from "../closebrackets"
 //import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
 //import {search, defaultSearchKeymap} from "../search"
-import {autocomplete, sortAndFilterCompletion} from "../autocomplete"
+import {autocomplete, startCompletion, sortAndFilterCompletion} from "../autocomplete"
 
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
@@ -74,7 +74,8 @@ let state = EditorState.create({doc: `<script>
     "Ctrl-y": isMac ? undefined : redo,
     "Shift-Tab": indentSelection,
     "Mod-Alt-[": foldCode,
-    "Mod-Alt-]": unfoldCode
+    "Mod-Alt-]": unfoldCode,
+    "Mod-Space": startCompletion
   }),
   keymap(baseKeymap),
 ]})
