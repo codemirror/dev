@@ -65,7 +65,7 @@ const bracketMatchingState = StateField.define<DecorationSet>({
 
 const bracketMatchingUnique = [
   bracketMatchingState,
-  EditorView.decorations.compute([bracketMatchingState], s => s.field(bracketMatchingState)),
+  bracketMatchingState.facet(EditorView.decorations),
   Facet.fallback(EditorView.styleModule.of(defaultStyles)), // FIXME use a theme?
 ]
 

@@ -185,6 +185,12 @@ export class StateField<Value> {
     }
   }
 
+  facet(facet: Facet<Value, any>): Extension
+  facet<T>(facet: Facet<T, any>, get: (value: Value) => T): Extension
+  facet<T>(facet: Facet<T, any>, get?: (value: Value) => T) {
+    return facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
+  }
+
   [isExtension]!: true
 }
 
