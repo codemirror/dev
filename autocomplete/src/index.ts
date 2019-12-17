@@ -61,7 +61,8 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
     Facet.override(keymap({
       ArrowDown: moveCompletion("down"),
       ArrowUp: moveCompletion("up"),
-      Enter: acceptCompletion
+      Enter: acceptCompletion,
+      Escape: closeCompletion
     }))
   ]
 }
@@ -83,6 +84,13 @@ function acceptCompletion(view: EditorView) {
   return true
 }
 
+export function startCompletion(view: EditorView) {
+  let active = view.state.field(activeCompletion)
+  if (active != null) return false
+  view.dispatch(view.state.t().annotate(setActiveCompletion("pending")))
+  return true
+}
+
 function applyCompletion(view: EditorView, option: Completion) {
   let apply = option.apply || option.label
   // FIXME make sure option.start/end still point at the current
@@ -93,6 +101,13 @@ function applyCompletion(view: EditorView, option: Completion) {
   } else {
     apply(view)
   }
+}
+
+function closeCompletion(view: EditorView) {
+  let active = view.state.field(activeCompletion)
+  if (active == null) return false
+  view.dispatch(view.state.t().annotate(setActiveCompletion(null)))
+  return true
 }
 
 const setActiveCompletion = Annotation.define<ActiveCompletion | null | "pending">()
@@ -154,7 +169,6 @@ function updateSelectedOption(tooltip: Tooltip, selected: number) {
       if (opt.hasAttribute("aria-selected")) opt.removeAttribute("aria-selected")
     }
   }
-  console.log("updated w/", set)
   if (set) scrollIntoView(tooltip.dom, set)
 }
 
@@ -165,7 +179,7 @@ function scrollIntoView(container: HTMLElement, element: HTMLElement) {
   else if (self.bottom > parent.bottom) container.scrollTop += self.bottom - parent.bottom
 }
 
-const DebounceTime = 200
+const DebounceTime = 100
 
 class Autocomplete extends ViewPlugin {
   stateVersion = 0
@@ -179,14 +193,11 @@ class Autocomplete extends ViewPlugin {
     let cur = update.state.field(activeCompletion)
     if (cur instanceof ActiveCompletion) updateSelectedOption(cur.tooltip, cur.selected)
 
-    let {docChanged, selectionSet} = update
-    if (!docChanged && !selectionSet) return
+    if (!(update.docChanged || update.selectionSet ||
+          update.transactions.some(t => t.annotation(setActiveCompletion) !== undefined))) return
     this.stateVersion++
-
-    clearTimeout(this.debounce)
-    this.debounce = -1
-    if (cur == "pending")
-      this.debounce = setTimeout(() => this.startUpdate(), DebounceTime)
+    if (this.debounce > -1) clearTimeout(this.debounce)
+    this.debounce = cur == "pending" ? setTimeout(() => this.startUpdate(), DebounceTime) : -1
   }
 
   startUpdate() {
@@ -212,7 +223,7 @@ const style = EditorView.theme({
 
     "& > li": {
       cursor: "pointer",
-      paddingRight: "1em"
+      padding: "1px 1em 1px 3px"
     },
 
     "& > li[aria-selected]": {
