@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
 import {StateField, Facet, Annotation, EditorSelection, SelectionRange} from "../../state"
-import {panels, PanelSpec, openPanel} from "../../panel"
+import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
 import {SearchCursor} from "./cursor"
@@ -22,20 +22,22 @@ class Query {
   get valid() { return !!this.search }
 }
 
-const searchAnnotation = Annotation.define<{query?: Query, panel?: PanelSpec | null}>()
+const searchAnnotation = Annotation.define<{query?: Query, panel?: boolean}>()
 
-const searchState = StateField.define<SearchState>({
+const searchState: StateField<SearchState> = StateField.define<SearchState>({
   create() {
-    return new SearchState(new Query("", "", false), null)
+    return new SearchState(new Query("", "", false), [])
   },
   update(search, tr) {
     let ann = tr.annotation(searchAnnotation)
-    return ann ? new SearchState(ann.query || search.query, ann.panel === undefined ? search.panel : ann.panel) : search
+    return ann ? new SearchState(ann.query || search.query,
+                                 ann.panel == null ? search.panel :
+                                 ann.panel ? [createSearchPanel] : []) : search
   }
 })
 
 class SearchState {
-  constructor(readonly query: Query, readonly panel: null | PanelSpec) {}
+  constructor(readonly query: Query, readonly panel: readonly ((view: EditorView) => Panel)[]) {}
 }
 
 class SearchHighlighter extends ViewPlugin {
@@ -102,7 +104,7 @@ export const search = function(config: SearchConfig) {
   }
   return [
     searchState,
-    searchState.facet(openPanel, s => s.panel),
+    searchState.facetN(showPanel, s => s.panel),
     keymap(keys),
     panelKeymap.of(panelKeys),
     SearchHighlighter.extension,
@@ -219,32 +221,34 @@ export const replaceAll: Command = view => {
   return true
 }
 
+function createSearchPanel(view: EditorView) {
+  let {query} = view.state.field(searchState)
+  return {
+    dom: buildPanel({
+      view,
+      keymap: view.state.facet(panelKeymap),
+      query,
+      updateQuery(q: Query) {
+        if (!query.eq(q)) {
+          query = q
+          view.dispatch(view.state.t().annotate(searchAnnotation({query})))
+        }
+      }
+    }),
+    mount() {
+      ;(this.dom.querySelector("[name=search]") as HTMLInputElement).select()
+    },
+    pos: 80,
+    style: "search"
+  }
+}
+
 /// Make sure the search panel is open and focused.
 export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState)!
   if (!state) return false
-  if (!state.panel) {
-    view.dispatch(view.state.t().annotate(searchAnnotation({
-      panel: {
-        create(view) {
-          return buildPanel({
-            view,
-            keymap: view.state.facet(panelKeymap),
-            query: state.query,
-            updateQuery(query: Query) {
-              if (!query.eq(state.query))
-                view.dispatch(view.state.t().annotate(searchAnnotation({query})))
-            }
-          })
-        },
-        mount(_, dom) {
-          ;(dom.querySelector("[name=search]") as HTMLInputElement).select()
-        },
-        pos: 80,
-        style: "search"
-      }
-    })))
-  }
+  if (!state.panel.length)
+    view.dispatch(view.state.t().annotate(searchAnnotation({panel: true})))
   return true
 }
 
@@ -262,10 +266,10 @@ export const defaultSearchKeymap = {
 /// Close the search panel.
 export const closeSearchPanel: Command = view => {
   let state = view.state.field(searchState)
-  if (!state || !state.panel) return false
+  if (!state || !state.panel.length) return false
   let panel = view.dom.querySelector(".codemirror-panel-search")
   if (panel && panel.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.t().annotate(searchAnnotation({panel: null})))
+  view.dispatch(view.state.t().annotate(searchAnnotation({panel: false})))
   return true
 }
 
@@ -367,7 +371,7 @@ function maybeAnnounceMatch(view: EditorView) {
   }
 
   let state = view.state.field(searchState)
-  let panel = state.panel && view.dom.querySelector(".codemirror-panel-search")
+  let panel = state.panel.length && view.dom.querySelector(".codemirror-panel-search")
   if (!panel || !panel.contains(view.root.activeElement)) return
   let live = panel.querySelector("div[aria-live]")!
   live.textContent = view.phrase("current match") + ". " + text

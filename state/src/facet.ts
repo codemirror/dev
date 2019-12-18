@@ -191,6 +191,10 @@ export class StateField<Value> {
     return facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
   }
 
+  facetN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[]): Extension {
+    return facet.computeN([this], state => get(state.field(this)))
+  }
+
   [isExtension]!: true
 }
 
