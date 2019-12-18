@@ -1,9 +1,8 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
         WidgetType, ViewUpdate, Command, themeClass} from "../../view"
-import {Annotation, EditorSelection} from "../../state"
-import {Extension} from "../../extension"
+import {Facet, Annotation, EditorSelection, StateField, Extension} from "../../state"
 import {hoverTooltip} from "../../tooltip"
-import {panels, openPanel} from "../../panel"
+import {panels, Panel, showPanel} from "../../panel"
 
 /// Describes a problem or hint for a piece of code.
 export interface Diagnostic {
@@ -36,31 +35,106 @@ export interface Action {
   apply: (view: EditorView, from: number, to: number) => void
 }
 
+class LintState {
+  constructor(readonly diagnostics: DecorationSet,
+              readonly panel: readonly ((view: EditorView) => Panel)[]) {}
+
+  findDiagnostic(diagnostic: Diagnostic): {from: number, to: number} | null {
+    let found: {from: number, to: number} | null = null
+    this.diagnostics.between(0, this.diagnostics.length, (from, to, {spec}) => {
+      if (spec.diagnostic == diagnostic) found = {from, to}
+    })
+    return found
+  }
+}
+
 /// Transaction annotation that is used to update the current set of
 /// diagnostics.
 export const setDiagnostics = Annotation.define<readonly Diagnostic[]>()
 
+const lintPanel = Annotation.define<boolean>()
+
+const lintState = StateField.define<LintState>({
+  create() {
+    return new LintState(Decoration.none, [])
+  },
+  update(value, tr, state) {
+    let setDiag = tr.annotation(setDiagnostics)
+    if (setDiag) return new LintState(Decoration.set(setDiag.map(d => {
+      return d.from < d.to
+        ? Decoration.mark(d.from, d.to, {
+          attributes: {class: themeClass(state, "diagnosticRange." + d.severity)},
+          diagnostic: d
+        } as MarkDecorationSpec)
+        : Decoration.widget(d.from, {
+          widget: new DiagnosticWidget(d),
+          diagnostic: d
+        } as WidgetDecorationSpec)
+    })), value.panel)
+
+    let panel = tr.annotation(lintPanel)
+    if (panel != null)
+      return new LintState(value.diagnostics, panel ? [(view: EditorView) => new LintPanel(view)] : [])
+
+    if (tr.docChanged)
+      return new LintState(value.diagnostics.map(tr.changes), value.panel)
+
+    return value
+  }
+})
+
 /// Returns an extension that enables the linting functionality.
 /// Implicitly enabled by the [`linter`](#lint.linter) function.
 export function linting(): Extension {
-  return lintExtension
+  return [
+    lintState,
+    lintState.facetN(showPanel, s => s.panel),
+    lintState.facet(EditorView.decorations, s => s.diagnostics),
+    // FIXME highlight active diagnostic
+    panels(),
+    hoverTooltip(lintTooltip),
+    defaultTheme
+  ]
 }
 
-const lintPanel = Annotation.define<boolean>()
+function lintTooltip(view: EditorView, check: (from: number, to: number) => boolean) {
+  let {diagnostics} = view.state.field(lintState)
+  let found: Diagnostic[] = [], stackStart = 2e8, stackEnd = 0
+  diagnostics.between(0, view.state.doc.length, (start, end, {spec}) => {
+    if (check(start, end)) {
+      found.push(spec.diagnostic)
+      stackStart = Math.min(start, stackStart)
+      stackEnd = Math.max(end, stackEnd)
+    }
+  })
+  if (!found.length) return null
+
+  return {
+    pos: stackStart, end: stackEnd,
+    create() {
+      let dom = document.createElement("ul")
+      for (let d of found) dom.appendChild(renderDiagnostic(view, d))
+      return dom
+    },
+    style: "lint",
+    hideOnChange: true
+  }
+}
 
 /// Command to open and focus the lint panel.
 export const openLintPanel: Command = (view: EditorView) => {
-  let plugin = view.plugin(lintPlugin)
-  if (!plugin) return false
-  if (!plugin.panel) view.dispatch(view.state.t().annotate(lintPanel(true)))
-  if (plugin.panel) plugin.panel!.list.focus()
+  let field = view.state.field(lintState, false)
+  if (!field) return false
+  if (!field.panel.length) view.dispatch(view.state.t().annotate(lintPanel(true)))
+//  if (view.state.field(lintState).panel.length)
+//    (view.dom.querySelector(".codemirror-panel-lint ul") as HTMLElement).focus()
   return true
 }
 
 /// Command to close the lint panel, when open.
 export const closeLintPanel: Command = (view: EditorView) => {
-  let plugin = view.plugin(lintPlugin)
-  if (!plugin || !plugin.panel) return false
+  let field = view.state.field(lintState, false)
+  if (!field || !field.panel.length) return false
   view.dispatch(view.state.t().annotate(lintPanel(false)))
   return true
 }
@@ -71,101 +145,41 @@ const LintDelay = 500
 /// enables linting with that source. It will be called whenever the
 /// editor is idle (after its content changed).
 export function linter(source: (view: EditorView) => readonly Diagnostic[]): Extension {
-  return [
-    ViewPlugin.create(view => {
-      let lintTime = Date.now() + LintDelay, set = true
-      function run() {
-        let now = Date.now()
-        if (now < lintTime - 10) return setTimeout(run, lintTime - now)
-        set = false
-        view.dispatch(view.state.t().annotate(setDiagnostics(source(view))))
-      }
-      setTimeout(run, LintDelay)
-      return {
-        update(update: ViewUpdate) {
-          if (update.docChanged) {
-            lintTime = Date.now() + LintDelay
-            if (!set) {
-              set = true
-              setTimeout(run, LintDelay)
-            }
-          }
-        }
-      }
-    }).extension,
-    linting()
-  ]
-}
+  class RunLintPlugin extends ViewPlugin {
+    lintTime = Date.now() + LintDelay
+    set = true
 
-class LintPlugin {
-  diagnostics = Decoration.none
-  panel: LintPanel | null = null
-
-  constructor(readonly view: EditorView) {}
-
-  update(update: ViewUpdate) {
-    let diagnostics = update.annotation(setDiagnostics)
-    if (diagnostics) {
-      this.diagnostics = Decoration.set(diagnostics.map(d => {
-        return d.from < d.to
-          ? Decoration.mark(d.from, d.to, {
-            attributes: {class: themeClass(this.view.state, "diagnosticRange." + d.severity)},
-            diagnostic: d
-          } as MarkDecorationSpec)
-          : Decoration.widget(d.from, {
-            widget: new DiagnosticWidget(d),
-            diagnostic: d
-          } as WidgetDecorationSpec)
-      }))
-      if (this.panel) this.panel.update(this.diagnostics)
-    } else if (update.docChanged) {
-      this.diagnostics = this.diagnostics.map(update.changes)
-      if (this.panel) this.panel.update(this.diagnostics)
+    constructor(readonly view: EditorView) {
+      super()
+      this.run = this.run.bind(this)
+      setTimeout(this.run, LintDelay)
     }
 
-    let panel = update.annotation(lintPanel)
-    if (panel != null)
-      this.panel = panel ? new LintPanel(this, this.diagnostics) : null
-  }
-
-  draw() {
-    if (this.panel) this.panel.draw()
-  }
-
-  get activeDiagnostic() {
-    return this.panel ? this.panel.activeDiagnostic : Decoration.none
-  }
-
-  hoverTooltip(view: EditorView, check: (from: number, to: number) => boolean) {
-    let found: Diagnostic[] = [], stackStart = 2e8, stackEnd = 0
-    this.diagnostics.between(0, view.state.doc.length, (start, end, {spec}) => {
-      if (check(start, end)) {
-        found.push(spec.diagnostic)
-        stackStart = Math.min(start, stackStart)
-        stackEnd = Math.max(end, stackEnd)
+    run() {
+      let now = Date.now()
+      if (now < this.lintTime - 10) {
+        setTimeout(this.run, this.lintTime - now)
+      } else {
+        this.set = false
+        // FIXME support async sources
+        this.view.dispatch(this.view.state.t().annotate(setDiagnostics(source(this.view))))
       }
-    })
-    return found.length ? {
-      pos: stackStart, end: stackEnd,
-      dom: this.renderTooltip(found),
-      style: "lint",
-      hideOnChange: true
-    } : null
-  }
+    }
 
-  renderTooltip(diagnostics: Diagnostic[]) {
-    let dom = document.createElement("ul")
-    for (let d of diagnostics) dom.appendChild(renderDiagnostic(this.view, d))
-    return dom
+    update(update: ViewUpdate) {
+      if (update.docChanged) {
+        this.lintTime = Date.now() + LintDelay
+        if (!this.set) {
+          this.set = true
+          setTimeout(this.run, LintDelay)
+        }
+      }
+    }
   }
-
-  findDiagnostic(diagnostic: Diagnostic): {from: number, to: number} | null {
-    let found: {from: number, to: number} | null = null
-    this.diagnostics.between(0, this.view.state.doc.length, (from, to, {spec}) => {
-      if (spec.diagnostic == diagnostic) found = {from, to}
-    })
-    return found
-  }
+  return [
+    RunLintPlugin.extension,
+    linting()
+  ]
 }
 
 function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
@@ -178,8 +192,7 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
     button.textContent = action.name
     button.onclick = button.onmousedown = e => {
       e.preventDefault()
-      let plugin = view.plugin(lintPlugin)
-      let found = plugin && plugin.findDiagnostic(diagnostic)
+      let found = view.state.field(lintState).findDiagnostic(diagnostic)
       if (found) action.apply(view, found.from, found.to)
     }
   }
@@ -205,15 +218,13 @@ class PanelItem {
   }
 }
 
-class LintPanel {
-  style = "lint"
-  needsSync = true
+class LintPanel implements Panel {
   items: PanelItem[] = []
   selectedItem = -1
   dom: HTMLElement
   list: HTMLElement
 
-  constructor(readonly parent: LintPlugin, readonly diagnostics: DecorationSet) {
+  constructor(readonly view: EditorView) {
     this.dom = document.createElement("div")
     this.list = this.dom.appendChild(document.createElement("ul"))
     this.list.tabIndex = 0
@@ -253,14 +264,13 @@ class LintPanel {
     close.textContent = "×"
     close.addEventListener("click", () => closeLintPanel(this.view))
 
-    this.update(diagnostics)
+    this.update()
   }
 
-  get view() { return this.parent.view }
-
-  update(diagnostics: DecorationSet) {
-    let i = 0
-    this.diagnostics.between(0, this.view.state.doc.length, (start, end, {spec}) => {
+  update() {
+    let {diagnostics} = this.view.state.field(lintState)
+    let i = 0, needsSync = false
+    diagnostics.between(0, this.view.state.doc.length, (start, end, {spec}) => {
       let found = -1
       for (let j = i; j < this.items.length; j++)
         if (this.items[j].diagnostic == spec.diagnostic) { found = j; break }
@@ -269,18 +279,14 @@ class LintPanel {
       } else {
         if (this.selectedItem >= i && this.selectedItem < found) this.selectedItem = i
         if (found > i) this.items.splice(i, found - i)
-        this.needsSync = true
+        needsSync = true
       }
       i++
     })
     while (i < this.items.length) this.items.pop()
     if (this.selectedItem >= i || this.selectedItem < 0) this.selectedItem = i ? 0 : -1
-  }
 
-  draw() {
-    if (!this.needsSync) return
-    this.needsSync = false
-    this.sync()
+    if (needsSync) this.sync()
   }
 
   sync() {
@@ -317,7 +323,7 @@ class LintPanel {
     if (selRect.top < panelRect.top) this.list.scrollTop -= panelRect.top - selRect.top
     else if (selRect.bottom > panelRect.bottom) this.list.scrollTop += selRect.bottom - panelRect.bottom
 
-    let found = this.parent.findDiagnostic(selected.diagnostic)
+    let found = this.view.state.field(lintState).findDiagnostic(selected.diagnostic)
     if (found) this.view.dispatch(this.view.state.t().setSelection(EditorSelection.single(found.from, found.to)).scrollIntoView())
   }
 
@@ -330,13 +336,17 @@ class LintPanel {
     this.list.setAttribute("aria-activedescendant", selected ? selected.id : "")
   }
 
+  get style() { return "lint" }
+}
+
+  /* FIXME restore
   get activeDiagnostic() {
     let found = this.selectedItem < 0 ? null : this.parent.findDiagnostic(this.items[this.selectedItem].diagnostic)
     return found && found.to > found.from
       ? Decoration.set(Decoration.mark(found.from, found.to, {class: themeClass(this.view.state, "lintRange.active")}))
       : Decoration.none
   }
-}
+*/
 
 function underline(color: string) {
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="6" height="3">
@@ -345,7 +355,7 @@ function underline(color: string) {
   return `url('data:image/svg+xml;base64,${btoa(svg)}')`
 }
 
-const defaultTheme = EditorView.theme({
+const defaultTheme = Facet.fallback(EditorView.theme({
   diagnostic: {
     padding: "3px 6px 3px 8px",
     marginLeft: "-1px",
@@ -429,16 +439,4 @@ const defaultTheme = EditorView.theme({
     padding: 0,
     margin: 0
   }
-})
-
-const lintPlugin = ViewPlugin.create(view => new LintPlugin(view))
-  .decorations(p => p.diagnostics)
-  .decorations(p => p.activeDiagnostic)
-  .behavior(openPanel, p => p.panel)
-
-const lintExtension = [
-  lintPlugin.extension,
-  hoverTooltip((view, check) => view.plugin(lintPlugin)!.hoverTooltip(view, check)),
-  panels(),
-  defaultTheme
-]
+}))

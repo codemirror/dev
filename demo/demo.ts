@@ -15,10 +15,10 @@ import {autocomplete, startCompletion, sortAndFilterCompletion} from "../autocom
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
 
-//import {esLint, javascript} from "../lang-javascript"
+import {esLint, javascript} from "../lang-javascript"
 // @ts-ignore
-//import Linter from "eslint4b-prebuilt"
-//import {linter} from "../lint"
+import Linter from "eslint4b-prebuilt"
+import {linter, openLintPanel} from "../lint"
 
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
@@ -33,7 +33,7 @@ let state = EditorState.create({doc: `<script>
   foldGutter(),
   multipleSelections(),
   html(),
-//  linter(esLint(new Linter)),
+  linter(esLint(new Linter)),
   search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
   bracketMatching(),
@@ -75,7 +75,8 @@ let state = EditorState.create({doc: `<script>
     "Shift-Tab": indentSelection,
     "Mod-Alt-[": foldCode,
     "Mod-Alt-]": unfoldCode,
-    "Mod-Space": startCompletion
+    "Mod-Space": startCompletion,
+    "Shift-Mod-m": openLintPanel
   }),
   keymap(baseKeymap),
 ]})

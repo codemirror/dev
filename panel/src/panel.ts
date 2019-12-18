@@ -54,7 +54,7 @@ class Panels extends ViewPlugin {
         let known = this.specs.indexOf(spec), panel
         if (known < 0) {
           panel = spec(update.view)
-          if (panel.mount) mount.push(panel)
+          mount.push(panel)
         } else {
           panel = this.panels[known]
           if (panel.update) panel.update(update)
@@ -66,7 +66,10 @@ class Panels extends ViewPlugin {
       this.panels = panels
       this.top.sync(top)
       this.bottom.sync(bottom)
-      for (let p of mount) p.mount!()
+      for (let p of mount) {
+        p.dom.className += " " + panelClass(update.state, p)
+        if (p.mount) p.mount!()
+      }
     } else {
       for (let p of this.panels) if (p.update) p.update(update)
     }
