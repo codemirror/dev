@@ -1,17 +1,16 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {Facet} from "../../state"
+import {EditorState, Facet} from "../../state"
 
 /// Enables the panel-managing extension.
 export function panels() { return [Panels.extension, defaultTheme] }
 
-/// Describe a newly created panel.
-export interface PanelSpec {
-  /// Create the DOM element that the panel should display.
-  create(view: EditorView): HTMLElement
+export interface Panel {
+  /// The element representing this panel.
+  dom: HTMLElement,
   /// Optionally called after the panel has been added to the editor.
-  mount?(view: EditorView, dom: HTMLElement): void
+  mount?(): void
   /// Update the DOM for a given view update.
-  update?(update: ViewUpdate, dom: HTMLElement): void
+  update?(update: ViewUpdate): void
   /// An optional theme style. By default, panels are themed as
   /// `"panel"`. If you pass `"foo"` here, your panel is themed as
   /// `"panel.foo"`.
@@ -27,30 +26,58 @@ export interface PanelSpec {
 
 /// Opening a panel is done by providing an object describing the
 /// panel through this facet.
-export const openPanel = Facet.define<PanelSpec | null, {top: readonly PanelSpec[], bottom: readonly PanelSpec[]}>({
-  combine(specs) {
-    let top: PanelSpec[] = [], bottom: PanelSpec[] = []
-    for (let spec of specs) if (spec) (spec.top ? top : bottom).push(spec)
-    return {top: top.sort((a, b) => (a.pos || 0) - (b.pos || 0)),
-            bottom: bottom.sort((a, b) => (a.pos || 0) - (b.pos || 0))}
-  }
-})
+export const showPanel = Facet.define<(view: EditorView) => Panel>()
 
 class Panels extends ViewPlugin {
+  specs: readonly ((view: EditorView) => Panel)[]
+  panels: Panel[]
   top: PanelGroup
   bottom: PanelGroup
 
   constructor(view: EditorView) {
     super()
-    let {top, bottom} = view.state.facet(openPanel)
-    this.top = new PanelGroup(view, true, top)
-    this.bottom = new PanelGroup(view, false, bottom)
+    this.specs = view.state.facet(showPanel)
+    this.panels = this.specs.map(spec => spec(view))
+    this.top = new PanelGroup(view, true, this.panels.filter(p => p.top)) 
+    this.bottom = new PanelGroup(view, false, this.panels.filter(p => !p.top))
+    for (let p of this.panels) {
+      p.dom.className += " " + panelClass(view.state, p)
+      if (p.mount) p.mount()
+    }
   }
 
   update(update: ViewUpdate) {
-    let {top, bottom} = update.state.facet(openPanel)
-    this.top.update(update, top)
-    this.bottom.update(update, bottom)
+    let specs = update.state.facet(showPanel)
+    if (specs != this.specs) {
+      let panels = [], top: Panel[] = [], bottom: Panel[] = [], mount = []
+      for (let spec of specs) {
+        let known = this.specs.indexOf(spec), panel
+        if (known < 0) {
+          panel = spec(update.view)
+          if (panel.mount) mount.push(panel)
+        } else {
+          panel = this.panels[known]
+          if (panel.update) panel.update(update)
+        }
+        panels.push(panel)
+        ;(panel.top ? top : bottom).push(panel)
+      }
+      this.specs = specs
+      this.panels = panels
+      this.top.sync(top)
+      this.bottom.sync(bottom)
+      for (let p of mount) p.mount!()
+    } else {
+      for (let p of this.panels) if (p.update) p.update(update)
+    }
+
+    if (update.themeChanged) for (let p of this.panels) {
+      let prev = panelClass(update.prevState, p), cur = panelClass(update.state, p)
+      if (prev != cur) {
+        for (let cls of prev.split(" ")) p.dom.classList.remove(cls)
+        for (let cls of cur.split(" ")) p.dom.classList.add(cls)
+      }
+    }
   }
 
   get scrollMargins() {
@@ -58,70 +85,20 @@ class Panels extends ViewPlugin {
   }
 }
 
-class Panel {
-  dom: HTMLElement
-  style: string
-  baseClass: string
-
-  constructor(view: EditorView, readonly spec: PanelSpec) {
-    this.dom = spec.create(view)
-    this.style = spec.style || ""
-    this.baseClass = this.dom.className
-    this.setTheme(view)
-  }
-
-  setTheme(view: EditorView) {
-    this.dom.className = this.baseClass + " " + themeClass(view.state, "panel" + (this.style ? "." + this.style : ""))
-  }
-
-  update(update: ViewUpdate) {
-    if (this.spec.update) this.spec.update(update, this.dom)
-  }
-
-  mount(view: EditorView) {
-    if (this.spec.mount) this.spec.mount(view, this.dom)
-  }
+function panelClass(state: EditorState, panel: Panel) {
+  return themeClass(state, panel.style ? `panel.${panel.style}` : "panel")
 }
 
 class PanelGroup {
   dom: HTMLElement | null = null
-  panels: Panel[]
-  floating = false
 
-  constructor(readonly view: EditorView, readonly top: boolean, private specs: readonly PanelSpec[]) {
-    this.panels = specs.map(s => new Panel(view, s))
+  constructor(readonly view: EditorView, readonly top: boolean, public panels: Panel[]) {
     this.syncDOM()
-    for (let panel of this.panels) panel.mount(view)
   }
 
-  update(update: ViewUpdate, specs: readonly PanelSpec[]) {
-    if (specs == this.specs) {
-      for (let panel of this.panels) panel.update(update)
-    } else {
-      let panels: Panel[] = [], mount = []
-      for (let spec of specs) {
-        let found = -1
-        for (let i = 0; i < this.panels.length; i++) if (this.panels[i].spec == spec) found = i
-        if (found < 0) {
-          let panel = new Panel(this.view, spec)
-          panels.push(panel)
-          mount.push(panel)
-        } else {
-          let panel = this.panels[found]
-          panels.push(panel)
-          panel.update(update)
-        }
-      }
-      for (let panel of this.panels) if (panels.indexOf(panel) < 0) panel.dom.remove()
-      this.specs = specs
-      this.panels = panels
-      this.syncDOM()
-      for (let panel of mount) panel.mount(this.view)
-    }
-    if (update.themeChanged && this.dom) {
-      this.dom.className = themeClass(this.view.state, this.top ? "panels.top" : "panels.bottom")
-      for (let panel of this.panels) panel.setTheme(this.view)
-    }
+  sync(panels: Panel[]) {
+    this.panels = panels
+    this.syncDOM()
   }
 
   syncDOM() {
