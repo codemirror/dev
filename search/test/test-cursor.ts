@@ -1,6 +1,6 @@
 import {SearchCursor} from ".."
 import {Text} from "../../text"
-const ist = require("ist")
+import ist from "ist"
 
 function testMatches(cursor: SearchCursor, expected: [number, number][]) {
   let matches = []

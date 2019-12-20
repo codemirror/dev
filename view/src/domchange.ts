@@ -1,4 +1,5 @@
 import {EditorView} from "./editorview"
+import {ContentView} from "./contentview"
 import {selectionCollapsed} from "./dom"
 import browser from "./browser"
 import {EditorSelection, Change, Transaction} from "../../state"
@@ -121,9 +122,9 @@ class DOMReader {
       this.readNode(cur)
       let next: Node | null = cur.nextSibling
       if (next == end) break
-      let view = cur.cmView, nextView = next!.cmView
+      let view = ContentView.get(cur), nextView = ContentView.get(next!)
       if ((view ? view.breakAfter : isBlockElement(cur)) ||
-          ((nextView ? nextView.breakAfter : isBlockElement(next!)) && !(cur.nodeName == "BR" && !cur.cmIgnore)))
+          ((nextView ? nextView.breakAfter : isBlockElement(next!)) && !(cur.nodeName == "BR" && !(cur as any).cmIgnore)))
         this.text += LINE_SEP
       cur = next!
     }
@@ -131,8 +132,8 @@ class DOMReader {
   }
 
   readNode(node: Node) {
-    if (node.cmIgnore) return
-    let view = node.cmView
+    if ((node as any).cmIgnore) return
+    let view = ContentView.get(node)
     let fromView = view && view.overrideDOMText
     let text: string | undefined
     if (fromView != null) text = fromView.join(LINE_SEP)

@@ -1,4 +1,4 @@
-const ist = require("ist")
+import ist from "ist"
 import {Extension, ExtensionGroup} from ".."
 
 let tp = new ExtensionGroup<{[id: number]: any}>(v => v), v = Object.create(null)

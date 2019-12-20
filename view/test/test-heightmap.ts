@@ -1,7 +1,7 @@
 import {Decoration, WidgetType, BlockType, BlockInfo, __test} from ".."
 import {Text} from "../../text"
 import {ChangedRange} from "../../state"
-const ist = require("ist")
+import ist from "ist"
 
 const {HeightMap, HeightOracle, MeasuredHeights, QueryType} = __test
 

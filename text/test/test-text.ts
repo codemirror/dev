@@ -1,5 +1,5 @@
 import {Text} from ".."
-const ist = require("ist")
+import ist from "ist"
 
 function depth(node: Text): number {
   return !node.children ? 0 : 1 + Math.max(...node.children.map(depth))
@@ -71,7 +71,7 @@ describe("doc", () => {
 
   it("returns the correct strings for slice", () => {
     let text = []
-    for (let i = 0; i < 1000; i++) text.push(String(i).padStart(4, "0"))
+    for (let i = 0; i < 1000; i++) text.push("0".repeat(4 - String(i).length) + i)
     let doc = Text.of(text)
     let str = text.join("\n")
     for (let i = 0; i < 400; i++) {

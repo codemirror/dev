@@ -1,4 +1,4 @@
-const ist = require("ist")
+import ist from "ist"
 import {handleInsertion, handleBackspace} from ".."
 import {EditorState, EditorSelection, languageData} from "../../state"
 import {Text} from "../../text"

@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, Range} from ".."
+import {EditorView, Decoration, DecorationSet, WidgetType, Range} from ".."
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorSelection, Annotation, StateField} from "../../state"
 import ist from "ist"

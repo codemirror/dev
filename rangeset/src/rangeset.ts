@@ -644,7 +644,7 @@ function rebalanceChildren<T extends RangeValue>(local: Range<T>[], children: Ra
   }
 }
 
-const enum Side { A, B }
+const enum Side { A = 1, B = 2 }
 
 const FAR = 1e9
 

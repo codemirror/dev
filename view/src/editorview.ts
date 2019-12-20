@@ -2,6 +2,7 @@ import {EditorState, Transaction, CancellablePromise, Extension} from "../../sta
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
+import {ContentView} from "./contentview"
 import {InputState, MouseSelectionUpdate} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
@@ -496,7 +497,7 @@ function handleResize() {
   resizeDebounce = -1
   let found = document.querySelectorAll(".codemirror-content")
   for (let i = 0; i < found.length; i++) {
-    let docView = found[i].cmView
+    let docView = ContentView.get(found[i])
     if (docView) docView.editorView.requestMeasure() // FIXME remove need to pass an annotation?
   }
 }

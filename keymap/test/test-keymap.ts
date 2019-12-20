@@ -1,7 +1,7 @@
 import {keymap, Keymap} from ".."
 import {EditorView} from "../../view"
 import {EditorState} from "../../state"
-const ist = require("ist")
+import ist from "ist"
 
 const fakeView = {state: {}, dispatch: () => {}}
 

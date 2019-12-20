@@ -172,9 +172,9 @@ export class LineView extends ContentView implements BlockView {
     }
     super.sync()
     let last = this.dom!.lastChild
-    if (!last || (last.nodeName != "BR" && !(last.cmView instanceof TextView))) {
+    if (!last || (last.nodeName != "BR" && !(ContentView.get(last) instanceof TextView))) {
       let hack = document.createElement("BR")
-      hack.cmIgnore = true
+      ;(hack as any).cmIgnore = true
       this.dom!.appendChild(hack)
     }
   }

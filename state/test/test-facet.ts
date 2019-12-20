@@ -1,4 +1,4 @@
-const ist = require("ist")
+import ist from "ist"
 import {EditorState, EditorSelection, Facet, Extension} from ".."
 
 function mk(...extensions: Extension[]) {

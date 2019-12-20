@@ -1,4 +1,4 @@
-const ist = require("ist")
+import ist from "ist"
 import {EditorSelection, SelectionRange} from ".."
 
 describe("EditorSelection", () => {

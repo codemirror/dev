@@ -1,5 +1,6 @@
 import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
 import {EditorView} from "./editorview"
+import {ContentView} from "./contentview"
 import {handleDOMEvents, ViewUpdate, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
@@ -210,8 +211,8 @@ function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) 
 function eventBelongsToEditor(view: EditorView, event: Event): boolean {
   if (!event.bubbles) return true
   if (event.defaultPrevented) return false
-  for (let node: Node | null = event.target as Node; node != view.contentDOM; node = node.parentNode)
-    if (!node || node.nodeType == 11 || (node.cmView && node.cmView.ignoreEvent(event)))
+  for (let node: Node | null = event.target as Node, cView; node != view.contentDOM; node = node.parentNode)
+    if (!node || node.nodeType == 11 || ((cView = ContentView.get(node)) && cView.ignoreEvent(event)))
       return false
   return true
 }

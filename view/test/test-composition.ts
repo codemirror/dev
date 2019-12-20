@@ -53,21 +53,17 @@ function wordDeco(state: EditorState): DecorationSet {
   return Decoration.set(deco)
 }
 
-const wordHighlighter = EditorView.viewPlugin.of(view => ({
-  decorations: wordDeco(view.state),
-  update(update: ViewUpdate) { this.decorations = wordDeco(update.state) }
-}))
+const wordHighlighter = EditorView.decorations.compute(["doc"], wordDeco)
 
 function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  return EditorView.viewPlugin.of(() => ({
-    decorations: Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))),
-    update(update: ViewUpdate) {
-      this.decorations = this.decorations.map(update.changes)
-    }
-  })
+  let deco = Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
+  return class WidgetPlugin extends ViewPlugin {
+    constructor(startDeco: DecorationSet) { super(); this.decorations = deco }
+    update(update: ViewUpdate) { this.decorations = this.decorations.map(update.changes) }
+  }.extension
 }
 
 describe("Composition", () => {
@@ -251,7 +247,7 @@ describe("Composition", () => {
     event(cm, "compositionstart")
     let one = cm.domAtPos(1).node as Text
     up(one, "!")
-    cm.docView.observer.flush()
+    cm.observer.flush()
     event(cm, "compositionend")
     one.nodeValue = "one!!"
     let L2 = cm.contentDOM.lastChild
@@ -259,13 +255,13 @@ describe("Composition", () => {
     let two = cm.domAtPos(7).node as Text
     ist(cm.contentDOM.lastChild, L2)
     up(two, ".")
-    cm.docView.observer.flush()
+    cm.observer.flush()
     ist(hasCompositionDeco(cm))
     ist(getSelection()!.focusNode, two)
     ist(getSelection()!.focusOffset, 4)
     ist(cm.inputState.composing)
     event(cm, "compositionend")
-    cm.docView.observer.flush()
+    cm.observer.flush()
     ist(cm.state.doc.toString(), "one!!\ntwo.")
   })
 })
