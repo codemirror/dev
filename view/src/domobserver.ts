@@ -199,7 +199,7 @@ export class DOMObserver {
 
 function findChild(cView: ContentView, dom: Node | null, dir: number): ContentView | null {
   while (dom) {
-    let curView = dom.cmView
+    let curView = ContentView.get(dom)
     if (curView && curView.parent == cView) return curView
     let parent = dom.parentNode
     dom = parent != cView.dom ? parent : dir > 0 ? dom.nextSibling : dom.previousSibling

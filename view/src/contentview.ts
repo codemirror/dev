@@ -1,10 +1,6 @@
 import {Rect, maxOffset, domIndex} from "./dom"
 import {EditorView} from "./editorview"
 
-declare global {
-  interface Node { cmView: ContentView | undefined; cmIgnore: boolean | undefined }
-}
-
 export const enum Dirty { Not = 0, Child = 1, Node = 2 }
 
 export class DOMPos {
@@ -59,7 +55,7 @@ export abstract class ContentView {
       let parent = this.dom as HTMLElement, pos: Node | null = parent.firstChild
       for (let child of this.children) {
         if (child.dirty) {
-          if (pos && !child.dom && !pos.cmView) {
+          if (pos && !child.dom && !ContentView.get(pos)) {
             let prev = pos.previousSibling
             if (child.reuseDOM(pos)) pos = prev ? prev.nextSibling : parent.firstChild
           }
@@ -100,7 +96,7 @@ export abstract class ContentView {
       else after = node.nextSibling
     }
     if (after == this.dom.firstChild) return 0
-    while (after && !after.cmView) after = after.nextSibling
+    while (after && !ContentView.get(after)) after = after.nextSibling
     if (!after) return this.length
 
     for (let i = 0, pos = 0;; i++) {
@@ -149,7 +145,7 @@ export abstract class ContentView {
 
   setDOM(dom: Node) {
     this.dom = dom
-    dom.cmView = this
+    ;(dom as any).cmView = this
   }
 
   get rootView(): ContentView {
@@ -184,6 +180,8 @@ export abstract class ContentView {
                    this.length ? "[" + (name == "Text" ? (this as any).text : this.length) + "]" : "") +
       (this.breakAfter ? "#" : "")
   }
+
+  static get(node: Node): ContentView | null { return (node as any).cmView }
 }
 
 ContentView.prototype.breakAfter = 0

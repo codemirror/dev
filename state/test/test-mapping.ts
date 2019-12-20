@@ -1,4 +1,4 @@
-const ist = require("ist")
+import ist from "ist"
 import {ChangeDesc, ChangeSet} from ".."
 
 function testMapping(mapping: ChangeSet<ChangeDesc>, ...cases: any[][]) {

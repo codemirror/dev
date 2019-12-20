@@ -225,7 +225,7 @@ export class DocView extends ContentView {
 
   nearest(dom: Node): ContentView | null {
     for (let cur: Node | null = dom; cur;) {
-      let domView = cur.cmView
+      let domView = ContentView.get(cur)
       if (domView && domView.rootView == this) return domView
       cur = cur.parentNode
     }
@@ -413,8 +413,8 @@ export function computeCompositionDeco(view: EditorView, changes: readonly Chang
   } else if (cView instanceof LineView) {
     while (topNode.parentNode != cView.dom) topNode = topNode.parentNode!
     let prev = topNode.previousSibling
-    while (prev && !prev.cmView) prev = prev.previousSibling
-    from = to = prev ? prev.cmView!.posAtEnd : cView.posAtStart
+    while (prev && !ContentView.get(prev)) prev = prev.previousSibling
+    from = to = prev ? ContentView.get(prev)!.posAtEnd : cView.posAtStart
   } else {
     return Decoration.none
   }

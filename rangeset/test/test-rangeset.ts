@@ -1,6 +1,6 @@
 import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from ".."
 import {Change, ChangeSet, Mapping, MapMode, ChangedRange} from "../../state"
-const ist = require("ist")
+import ist from "ist"
 
 class Value extends RangeValue {
   startSide: number
