@@ -1,6 +1,5 @@
 import {EditorState, Transaction, ChangeSet, Facet, Extension} from "../../state"
 import {StyleModule} from "style-mod"
-import {Viewport} from "./viewport"
 import {Decoration, DecorationSet} from "./decoration"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
@@ -43,6 +42,7 @@ export class ViewPlugin {
   private static _extension: Extension | null = null
 
   static get extension() {
+    // FIXME this blindly assumes the constructor has only one view arg
     return this._extension || (this._extension = viewPlugin.of(view => new (this as any)(view)))
   }
 }

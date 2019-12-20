@@ -1,6 +1,7 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection} from "../../state"
-import {Decoration, WidgetType, ViewPlugin} from ".."
+import {EditorSelection, StateField} from "../../state"
+import {EditorView} from "../../view"
+import {Decoration, DecorationSet, WidgetType, ViewPlugin} from ".."
 import ist from "ist"
 
 const visualBidi = !/Edge\/(\d+)|MSIE \d|Trident\//.exec(navigator.userAgent)
@@ -13,16 +14,16 @@ class OWidget extends WidgetType<void> {
   }
 }
 
-const oWidgets = ViewPlugin.decoration({
-  create({state}) {
+const widgetField = StateField.define<DecorationSet>({
+  create(state) {
     let doc = state.doc.toString(), deco = []
     for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
       deco.push(Decoration.replace(i, i + 1, {widget: new OWidget(undefined)}))
     return Decoration.set(deco)
   },
-  update(deco) { return deco },
-  map: true
+  update(deco, tr) { return deco.map(tr.changes) }
 })
+const oWidgets = [widgetField, widgetField.facet(EditorView.decorations)]
 
 class BigWidget extends WidgetType<void> {
   toDOM() {
@@ -116,7 +117,7 @@ describe("EditorView.movePos", () => {
   })
 
   it("can cross large line widgets during line motion", () => {
-    let cm = tempEditor("one\ntwo", [ViewPlugin.decoration({
+    const field = StateField.define<DecorationSet>({
       create() {
         return Decoration.set([
           Decoration.widget(3, {widget: new BigWidget(undefined), side: 1, block: true}),
@@ -124,7 +125,8 @@ describe("EditorView.movePos", () => {
         ])
       },
       update(deco) { return deco }
-    })])
+    })
+    let cm = tempEditor("one\ntwo", [field, field.facet(EditorView.decorations)])
     ist(cm.contentDOM.offsetHeight, 400, ">")
     ist(cm.movePos(0, "forward", "line"), 4)
     ist(cm.movePos(2, "forward", "line"), 6)

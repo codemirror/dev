@@ -1,6 +1,5 @@
-import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewPluginValue,
-        ViewUpdate, EditorView} from "../../view"
-import {ChangedRange} from "../../state"
+import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
+import {ChangedRange, Facet} from "../../state"
 import {combineConfig} from "../../extension"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
@@ -38,7 +37,7 @@ const NAMES: {[key: number]: string} = {
   65532: "object replacement"
 }
 
-const specialCharConfig = EditorView.extend.behavior<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
+const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
   combine(configs) {
     // FIXME make configurations compose properly
     let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
@@ -59,23 +58,21 @@ const specialCharConfig = EditorView.extend.behavior<SpecialCharConfig, Required
   }
 })
 
-const specialCharPlugin = ViewPlugin.create(view => new SpecialCharPlugin(view))
-  .decorations(plugin => plugin.decorations)
-
 /// Returns an extension that installs highlighting of special
 /// characters.
 export function specialChars(config: SpecialCharConfig = {}) {
-  return [specialCharConfig(config), specialCharPlugin.extension, styleExt]
+  return [specialCharConfig.of(config), SpecialCharPlugin.extension, styleExt]
 }
 
 const JOIN_GAP = 10
 
-class SpecialCharPlugin implements ViewPluginValue {
+class SpecialCharPlugin extends ViewPlugin {
   from = 0
   to = 0
   decorations: DecorationSet = Decoration.none
 
   constructor(public view: EditorView) {
+    super()
     this.updateForViewport()
   }
 
@@ -91,7 +88,7 @@ class SpecialCharPlugin implements ViewPluginValue {
 
   closeHoles(ranges: readonly ChangedRange[]) {
     let decorations: Range<Decoration>[] = [], vp = this.view.viewport, replaced: number[] = []
-    let config = this.view.behavior(specialCharConfig)
+    let config = this.view.state.facet(specialCharConfig)
     for (let i = 0; i < ranges.length; i++) {
       let {fromB: from, toB: to} = ranges[i]
       // Must redraw all tabs further on the line
@@ -128,7 +125,7 @@ class SpecialCharPlugin implements ViewPluginValue {
   }
 
   getDecorationsFor(from: number, to: number, target: Range<Decoration>[]) {
-    let config = this.view.behavior(specialCharConfig)
+    let config = this.view.state.facet(specialCharConfig)
 
     let {doc} = this.view.state
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
@@ -199,4 +196,4 @@ const style = new StyleModule({
     verticalAlign: "bottom"
   }
 })
-const styleExt = EditorView.styleModule(style)
+const styleExt = EditorView.styleModule.of(style)

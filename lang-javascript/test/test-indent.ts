@@ -3,7 +3,7 @@ import {EditorState} from "../../state"
 import {javascript} from ".."
 
 function getIndent(state: EditorState, pos: number): number {
-  for (let f of state.behavior(EditorState.indentation)) {
+  for (let f of state.facet(EditorState.indentation)) {
     let result = f(state, pos)
     if (result > -1) return result
   }

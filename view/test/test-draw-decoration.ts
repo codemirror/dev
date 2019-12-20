@@ -1,25 +1,22 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, Range} from ".."
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection, Annotation} from "../../state"
+import {EditorSelection, Annotation, StateField} from "../../state"
 import ist from "ist"
 
 const filterDeco = Annotation.define<(from: number, to: number, spec: any) => boolean>()
 const addDeco = Annotation.define<Range<Decoration>[]>()
 
 function decos(startState: DecorationSet = Decoration.none) {
-  return [
-    ViewPlugin.decoration({
-      create() { return startState },
-      update(value, {transactions, state}) {
-        for (let tr of transactions) {
-          let add = tr.annotation(addDeco), filter = tr.annotation(filterDeco)
-          if (add || filter) value = value.update(add, filter)
-        }
-        return value
-      },
-      map: true
-    })
-  ]
+  let field = StateField.define<DecorationSet>({
+    create() { return startState },
+    update(value, tr) {
+      value = value.map(tr.changes)
+      let add = tr.annotation(addDeco), filter = tr.annotation(filterDeco)
+      if (add || filter) value = value.update(add, filter)
+      return value
+    }
+  })
+  return [field, field.facet(EditorView.decorations)]
 }
 
 function d(from: number, to: any, spec: any = null) {
@@ -271,7 +268,7 @@ describe("EditorView decoration", () => {
       range.setStart(sel.anchorNode!, sel.anchorOffset)
       sel.removeAllRanges()
       sel.addRange(range)
-      cm.docView.observer.flush()
+      cm.observer.flush()
       let {anchor, head} = cm.state.selection.primary
       ist(head, 7)
       ist(anchor, 2)

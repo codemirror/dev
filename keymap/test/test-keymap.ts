@@ -1,11 +1,12 @@
 import {keymap, Keymap} from ".."
 import {EditorView} from "../../view"
+import {EditorState} from "../../state"
 const ist = require("ist")
 
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
-  return EditorView.extend.resolve([keymap(map)]).getBehavior(EditorView.handleDOMEvents, {} as any)[0]
+  return EditorState.create({extensions: [keymap(map)]}).facet(EditorView.handleDOMEvents)[0]
 }
 
 function dispatch(handlers: any, key: string, mods?: any) {

@@ -1,46 +1,50 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state"
+import {EditorSelection, Text} from "../../state"
 import {EditorView, ViewPlugin, ViewUpdate} from ".."
 import ist from "ist"
 
 describe("EditorView extension", () => {
   it("calls update when the viewport changes", () => {
-    let plugin = ViewPlugin.create(view => {
-      let {from, to} = view.viewport
-      return {
-        viewports: [[from, to]],
-        update({viewport: {from, to}}: ViewUpdate) {
-          this.viewports.push([from, to])
-        }
+    let viewports: {from: number, to: number}[] = []
+    class Plugin extends ViewPlugin {
+      constructor(view: EditorView) {
+        super()
+        viewports.push(view.viewport)
       }
-    })
-    let cm = tempEditor("x\n".repeat(500), [plugin.extension])
-    ist(cm.plugin(plugin)!.viewports.length, 1)
-    ist(cm.plugin(plugin)!.viewports[0][0], 0)
+      update(update: ViewUpdate) {
+        viewports.push(update.view.viewport)
+      }
+    }
+    let cm = tempEditor("x\n".repeat(500), [Plugin.extension])
+    ist(viewports.length, 1)
+    ist(viewports[0].from, 0)
     cm.dom.style.height = "300px"
     cm.scrollDOM.style.overflow = "auto"
     cm.scrollDOM.scrollTop = 300
-    cm.docView.checkLayout()
-    let val = cm.plugin(plugin)!.viewports
-    ist(val.length, 2)
-    ist(val[1][0], 0, ">")
-    ist(val[1][1], val[0][0], ">")
+    cm.measure()
+    ist(viewports.length, 2)
+    ist(viewports[1].from, 0, ">")
+    ist(viewports[1].to, viewports[0].from, ">")
     cm.scrollDOM.scrollTop = 1000
-    cm.docView.checkLayout()
-    ist(cm.plugin(plugin)!.viewports.length, 3)
+    cm.measure()
+    ist(viewports.length, 3)
   })
 
   it("calls update on plugins", () => {
-    let updates = 0
-    let cm = tempEditor("xyz", [ViewPlugin.create(view => ({
+    let updates = 0, prevDoc: Text
+    class Plugin extends ViewPlugin {
+      constructor(view: EditorView) {
+        super()
+        prevDoc = view.state.doc
+      }
       update(update: ViewUpdate) {
         ist(update.prevState.doc, prevDoc)
         ist(update.state.doc, cm.state.doc)
         prevDoc = cm.state.doc
         updates++
       }
-    })).extension])
-    let prevDoc = cm.state.doc
+    }
+    let cm = tempEditor("xyz", [Plugin.extension])
     ist(updates, 0)
     cm.dispatch(cm.state.t().replace(1, 2, "u"))
     ist(updates, 1)
@@ -49,12 +53,12 @@ describe("EditorView extension", () => {
   })
 
   it("allows content attributes to be changed through effects", () => {
-    let cm = tempEditor("", [EditorView.contentAttributes({spellcheck: "true"})])
+    let cm = tempEditor("", [EditorView.contentAttributes.of({spellcheck: "true"})])
     ist(cm.contentDOM.spellcheck, true)
   })
 
   it("allows editor attributes to be changed through effects", () => {
-    let cm = tempEditor("", [EditorView.editorAttributes({class: "something"})])
+    let cm = tempEditor("", [EditorView.editorAttributes.of({class: "something"})])
     ist(cm.dom.classList.contains("something"))
     ist(cm.dom.classList.contains("codemirror"))
   })

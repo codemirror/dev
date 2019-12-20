@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType} from ".."
-import {EditorState, Annotation} from "../../state"
+import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType} from ".."
+import {EditorState} from "../../state"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
@@ -18,8 +18,6 @@ function hasCompositionDeco(cm: EditorView) {
   return cm.docView.compositionDeco.size > 0
 }
 
-const dummyAnnotation = Annotation.define<null>() // Crude kludge to be able to flush the doc view
-
 function compose(cm: EditorView, start: () => Text,
                  update: ((node: Text) => void)[],
                  options: {end?: (node: Text) => void, cancel?: boolean} = {}) {
@@ -29,7 +27,7 @@ function compose(cm: EditorView, start: () => Text,
     if (i < 0) node = start()
     else update[i](node)
     let {focusNode, focusOffset} = sel
-    cm.docView.observer.flush()
+    cm.observer.flush()
 
     if (options.cancel && i == update.length - 1) {
       ist(!hasCompositionDeco(cm))
@@ -42,8 +40,8 @@ function compose(cm: EditorView, start: () => Text,
   }
   event(cm, "compositionend")
   if (options.end) options.end(node)
-  cm.docView.observer.flush()
-  cm.update([], [dummyAnnotation(null)])
+  cm.observer.flush()
+  cm.update([])
   ist(!cm.inputState.composing)
   ist(!hasCompositionDeco(cm))
 }
@@ -55,22 +53,20 @@ function wordDeco(state: EditorState): DecorationSet {
   return Decoration.set(deco)
 }
 
-const wordHighlighter = ViewPlugin.decoration({
-  create({state}) { return wordDeco(state) },
-  update(_, {state}) { return wordDeco(state) },
-  map: false
-})
+const wordHighlighter = EditorView.viewPlugin.of(view => ({
+  decorations: wordDeco(view.state),
+  update(update: ViewUpdate) { this.decorations = wordDeco(update.state) }
+}))
 
 function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  return ViewPlugin.decoration({
-    create() {
-      return Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
-    },
-    update(deco) { return deco },
-    map: true
+  return EditorView.viewPlugin.of(() => ({
+    decorations: Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))),
+    update(update: ViewUpdate) {
+      this.decorations = this.decorations.map(update.changes)
+    }
   })
 }
 

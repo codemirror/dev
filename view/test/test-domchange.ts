@@ -1,10 +1,10 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state"
-import {Decoration, EditorView, ViewPlugin, WidgetType} from ".."
+import {EditorSelection, StateField} from "../../state"
+import {Decoration, DecorationSet, EditorView, WidgetType} from ".."
 import ist from "ist"
 
 function flush(cm: EditorView) {
-  cm.docView.observer.flush()
+  cm.observer.flush()
 }
 
 describe("DOM changes", () => {
@@ -119,10 +119,11 @@ describe("DOM changes", () => {
   })
 
   it("doesn't drop collapsed text", () => {
-    let cm = tempEditor("abcd", [ViewPlugin.decoration({
+    let field = StateField.define<DecorationSet>({
       create() { return Decoration.set(Decoration.replace(1, 3, {})) },
-      update(d, u) { return u.transactions.length ? Decoration.none : d }
-    })])
+      update(d, u) { return Decoration.none }
+    })
+    let cm = tempEditor("abcd", [field, field.facet(EditorView.decorations)])
     cm.domAtPos(0).node.firstChild!.textContent = "x"
     flush(cm)
     ist(cm.state.doc.toString(), "xbcd")
@@ -153,10 +154,11 @@ describe("DOM changes", () => {
     class Widget extends WidgetType<any> {
       toDOM() { return document.createElement("div") }
     }
-    let cm = tempEditor("abcd", [ViewPlugin.decoration({
+    let field = StateField.define<DecorationSet>({
       create() { return Decoration.set(Decoration.widget(4, {widget: new Widget(null) })) },
-      update(d, u) { return d }
-    })])
+      update(v) { return v }
+    })
+    let cm = tempEditor("abcd", [field, field.facet(EditorView.decorations)])
     cm.domAtPos(0).node.appendChild(document.createTextNode("x"))
     flush(cm)
     ist(cm.state.doc.toString(), "abcdx")
