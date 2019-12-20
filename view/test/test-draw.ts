@@ -85,7 +85,7 @@ describe("EditorView drawing", () => {
     cm.dom.style.height = "300px"
     cm.scrollDOM.style.overflow = "auto"
     cm.scrollDOM.scrollTop = 0
-    cm.docView.checkLayout()
+    cm.measure()
     ist(cm.contentDOM.childNodes.length, 500, "<")
     ist(cm.contentDOM.scrollHeight, 10000, ">")
     ist(!cm.contentDOM.textContent!.match(/b/))
@@ -93,7 +93,7 @@ describe("EditorView drawing", () => {
     cm.dispatch(cm.state.t().replace(2000, 2000, "\n\n"))
     ist(cm.contentDOM.lastChild, gap) // Make sure gap nodes are reused when resized
     cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2
-    cm.docView.checkLayout()
+    cm.measure()
     ist(cm.contentDOM.textContent!.match(/b/))
   })
 
@@ -103,7 +103,7 @@ describe("EditorView drawing", () => {
     cm.scrollDOM.style.overflow = "auto"
     cm.scrollDOM.scrollTop = 3000
     cm.dispatch(cm.state.t().setSelection(EditorSelection.single(1, cm.state.doc.length)))
-    cm.docView.checkLayout()
+    cm.measure()
     cm.focus()
     let text = cm.contentDOM.textContent!
     ist(text.length, 500, "<")
@@ -177,7 +177,7 @@ describe("EditorView drawing", () => {
 
   it("notices it is added to the DOM even if initially detached", () => {
     if (!(window as any).IntersectionObserver) return // Only works with intersection observer support
-    let cm = tempEditor("a\n\b\nc\nd", [EditorView.contentAttributes({style: "font-size: 60px"})])
+    let cm = tempEditor("a\n\b\nc\nd", [EditorView.contentAttributes.of({style: "font-size: 60px"})])
     let parent = cm.dom.parentNode!
     cm.dom.remove()
     return later().then(() => {

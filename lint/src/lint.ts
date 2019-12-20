@@ -126,8 +126,8 @@ export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
   if (!field.panel.length) view.dispatch(view.state.t().annotate(lintPanel(true)))
-//  if (view.state.field(lintState).panel.length)
-//    (view.dom.querySelector(".codemirror-panel-lint ul") as HTMLElement).focus()
+  if (view.state.field(lintState).panel.length)
+    (view.dom.querySelector(".codemirror-panel-lint ul") as HTMLElement).focus()
   return true
 }
 

@@ -5,7 +5,7 @@ import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection} from ".."
 
 const mkState = (config?: any, doc?: string) => EditorState.create({
-  extensions: [history(config), EditorState.allowMultipleSelections(true)],
+  extensions: [history(config), EditorState.allowMultipleSelections.of(true)],
   doc
 })
 

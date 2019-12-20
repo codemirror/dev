@@ -1,6 +1,5 @@
 import {EditorView} from ".."
-import {EditorState} from "../../state"
-import {Extension} from "../../extension"
+import {EditorState, Extension} from "../../state"
 
 const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElement
 
