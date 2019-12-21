@@ -7,7 +7,7 @@ import {InputState, MouseSelectionUpdate} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
-import {ViewState} from "./viewport"
+import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule, theme, handleDOMEvents,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
