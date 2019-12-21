@@ -165,7 +165,7 @@ export class WidgetView extends InlineView {
     if (this.length == 0) return [""]
     let top: ContentView = this
     while (top.parent) top = top.parent
-    let state = (top as any).state, text: Text | undefined = state && state.doc, start = this.posAtStart
+    let view = (top as any).editorView, text: Text | undefined = view && view.state.doc, start = this.posAtStart
     return text ? text.sliceLines(start, start + this.length) : [""]
   }
 

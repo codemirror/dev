@@ -12,7 +12,8 @@ describe("EditorView extension", () => {
         viewports.push(view.viewport)
       }
       update(update: ViewUpdate) {
-        viewports.push(update.view.viewport)
+        if (update.viewportChanged)
+          viewports.push(update.view.viewport)
       }
     }
     let cm = tempEditor("x\n".repeat(500), [Plugin.extension])
@@ -20,12 +21,12 @@ describe("EditorView extension", () => {
     ist(viewports[0].from, 0)
     cm.dom.style.height = "300px"
     cm.scrollDOM.style.overflow = "auto"
-    cm.scrollDOM.scrollTop = 300
+    cm.scrollDOM.scrollTop = 2000
     cm.measure()
     ist(viewports.length, 2)
     ist(viewports[1].from, 0, ">")
     ist(viewports[1].to, viewports[0].from, ">")
-    cm.scrollDOM.scrollTop = 1000
+    cm.scrollDOM.scrollTop = 4000
     cm.measure()
     ist(viewports.length, 3)
   })

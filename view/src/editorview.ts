@@ -10,7 +10,7 @@ import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewport"
 import {ViewUpdate, styleModule, theme, handleDOMEvents,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest} from "./extension"
+        viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import {styles} from "./styles"
@@ -149,6 +149,7 @@ export class EditorView {
     this.updateState = UpdateState.Idle
 
     ensureGlobalHandler()
+    this.requestMeasure()
   }
 
   /// Update the view for the given array of transactions. This will
@@ -227,7 +228,7 @@ export class EditorView {
       if (changed) this.docView.update(update, [])
       for (let i = 0; i < measuring.length; i++) measuring[i].write(measured[i], this)
 
-      if (!changed && this.measureRequests.length == 0) break
+      if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
     }
 
     this.updateState = UpdateState.Idle

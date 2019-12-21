@@ -1,7 +1,7 @@
 // FIXME rename this file to viewstate.ts
 
 import {Text} from "../../text"
-import {EditorState, ChangedRange} from "../../state"
+import {EditorState, ChangedRange, Mapping} from "../../state"
 import {DecorationSet, Decoration, joinRanges, findChangedRanges} from "./decoration"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType} from "./heightmap"
 import {decorations, ViewUpdate, UpdateFlag} from "./extension"
@@ -44,9 +44,9 @@ export class ViewState {
   heightOracle: HeightOracle = new HeightOracle
   heightMap: HeightMap = HeightMap.empty()
 
-  viewport: Viewport
-
   scrollTo = -1
+
+  viewport: Viewport
 
   // FIXME move view.state here
   constructor(public state: EditorState) {
@@ -63,19 +63,19 @@ export class ViewState {
     let {content, height} = decoChanges(update ? contentChanges : none,
                                         newDeco, update.prevState.facet(decorations),
                                         prev.doc.length)
-    this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc),
-                                                 extendWithRanges(contentChanges, height))
-    if (height.length) {
-      let viewport = new Viewport(update.changes.mapPos(this.viewport.from, 1),
-                                  update.changes.mapPos(this.viewport.to, -1))
-      if (!this.viewportIsCovering(viewport) || (viewport.to - viewport.from) - (this.viewport.to - this.viewport.from) > 100)
-        viewport = this.getViewport(0, -1)
-      if (viewport.eq(this.viewport)) {
-        this.viewport = viewport
-        update.flags |= UpdateFlag.Viewport
-      }
+    let heightChanges = extendWithRanges(contentChanges, height)
+    this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
+
+    let viewport = heightChanges.length ? this.mapViewport(this.viewport, update.changes) : this.viewport
+    if (!viewport || scrollTo > -1 && (scrollTo < viewport.from || scrollTo > viewport.to) ||
+        !this.viewportIsCovering(viewport))
+      viewport = this.getViewport(0, scrollTo)
+    if (!viewport.eq(this.viewport)) {
+      this.viewport = viewport
+      update.flags |= UpdateFlag.Viewport
     }
     if (scrollTo > -1) this.scrollTo = scrollTo
+
     return extendWithRanges(contentChanges, content)
   }
 
@@ -119,7 +119,7 @@ export class ViewState {
     this.scrollTo = -1
     if (!this.viewportIsCovering(this.viewport, bias) ||
         scrollTo > -1 && (scrollTo < this.viewport.from || scrollTo > this.viewport.to)) {
-      this.viewport = this.getViewport(bias, this.scrollTo)
+      this.viewport = this.getViewport(bias, scrollTo)
       result |= UpdateFlag.Viewport
     }
     if (scrollTo > -1) docView.scrollPosIntoView(scrollTo) // FIXME return instead?
@@ -147,6 +147,13 @@ export class ViewState {
       }
     }
     return viewport
+  }
+
+  mapViewport(viewport: Viewport, changes: Mapping) {
+    let from = changes.mapPos(viewport.from, -1), to = changes.mapPos(viewport.to, 1)
+    if ((to - from) - (viewport.to - viewport.from) > 100) return null // Grew too much, recompute
+    return new Viewport(this.heightMap.lineAt(from, QueryType.ByPos, this.state.doc, 0, 0).from,
+                        this.heightMap.lineAt(to, QueryType.ByPos, this.state.doc, 0, 0).to)
   }
 
   viewportIsCovering({from, to}: Viewport, bias = 0) {
