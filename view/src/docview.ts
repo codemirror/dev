@@ -2,14 +2,13 @@ import {ContentView, ChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
-import {Viewport, decoChanges} from "./viewport"
+import {Viewport, decoChanges, extendWithRanges} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView} from "./dom"
 import {ViewUpdate, decorations as decorationsFacet} from "./extension"
 import {EditorView} from "./editorview"
 import {ChangedRange} from "../../state"
-import {extendWithRanges} from "./viewport"
 
 const none = [] as any
 
