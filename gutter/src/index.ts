@@ -1,7 +1,6 @@
-import {combineConfig, fillConfig} from "../../extension"
 import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
+import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this

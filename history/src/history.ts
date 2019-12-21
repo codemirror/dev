@@ -1,5 +1,4 @@
-import {EditorState, Transaction, StateField, StateCommand, Annotation, Facet, Extension} from "../../state"
-import {combineConfig} from "../../extension"
+import {combineConfig, EditorState, Transaction, StateField, StateCommand, Annotation, Facet, Extension} from "../../state"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateAnnotation = Annotation.define<HistoryState>()

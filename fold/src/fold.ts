@@ -1,6 +1,5 @@
-import {EditorState, Annotation, Facet, StateField} from "../../state"
+import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField} from "../../state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
-import {combineConfig, fillConfig} from "../../extension"
 import {Gutter, GutterMarker} from "../../gutter"
 
 type Range = {from: number, to: number}

@@ -1,6 +1,5 @@
 import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {ChangedRange, Facet} from "../../state"
-import {combineConfig} from "../../extension"
+import {combineConfig, ChangedRange, Facet} from "../../state"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
 

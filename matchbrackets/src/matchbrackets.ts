@@ -1,5 +1,4 @@
-import {EditorState, Facet, StateField} from "../../state"
-import {combineConfig} from "../../extension"
+import {combineConfig, EditorState, Facet, StateField} from "../../state"
 import {EditorView, themeClass} from "../../view"
 import {Decoration, DecorationSet} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
