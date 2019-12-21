@@ -1,6 +1,6 @@
 import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {Annotation, CancellablePromise, EditorSelection, EditorState, Transaction, Extension, StateField, Facet} from "../../state"
-import {combineConfig} from "../../extension"
+import {combineConfig, Annotation, CancellablePromise, EditorSelection, EditorState,
+        Transaction, Extension, StateField, Facet} from "../../state"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 

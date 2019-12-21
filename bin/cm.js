@@ -94,7 +94,6 @@ function tsPlugin(options) {
 
 const packages = [
   new Pkg("text"),
-  new Pkg("extension", {entry: "extension"}),
   new Pkg("state"),
   new Pkg("rangeset", {entry: "rangeset"}),
   new Pkg("history", {entry: "history"}),
