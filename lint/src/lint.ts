@@ -35,49 +35,64 @@ export interface Action {
   apply: (view: EditorView, from: number, to: number) => void
 }
 
+class SelectedDiagnostic {
+  constructor(readonly from: number, readonly to: number, readonly diagnostic: Diagnostic) {}
+}
+
 class LintState {
   constructor(readonly diagnostics: DecorationSet,
-              readonly panel: readonly ((view: EditorView) => Panel)[]) {}
+              readonly panel: ((view: EditorView) => Panel) | null,
+              readonly selected: SelectedDiagnostic | null) {}
+}
 
-  findDiagnostic(diagnostic: Diagnostic): {from: number, to: number} | null {
-    let found: {from: number, to: number} | null = null
-    this.diagnostics.between(0, this.diagnostics.length, (from, to, {spec}) => {
-      if (spec.diagnostic == diagnostic) found = {from, to}
-    })
-    return found
-  }
+function findDiagnostic(diagnostics: DecorationSet, diagnostic: Diagnostic | null = null, after = 0): SelectedDiagnostic | null {
+  let found: SelectedDiagnostic | null = null
+  diagnostics.between(after, diagnostics.length, (from, to, {spec}) => {
+    if (diagnostic && spec.diagnostic != diagnostic) return
+    found = new SelectedDiagnostic(from, to, spec.diagnostic)
+    return false
+  })
+  return found
 }
 
 /// Transaction annotation that is used to update the current set of
 /// diagnostics.
 export const setDiagnostics = Annotation.define<readonly Diagnostic[]>()
 
-const lintPanel = Annotation.define<boolean>()
+const setState = Annotation.define<LintState>()
 
 const lintState = StateField.define<LintState>({
   create() {
-    return new LintState(Decoration.none, [])
+    return new LintState(Decoration.none, null, null)
   },
   update(value, tr, state) {
     let setDiag = tr.annotation(setDiagnostics)
-    if (setDiag) return new LintState(Decoration.set(setDiag.map(d => {
-      return d.from < d.to
-        ? Decoration.mark(d.from, d.to, {
-          attributes: {class: themeClass(state, "diagnosticRange." + d.severity)},
-          diagnostic: d
-        } as MarkDecorationSpec)
-        : Decoration.widget(d.from, {
-          widget: new DiagnosticWidget(d),
-          diagnostic: d
-        } as WidgetDecorationSpec)
-    })), value.panel)
+    if (setDiag) {
+      let ranges = Decoration.set(setDiag.map(d => {
+        return d.from < d.to
+          ? Decoration.mark(d.from, d.to, {
+            attributes: {class: themeClass(state, "lintRange." + d.severity)},
+            diagnostic: d
+          } as MarkDecorationSpec)
+          : Decoration.widget(d.from, {
+            widget: new DiagnosticWidget(d),
+            diagnostic: d
+          } as WidgetDecorationSpec)
+      }))
+      return new LintState(ranges, value.panel, findDiagnostic(ranges))
+    }
 
-    let panel = tr.annotation(lintPanel)
-    if (panel != null)
-      return new LintState(value.diagnostics, panel ? [(view: EditorView) => new LintPanel(view)] : [])
+    let newState = tr.annotation(setState)
+    if (newState) return newState
 
-    if (tr.docChanged)
-      return new LintState(value.diagnostics.map(tr.changes), value.panel)
+    if (tr.docChanged) {
+      let mapped = value.diagnostics.map(tr.changes), selected = null
+      if (value.selected) {
+        let selPos = tr.changes.mapPos(value.selected.from, 1)
+        selected = findDiagnostic(mapped, value.selected.diagnostic, selPos) || findDiagnostic(mapped, null, selPos)
+      }
+      return new LintState(mapped, value.panel, selected)
+    }
 
     return value
   }
@@ -88,9 +103,14 @@ const lintState = StateField.define<LintState>({
 export function linting(): Extension {
   return [
     lintState,
-    lintState.facetN(showPanel, s => s.panel),
+    lintState.facetN(showPanel, s => s.panel ? [s.panel] : []),
     lintState.facet(EditorView.decorations, s => s.diagnostics),
-    // FIXME highlight active diagnostic
+    EditorView.decorations.compute([lintState], state => {
+      let {selected, panel} = state.field(lintState)
+      return !selected || !panel ? Decoration.none : Decoration.set([
+        Decoration.mark(selected.from, selected.to, {class: themeClass(state, "lintRange.active")})
+      ])
+    }),
     panels(),
     hoverTooltip(lintTooltip),
     defaultTheme
@@ -128,8 +148,9 @@ function lintTooltip(view: EditorView, check: (from: number, to: number) => bool
 export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
-  if (!field.panel.length) view.dispatch(view.state.t().annotate(lintPanel(true)))
-  if (view.state.field(lintState).panel.length)
+  if (!field.panel)
+    view.dispatch(view.state.t().annotate(setState(new LintState(field.diagnostics, LintPanel.open, field.selected))))
+  if (view.state.field(lintState).panel)
     (view.dom.querySelector(".codemirror-panel-lint ul") as HTMLElement).focus()
   return true
 }
@@ -137,8 +158,8 @@ export const openLintPanel: Command = (view: EditorView) => {
 /// Command to close the lint panel, when open.
 export const closeLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
-  if (!field || !field.panel.length) return false
-  view.dispatch(view.state.t().annotate(lintPanel(false)))
+  if (!field || !field.panel) return false
+  view.dispatch(view.state.t().annotate(setState(new LintState(field.diagnostics, null, field.selected))))
   return true
 }
 
@@ -195,7 +216,7 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
     button.textContent = action.name
     button.onclick = button.onmousedown = e => {
       e.preventDefault()
-      let found = view.state.field(lintState).findDiagnostic(diagnostic)
+      let found = findDiagnostic(view.state.field(lintState).diagnostics, diagnostic)
       if (found) action.apply(view, found.from, found.to)
     }
   }
@@ -223,7 +244,6 @@ class PanelItem {
 
 class LintPanel implements Panel {
   items: PanelItem[] = []
-  selectedItem = -1
   dom: HTMLElement
   list: HTMLElement
 
@@ -240,10 +260,10 @@ class LintPanel implements Panel {
         this.view.focus()
       } else if (event.keyCode == 38) { // ArrowUp
         event.preventDefault()
-        this.moveSelection((this.selectedItem - 1 + this.items.length) % this.items.length)
+        this.moveSelection((this.selectedIndex - 1 + this.items.length) % this.items.length)
       } else if (event.keyCode == 40) { // ArrowDown
         event.preventDefault()
-        this.moveSelection((this.selectedItem + 1) % this.items.length)
+        this.moveSelection((this.selectedIndex + 1) % this.items.length)
       } else if (event.keyCode == 36) { // Home
         event.preventDefault()
         this.moveSelection(0)
@@ -270,25 +290,52 @@ class LintPanel implements Panel {
     this.update()
   }
 
+  get selectedIndex() {
+    let selected = this.view.state.field(lintState).selected
+    if (!selected) return -1
+    for (let i = 0; i < this.items.length; i++) if (this.items[i].diagnostic == selected.diagnostic) return i
+    return -1
+  }
+
   update() {
-    let {diagnostics} = this.view.state.field(lintState)
-    let i = 0, needsSync = false
+    let {diagnostics, selected} = this.view.state.field(lintState)
+    let i = 0, needsSync = false, newSelectedItem: PanelItem | null = null
     diagnostics.between(0, this.view.state.doc.length, (start, end, {spec}) => {
-      let found = -1
+      let found = -1, item
       for (let j = i; j < this.items.length; j++)
         if (this.items[j].diagnostic == spec.diagnostic) { found = j; break }
       if (found < 0) {
-        this.items.splice(i, 0, new PanelItem(this.view, spec.diagnostic))
-      } else {
-        if (this.selectedItem >= i && this.selectedItem < found) this.selectedItem = i
-        if (found > i) this.items.splice(i, found - i)
+        item = new PanelItem(this.view, spec.diagnostic)
+        this.items.splice(i, 0, item)
         needsSync = true
+      } else {
+        item = this.items[found]
+        if (found > i) { this.items.splice(i, found - i); needsSync = true }
+      }
+      if (selected && item.diagnostic == selected.diagnostic) {
+        if (!item.dom.hasAttribute("aria-selected")) {
+          item.dom.setAttribute("aria-selected", "true")
+          newSelectedItem = item
+        }
+      } else if (item.dom.hasAttribute("aria-selected")) {
+        item.dom.removeAttribute("aria-selected")
       }
       i++
     })
     while (i < this.items.length) this.items.pop()
-    if (this.selectedItem >= i || this.selectedItem < 0) this.selectedItem = i ? 0 : -1
-
+    if (newSelectedItem) {
+      this.list.setAttribute("aria-activedescendant", newSelectedItem!.id)
+      this.view.requestMeasure({
+        key: this,
+        read: () => ({sel: newSelectedItem!.dom.getBoundingClientRect(), panel: this.list.getBoundingClientRect()}),
+        write: ({sel, panel}) => {
+          if (sel.top < panel.top) this.list.scrollTop -= panel.top - sel.top
+          else if (sel.bottom > panel.bottom) this.list.scrollTop += sel.bottom - panel.bottom
+        }
+      })
+    } else if (!this.items.length) {
+      this.list.removeAttribute("aria-activedescendant")
+    }
     if (needsSync) this.sync()
   }
 
@@ -313,43 +360,24 @@ class LintPanel implements Panel {
       severity: "info",
       message: this.view.phrase("No diagnostics")
     } as Diagnostic))
-    this.syncSelection()
   }
 
-  moveSelection(selectedItem: number) {
+  moveSelection(selectedIndex: number) {
     // FIXME make actions accessible
     if (this.items.length == 0) return
-    this.selectedItem = selectedItem
-    this.syncSelection()
-    let selected = this.items[this.selectedItem]
-    let selRect = selected.dom.getBoundingClientRect(), panelRect = this.list.getBoundingClientRect()
-    if (selRect.top < panelRect.top) this.list.scrollTop -= panelRect.top - selRect.top
-    else if (selRect.bottom > panelRect.bottom) this.list.scrollTop += selRect.bottom - panelRect.bottom
-
-    let found = this.view.state.field(lintState).findDiagnostic(selected.diagnostic)
-    if (found) this.view.dispatch(this.view.state.t().setSelection(EditorSelection.single(found.from, found.to)).scrollIntoView())
-  }
-
-  syncSelection() {
-    let current = this.list.querySelector("[aria-selected]")
-    let selected = this.items[this.selectedItem]
-    if (current == (selected && selected.dom)) return
-    if (current) current.removeAttribute("aria-selected")
-    if (selected) selected.dom.setAttribute("aria-selected", "true")
-    this.list.setAttribute("aria-activedescendant", selected ? selected.id : "")
+    let field = this.view.state.field(lintState)
+    let selection = findDiagnostic(field.diagnostics, this.items[selectedIndex].diagnostic)
+    if (!selection) return
+    this.view.dispatch(this.view.state.t()
+                       .setSelection(EditorSelection.single(selection.from, selection.to))
+                       .scrollIntoView()
+                       .annotate(setState(new LintState(field.diagnostics, field.panel, selection))))
   }
 
   get style() { return "lint" }
-}
 
-  /* FIXME restore
-  get activeDiagnostic() {
-    let found = this.selectedItem < 0 ? null : this.parent.findDiagnostic(this.items[this.selectedItem].diagnostic)
-    return found && found.to > found.from
-      ? Decoration.set(Decoration.mark(found.from, found.to, {class: themeClass(this.view.state, "lintRange.active")}))
-      : Decoration.none
-  }
-*/
+  static open(view: EditorView) { return new LintPanel(view) }
+}
 
 function underline(color: string) {
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="6" height="3">
