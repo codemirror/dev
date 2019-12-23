@@ -286,20 +286,22 @@ export class RangeSet<T extends RangeValue> {
   /// Iterate over the ranges that touch the region `from` to `to`,
   /// calling `f` for each. There is no guarantee that the ranges will
   /// be reported in any order.
-  between(from: number, to: number, f: (from: number, to: number, value: T) => void): void {
+  between(from: number, to: number, f: (from: number, to: number, value: T) => void | false): void {
     this.betweenInner(from, to, f, 0)
   }
 
   /// @internal
-  betweenInner(from: number, to: number, f: (from: number, to: number, value: T) => void, offset: number) {
+  betweenInner(from: number, to: number, f: (from: number, to: number, value: T) => void | false, offset: number) {
     for (let loc of this.local) {
-      if (loc.from + offset <= to && loc.to + offset >= from) f(loc.from + offset, loc.to + offset, loc.value)
+      if (loc.from + offset <= to && loc.to + offset >= from)
+        if (f(loc.from + offset, loc.to + offset, loc.value) === false) return false
     }
     for (let child of this.children) {
       let end = offset + child.length
-      if (offset <= to && end >= from) child.betweenInner(from, to, f, offset)
+      if (offset <= to && end >= from) if (child.betweenInner(from, to, f, offset) === false) return false
       offset = end
     }
+    return true
   }
 
   /// Iterate over the ranges in the set that touch the area between

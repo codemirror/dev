@@ -51,7 +51,7 @@ ViewPlugin.prototype.decorations = Decoration.none
 ViewPlugin.prototype.scrollMargins = null
 
 export interface MeasureRequest<T> {
-  key: any
+  key?: any
   read(view: EditorView): T
   write(measure: T, view: EditorView): void
 }
