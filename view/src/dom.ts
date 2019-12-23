@@ -1,5 +1,9 @@
 import browser from "./browser"
 
+export function getSelection(root: DocumentOrShadowRoot): Selection {
+  return (root.getSelection ? root.getSelection() : document.getSelection())!
+}
+
 // Work around Chrome issue https://bugs.chromium.org/p/chromium/issues/detail?id=447523
 // (isCollapsed inappropriately returns true in shadow dom)
 export function selectionCollapsed(domSel: Selection) {

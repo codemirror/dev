@@ -5,7 +5,7 @@ import {ContentBuilder} from "./buildview"
 import {Viewport, decoChanges, extendWithRanges} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
-import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView} from "./dom"
+import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection} from "./dom"
 import {ViewUpdate, decorations as decorationsFacet} from "./extension"
 import {EditorView} from "./editorview"
 import {ChangedRange} from "../../state"
@@ -195,7 +195,7 @@ export class DocView extends ContentView {
     let anchor = this.domAtPos(primary.anchor)
     let head = this.domAtPos(primary.head)
 
-    let domSel = this.root.getSelection()!
+    let domSel = getSelection(this.root)
     // If the selection is already here, or in an equivalent position, don't touch it
     if (force ||
         !isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) ||
@@ -400,7 +400,7 @@ class GapWidget extends WidgetType<number> {
 }
 
 export function computeCompositionDeco(view: EditorView, changes: readonly ChangedRange[]): DecorationSet {
-  let sel = view.root.getSelection()!
+  let sel = getSelection(view.root)
   let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset)
   if (!textNode) return Decoration.none
   let cView = view.docView.nearest(textNode)

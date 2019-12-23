@@ -5,7 +5,7 @@ import {Dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn, isExtendingChar} from "../../text"
 import {SelectionRange} from "../../state"
-import {isEquivalentPosition, clientRectsFor} from "./dom"
+import {isEquivalentPosition, clientRectsFor, getSelection} from "./dom"
 import browser from "./browser"
 
 declare global {
@@ -18,7 +18,7 @@ export function movePos(view: EditorView, start: number,
                         direction: "forward" | "backward" | "left" | "right",
                         granularity: "character" | "word" | "line" | "lineboundary" = "character",
                         action: "move" | "extend"): number {
-  let sel = view.root.getSelection()!
+  let sel = getSelection(view.root)
   let context = LineContext.get(view, start)
   let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
   // Can only query native behavior when Selection.modify is

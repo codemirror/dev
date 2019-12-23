@@ -1,7 +1,7 @@
 import browser from "./browser"
 import {ContentView, Dirty} from "./contentview"
 import {EditorView} from "./editorview"
-import {hasSelection, DOMSelection} from "./dom"
+import {hasSelection, getSelection, DOMSelection} from "./dom"
 
 const observeOptions = {
   childList: true,
@@ -136,7 +136,7 @@ export class DOMObserver {
   }
 
   clearSelection() {
-    this.ignoreSelection.set(this.view.root.getSelection()!)
+    this.ignoreSelection.set(getSelection(this.view.root))
   }
 
   // Throw away any pending changes
@@ -150,7 +150,7 @@ export class DOMObserver {
   flush(records: MutationRecord[] = this.observer.takeRecords()) {
     if (this.charDataQueue.length)
       records = records.concat(this.takeCharRecords())
-    let selection = this.view.root.getSelection()!
+    let selection = getSelection(this.view.root)
     let newSel = !this.ignoreSelection.eq(selection) && hasSelection(this.dom, selection)
     if (records.length == 0 && !newSel) return
 

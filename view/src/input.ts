@@ -4,6 +4,7 @@ import {ContentView} from "./contentview"
 import {handleDOMEvents, ViewUpdate, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
+import {getSelection} from "./dom"
 
 // This will also be where dragging info and such goes
 export class InputState {
@@ -197,7 +198,7 @@ function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) 
   if (pos > primary.from && pos < primary.to) return true
   // On boundary clicks, check whether the coordinates are inside the
   // selection's client rectangles
-  let sel = view.root.getSelection()!
+  let sel = getSelection(view.root)
   if (sel.rangeCount == 0) return true
   let rects = sel.getRangeAt(0).getClientRects()
   for (let i = 0; i < rects.length; i++) {
