@@ -3,7 +3,6 @@ import {EditorView, themeClass} from "../../view"
 import {Decoration, DecorationSet} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
 import {openNodeProp, closeNodeProp} from "../../syntax"
-import {StyleModule} from "style-mod"
 
 /// Configuration options
 export interface Config {
@@ -22,10 +21,10 @@ export interface Config {
   maxScanDistance?: number
 }
 
-const defaultStyles = new StyleModule({
+const defaultTheme = Facet.fallback(EditorView.theme({
   matchingBracket: {color: "#0b0"},
   nonmatchingBracket: {color: "#a22"}
-})
+}))
 
 const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
@@ -54,7 +53,7 @@ const bracketMatchingState = StateField.define<DecorationSet>({
              (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
       if (!match) continue
       let styleName: "matchingBracket" | "nonmatchingBracket" = match.matched ? "matchingBracket" : "nonmatchingBracket"
-      let style = themeClass(state, styleName) + " " + defaultStyles[styleName]
+      let style = themeClass(state, styleName)
       decorations.push(Decoration.mark(match.start.from, match.start.to, {class: style}))
       if (match.end) decorations.push(Decoration.mark(match.end.from, match.end.to, {class: style}))
     }
@@ -65,7 +64,7 @@ const bracketMatchingState = StateField.define<DecorationSet>({
 const bracketMatchingUnique = [
   bracketMatchingState,
   bracketMatchingState.facet(EditorView.decorations),
-  Facet.fallback(EditorView.styleModule.of(defaultStyles)), // FIXME use a theme?
+  defaultTheme
 ]
 
 /// Create an extension that enables bracket matching. Whenever the
