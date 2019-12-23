@@ -21,8 +21,8 @@ const widgetField = StateField.define<DecorationSet>({
     return Decoration.set(deco)
   },
   update(deco, tr) { return deco.map(tr.changes) }
-})
-const oWidgets = [widgetField, widgetField.facet(EditorView.decorations)]
+}).provide(EditorView.decorations)
+const oWidgets = [widgetField]
 
 class BigWidget extends WidgetType<void> {
   toDOM() {
@@ -107,12 +107,12 @@ describe("EditorView.movePos", () => {
   it("can handle line motion around widgets when not focused", () => {
     let cm = tempEditor("hey\nooh\naah", [oWidgets])
     cm.contentDOM.blur()
-/*    ist(cm.movePos(0, "forward", "line"), 4)
+    ist(cm.movePos(0, "forward", "line"), 4)
     ist(cm.movePos(1, "forward", "line"), 5)
     ist(cm.movePos(2, "forward", "line"), 6)
-    ist(cm.movePos(8, "backward", "line"), 4)*/
+    ist(cm.movePos(8, "backward", "line"), 4)
     ist(cm.movePos(9, "backward", "line"), 5)
-//    ist(cm.movePos(10, "backward", "line"), 6)
+    ist(cm.movePos(10, "backward", "line"), 6)
   })
 
   it("can cross large line widgets during line motion", () => {
@@ -124,8 +124,8 @@ describe("EditorView.movePos", () => {
         ])
       },
       update(deco) { return deco }
-    })
-    let cm = tempEditor("one\ntwo", [field, field.facet(EditorView.decorations)])
+    }).provide(EditorView.decorations)
+    let cm = tempEditor("one\ntwo", [field])
     ist(cm.contentDOM.offsetHeight, 400, ">")
     ist(cm.movePos(0, "forward", "line"), 4)
     ist(cm.movePos(2, "forward", "line"), 6)

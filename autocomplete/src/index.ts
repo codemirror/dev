@@ -51,7 +51,6 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
   return [
     activeCompletion,
     autocompleteConfig.of(config),
-    activeCompletion.facetN(showTooltip, active => active instanceof ActiveCompletion ? [active.tooltip] : []),
     Autocomplete.extension,
     Facet.fallback(style),
     tooltips(),
@@ -119,7 +118,7 @@ const activeCompletion = StateField.define<ActiveCompletion | null | "pending">(
       : tr.docChanged || tr.selectionSet ? null
       : prev
   }
-})
+}).provideN(showTooltip, active => active instanceof ActiveCompletion ? [active.tooltip] : [])
 
 class ActiveCompletion {
   constructor(readonly options: readonly Completion[],

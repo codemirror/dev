@@ -34,7 +34,7 @@ const searchState: StateField<SearchState> = StateField.define<SearchState>({
                                  ann.panel == null ? search.panel :
                                  ann.panel ? [createSearchPanel] : []) : search
   }
-})
+}).provideN(showPanel, s => s.panel)
 
 class SearchState {
   constructor(readonly query: Query, readonly panel: readonly ((view: EditorView) => Panel)[]) {}
@@ -104,7 +104,6 @@ export const search = function(config: SearchConfig) {
   }
   return [
     searchState,
-    searchState.facetN(showPanel, s => s.panel),
     keymap(keys),
     panelKeymap.of(panelKeys),
     SearchHighlighter.extension,

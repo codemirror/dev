@@ -29,12 +29,11 @@ const field = StateField.define<DecorationSet>({
   update(deco, tr) {
     return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection, rangeConfig) : deco
   }
-})
+}).provide(EditorView.decorations)
 
 const multipleSelectionExtension = [
   EditorState.allowMultipleSelections.of(true),
   field,
-  field.facet(EditorView.decorations),
   EditorView.styleModule.of(styles)
 ]
 

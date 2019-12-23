@@ -33,7 +33,7 @@ const foldState = StateField.define<DecorationSet>({
     }
     return folded
   }
-})
+}).provide(EditorView.decorations)
 
 function foldInside(state: EditorState, from: number, to: number) {
   let found: {from: number, to: number} | null = null
@@ -86,7 +86,6 @@ export function codeFolding(config: FoldConfig = {}) {
   return [
     foldConfig.of(config),
     foldState,
-    foldState.facet(EditorView.decorations),
     Facet.fallback(defaultTheme)
   ]
 }

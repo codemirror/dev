@@ -96,15 +96,14 @@ const lintState = StateField.define<LintState>({
 
     return value
   }
-})
+}).provideN(showPanel, s => s.panel ? [s.panel] : [])
+  .provide(EditorView.decorations, s => s.diagnostics)
 
 /// Returns an extension that enables the linting functionality.
 /// Implicitly enabled by the [`linter`](#lint.linter) function.
 export function linting(): Extension {
   return [
     lintState,
-    lintState.facetN(showPanel, s => s.panel ? [s.panel] : []),
-    lintState.facet(EditorView.decorations, s => s.diagnostics),
     EditorView.decorations.compute([lintState], state => {
       let {selected, panel} = state.field(lintState)
       return !selected || !panel ? Decoration.none : Decoration.set([
