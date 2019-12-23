@@ -32,9 +32,9 @@ const field = StateField.define<DecorationSet>({
 }).provide(EditorView.decorations)
 
 const multipleSelectionExtension = [
-  EditorState.allowMultipleSelections.of(true),
+  EditorState.allowMultipleSelections(true),
   field,
-  EditorView.styleModule.of(styles)
+  EditorView.styleModule(styles)
 ]
 
 /// Returns an extension that enables multiple selections for the

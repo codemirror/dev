@@ -453,7 +453,7 @@ export class EditorView {
       if (specificity > 0) spec[prop].specificity = specificity
     }
     let module = new StyleModule(spec)
-    return [theme.of(module), styleModule.of(module)]
+    return [theme(module), styleModule(module)]
   }
 
   /// Registers translation phrases. The

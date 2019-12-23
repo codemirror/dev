@@ -54,12 +54,12 @@ describe("EditorView extension", () => {
   })
 
   it("allows content attributes to be changed through effects", () => {
-    let cm = tempEditor("", [EditorView.contentAttributes.of({spellcheck: "true"})])
+    let cm = tempEditor("", [EditorView.contentAttributes({spellcheck: "true"})])
     ist(cm.contentDOM.spellcheck, true)
   })
 
   it("allows editor attributes to be changed through effects", () => {
-    let cm = tempEditor("", [EditorView.editorAttributes.of({class: "something"})])
+    let cm = tempEditor("", [EditorView.editorAttributes({class: "something"})])
     ist(cm.dom.classList.contains("something"))
     ist(cm.dom.classList.contains("codemirror"))
   })

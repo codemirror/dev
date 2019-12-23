@@ -3,16 +3,18 @@ import {EditorState} from "./state"
 
 let nextID = 0
 
-export function computedFacet<T>(facet: Facet<T, any>, depends: readonly Slot<any>[],
+export function computedFacet<T>(facet: Facet<T, any>, depends: readonly Slot[],
                                  get: (state: EditorState) => T): Extension {
-  if (facet.isStatic) throw new Error("Can't compute a static facet")
-  return new FacetProvider<T>(depends, facet, Provider.Single, get)
+  let data = FacetData.get(facet)
+  if (data.isStatic) throw new Error("Can't compute a static facet")
+  return new FacetProvider<T>(depends, data, Provider.Single, get)
 }
 
-export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot<any>[],
+export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot[],
                                   get: (state: EditorState) => readonly T[]): Extension {
-  if (facet.isStatic) throw new Error("Can't compute a static facet")
-  return new FacetProvider<T>(depends, facet, Provider.Multi, get)
+  let data = FacetData.get(facet)
+  if (data.isStatic) throw new Error("Can't compute a static facet")
+  return new FacetProvider<T>(depends, data, Provider.Multi, get)
 }
 
 export type FacetConfig<Input, Output> = {
@@ -22,34 +24,37 @@ export type FacetConfig<Input, Output> = {
   static?: boolean
 }
 
-export function defineFacet<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}) {
-  return new Facet<Input, Output>(config.combine || ((a: any) => a) as any,
-                                  config.compareInput || ((a, b) => a === b),
-                                  config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
-                                  !!config.static)
+export function defineFacet<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}): Facet<Input, Output> {
+  let data = new FacetData<Input, Output>(config.combine || ((a: any) => a) as any,
+                                          config.compareInput || ((a, b) => a === b),
+                                          config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
+                                          !!config.static)
+  let facet = function(value: Input) {
+    return new FacetProvider<Input>([], data, Provider.Static, value)
+  }
+  ;(facet as any)._data = data
+  return facet
 }
 
-export class Facet<Input, Output> {
-  /// @internal
+export type Facet<Input, Output> = (value: Input) => Extension
+
+export class FacetData<Input, Output> {
   readonly id = nextID++
-  /// @internal
   readonly default: Output
 
   constructor(
-    /// @internal
     readonly combine: (values: readonly Input[]) => Output,
-    /// @internal
     readonly compareInput: (a: Input, b: Input) => boolean,
-    /// @internal
     readonly compare: (a: Output, b: Output) => boolean,
-    /// @internal
     readonly isStatic: boolean
   ) {
     this.default = combine([])
   }
 
-  of(value: Input): Extension {
-    return new FacetProvider<Input>([], this, Provider.Static, value)
+  static get<Input, Output>(f: Facet<Input, Output>): FacetData<Input, Output> {
+    let value = (f as any)._data
+    if (!value) throw new Error("No facet data for function " + f)
+    return value
   }
 }
 
@@ -57,7 +62,7 @@ function sameArray<T>(a: readonly T[], b: readonly T[]) {
   return a == b || a.length == b.length && a.every((e, i) => e === b[i])
 }
 
-type Slot<T> = Facet<any, T> | StateField<T> | "doc" | "selection"
+type Slot = Facet<any, any> | StateField<any> | "doc" | "selection"
 
 /// Marks a value as an [`Extension`](#state.Extension).
 declare const isExtension: unique symbol
@@ -67,8 +72,8 @@ const enum Provider { Static, Single, Multi }
 class FacetProvider<Input> {
   readonly id = nextID++
 
-  constructor(readonly dependencies: readonly Slot<any>[],
-              readonly facet: Facet<Input, any>,
+  constructor(readonly dependencies: readonly Slot[],
+              readonly facet: FacetData<Input, any>,
               readonly type: Provider,
               readonly value: ((state: EditorState) => Input) | ((state: EditorState) => readonly Input[]) | Input) {}
 
@@ -80,7 +85,10 @@ class FacetProvider<Input> {
     for (let dep of this.dependencies) {
       if (dep == "doc") depDoc = true
       else if (dep == "selection") depSel = true
-      else if ((addresses[dep.id] & 1) == 0) depAddrs.push(addresses[dep.id])
+      else {
+        let id = dep instanceof StateField ? dep.id : FacetData.get(dep).id
+        if ((addresses[id] & 1) == 0) depAddrs.push(addresses[id])
+      }
     }
 
     return (state: EditorState, tr: Transaction | null) => {
@@ -103,7 +111,7 @@ class FacetProvider<Input> {
 
 function dynamicFacetSlot<Input, Output>(
   addresses: {[id: number]: number},
-  facet: Facet<Input, Output>,
+  facet: FacetData<Input, Output>,
   providers: readonly FacetProvider<Input>[]
 ) {
   let providerAddrs = providers.map(p => addresses[p.id])
@@ -239,8 +247,8 @@ export class Configuration {
   }
 
   staticFacet<Output>(facet: Facet<any, Output>) {
-    let addr = this.address[facet.id]
-    return addr == null ? facet.default : this.staticValues[addr >> 1]
+    let data = FacetData.get(facet), addr = this.address[data.id]
+    return addr == null ? data.default : this.staticValues[addr >> 1]
   }
 
   // Passing EditorState as argument to avoid cyclic dependency

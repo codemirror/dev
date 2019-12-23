@@ -47,7 +47,7 @@ const historyField = StateField.define({
 export function history(config: HistoryConfig = {}): Extension {
   return [
     historyField,
-    historyConfig.of(config)
+    historyConfig(config)
   ]
 }
 

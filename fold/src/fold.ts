@@ -84,7 +84,7 @@ const foldConfig = defineFacet<FoldConfig, Required<FoldConfig>>({
 
 export function codeFolding(config: FoldConfig = {}) {
   return [
-    foldConfig.of(config),
+    foldConfig(config),
     foldState,
     Precedence.Fallback.set(defaultTheme)
   ]

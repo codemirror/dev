@@ -96,9 +96,9 @@ export class StreamSyntax implements Syntax {
       update: (value, tr) => value.apply(tr)
     })
     this.extension = [
-      EditorState.syntax.of(this),
+      EditorState.syntax(this),
       this.field,
-      EditorState.indentation.of((state: EditorState, pos: number) => {
+      EditorState.indentation((state: EditorState, pos: number) => {
         return state.field(this.field).getIndent(this.parser, state, pos)
       })
     ]

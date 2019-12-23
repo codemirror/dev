@@ -98,8 +98,8 @@ export class TagSystem {
   highlighter(spec: {[tag: string]: Style}) {
     let styling = new Styling(this, spec)
     return [
-      EditorView.viewPlugin.of(view => new Highlighter(view, this.prop, styling)),
-      EditorView.styleModule.of(styling.module)
+      EditorView.viewPlugin(view => new Highlighter(view, this.prop, styling)),
+      EditorView.styleModule(styling.module)
     ]
   }
 

@@ -17,7 +17,7 @@ describe("EditorState", () => {
 
   it("maps selection through changes", () => {
     let state = EditorState.create({doc: "abcdefgh",
-                                    extensions: [EditorState.allowMultipleSelections.of(true)],
+                                    extensions: [EditorState.allowMultipleSelections(true)],
                                     selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
     let newState = state.t().replaceSelection("Q").apply()
     ist(newState.doc.toString(), "QabcdQefghQ")
@@ -39,20 +39,20 @@ describe("EditorState", () => {
   })
 
   it("stores and updates tab size", () => {
-    let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize.of(2)]})
+    let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize(2)]})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.t().reconfigure([EditorState.tabSize.of(8)]).apply()
+    let updated = deflt.t().reconfigure([EditorState.tabSize(8)]).apply()
     ist(updated.tabSize, 8)
   })
 
   it("stores and updates the line separator", () => {
-    let deflt = EditorState.create({}), crlf = EditorState.create({extensions: [EditorState.lineSeparator.of("\r\n")]})
+    let deflt = EditorState.create({}), crlf = EditorState.create({extensions: [EditorState.lineSeparator("\r\n")]})
     ist(deflt.joinLines(["a", "b"]), "a\nb")
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.t().reconfigure([EditorState.lineSeparator.of("\n")]).apply()
+    let updated = crlf.t().reconfigure([EditorState.lineSeparator("\n")]).apply()
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })
@@ -81,7 +81,7 @@ describe("EditorState", () => {
     let field = StateField.define({create: () => [0], update: (v, tr) => tr.docChanged ? [tr.doc.length] : v})
       .provide(facet, val => val[0])
     let state = EditorState.create({
-      extensions: [field, facet.of(1)]
+      extensions: [field, facet(1)]
     })
     ist(state.facet(facet).join(), "0,1")
     let state2 = state.t().apply()

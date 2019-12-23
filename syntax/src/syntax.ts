@@ -22,7 +22,7 @@ export class LezerSyntax implements Syntax {
       create() { return new SyntaxState(Tree.empty) },
       update(value, tr) { return value.apply(tr) }
     })
-    this.extension = [EditorState.syntax.of(this), this.field, syntaxIndentation(this), syntaxFolding(this)]
+    this.extension = [EditorState.syntax(this), this.field, syntaxIndentation(this), syntaxFolding(this)]
   }
 
   tryGetTree(state: EditorState, from: number, to: number) {
