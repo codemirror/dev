@@ -3,6 +3,18 @@ import {EditorState} from "./state"
 
 let nextID = 0
 
+export function computedFacet<T>(facet: Facet<T, any>, depends: readonly Slot<any>[],
+                                 get: (state: EditorState) => T): Extension {
+  if (facet.isStatic) throw new Error("Can't compute a static facet")
+  return new FacetProvider<T>(depends, facet, Provider.Single, get)
+}
+
+export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot<any>[],
+                                  get: (state: EditorState) => readonly T[]): Extension {
+  if (facet.isStatic) throw new Error("Can't compute a static facet")
+  return new FacetProvider<T>(depends, facet, Provider.Multi, get)
+}
+
 export class Facet<Input, Output> {
   /// @internal
   readonly id = nextID++
@@ -16,7 +28,8 @@ export class Facet<Input, Output> {
     readonly compareInput: (a: Input, b: Input) => boolean,
     /// @internal
     readonly compare: (a: Output, b: Output) => boolean,
-    private isStatic: boolean
+    /// @internal
+    readonly isStatic: boolean
   ) {
     this.default = combine([])
   }
@@ -35,16 +48,6 @@ export class Facet<Input, Output> {
 
   of(value: Input): Extension {
     return new FacetProvider<Input>([], this, Provider.Static, value)
-  }
-
-  compute(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
-    if (this.isStatic) throw new Error("Can't compute a static facet")
-    return new FacetProvider<Input>(deps, this, Provider.Single, get)
-  }
-
-  computeN(deps: readonly Slot<any>[], get: (state: EditorState) => readonly Input[]): Extension {
-    if (this.isStatic) throw new Error("Can't compute a static facet")
-    return new FacetProvider<Input>(deps, this, Provider.Multi, get)
   }
 }
 
@@ -166,12 +169,12 @@ export class StateField<Value> {
   provide(facet: Facet<Value, any>): StateField<Value>
   provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: Precedence): StateField<Value>
   provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: Precedence) {
-    let provider = facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
+    let provider = computedFacet(facet, [this], get ? state => get(state.field(this)) : state => state.field(this) as any)
     return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
   provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: Precedence): StateField<Value> {
-    let provider = facet.computeN([this], state => get(state.field(this)))
+    let provider = computedFacetN(facet, [this], state => get(state.field(this)))
     return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
