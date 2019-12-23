@@ -1,6 +1,6 @@
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
-import {Facet} from "./facet"
+import {defineFacet} from "./facet"
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
@@ -8,7 +8,7 @@ import {Tree, NodeType, NodeProp} from "lezer-tree"
 /// can be run and tested outside of a browser environment.
 export type StateCommand = (target: {state: EditorState, dispatch: (transaction: Transaction) => void}) => boolean
 
-export const allowMultipleSelections = Facet.define<boolean, boolean>({
+export const allowMultipleSelections = defineFacet<boolean, boolean>({
   combine: values => values.some(v => v),
   static: true
 })

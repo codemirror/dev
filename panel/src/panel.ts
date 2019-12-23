@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {EditorState, Facet, Precedence} from "../../state"
+import {EditorState, defineFacet, Precedence} from "../../state"
 
 /// Enables the panel-managing extension.
 export function panels() { return [Panels.extension, defaultTheme] }
@@ -26,7 +26,7 @@ export interface Panel {
 
 /// Opening a panel is done by providing an object describing the
 /// panel through this facet.
-export const showPanel = Facet.define<(view: EditorView) => Panel>()
+export const showPanel = defineFacet<(view: EditorView) => Panel>()
 
 class Panels extends ViewPlugin {
   specs: readonly ((view: EditorView) => Panel)[]

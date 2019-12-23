@@ -1,6 +1,6 @@
 import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
 import {combineConfig, Annotation, CancellablePromise, EditorSelection, EditorState,
-        Transaction, Extension, StateField, Facet, Precedence} from "../../state"
+        Transaction, Extension, StateField, defineFacet, Precedence} from "../../state"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
@@ -37,7 +37,7 @@ export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<Com
   return startMatch.concat(inMatch)
 }
 
-const autocompleteConfig = Facet.define<Partial<AutocompleteData>, AutocompleteData>({
+const autocompleteConfig = defineFacet<Partial<AutocompleteData>, AutocompleteData>({
   combine(configs) {
     return combineConfig(configs, {
       completeAt(state: EditorState, pos: number) {

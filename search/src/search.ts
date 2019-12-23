@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
-import {StateField, Facet, Annotation, EditorSelection, SelectionRange, Precedence} from "../../state"
+import {StateField, defineFacet, Annotation, EditorSelection, SelectionRange, Precedence} from "../../state"
 import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
@@ -82,7 +82,7 @@ export interface SearchConfig {
   panelKeymap?: Keymap
 }
 
-const panelKeymap = Facet.define<Keymap, NormalizedKeymap<Command>>({
+const panelKeymap = defineFacet<Keymap, NormalizedKeymap<Command>>({
   combine(keymaps) {
     let result = Object.create(null)
     for (let map of keymaps) for (let prop of Object.keys(map)) result[prop] = map[prop]

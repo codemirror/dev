@@ -1,4 +1,4 @@
-import {combineConfig, EditorState, Facet, StateField, Precedence} from "../../state"
+import {combineConfig, EditorState, defineFacet, StateField, Precedence} from "../../state"
 import {EditorView, themeClass} from "../../view"
 import {Decoration, DecorationSet} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
@@ -28,7 +28,7 @@ const defaultTheme = Precedence.Fallback.set(EditorView.theme({
 
 const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
 
-const bracketMatchingConfig = Facet.define<Config, Required<Config>>({
+const bracketMatchingConfig = defineFacet<Config, Required<Config>>({
   combine(configs) {
     return combineConfig(configs, {
       afterCursor: true,

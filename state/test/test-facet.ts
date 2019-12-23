@@ -1,11 +1,11 @@
 import ist from "ist"
-import {EditorState, EditorSelection, Facet, computedFacet, computedFacetN, Extension, Precedence} from ".."
+import {EditorState, EditorSelection, defineFacet, computedFacet, computedFacetN, Extension, Precedence} from ".."
 
 function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
 }
 
-let num = Facet.define<number>(), str = Facet.define<string>()
+let num = defineFacet<number>(), str = defineFacet<string>()
 
 describe("EditorState facets", () => {
   it("allows querying of facets", () => {
@@ -87,13 +87,13 @@ describe("EditorState facets", () => {
   })
 
   it("works with a static combined facet", () => {
-    let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
+    let f = defineFacet<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
     let st = mk(f.of(1), f.of(2), f.of(3))
     ist(st.facet(f), 6)
   })
 
   it("works with a dynamic combined facet", () => {
-    let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
+    let f = defineFacet<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
     let st = mk(f.of(1), computedFacet(f, ["doc"], s => s.doc.length), f.of(3))
     ist(st.facet(f), 4)
     st = st.t().replace(0, 0, "hello").apply()

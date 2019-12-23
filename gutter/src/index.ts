@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension, Precedence} from "../../state"
+import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, defineFacet, Extension, Precedence} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -74,7 +74,7 @@ const defaults = {
   handleDOMEvents: {}
 }
 
-const activeGutters = Facet.define<Required<GutterConfig>>()
+const activeGutters = defineFacet<Required<GutterConfig>>()
 
 /// Define an editor gutter.
 export function gutter(config: GutterConfig) {
@@ -113,7 +113,7 @@ const baseTheme = Precedence.Fallback.set(EditorView.theme({
   }
 }))
 
-const unfixGutters = Facet.define<boolean>()
+const unfixGutters = defineFacet<boolean>()
 
 /// The gutter-drawing plugin is automatically enabled when you add a
 /// gutter, but you can use this function to explicitly configure it.
@@ -353,7 +353,7 @@ export type LineNumberMarkerUpdate = {
   filter?: (from: number, to: number, marker: GutterMarker) => boolean
 }
 
-const lineNumberConfig = Facet.define<LineNumberConfig, Required<LineNumberConfig>>({
+const lineNumberConfig = defineFacet<LineNumberConfig, Required<LineNumberConfig>>({
   combine(values) {
     return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, handleDOMEvents: {}}, {
       handleDOMEvents(a: Handlers, b: Handlers) {

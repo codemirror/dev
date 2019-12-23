@@ -1,5 +1,5 @@
 import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {combineConfig, ChangedRange, Facet} from "../../state"
+import {combineConfig, ChangedRange, defineFacet} from "../../state"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
 
@@ -36,7 +36,7 @@ const NAMES: {[key: number]: string} = {
   65532: "object replacement"
 }
 
-const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
+const specialCharConfig = defineFacet<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
   combine(configs) {
     // FIXME make configurations compose properly
     let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {

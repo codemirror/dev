@@ -15,13 +15,27 @@ export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot<a
   return new FacetProvider<T>(depends, facet, Provider.Multi, get)
 }
 
+export type FacetConfig<Input, Output> = {
+  combine?: (value: readonly Input[]) => Output,
+  compare?: (a: Output, b: Output) => boolean,
+  compareInput?: (a: Input, b: Input) => boolean,
+  static?: boolean
+}
+
+export function defineFacet<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}) {
+  return new Facet<Input, Output>(config.combine || ((a: any) => a) as any,
+                                  config.compareInput || ((a, b) => a === b),
+                                  config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
+                                  !!config.static)
+}
+
 export class Facet<Input, Output> {
   /// @internal
   readonly id = nextID++
   /// @internal
   readonly default: Output
 
-  private constructor(
+  constructor(
     /// @internal
     readonly combine: (values: readonly Input[]) => Output,
     /// @internal
@@ -32,18 +46,6 @@ export class Facet<Input, Output> {
     readonly isStatic: boolean
   ) {
     this.default = combine([])
-  }
-
-  static define<Input, Output = readonly Input[]>(config: {
-    combine?: (value: readonly Input[]) => Output,
-    compare?: (a: Output, b: Output) => boolean,
-    compareInput?: (a: Input, b: Input) => boolean,
-    static?: boolean
-  } = {}) {
-    return new Facet<Input, Output>(config.combine || ((a: any) => a) as any,
-                                    config.compareInput || ((a, b) => a === b),
-                                    config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
-                                    !!config.static)
   }
 
   of(value: Input): Extension {
