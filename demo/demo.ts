@@ -7,7 +7,7 @@ import {lineNumbers} from "../gutter"
 import {baseKeymap, indentSelection} from "../commands"
 import {bracketMatching} from "../matchbrackets"
 import {closeBrackets} from "../closebrackets"
-//import {specialChars} from "../special-chars"
+import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
 import {search, defaultSearchKeymap} from "../search"
 import {autocomplete, startCompletion, sortAndFilterCompletion} from "../autocomplete"
@@ -29,6 +29,7 @@ let state = EditorState.create({doc: `<script>
   });
 </script>`, extensions: [
   lineNumbers(),
+  specialChars(),
   history(),
   foldGutter(),
   multipleSelections(),
