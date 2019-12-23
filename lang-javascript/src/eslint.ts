@@ -69,8 +69,8 @@ function translateDiagnostic(input: any, doc: Text, offset: {line: number, col: 
     let {range, text} = input.fix, from = range[0] + offset.pos - start, to = range[1] + offset.pos - start
     result.actions = [{
       name: "fix",
-      apply(view: EditorView, start: number, end: number) {
-        view.dispatch(view.state.t().replace(Math.min(start + from, end), Math.min(start + to, end), text).scrollIntoView())
+      apply(view: EditorView, start: number) {
+        view.dispatch(view.state.t().replace(start + from, start + to, text).scrollIntoView())
       }
     }]
   }
