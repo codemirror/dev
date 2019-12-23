@@ -31,6 +31,9 @@ export class DOMObserver {
   intersection: IntersectionObserver | null = null
   intersecting: boolean = false
 
+  // Timeout for scheduling check of the parents that need scroll handlers
+  parentCheck = -1
+
   constructor(private view: EditorView,
               private onChange: (from: number, to: number, typeOver: boolean) => boolean,
               private onScrollChanged: () => void) {
@@ -52,6 +55,7 @@ export class DOMObserver {
     window.addEventListener("scroll", this.onScroll)
     if (typeof IntersectionObserver == "function") {
       this.intersection = new IntersectionObserver(entries => {
+        if (this.parentCheck < 0) this.parentCheck = setTimeout(this.listenForScroll.bind(this), 1000)
         if (entries[entries.length - 1].intersectionRatio > 0 != this.intersecting) {
           this.intersecting = !this.intersecting
           this.onScroll()
@@ -69,8 +73,8 @@ export class DOMObserver {
     }
   }
 
-  // FIXME schedule calls to this
   listenForScroll() {
+    this.parentCheck = -1
     let i = 0, changed: HTMLElement[] | null = null
     for (let dom = this.dom as any; dom;) {
       if (dom.nodeType == 1) {
@@ -194,6 +198,7 @@ export class DOMObserver {
     if (this.intersection) this.intersection.disconnect()
     for (let dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll)
     window.removeEventListener("scroll", this.onScroll)
+    clearTimeout(this.parentCheck)
   }
 }
 

@@ -322,7 +322,7 @@ export class DocView extends ContentView {
     let visible = this.view.viewState.viewport, viewports: Viewport[] = [visible]
     let {head, anchor} = this.view.state.selection.primary
     if (head < visible.from || head > visible.to) {
-      let {from, to} = this.view.viewState.lineAt(head, 0) // FIXME ugh
+      let {from, to} = this.view.viewState.lineAt(head, 0)
       viewports.push(new Viewport(from, to))
     }
     if (!viewports.some(({from, to}) => anchor >= from && anchor <= to)) {
