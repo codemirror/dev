@@ -159,10 +159,7 @@ class GutterView extends ViewPlugin {
 
   update(update: ViewUpdate) {
     if (update.themeChanged) this.updateTheme()
-    let change = update.docChanged || update.heightChanged
-    for (let gutter of this.gutters) if (gutter.update(update)) change = true
-    // FIXME support gutter reconfiguring
-    if (!change) return
+    if (!this.updateGutters(update)) return
     let contexts = this.gutters.map(gutter => new UpdateContext(gutter, this.view.viewport))
     this.view.viewportLines(line => {
       let text: BlockInfo | undefined
@@ -174,6 +171,30 @@ class GutterView extends ViewPlugin {
     }, 0)
     for (let cx of contexts) cx.finish(this.view)
     this.dom.style.minHeight = this.view.contentHeight + "px"
+  }
+
+  updateGutters(update: ViewUpdate) {
+    let prev = update.prevState.facet(activeGutters), cur = update.state.facet(activeGutters)
+    let change = update.docChanged || update.heightChanged
+    if (prev == cur) {
+      for (let gutter of this.gutters) if (gutter.update(update)) change = true
+    } else {
+      change = true
+      let gutters = []
+      for (let conf of cur) {
+        let known = prev.indexOf(conf)
+        if (known < 0) {
+          gutters.push(new SingleGutterView(this.view, conf))
+        } else {
+          this.gutters[known].update(update)
+          gutters.push(this.gutters[known])
+        }
+      }
+      for (let g of this.gutters) g.dom.remove()
+      for (let g of gutters) this.dom.appendChild(g.dom)
+      this.gutters = gutters
+    }
+    return change
   }
 
   get scrollMargins() {
