@@ -1,6 +1,6 @@
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
-import {selectionCollapsed} from "./dom"
+import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
 import {EditorSelection, Change, Transaction} from "../../state"
 
@@ -27,11 +27,12 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     if (diff) change = new Change(from + diff.from, from + diff.toA,
                                   reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
   } else if (view.hasFocus) {
-    let domSel = view.root.getSelection()!
+    let domSel = getSelection(view.root)
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
     let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ? view.state.selection.primary.head
       : view.docView.posFromDOM(domSel.focusNode!, domSel.focusOffset)
-    let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset ? view.state.selection.primary.anchor
+    let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset
+      ? view.state.selection.primary.anchor
       : selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode!, domSel.anchorOffset)
     if (head != sel.head || anchor != sel.anchor)
       newSel = EditorSelection.single(anchor, head)
@@ -171,7 +172,7 @@ class DOMPoint {
 function selectionPoints(dom: HTMLElement, root: DocumentOrShadowRoot): DOMPoint[] {
   let result: DOMPoint[] = []
   if (root.activeElement != dom) return result
-  let {anchorNode, anchorOffset, focusNode, focusOffset} = root.getSelection()!
+  let {anchorNode, anchorOffset, focusNode, focusOffset} = getSelection(root)
   if (anchorNode) {
     result.push(new DOMPoint(anchorNode, anchorOffset))
     if (focusNode != anchorNode || focusOffset != anchorOffset)

@@ -75,11 +75,8 @@ export class EditorView {
   /// called as a method.
   readonly dispatch: (tr: Transaction) => void
 
-  /// The document or shadow root that the view lives in. Mostly
-  /// relevant when inspecting the DOM selection, where you'll want to
-  /// call `getSelection` on this, rather than the global `document`
-  /// or `window` objects, to ensure you get the right selection.
-  readonly root: DocumentOrShadowRoot // FIXME provide portable local getSelection
+  /// The document or shadow root that the view lives in.
+  readonly root: DocumentOrShadowRoot
 
   /// The DOM element that wraps the entire editor view.
   readonly dom: HTMLElement
