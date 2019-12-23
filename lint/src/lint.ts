@@ -106,7 +106,7 @@ export function linting(): Extension {
     lintState,
     EditorView.decorations.compute([lintState], state => {
       let {selected, panel} = state.field(lintState)
-      return !selected || !panel ? Decoration.none : Decoration.set([
+      return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
         Decoration.mark(selected.from, selected.to, {class: themeClass(state, "lintRange.active")})
       ])
     }),
