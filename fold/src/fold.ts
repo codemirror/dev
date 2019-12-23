@@ -1,4 +1,4 @@
-import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField} from "../../state"
+import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField, Precedence} from "../../state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
 import {gutter, GutterMarker} from "../../gutter"
 
@@ -86,7 +86,7 @@ export function codeFolding(config: FoldConfig = {}) {
   return [
     foldConfig.of(config),
     foldState,
-    Facet.fallback(defaultTheme)
+    Precedence.Fallback.set(defaultTheme)
   ]
 }
 

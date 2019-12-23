@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
         WidgetType, ViewUpdate, Command, themeClass} from "../../view"
-import {Facet, Annotation, EditorSelection, StateField, Extension} from "../../state"
+import {Annotation, EditorSelection, StateField, Extension, Precedence} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, Panel, showPanel} from "../../panel"
 
@@ -385,7 +385,7 @@ function underline(color: string) {
   return `url('data:image/svg+xml;base64,${btoa(svg)}')`
 }
 
-const defaultTheme = Facet.fallback(EditorView.theme({
+const defaultTheme = Precedence.Fallback.set(EditorView.theme({
   diagnostic: {
     padding: "3px 6px 3px 8px",
     marginLeft: "-1px",

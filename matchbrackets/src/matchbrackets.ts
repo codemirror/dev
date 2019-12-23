@@ -1,4 +1,4 @@
-import {combineConfig, EditorState, Facet, StateField} from "../../state"
+import {combineConfig, EditorState, Facet, StateField, Precedence} from "../../state"
 import {EditorView, themeClass} from "../../view"
 import {Decoration, DecorationSet} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
@@ -21,7 +21,7 @@ export interface Config {
   maxScanDistance?: number
 }
 
-const defaultTheme = Facet.fallback(EditorView.theme({
+const defaultTheme = Precedence.Fallback.set(EditorView.theme({
   matchingBracket: {color: "#0b0"},
   nonmatchingBracket: {color: "#a22"}
 }))

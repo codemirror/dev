@@ -1,6 +1,6 @@
 import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
 import {combineConfig, Annotation, CancellablePromise, EditorSelection, EditorState,
-        Transaction, Extension, StateField, Facet} from "../../state"
+        Transaction, Extension, StateField, Facet, Precedence} from "../../state"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
@@ -52,9 +52,9 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
     activeCompletion,
     autocompleteConfig.of(config),
     Autocomplete.extension,
-    Facet.fallback(style),
+    Precedence.Fallback.set(style),
     tooltips(),
-    Facet.override(keymap({
+    Precedence.Override.set(keymap({
       ArrowDown: moveCompletion("down"),
       ArrowUp: moveCompletion("up"),
       Enter: acceptCompletion,
