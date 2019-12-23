@@ -60,7 +60,7 @@ const specialCharConfig = defineFacet<SpecialCharConfig, Required<SpecialCharCon
 /// Returns an extension that installs highlighting of special
 /// characters.
 export function specialChars(config: SpecialCharConfig = {}) {
-  return [specialCharConfig.of(config), SpecialCharPlugin.extension, styleExt]
+  return [specialCharConfig(config), SpecialCharPlugin.extension, styleExt]
 }
 
 const JOIN_GAP = 10
@@ -195,4 +195,4 @@ const style = new StyleModule({
     verticalAlign: "bottom"
   }
 })
-const styleExt = EditorView.styleModule.of(style)
+const styleExt = EditorView.styleModule(style)

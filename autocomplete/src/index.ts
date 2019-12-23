@@ -50,7 +50,7 @@ const autocompleteConfig = defineFacet<Partial<AutocompleteData>, AutocompleteDa
 export function autocomplete(config: Partial<AutocompleteData> = {}): Extension {
   return [
     activeCompletion,
-    autocompleteConfig.of(config),
+    autocompleteConfig(config),
     Autocomplete.extension,
     Precedence.Fallback.set(style),
     tooltips(),

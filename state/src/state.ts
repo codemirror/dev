@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax, allowMultipleSelections} from "./extension"
-import {Configuration, defineFacet, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
+import {Configuration, defineFacet, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr, FacetData} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -103,8 +103,8 @@ export class EditorState {
 
   /// Get the value of a state [behavior](#extension.Behavior).
   facet<Output>(facet: Facet<any, Output>): Output {
-    let addr = this.config.address[facet.id]
-    if (addr == null) return facet.default
+    let info = FacetData.get(facet), addr = this.config.address[info.id]
+    if (addr == null) return info.default
     ensureAddr(this, addr)
     return getAddr(this, addr)
   }

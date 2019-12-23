@@ -71,7 +71,7 @@ const bracketMatchingUnique = [
 /// are highlighted. Or, when no matching bracket is found, another
 /// highlighting style is used to indicate this.
 export function bracketMatching(config: Config = {}) {
-  return [bracketMatchingConfig.of(config), bracketMatchingUnique]
+  return [bracketMatchingConfig(config), bracketMatchingUnique]
 }
 
 function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {

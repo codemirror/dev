@@ -10,7 +10,7 @@ import {EditorState, Syntax} from "../../state"
 export const indentNodeProp = new NodeProp<(context: IndentContext) => number>()
 
 export function syntaxIndentation(syntax: Syntax) {
-  return EditorState.indentation.of((state: EditorState, pos: number) => {
+  return EditorState.indentation((state: EditorState, pos: number) => {
     let tree = syntax.getPartialTree(state, pos, pos)
     return computeIndentation(state, tree, pos)
   })

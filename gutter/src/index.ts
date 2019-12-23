@@ -78,7 +78,7 @@ const activeGutters = defineFacet<Required<GutterConfig>>()
 
 /// Define an editor gutter.
 export function gutter(config: GutterConfig) {
-  return [gutters(), activeGutters.of(fillConfig(config, defaults))]
+  return [gutters(), activeGutters(fillConfig(config, defaults))]
 }
 
 const baseTheme = Precedence.Fallback.set(EditorView.theme({
@@ -126,7 +126,7 @@ export function gutters(config?: {fixed?: boolean}) {
     GutterView.extension,
     baseTheme
   ]
-  if (config && config.fixed === false) result.push(unfixGutters.of(true))
+  if (config && config.fixed === false) result.push(unfixGutters(true))
   return result
 }
 
@@ -407,7 +407,7 @@ const lineNumberGutter = gutter({
 /// gutters appear is determined by their extension priority.
 export function lineNumbers(config: LineNumberConfig = {}): Extension {
   return [
-    lineNumberConfig.of(config),
+    lineNumberConfig(config),
     lineNumberGutter
   ]
 }
