@@ -1,5 +1,5 @@
 import ist from "ist"
-import {EditorState, EditorSelection, Facet, Extension} from ".."
+import {EditorState, EditorSelection, Facet, Extension, Precedence} from ".."
 
 function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
@@ -32,15 +32,16 @@ describe("EditorState facets", () => {
   })
 
   it("sorts extensions by priority", () => {
-    let st = mk(str.of("a"), str.of("b"), Facet.extend(str.of("c")),
-                 Facet.override(str.of("d")), Facet.fallback(str.of("e")),
-                 Facet.extend(str.of("f")), str.of("g"))
+    let st = mk(str.of("a"), str.of("b"), Precedence.Extend.set(str.of("c")),
+                Precedence.Override.set(str.of("d")),
+                Precedence.Fallback.set(str.of("e")),
+                Precedence.Extend.set(str.of("f")), str.of("g"))
     ist(st.facet(str).join(), "d,c,f,a,b,g,e")
   })
 
   it("lets sub-extensions inherit their parent's priority", () => {
     let e = (n: number) => num.of(n)
-    let st = mk(num.of(1), Facet.override(e(2)), e(4))
+    let st = mk(num.of(1), Precedence.Override.set(e(2)), e(4))
     ist(st.facet(num).join(), "2,1,4")
   })
 

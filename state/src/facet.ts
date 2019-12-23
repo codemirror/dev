@@ -46,11 +46,6 @@ export class Facet<Input, Output> {
     if (this.isStatic) throw new Error("Can't compute a static facet")
     return new FacetProvider<Input>(deps, this, Provider.Multi, get)
   }
-
-  static fallback(e: Extension): Extension { return new PrecExtension(e, P.Fallback) }
-  static default(e: Extension): Extension { return new PrecExtension(e, P.Default) }
-  static extend(e: Extension): Extension { return new PrecExtension(e, P.Extend) }
-  static override(e: Extension): Extension { return new PrecExtension(e, P.Override) }
 }
 
 function sameArray<T>(a: readonly T[], b: readonly T[]) {
@@ -169,15 +164,15 @@ export class StateField<Value> {
   }
 
   provide(facet: Facet<Value, any>): StateField<Value>
-  provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: (ext: Extension) => Extension): StateField<Value>
-  provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: (ext: Extension) => Extension) {
+  provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: Precedence): StateField<Value>
+  provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: Precedence) {
     let provider = facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
-    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(prec ? prec(provider) : provider))
+    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
-  provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: (ext: Extension) => Extension): StateField<Value> {
+  provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: Precedence): StateField<Value> {
     let provider = facet.computeN([this], state => get(state.field(this)))
-    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(prec ? prec(provider) : provider))
+    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
   slot(addresses: {[id: number]: number}) {
@@ -203,10 +198,28 @@ export type Extension = {[isExtension]: true} | readonly Extension[]
 
 type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
 
-const enum P { Override, Extend, Default, Fallback }
+export class Precedence {
+  private constructor(
+    // @internal
+    readonly val: number
+  ) {}
+
+  static Fallback = new Precedence(3)
+  static Default = new Precedence(2)
+  static Extend = new Precedence(1)
+  static Override = new Precedence(0)
+
+  set(extension: Extension) {
+    return new PrecExtension(extension, this.val)
+  }
+}
+
+function maybePrec(prec: Precedence | undefined, ext: Extension) {
+  return prec == null ? ext : prec.set(ext)
+}
 
 class PrecExtension {
-  constructor(readonly e: Extension, readonly prec: P) {}
+  constructor(readonly e: Extension, readonly prec: number) {}
   [isExtension]!: true
 }
 
@@ -274,7 +287,7 @@ export class Configuration {
 function flatten(extension: Extension) {
   let result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], []]
   let seen = new Set<Extension>()
-  ;(function inner(ext, prec: P) {
+  ;(function inner(ext, prec: number) {
     if (seen.has(ext)) return
     seen.add(ext)
     if (Array.isArray(ext)) {
@@ -285,7 +298,7 @@ function flatten(extension: Extension) {
       result[prec].push(ext as any)
       if (ext instanceof StateField) inner(ext.facets, prec)
     }
-  })(extension, P.Default)
+  })(extension, Precedence.Default.val)
   return result.reduce((a, b) => a.concat(b))
 }
 

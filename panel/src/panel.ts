@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {EditorState, Facet} from "../../state"
+import {EditorState, Facet, Precedence} from "../../state"
 
 /// Enables the panel-managing extension.
 export function panels() { return [Panels.extension, defaultTheme] }
@@ -145,7 +145,7 @@ function rm(node: ChildNode) {
   return next
 }
 
-const defaultTheme = Facet.fallback(EditorView.theme({
+const defaultTheme = Precedence.Fallback.set(EditorView.theme({
   panels: {
     background: "#f5f5f5",
     boxSizing: "border-box",

@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
+import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension, Precedence} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -81,7 +81,7 @@ export function gutter(config: GutterConfig) {
   return [gutters(), activeGutters.of(fillConfig(config, defaults))]
 }
 
-const baseTheme = Facet.fallback(EditorView.theme({
+const baseTheme = Precedence.Fallback.set(EditorView.theme({
   gutters: {
     background: "#f5f5f5",
     borderRight: "1px solid silver",
