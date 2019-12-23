@@ -124,7 +124,7 @@ const activeCompletion = StateField.define<ActiveCompletion | null | "pending">(
 class ActiveCompletion {
   constructor(readonly options: readonly Completion[],
               readonly selected: number,
-              readonly tooltip: Tooltip) {} // FIXME this should not directly hold the tooltip
+              readonly tooltip: Tooltip) {}
 }
 
 function createListBox(options: readonly Completion[]) {

@@ -1,5 +1,3 @@
-// FIXME rename this file to viewstate.ts
-
 import {Text} from "../../text"
 import {EditorState, ChangedRange, Mapping} from "../../state"
 import {DecorationSet, Decoration, joinRanges, findChangedRanges} from "./decoration"
@@ -48,7 +46,6 @@ export class ViewState {
 
   viewport: Viewport
 
-  // FIXME move view.state here
   constructor(public state: EditorState) {
     this.heightMap = this.heightMap.applyChanges(state.facet(decorations), Text.empty, this.heightOracle.setDoc(state.doc),
                                                  [new ChangedRange(0, 0, 0, state.doc.length)])
@@ -63,8 +60,9 @@ export class ViewState {
     let {content, height} = decoChanges(update ? contentChanges : none,
                                         newDeco, update.prevState.facet(decorations),
                                         prev.doc.length)
-    let heightChanges = extendWithRanges(contentChanges, height)
+    let heightChanges = extendWithRanges(contentChanges, height), prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
+    if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
 
     let viewport = heightChanges.length ? this.mapViewport(this.viewport, update.changes) : this.viewport
     if (!viewport || scrollTo > -1 && (scrollTo < viewport.from || scrollTo > viewport.to) ||

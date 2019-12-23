@@ -1,6 +1,6 @@
 import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField} from "../../state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
-import {Gutter, GutterMarker} from "../../gutter"
+import {gutter, GutterMarker} from "../../gutter"
 
 type Range = {from: number, to: number}
 
@@ -143,7 +143,7 @@ class FoldMarker extends GutterMarker {
 export function foldGutter(config: FoldGutterConfig = {}) {
   let fullConfig = fillConfig(config, foldGutterDefaults)
   return [
-    new Gutter({
+    gutter({
       style: "foldGutter",
       lineMarker(view, line) {
         // FIXME optimize this. At least don't run it for updates that
@@ -173,7 +173,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
           return false
         }
       }
-    }).extension,
+    }),
     codeFolding()
   ]
 }

@@ -74,26 +74,44 @@ const defaults = {
   handleDOMEvents: {}
 }
 
-const activeGutters = Facet.define<Gutter>()
+const activeGutters = Facet.define<Required<GutterConfig>>()
 
-/// Defines an editor gutter.
-// FIXME replace with a regular extension value
-export class Gutter {
-  /// @internal
-  config: Required<GutterConfig>
-
-  constructor(config: GutterConfig) {
-    this.config = fillConfig(config, defaults)
-  }
-
-  /// The extension that installs this gutter.
-  get extension() {
-    return [
-      gutters(),
-      activeGutters.of(this)
-    ]
-  }
+/// Define an editor gutter.
+export function gutter(config: GutterConfig) {
+  return [gutters(), activeGutters.of(fillConfig(config, defaults))]
 }
+
+const baseTheme = Facet.fallback(EditorView.theme({
+  gutters: {
+    background: "#f5f5f5",
+    borderRight: "1px solid silver",
+    color: "#999",
+    display: "flex",
+    height: "100%",
+    boxSizing: "border-box",
+    left: 0
+  },
+
+  gutter: {
+    display: "flex !important", // Necessary -- prevents margin collapsing
+    flexDirection: "column",
+    flexShrink: 0,
+    boxSizing: "border-box",
+    height: "100%",
+    overflow: "hidden"
+  },
+
+  gutterElement: {
+    boxSizing: "border-box"
+  },
+
+  "gutterElement.lineNumber": {
+    padding: "0 3px 0 5px",
+    minWidth: "20px",
+    textAlign: "right",
+    whiteSpace: "nowrap"
+  }
+}))
 
 const unfixGutters = Facet.define<boolean>()
 
@@ -121,7 +139,7 @@ class GutterView extends ViewPlugin {
     super()
     this.dom = document.createElement("div")
     this.dom.setAttribute("aria-hidden", "true")
-    this.gutters = view.state.facet(activeGutters).map(gutter => new SingleGutterView(view, gutter.config))
+    this.gutters = view.state.facet(activeGutters).map(conf => new SingleGutterView(view, conf))
     for (let gutter of this.gutters) this.dom.appendChild(gutter.dom)
     this.fixed = !view.state.facet(unfixGutters) // FIXME dynamic?
     if (this.fixed) {
@@ -141,9 +159,10 @@ class GutterView extends ViewPlugin {
 
   update(update: ViewUpdate) {
     if (update.themeChanged) this.updateTheme()
-    for (let gutter of this.gutters) gutter.update(update)
+    let change = update.docChanged || update.heightChanged
+    for (let gutter of this.gutters) if (gutter.update(update)) change = true
     // FIXME support gutter reconfiguring
-    // FIXME would be nice to be able to recognize updates that didn't redraw
+    if (!change) return
     let contexts = this.gutters.map(gutter => new UpdateContext(gutter, this.view.viewport))
     this.view.viewportLines(line => {
       let text: BlockInfo | undefined
@@ -242,11 +261,13 @@ class SingleGutterView {
 
   update(update: ViewUpdate) {
     if (update.themeChanged) this.updateTheme()
+    let prevMarkers = this.markers
     this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
     if (this.spacer && this.config.updateSpacer) {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
       if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)
     }
+    return this.markers == prevMarkers
   }
 
   destroy() {
@@ -338,7 +359,7 @@ class NumberMarker extends GutterMarker {
   }
 }
 
-const lineNumberGutter = new Gutter({
+const lineNumberGutter = gutter({
   style: "lineNumber",
   updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
     for (let tr of update.transactions) {
@@ -366,7 +387,7 @@ const lineNumberGutter = new Gutter({
 export function lineNumbers(config: LineNumberConfig = {}): Extension {
   return [
     lineNumberConfig.of(config),
-    lineNumberGutter.extension
+    lineNumberGutter
   ]
 }
 
@@ -375,35 +396,3 @@ function maxLineNumber(lines: number) {
   while (last < lines) last = last * 10 + 9
   return last
 }
-
-const baseTheme = EditorView.theme({
-  gutters: {
-    background: "#f5f5f5",
-    borderRight: "1px solid silver",
-    color: "#999",
-    display: "flex",
-    height: "100%",
-    boxSizing: "border-box",
-    left: 0
-  },
-
-  gutter: {
-    display: "flex !important", // Necessary -- prevents margin collapsing
-    flexDirection: "column",
-    flexShrink: 0,
-    boxSizing: "border-box",
-    height: "100%",
-    overflow: "hidden"
-  },
-
-  gutterElement: {
-    boxSizing: "border-box"
-  },
-
-  "gutterElement.lineNumber": {
-    padding: "0 3px 0 5px",
-    minWidth: "20px",
-    textAlign: "right",
-    whiteSpace: "nowrap"
-  }
-})
