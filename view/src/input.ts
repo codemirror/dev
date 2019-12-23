@@ -385,8 +385,12 @@ handlers.focus = handlers.blur = view => {
 }
 
 handlers.beforeprint = view => {
-  // FIXME restore
-  // view.docView.checkLayout(true)
+  view.viewState.printing = true
+  view.requestMeasure()
+  setTimeout(() => {
+    view.viewState.printing = false
+    view.requestMeasure()
+  }, 2000)
 }
 
 function forceClearComposition(view: EditorView) {

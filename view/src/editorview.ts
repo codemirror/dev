@@ -156,7 +156,7 @@ export class EditorView {
   update(transactions: Transaction[]) {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
-    this.updateState = UpdateState.Updating // FIXME make sure this is maintained correctly
+    this.updateState = UpdateState.Updating
 
     this.clearWaiting()
     let state = this.state
@@ -171,12 +171,12 @@ export class EditorView {
 
     let ranges = this.viewState.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
     if (!update.empty) this.updatePlugins(update)
-    this.docView.update(update, ranges)
+    let redrawn = this.docView.update(update, ranges)
     this.inputState.ensureHandlers(this)
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
-    if (update.docChanged) this.requestMeasure()
+    if (redrawn) this.requestMeasure()
   }
 
   updatePlugins(update: ViewUpdate) {
@@ -496,6 +496,6 @@ function handleResize() {
   let found = document.querySelectorAll(".codemirror-content")
   for (let i = 0; i < found.length; i++) {
     let docView = ContentView.get(found[i])
-    if (docView) docView.editorView.requestMeasure() // FIXME remove need to pass an annotation?
+    if (docView) docView.editorView.requestMeasure()
   }
 }

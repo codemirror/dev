@@ -86,9 +86,11 @@ export class DocView extends ContentView {
         update.state.selection.primary.from >= this.view.viewport.from &&
         update.state.selection.primary.to <= this.view.viewport.to) {
       this.updateSelection(forceSelection)
+      return false
     } else {
       this.updateInner(changedRanges, localDeco.concat(this.view.state.facet(decorationsFacet)),
                        update.prevState.doc.length, forceSelection)
+      return true
     }
   }
 
