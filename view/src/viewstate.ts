@@ -33,9 +33,9 @@ const MAX_COVER_MARGIN = VIEWPORT_MARGIN / 4
 
 export class ViewState {
   // These are contentDOM-local coordinates
-  // FIXME make local to .measure?
   viewportTop = 0
   viewportBottom = 0
+
   paddingTop = 0
   paddingBottom = 0
 
@@ -43,6 +43,8 @@ export class ViewState {
   heightMap: HeightMap = HeightMap.empty()
 
   scrollTo = -1
+  // Briefly set to true when printing, to disable viewport limiting
+  printing = false
 
   viewport: Viewport
 
@@ -88,7 +90,7 @@ export class ViewState {
     }
 
     // Pixel viewport
-    let {top, bottom} = visiblePixelRange(dom, this.paddingTop)
+    let {top, bottom} = this.printing ? {top: -1e8, bottom: 1e8} : visiblePixelRange(dom, this.paddingTop)
     this.viewportTop = top; this.viewportBottom = bottom
     if (bottom <= top) return 0
 
