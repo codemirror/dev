@@ -1,29 +1,41 @@
 import {Transaction} from "./transaction"
 import {EditorState} from "./state"
 
-let nextID = 0
+/// A facet is a value that is assicated with a state and can be
+/// influenced by any number of extensions. Extensions can provide
+/// input values for the facet, and the facet combines those into an
+/// output value.
+///
+/// Examples of facets are the theme styles associated with an editor
+/// (which are all stored) or the tab size (which is reduced to a
+/// single value, using the input with the hightest precedence).
+export type Facet<Input, Output> = (value: Input) => Extension
 
-export function computedFacet<T>(facet: Facet<T, any>, depends: readonly Slot[],
-                                 get: (state: EditorState) => T): Extension {
-  let data = FacetData.get(facet)
-  if (data.isStatic) throw new Error("Can't compute a static facet")
-  return new FacetProvider<T>(depends, data, Provider.Single, get)
-}
-
-export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot[],
-                                  get: (state: EditorState) => readonly T[]): Extension {
-  let data = FacetData.get(facet)
-  if (data.isStatic) throw new Error("Can't compute a static facet")
-  return new FacetProvider<T>(depends, data, Provider.Multi, get)
-}
-
+/// Config object passed to [`defineFacet`](#state.defineFacet).
 export type FacetConfig<Input, Output> = {
+  /// How to combine the input values into a single output value. When
+  /// not given, the array of input values becomes the output. This
+  /// will immediately be called on creating the facet, with an empty
+  /// array, to compute the facet's default value when no inputs are
+  /// present.
   combine?: (value: readonly Input[]) => Output,
+  /// How to compare output values to determine whether the value of
+  /// the facet changed. Defaults to comparing by `===` or, if no
+  /// `combine` function was given, comparing each element of the
+  /// array with `===`.
   compare?: (a: Output, b: Output) => boolean,
+  /// How to compare input values to avoid recomputing the output
+  /// value when no inputs changed. Defaults to comparing with `===`.
   compareInput?: (a: Input, b: Input) => boolean,
+  /// Static facets can not contain dynamic inputs.
   static?: boolean
 }
 
+/// Define a new facet. The resulting value can be called with an
+/// input value to create an extension that simply provides a value
+/// for the facet, or passed to
+/// [`EditorState.facet`](#state.EditorState.facet) to read the output
+/// value of the facet for a given state.
 export function defineFacet<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}): Facet<Input, Output> {
   let data = new FacetData<Input, Output>(config.combine || ((a: any) => a) as any,
                                           config.compareInput || ((a, b) => a === b),
@@ -36,7 +48,30 @@ export function defineFacet<Input, Output = readonly Input[]>(config: FacetConfi
   return facet
 }
 
-export type Facet<Input, Output> = (value: Input) => Extension
+/// Create an extension that computes a value for the given facet from
+/// a state. You must take care to declare the parts of the state that
+/// this value depends on, since your function is only called again
+/// for a new state when one of those parts changed.
+///
+/// In most cases, you'll want to use
+/// [`StateField.provide`](#state.StateField^provide) instead.
+export function computedFacet<T>(facet: Facet<T, any>, depends: readonly Slot[],
+                                 get: (state: EditorState) => T): Extension {
+  let data = FacetData.get(facet)
+  if (data.isStatic) throw new Error("Can't compute a static facet")
+  return new FacetProvider<T>(depends, data, Provider.Single, get)
+}
+
+/// Create an extension that computes zero or more values for a given
+/// facet from a state.
+export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot[],
+                                  get: (state: EditorState) => readonly T[]): Extension {
+  let data = FacetData.get(facet)
+  if (data.isStatic) throw new Error("Can't compute a static facet")
+  return new FacetProvider<T>(depends, data, Provider.Multi, get)
+}
+
+let nextID = 0
 
 export class FacetData<Input, Output> {
   readonly id = nextID++
@@ -176,6 +211,11 @@ export class StateField<Value> {
     return new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b), [])
   }
 
+  /// Extends the field to also provide a facet value. Returns a new
+  /// `StateField` instance that, when used to extend a state,
+  /// provides an input to the given facet that's derived from the
+  /// field. When no `get` value is given, the entire value of the
+  /// field is used as facet input.
   provide(facet: Facet<Value, any>): StateField<Value>
   provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: Precedence): StateField<Value>
   provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: Precedence) {
@@ -183,11 +223,14 @@ export class StateField<Value> {
     return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
+  /// Extends the field to provide zero or more input values for the
+  /// given facet.
   provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: Precedence): StateField<Value> {
     let provider = computedFacetN(facet, [this], state => get(state.field(this)))
     return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
+  /// @internal
   slot(addresses: {[id: number]: number}) {
     let idx = addresses[this.id] >> 1
     return (state: EditorState, tr: Transaction | null) => {
@@ -207,21 +250,36 @@ export class StateField<Value> {
   [isExtension]!: true
 }
 
+/// An extension can be a [state field](#state.StateField), a facet
+/// provider, or an array of other extensions.
 export type Extension = {[isExtension]: true} | readonly Extension[]
 
-type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
-
+/// By default extensions are registered in the order they are
+/// provided in a flattening of the nested arrays that were provided.
+/// Individual extension values can be assigned a precedence to
+/// override this. Extensions that do not have a precedence set get
+/// the precedence of the nearest parent with a precedence, or
+/// [`Default`](#state.Precedence.Default) if there is no such parent.
+/// The final ordering of extensions is determined by first sorting by
+/// precedence and then by order within each precedence.
 export class Precedence {
   private constructor(
-    // @internal
+    /// @internal
     readonly val: number
   ) {}
 
+  /// A precedence below the default precedence, which will cause
+  /// default-precedence extensions to override it even if they are
+  /// specified later in the extension ordering.
   static Fallback = new Precedence(3)
+  /// Normal, default precedence.
   static Default = new Precedence(2)
+  /// A precedence above the default precedence.
   static Extend = new Precedence(1)
+  /// Precedence above the `Default` and `Extend` precedences.
   static Override = new Precedence(0)
 
+  /// Tag an extension with this precedence.
   set(extension: Extension) {
     return new PrecExtension(extension, this.val)
   }
@@ -235,6 +293,8 @@ class PrecExtension {
   constructor(readonly e: Extension, readonly prec: number) {}
   [isExtension]!: true
 }
+
+type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
 
 export class Configuration {
   readonly statusTemplate: SlotStatus[] = []
