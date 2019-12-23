@@ -51,7 +51,7 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
   return [
     activeCompletion,
     autocompleteConfig.of(config),
-    activeCompletion.facet(showTooltip, active => active instanceof ActiveCompletion ? active.tooltip : null),
+    activeCompletion.facetN(showTooltip, active => active instanceof ActiveCompletion ? [active.tooltip] : []),
     Autocomplete.extension,
     Facet.fallback(style),
     tooltips(),
@@ -124,7 +124,7 @@ const activeCompletion = StateField.define<ActiveCompletion | null | "pending">(
 class ActiveCompletion {
   constructor(readonly options: readonly Completion[],
               readonly selected: number,
-              readonly tooltip: Tooltip) {}
+              readonly tooltip: (view: EditorView) => Tooltip) {}
 }
 
 function createListBox(options: readonly Completion[]) {
@@ -138,29 +138,29 @@ function createListBox(options: readonly Completion[]) {
   return ul
 }
 
-function buildTooltip(options: readonly Completion[]): Tooltip {
-  function updateSel(view: EditorView, dom: HTMLElement) {
-    let cur = view.state.field(activeCompletion)
-    if (cur instanceof ActiveCompletion) updateSelectedOption(dom, cur.selected)
-  }
-  return {
-    create(view: EditorView) {
-      let list = createListBox(options)
-      list.addEventListener("click", (e: MouseEvent) => {
-        let index = 0, dom = e.target as HTMLElement | null
-        for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-        let active = view.state.field(activeCompletion)
-        if (active instanceof ActiveCompletion && index < active.options.length)
-          applyCompletion(view, active.options[index])
-      })
-      return list
-    },
-    mount: updateSel,
-    update(update: ViewUpdate, dom: HTMLElement) {
-      if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion)) updateSel(update.view, dom)
-    },
-    pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
-    style: "autocomplete"
+function buildTooltip(options: readonly Completion[]) {
+  return (view: EditorView): Tooltip => {
+    let list = createListBox(options)
+    list.addEventListener("click", (e: MouseEvent) => {
+      let index = 0, dom = e.target as HTMLElement | null
+      for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
+      let active = view.state.field(activeCompletion)
+      if (active instanceof ActiveCompletion && index < active.options.length)
+        applyCompletion(view, active.options[index])
+    })
+    function updateSel(view: EditorView) {
+      let cur = view.state.field(activeCompletion)
+      if (cur instanceof ActiveCompletion) updateSelectedOption(list, cur.selected)
+    }
+    return {
+      dom: list,
+      mount: updateSel,
+      update(update: ViewUpdate) {
+        if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion)) updateSel(update.view)
+      },
+      pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
+      style: "autocomplete"
+    }
   }
 }
 

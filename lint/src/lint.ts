@@ -110,14 +110,17 @@ function lintTooltip(view: EditorView, check: (from: number, to: number) => bool
   if (!found.length) return null
 
   return {
-    pos: stackStart, end: stackEnd,
-    create() {
+    start: stackStart, end: stackEnd,
+    tooltip(view: EditorView) {
       let dom = document.createElement("ul")
       for (let d of found) dom.appendChild(renderDiagnostic(view, d))
-      return dom
-    },
-    style: "lint",
-    hideOnChange: true
+      return {
+        pos: stackStart,
+        dom,
+        style: "lint",
+        hideOnChange: true
+      }
+    }
   }
 }
 
