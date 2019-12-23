@@ -135,7 +135,7 @@ export class EditorView {
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.viewState = new ViewState(config.state || EditorState.create())
-    this.plugins = this.state.facet(viewPlugin).map(ctor => ctor(this))
+    this.plugins = this.state.facet(viewPlugin).map(ctor => createPlugin(this, ctor))
     this.observer = new DOMObserver(this, (from, to, typeOver) => applyDOMChange(this, from, to, typeOver),
                                     () => this.measure())
     this.docView = new DocView(this)
@@ -181,25 +181,23 @@ export class EditorView {
 
   updatePlugins(update: ViewUpdate) {
     let prevSpecs = update.prevState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
-    // FIXME try/catch and replace crashers with dummy plugins
     if (prevSpecs != specs) {
       let newPlugins = [], reused = []
       for (let ctor of specs) {
         let found = prevSpecs.indexOf(ctor)
         if (found < 0) {
-          newPlugins.push(ctor(this))
+          newPlugins.push(createPlugin(this, ctor))
         } else {
-          let plugin = this.plugins[found]
+          let plugin = updatePlugin(update, this.plugins[found])
           reused.push(plugin)
-          if (plugin.update) plugin.update(update)
           newPlugins.push(plugin)
         }
       }
       for (let plugin of this.plugins)
-        if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
+        if (plugin.destroy && reused.indexOf(plugin) < 0) destroyPlugin(plugin)
       this.plugins = newPlugins
     } else {
-      for (let plugin of this.plugins) plugin.update(update)
+      for (let i = 0; i < this.plugins.length; i++) this.plugins[i] = updatePlugin(update, this.plugins[i])
     }
   }
 
@@ -410,12 +408,7 @@ export class EditorView {
   /// plugins. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    for (let plugin of this.plugins) {
-      if (plugin.destroy) {
-        try { plugin.destroy() }
-        catch(e) { console.error(e) }
-      }
-    }
+    for (let plugin of this.plugins) destroyPlugin(plugin)
     this.inputState.destroy()
     this.dom.remove()
     this.observer.destroy()
@@ -476,6 +469,29 @@ export class EditorView {
   /// Facet that provides editor DOM attributes for the editor's
   /// outer element.
   static editorAttributes = editorAttributes
+}
+
+function updatePlugin(update: ViewUpdate, plugin: ViewPlugin) {
+  try {
+    plugin.update(update)
+    return plugin
+  } catch (e) {
+    console.error("CodeMirror plugin crashed:", e)
+    return ViewPlugin.dummy
+  }
+}
+
+function destroyPlugin(plugin: ViewPlugin) {
+  try { plugin.destroy() }
+  catch (e) { console.error("CodeMirror plugin crashed:", e) }
+}
+
+function createPlugin(view: EditorView, ctor: (view: EditorView) => ViewPlugin) {
+  try { return ctor(view) }
+  catch (e) {
+    console.error("CodeMirror plugin crashed:", e)
+    return ViewPlugin.dummy
+  }
 }
 
 function ensureTop(given: number | undefined, dom: HTMLElement) {

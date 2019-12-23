@@ -45,6 +45,8 @@ export class ViewPlugin {
     // FIXME this blindly assumes the constructor has only one view arg
     return this._extension || (this._extension = viewPlugin.of(view => new (this as any)(view)))
   }
+
+  static dummy = new class DummyPlugin extends ViewPlugin {}
 }
 
 ViewPlugin.prototype.decorations = Decoration.none
