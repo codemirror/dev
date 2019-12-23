@@ -135,8 +135,7 @@ function dynamicFacetSlot<Input, Output>(
 /// [`StateField`](#state.StateField^define). The `Value` type
 /// parameter refers to the content of the field. Since it will be
 /// stored in (immutable) state objects, it should be an immutable
-/// value itself. The `Deps` type parameter is used only for fields
-/// with [dependencies](#state.StateField^defineDeps).
+/// value itself.
 export type StateFieldSpec<Value> = {
   /// Creates the initial value for the field when a state is created.
   create: (state: EditorState) => Value,
@@ -154,19 +153,31 @@ export type StateFieldSpec<Value> = {
 /// Fields can store additional information in an editor state, and
 /// keep it in sync with the rest of the state.
 export class StateField<Value> {
-  /// @internal
-  readonly id = nextID++
-
   private constructor(
+    /// @internal
+    readonly id: number,
     private createF: (state: EditorState) => Value,
     private updateF: (value: Value, tr: Transaction, state: EditorState) => Value,
-    private compareF: (a: Value, b: Value) => boolean
+    private compareF: (a: Value, b: Value) => boolean,
+    /// @internal
+    readonly facets: readonly Extension[]
   ) {}
 
   /// Define a state field.
   static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
-    return new StateField<Value>(config.create, config.update,
-                                 config.compare || ((a, b) => a === b))
+    return new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b), [])
+  }
+
+  provide(facet: Facet<Value, any>): StateField<Value>
+  provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: (ext: Extension) => Extension): StateField<Value>
+  provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: (ext: Extension) => Extension) {
+    let provider = facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
+    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(prec ? prec(provider) : provider))
+  }
+
+  provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: (ext: Extension) => Extension): StateField<Value> {
+    let provider = facet.computeN([this], state => get(state.field(this)))
+    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(prec ? prec(provider) : provider))
   }
 
   slot(addresses: {[id: number]: number}) {
@@ -183,16 +194,6 @@ export class StateField<Value> {
         return SlotStatus.Changed
       }
     }
-  }
-
-  facet(facet: Facet<Value, any>): Extension
-  facet<T>(facet: Facet<T, any>, get: (value: Value) => T): Extension
-  facet<T>(facet: Facet<T, any>, get?: (value: Value) => T) {
-    return facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
-  }
-
-  facetN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[]): Extension {
-    return facet.computeN([this], state => get(state.field(this)))
   }
 
   [isExtension]!: true
@@ -276,9 +277,14 @@ function flatten(extension: Extension) {
   ;(function inner(ext, prec: P) {
     if (seen.has(ext)) return
     seen.add(ext)
-    if (Array.isArray(ext)) for (let e of ext) inner(e, prec)
-    else if (ext instanceof PrecExtension) inner(ext.e, ext.prec)
-    else result[prec].push(ext as any)
+    if (Array.isArray(ext)) {
+      for (let e of ext) inner(e, prec)
+    } else if (ext instanceof PrecExtension) {
+      inner(ext.e, ext.prec)
+    } else {
+      result[prec].push(ext as any)
+      if (ext instanceof StateField) inner(ext.facets, prec)
+    }
   })(extension, P.Default)
   return result.reduce((a, b) => a.concat(b))
 }

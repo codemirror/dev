@@ -261,11 +261,10 @@ export function hoverTooltip(
       let set = tr.annotation(setHover)
       return set === undefined ? value : set
     }
-  })
+  }).provideN(showTooltip, v => v ? [v.tooltip] : [])
 
   return [
     hoverState,
-    hoverState.facetN(showTooltip, v => v ? [v.tooltip] : []),
     EditorView.viewPlugin.of(view => new HoverPlugin(view, source, hoverState, setHover)),
     tooltips()
   ]

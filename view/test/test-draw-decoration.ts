@@ -15,8 +15,8 @@ function decos(startState: DecorationSet = Decoration.none) {
       if (add || filter) value = value.update(add, filter)
       return value
     }
-  })
-  return [field, field.facet(EditorView.decorations)]
+  }).provide(EditorView.decorations)
+  return [field]
 }
 
 function d(from: number, to: any, spec: any = null) {

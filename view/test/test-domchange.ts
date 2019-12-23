@@ -122,8 +122,8 @@ describe("DOM changes", () => {
     let field = StateField.define<DecorationSet>({
       create() { return Decoration.set(Decoration.replace(1, 3, {})) },
       update(d, u) { return Decoration.none }
-    })
-    let cm = tempEditor("abcd", [field, field.facet(EditorView.decorations)])
+    }).provide(EditorView.decorations)
+    let cm = tempEditor("abcd", [field])
     cm.domAtPos(0).node.firstChild!.textContent = "x"
     flush(cm)
     ist(cm.state.doc.toString(), "xbcd")
@@ -157,8 +157,8 @@ describe("DOM changes", () => {
     let field = StateField.define<DecorationSet>({
       create() { return Decoration.set(Decoration.widget(4, {widget: new Widget(null) })) },
       update(v) { return v }
-    })
-    let cm = tempEditor("abcd", [field, field.facet(EditorView.decorations)])
+    }).provide(EditorView.decorations)
+    let cm = tempEditor("abcd", [field])
     cm.domAtPos(0).node.appendChild(document.createTextNode("x"))
     flush(cm)
     ist(cm.state.doc.toString(), "abcdx")
