@@ -1,5 +1,5 @@
 import ist from "ist"
-import {EditorState, StateField, Facet, Change, EditorSelection, SelectionRange, Annotation} from ".."
+import {EditorState, StateField, defineFacet, Change, EditorSelection, SelectionRange, Annotation} from ".."
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -77,7 +77,7 @@ describe("EditorState", () => {
   })
 
   it("allows facets computed from fields", () => {
-    let facet = Facet.define<number>()
+    let facet = defineFacet<number>()
     let field = StateField.define({create: () => [0], update: (v, tr) => tr.docChanged ? [tr.doc.length] : v})
       .provide(facet, val => val[0])
     let state = EditorState.create({

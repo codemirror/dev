@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {Annotation, Facet, StateField} from "../../state"
+import {Annotation, defineFacet, StateField} from "../../state"
 
 const HoverTime = 750, HoverMaxDist = 10
 
@@ -147,7 +147,7 @@ export interface Tooltip {
 }
 
 // Behavior by which an extension can provide a tooltip to be shown.
-export const showTooltip = Facet.define<(view: EditorView) => Tooltip>()
+export const showTooltip = defineFacet<(view: EditorView) => Tooltip>()
 
 /// Hover tooltips are associated with a range, rather than a single
 /// position.

@@ -1,4 +1,4 @@
-import {combineConfig, EditorState, Transaction, StateField, StateCommand, Annotation, Facet, Extension} from "../../state"
+import {combineConfig, EditorState, Transaction, StateField, StateCommand, Annotation, defineFacet, Extension} from "../../state"
 import {HistoryState, ItemFilter, PopTarget} from "./core"
 
 const historyStateAnnotation = Annotation.define<HistoryState>()
@@ -14,7 +14,7 @@ export interface HistoryConfig {
   newGroupDelay?: number
 }
 
-const historyConfig = Facet.define<HistoryConfig, Required<HistoryConfig>>({
+const historyConfig = defineFacet<HistoryConfig, Required<HistoryConfig>>({
   combine(configs) {
     return combineConfig(configs, {
       minDepth: 100,
