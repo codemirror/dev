@@ -35,7 +35,7 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     "in of await yield void typeof delete instanceof": "operatorKeyword",
     "export import let var const function class extends": "keyword definition",
     "with debugger from as": "keyword",
-    TemplateString: "string type2",
+    TemplateString: "string#2",
     "BooleanLiteral Super": "atom",
     This: "self",
     Null: "null",

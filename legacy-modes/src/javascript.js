@@ -217,7 +217,7 @@ function tokenQuasi(stream, state) {
     }
     escaped = !escaped && next == "\\";
   }
-  return ret("quasi", "string type2", stream.current());
+  return ret("quasi", "string#2", stream.current());
 }
 
 var brackets = "([{}])";
@@ -488,7 +488,7 @@ function quasi(type, value) {
 }
 function continueQuasi(type) {
   if (type == "}") {
-    cx.marked = "string type2";
+    cx.marked = "string#2";
     cx.state.tokenize = tokenQuasi;
     return cont(quasi);
   }

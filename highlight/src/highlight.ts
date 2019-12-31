@@ -23,6 +23,8 @@ export class TagSystem {
   /// @internal
   typeNames: string[] = [""]
   /// @internal
+  typeIDs: {[name: string]: number} = Object.create(null)
+  /// @internal
   parents: number[]
 
   /// A [node
@@ -38,22 +40,39 @@ export class TagSystem {
   /// instance of some other type, which means that, if no styling for
   /// the type itself is provided, it'll fall back to the parent
   /// type's styling.
-  constructor(options: {flags: string[], types: string[]}) {
+  ///
+  /// You can specify a `subtypes` property to assign a given number
+  /// of sub-types to each type. These are automatically generated
+  /// types with the base type name suffixed with `#1` to `#`_`N`_
+  /// (where _N_ is the number given in the `subtypes` field) that
+  /// have the base type as parent type.
+  constructor(options: {flags: string[], types: string[], subtypes?: number}) {
     this.flags = options.flags
     this.types = options.types
     this.flagMask = Math.pow(2, this.flags.length) - 1
     this.typeShift = this.flags.length + 1
+    let subtypes = options.subtypes || 0
     let parentNames: (string | undefined)[] = [undefined]
+    this.typeIDs[""] = 0
+    let typeID = 1
     for (let type of options.types) {
       let match = /^([\w\-]+)(?:=([\w-]+))?$/.exec(type)
       if (!match) throw new RangeError("Invalid type name " + type)
-      this.typeNames.push(match[1])
-      parentNames.push(match[2])
+      let id = typeID++
+      this.typeNames[id] = match[1]
+      this.typeIDs[match[1]] = id
+      parentNames[id] = match[2]
+      for (let i = 0; i < subtypes; i++) {
+        let subID = typeID++, name = match[1] + "#" + (i + 1)
+        this.typeNames[subID] = name
+        this.typeIDs[name] = subID
+        parentNames[subID] = match[1]
+      }
     }
     this.parents = parentNames.map(name => {
       if (name == null) return 0
-      let id = this.typeNames.indexOf(name)
-      if (id < 0) throw new RangeError(`Unknown parent type '${name}' specified`)
+      let id = this.typeIDs[name]
+      if (id == null) throw new RangeError(`Unknown parent type '${name}' specified`)
       return id
     })
     if (this.flags.length > 29 || this.typeNames.length > Math.pow(2, 29 - this.flags.length))
@@ -70,8 +89,8 @@ export class TagSystem {
       if (flag > -1) {
         value += 1 << (flag + 1)
       } else {
-        let typeID = this.typeNames.indexOf(part)
-        if (typeID < 0) throw new RangeError(`Unknown tag type '${part}'`)
+        let typeID = this.typeIDs[part]
+        if (typeID == null) throw new RangeError(`Unknown tag type '${part}'`)
         if (value >> this.typeShift) throw new RangeError(`Multiple tag types specified in '${name}'`)
         value += typeID << this.typeShift
       }
@@ -116,10 +135,11 @@ export class TagSystem {
 /// The set of highlighting tags used by regular language packages and
 /// themes.
 export const defaultTags = new TagSystem({
-  flags: ["invalid", "meta", "type2", "type3", "type4",
+  flags: ["invalid", "meta",
           "link", "strong", "emphasis", "heading", "list", "quote",
           "changed", "inserted", "deleted",
           "definition", "constant", "control"],
+  subtypes: 7,
   types: [
     "comment",
     "lineComment=comment",

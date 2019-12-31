@@ -42,7 +42,7 @@ export const cssSyntax = new LezerSyntax(parser.withProps(
     BinOp: "arithmeticOperator",
     Important: "modifier",
     Comment: "blockComment",
-    ParenthesizedContent: "name type2",
+    ParenthesizedContent: "name#2",
     ColorLiteral: "color",
     StringLiteral: "string",
     ":": "punctuation definition",

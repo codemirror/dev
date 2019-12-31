@@ -74,6 +74,12 @@ issue](https://github.com/codemirror/codemirror.next) to propose a new
 type, or create a [custom tag system](#highlight.TagSystem) for your
 use case.
 
+Each type can be suffixed with a hash sign and a number from `1` to
+`7` to specify a subtype. This can be useful to distinguish elements
+not otherwise encodable. For example, if a language has multiple types
+of string literals, you can use `string#2` or similar to allow
+highlighters to style them differently if they want to.
+
 These flags can be added to every type:
 
  * **`invalid`** indicates that the node is an error of some kind.
@@ -90,15 +96,11 @@ These flags can be added to every type:
  * **`constant`** can be used to indicate constant variable names.
  * **`control`** is usually combined with `keyword` or `operator` to
    tag control structures.
- * **`type2`**, **`type3`**, and **`type4`** provide generic flags to
-   distinguish elements not otherwise encodable. For example, if a
-   language has multiple types of string literals, you can use these
-   to allow highlighters to style them differently if they want to.
 
 Tags are specified with strings that contain zero or more type or flag
 names separated by spaces. A tag may contain at most one type name,
-and any number of flags. So `"number type3 invalid"` indicates a tag
-that's of type `number` and has the `type2` and `invalid` flags set.
+and any number of flags. So `"number meta invalid"` indicates a tag
+that's of type `number` and has the `meta` and `invalid` flags set.
 
 A tag string may start with the character `+` to indicate that it is
 additive. By default, the innermost syntax node active at a given
