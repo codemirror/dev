@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, defineFacet, Extension, Precedence} from "../../state"
+import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension, Precedence} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -74,11 +74,11 @@ const defaults = {
   handleDOMEvents: {}
 }
 
-const activeGutters = defineFacet<Required<GutterConfig>>()
+const activeGutters = Facet.define<Required<GutterConfig>>()
 
 /// Define an editor gutter.
 export function gutter(config: GutterConfig) {
-  return [gutters(), activeGutters(fillConfig(config, defaults))]
+  return [gutters(), activeGutters.of(fillConfig(config, defaults))]
 }
 
 const baseTheme = Precedence.Fallback.set(EditorView.theme({
@@ -113,7 +113,7 @@ const baseTheme = Precedence.Fallback.set(EditorView.theme({
   }
 }))
 
-const unfixGutters = defineFacet<boolean>()
+const unfixGutters = Facet.define<boolean>()
 
 /// The gutter-drawing plugin is automatically enabled when you add a
 /// gutter, but you can use this function to explicitly configure it.
@@ -126,7 +126,7 @@ export function gutters(config?: {fixed?: boolean}) {
     GutterView.extension,
     baseTheme
   ]
-  if (config && config.fixed === false) result.push(unfixGutters(true))
+  if (config && config.fixed === false) result.push(unfixGutters.of(true))
   return result
 }
 
@@ -353,7 +353,7 @@ export type LineNumberMarkerUpdate = {
   filter?: (from: number, to: number, marker: GutterMarker) => boolean
 }
 
-const lineNumberConfig = defineFacet<LineNumberConfig, Required<LineNumberConfig>>({
+const lineNumberConfig = Facet.define<LineNumberConfig, Required<LineNumberConfig>>({
   combine(values) {
     return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, handleDOMEvents: {}}, {
       handleDOMEvents(a: Handlers, b: Handlers) {
@@ -407,7 +407,7 @@ const lineNumberGutter = gutter({
 /// gutters appear is determined by their extension priority.
 export function lineNumbers(config: LineNumberConfig = {}): Extension {
   return [
-    lineNumberConfig(config),
+    lineNumberConfig.of(config),
     lineNumberGutter
   ]
 }

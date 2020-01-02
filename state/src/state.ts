@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {EditorSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax, allowMultipleSelections} from "./extension"
-import {Configuration, defineFacet, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr, FacetData} from "./facet"
+import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -103,8 +103,8 @@ export class EditorState {
 
   /// Get the value of a state [behavior](#extension.Behavior).
   facet<Output>(facet: Facet<any, Output>): Output {
-    let info = FacetData.get(facet), addr = this.config.address[info.id]
-    if (addr == null) return info.default
+    let addr = this.config.address[facet.id]
+    if (addr == null) return facet.default
     ensureAddr(this, addr)
     return getAddr(this, addr)
   }
@@ -155,11 +155,11 @@ export class EditorState {
 
   /// Facet that defines a way to query for automatic indentation
   /// depth at the start of a given line.
-  static indentation = defineFacet<(state: EditorState, pos: number) => number>()
+  static indentation = Facet.define<(state: EditorState, pos: number) => number>()
 
   /// Configures the tab size to use in this state. The first
   /// (highest-precedence) value of the behavior is used.
-  static tabSize = defineFacet<number, number>({
+  static tabSize = Facet.define<number, number>({
     combine: values => values.length ? values[0] : DEFAULT_TABSIZE
   })
 
@@ -174,14 +174,14 @@ export class EditorState {
   /// When you configure a value here, only that precise separator
   /// will be used, allowing you to round-trip documents through the
   /// editor without normalizing line separators.
-  static lineSeparator = defineFacet<string, string | undefined>({
+  static lineSeparator = Facet.define<string, string | undefined>({
     combine: values => values.length ? values[0] : undefined,
     static: true
   })
 
   /// Facet for overriding the unit (in columns) by which
   /// indentation happens. When not set, this defaults to 2.
-  static indentUnit = defineFacet<number, number>({
+  static indentUnit = Facet.define<number, number>({
     combine: values => values.length ? values[0] : DEFAULT_INDENT_UNIT
   })
 
@@ -190,11 +190,11 @@ export class EditorState {
   get indentUnit() { return this.facet(EditorState.indentUnit) }
 
   /// Facet that registers a parsing service for the state.
-  static syntax = defineFacet<Syntax>()
+  static syntax = Facet.define<Syntax>()
 
   /// A facet that registers a code folding service. When called
   /// with the extent of a line, it'll return a range object when a
   /// foldable that starts on that line (but continues beyond it) can
   /// be found.
-  static foldable = defineFacet<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
+  static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 }

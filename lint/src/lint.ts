@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
         WidgetType, ViewUpdate, Command, themeClass} from "../../view"
-import {Annotation, EditorSelection, StateField, Extension, Precedence, computedFacet} from "../../state"
+import {Annotation, EditorSelection, StateField, Extension, Precedence} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, Panel, showPanel} from "../../panel"
 
@@ -104,7 +104,7 @@ const lintState = StateField.define<LintState>({
 export function linting(): Extension {
   return [
     lintState,
-    computedFacet(EditorView.decorations, [lintState], state => {
+    EditorView.decorations.compute([lintState], state => {
       let {selected, panel} = state.field(lintState)
       return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
         Decoration.mark(selected.from, selected.to, {class: themeClass(state, "lintRange.active")})

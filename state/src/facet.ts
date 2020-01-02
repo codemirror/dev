@@ -1,15 +1,7 @@
 import {Transaction} from "./transaction"
 import {EditorState} from "./state"
 
-/// A facet is a value that is assicated with a state and can be
-/// influenced by any number of extensions. Extensions can provide
-/// input values for the facet, and the facet combines those into an
-/// output value.
-///
-/// Examples of facets are the theme styles associated with an editor
-/// (which are all stored) or the tab size (which is reduced to a
-/// single value, using the input with the hightest precedence).
-export type Facet<Input, Output> = (value: Input) => Extension
+let nextID = 0
 
 /// Config object passed to [`defineFacet`](#state.defineFacet).
 export type FacetConfig<Input, Output> = {
@@ -31,65 +23,60 @@ export type FacetConfig<Input, Output> = {
   static?: boolean
 }
 
-/// Define a new facet. The resulting value can be called with an
-/// input value to create an extension that simply provides a value
-/// for the facet, or passed to
-/// [`EditorState.facet`](#state.EditorState.facet) to read the output
-/// value of the facet for a given state.
-export function defineFacet<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}): Facet<Input, Output> {
-  let data = new FacetData<Input, Output>(config.combine || ((a: any) => a) as any,
-                                          config.compareInput || ((a, b) => a === b),
-                                          config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
-                                          !!config.static)
-  let facet = function(value: Input) {
-    return new FacetProvider<Input>([], data, Provider.Static, value)
-  }
-  ;(facet as any)._data = data
-  return facet
-}
-
-/// Create an extension that computes a value for the given facet from
-/// a state. You must take care to declare the parts of the state that
-/// this value depends on, since your function is only called again
-/// for a new state when one of those parts changed.
+/// A facet is a value that is assicated with a state and can be
+/// influenced by any number of extensions. Extensions can provide
+/// input values for the facet, and the facet combines those into an
+/// output value.
 ///
-/// In most cases, you'll want to use
-/// [`StateField.provide`](#state.StateField^provide) instead.
-export function computedFacet<T>(facet: Facet<T, any>, depends: readonly Slot[],
-                                 get: (state: EditorState) => T): Extension {
-  let data = FacetData.get(facet)
-  if (data.isStatic) throw new Error("Can't compute a static facet")
-  return new FacetProvider<T>(depends, data, Provider.Single, get)
-}
-
-/// Create an extension that computes zero or more values for a given
-/// facet from a state.
-export function computedFacetN<T>(facet: Facet<T, any>, depends: readonly Slot[],
-                                  get: (state: EditorState) => readonly T[]): Extension {
-  let data = FacetData.get(facet)
-  if (data.isStatic) throw new Error("Can't compute a static facet")
-  return new FacetProvider<T>(depends, data, Provider.Multi, get)
-}
-
-let nextID = 0
-
-export class FacetData<Input, Output> {
+/// Examples of facets are the theme styles associated with an editor
+/// (which are all stored) or the tab size (which is reduced to a
+/// single value, using the input with the hightest precedence).
+export class Facet<Input, Output> {
+  /// @internal
   readonly id = nextID++
+  /// @internal
   readonly default: Output
 
-  constructor(
+  private constructor(
+    /// @internal
     readonly combine: (values: readonly Input[]) => Output,
+    /// @internal
     readonly compareInput: (a: Input, b: Input) => boolean,
+    /// @internal
     readonly compare: (a: Output, b: Output) => boolean,
-    readonly isStatic: boolean
+    private isStatic: boolean
   ) {
     this.default = combine([])
   }
 
-  static get<Input, Output>(f: Facet<Input, Output>): FacetData<Input, Output> {
-    let value = (f as any)._data
-    if (!value) throw new Error("No facet data for function " + f)
-    return value
+  static define<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}) {
+    return new Facet<Input, Output>(config.combine || ((a: any) => a) as any,
+                                    config.compareInput || ((a, b) => a === b),
+                                    config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
+                                    !!config.static)
+  }
+
+  of(value: Input): Extension {
+    return new FacetProvider<Input>([], this, Provider.Static, value)
+  }
+
+  /// Create an extension that computes a value for the facet from a
+  /// state. You must take care to declare the parts of the state that
+  /// this value depends on, since your function is only called again
+  /// for a new state when one of those parts changed.
+  ///
+  /// In most cases, you'll want to use
+  /// [`StateField.provide`](#state.StateField^provide) instead.
+  compute(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
+    if (this.isStatic) throw new Error("Can't compute a static facet")
+    return new FacetProvider<Input>(deps, this, Provider.Single, get)
+  }
+
+  /// Create an extension that computes zero or more values for this
+  /// facet from a state.
+  computeN(deps: readonly Slot<any>[], get: (state: EditorState) => readonly Input[]): Extension {
+    if (this.isStatic) throw new Error("Can't compute a static facet")
+    return new FacetProvider<Input>(deps, this, Provider.Multi, get)
   }
 }
 
@@ -97,7 +84,7 @@ function sameArray<T>(a: readonly T[], b: readonly T[]) {
   return a == b || a.length == b.length && a.every((e, i) => e === b[i])
 }
 
-type Slot = Facet<any, any> | StateField<any> | "doc" | "selection"
+type Slot<T> = Facet<any, T> | StateField<T> | "doc" | "selection"
 
 /// Marks a value as an [`Extension`](#state.Extension).
 declare const isExtension: unique symbol
@@ -107,8 +94,8 @@ const enum Provider { Static, Single, Multi }
 class FacetProvider<Input> {
   readonly id = nextID++
 
-  constructor(readonly dependencies: readonly Slot[],
-              readonly facet: FacetData<Input, any>,
+  constructor(readonly dependencies: readonly Slot<any>[],
+              readonly facet: Facet<Input, any>,
               readonly type: Provider,
               readonly value: ((state: EditorState) => Input) | ((state: EditorState) => readonly Input[]) | Input) {}
 
@@ -120,10 +107,7 @@ class FacetProvider<Input> {
     for (let dep of this.dependencies) {
       if (dep == "doc") depDoc = true
       else if (dep == "selection") depSel = true
-      else {
-        let id = dep instanceof StateField ? dep.id : FacetData.get(dep).id
-        if ((addresses[id] & 1) == 0) depAddrs.push(addresses[id])
-      }
+      else if ((addresses[dep.id] & 1) == 0) depAddrs.push(addresses[dep.id])
     }
 
     return (state: EditorState, tr: Transaction | null) => {
@@ -146,7 +130,7 @@ class FacetProvider<Input> {
 
 function dynamicFacetSlot<Input, Output>(
   addresses: {[id: number]: number},
-  facet: FacetData<Input, Output>,
+  facet: Facet<Input, Output>,
   providers: readonly FacetProvider<Input>[]
 ) {
   let providerAddrs = providers.map(p => addresses[p.id])
@@ -219,14 +203,14 @@ export class StateField<Value> {
   provide(facet: Facet<Value, any>): StateField<Value>
   provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: Precedence): StateField<Value>
   provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: Precedence) {
-    let provider = computedFacet(facet, [this], get ? state => get(state.field(this)) : state => state.field(this) as any)
+    let provider = facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
     return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
   /// Extends the field to provide zero or more input values for the
   /// given facet.
   provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: Precedence): StateField<Value> {
-    let provider = computedFacetN(facet, [this], state => get(state.field(this)))
+    let provider = facet.computeN([this], state => get(state.field(this)))
     return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
   }
 
@@ -250,8 +234,10 @@ export class StateField<Value> {
   [isExtension]!: true
 }
 
-/// An extension can be a [state field](#state.StateField), a facet
-/// provider, or an array of other extensions.
+/// Extension values can be
+/// [provided](#state.EditorStateConfig.extensions) when creating a
+/// state to attach various kinds of configuration and behavior
+/// information.
 export type Extension = {[isExtension]: true} | readonly Extension[]
 
 /// By default extensions are registered in the order they are
@@ -272,9 +258,9 @@ export class Precedence {
   /// default-precedence extensions to override it even if they are
   /// specified later in the extension ordering.
   static Fallback = new Precedence(3)
-  /// Normal, default precedence.
+  /// The regular default precedence.
   static Default = new Precedence(2)
-  /// A precedence above the default precedence.
+  /// A higher-than-default precedence.
   static Extend = new Precedence(1)
   /// Precedence above the `Default` and `Extend` precedences.
   static Override = new Precedence(0)
@@ -307,8 +293,8 @@ export class Configuration {
   }
 
   staticFacet<Output>(facet: Facet<any, Output>) {
-    let data = FacetData.get(facet), addr = this.address[data.id]
-    return addr == null ? data.default : this.staticValues[addr >> 1]
+    let addr = this.address[facet.id]
+    return addr == null ? facet.default : this.staticValues[addr >> 1]
   }
 
   // Passing EditorState as argument to avoid cyclic dependency

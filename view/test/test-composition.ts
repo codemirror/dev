@@ -1,6 +1,6 @@
 import {tempEditor, requireFocus} from "./temp-editor"
 import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType} from ".."
-import {EditorState, computedFacet} from "../../state"
+import {EditorState} from "../../state"
 import ist from "ist"
 
 function event(cm: EditorView, type: string) {
@@ -53,7 +53,7 @@ function wordDeco(state: EditorState): DecorationSet {
   return Decoration.set(deco)
 }
 
-const wordHighlighter = computedFacet(EditorView.decorations, ["doc"], wordDeco)
+const wordHighlighter = EditorView.decorations.compute(["doc"], wordDeco)
 
 function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {

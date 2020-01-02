@@ -1,5 +1,5 @@
 import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {combineConfig, ChangedRange, defineFacet} from "../../state"
+import {combineConfig, ChangedRange, Facet} from "../../state"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
 
@@ -36,7 +36,7 @@ const NAMES: {[key: number]: string} = {
   65532: "object replacement"
 }
 
-const specialCharConfig = defineFacet<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
+const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
   combine(configs) {
     // FIXME make configurations compose properly
     let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
@@ -60,7 +60,7 @@ const specialCharConfig = defineFacet<SpecialCharConfig, Required<SpecialCharCon
 /// Returns an extension that installs highlighting of special
 /// characters.
 export function specialChars(config: SpecialCharConfig = {}) {
-  return [specialCharConfig(config), SpecialCharPlugin.extension, styleExt]
+  return [specialCharConfig.of(config), SpecialCharPlugin.extension, styleExt]
 }
 
 const JOIN_GAP = 10
@@ -195,4 +195,4 @@ const style = new StyleModule({
     verticalAlign: "bottom"
   }
 })
-const styleExt = EditorView.styleModule(style)
+const styleExt = EditorView.styleModule.of(style)

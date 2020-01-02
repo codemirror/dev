@@ -1,4 +1,4 @@
-import {EditorState, Transaction, ChangeSet, defineFacet, Extension} from "../../state"
+import {EditorState, Transaction, ChangeSet, Facet, Extension} from "../../state"
 import {StyleModule} from "style-mod"
 import {Decoration, DecorationSet} from "./decoration"
 import {EditorView} from "./editorview"
@@ -13,11 +13,11 @@ export type Command = (target: EditorView) => boolean
 
 const none: readonly any[] = []
 
-export const handleDOMEvents = defineFacet<{[key: string]: (view: EditorView, event: any) => boolean}>()
+export const handleDOMEvents = Facet.define<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
-export const clickAddsSelectionRange = defineFacet<(event: MouseEvent) => boolean>()
+export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boolean>()
 
-export const dragMovesSelection = defineFacet<(event: MouseEvent) => boolean>()
+export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
 
 /// View plugins associate stateful values with a view. They can
 /// influence the way the content is drawn, and are notified of things
@@ -43,7 +43,7 @@ export class ViewPlugin {
 
   static get extension() {
     // FIXME this blindly assumes the constructor has only one view arg
-    return this._extension || (this._extension = viewPlugin(view => new (this as any)(view)))
+    return this._extension || (this._extension = viewPlugin.of(view => new (this as any)(view)))
   }
 
   static dummy = new class DummyPlugin extends ViewPlugin {}
@@ -58,24 +58,24 @@ export interface MeasureRequest<T> {
   write(measure: T, view: EditorView): void
 }
 
-export const viewPlugin = defineFacet<(view: EditorView) => ViewPlugin>()
+export const viewPlugin = Facet.define<(view: EditorView) => ViewPlugin>()
 
-export const editorAttributes = defineFacet<Attrs, Attrs>({
+export const editorAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
 })
 
-export const contentAttributes = defineFacet<Attrs, Attrs>({
+export const contentAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})
 })
 
 // Provide decorations
-export const decorations = defineFacet<DecorationSet>()
+export const decorations = Facet.define<DecorationSet>()
 
-export const styleModule = defineFacet<StyleModule>()
+export const styleModule = Facet.define<StyleModule>()
 
-export const theme = defineFacet<StyleModule<{[key: string]: string}>>()
+export const theme = Facet.define<StyleModule<{[key: string]: string}>>()
 
-export const phrases = defineFacet<{[key: string]: string}>()
+export const phrases = Facet.define<{[key: string]: string}>()
 
 export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, Oracle = 8 }
 

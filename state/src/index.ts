@@ -1,7 +1,6 @@
 export {EditorStateConfig, EditorState} from "./state"
 export {StateCommand, Syntax, languageData, CancellablePromise, Annotation} from "./extension"
-export {Facet, StateField, StateFieldSpec, Extension, Precedence,
-        defineFacet, FacetConfig, computedFacet, computedFacetN} from "./facet"
+export {Facet, FacetConfig, StateField, StateFieldSpec, Extension, Precedence} from "./facet"
 export {EditorSelection, SelectionRange} from "./selection"
 export {Change, ChangeDesc, ChangeSet, Mapping, MapMode, ChangedRange} from "./change"
 export {Transaction} from "./transaction"
