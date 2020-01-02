@@ -156,7 +156,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
       initialSpacer() {
         return new FoldMarker(fullConfig, false)
       },
-      handleDOMEvents: {
+      domEventHandlers: {
         click: (view, line) => {
           let folded = foldInside(view.state, line.from, line.to)
           if (folded) {

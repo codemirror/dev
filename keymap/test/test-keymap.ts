@@ -6,7 +6,7 @@ import ist from "ist"
 const fakeView = {state: {}, dispatch: () => {}}
 
 function mk(map: Keymap) {
-  return EditorState.create({extensions: [keymap(map)]}).facet(EditorView.handleDOMEvents)[0]
+  return EditorState.create({extensions: [keymap(map)]}).facet(EditorView.domEventHandlers)[0]
 }
 
 function dispatch(handlers: any, key: string, mods?: any) {

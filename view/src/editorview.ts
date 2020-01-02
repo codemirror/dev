@@ -8,7 +8,7 @@ import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
-import {ViewUpdate, styleModule, theme, handleDOMEvents,
+import {ViewUpdate, styleModule, theme, domEventHandlers,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
 import {DOMObserver} from "./domobserver"
@@ -426,7 +426,7 @@ export class EditorView {
   /// first such function to return true will be assumed to have handled
   /// that event, and no other handlers or built-in behavior will be
   /// activated for it.
-  static handleDOMEvents = handleDOMEvents
+  static domEventHandlers = domEventHandlers
 
   /// Facet used to configure whether a given selection drag event
   /// should move or copy the selection. The given predicate will be

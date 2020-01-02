@@ -13,7 +13,7 @@ export type Command = (target: EditorView) => boolean
 
 const none: readonly any[] = []
 
-export const handleDOMEvents = Facet.define<{[key: string]: (view: EditorView, event: any) => boolean}>()
+export const domEventHandlers = Facet.define<{[key: string]: (view: EditorView, event: any) => boolean}>()
 
 export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boolean>()
 

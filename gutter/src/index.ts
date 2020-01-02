@@ -59,7 +59,7 @@ export interface GutterConfig {
   /// Update the spacer element when the view is updated.
   updateSpacer?: null | ((spacer: GutterMarker, update: ViewUpdate) => GutterMarker)
   /// Supply event handlers for DOM events on this gutter.
-  handleDOMEvents?: Handlers
+  domEventHandlers?: Handlers
 }
 
 const defaults = {
@@ -71,7 +71,7 @@ const defaults = {
   lineMarker: () => null,
   initialSpacer: null,
   updateSpacer: null,
-  handleDOMEvents: {}
+  domEventHandlers: {}
 }
 
 const activeGutters = Facet.define<Required<GutterConfig>>()
@@ -259,10 +259,10 @@ class SingleGutterView {
 
   constructor(public view: EditorView, public config: Required<GutterConfig>) {
     this.dom = document.createElement("div")
-    for (let prop in config.handleDOMEvents) {
+    for (let prop in config.domEventHandlers) {
       this.dom.addEventListener(prop, (event: Event) => {
         let line = view.lineAtHeight((event as MouseEvent).clientY)
-        if (config.handleDOMEvents[prop](view, line, event)) event.preventDefault()
+        if (config.domEventHandlers[prop](view, line, event)) event.preventDefault()
       })
     }
     this.markers = config.initialMarkers(view)
@@ -340,7 +340,7 @@ export interface LineNumberConfig {
   /// to string.
   formatNumber?: (lineNo: number) => string
   /// Supply event handlers for DOM events on this gutter.
-  handleDOMEvents?: Handlers
+  domEventHandlers?: Handlers
 }
 
 /// Used to insert markers into the line number gutter.
@@ -355,8 +355,8 @@ export type LineNumberMarkerUpdate = {
 
 const lineNumberConfig = Facet.define<LineNumberConfig, Required<LineNumberConfig>>({
   combine(values) {
-    return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, handleDOMEvents: {}}, {
-      handleDOMEvents(a: Handlers, b: Handlers) {
+    return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, domEventHandlers: {}}, {
+      domEventHandlers(a: Handlers, b: Handlers) {
         let result: Handlers = {}
         for (let event in a) result[event] = a[event]
         for (let event in b) {

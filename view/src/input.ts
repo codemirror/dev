@@ -1,7 +1,7 @@
 import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
-import {handleDOMEvents, ViewUpdate, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
+import {domEventHandlers, ViewUpdate, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 import {getSelection} from "./dom"
@@ -50,13 +50,13 @@ export class InputState {
   }
 
   ensureHandlers(view: EditorView) {
-    let handlers = view.state.facet(handleDOMEvents)
+    let handlers = view.state.facet(domEventHandlers)
     if (handlers == this.customHandlers) return
     this.customHandlers = handlers
     for (let set of handlers) {
       for (let type in set) if (this.registeredEvents.indexOf(type) < 0) {
         this.registeredEvents.push(type)
-        view.contentDOM.addEventListener(type, (event: Event) => {
+        ;(type != "scroll" ? view.contentDOM : view.scrollDOM).addEventListener(type, (event: Event) => {
           if (!eventBelongsToEditor(view, event)) return
           if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         })
