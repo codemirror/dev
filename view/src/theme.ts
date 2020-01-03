@@ -12,7 +12,7 @@ export function buildTheme(id: string, spec: {[name: string]: Style}) {
     for (let i = 1; i <= parts.length; i++) selector += ".cm-" + parts.slice(0, i).join("-")
     styles[selector] = spec[prop]
   }
-  return new StyleModule(spec, {generateClasses: false})
+  return new StyleModule(styles, {generateClasses: false})
 }
 
 /// Create a set of CSS class names for the given theme selector,

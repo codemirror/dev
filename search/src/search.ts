@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
-import {StateField, Facet, Annotation, EditorSelection, SelectionRange, Precedence} from "../../state"
+import {StateField, Facet, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
@@ -61,7 +61,7 @@ class SearchHighlighter extends ViewPlugin {
     while (!cursor.next().done) {
       let {from, to} = cursor.value
       let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
-      deco.push(Decoration.mark(from, to, {class: themeClass(state, selected ? "searchMatch.selected" : "searchMatch")}))
+      deco.push(Decoration.mark(from, to, {class: themeClass(selected ? "searchMatch.selected" : "searchMatch")}))
     }
     return Decoration.set(deco)
   }
@@ -108,7 +108,7 @@ export const search = function(config: SearchConfig) {
     panelKeymap.of(panelKeys),
     SearchHighlighter.extension,
     panels(),
-    theme
+    baseTheme
   ]
 }
 
@@ -376,7 +376,7 @@ function maybeAnnounceMatch(view: EditorView) {
   live.textContent = view.phrase("current match") + ". " + text
 }
 
-const theme = Precedence.Fallback.set(EditorView.theme({
+const baseTheme = EditorView.baseTheme({
   "panel.search": {
     padding: "2px 6px 4px",
     position: "relative",
@@ -406,4 +406,4 @@ const theme = Precedence.Fallback.set(EditorView.theme({
   "searchMatch.selected": {
     background: "#fca"
   }
-}))
+})

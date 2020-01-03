@@ -249,7 +249,7 @@ export class EditorView {
   /// @internal
   updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
-      class: themeClass("wrap") + " " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") +
+      class: themeClass("wrap") + " " + styles.wrapper + (this.hasFocus ? " cm-focused " : " ") +
         baseThemeID + " " + this.state.facet(theme).join(" ")
     })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
@@ -512,7 +512,7 @@ function ensureGlobalHandler() {
 
 function handleResize() {
   resizeDebounce = -1
-  let found = document.querySelectorAll(".codemirror-content")
+  let found = document.querySelectorAll(".cm-content")
   for (let i = 0; i < found.length; i++) {
     let docView = ContentView.get(found[i])
     if (docView) docView.editorView.requestMeasure()

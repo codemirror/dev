@@ -1,4 +1,4 @@
-import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField, Precedence} from "../../state"
+import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField} from "../../state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
 import {gutter, GutterMarker} from "../../gutter"
 
@@ -86,7 +86,7 @@ export function codeFolding(config: FoldConfig = {}) {
   return [
     foldConfig.of(config),
     foldState,
-    Precedence.Fallback.set(defaultTheme)
+    baseTheme
   ]
 }
 
@@ -101,7 +101,7 @@ class FoldWidget extends WidgetType<null> {
     // FIXME should this have a role? does it make sense to allow focusing by keyboard?
     element.setAttribute("aria-label", view.phrase("folded code"))
     element.title = view.phrase("unfold")
-    element.className = themeClass(view.state, "foldPlaceholder")
+    element.className = themeClass("foldPlaceholder")
 
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
@@ -177,7 +177,7 @@ export function foldGutter(config: FoldGutterConfig = {}) {
   ]
 }
 
-const defaultTheme = EditorView.theme({
+const baseTheme = EditorView.baseTheme({
   foldPlaceholder: {
     background: "#eee",
     border: "1px solid silver",

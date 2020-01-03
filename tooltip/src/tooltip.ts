@@ -48,12 +48,11 @@ class TooltipPlugin extends ViewPlugin {
     }
 
     if (update.docChanged && this.tooltips.length) this.view.requestMeasure(this.measureReq)
-    if (update.themeChanged) this.themeChanged()
   }
 
   createTooltip(source: (view: EditorView) => Tooltip) {
     let tooltip = source(this.view)
-    tooltip.dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
+    tooltip.dom.className = themeClass("tooltip" + (tooltip.style ? "." + tooltip.style : ""))
     this.view.dom.appendChild(tooltip.dom)
     if (tooltip.mount) tooltip.mount(this.view)
     return tooltip
@@ -62,11 +61,6 @@ class TooltipPlugin extends ViewPlugin {
   destroy() {
     this.view.scrollDOM.removeEventListener("scroll", this.onscroll)
     for (let {dom} of this.tooltips) dom.remove()
-  }
-
-  themeChanged() {
-    for (let tooltip of this.tooltips)
-      tooltip.dom.className = themeClass(this.view.state, "tooltip" + (tooltip.style ? "." + tooltip.style : ""))
   }
 
   readMeasure() {
@@ -104,23 +98,20 @@ class TooltipPlugin extends ViewPlugin {
   }
 }
 
-const tooltipExt = [
-  TooltipPlugin.extension,
-  EditorView.theme({
-    tooltip: {
-      position: "absolute",
-      border: "1px solid silver",
-      background: "#f5f5f5",
-      zIndex: 100
-    }
-  })
-]
+const baseTheme = EditorView.baseTheme({
+  tooltip: {
+    position: "absolute",
+    border: "1px solid silver",
+    background: "#f5f5f5",
+    zIndex: 100
+  }
+})
 
 /// Supporting extension for displaying tooltips. Allows
 /// [`showTooltip`](#tooltip.showTooltip) to be used to define
 /// tooltips.
 export function tooltips() {
-  return tooltipExt
+  return [TooltipPlugin.extension, baseTheme]
 }
 
 /// Describes a tooltip.
@@ -133,9 +124,9 @@ export interface Tooltip {
   update?(update: ViewUpdate): void
   /// The document position at which to show the tooltip.
   pos: number
-  /// An extra theme style to use for the tooltip. By default, it'll
-  /// be themed as `"tooltip"`, but you can pass a name, say `"mine"`,
-  /// to style it as `"tooltip.mine"` instead.
+  /// An extra theme selector to use for the tooltip. By default,
+  /// it'll be themed as `"tooltip"`, but you can pass a name, say
+  /// `"mine"`, to style it as `"tooltip.mine"` instead.
   style?: string
   /// Whether the tooltip should be shown above or below the target
   /// position. Defaults to false.

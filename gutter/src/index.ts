@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension, Precedence} from "../../state"
+import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -37,9 +37,9 @@ type Handlers = {[event: string]: (view: EditorView, line: BlockInfo, event: any
 
 /// Configuration options when creating a generic gutter.
 export interface GutterConfig {
-  /// The theme style for the gutter's wrapping DOM element (in
-  /// addition to `gutter`). Will be suffixed with `"Element"` to get
-  /// the theme style for the gutter elements.
+  /// The theme selector for the gutter's wrapping DOM element. Will
+  /// be prefixed with `"gutter."` for the gutter wrapper, and then
+  /// suffixed with `"Element"` for the individual line elements.
   style?: string
   /// Controls whether empty gutter elements should be rendered.
   /// Defaults to false.
@@ -81,7 +81,7 @@ export function gutter(config: GutterConfig) {
   return [gutters(), activeGutters.of(fillConfig(config, defaults))]
 }
 
-const baseTheme = Precedence.Fallback.set(EditorView.theme({
+const baseTheme = EditorView.baseTheme({
   gutters: {
     background: "#f5f5f5",
     borderRight: "1px solid silver",
@@ -111,7 +111,7 @@ const baseTheme = Precedence.Fallback.set(EditorView.theme({
     textAlign: "right",
     whiteSpace: "nowrap"
   }
-}))
+})
 
 const unfixGutters = Facet.define<boolean>()
 
@@ -138,6 +138,7 @@ class GutterView extends ViewPlugin {
   constructor(readonly view: EditorView) {
     super()
     this.dom = document.createElement("div")
+    this.dom.className = themeClass("gutters")
     this.dom.setAttribute("aria-hidden", "true")
     this.gutters = view.state.facet(activeGutters).map(conf => new SingleGutterView(view, conf))
     for (let gutter of this.gutters) this.dom.appendChild(gutter.dom)
@@ -149,16 +150,9 @@ class GutterView extends ViewPlugin {
       this.dom.style.position = "sticky"
     }
     view.scrollDOM.insertBefore(this.dom, view.contentDOM)
-    this.updateTheme()
-  }
-
-  updateTheme() {
-    this.dom.className = themeClass(this.view.state, "gutters")
-    for (let gutter of this.gutters) gutter.updateTheme()
   }
 
   update(update: ViewUpdate) {
-    if (update.themeChanged) this.updateTheme()
     if (!this.updateGutters(update)) return
     let contexts = this.gutters.map(gutter => new UpdateContext(gutter, this.view.viewport))
     this.view.viewportLines(line => {
@@ -259,6 +253,8 @@ class SingleGutterView {
 
   constructor(public view: EditorView, public config: Required<GutterConfig>) {
     this.dom = document.createElement("div")
+    this.dom.className = themeClass("gutter" + (this.config.style ? "." + this.config.style : ""))
+    this.elementClass = themeClass("gutterElement" + (this.config.style ? "." + this.config.style : ""))
     for (let prop in config.domEventHandlers) {
       this.dom.addEventListener(prop, (event: Event) => {
         let line = view.lineAtHeight((event as MouseEvent).clientY)
@@ -271,17 +267,9 @@ class SingleGutterView {
       this.dom.appendChild(this.spacer.dom)
       this.spacer.dom.style.cssText += "visibility: hidden; pointer-events: none"
     }
-    this.updateTheme()
-  }
-
-  updateTheme() {
-    this.dom.className = themeClass(this.view.state, "gutter" + (this.config.style ? "." + this.config.style : ""))
-    this.elementClass = themeClass(this.view.state, "gutterElement" + (this.config.style ? "." + this.config.style : ""))
-    while (this.elements.length) this.dom.removeChild(this.elements.pop()!.dom)
   }
 
   update(update: ViewUpdate) {
-    if (update.themeChanged) this.updateTheme()
     let prevMarkers = this.markers
     this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
     if (this.spacer && this.config.updateSpacer) {

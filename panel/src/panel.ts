@@ -1,8 +1,8 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {EditorState, Facet, Precedence} from "../../state"
+import {Facet} from "../../state"
 
 /// Enables the panel-managing extension.
-export function panels() { return [Panels.extension, defaultTheme] }
+export function panels() { return [Panels.extension, baseTheme] }
 
 export interface Panel {
   /// The element representing this panel.
@@ -11,7 +11,7 @@ export interface Panel {
   mount?(): void
   /// Update the DOM for a given view update.
   update?(update: ViewUpdate): void
-  /// An optional theme style. By default, panels are themed as
+  /// An optional theme selector. By default, panels are themed as
   /// `"panel"`. If you pass `"foo"` here, your panel is themed as
   /// `"panel.foo"`.
   style?: string,
@@ -41,7 +41,7 @@ class Panels extends ViewPlugin {
     this.top = new PanelGroup(view, true, this.panels.filter(p => p.top)) 
     this.bottom = new PanelGroup(view, false, this.panels.filter(p => !p.top))
     for (let p of this.panels) {
-      p.dom.className += " " + panelClass(view.state, p)
+      p.dom.className += " " + panelClass(p)
       if (p.mount) p.mount()
     }
   }
@@ -67,19 +67,11 @@ class Panels extends ViewPlugin {
       this.top.sync(top)
       this.bottom.sync(bottom)
       for (let p of mount) {
-        p.dom.className += " " + panelClass(update.state, p)
+        p.dom.className += " " + panelClass(p)
         if (p.mount) p.mount!()
       }
     } else {
       for (let p of this.panels) if (p.update) p.update(update)
-    }
-
-    if (update.themeChanged) for (let p of this.panels) {
-      let prev = panelClass(update.prevState, p), cur = panelClass(update.state, p)
-      if (prev != cur) {
-        for (let cls of prev.split(" ")) p.dom.classList.remove(cls)
-        for (let cls of cur.split(" ")) p.dom.classList.add(cls)
-      }
     }
   }
 
@@ -88,8 +80,8 @@ class Panels extends ViewPlugin {
   }
 }
 
-function panelClass(state: EditorState, panel: Panel) {
-  return themeClass(state, panel.style ? `panel.${panel.style}` : "panel")
+function panelClass(panel: Panel) {
+  return themeClass(panel.style ? `panel.${panel.style}` : "panel")
 }
 
 class PanelGroup {
@@ -115,7 +107,7 @@ class PanelGroup {
 
     if (!this.dom) {
       this.dom = document.createElement("div")
-      this.dom.className = themeClass(this.view.state, this.top ? "panels.top" : "panels.bottom")
+      this.dom.className = themeClass(this.top ? "panels.top" : "panels.bottom")
       this.dom.style[this.top ? "top" : "bottom"] = "0"
       this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
     }
@@ -145,7 +137,7 @@ function rm(node: ChildNode) {
   return next
 }
 
-const defaultTheme = Precedence.Fallback.set(EditorView.theme({
+const baseTheme = EditorView.baseTheme({
   panels: {
     background: "#f5f5f5",
     boxSizing: "border-box",
@@ -159,4 +151,4 @@ const defaultTheme = Precedence.Fallback.set(EditorView.theme({
   "panels.bottom": {
     borderTop: "1px solid silver"
   }
-}))
+})

@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
         WidgetType, ViewUpdate, Command, themeClass} from "../../view"
-import {Annotation, EditorSelection, StateField, Extension, Precedence} from "../../state"
+import {Annotation, EditorSelection, StateField, Extension} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, Panel, showPanel} from "../../panel"
 
@@ -71,7 +71,7 @@ const lintState = StateField.define<LintState>({
       let ranges = Decoration.set(setDiag.map(d => {
         return d.from < d.to
           ? Decoration.mark(d.from, d.to, {
-            attributes: {class: themeClass(state, "lintRange." + d.severity)},
+            attributes: {class: themeClass("lintRange." + d.severity)},
             diagnostic: d
           } as MarkDecorationSpec)
           : Decoration.widget(d.from, {
@@ -107,12 +107,12 @@ export function linting(): Extension {
     EditorView.decorations.compute([lintState], state => {
       let {selected, panel} = state.field(lintState)
       return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
-        Decoration.mark(selected.from, selected.to, {class: themeClass(state, "lintRange.active")})
+        Decoration.mark(selected.from, selected.to, {class: themeClass("lintRange.active")})
       ])
     }),
     panels(),
     hoverTooltip(lintTooltip),
-    defaultTheme
+    baseTheme
   ]
 }
 
@@ -208,10 +208,10 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
 function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
   let dom = document.createElement("li")
   dom.textContent = diagnostic.message
-  dom.className = themeClass(view.state, "diagnostic." + diagnostic.severity)
+  dom.className = themeClass("diagnostic." + diagnostic.severity)
   if (diagnostic.actions) for (let action of diagnostic.actions) {
     let button = dom.appendChild(document.createElement("button"))
-    button.className = themeClass(view.state, "diagnosticAction")
+    button.className = themeClass("diagnosticAction")
     button.textContent = action.name
     button.onclick = button.onmousedown = e => {
       e.preventDefault()
@@ -226,7 +226,7 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
 class DiagnosticWidget extends WidgetType<Diagnostic> {
   toDOM(view: EditorView) {
     let elt = document.createElement("span")
-    elt.className = themeClass(view.state, "lintPoint." + this.value.severity)
+    elt.className = themeClass("lintPoint." + this.value.severity)
     return elt
   }
 }
@@ -385,7 +385,7 @@ function underline(color: string) {
   return `url('data:image/svg+xml;base64,${btoa(svg)}')`
 }
 
-const defaultTheme = Precedence.Fallback.set(EditorView.theme({
+const baseTheme = EditorView.baseTheme({
   diagnostic: {
     padding: "3px 6px 3px 8px",
     marginLeft: "-1px",
@@ -469,4 +469,4 @@ const defaultTheme = Precedence.Fallback.set(EditorView.theme({
     padding: 0,
     margin: 0
   }
-}))
+})
