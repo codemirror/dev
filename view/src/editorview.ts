@@ -11,11 +11,9 @@ import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule, domEventHandlers,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
-import {theme, buildTheme, baseThemeID} from "./theme"
+import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
-import {styles} from "./styles"
-import {themeClass} from "./theme"
 import browser from "./browser"
 import {applyDOMChange} from "./domchange"
 
@@ -127,6 +125,7 @@ export class EditorView {
     this.contentDOM = document.createElement("div")
 
     this.scrollDOM = document.createElement("div")
+    this.scrollDOM.className = themeClass("scroller")
     this.scrollDOM.appendChild(this.contentDOM)
 
     this.dom = document.createElement("div")
@@ -249,7 +248,7 @@ export class EditorView {
   /// @internal
   updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
-      class: themeClass("wrap") + " " + styles.wrapper + (this.hasFocus ? " cm-focused " : " ") +
+      class: themeClass("wrap") + (this.hasFocus ? " cm-focused " : " ") +
         baseThemeID + " " + this.state.facet(theme).join(" ")
     })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
@@ -257,17 +256,16 @@ export class EditorView {
     let contentAttrs = combineAttrs(this.state.facet(contentAttributes), {
       spellcheck: "false",
       contenteditable: "true",
-      class: styles.content + " " + themeClass("content"),
+      class: themeClass("content"),
       style: `${browser.tabSize}: ${this.state.tabSize}`
     })
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs
-    this.scrollDOM.className = themeClass("scroller") + " " + styles.scroller
   }
 
   private mountStyles() {
     this.styleModules = this.state.facet(styleModule)
-    StyleModule.mount(this.root, this.styleModules.concat(styles).reverse())
+    StyleModule.mount(this.root, this.styleModules.concat(baseTheme).reverse())
   }
 
   /// Look up a translation for the given phrase (via the
