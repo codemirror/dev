@@ -40,4 +40,4 @@ export const styles = new StyleModule({
     display: "block",
     padding: "0 2px 0 4px"
   }
-}, {priority: 0})
+})

@@ -1,4 +1,4 @@
-import {EditorState, Transaction, CancellablePromise, Extension} from "../../state"
+import {EditorState, Transaction, CancellablePromise, Extension, Precedence} from "../../state"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
@@ -8,9 +8,10 @@ import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
-import {ViewUpdate, styleModule, theme, domEventHandlers,
+import {ViewUpdate, styleModule, domEventHandlers,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
+import {theme, buildTheme, baseThemeID} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import {styles} from "./styles"
@@ -248,19 +249,20 @@ export class EditorView {
   /// @internal
   updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
-      class: "codemirror " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") + themeClass(this.state, "wrap")
+      class: themeClass("wrap") + " " + styles.wrapper + (this.hasFocus ? " codemirror-focused " : " ") +
+        baseThemeID + " " + this.state.facet(theme).join(" ")
     })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
     this.editorAttrs = editorAttrs
     let contentAttrs = combineAttrs(this.state.facet(contentAttributes), {
       spellcheck: "false",
       contenteditable: "true",
-      class: styles.content + " " + themeClass(this.state, "content"),
+      class: styles.content + " " + themeClass("content"),
       style: `${browser.tabSize}: ${this.state.tabSize}`
     })
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs
-    this.scrollDOM.className = themeClass(this.state, "scroller") + " " + styles.scroller
+    this.scrollDOM.className = themeClass("scroller") + " " + styles.scroller
   }
 
   private mountStyles() {
@@ -448,12 +450,13 @@ export class EditorView {
   /// Facet that provides CSS classes to add to elements identified
   /// by the given string.
   static theme(spec: {[name: string]: Style}): Extension {
-    for (let prop in spec) {
-      let specificity = prop.split(".").length - 1
-      if (specificity > 0) spec[prop].specificity = specificity
-    }
-    let module = new StyleModule(spec)
-    return [theme.of(module), styleModule.of(module)]
+    let prefix = StyleModule.newName()
+    return [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
+  }
+
+  /// Create an extension that adds styles to the base theme.
+  static baseTheme(spec: {[name: string]: Style}): Extension {
+    return Precedence.Fallback.set(styleModule.of(buildTheme(baseThemeID, spec)))
   }
 
   /// Registers translation phrases. The

@@ -1,5 +1,5 @@
 import {EditorState, Transaction, ChangeSet, Facet, Extension} from "../../state"
-import {StyleModule} from "style-mod"
+ import {StyleModule} from "style-mod"
 import {Decoration, DecorationSet} from "./decoration"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
@@ -73,8 +73,6 @@ export const decorations = Facet.define<DecorationSet>()
 
 export const styleModule = Facet.define<StyleModule>()
 
-export const theme = Facet.define<StyleModule<{[key: string]: string}>>()
-
 export const phrases = Facet.define<{[key: string]: string}>()
 
 export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, Oracle = 8 }
@@ -131,14 +129,6 @@ export class ViewUpdate {
   /// Whether the selection was explicitly set in this update.
   get selectionSet() {
     return this.transactions.some(tr => tr.selectionSet)
-  }
-
-  /// Tells you whether the set of active [theme
-  /// extensions](#view.EditorView^theme) changed, which may require
-  /// plugins to update [CSS class names](#view.themeClass)
-  /// on their DOM elements.
-  get themeChanged() {
-    return this.prevState.facet(theme) != this.view.state.facet(theme)
   }
 
   /// @internal
