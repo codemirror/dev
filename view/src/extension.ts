@@ -39,11 +39,8 @@ export class ViewPlugin {
 
   scrollMargins!: Partial<Rect> | null
 
-  private static _extension: Extension | null = null
-
-  static get extension() {
-    // FIXME this blindly assumes the constructor has only one view arg
-    return this._extension || (this._extension = viewPlugin.of(view => new (this as any)(view)))
+  static get extension(this: {new (view: EditorView): ViewPlugin}): Extension {
+    return (this as any)._extension || ((this as any)._extension = viewPlugin.of(view => new this(view)))
   }
 
   static dummy = new class DummyPlugin extends ViewPlugin {}
