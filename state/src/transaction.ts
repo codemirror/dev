@@ -1,7 +1,7 @@
 import {Text} from "../../text"
 import {Annotation, allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
-import {EditorSelection, SelectionRange} from "./selection"
+import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Change, ChangeSet} from "./change"
 import {Extension, Configuration} from "./facet"
 
@@ -131,7 +131,9 @@ export class Transaction {
   /// Update the selection.
   setSelection(selection: EditorSelection): Transaction {
     this.ensureOpen()
-    this.selection = this.startState.facet(allowMultipleSelections) ? selection : selection.asSingle()
+    if (!this.startState.facet(allowMultipleSelections)) selection = selection.asSingle()
+    checkSelection(selection, this.doc)
+    this.selection = selection
     this.flags |= Flag.SelectionSet
     return this
   }

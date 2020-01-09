@@ -272,7 +272,6 @@ export class PointDecoration extends Decoration {
   get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
 
   map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null {
-    // FIXME make mapping behavior configurable?
     if (this.block) {
       let {type} = this
       let newFrom = type == BlockType.WidgetAfter ? mapping.mapPos(from, 1, MapMode.TrackAfter) : mapping.mapPos(from, -1, MapMode.TrackBefore)

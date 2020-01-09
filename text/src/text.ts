@@ -434,7 +434,6 @@ class RawTextCursor implements TextIterator {
   private nodes: Text[]
   private offsets: number[]
 
-  // @internal
   constructor(text: Text, readonly dir: 1 | -1 = 1) {
     this.nodes = [text]
     this.offsets = [dir > 0 ? 0 : text instanceof TextLeaf ? text.text.length : text.children!.length]

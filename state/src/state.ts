@@ -1,5 +1,5 @@
 import {Text} from "../../text"
-import {EditorSelection} from "./selection"
+import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax, allowMultipleSelections} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
@@ -52,8 +52,6 @@ export class EditorState {
     readonly selection: EditorSelection,
     tr: Transaction | null = null
   ) {
-    for (let range of selection.ranges)
-      if (range.to > doc.length) throw new RangeError("Selection points outside of document")
     this.status = config.statusTemplate.slice()
     if (tr && !tr.reconfigured) {
       this.values = tr.startState.values.slice()
@@ -142,6 +140,7 @@ export class EditorState {
     let doc = config.doc instanceof Text ? config.doc
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
     let selection = config.selection || EditorSelection.single(0)
+    checkSelection(selection, doc)
     if (!configuration.staticFacet(allowMultipleSelections)) selection = selection.asSingle()
     return new EditorState(configuration, doc, selection)
   }

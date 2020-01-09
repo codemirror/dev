@@ -1,6 +1,6 @@
 import {Mapping} from "./change"
 import {EditorState} from "./state"
-import {charType} from "../../text"
+import {Text, charType} from "../../text"
 
 /// A single selection range. When
 /// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)
@@ -166,4 +166,9 @@ function normalized(ranges: SelectionRange[], primaryIndex: number = 0): EditorS
     }
   }
   return new EditorSelection(ranges, primaryIndex)
+}
+
+export function checkSelection(selection: EditorSelection, doc: Text) {
+  for (let range of selection.ranges)
+    if (range.to > doc.length) throw new RangeError("Selection points outside of document")
 }
