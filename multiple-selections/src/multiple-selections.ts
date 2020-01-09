@@ -1,26 +1,7 @@
 import {EditorState, StateField, EditorSelection} from "../../state"
-import {DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec} from "../../view"
-import {StyleModule} from "style-mod"
+import {DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec, themeClass} from "../../view"
 
-const styles = new StyleModule({
-  secondarySelection: {
-    backgroundColor_fallback: "#3297FD",
-    color_fallback: "white !important",
-    backgroundColor: "Highlight",
-    color: "HighlightText !important"
-  },
-
-  secondaryCursor: {
-    display: "inline-block",
-    verticalAlign: "text-top",
-    borderLeft: "1px solid #555",
-    width: 0,
-    height: "1.15em",
-    margin: "0 -0.5px -.5em"
-  }
-})
-
-const rangeConfig = {class: styles.secondarySelection}
+const rangeConfig = {class: themeClass("secondarySelection")}
 
 const field = StateField.define<DecorationSet>({
   create(state) {
@@ -31,24 +12,22 @@ const field = StateField.define<DecorationSet>({
   }
 }).provide(EditorView.decorations)
 
-const multipleSelectionExtension = [
-  EditorState.allowMultipleSelections.of(true),
-  field,
-  EditorView.styleModule.of(styles)
-]
-
 /// Returns an extension that enables multiple selections for the
 /// editor. Secondary cursors and selected ranges are drawn with
 /// simple decorations, and might look the same as the primary native
 /// selection.
 export function multipleSelections() {
-  return multipleSelectionExtension
+  return [
+    EditorState.allowMultipleSelections.of(true),
+    field,
+    styles
+  ]
 }
 
 class CursorWidget extends WidgetType<null> {
   toDOM() {
     let span = document.createElement("span")
-    span.className = styles.secondaryCursor
+    span.className = themeClass("secondaryCursor")
     return span
   }
 }
@@ -64,3 +43,21 @@ function decorateSelections(selection: EditorSelection, rangeConfig: MarkDecorat
   }
   return Decoration.set(deco)
 }
+
+const styles = EditorView.baseTheme({
+  secondarySelection: {
+    backgroundColor_fallback: "#3297FD",
+    color_fallback: "white !important",
+    backgroundColor: "Highlight",
+    color: "HighlightText !important"
+  },
+
+  secondaryCursor: {
+    display: "inline-block",
+    verticalAlign: "text-top",
+    borderLeft: "1.4px solid #555",
+    width: 0,
+    height: "1.15em",
+    margin: "0 -0.5px -.5em"
+  }
+})
