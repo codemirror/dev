@@ -304,7 +304,8 @@ function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
 const MIN_RANGE_GAP = 4
 
 function addRange(from: number, to: number, ranges: number[]) {
-  if (ranges[ranges.length - 1] + MIN_RANGE_GAP > from) ranges[ranges.length - 1] = to
+  let last = ranges.length - 1
+  if (last >= 0 && ranges[last] + MIN_RANGE_GAP > from) ranges[last] = Math.max(ranges[last], to)
   else ranges.push(from, to)
 }
 
