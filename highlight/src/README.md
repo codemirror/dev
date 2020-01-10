@@ -42,6 +42,9 @@ other types.
    * **`color`**
  * **`content`** is used for things like plain text in XML or markup
    documents.
+   * **`heading`**
+   * **`list`**
+   * **`quote`**
  * **`keyword`**
    * **`self`**
    * **`null`**
@@ -85,9 +88,8 @@ These flags can be added to every type:
  * **`invalid`** indicates that the node is an error of some kind.
  * **`meta`** Usually used for annotations, syntax-level attributes,
    or other metadata.
- * **`link`**, **`strong`**, **`emphasis`**, **`heading`**,
-   **`list`**, and **`quote`** can be useful in markup languages to
-   add styling information.
+ * **`link`**, **`strong`**, **`emphasis`**, **`monospace`** can be
+   useful in markup languages to add styling information.
  * **`changed`**, **`inserted`**, and **`deleted`** would be
    appropriate in a diff file or other change-tracking syntax.
  * **`definition`** indicates that this is a definition. Often used

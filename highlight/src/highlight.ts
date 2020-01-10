@@ -136,7 +136,7 @@ export class TagSystem {
 /// themes.
 export const defaultTags = new TagSystem({
   flags: ["invalid", "meta",
-          "link", "strong", "emphasis", "heading", "list", "quote",
+          "link", "strong", "emphasis", "monospace",
           "changed", "inserted", "deleted",
           "definition", "constant", "control"],
   subtypes: 7,
@@ -161,6 +161,9 @@ export const defaultTags = new TagSystem({
     "escape=literal",
     "color=literal",
     "content",
+    "heading=content",
+    "list=content",
+    "quote=content",
     "keyword",
     "self=keyword",
     "null=keyword",
