@@ -169,14 +169,15 @@ export class EditorView {
     if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.annotation(Transaction.preserveGoalColumn)))
       this.inputState.goalColumns.length = 0
 
-    let ranges = this.viewState.update(update, transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1)
+    let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1
+    let ranges = this.viewState.update(update, scrollTo)
     if (!update.empty) this.updatePlugins(update)
     let redrawn = this.docView.update(update, ranges)
     this.inputState.ensureHandlers(this)
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
-    if (redrawn) this.requestMeasure()
+    if (redrawn || scrollTo > -1) this.requestMeasure()
   }
 
   updatePlugins(update: ViewUpdate) {
