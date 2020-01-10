@@ -9,15 +9,13 @@ component that displays the editor state and allows text input.
 
 @BlockInfo
 
+@themeClass
+
 ### Extending the View
 
 @Command
 
 @ViewPlugin
-
-@DecorationPluginSpec
-
-@ViewPluginValue
 
 @ViewUpdate
 

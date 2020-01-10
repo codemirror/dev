@@ -55,12 +55,26 @@ extensions for the editor state.
 
 @StateCommand
 
-@StateField
+@Extension
 
 @StateFieldSpec
+
+@StateField
+
+@FacetConfig
+
+@Facet
+
+@Precedence
 
 @Syntax
 
 @languageData
 
 @CancellablePromise
+
+### Utilities
+
+@fillConfig
+
+@combineConfig

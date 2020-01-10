@@ -1,3 +1,3 @@
 @panels
-@PanelSpec
-@openPanel
+@Panel
+@showPanel

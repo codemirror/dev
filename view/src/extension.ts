@@ -39,10 +39,14 @@ export class ViewPlugin {
 
   scrollMargins!: Partial<Rect> | null
 
+  /// An extension that registers this plugin. Only available for
+  /// subclasses whose constructor can be called with a single
+  /// [`EditorView`](#view.EditorView) object as argument.
   static get extension(this: {new (view: EditorView): ViewPlugin}): Extension {
     return (this as any)._extension || ((this as any)._extension = viewPlugin.of(view => new this(view)))
   }
 
+  /// @internal
   static dummy = new class DummyPlugin extends ViewPlugin {}
 }
 

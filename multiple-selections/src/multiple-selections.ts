@@ -14,8 +14,8 @@ const field = StateField.define<DecorationSet>({
 
 /// Returns an extension that enables multiple selections for the
 /// editor. Secondary cursors and selected ranges are drawn with
-/// simple decorations, and might look the same as the primary native
-/// selection.
+/// simple decorations, and might not look the same as the primary
+/// native selection.
 export function multipleSelections() {
   return [
     EditorState.allowMultipleSelections.of(true),

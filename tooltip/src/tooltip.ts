@@ -137,7 +137,7 @@ export interface Tooltip {
   strictSide?: boolean
 }
 
-// Behavior by which an extension can provide a tooltip to be shown.
+/// Behavior by which an extension can provide a tooltip to be shown.
 export const showTooltip = Facet.define<(view: EditorView) => Tooltip>()
 
 /// Hover tooltips are associated with a range, rather than a single

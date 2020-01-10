@@ -49,6 +49,7 @@ export class Facet<Input, Output> {
     this.default = combine([])
   }
 
+  /// Define a new facet.
   static define<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}) {
     return new Facet<Input, Output>(config.combine || ((a: any) => a) as any,
                                     config.compareInput || ((a, b) => a === b),
@@ -56,6 +57,7 @@ export class Facet<Input, Output> {
                                     !!config.static)
   }
 
+  /// Returns an extension that adds the given value for this facet.
   of(value: Input): Extension {
     return new FacetProvider<Input>([], this, Provider.Static, value)
   }
@@ -231,13 +233,19 @@ export class StateField<Value> {
     }
   }
 
+  /// State field instances can be used as
+  /// [`Extension`](#state.Extension) values to enable the field in a
+  /// given state. (This symbol is a TypeScript-related trick to mark
+  /// it as an extension value.)
   [isExtension]!: true
 }
 
 /// Extension values can be
 /// [provided](#state.EditorStateConfig.extensions) when creating a
 /// state to attach various kinds of configuration and behavior
-/// information.
+/// information. It may an extension object, such as a [state
+/// field](#state.StateField) or facet provider, or an array of other
+/// extensions.
 export type Extension = {[isExtension]: true} | readonly Extension[]
 
 /// By default extensions are registered in the order they are
@@ -266,7 +274,7 @@ export class Precedence {
   static Override = new Precedence(0)
 
   /// Tag an extension with this precedence.
-  set(extension: Extension) {
+  set(extension: Extension): Extension {
     return new PrecExtension(extension, this.val)
   }
 }

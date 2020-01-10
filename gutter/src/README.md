@@ -4,7 +4,7 @@
 
 @GutterConfig
 
-@Gutter
+@gutter
 
 @gutters
 
