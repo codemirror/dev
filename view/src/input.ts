@@ -168,7 +168,8 @@ class MouseSelection {
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.t().setSelection(selection)
-                         .annotate(Transaction.userEvent("pointer")))
+                         .annotate(Transaction.userEvent("pointer"))
+                         .scrollIntoView())
   }
 
   map(changes: ChangeSet) {
@@ -287,7 +288,8 @@ function updateMouseSelection(type: number): MouseSelectionUpdate {
     let range = rangeForClick(view, curPos, curBias, type)
     if (startPos != curPos && !extend) {
       let startRange = rangeForClick(view, startPos, startBias, type)
-      range = range.extend(Math.min(startRange.from, range.from), Math.max(startRange.to, range.to))
+      let from = Math.min(startRange.from, range.from), to = Math.max(startRange.to, range.to)
+      range = from < range.from ? new SelectionRange(from, to) : new SelectionRange(to, from)
     }
     if (extend)
       return startSelection.replaceRange(startSelection.primary.extend(range.from, range.to))
