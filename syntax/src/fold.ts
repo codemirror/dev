@@ -12,11 +12,12 @@ export function syntaxFolding(syntax: Syntax) {
     let inner = tree.resolve(end)
     let found: null | {from: number, to: number} = null
     for (let cur: Subtree | null = inner; cur; cur = cur.parent) {
-      if (cur.start < start || cur.end <= end) continue
+      if (cur.end <= end) continue
+      if (found && cur.start < start) break
       let prop = cur.type.prop(foldNodeProp)
       if (prop) {
         let value = prop(cur, state)
-        if (value && value.to > end) found = value
+        if (value && value.from <= end && value.to > end) found = value
       }
     }
     return found
