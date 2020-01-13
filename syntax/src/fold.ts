@@ -4,7 +4,7 @@ import {EditorState, Syntax} from "../../state"
 /// This node prop is used to associate folding information with node
 /// types. Given a subtree, it should check whether that tree is
 /// foldable and return the range that can be collapsed when it is.
-export const foldNodeProp = new NodeProp<(subtree: Subtree) => ({from: number, to: number} | null)>()
+export const foldNodeProp = new NodeProp<(subtree: Subtree, state: EditorState) => ({from: number, to: number} | null)>()
 
 export function syntaxFolding(syntax: Syntax) {
   return EditorState.foldable.of((state: EditorState, start: number, end: number) => {
@@ -15,7 +15,7 @@ export function syntaxFolding(syntax: Syntax) {
       if (cur.start < start || cur.end <= end) continue
       let prop = cur.type.prop(foldNodeProp)
       if (prop) {
-        let value = prop(cur)
+        let value = prop(cur, state)
         if (value && value.to > end) found = value
       }
     }
