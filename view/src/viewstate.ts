@@ -137,13 +137,13 @@ export class ViewState {
     // If scrollTo is > -1, make sure the viewport includes that position
     if (scrollTo > -1) {
       if (scrollTo < viewport.from) {
-        let {top} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
-        viewport = new Viewport(map.lineAt(top - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
-                                map.lineAt(top + (bottom - top) + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
+        let {top: newTop} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
+        viewport = new Viewport(map.lineAt(newTop - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
+                                map.lineAt(newTop + (bottom - top) + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
       } else if (scrollTo > viewport.to) {
-        let {bottom} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
-        viewport = new Viewport(map.lineAt(bottom - (bottom - top) - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
-                                map.lineAt(bottom + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
+        let {bottom: newBottom} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
+        viewport = new Viewport(map.lineAt(newBottom - (bottom - top) - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
+                                map.lineAt(newBottom + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
       }
     }
     return viewport
