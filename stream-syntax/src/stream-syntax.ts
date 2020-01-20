@@ -204,7 +204,9 @@ class SyntaxState<ParseState> {
       pos += stream.string.length + 1
       if (Date.now() > sliceEnd) break
     }
-    let tree = Tree.build(buffer, nodeGroup, parser.docType).balance()
+    let tree = Tree.build({buffer,
+                           group: nodeGroup,
+                           topID: parser.docType}).balance()
     this.tree = this.tree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
