@@ -113,7 +113,9 @@ const baseTheme = EditorView.baseTheme({
   }
 })
 
-const unfixGutters = Facet.define<boolean>()
+const unfixGutters = Facet.define<boolean, boolean>({
+  combine: values => values.some(x => x)
+})
 
 /// The gutter-drawing plugin is automatically enabled when you add a
 /// gutter, but you can use this function to explicitly configure it.
@@ -142,7 +144,7 @@ class GutterView extends ViewPlugin {
     this.dom.setAttribute("aria-hidden", "true")
     this.gutters = view.state.facet(activeGutters).map(conf => new SingleGutterView(view, conf))
     for (let gutter of this.gutters) this.dom.appendChild(gutter.dom)
-    this.fixed = !view.state.facet(unfixGutters) // FIXME dynamic?
+    this.fixed = !view.state.facet(unfixGutters)
     if (this.fixed) {
       // FIXME IE11 fallback, which doesn't support position: sticky,
       // by using position: relative + event handlers that realign the
@@ -165,6 +167,10 @@ class GutterView extends ViewPlugin {
     }, 0)
     for (let cx of contexts) cx.finish(this.view)
     this.dom.style.minHeight = this.view.contentHeight + "px"
+    if (update.state.facet(unfixGutters) != this.fixed) {
+      this.fixed = !this.fixed
+      this.dom.style.position = this.fixed ? "sticky" : ""
+    }
   }
 
   updateGutters(update: ViewUpdate) {
