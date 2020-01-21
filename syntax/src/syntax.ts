@@ -2,13 +2,14 @@ import {Parser, InputStream} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
 import {EditorState, StateField, Transaction, Syntax, languageData, Extension} from "../../state"
+import {ViewPlugin, EditorView} from "../../view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
 
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
 export class LezerSyntax implements Syntax {
-  private field: StateField<SyntaxState>
+  readonly field: StateField<SyntaxState>
   /// The extension value to install this provider.
   readonly extension: Extension
 
@@ -22,7 +23,13 @@ export class LezerSyntax implements Syntax {
       create(state) { return SyntaxState.init(Tree.empty, parser, state.doc) },
       update(value, tr) { return value.apply(tr, parser) }
     })
-    this.extension = [EditorState.syntax.of(this), this.field, syntaxIndentation(this), syntaxFolding(this)]
+    this.extension = [
+      EditorState.syntax.of(this),
+      this.field,
+      EditorView.viewPlugin.of(view => new HighlightWorker(view, this)),
+      syntaxIndentation(this),
+      syntaxFolding(this)
+    ]
   }
 
   getTree(state: EditorState) {
@@ -96,25 +103,26 @@ class DocStream implements InputStream {
   }
 }
 
-const enum Work { Apply = 25, Slice = 100, Pause = 200 }
+const enum Work { Apply = 25, MinSlice = 75, Slice = 100, Pause = 200 }
 
 class SyntaxState {
   public updatedTree: Tree // FIXME is it a good idea to separate this from .tree?
-  public upto = 0
 
-  constructor(public tree: Tree) {
+  constructor(public tree: Tree, public upto: number) {
     this.updatedTree = tree
   }
 
   static init(tree: Tree, parser: Parser, doc: Text) {
-    let state = new SyntaxState(tree)
+    let state = new SyntaxState(tree, 0)
     state.work(parser, doc, doc.length, Work.Apply)
     state.tree = state.updatedTree
     return state
   }
 
   apply(tr: Transaction, parser: Parser) {
-    return tr.docChanged ? SyntaxState.init(this.updatedTree.applyChanges(tr.changes.changedRanges()), parser, tr.doc) : this
+    return !tr.docChanged && this.updatedTree == this.tree ? this
+      : this.upto >= tr.doc.length && !tr.docChanged ? new SyntaxState(this.updatedTree, this.upto)
+      : SyntaxState.init(this.updatedTree.applyChanges(tr.changes.changedRanges()), parser, tr.doc)
   }
 
   work(parser: Parser, doc: Text, upto: number, maxTime: number): boolean {
@@ -141,23 +149,51 @@ class SyntaxState {
   }
 }
 
-/*
+type Deadline = {timeRemaining(): number, didTimeout: boolean}
+type IdleCallback = (deadline?: Deadline) => void
+
+let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number =
+  typeof window != "undefined" && (window as any).requestIdleCallback ||
+  ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
+let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
+
+class HighlightWorker extends ViewPlugin {
+  working: number = -1
+
+  constructor(readonly view: EditorView, readonly syntax: LezerSyntax) {
+    super()
+    this.work = this.work.bind(this)
+    this.scheduleWork()
+  }
+
+  update() {
+    this.scheduleWork()
+  }
 
   scheduleWork() {
-    if (this.working != -1) return
-    this.working = setTimeout(() => this.work(), Work.Pause) as any
+    if (this.working > -1) return
+    let {state} = this.view, field = state.field(this.syntax.field)
+    if (field.upto >= state.doc.length) return
+    this.working = requestIdle(this.work, {timeout: Work.Pause})
   }
 
-  work() {
+  work(deadline?: Deadline) {
     this.working = -1
-    let to = this.requests.reduce((max, req) => req.promise.canceled ? max : Math.max(max, req.upto), 0)
-    if (to > this.parsedTo) this.continueParse(to)
-
-    this.requests = this.requests.filter(req => {
-      if (!req.promise.canceled && req.upto > this.parsedTo) return true
-      if (!req.promise.canceled) req.resolve(this.tree)
-      return false
-    })
-    if (this.requests.length) this.scheduleWork()
+    let {state} = this.view, field = state.field(this.syntax.field)
+    if (field.upto >= state.doc.length) return
+    let prev = field.upto
+    field.work(this.syntax.parser, state.doc, state.doc.length,
+               deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    // FIXME this needs more thought. Right now, we fire a transaction
+    // when the parsing crossed the end of the viewport, and when the
+    // entire document is highlighted. Is that a good approach?
+    if (field.upto == state.doc.length ||
+        prev < this.view.viewport.to && field.upto >= this.view.viewport.to)
+      this.view.dispatch(state.t())
+    if (field.upto < state.doc.length) this.scheduleWork()
   }
-*/
+
+  destroy() {
+    if (this.working >= 0) cancelIdle(this.working)
+  }
+}
