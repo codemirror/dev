@@ -8,8 +8,7 @@ export const foldNodeProp = new NodeProp<(subtree: Subtree, state: EditorState) 
 
 export function syntaxFolding(syntax: Syntax) {
   return EditorState.foldable.of((state: EditorState, start: number, end: number) => {
-    let tree = syntax.getPartialTree(state, start, Math.min(state.doc.length, end + 100))
-    let inner = tree.resolve(end)
+    let inner = syntax.getTree(state).resolve(end)
     let found: null | {from: number, to: number} = null
     for (let cur: Subtree | null = inner; cur; cur = cur.parent) {
       if (cur.end <= end || cur.start > end) continue

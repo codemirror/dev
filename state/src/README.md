@@ -71,8 +71,6 @@ extensions for the editor state.
 
 @languageData
 
-@CancellablePromise
-
 ### Utilities
 
 @fillConfig

@@ -73,14 +73,6 @@ export function bracketMatching(config: Config = {}) {
   return [bracketMatchingConfig.of(config), bracketMatchingUnique]
 }
 
-function getTree(state: EditorState, pos: number, dir: number, maxScanDistance: number) {
-  for (let syntax of state.facet(EditorState.syntax)) {
-    return syntax.getPartialTree(state, dir < 0 ? Math.max(0, pos - maxScanDistance) : pos,
-                                 dir < 0 ? pos : Math.min(state.doc.length, pos + maxScanDistance))
-  }
-  return Tree.empty
-}
-
 function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string): null | readonly string[] {
   let byProp = node.prop(dir < 0 ? closeNodeProp : openNodeProp)
   if (byProp) return byProp
@@ -110,15 +102,14 @@ export interface MatchResult {
 /// bracket was found at `pos`, or a match result otherwise.
 export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult | null {
   let maxScanDistance = config.maxScanDistance || DEFAULT_SCAN_DIST, brackets = config.brackets || DEFAULT_BRACKETS
-  let tree = getTree(state, pos, dir, maxScanDistance)
-  let sub = tree.resolve(pos, dir), matches
+  let tree = state.tree, sub = tree.resolve(pos, dir), matches
   if (matches = matchingNodes(sub.type, dir, brackets))
     return matchMarkedBrackets(state, pos, dir, sub, matches, brackets)
   else
     return matchPlainBrackets(state, pos, dir, tree, sub.type, maxScanDistance, brackets)
 }
 
-function matchMarkedBrackets(state: EditorState, pos: number, dir: -1 | 1, token: Subtree,
+function matchMarkedBrackets(_state: EditorState, _pos: number, dir: -1 | 1, token: Subtree,
                              matching: readonly string[], brackets: string) {
   let parent = token.parent, firstToken = {from: token.start, to: token.end}
   let depth = 0

@@ -2,7 +2,7 @@ import {EditorState} from "../state"
 import {EditorView} from "../view"
 import {keymap} from "../keymap"
 import {history, redo, redoSelection, undo, undoSelection} from "../history"
-import {foldCode, unfoldCode, codeFolding, foldGutter} from "../fold"
+import {foldCode, unfoldCode, foldGutter} from "../fold"
 import {lineNumbers} from "../gutter"
 import {baseKeymap, indentSelection} from "../commands"
 import {bracketMatching} from "../matchbrackets"
@@ -15,7 +15,7 @@ import {autocomplete, startCompletion, sortAndFilterCompletion} from "../autocom
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
 
-import {esLint, javascript} from "../lang-javascript"
+import {esLint} from "../lang-javascript"
 // @ts-ignore
 import Linter from "eslint4b-prebuilt"
 import {linter, openLintPanel} from "../lint"
@@ -41,8 +41,7 @@ let state = EditorState.create({doc: `<script>
   closeBrackets,
   autocomplete({completeAt(state: EditorState, pos: number) {
     return new Promise(resolve => {
-      let syntax = state.facet(EditorState.syntax)[0]!
-      let tree = syntax.getPartialTree(state, pos, pos).resolve(pos, -1)
+      let tree = state.tree.resolve(pos, -1)
       let start = pos
       // FIXME for StartCloseTag, only suggest open tags
       // FIXME also "Text" if previous sibling is StartCloseTag

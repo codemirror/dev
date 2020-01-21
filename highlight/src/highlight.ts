@@ -1,7 +1,6 @@
-import {NodeType, NodeProp} from "lezer-tree"
+import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, ViewUpdate, Decoration, Range} from "../../view"
-import {EditorState} from "../../state"
 
 const Inherit = 1
 
@@ -248,26 +247,24 @@ class Styling {
 }
 
 class Highlighter extends ViewPlugin {
-  partialDeco = false
+  tree: Tree
 
   constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
     super()
-    this.buildDeco(view)
+    this.tree = view.state.tree
+    this.decorations = this.buildDeco(view.viewport, this.tree)
   }
 
   update(update: ViewUpdate) {
-    if (this.partialDeco || update.docChanged || update.viewportChanged)
-      this.buildDeco(update.view)
+    let tree = update.state.tree
+    if (tree != this.tree || update.viewportChanged) {
+      this.tree = tree
+      this.decorations = this.buildDeco(update.view.viewport, tree)
+    }
   }
 
-  buildDeco(view: EditorView) {
-    let syntax = view.state.facet(EditorState.syntax)[0]
-    if (!syntax) return
-
-    let {from, to} = view.viewport
-    let {tree, rest} = syntax.getTree(view.state, from, to)
-    this.partialDeco = !!rest
-    if (rest) view.waitFor(rest)
+  buildDeco({from, to}: {from: number, to: number}, tree: Tree) {
+    if (tree == Tree.empty) return Decoration.none
 
     let tokens: Range<Decoration>[] = []
     let start = from
@@ -312,7 +309,7 @@ class Highlighter extends ViewPlugin {
         }
       }
     })
-    this.decorations = Decoration.set(tokens)
+    return Decoration.set(tokens)
   }
 }
 

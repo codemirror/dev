@@ -1,11 +1,11 @@
 import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {combineConfig, Annotation, CancellablePromise, EditorSelection, EditorState,
+import {combineConfig, Annotation, EditorSelection, EditorState,
         Transaction, Extension, StateField, Facet, Precedence} from "../../state"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
 export interface AutocompleteData {
-  completeAt: (state: EditorState, pos: number) => CompletionResult | CancellablePromise<CompletionResult>
+  completeAt: (state: EditorState, pos: number) => CompletionResult | Promise<CompletionResult>
 }
 
 export interface CompletionResult {
@@ -19,7 +19,7 @@ export interface Completion {
   apply?: string | ((view: EditorView) => void)
 }
 
-export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | CancellablePromise<CompletionResult> {
+export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | Promise<CompletionResult> {
   let syntax = state.facet(EditorState.syntax)
   if (syntax.length == 0) return {items: []}
   let {completeAt} = syntax[0].languageDataAt<AutocompleteData>(state, pos)
@@ -110,7 +110,7 @@ const setActiveCompletion = Annotation.define<ActiveCompletion | null | "pending
 
 const activeCompletion = StateField.define<ActiveCompletion | null | "pending">({
   create() { return null },
-  update(prev, tr, state) {
+  update(prev, tr) {
     let set = tr.annotation(setActiveCompletion)
     if (set !== undefined) return set
 

@@ -8,7 +8,7 @@ function s(doc: string) {
 }
 
 function tr(state: EditorState) {
-  return javascriptSyntax.getPartialTree(state, 0, state.doc.length)
+  return javascriptSyntax.ensureTree(state, state.doc.length, 1e9)!
 }
 
 describe("javascript syntax queries", () => {

@@ -1,4 +1,5 @@
 import {Text} from "../../text"
+import {Tree} from "lezer-tree"
 import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"
 import {Syntax, allowMultipleSelections} from "./extension"
@@ -190,6 +191,15 @@ export class EditorState {
 
   /// Facet that registers a parsing service for the state.
   static syntax = Facet.define<Syntax>()
+
+  /// Get the syntax tree for this state, which is the current
+  /// (possibly incomplete) parse tree of the [syntax](#state.Syntax)
+  /// with the highest precedence, or the empty tree if there is no
+  /// syntax available.
+  get tree() {
+    let syntax = this.facet(EditorState.syntax)
+    return syntax.length ? syntax[0].getTree(this) : Tree.empty
+  }
 
   /// A facet that registers a code folding service. When called
   /// with the extent of a line, it'll return a range object when a

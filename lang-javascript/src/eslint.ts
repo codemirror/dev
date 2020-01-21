@@ -39,7 +39,8 @@ export function esLint(eslint: any, config?: any) {
     if (syntax == javascriptSyntax) return range(view.state)
     if (!syntax || !(syntax instanceof LezerSyntax && syntax.parser.hasNested)) return []
     let found: Diagnostic[] = []
-    syntax.getPartialTree(view.state, 0, view.state.doc.length).iterate({
+    // FIXME move to async parsing?
+    syntax.getTree(view.state).iterate({
       enter(type, start, end) {
         if (type == javascriptSyntax.docNodeType) {
           for (let d of range(view.state, start, end)) found.push(d)

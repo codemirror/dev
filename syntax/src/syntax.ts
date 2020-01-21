@@ -1,7 +1,7 @@
-import {Parser, ParseContext, InputStream} from "lezer"
+import {Parser, InputStream} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
-import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise, Extension} from "../../state"
+import {EditorState, StateField, Transaction, Syntax, languageData, Extension} from "../../state"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
 
@@ -19,27 +19,21 @@ export class LezerSyntax implements Syntax {
   /// parser, before passing it to this constructor.
   constructor(readonly parser: Parser) {
     this.field = StateField.define<SyntaxState>({
-      create() { return new SyntaxState(Tree.empty) },
-      update(value, tr) { return value.apply(tr) }
+      create(state) { return SyntaxState.init(Tree.empty, parser, state.doc) },
+      update(value, tr) { return value.apply(tr, parser) }
     })
     this.extension = [EditorState.syntax.of(this), this.field, syntaxIndentation(this), syntaxFolding(this)]
   }
 
-  tryGetTree(state: EditorState, from: number, to: number) {
-    let field = state.field(this.field)
-    return field.updateTree(this.parser, state.doc, from, to, false) ? field.tree : null
+  getTree(state: EditorState) {
+    return state.field(this.field).tree
   }
 
-  getTree(state: EditorState, from: number, to: number) {
+  ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
     let field = state.field(this.field)
-    let rest = field.updateTree(this.parser, state.doc, from, to, true) as CancellablePromise<Tree> | true
-    return {tree: field.tree, rest: rest === true ? null : rest}
-  }
-
-  getPartialTree(state: EditorState, from: number, to: number) {
-    let field = state.field(this.field)
-    field.updateTree(this.parser, state.doc, from, to, false)
-    return field.tree
+    if (field.upto >= upto) return field.updatedTree
+    if (field.work(this.parser, state.doc, upto, timeout)) return field.updatedTree
+    return null
   }
 
   get docNodeType() { return this.parser.group.types[1] }
@@ -47,7 +41,7 @@ export class LezerSyntax implements Syntax {
   languageDataAt<Interface = any>(state: EditorState, pos: number) {
     let type = this.parser.group.types[1]
     if (this.parser.hasNested) {
-      let tree = this.getPartialTree(state, pos, pos)
+      let tree = this.getTree(state)
       let target: Subtree | null = tree.resolve(pos)
       while (target) {
         if (target.type.prop(NodeProp.top)) {
@@ -62,6 +56,8 @@ export class LezerSyntax implements Syntax {
 }
 
 const nothing = {}
+
+// FIXME limit parsing to some maximum doc size, possibly by making the docstream end there
 
 class DocStream implements InputStream {
   cursor: TextIterator
@@ -100,68 +96,52 @@ class DocStream implements InputStream {
   }
 }
 
-const enum Work { Slice = 100, Pause = 200 }
+const enum Work { Apply = 25, Slice = 100, Pause = 200 }
 
-class RequestInfo {
-  promise: CancellablePromise<Tree>
-  resolve!: (tree: Tree) => void
+class SyntaxState {
+  public updatedTree: Tree // FIXME is it a good idea to separate this from .tree?
+  public upto = 0
 
-  constructor(readonly upto: number) {
-    this.promise = new Promise<Tree>(r => this.resolve = r)
-    this.promise.canceled = false
+  constructor(public tree: Tree) {
+    this.updatedTree = tree
+  }
+
+  static init(tree: Tree, parser: Parser, doc: Text) {
+    let state = new SyntaxState(tree)
+    state.work(parser, doc, doc.length, Work.Apply)
+    state.tree = state.updatedTree
+    return state
+  }
+
+  apply(tr: Transaction, parser: Parser) {
+    return tr.docChanged ? SyntaxState.init(this.updatedTree.applyChanges(tr.changes.changedRanges()), parser, tr.doc) : this
+  }
+
+  work(parser: Parser, doc: Text, upto: number, maxTime: number): boolean {
+    if (upto <= this.upto) return true
+
+    let parse = parser.startParse(new DocStream(doc), {cache: this.updatedTree})
+    let endTime = Date.now() + maxTime
+    for (;;) {
+      let done = parse.advance()
+      // FIXME stop parsing when parse.badness is too high
+      if (done) {
+        this.upto = doc.length
+        this.updatedTree = done
+        return true
+      }
+      if (parse.pos > upto || Date.now() > endTime) {
+        this.upto = parse.pos
+        let parsed = parse.forceFinish()
+        let after = this.updatedTree.applyChanges([{fromA: 0, toA: parse.pos, fromB: 0, toB: parse.pos}])
+        this.updatedTree = parsed.append(after)
+        return this.upto >= upto
+      }
+    }
   }
 }
 
-class SyntaxState {
-  private parsedTo = 0
-  private parse: ParseContext | null = null
-  private working = -1
-  private requests: RequestInfo[] = []
-
-  constructor(public tree: Tree) {}
-
-  apply(tr: Transaction) {
-    return tr.docChanged ? new SyntaxState(this.tree.applyChanges(tr.changes.changedRanges())) : this
-  }
-
-
-  // FIXME implement clearing out parts of the tree when it is too big
-  updateTree(parser: Parser, doc: Text, from: number, to: number, rest: boolean): boolean | CancellablePromise<Tree> {
-    if (to <= this.parsedTo) return true
-
-    if (!this.parse) {
-      this.parse = parser.startParse(new DocStream(doc), {cache: this.tree})
-      this.continueParse(to)
-    }
-    if (this.parsedTo >= to) return true
-    if (!rest) return false
-    this.scheduleWork()
-    let req = this.requests.find(r => r.upto == to && !r.promise.canceled)
-    if (!req) this.requests.push(req = new RequestInfo(to))
-    return req.promise
-  }
-
-  continueParse(to: number) {
-    let endTime = Date.now() + Work.Slice
-    for (let i = 0;; i++) {
-      let done = this.parse!.advance()
-      if (done) {
-        this.parsedTo = 1e9
-        this.parse = null
-        this.tree = done
-        return
-      }
-      if (i == 1000) {
-        i = 0
-        if (Date.now() > endTime) break
-      }
-    }
-    this.parsedTo = this.parse!.pos
-    // FIXME somehow avoid rebuilding all the nodes that are already
-    // in this.tree when this happens repeatedly
-    this.tree = this.parse!.forceFinish()
-    if (this.parsedTo >= to) this.parse = null
-  }
+/*
 
   scheduleWork() {
     if (this.working != -1) return
@@ -180,4 +160,4 @@ class SyntaxState {
     })
     if (this.requests.length) this.scheduleWork()
   }
-}
+*/

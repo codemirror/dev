@@ -171,8 +171,6 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
 }
 
 function nodeStart(state: EditorState, pos: number) {
-  let syntax = state.facet(EditorState.syntax)
-  if (syntax.length == 0) return false
-  let tree = syntax[0].getPartialTree(state, pos, pos).resolve(pos + 1)
+  let tree = state.tree.resolve(pos + 1)
   return tree.parent && tree.start == pos
 }

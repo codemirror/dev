@@ -27,15 +27,6 @@ export class Annotation<T> {
   }
 }
 
-/// This is a
-/// [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
-/// with an additional field that can be used to indicate you are no
-/// longer interested in its result. It is used by the editor view's
-/// [`waitFor`](#view.EditorView.waitFor) mechanism, which helps deal
-/// with partial results (mostly from [`Syntax`](#state.Syntax)
-/// queries).
-export type CancellablePromise<T> = Promise<T> & {canceled?: boolean}
-
 /// A node prop that can be stored on a grammar's top node to
 /// associate information with the language. Different extension might
 /// use different properties from this object (which they typically
@@ -45,18 +36,17 @@ export const languageData = new NodeProp<{}>()
 /// Syntax [parsing services](#state.EditorState^syntax) must provide
 /// this interface.
 export interface Syntax {
-  /// Get a syntax tree covering at least the given range. When that
-  /// can't be done quickly enough, `rest` will hold a promise that
-  /// you can wait on to get the rest of the tree.
-  getTree(state: EditorState, from: number, to: number): {tree: Tree, rest: CancellablePromise<Tree> | null}
+  /// Read the current syntax tree from a state. This may return an
+  /// incomplete tree.
+  getTree(state: EditorState): Tree
 
-  /// Get a syntax tree covering the given range, or null if that
-  /// can't be done in reasonable time.
-  tryGetTree(state: EditorState, from: number, to: number): Tree | null
-
-  /// Get a syntax tree, preferably covering the given range, but less
-  /// is also acceptable.
-  getPartialTree(state: EditorState, from: number, to: number): Tree
+  /// Get a tree that covers the document at least up to `upto`. If
+  /// that involves more than `timeout` milliseconds of work, return
+  /// null instead. Don't call this as a matter of course in, for
+  /// example, state updates or decorating functions, since it'll make
+  /// the editor unresponsive. Calling it in response to a specific
+  /// user command can be appropriate.
+  ensureTree(state: EditorState, upto: number, timeout?: number): Tree | null
 
   /// The node type at the root of trees produced by this syntax.
   docNodeType: NodeType
@@ -66,3 +56,7 @@ export interface Syntax {
   /// nested grammars it may be the data of some nested grammar.
   languageDataAt<Interface = any>(state: EditorState, pos: number): Interface
 }
+
+// FIXME add a view plugin that schedules background parsing
+
+// FIXME add a way to be notified when the document is fully parsed

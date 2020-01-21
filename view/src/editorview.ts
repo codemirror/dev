@@ -1,4 +1,4 @@
-import {EditorState, Transaction, CancellablePromise, Extension, Precedence} from "../../state"
+import {EditorState, Transaction, Extension, Precedence} from "../../state"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
@@ -108,9 +108,6 @@ export class EditorView {
   updateState: UpdateState = UpdateState.Updating
 
   /// @internal
-  waiting: CancellablePromise<any>[] = []
-
-  /// @internal
   observer: DOMObserver
 
   /// @internal
@@ -158,7 +155,6 @@ export class EditorView {
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
     this.updateState = UpdateState.Updating
 
-    this.clearWaiting()
     let state = this.state
     for (let tr of transactions) {
       if (tr.startState != state)
@@ -229,21 +225,6 @@ export class EditorView {
 
     this.updateState = UpdateState.Idle
     this.measureScheduled = -1
-  }
-
-  /// Wait for the given promise to resolve, and then run an update.
-  /// Or, if an update happens before that, set the promise's
-  /// `canceled` property to true and ignore it.
-  waitFor(promise: CancellablePromise<any>) {
-    promise.then(() => {
-      if (!promise.canceled) this.update([])
-    })
-    this.waiting.push(promise)
-  }
-
-  private clearWaiting() {
-    for (let promise of this.waiting) promise.canceled = true
-    this.waiting.length = 0
   }
 
   /// @internal

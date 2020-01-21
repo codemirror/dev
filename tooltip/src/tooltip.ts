@@ -152,6 +152,7 @@ export interface HoverTooltip {
   tooltip: (view: EditorView) => Tooltip,
 }
 
+// FIXME moving the pointer over the tooltip is broken again
 class HoverPlugin extends ViewPlugin {
   lastMouseMove: MouseEvent | null = null
   hoverTimeout = -1

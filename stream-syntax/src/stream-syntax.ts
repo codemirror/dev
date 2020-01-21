@@ -1,5 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Transaction, Syntax, languageData, CancellablePromise, Extension} from "../../state"
+import {EditorState, StateField, Transaction, Syntax, languageData, Extension} from "../../state"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
 
@@ -71,16 +71,6 @@ function defaultCopyState<State>(state: State) {
   return newState
 }
 
-class RequestInfo {
-  promise: CancellablePromise<Tree>
-  resolve!: (tree: Tree) => void
-
-  constructor(readonly upto: number) {
-    this.promise = new Promise<Tree>(r => this.resolve = r)
-    this.promise.canceled = false
-  }
-}
-
 /// A syntax provider that uses a stream parser.
 export class StreamSyntax implements Syntax {
   private field: StateField<SyntaxState<any>>
@@ -104,21 +94,13 @@ export class StreamSyntax implements Syntax {
     ]
   }
 
-  tryGetTree(state: EditorState, from: number, to: number) {
-    let field = state.field(this.field)
-    return field.updateTree(this.parser, state, to, false) ? field.tree : null
+  getTree(state: EditorState) {
+    return state.field(this.field).tree
   }
 
-  getTree(state: EditorState, from: number, to: number) {
+  ensureTree(state: EditorState, upto: number, timeout = 100) {
     let field = state.field(this.field)
-    let rest = field.updateTree(this.parser, state, to, true) as CancellablePromise<Tree> | true
-    return {tree: field.tree, rest: rest === true ? null : rest}
-  }
-
-  getPartialTree(state: EditorState, from: number, to: number) {
-    let field = state.field(this.field)
-    field.updateTree(this.parser, state, to, false)
-    return field.tree
+    return field.tree // FIXME
   }
 
   get docNodeType() { return typeArray[this.parser.docType] }
@@ -135,7 +117,6 @@ const MAX_RECOMPUTE_DISTANCE = 20e3
 const WORK_SLICE = 100, WORK_PAUSE = 200
 
 class SyntaxState<ParseState> {
-  requests: RequestInfo[] = []
   working = -1
 
   constructor(public tree: Tree,
@@ -212,7 +193,7 @@ class SyntaxState<ParseState> {
     this.frontierPos = pos
     this.frontierState = state
   }
-
+/* FIXME
   updateTree(parser: StreamParserInstance<ParseState>, state: EditorState, upto: number,
              rest: boolean): boolean | CancellablePromise<Tree> {
     upto = Math.min(upto + 100, state.doc.lineAt(upto).end)
@@ -247,6 +228,7 @@ class SyntaxState<ParseState> {
     })
     if (this.requests.length) this.scheduleWork(parser, state)
   }
+*/
 
   getIndent(parser: StreamParserInstance<ParseState>, state: EditorState, pos: number) {
     let line = state.doc.lineAt(pos)
