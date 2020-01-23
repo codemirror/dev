@@ -75,8 +75,6 @@ export class LezerSyntax implements Syntax {
 
 const nothing = {}
 
-// FIXME limit parsing to some maximum doc size, possibly by making the docstream end there
-
 class DocStream implements InputStream {
   cursor: TextIterator
   cursorPos = 0
@@ -114,15 +112,25 @@ class DocStream implements InputStream {
   }
 }
 
-const enum Work { Apply = 25, MinSlice = 75, Slice = 100, Pause = 200 }
+const enum Work {
+  // Milliseconds of work time to perform immediately for a state doc change
+  Apply = 25,
+  // Minimum amount of work time to perform in an idle callback
+  MinSlice = 25,
+  // Amount of work time to perform in pseudo-thread when idle callbacks aren't supported
+  Slice = 100,
+  // Maximum pause (timeout) for the pseudo-thread
+  Pause = 200,
+  // Don't parse beyond this point unless explicitly requested to with `ensureTree`.
+  MaxPos = 5e6
+}
 
-function work(parse: ParseContext, time: number, upto: number = -1) {
+function work(parse: ParseContext, time: number, upto: number = Work.MaxPos) {
   let endTime = Date.now() + time
   for (;;) {
     let done = parse.advance()
-    // FIXME stop parsing when parse.badness is too high
     if (done) return done
-    if ((upto >= 0 && parse.pos > upto) || Date.now() > endTime) return null
+    if (parse.pos > upto || Date.now() > endTime) return null
   }
 }
 
@@ -133,7 +141,7 @@ function takeTree(parse: ParseContext, base: Tree) {
 }
 
 class SyntaxState {
-  public updatedTree: Tree // FIXME is it a good idea to separate this from .tree?
+  public updatedTree: Tree
   public parse: ParseContext | null = null
 
   constructor(public tree: Tree, public upto: number) {
@@ -174,6 +182,11 @@ let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number 
   ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
 let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
 
+// FIXME figure out some way to back off from full re-parses when the
+// document is large—you could waste a lot of battery re-parsing a
+// multi-megabyte document every time you insert a backtick, even if
+// it happens in the background.
+
 class HighlightWorker extends ViewPlugin {
   working: number = -1
 
@@ -202,12 +215,10 @@ class HighlightWorker extends ViewPlugin {
     if (field.upto >= state.doc.length) return
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    // FIXME this needs more thought. When do we stop parsing? When do
-    // we notify the state with the updated tree?
     if (done)
       this.view.dispatch(state.t().annotate(this.setSyntax(new SyntaxState(
         field.stopParse(done, state.doc.length), state.doc.length))))
-    else
+    else if (field.parse!.badness < .8)
       this.scheduleWork()
   }
 
