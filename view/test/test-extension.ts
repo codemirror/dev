@@ -61,6 +61,6 @@ describe("EditorView extension", () => {
   it("allows editor attributes to be changed through effects", () => {
     let cm = tempEditor("", [EditorView.editorAttributes.of({class: "something"})])
     ist(cm.dom.classList.contains("something"))
-    ist(cm.dom.classList.contains("codemirror"))
+    ist(cm.dom.classList.contains("cm-wrap"))
   })
 })

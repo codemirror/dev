@@ -279,7 +279,7 @@ describe("EditorView decoration", () => {
     function classes(cm: EditorView, ...lines: string[]) {
       for (let i = 0; i < lines.length; i++) {
         let className = (cm.contentDOM.childNodes[i] as HTMLElement).className.split(" ")
-          .filter(c => c != "codemirror-line" && !/ͼ/.test(c)).sort().join(" ")
+          .filter(c => c != "cm-line" && !/ͼ/.test(c)).sort().join(" ")
         ist(className, lines[i])
       }
     }
