@@ -20,6 +20,9 @@ import {esLint} from "../lang-javascript"
 import Linter from "eslint4b-prebuilt"
 import {linter, openLintPanel} from "../lint"
 
+//import {StreamSyntax} from "../stream-syntax"
+//import legacyJS from "../legacy-modes/src/javascript"
+
 let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
   const {readFile} = require("fs");
@@ -33,6 +36,7 @@ let state = EditorState.create({doc: `<script>
   history(),
   foldGutter(),
   multipleSelections(),
+//  new StreamSyntax(legacyJS()).extension,
   html(),
   linter(esLint(new Linter)),
   search({keymap: defaultSearchKeymap}),

@@ -20,7 +20,7 @@ export type StreamParser<State> = {
   /// update its state here if it needs to.
   blankLine?(state: State, editorState: EditorState): void
   /// Produce a start state for the parser.
-  startState?(): State
+  startState?(editorState: EditorState): State
   /// Copy a given state. By default, a shallow object copy is done
   /// which also copies arrays held at the top level of the object.
   copyState?(state: State): State
@@ -38,7 +38,7 @@ class StreamParserInstance<State> {
   token: (stream: StringStream, state: State, editorState: EditorState) => string | null
   blankLine: (state: State, editorState: EditorState) => void
   // FIXME maybe support passing something from the parent when nesting
-  startState: () => State
+  startState: (es: EditorState) => State
   copyState: (state: State) => State
   indent: (state: State, textAfter: string, editorState: EditorState) => number
   docType: number
@@ -85,7 +85,7 @@ export class StreamSyntax implements Syntax {
     let setSyntax = Annotation.define<SyntaxState<any>>()
     this.field = StateField.define<SyntaxState<any>>({
       create(state) {
-        let start = new SyntaxState(Tree.empty, [parserInst.startState()], 1, 0, null)
+        let start = new SyntaxState(Tree.empty, [parserInst.startState(state)], 1, 0, null)
         start.advanceFrontier(parserInst, state, Work.Apply)
         start.tree = start.updatedTree
         return start
@@ -187,7 +187,9 @@ class SyntaxState<ParseState> {
     return state
   }
 
-  advanceFrontier(parser: StreamParserInstance<ParseState>, editorState: EditorState, timeout: number, upto: number = -1) {
+  advanceFrontier(parser: StreamParserInstance<ParseState>, editorState: EditorState, timeout: number,
+                  upto: number = editorState.doc.length) {
+    if (this.frontierPos >= editorState.doc.length) return
     let sliceEnd = Date.now() + timeout
     let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)!
     let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
@@ -261,9 +263,10 @@ class HighlightWorker extends ViewPlugin {
     this.working = -1
     let {state} = this.view, field = state.field(this.field)
     if (field.frontierPos >= state.doc.length) return
-    field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    // FIXME always stop at the end of the viewport by default?
-    if (field.frontierPos < this.view.viewport.to) this.scheduleWork()
+    // Advance to the end of the viewport, and no further, by default
+    let end = this.view.viewport.to
+    field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice, end)
+    if (field.frontierPos < end) this.scheduleWork()
     else this.view.dispatch(state.t().annotate(this.setSyntax(field.copy())))
   }
 
