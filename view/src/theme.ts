@@ -35,7 +35,7 @@ export const baseTheme = buildTheme(baseThemeID, {
   wrap: {
     position: "relative !important",
     boxSizing: "border-box",
-    "&.codemirror-focused": {
+    "&.cm-focused": {
       // FIXME it would be great if we could directly use the browser's
       // default focus outline, but it appears we can't, so this tries to
       // approximate that

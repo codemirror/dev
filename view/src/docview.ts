@@ -286,7 +286,7 @@ export class DocView extends ContentView {
     }
     // If no workable line exists, force a layout of a measurable element
     let dummy = document.createElement("div"), lineHeight!: number, charWidth!: number
-    dummy.className = "codemirror-line"
+    dummy.className = "cm-line"
     dummy.textContent = "abc def ghi jkl mno pqr stu"
     this.view.observer.ignore(() => {
       this.dom.appendChild(dummy)

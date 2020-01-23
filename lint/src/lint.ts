@@ -150,7 +150,7 @@ export const openLintPanel: Command = (view: EditorView) => {
   if (!field.panel)
     view.dispatch(view.state.t().annotate(setState(new LintState(field.diagnostics, LintPanel.open, field.selected))))
   if (view.state.field(lintState).panel)
-    (view.dom.querySelector(".codemirror-panel-lint ul") as HTMLElement).focus()
+    (view.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
 }
 

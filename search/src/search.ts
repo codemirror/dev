@@ -266,7 +266,7 @@ export const defaultSearchKeymap = {
 export const closeSearchPanel: Command = view => {
   let state = view.state.field(searchState)
   if (!state || !state.panel.length) return false
-  let panel = view.dom.querySelector(".codemirror-panel-search")
+  let panel = view.dom.querySelector(".cm-panel-search")
   if (panel && panel.contains(view.root.activeElement)) view.focus()
   view.dispatch(view.state.t().annotate(searchAnnotation({panel: false})))
   return true
@@ -370,7 +370,7 @@ function maybeAnnounceMatch(view: EditorView) {
   }
 
   let state = view.state.field(searchState)
-  let panel = state.panel.length && view.dom.querySelector(".codemirror-panel-search")
+  let panel = state.panel.length && view.dom.querySelector(".cm-panel-search")
   if (!panel || !panel.contains(view.root.activeElement)) return
   let live = panel.querySelector("div[aria-live]")!
   live.textContent = view.phrase("current match") + ". " + text

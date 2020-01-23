@@ -152,7 +152,6 @@ export interface HoverTooltip {
   tooltip: (view: EditorView) => Tooltip,
 }
 
-// FIXME moving the pointer over the tooltip is broken again
 class HoverPlugin extends ViewPlugin {
   lastMouseMove: MouseEvent | null = null
   hoverTimeout = -1
@@ -218,7 +217,7 @@ class HoverPlugin extends ViewPlugin {
 
 function isInTooltip(elt: HTMLElement) {
   for (let cur: Node | null = elt; cur; cur = cur.parentNode)
-    if (cur.nodeType == 1 && (cur as HTMLElement).classList.contains("codemirror-tooltip")) return true
+    if (cur.nodeType == 1 && (cur as HTMLElement).classList.contains("cm-tooltip")) return true
   return false
 }
 
