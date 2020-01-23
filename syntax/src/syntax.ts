@@ -1,7 +1,7 @@
-import {Parser, InputStream} from "lezer"
+import {Parser, InputStream, ParseContext} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
-import {EditorState, StateField, Transaction, Syntax, languageData, Extension} from "../../state"
+import {EditorState, StateField, Transaction, Syntax, languageData, Extension, Annotation} from "../../state"
 import {ViewPlugin, EditorView} from "../../view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
@@ -19,14 +19,15 @@ export class LezerSyntax implements Syntax {
   /// method to register CodeMirror-specific syntax node props in the
   /// parser, before passing it to this constructor.
   constructor(readonly parser: Parser) {
+    let setSyntax = Annotation.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
-      create(state) { return SyntaxState.init(Tree.empty, parser, state.doc) },
-      update(value, tr) { return value.apply(tr, parser) }
+      create(state) { return SyntaxState.advance(Tree.empty, parser, state.doc) },
+      update(value, tr) { return value.apply(tr, parser, setSyntax) }
     })
     this.extension = [
       EditorState.syntax.of(this),
       this.field,
-      EditorView.viewPlugin.of(view => new HighlightWorker(view, this)),
+      EditorView.viewPlugin.of(view => new HighlightWorker(view, this, setSyntax)),
       syntaxIndentation(this),
       syntaxFolding(this)
     ]
@@ -39,8 +40,14 @@ export class LezerSyntax implements Syntax {
   ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
     let field = state.field(this.field)
     if (field.upto >= upto) return field.updatedTree
-    if (field.work(this.parser, state.doc, upto, timeout)) return field.updatedTree
-    return null
+    if (!field.parse) field.startParse(this.parser, state.doc)
+
+    if (field.parse!.pos < upto) {
+      let done = work(field.parse!, timeout, upto)
+      if (done) return field.stopParse(done, state.doc.length)
+    }
+
+    return field.parse!.pos < upto ? null : field.stopParse()
   }
 
   get docNodeType() { return this.parser.group.types[1] }
@@ -105,47 +112,53 @@ class DocStream implements InputStream {
 
 const enum Work { Apply = 25, MinSlice = 75, Slice = 100, Pause = 200 }
 
+function work(parse: ParseContext, time: number, upto: number = 1e9) {
+  let endTime = Date.now() + time
+  for (;;) {
+    let done = parse.advance()
+    // FIXME stop parsing when parse.badness is too high
+    if (done) return done
+    if (parse.pos > upto || Date.now() > endTime) return null
+  }
+}
+
+function takeTree(parse: ParseContext, base: Tree) {
+  let parsed = parse.forceFinish()
+  let after = base.applyChanges([{fromA: 0, toA: parse.pos, fromB: 0, toB: parse.pos}])
+  return parsed.append(after)
+}
+
 class SyntaxState {
   public updatedTree: Tree // FIXME is it a good idea to separate this from .tree?
+  public parse: ParseContext | null = null
 
   constructor(public tree: Tree, public upto: number) {
     this.updatedTree = tree
   }
 
-  static init(tree: Tree, parser: Parser, doc: Text) {
-    let state = new SyntaxState(tree, 0)
-    state.work(parser, doc, doc.length, Work.Apply)
-    state.tree = state.updatedTree
-    return state
+  static advance(tree: Tree, parser: Parser, doc: Text) {
+    let parse = parser.startParse(new DocStream(doc), {cache: tree})
+    let done = work(parse, Work.Apply)
+    return done ? new SyntaxState(done, doc.length) : new SyntaxState(takeTree(parse, tree), parse.pos)
   }
 
-  apply(tr: Transaction, parser: Parser) {
-    return !tr.docChanged && this.updatedTree == this.tree ? this
-      : this.upto >= tr.doc.length && !tr.docChanged ? new SyntaxState(this.updatedTree, this.upto)
-      : SyntaxState.init(this.updatedTree.applyChanges(tr.changes.changedRanges()), parser, tr.doc)
+  apply(tr: Transaction, parser: Parser, annotation: (s: SyntaxState) => Annotation<SyntaxState>) {
+    let given = tr.annotation(annotation)
+    return given || (!tr.docChanged && this) || SyntaxState.advance(
+      (this.parse ? takeTree(this.parse, this.updatedTree) : this.updatedTree).applyChanges(tr.changes.changedRanges()),
+      parser, tr.doc)
   }
 
-  work(parser: Parser, doc: Text, upto: number, maxTime: number): boolean {
-    if (upto <= this.upto) return true
+  startParse(parser: Parser, doc: Text) {
+    this.parse = parser.startParse(new DocStream(doc), {cache: this.updatedTree})
+  }
 
-    let parse = parser.startParse(new DocStream(doc), {cache: this.updatedTree})
-    let endTime = Date.now() + maxTime
-    for (;;) {
-      let done = parse.advance()
-      // FIXME stop parsing when parse.badness is too high
-      if (done) {
-        this.upto = doc.length
-        this.updatedTree = done
-        return true
-      }
-      if (parse.pos > upto || Date.now() > endTime) {
-        this.upto = parse.pos
-        let parsed = parse.forceFinish()
-        let after = this.updatedTree.applyChanges([{fromA: 0, toA: parse.pos, fromB: 0, toB: parse.pos}])
-        this.updatedTree = parsed.append(after)
-        return this.upto >= upto
-      }
-    }
+  stopParse(tree?: Tree, upto?: number) {
+    if (!tree) tree = takeTree(this.parse!, this.updatedTree)
+    this.updatedTree = tree
+    this.upto = upto ?? this.parse!.pos
+    this.parse = null
+    return tree
   }
 }
 
@@ -160,7 +173,9 @@ let cancelIdle: (id: number) => void = typeof window != "undefined" && (window a
 class HighlightWorker extends ViewPlugin {
   working: number = -1
 
-  constructor(readonly view: EditorView, readonly syntax: LezerSyntax) {
+  constructor(readonly view: EditorView,
+              readonly syntax: LezerSyntax,
+              readonly setSyntax: (s: SyntaxState) => Annotation<SyntaxState>) {
     super()
     this.work = this.work.bind(this)
     this.scheduleWork()
@@ -181,16 +196,15 @@ class HighlightWorker extends ViewPlugin {
     this.working = -1
     let {state} = this.view, field = state.field(this.syntax.field)
     if (field.upto >= state.doc.length) return
-    let prev = field.upto
-    field.work(this.syntax.parser, state.doc, state.doc.length,
-               deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    // FIXME this needs more thought. Right now, we fire a transaction
-    // when the parsing crossed the end of the viewport, and when the
-    // entire document is highlighted. Is that a good approach?
-    if (field.upto == state.doc.length ||
-        prev < this.view.viewport.to && field.upto >= this.view.viewport.to)
-      this.view.dispatch(state.t())
-    if (field.upto < state.doc.length) this.scheduleWork()
+    if (!field.parse) field.startParse(this.syntax.parser, state.doc)
+    let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    // FIXME this needs more thought. When do we stop parsing? When do
+    // we notify the state with the updated tree?
+    if (done)
+      this.view.dispatch(state.t().annotate(this.setSyntax(new SyntaxState(
+        field.stopParse(done, state.doc.length), state.doc.length))))
+    else
+      this.scheduleWork()
   }
 
   destroy() {
