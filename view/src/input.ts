@@ -134,7 +134,7 @@ class MouseSelection {
 
   queryPos(event: MouseEvent): {pos: number, bias: 1 | -1} {
     let pos = this.view.posAtCoords({x: event.clientX, y: event.clientY})
-    let coords = this.view.coordsAtPos(pos)
+    let coords = pos < 0 ? null : this.view.coordsAtPos(pos)
     let bias: 1 | -1 = !coords ? 1 :
       coords.top > event.clientY ? -1 :
       coords.bottom < event.clientY ? 1 :
