@@ -2,7 +2,7 @@ import {Parser, InputStream, ParseContext} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
 import {EditorState, StateField, Transaction, Syntax, languageData, Extension, Annotation} from "../../state"
-import {ViewPlugin, EditorView} from "../../view"
+import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
 
@@ -185,8 +185,8 @@ class HighlightWorker extends ViewPlugin {
     this.scheduleWork()
   }
 
-  update() {
-    this.scheduleWork()
+  update(update: ViewUpdate) {
+    if (update.docChanged) this.scheduleWork()
   }
 
   scheduleWork() {

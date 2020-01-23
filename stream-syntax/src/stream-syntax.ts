@@ -1,5 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Transaction, Syntax, languageData, Extension} from "../../state"
+import {EditorState, StateField, Syntax, languageData, Extension, Annotation} from "../../state"
+import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
 
@@ -80,13 +81,29 @@ export class StreamSyntax implements Syntax {
 
   /// Create a stream syntax.
   constructor(parser: StreamParser<any>) {
-    this.parser = new StreamParserInstance(parser)
+    let parserInst = this.parser = new StreamParserInstance(parser)
+    let setSyntax = Annotation.define<SyntaxState<any>>()
     this.field = StateField.define<SyntaxState<any>>({
-      create: state => new SyntaxState(Tree.empty, [this.parser.startState()], 1, 0, null),
-      update: (value, tr) => value.apply(tr)
+      create(state) {
+        let start = new SyntaxState(Tree.empty, [parserInst.startState()], 1, 0, null)
+        start.advanceFrontier(parserInst, state, Work.Apply)
+        start.tree = start.updatedTree
+        return start
+      },
+      update(value, tr, state) {
+        let set = tr.annotation(setSyntax)
+        if (set) return set
+        if (!tr.docChanged) return value
+        let {start, number} = tr.doc.lineAt(tr.changes.changedRanges()[0].fromA)
+        let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, start)
+        newValue.advanceFrontier(parserInst, state, Work.Apply)
+        newValue.tree = newValue.updatedTree
+        return newValue
+      }
     })
     this.extension = [
       EditorState.syntax.of(this),
+      EditorView.viewPlugin.of(view => new HighlightWorker(view, this.parser, this.field, setSyntax)),
       this.field,
       EditorState.indentation.of((state: EditorState, pos: number) => {
         return state.field(this.field).getIndent(this.parser, state, pos)
@@ -104,12 +121,14 @@ export class StreamSyntax implements Syntax {
 
   ensureTree(state: EditorState, upto: number, timeout = 100) {
     let field = state.field(this.field)
-    return field.tree // FIXME
+    if (field.frontierPos < upto)
+      field.advanceFrontier(this.parser, state, timeout, upto)
+    return field.frontierPos < upto ? null : field.updatedTree
   }
 
   get docNodeType() { return typeArray[this.parser.docType] }
 
-  languageDataAt<Interface = any>(state: EditorState, pos: number) {
+  languageDataAt<Interface = any>() {
     return (typeArray[this.parser.docType].prop(languageData) || {}) as Interface
   }
 }
@@ -118,10 +137,11 @@ const CACHE_STEP_SHIFT = 6, CACHE_STEP = 1 << CACHE_STEP_SHIFT
 
 const MAX_RECOMPUTE_DISTANCE = 20e3
 
-const WORK_SLICE = 100, WORK_PAUSE = 200
+const enum Work { Apply = 25, MinSlice = 50, Slice = 100, Pause = 200 }
 
 class SyntaxState<ParseState> {
   working = -1
+  updatedTree: Tree
 
   constructor(public tree: Tree,
               // Slot 0 stores the start state (line 1), slot 1 the
@@ -130,17 +150,16 @@ class SyntaxState<ParseState> {
               public cache: ParseState[],
               public frontierLine: number,
               public frontierPos: number,
-              public frontierState: ParseState | null) {}
+              public frontierState: ParseState | null) {
+    this.updatedTree = tree
+  }
 
-  apply(tr: Transaction) {
-    if (!tr.docChanged) return this
-    let {start, number} = tr.doc.lineAt(tr.changes.changedRanges()[0].fromA)
-    if (number >= this.frontierLine)
-      return new SyntaxState(this.tree, this.cache.slice(), this.frontierLine, this.frontierPos, this.frontierState)
-    else {
-      return new SyntaxState(this.tree.cut(start),
-                             this.cache.slice(0, (number >> CACHE_STEP_SHIFT) + 1), number, start, null)
-    }
+  copy() {
+    return new SyntaxState(this.updatedTree, this.cache.slice(), this.frontierLine, this.frontierPos, this.frontierState)
+  }
+
+  cut(line: number, pos: number) {
+    return new SyntaxState(this.updatedTree.cut(pos), this.cache.slice(0, (line >> CACHE_STEP_SHIFT) + 1), line, pos, null)
   }
 
   maybeStoreState(parser: StreamParserInstance<ParseState>, lineBefore: number, state: ParseState) {
@@ -168,9 +187,9 @@ class SyntaxState<ParseState> {
     return state
   }
 
-  advanceFrontier(parser: StreamParserInstance<ParseState>, editorState: EditorState, upto: number) {
+  advanceFrontier(parser: StreamParserInstance<ParseState>, editorState: EditorState, timeout: number, upto: number = -1) {
+    let sliceEnd = Date.now() + timeout
     let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)!
-    let sliceEnd = Date.now() + WORK_SLICE
     let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
     let buffer: number[] = []
     let line = this.frontierLine, pos = this.frontierPos
@@ -192,47 +211,11 @@ class SyntaxState<ParseState> {
     let tree = Tree.build({buffer,
                            group: nodeGroup,
                            topID: parser.docType}).balance()
-    this.tree = this.tree.append(tree).balance()
+    this.updatedTree = this.updatedTree.append(tree).balance()
     this.frontierLine = line
     this.frontierPos = pos
     this.frontierState = state
   }
-/* FIXME
-  updateTree(parser: StreamParserInstance<ParseState>, state: EditorState, upto: number,
-             rest: boolean): boolean | CancellablePromise<Tree> {
-    upto = Math.min(upto + 100, state.doc.lineAt(upto).end)
-    // FIXME make sure multiple calls in same frame don't keep doing work
-    if (this.frontierPos >= upto) return true
-    if (this.working == -1) this.advanceFrontier(parser, state, upto)
-    if (this.frontierPos >= upto) return true
-    if (!rest) return false
-    let req = this.requests.find(r => r.upto == upto && !r.promise.canceled)
-    if (!req) {
-      req = new RequestInfo(upto)
-      this.requests.push(req)
-    }
-    this.scheduleWork(parser, state)
-    return req.promise
-  }
-
-  scheduleWork(parser: StreamParserInstance<ParseState>, state: EditorState) {
-    if (this.working != -1) return
-    this.working = setTimeout(() => this.work(parser, state), WORK_PAUSE) as any
-  }
-
-  work(parser: StreamParserInstance<ParseState>, state: EditorState) {
-    this.working = -1
-    let upto = this.requests.reduce((max, req) => req.promise.canceled ? max : Math.max(max, req.upto), 0)
-    if (upto > this.frontierPos) this.advanceFrontier(parser, state, upto)
-
-    this.requests = this.requests.filter(req => {
-      if (req.upto > this.frontierPos && !req.promise.canceled) return true
-      if (!req.promise.canceled) req.resolve(this.tree)
-      return false
-    })
-    if (this.requests.length) this.scheduleWork(parser, state)
-  }
-*/
 
   getIndent(parser: StreamParserInstance<ParseState>, state: EditorState, pos: number) {
     let line = state.doc.lineAt(pos)
@@ -240,6 +223,52 @@ class SyntaxState<ParseState> {
     if (parseState == null) return -1
     let text = line.slice(pos - line.start, Math.min(line.end, pos + 100) - line.start)
     return parser.indent(parseState, /^\s*(.*)/.exec(text)![1], state)
+  }
+}
+
+type Deadline = {timeRemaining(): number, didTimeout: boolean}
+type IdleCallback = (deadline?: Deadline) => void
+
+let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number =
+  typeof window != "undefined" && (window as any).requestIdleCallback ||
+  ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
+let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
+
+class HighlightWorker extends ViewPlugin {
+  working: number = -1
+
+  constructor(readonly view: EditorView,
+              readonly parser: StreamParserInstance<any>,
+              readonly field: StateField<SyntaxState<any>>,
+              readonly setSyntax: (st: SyntaxState<any>) => Annotation<SyntaxState<any>>) {
+    super()
+    this.work = this.work.bind(this)
+    this.scheduleWork()
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged) this.scheduleWork()
+  }
+
+  scheduleWork() {
+    if (this.working > -1) return
+    let {state} = this.view, field = state.field(this.field)
+    if (field.frontierPos >= state.doc.length) return
+    this.working = requestIdle(this.work, {timeout: Work.Pause})
+  }
+
+  work(deadline?: Deadline) {
+    this.working = -1
+    let {state} = this.view, field = state.field(this.field)
+    if (field.frontierPos >= state.doc.length) return
+    field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    // FIXME always stop at the end of the viewport by default?
+    if (field.frontierPos < this.view.viewport.to) this.scheduleWork()
+    else this.view.dispatch(state.t().annotate(this.setSyntax(field.copy())))
+  }
+
+  destroy() {
+    if (this.working >= 0) cancelIdle(this.working)
   }
 }
 
