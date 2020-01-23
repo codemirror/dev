@@ -1,6 +1,7 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, ViewUpdate, Decoration, Range} from "../../view"
+import {EditorState} from "../../state"
 
 const Inherit = 1
 
@@ -256,16 +257,18 @@ class Highlighter extends ViewPlugin {
   }
 
   update(update: ViewUpdate) {
-    let tree = update.state.tree
-    if (tree != this.tree || update.viewportChanged) {
-      this.tree = tree
-      this.decorations = this.buildDeco(update.view.viewport, tree)
+    let syntax = update.state.facet(EditorState.syntax)
+    if (!syntax.length) {
+      this.decorations = Decoration.none
+    } else if (syntax[0].parsePos(update.state) < update.view.viewport.to) {
+      this.decorations = this.decorations.map(update.changes)
+    } else if (this.tree != syntax[0].getTree(update.state) || update.viewportChanged) {
+      this.tree = syntax[0].getTree(update.state)
+      this.decorations = this.buildDeco(update.view.viewport, this.tree)
     }
   }
 
   buildDeco({from, to}: {from: number, to: number}, tree: Tree) {
-    if (tree == Tree.empty) return Decoration.none
-
     let tokens: Range<Decoration>[] = []
     let start = from
     function flush(pos: number, style: string) {

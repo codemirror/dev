@@ -40,6 +40,10 @@ export interface Syntax {
   /// incomplete tree.
   getTree(state: EditorState): Tree
 
+  /// Get the position up to which the current document has been
+  /// parsed.
+  parsePos(state: EditorState): number
+
   /// Get a tree that covers the document at least up to `upto`. If
   /// that involves more than `timeout` milliseconds of work, return
   /// null instead. Don't call this as a matter of course in, for

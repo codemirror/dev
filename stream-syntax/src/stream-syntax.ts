@@ -98,6 +98,10 @@ export class StreamSyntax implements Syntax {
     return state.field(this.field).tree
   }
 
+  parsePos(state: EditorState) {
+    return state.field(this.field).frontierPos
+  }
+
   ensureTree(state: EditorState, upto: number, timeout = 100) {
     let field = state.field(this.field)
     return field.tree // FIXME

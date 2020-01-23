@@ -37,6 +37,10 @@ export class LezerSyntax implements Syntax {
     return state.field(this.field).tree
   }
 
+  parsePos(state: EditorState) {
+    return state.field(this.field).upto
+  }
+
   ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
     let field = state.field(this.field)
     if (field.upto >= upto) return field.updatedTree
@@ -112,13 +116,13 @@ class DocStream implements InputStream {
 
 const enum Work { Apply = 25, MinSlice = 75, Slice = 100, Pause = 200 }
 
-function work(parse: ParseContext, time: number, upto: number = 1e9) {
+function work(parse: ParseContext, time: number, upto: number = -1) {
   let endTime = Date.now() + time
   for (;;) {
     let done = parse.advance()
     // FIXME stop parsing when parse.badness is too high
     if (done) return done
-    if (parse.pos > upto || Date.now() > endTime) return null
+    if ((upto >= 0 && parse.pos > upto) || Date.now() > endTime) return null
   }
 }
 
