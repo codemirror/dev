@@ -103,7 +103,7 @@ export class StreamSyntax implements Syntax {
     })
     this.extension = [
       EditorState.syntax.of(this),
-      EditorView.viewPlugin.of(view => new HighlightWorker(view, this.parser, this.field, setSyntax)),
+      EditorView.plugin.of(view => new HighlightWorker(view, this.parser, this.field, setSyntax)),
       this.field,
       EditorState.indentation.of((state: EditorState, pos: number) => {
         return state.field(this.field).getIndent(this.parser, state, pos)

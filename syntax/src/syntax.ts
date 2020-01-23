@@ -27,7 +27,7 @@ export class LezerSyntax implements Syntax {
     this.extension = [
       EditorState.syntax.of(this),
       this.field,
-      EditorView.viewPlugin.of(view => new HighlightWorker(view, this, setSyntax)),
+      EditorView.plugin.of(view => new HighlightWorker(view, this, setSyntax)),
       syntaxIndentation(this),
       syntaxFolding(this)
     ]

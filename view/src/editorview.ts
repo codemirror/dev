@@ -426,7 +426,7 @@ export class EditorView {
 
   /// Facet to register [view plugin](#view.ViewPlugin) constructor
   /// functions.
-  static viewPlugin = viewPlugin
+  static plugin = viewPlugin
 
   /// Facet that provides CSS classes to add to elements identified
   /// by the given string.
