@@ -397,6 +397,11 @@ export class EditorView {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
   }
 
+  /// Facet that registers [view plugins](#view.ViewPlugin). Usually,
+  /// it is more convenient to use
+  /// [`ViewPlugin.register`](#view.ViewPlugin^register).
+  static plugin = viewPlugin
+
   /// Facet to add a [style
   /// module](https://github.com/marijnh/style-mod#readme) to an editor
   /// view. The view will ensure that the module is registered in its
