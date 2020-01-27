@@ -148,7 +148,7 @@ export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
   if (!field.panel)
-    view.dispatch(view.state.t().annotate(setState(new LintState(field.diagnostics, LintPanel.open, field.selected))))
+    view.dispatch(view.state.t().annotate(setState, new LintState(field.diagnostics, LintPanel.open, field.selected)))
   if (view.state.field(lintState).panel)
     (view.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
@@ -158,7 +158,7 @@ export const openLintPanel: Command = (view: EditorView) => {
 export const closeLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field || !field.panel) return false
-  view.dispatch(view.state.t().annotate(setState(new LintState(field.diagnostics, null, field.selected))))
+  view.dispatch(view.state.t().annotate(setState, new LintState(field.diagnostics, null, field.selected)))
   return true
 }
 
@@ -185,7 +185,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
       } else {
         this.set = false
         // FIXME support async sources
-        this.view.dispatch(this.view.state.t().annotate(setDiagnostics(source(this.view))))
+        this.view.dispatch(this.view.state.t().annotate(setDiagnostics, source(this.view)))
       }
     }
 
@@ -370,7 +370,7 @@ class LintPanel implements Panel {
     this.view.dispatch(this.view.state.t()
                        .setSelection(EditorSelection.single(selection.from, selection.to))
                        .scrollIntoView()
-                       .annotate(setState(new LintState(field.diagnostics, field.panel, selection))))
+                       .annotate(setState, new LintState(field.diagnostics, field.panel, selection)))
   }
 
   get style() { return "lint" }

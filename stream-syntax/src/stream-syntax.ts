@@ -242,7 +242,7 @@ class HighlightWorker extends ViewPlugin {
   constructor(readonly view: EditorView,
               readonly parser: StreamParserInstance<any>,
               readonly field: StateField<SyntaxState<any>>,
-              readonly setSyntax: (st: SyntaxState<any>) => Annotation<SyntaxState<any>>) {
+              readonly setSyntax: Annotation<SyntaxState<any>>) {
     super()
     this.work = this.work.bind(this)
     this.scheduleWork()
@@ -267,7 +267,7 @@ class HighlightWorker extends ViewPlugin {
     let end = this.view.viewport.to
     field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice, end)
     if (field.frontierPos < end) this.scheduleWork()
-    else this.view.dispatch(state.t().annotate(this.setSyntax(field.copy())))
+    else this.view.dispatch(state.t().annotate(this.setSyntax, field.copy()))
   }
 
   destroy() {

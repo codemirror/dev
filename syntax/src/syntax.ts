@@ -154,7 +154,7 @@ class SyntaxState {
     return done ? new SyntaxState(done, doc.length) : new SyntaxState(takeTree(parse, tree), parse.pos)
   }
 
-  apply(tr: Transaction, parser: Parser, annotation: (s: SyntaxState) => Annotation<SyntaxState>) {
+  apply(tr: Transaction, parser: Parser, annotation: Annotation<SyntaxState>) {
     let given = tr.annotation(annotation)
     return given || (!tr.docChanged && this) || SyntaxState.advance(
       (this.parse ? takeTree(this.parse, this.updatedTree) : this.updatedTree).applyChanges(tr.changes.changedRanges()),
@@ -192,7 +192,7 @@ class HighlightWorker extends ViewPlugin {
 
   constructor(readonly view: EditorView,
               readonly syntax: LezerSyntax,
-              readonly setSyntax: (s: SyntaxState) => Annotation<SyntaxState>) {
+              readonly setSyntax: Annotation<SyntaxState>) {
     super()
     this.work = this.work.bind(this)
     this.scheduleWork()
@@ -216,8 +216,8 @@ class HighlightWorker extends ViewPlugin {
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (done)
-      this.view.dispatch(state.t().annotate(this.setSyntax(new SyntaxState(
-        field.stopParse(done, state.doc.length), state.doc.length))))
+      this.view.dispatch(state.t().annotate(this.setSyntax, new SyntaxState(
+        field.stopParse(done, state.doc.length), state.doc.length)))
     else if (field.parse!.badness < .8)
       this.scheduleWork()
   }

@@ -57,7 +57,7 @@ function cmd(target: PopTarget, only: ItemFilter): StateCommand {
     let historyState = state.field(historyField, false)
     if (!historyState || !historyState.canPop(target, only)) return false
     const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
-    dispatch(transaction.annotate(historyStateAnnotation(newState)))
+    dispatch(transaction.annotate(historyStateAnnotation, newState))
     return true
   }
 }
@@ -79,7 +79,7 @@ export const redoSelection = cmd(PopTarget.Undone, ItemFilter.Any)
 /// from being appended to an existing history event (so that they
 /// require a separate undo command to undo).
 export function closeHistory(tr: Transaction): Transaction {
-  return tr.annotate(closeHistoryAnnotation(true))
+  return tr.annotate(closeHistoryAnnotation, true)
 }
 
 function depth(target: PopTarget, only: ItemFilter) {

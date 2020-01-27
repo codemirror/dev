@@ -68,7 +68,7 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.t().annotate(setActiveCompletion(new ActiveCompletion(active.options, selected, active.tooltip))))
+    view.dispatch(view.state.t().annotate(setActiveCompletion, new ActiveCompletion(active.options, selected, active.tooltip)))
     return true
   }
 }
@@ -83,7 +83,7 @@ function acceptCompletion(view: EditorView) {
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active != null) return false
-  view.dispatch(view.state.t().annotate(setActiveCompletion("pending")))
+  view.dispatch(view.state.t().annotate(setActiveCompletion, "pending"))
   return true
 }
 
@@ -102,7 +102,7 @@ function applyCompletion(view: EditorView, option: Completion) {
 function closeCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active == null) return false
-  view.dispatch(view.state.t().annotate(setActiveCompletion(null)))
+  view.dispatch(view.state.t().annotate(setActiveCompletion, null))
   return true
 }
 
@@ -212,7 +212,7 @@ class Autocomplete extends ViewPlugin {
     Promise.resolve(config.completeAt(state, state.selection.primary.head)).then(result => {
       if (this.stateVersion != version || result.items.length == 0) return
       let tooltip = buildTooltip(result.items)
-      this.view.dispatch(this.view.state.t().annotate(setActiveCompletion(new ActiveCompletion(result.items, 0, tooltip))))
+      this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result.items, 0, tooltip)))
     })
   }
 }

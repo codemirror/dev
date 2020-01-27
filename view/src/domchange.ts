@@ -70,13 +70,13 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       if (newSel && !tr.selection.primary.eq(newSel.primary))
         tr.setSelection(tr.selection.replaceRange(newSel.primary))
     }
-    view.dispatch(tr.scrollIntoView().annotate(Transaction.userEvent("input")))
+    view.dispatch(tr.scrollIntoView().annotate(Transaction.userEvent, "input"))
     return true
   } else if (newSel && !newSel.primary.eq(sel)) {
     let tr = view.state.t().setSelection(newSel)
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
       if (view.inputState.lastSelectionOrigin == "keyboard") tr.scrollIntoView()
-      else tr.annotate(Transaction.userEvent(view.inputState.lastSelectionOrigin!))
+      else tr.annotate(Transaction.userEvent, view.inputState.lastSelectionOrigin!)
     }
     view.dispatch(tr)
     return true

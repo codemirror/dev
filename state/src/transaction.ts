@@ -24,7 +24,7 @@ export class Transaction {
   docs: Text[] = []
   /// The selection at the end of the transaction.
   selection: EditorSelection
-  private _annotations: Annotation<any>[]
+  private _annotations: {[id: number]: any} = Object.create(null)
   private flags: number = 0
   /// @internal
   reconfigureConfig: Configuration | null = null
@@ -37,7 +37,7 @@ export class Transaction {
     time: number = Date.now()
   ) {
     this.selection = startState.selection
-    this._annotations = [Transaction.time(time)]
+    this._annotations[Transaction.time.id] = time
   }
 
   /// The document at the end of the transaction.
@@ -48,30 +48,15 @@ export class Transaction {
 
   /// Add annotations to this transaction. Annotations can provide
   /// additional information about the transaction.
-  annotate(...annotations: Annotation<any>[]): Transaction {
+  annotate<T>(annotation: Annotation<T>, value: T): Transaction {
     this.ensureOpen()
-    for (let ann of annotations) this._annotations.push(ann)
+    this._annotations[annotation.id] = value
     return this
   }
 
   /// Get the value of the given annotation type, if any.
-  annotation<T>(type: (value: T) => Annotation<T>): T | undefined {
-    for (let i = this._annotations.length - 1; i >= 0; i--)
-      if (this._annotations[i].type == type) return this._annotations[i].value as T
-    return undefined
-  }
-
-  /// Get all values associated with the given annotation in this
-  /// transaction.
-  annotations<T>(type: (value: T) => Annotation<T>): readonly T[] {
-    let found = none as T[]
-    for (let ann of this._annotations) {
-      if (ann.type == type) {
-        if (found == none) found = []
-        found.push(ann.value as T)
-      }
-    }
-    return found
+  annotation<T>(annotation: Annotation<T>): T | undefined {
+    return this._annotations[annotation.id]
   }
 
   /// Add a change to this transaction. If `mirror` is given, it
@@ -216,5 +201,3 @@ export class Transaction {
   /// the undo history or not.
   static addToHistory = Annotation.define<boolean>()
 }
-
-const none: readonly any[] = []

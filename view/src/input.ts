@@ -168,7 +168,7 @@ class MouseSelection {
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.t().setSelection(selection)
-                         .annotate(Transaction.userEvent("pointer"))
+                         .annotate(Transaction.userEvent, "pointer")
                          .scrollIntoView())
   }
 
@@ -241,7 +241,7 @@ function capturePaste(view: EditorView) {
 
 function doPaste(view: EditorView, text: string) {
   view.dispatch(view.state.t().replaceSelection(text)
-                .annotate(Transaction.userEvent("paste")).scrollIntoView())
+                .annotate(Transaction.userEvent, "paste").scrollIntoView())
 }
 
 function mustCapture(event: KeyboardEvent): boolean {
@@ -329,7 +329,7 @@ handlers.drop = (view, event: DragEvent) => {
   let change = new Change(dropPos, dropPos, view.state.splitLines(text))
   tr.change(change)
     .setSelection(EditorSelection.single(dropPos, dropPos + change.length))
-    .annotate(Transaction.userEvent("drop"))
+    .annotate(Transaction.userEvent, "drop")
   view.focus()
   view.dispatch(tr)
 }
@@ -376,7 +376,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut") {
-    view.dispatch(view.state.t().replaceSelection([""]).scrollIntoView().annotate(Transaction.userEvent("cut")))
+    view.dispatch(view.state.t().replaceSelection([""]).scrollIntoView().annotate(Transaction.userEvent, "cut"))
   }
 }
 

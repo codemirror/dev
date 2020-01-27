@@ -27,7 +27,7 @@ describe("EditorState", () => {
   const someAnnotation = Annotation.define<number>()
 
   it("can store annotations on transactions", () => {
-    let tr = EditorState.create({doc: "foo"}).t().annotate(someAnnotation(55))
+    let tr = EditorState.create({doc: "foo"}).t().annotate(someAnnotation, 55)
     ist(tr.annotation(someAnnotation), 55)
   })
 

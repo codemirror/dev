@@ -9,7 +9,7 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
     return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
-  if (granularity == "line") transaction.annotate(Transaction.preserveGoalColumn(true))
+  if (granularity == "line") transaction.annotate(Transaction.preserveGoalColumn, true)
   view.dispatch(transaction.scrollIntoView())
   return true
 }
@@ -41,7 +41,7 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
     return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
   if (transaction.selection.eq(view.state.selection)) return false
-  if (granularity == "line") transaction.annotate(Transaction.preserveGoalColumn(true))
+  if (granularity == "line") transaction.annotate(Transaction.preserveGoalColumn, true)
   view.dispatch(transaction.scrollIntoView())
   return true
 }

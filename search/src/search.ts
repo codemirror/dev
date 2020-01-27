@@ -230,7 +230,7 @@ function createSearchPanel(view: EditorView) {
       updateQuery(q: Query) {
         if (!query.eq(q)) {
           query = q
-          view.dispatch(view.state.t().annotate(searchAnnotation({query})))
+          view.dispatch(view.state.t().annotate(searchAnnotation, {query}))
         }
       }
     }),
@@ -247,7 +247,7 @@ export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState)!
   if (!state) return false
   if (!state.panel.length)
-    view.dispatch(view.state.t().annotate(searchAnnotation({panel: true})))
+    view.dispatch(view.state.t().annotate(searchAnnotation, {panel: true}))
   return true
 }
 
@@ -268,7 +268,7 @@ export const closeSearchPanel: Command = view => {
   if (!state || !state.panel.length) return false
   let panel = view.dom.querySelector(".cm-panel-search")
   if (panel && panel.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.t().annotate(searchAnnotation({panel: false})))
+  view.dispatch(view.state.t().annotate(searchAnnotation, {panel: false}))
   return true
 }
 
