@@ -2,7 +2,7 @@ import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
 import {Facet} from "../../state"
 
 /// Enables the panel-managing extension.
-export function panels() { return [Panels.extension, baseTheme] }
+export function panels() { return [Panels.register(), baseTheme] }
 
 export interface Panel {
   /// The element representing this panel.

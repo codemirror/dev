@@ -111,7 +111,7 @@ const baseTheme = EditorView.baseTheme({
 /// [`showTooltip`](#tooltip.showTooltip) to be used to define
 /// tooltips.
 export function tooltips() {
-  return [TooltipPlugin.extension, baseTheme]
+  return [TooltipPlugin.register(), baseTheme]
 }
 
 /// Describes a tooltip.
@@ -156,12 +156,16 @@ class HoverPlugin extends ViewPlugin {
   lastMouseMove: MouseEvent | null = null
   hoverTimeout = -1
   mouseInside = false
+  readonly source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null
+  readonly field: StateField<HoverTooltip | null>
+  readonly setHover: Annotation<HoverTooltip | null>
 
   constructor(readonly view: EditorView,
-              readonly source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
-              readonly field: StateField<HoverTooltip | null>,
-              readonly setHover: Annotation<HoverTooltip | null>) {
+              args: [(view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
+                     StateField<HoverTooltip | null>,
+                     Annotation<HoverTooltip | null>]) {
     super()
+    ;[this.source, this.field, this.setHover] = args
     this.checkHover = this.checkHover.bind(this)
     view.dom.addEventListener("mouseenter", this.mouseenter = this.mouseenter.bind(this))
     view.dom.addEventListener("mouseleave", this.mouseleave = this.mouseleave.bind(this))
@@ -256,7 +260,7 @@ export function hoverTooltip(
 
   return [
     hoverState,
-    EditorView.plugin.of(view => new HoverPlugin(view, source, hoverState, setHover)),
+    HoverPlugin.register([source, hoverState, setHover]),
     tooltips()
   ]
 }

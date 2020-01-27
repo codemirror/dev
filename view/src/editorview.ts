@@ -424,10 +424,6 @@ export class EditorView {
   /// are shown in the view.
   static decorations = decorations
 
-  /// Facet to register [view plugin](#view.ViewPlugin) constructor
-  /// functions.
-  static plugin = viewPlugin
-
   /// Facet that provides CSS classes to add to elements identified
   /// by the given string.
   static theme(spec: {[name: string]: Style}): Extension {

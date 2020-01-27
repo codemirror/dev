@@ -106,7 +106,7 @@ export const search = function(config: SearchConfig) {
     searchState,
     keymap(keys),
     panelKeymap.of(panelKeys),
-    SearchHighlighter.extension,
+    SearchHighlighter.register(),
     panels(),
     baseTheme
   ]

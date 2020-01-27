@@ -55,15 +55,16 @@ function wordDeco(state: EditorState): DecorationSet {
 
 const wordHighlighter = EditorView.decorations.compute(["doc"], wordDeco)
 
+class WidgetPlugin extends ViewPlugin {
+  constructor(_view: EditorView, startDeco: DecorationSet) { super(); this.decorations = startDeco }
+  update(update: ViewUpdate) { this.decorations = this.decorations.map(update.changes) }
+}
+
 function widgets(positions: number[], sides: number[]) {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  let deco = Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
-  return class WidgetPlugin extends ViewPlugin {
-    constructor(startDeco: DecorationSet) { super(); this.decorations = deco }
-    update(update: ViewUpdate) { this.decorations = this.decorations.map(update.changes) }
-  }.extension
+  return WidgetPlugin.register(Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]}))))
 }
 
 describe("Composition", () => {

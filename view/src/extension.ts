@@ -28,7 +28,7 @@ export class ViewPlugin {
   /// for updating the plugin's internal state (including any state
   /// that may be read by behaviors). It should _not_ change the DOM,
   /// or read the DOM in a way that triggers a layout recomputation.
-  update(update: ViewUpdate): void {}
+  update(_update: ViewUpdate): void {}
 
   /// Called when the plugin is no longer going to be used. Should
   /// revert any changes the plugin made to the DOM.
@@ -39,11 +39,17 @@ export class ViewPlugin {
 
   scrollMargins!: Partial<Rect> | null
 
-  /// An extension that registers this plugin. Only available for
-  /// subclasses whose constructor can be called with a single
-  /// [`EditorView`](#view.EditorView) object as argument.
-  static get extension(this: {new (view: EditorView): ViewPlugin}): Extension {
-    return (this as any)._extension || ((this as any)._extension = viewPlugin.of(view => new this(view)))
+  /// Create an extension that registers this plugin, optionally
+  /// passing an extra argument to its constructor. When called
+  /// without argument, this function will return the same value on
+  /// subsequent calls.
+  static register(this: {new (view: EditorView): ViewPlugin}): Extension
+  static register<Arg>(this: {new (view: EditorView, arg: Arg): ViewPlugin}, arg: Arg): Extension
+  static register<Arg>(this: {new (view: EditorView, arg: Arg): ViewPlugin}, arg?: Arg): Extension {
+    if (arg == null && (this as any)._extension) return (this as any)._extension
+    let ext = viewPlugin.of(view => new this(view, arg!))
+    if (arg == null) (this as any)._extension = ext
+    return ext
   }
 
   /// @internal

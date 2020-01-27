@@ -125,7 +125,7 @@ const unfixGutters = Facet.define<boolean, boolean>({
 /// horizontally.
 export function gutters(config?: {fixed?: boolean}) {
   let result = [
-    GutterView.extension,
+    GutterView.register(),
     baseTheme
   ]
   if (config && config.fixed === false) result.push(unfixGutters.of(true))

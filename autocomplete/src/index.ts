@@ -51,7 +51,7 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
   return [
     activeCompletion,
     autocompleteConfig.of(config),
-    Autocomplete.extension,
+    Autocomplete.register(),
     Precedence.Fallback.set(style),
     tooltips(),
     Precedence.Override.set(keymap({

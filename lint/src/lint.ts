@@ -200,7 +200,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
     }
   }
   return [
-    RunLintPlugin.extension,
+    RunLintPlugin.register(),
     linting()
   ]
 }

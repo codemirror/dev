@@ -16,7 +16,7 @@ describe("EditorView extension", () => {
           viewports.push(update.view.viewport)
       }
     }
-    let cm = tempEditor("x\n".repeat(500), [Plugin.extension])
+    let cm = tempEditor("x\n".repeat(500), [Plugin.register()])
     ist(viewports.length, 1)
     ist(viewports[0].from, 0)
     cm.dom.style.height = "300px"
@@ -45,7 +45,7 @@ describe("EditorView extension", () => {
         updates++
       }
     }
-    let cm = tempEditor("xyz", [Plugin.extension])
+    let cm = tempEditor("xyz", [Plugin.register()])
     ist(updates, 0)
     cm.dispatch(cm.state.t().replace(1, 2, "u"))
     ist(updates, 1)

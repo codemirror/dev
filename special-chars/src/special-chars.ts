@@ -60,7 +60,7 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
 /// Returns an extension that installs highlighting of special
 /// characters.
 export function specialChars(config: SpecialCharConfig = {}) {
-  return [specialCharConfig.of(config), SpecialCharPlugin.extension, styleExt]
+  return [specialCharConfig.of(config), SpecialCharPlugin.register(), styleExt]
 }
 
 const JOIN_GAP = 10

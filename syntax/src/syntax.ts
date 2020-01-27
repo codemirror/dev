@@ -27,7 +27,7 @@ export class LezerSyntax implements Syntax {
     this.extension = [
       EditorState.syntax.of(this),
       this.field,
-      EditorView.plugin.of(view => new HighlightWorker(view, this, setSyntax)),
+      HighlightWorker.register([this, setSyntax]),
       syntaxIndentation(this),
       syntaxFolding(this)
     ]
@@ -189,11 +189,12 @@ let cancelIdle: (id: number) => void = typeof window != "undefined" && (window a
 
 class HighlightWorker extends ViewPlugin {
   working: number = -1
+  readonly syntax: LezerSyntax
+  readonly setSyntax: Annotation<SyntaxState>
 
-  constructor(readonly view: EditorView,
-              readonly syntax: LezerSyntax,
-              readonly setSyntax: Annotation<SyntaxState>) {
+  constructor(readonly view: EditorView, arg: [LezerSyntax, Annotation<SyntaxState>]) {
     super()
+    ;[this.syntax, this.setSyntax] = arg
     this.work = this.work.bind(this)
     this.scheduleWork()
   }

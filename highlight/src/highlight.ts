@@ -117,7 +117,7 @@ export class TagSystem {
   highlighter(spec: {[tag: string]: Style}) {
     let styling = new Styling(this, spec)
     return [
-      EditorView.plugin.of(view => new Highlighter(view, this.prop, styling)),
+      Highlighter.register([this.prop, styling]),
       EditorView.styleModule.of(styling.module)
     ]
   }
@@ -249,9 +249,12 @@ class Styling {
 
 class Highlighter extends ViewPlugin {
   tree: Tree
+  private prop: NodeProp<number>
+  private styling: Styling
 
-  constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
+  constructor(view: EditorView, arg: [NodeProp<number>, Styling]) {
     super()
+    ;[this.prop, this.styling] = arg
     this.tree = view.state.tree
     this.decorations = this.buildDeco(view.viewport, this.tree)
   }
