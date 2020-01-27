@@ -104,7 +104,7 @@ class FacetProvider<Input> {
   dynamicSlot(addresses: {[id: number]: number}) {
     let getter: (state: EditorState) => any = this.value as any
     let compare = this.facet.compareInput
-    let idx = addresses[this.id] >> 1
+    let idx = addresses[this.id] >> 1, multi = this.type == Provider.Multi
     let depDoc = false, depSel = false, depAddrs: number[] = []
     for (let dep of this.dependencies) {
       if (dep == "doc") depDoc = true
@@ -117,10 +117,11 @@ class FacetProvider<Input> {
         state.values[idx] = getter(state)
         return SlotStatus.Changed
       } else {
-        let newVal
         let depChanged = (depDoc && tr!.docChanged) || (depSel && (tr!.docChanged || tr!.selectionSet)) || 
           depAddrs.some(addr => (ensureAddr(state, addr) & SlotStatus.Changed) > 0)
-        if (!depChanged || compare(newVal = getter(state), tr!.startState.values[idx])) return 0
+        if (!depChanged) return 0
+        let newVal = getter(state), oldVal = tr!.startState.values[idx]
+        if (multi ? compareArray(newVal, oldVal, compare) : compare(newVal, oldVal)) return 0
         state.values[idx] = newVal
         return SlotStatus.Changed
       }
@@ -128,6 +129,12 @@ class FacetProvider<Input> {
   }
 
   [isExtension]!: true
+}
+
+function compareArray<T>(a: readonly T[], b: readonly T[], compare: (a: T, b: T) => boolean) {
+  if (a.length != b.length) return false
+  for (let i = 0; i < a.length; i++) if (!compare(a[i], b[i])) return false
+  return true
 }
 
 function dynamicFacetSlot<Input, Output>(
