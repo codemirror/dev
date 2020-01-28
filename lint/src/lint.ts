@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, PluginValue, Decoration, DecorationSet, MarkDecorationSpec,
+import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
         WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass} from "../../view"
 import {Annotation, EditorSelection, StateField, Extension} from "../../state"
 import {hoverTooltip} from "../../tooltip"
@@ -168,7 +168,7 @@ const LintDelay = 500
 /// enables linting with that source. It will be called whenever the
 /// editor is idle (after its content changed).
 export function linter(source: (view: EditorView) => readonly Diagnostic[]): Extension {
-  class RunLintPlugin implements PluginValue {
+  const runLintPlugin = ViewPlugin.fromClass(class {
     lintTime = Date.now() + LintDelay
     set = true
 
@@ -197,9 +197,9 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
         }
       }
     }
-  }
+  })
   return [
-    ViewPlugin.fromClass(RunLintPlugin),
+    runLintPlugin,
     linting()
   ]
 }

@@ -303,6 +303,7 @@ export class EditorView {
   /// Collect all values provided by the active plugins for a given
   /// field.
   pluginField<T>(field: PluginField<T>): readonly T[] {
+    // FIXME make this error when called during plugin updating
     let result: T[] = []
     for (let plugin of this.plugins) plugin.takeField(field, result)
     return result

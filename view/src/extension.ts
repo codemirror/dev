@@ -51,8 +51,6 @@ let nextPluginID = 0
 
 export const viewPlugin = Facet.define<ViewPlugin<any>>()
 
-const classPlugin = typeof Symbol == "undefined" ? "_classPlugin" : Symbol("classPlugin")
-
 /// View plugins associate stateful values with a view. They can
 /// influence the way the content is drawn, and are notified of things
 /// that happen in the view.
@@ -78,10 +76,9 @@ export class ViewPlugin<T extends PluginValue> {
   }
 
   /// Create a plugin for a class whose constructor takes a single
-  /// editor view as argument. Will return the same value for the same
-  /// class when called multiple times.
+  /// editor view as argument.
   static fromClass<T extends PluginValue>(cls: {new (view: EditorView): T}) {
-    return (cls as any)[classPlugin] || ((cls as any)[classPlugin] = ViewPlugin.define(view => new cls(view)))
+    return ViewPlugin.define(view => new cls(view))
   }
 
   /// Create a new version of this plugin that provides a given

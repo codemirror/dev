@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
+import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
 import {StateField, Facet, Annotation, EditorSelection, SelectionRange} from "../../state"
 import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
@@ -40,7 +40,7 @@ class SearchState {
   constructor(readonly query: Query, readonly panel: readonly ((view: EditorView) => Panel)[]) {}
 }
 
-class SearchHighlighter implements PluginValue {
+const searchHighlighter = ViewPlugin.fromClass(class {
   decorations: DecorationSet
 
   constructor(readonly view: EditorView) {
@@ -64,7 +64,7 @@ class SearchHighlighter implements PluginValue {
     }
     return Decoration.set(deco)
   }
-}
+}).decorations()
 
 /// The configuration options passed to [`search`](#search.search).
 export interface SearchConfig {
@@ -105,7 +105,7 @@ export const search = function(config: SearchConfig) {
     searchState,
     keymap(keys),
     panelKeymap.of(panelKeys),
-    ViewPlugin.fromClass(SearchHighlighter),
+    searchHighlighter,
     panels(),
     baseTheme
   ]

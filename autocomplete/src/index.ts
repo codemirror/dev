@@ -51,7 +51,7 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
   return [
     activeCompletion,
     autocompleteConfig.of(config),
-    ViewPlugin.fromClass(Autocomplete),
+    autocompletePlugin,
     Precedence.Fallback.set(style),
     tooltips(),
     Precedence.Override.set(keymap({
@@ -188,7 +188,7 @@ function scrollIntoView(container: HTMLElement, element: HTMLElement) {
 
 const DebounceTime = 100
 
-class Autocomplete implements PluginValue {
+const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   stateVersion = 0
   debounce = -1
 
@@ -213,7 +213,7 @@ class Autocomplete implements PluginValue {
       this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result.items, 0, tooltip)))
     })
   }
-}
+})
 
 const style = EditorView.theme({
   "tooltip.autocomplete": {

@@ -13,10 +13,10 @@ type Measured = {
   innerHeight: number
 }
 
-class TooltipPlugin {
+const tooltipPlugin = ViewPlugin.fromClass(class {
   sources: readonly ((view: EditorView) => Tooltip)[]
   tooltips: Tooltip[]
-  measureReq: {read: () => Measured, write: (m: Measured) => void, key: TooltipPlugin}
+  measureReq: {read: () => Measured, write: (m: Measured) => void, key: any}
 
   constructor(readonly view: EditorView) {
     view.scrollDOM.addEventListener("scroll", this.onscroll = this.onscroll.bind(this))
@@ -95,7 +95,7 @@ class TooltipPlugin {
   onscroll() {
     if (this.tooltips.length) this.view.requestMeasure(this.measureReq)
   }
-}
+})
 
 const baseTheme = EditorView.baseTheme({
   tooltip: {
@@ -110,7 +110,7 @@ const baseTheme = EditorView.baseTheme({
 /// [`showTooltip`](#tooltip.showTooltip) to be used to define
 /// tooltips.
 export function tooltips() {
-  return [ViewPlugin.fromClass(TooltipPlugin), baseTheme]
+  return [tooltipPlugin, baseTheme]
 }
 
 /// Describes a tooltip.

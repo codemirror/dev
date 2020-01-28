@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
+import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
 import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
 
@@ -125,14 +125,14 @@ const unfixGutters = Facet.define<boolean, boolean>({
 /// horizontally.
 export function gutters(config?: {fixed?: boolean}) {
   let result = [
-    ViewPlugin.fromClass(GutterView),
+    gutterView,
     baseTheme
   ]
   if (config && config.fixed === false) result.push(unfixGutters.of(true))
   return result
 }
 
-class GutterView implements PluginValue {
+const gutterView = ViewPlugin.fromClass(class {
   gutters: SingleGutterView[]
   dom: HTMLElement
   fixed: boolean
@@ -200,7 +200,7 @@ class GutterView implements PluginValue {
     if (this.gutters.length == 0 || !this.fixed) return null
     return getComputedStyle(this.view.scrollDOM).direction == "ltr" ? {left: this.dom.offsetWidth} : {right: this.dom.offsetWidth}
   }
-}
+})
 
 class UpdateContext {
   next: () => (void | Range<GutterMarker>)
