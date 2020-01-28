@@ -6,17 +6,15 @@ import ist from "ist"
 describe("EditorView extension", () => {
   it("calls update when the viewport changes", () => {
     let viewports: {from: number, to: number}[] = []
-    class Plugin extends ViewPlugin {
-      constructor(view: EditorView) {
-        super()
-        viewports.push(view.viewport)
+    let plugin = ViewPlugin.define(view => {
+      viewports.push(view.viewport)
+      return {
+        update(update: ViewUpdate) {
+          if (update.viewportChanged) viewports.push(update.view.viewport)
+        }
       }
-      update(update: ViewUpdate) {
-        if (update.viewportChanged)
-          viewports.push(update.view.viewport)
-      }
-    }
-    let cm = tempEditor("x\n".repeat(500), [Plugin.register()])
+    })
+    let cm = tempEditor("x\n".repeat(500), [plugin])
     ist(viewports.length, 1)
     ist(viewports[0].from, 0)
     cm.dom.style.height = "300px"
@@ -33,19 +31,18 @@ describe("EditorView extension", () => {
 
   it("calls update on plugins", () => {
     let updates = 0, prevDoc: Text
-    class Plugin extends ViewPlugin {
-      constructor(view: EditorView) {
-        super()
-        prevDoc = view.state.doc
+    let plugin = ViewPlugin.define(view => {
+      prevDoc = view.state.doc
+      return {
+        update(update: ViewUpdate) {
+          ist(update.prevState.doc, prevDoc)
+          ist(update.state.doc, cm.state.doc)
+          prevDoc = cm.state.doc
+          updates++
+        }
       }
-      update(update: ViewUpdate) {
-        ist(update.prevState.doc, prevDoc)
-        ist(update.state.doc, cm.state.doc)
-        prevDoc = cm.state.doc
-        updates++
-      }
-    }
-    let cm = tempEditor("xyz", [Plugin.register()])
+    })
+    let cm = tempEditor("xyz", [plugin])
     ist(updates, 0)
     cm.dispatch(cm.state.t().replace(1, 2, "u"))
     ist(updates, 1)

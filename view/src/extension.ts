@@ -1,6 +1,6 @@
 import {EditorState, Transaction, ChangeSet, Facet, Extension} from "../../state"
- import {StyleModule} from "style-mod"
-import {Decoration, DecorationSet} from "./decoration"
+import {StyleModule} from "style-mod"
+import {DecorationSet} from "./decoration"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 import {Rect} from "./dom"
@@ -19,53 +19,131 @@ export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boole
 
 export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
 
-/// View plugins associate stateful values with a view. They can
-/// influence the way the content is drawn, and are notified of things
-/// that happen in the view.
-export class ViewPlugin {
+/// This is the interface plugin objects conform to.
+export interface PluginValue {
   /// Notifies the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
   /// that may be read by behaviors). It should _not_ change the DOM,
   /// or read the DOM in a way that triggers a layout recomputation.
-  update(_update: ViewUpdate): void {}
+  update?(_update: ViewUpdate): void
 
   /// Called when the plugin is no longer going to be used. Should
   /// revert any changes the plugin made to the DOM.
-  destroy(): void {}
-
-  // FIXME somehow ensure that no replacing decorations end up in here
-  decorations!: DecorationSet
-
-  scrollMargins!: Partial<Rect> | null
-
-  /// Create an extension that registers this plugin, optionally
-  /// passing an extra argument to its constructor. When called
-  /// without argument, this function will return the same value on
-  /// subsequent calls.
-  static register(this: {new (view: EditorView): ViewPlugin}): Extension
-  static register<Arg>(this: {new (view: EditorView, arg: Arg): ViewPlugin}, arg: Arg): Extension
-  static register<Arg>(this: {new (view: EditorView, arg: Arg): ViewPlugin}, arg?: Arg): Extension {
-    if (arg == null && (this as any)._extension) return (this as any)._extension
-    let ext = viewPlugin.of(view => new this(view, arg!))
-    if (arg == null) (this as any)._extension = ext
-    return ext
-  }
-
-  /// @internal
-  static dummy = new class DummyPlugin extends ViewPlugin {}
+  destroy?(): void
 }
 
-ViewPlugin.prototype.decorations = Decoration.none
-ViewPlugin.prototype.scrollMargins = null
+/// Plugin fields are a mechanism for allowing plugins to provide
+/// values that can be retrieved through the
+/// [`pluginValues`](#view.EditorView.pluginValues) view method.
+export class PluginField<T> {
+  static define<T>() { return new PluginField<T>() }
+
+  /// Plugins can provide additional scroll margins (space around the
+  /// sides of the scrolling element that should be considered
+  /// invisible) through this field. This can be useful when the
+  /// plugin introduces elements that cover part of that element (for
+  /// example a horizontally fixed gutter).
+  static scrollMargins = PluginField.define<Partial<Rect> | null>()
+}
+
+let nextPluginID = 0
+
+export const viewPlugin = Facet.define<ViewPlugin<any>>()
+
+/// View plugins associate stateful values with a view. They can
+/// influence the way the content is drawn, and are notified of things
+/// that happen in the view.
+export class ViewPlugin<T extends PluginValue> {
+  /// Instances of this class act as extensions.
+  extension: Extension
+
+  private constructor(
+    /// @internal
+    readonly id: number,
+    /// @internal
+    readonly create: (view: EditorView) => T,
+    /// @internal
+    readonly fields: readonly {field: PluginField<any>, get: (plugin: T) => any}[]
+  ) {
+    this.extension = viewPlugin.of(this)
+  }
+
+  /// Define a plugin from a constructor function that creates the
+  /// plugin's value, given an editor view.
+  static define<T extends PluginValue>(create: (view: EditorView) => T) {
+    return new ViewPlugin<T>(nextPluginID++, create, [])
+  }
+
+  /// Create a new version of this plugin that provides a given
+  /// [plugin field](#view.PluginField).
+  provide<V>(field: PluginField<V>, get: (plugin: T) => V) {
+    return new ViewPlugin(this.id, this.create, this.fields.concat({field, get}))
+  }
+
+  /// Create a new version of this plugin that provides decorations.
+  /// Decorations provided by plugins can observe the editor and base
+  /// on, for example, the current viewport. On the other hand, they
+  /// should not influence the viewport, for example through collapsed
+  /// regions or large widgets.
+  ///
+  /// When the plugin value type has a `decorations` property, that is
+  /// used to provide the decorations when no explicit getter is
+  /// provided.
+  decorations<V extends {decorations: DecorationSet} & PluginValue>(this: ViewPlugin<V>): ViewPlugin<T>
+  decorations(get: (plugin: T) => DecorationSet): ViewPlugin<T>
+  decorations(get?: (plugin: T) => DecorationSet) {
+    return this.provide(pluginDecorations, get || ((value: any) => value.decorations))
+  }
+}
+
+// FIXME somehow ensure that no replacing decorations end up in here
+export const pluginDecorations = PluginField.define<DecorationSet>()
+
+export class PluginInstance {
+  updateFunc: (update: ViewUpdate) => void
+
+  constructor(readonly value: PluginValue, readonly spec: ViewPlugin<any>) {
+    this.updateFunc = this.value.update ? this.value.update.bind(this.value) : () => undefined
+  }
+
+  static create(spec: ViewPlugin<any>, view: EditorView) {
+    let value
+    try { value = spec.create(view) }
+    catch (e) {
+      console.error("CodeMirror plugin crashed:", e)
+      return PluginInstance.dummy
+    }
+    return new PluginInstance(value, spec)
+  }
+
+  takeField<T>(type: PluginField<T>, target: T[]) {
+    for (let {field, get} of this.spec.fields) if (field == type) target.push(get(this.value))
+  }
+
+  update(update: ViewUpdate) {
+    try {
+      this.updateFunc(update)
+      return this
+    } catch (e) {
+      console.error("CodeMirror plugin crashed:", e)
+      return PluginInstance.dummy
+    }
+  }
+
+  destroy() {
+    try { if (this.value.destroy) this.value.destroy() }
+    catch (e) { console.error("CodeMirror plugin crashed:", e) }
+  }
+
+  static dummy = new PluginInstance({}, ViewPlugin.define(() => ({})))
+}
 
 export interface MeasureRequest<T> {
   key?: any
   read(view: EditorView): T
   write(measure: T, view: EditorView): void
 }
-
-export const viewPlugin = Facet.define<(view: EditorView) => ViewPlugin>()
 
 export const editorAttributes = Facet.define<Attrs, Attrs>({
   combine: values => values.reduce((a, b) => combineAttrs(b, a), {})

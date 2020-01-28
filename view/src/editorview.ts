@@ -10,7 +10,8 @@ import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule, domEventHandlers,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, ViewPlugin, decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
+        viewPlugin, ViewPlugin, PluginInstance, PluginField,
+        decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
 import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
@@ -98,8 +99,7 @@ export class EditorView {
   /// @internal
   readonly docView: DocView
 
-  /// @internal
-  plugins: ViewPlugin[] = []
+  private plugins: PluginInstance[] = []
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
@@ -132,7 +132,7 @@ export class EditorView {
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.viewState = new ViewState(config.state || EditorState.create())
-    this.plugins = this.state.facet(viewPlugin).map(ctor => createPlugin(this, ctor))
+    this.plugins = this.state.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
     this.observer = new DOMObserver(this, (from, to, typeOver) => applyDOMChange(this, from, to, typeOver),
                                     () => this.measure())
     this.docView = new DocView(this)
@@ -180,24 +180,26 @@ export class EditorView {
     let prevSpecs = update.prevState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
     if (prevSpecs != specs) {
       let newPlugins = [], reused = []
-      for (let ctor of specs) {
-        let found = prevSpecs.indexOf(ctor)
+      for (let spec of specs) {
+        let found = prevSpecs.indexOf(spec)
         if (found < 0) {
-          newPlugins.push(createPlugin(this, ctor))
+          newPlugins.push(PluginInstance.create(spec, this))
         } else {
-          let plugin = updatePlugin(update, this.plugins[found])
+          let plugin = this.plugins[found].update(update)
           reused.push(plugin)
           newPlugins.push(plugin)
         }
       }
       for (let plugin of this.plugins)
-        if (plugin.destroy && reused.indexOf(plugin) < 0) destroyPlugin(plugin)
+        if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
       this.plugins = newPlugins
     } else {
-      for (let i = 0; i < this.plugins.length; i++) this.plugins[i] = updatePlugin(update, this.plugins[i])
+      for (let i = 0; i < this.plugins.length; i++)
+        this.plugins[i] = this.plugins[i].update(update)
     }
   }
 
+  /// @internal
   measure() {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
     this.measureScheduled = 1 // Prevent requestMeasure calls from scheduling another animation frame
@@ -227,8 +229,7 @@ export class EditorView {
     this.measureScheduled = -1
   }
 
-  /// @internal
-  updateAttrs() {
+  private updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
       class: themeClass("wrap") + (this.hasFocus ? " cm-focused " : " ") +
         baseThemeID + " " + this.state.facet(theme).join(" ")
@@ -297,6 +298,23 @@ export class EditorView {
       }
       this.measureRequests.push(request)
     }
+  }
+
+  /// Collect all values provided by the active plugins for a given
+  /// field.
+  pluginField<T>(field: PluginField<T>): readonly T[] {
+    let result: T[] = []
+    for (let plugin of this.plugins) plugin.takeField(field, result)
+    return result
+  }
+
+  /// Get the value of a specific plugin, if present. Note that
+  /// plugins that crash can be dropped from a view, so even when you
+  /// know you registered a given plugin, it is recommended to check
+  /// the return value of this method.
+  plugin<T>(plugin: ViewPlugin<T>): T | null {
+    for (let inst of this.plugins) if (inst.spec == plugin) return inst.value as T
+    return null
   }
 
   /// Find the line or block widget at the given vertical position.
@@ -390,7 +408,7 @@ export class EditorView {
   /// plugins. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    for (let plugin of this.plugins) destroyPlugin(plugin)
+    for (let plugin of this.plugins) plugin.destroy()
     this.inputState.destroy()
     this.dom.remove()
     this.observer.destroy()
@@ -454,29 +472,6 @@ export class EditorView {
   /// Facet that provides editor DOM attributes for the editor's
   /// outer element.
   static editorAttributes = editorAttributes
-}
-
-function updatePlugin(update: ViewUpdate, plugin: ViewPlugin) {
-  try {
-    plugin.update(update)
-    return plugin
-  } catch (e) {
-    console.error("CodeMirror plugin crashed:", e)
-    return ViewPlugin.dummy
-  }
-}
-
-function destroyPlugin(plugin: ViewPlugin) {
-  try { plugin.destroy() }
-  catch (e) { console.error("CodeMirror plugin crashed:", e) }
-}
-
-function createPlugin(view: EditorView, ctor: (view: EditorView) => ViewPlugin) {
-  try { return ctor(view) }
-  catch (e) {
-    console.error("CodeMirror plugin crashed:", e)
-    return ViewPlugin.dummy
-  }
 }
 
 function ensureTop(given: number | undefined, dom: HTMLElement) {

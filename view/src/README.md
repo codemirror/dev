@@ -17,6 +17,10 @@ component that displays the editor state and allows text input.
 
 @ViewPlugin
 
+@PluginValue
+
+@PluginField
+
 @ViewUpdate
 
 ### Decorations

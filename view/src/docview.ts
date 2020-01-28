@@ -6,7 +6,7 @@ import {Viewport, decoChanges, extendWithRanges} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection} from "./dom"
-import {ViewUpdate, decorations as decorationsFacet} from "./extension"
+import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet} from "./extension"
 import {EditorView} from "./editorview"
 import {ChangedRange} from "../../state"
 
@@ -348,8 +348,7 @@ export class DocView extends ContentView {
   }
 
   gatherLocalDeco() {
-    let deco = [this.computeGapDeco(), this.compositionDeco]
-    for (let plugin of this.view.plugins) deco.push(plugin.decorations)
+    let deco = [this.computeGapDeco(), this.compositionDeco].concat(this.view.pluginField(pluginDecorations))
     return this.localDeco = deco
   }
 
@@ -357,8 +356,8 @@ export class DocView extends ContentView {
     let rect = this.coordsAt(pos)
     if (!rect) return
     let mLeft = 0, mRight = 0, mTop = 0, mBottom = 0
-    for (let plugin of this.view.plugins) if (plugin.scrollMargins) {
-      let {left, right, top, bottom} = plugin.scrollMargins
+    for (let margins of this.view.pluginField(PluginField.scrollMargins)) if (margins) {
+      let {left, right, top, bottom} = margins
       if (left != null) mLeft = Math.max(mLeft, left)
       if (right != null) mRight = Math.max(mRight, right)
       if (top != null) mTop = Math.max(mTop, top)
