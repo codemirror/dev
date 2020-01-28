@@ -1,6 +1,6 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
-import {EditorView, ViewPlugin, ViewUpdate, Decoration, Range} from "../../view"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet, Range} from "../../view"
 import {EditorState} from "../../state"
 
 const Inherit = 1
@@ -117,7 +117,7 @@ export class TagSystem {
   highlighter(spec: {[tag: string]: Style}) {
     let styling = new Styling(this, spec)
     return [
-      Highlighter.register([this.prop, styling]),
+      ViewPlugin.define(view => new Highlighter(view, this.prop, styling)).decorations(),
       EditorView.styleModule.of(styling.module)
     ]
   }
@@ -247,14 +247,11 @@ class Styling {
   }
 }
 
-class Highlighter extends ViewPlugin {
+class Highlighter implements PluginValue {
   tree: Tree
-  private prop: NodeProp<number>
-  private styling: Styling
+  decorations: DecorationSet
 
-  constructor(view: EditorView, arg: [NodeProp<number>, Styling]) {
-    super()
-    ;[this.prop, this.styling] = arg
+  constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
     this.tree = view.state.tree
     this.decorations = this.buildDeco(view.viewport, this.tree)
   }

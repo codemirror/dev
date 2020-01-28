@@ -13,13 +13,12 @@ type Measured = {
   innerHeight: number
 }
 
-class TooltipPlugin extends ViewPlugin {
+class TooltipPlugin {
   sources: readonly ((view: EditorView) => Tooltip)[]
   tooltips: Tooltip[]
   measureReq: {read: () => Measured, write: (m: Measured) => void, key: TooltipPlugin}
 
   constructor(readonly view: EditorView) {
-    super()
     view.scrollDOM.addEventListener("scroll", this.onscroll = this.onscroll.bind(this))
     this.measureReq = {read: this.readMeasure.bind(this), write: this.writeMeasure.bind(this), key: this}
     this.sources = view.state.facet(showTooltip)
@@ -111,7 +110,7 @@ const baseTheme = EditorView.baseTheme({
 /// [`showTooltip`](#tooltip.showTooltip) to be used to define
 /// tooltips.
 export function tooltips() {
-  return [TooltipPlugin.register(), baseTheme]
+  return [ViewPlugin.fromClass(TooltipPlugin), baseTheme]
 }
 
 /// Describes a tooltip.
@@ -152,20 +151,15 @@ export interface HoverTooltip {
   tooltip: (view: EditorView) => Tooltip,
 }
 
-class HoverPlugin extends ViewPlugin {
+class HoverPlugin {
   lastMouseMove: MouseEvent | null = null
   hoverTimeout = -1
   mouseInside = false
-  readonly source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null
-  readonly field: StateField<HoverTooltip | null>
-  readonly setHover: Annotation<HoverTooltip | null>
 
   constructor(readonly view: EditorView,
-              args: [(view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
-                     StateField<HoverTooltip | null>,
-                     Annotation<HoverTooltip | null>]) {
-    super()
-    ;[this.source, this.field, this.setHover] = args
+              readonly source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
+              readonly field: StateField<HoverTooltip | null>,
+              readonly setHover: Annotation<HoverTooltip | null>) {
     this.checkHover = this.checkHover.bind(this)
     view.dom.addEventListener("mouseenter", this.mouseenter = this.mouseenter.bind(this))
     view.dom.addEventListener("mouseleave", this.mouseleave = this.mouseleave.bind(this))
@@ -260,7 +254,7 @@ export function hoverTooltip(
 
   return [
     hoverState,
-    HoverPlugin.register([source, hoverState, setHover]),
+    ViewPlugin.define(view => new HoverPlugin(view, source, hoverState, setHover)),
     tooltips()
   ]
 }

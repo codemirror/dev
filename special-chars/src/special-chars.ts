@@ -1,4 +1,4 @@
-import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
+import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, PluginValue, ViewUpdate, EditorView} from "../../view"
 import {combineConfig, ChangedRange, Facet} from "../../state"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
@@ -60,18 +60,17 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
 /// Returns an extension that installs highlighting of special
 /// characters.
 export function specialChars(config: SpecialCharConfig = {}) {
-  return [specialCharConfig.of(config), SpecialCharPlugin.register(), styleExt]
+  return [specialCharConfig.of(config), ViewPlugin.fromClass(SpecialCharPlugin), styleExt]
 }
 
 const JOIN_GAP = 10
 
-class SpecialCharPlugin extends ViewPlugin {
+class SpecialCharPlugin implements PluginValue {
   from = 0
   to = 0
   decorations: DecorationSet = Decoration.none
 
   constructor(public view: EditorView) {
-    super()
     this.updateForViewport()
   }
 

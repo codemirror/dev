@@ -1,4 +1,4 @@
-import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
+import {ViewPlugin, PluginValue, ViewUpdate, EditorView} from "../../view"
 import {combineConfig, Annotation, EditorSelection, EditorState,
         Transaction, Extension, StateField, Facet, Precedence} from "../../state"
 import {keymap} from "../../keymap"
@@ -51,7 +51,7 @@ export function autocomplete(config: Partial<AutocompleteData> = {}): Extension 
   return [
     activeCompletion,
     autocompleteConfig.of(config),
-    Autocomplete.register(),
+    ViewPlugin.fromClass(Autocomplete),
     Precedence.Fallback.set(style),
     tooltips(),
     Precedence.Override.set(keymap({
@@ -188,13 +188,11 @@ function scrollIntoView(container: HTMLElement, element: HTMLElement) {
 
 const DebounceTime = 100
 
-class Autocomplete extends ViewPlugin {
+class Autocomplete implements PluginValue {
   stateVersion = 0
   debounce = -1
 
-  constructor(readonly view: EditorView) {
-    super()
-  }
+  constructor(readonly view: EditorView) {}
 
   update(update: ViewUpdate) {
     if (!(update.docChanged || update.selectionSet ||

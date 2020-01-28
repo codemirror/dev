@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet} from "../../rangeset"
 import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
 
@@ -21,7 +21,7 @@ export abstract class GutterMarker extends RangeValue {
   }
 
   /// Render the DOM node for this marker, if any.
-  toDOM(view: EditorView): Node | null { return null }
+  toDOM(_view: EditorView): Node | null { return null }
 
   /// Create a range that places this marker at the given position.
   at(pos: number) { return new Range(pos, pos, this) }
@@ -77,7 +77,7 @@ const defaults = {
 const activeGutters = Facet.define<Required<GutterConfig>>()
 
 /// Define an editor gutter.
-export function gutter(config: GutterConfig) {
+export function gutter(config: GutterConfig): Extension {
   return [gutters(), activeGutters.of(fillConfig(config, defaults))]
 }
 
@@ -125,20 +125,19 @@ const unfixGutters = Facet.define<boolean, boolean>({
 /// horizontally.
 export function gutters(config?: {fixed?: boolean}) {
   let result = [
-    GutterView.register(),
+    ViewPlugin.fromClass(GutterView),
     baseTheme
   ]
   if (config && config.fixed === false) result.push(unfixGutters.of(true))
   return result
 }
 
-class GutterView extends ViewPlugin {
+class GutterView implements PluginValue {
   gutters: SingleGutterView[]
   dom: HTMLElement
   fixed: boolean
 
   constructor(readonly view: EditorView) {
-    super()
     this.dom = document.createElement("div")
     this.dom.className = themeClass("gutters")
     this.dom.setAttribute("aria-hidden", "true")
@@ -165,7 +164,7 @@ class GutterView extends ViewPlugin {
 
       for (let cx of contexts) cx.line(this.view, text)
     }, 0)
-    for (let cx of contexts) cx.finish(this.view)
+    for (let cx of contexts) cx.finish()
     this.dom.style.minHeight = this.view.contentHeight + "px"
     if (update.state.facet(unfixGutters) != this.fixed) {
       this.fixed = !this.fixed
@@ -244,7 +243,7 @@ class UpdateContext {
     this.i++
   }
 
-  finish(view: EditorView) {
+  finish() {
     let gutter = this.gutter
     while (gutter.elements.length > this.i) gutter.dom.removeChild(gutter.elements.pop()!.dom)
   }
@@ -321,7 +320,7 @@ class GutterElement {
   }
 }
 
-function sameMarkers<T>(a: readonly GutterMarker[], b: readonly GutterMarker[]): boolean {
+function sameMarkers(a: readonly GutterMarker[], b: readonly GutterMarker[]): boolean {
   if (a.length != b.length) return false
   for (let i = 0; i < a.length; i++) if (!a[i].compare(b[i])) return false
   return true

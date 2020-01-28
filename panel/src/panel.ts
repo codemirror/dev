@@ -1,8 +1,8 @@
-import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate, themeClass} from "../../view"
 import {Facet} from "../../state"
 
 /// Enables the panel-managing extension.
-export function panels() { return [Panels.register(), baseTheme] }
+export function panels() { return [ViewPlugin.fromClass(Panels), baseTheme] }
 
 export interface Panel {
   /// The element representing this panel.
@@ -28,14 +28,13 @@ export interface Panel {
 /// panel through this facet.
 export const showPanel = Facet.define<(view: EditorView) => Panel>()
 
-class Panels extends ViewPlugin {
+class Panels implements PluginValue {
   specs: readonly ((view: EditorView) => Panel)[]
   panels: Panel[]
   top: PanelGroup
   bottom: PanelGroup
 
   constructor(view: EditorView) {
-    super()
     this.specs = view.state.facet(showPanel)
     this.panels = this.specs.map(spec => spec(view))
     this.top = new PanelGroup(view, true, this.panels.filter(p => p.top)) 

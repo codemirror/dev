@@ -27,7 +27,7 @@ export class LezerSyntax implements Syntax {
     this.extension = [
       EditorState.syntax.of(this),
       this.field,
-      HighlightWorker.register([this, setSyntax]),
+      ViewPlugin.define(view => new HighlightWorker(view, this, setSyntax)),
       syntaxIndentation(this),
       syntaxFolding(this)
     ]
@@ -187,14 +187,12 @@ let cancelIdle: (id: number) => void = typeof window != "undefined" && (window a
 // multi-megabyte document every time you insert a backtick, even if
 // it happens in the background.
 
-class HighlightWorker extends ViewPlugin {
+class HighlightWorker {
   working: number = -1
-  readonly syntax: LezerSyntax
-  readonly setSyntax: Annotation<SyntaxState>
 
-  constructor(readonly view: EditorView, arg: [LezerSyntax, Annotation<SyntaxState>]) {
-    super()
-    ;[this.syntax, this.setSyntax] = arg
+  constructor(readonly view: EditorView, 
+              readonly syntax: LezerSyntax,
+              readonly setSyntax: Annotation<SyntaxState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
   }

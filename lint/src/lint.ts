@@ -1,5 +1,5 @@
-import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec, WidgetDecorationSpec,
-        WidgetType, ViewUpdate, Command, themeClass} from "../../view"
+import {EditorView, ViewPlugin, PluginValue, Decoration, DecorationSet, MarkDecorationSpec,
+        WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass} from "../../view"
 import {Annotation, EditorSelection, StateField, Extension} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, Panel, showPanel} from "../../panel"
@@ -65,7 +65,7 @@ const lintState = StateField.define<LintState>({
   create() {
     return new LintState(Decoration.none, null, null)
   },
-  update(value, tr, state) {
+  update(value, tr) {
     let setDiag = tr.annotation(setDiagnostics)
     if (setDiag) {
       let ranges = Decoration.set(setDiag.map(d => {
@@ -168,12 +168,11 @@ const LintDelay = 500
 /// enables linting with that source. It will be called whenever the
 /// editor is idle (after its content changed).
 export function linter(source: (view: EditorView) => readonly Diagnostic[]): Extension {
-  class RunLintPlugin extends ViewPlugin {
+  class RunLintPlugin implements PluginValue {
     lintTime = Date.now() + LintDelay
     set = true
 
     constructor(readonly view: EditorView) {
-      super()
       this.run = this.run.bind(this)
       setTimeout(this.run, LintDelay)
     }
@@ -200,7 +199,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
     }
   }
   return [
-    RunLintPlugin.register(),
+    ViewPlugin.fromClass(RunLintPlugin),
     linting()
   ]
 }
@@ -224,7 +223,7 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
 }
 
 class DiagnosticWidget extends WidgetType<Diagnostic> {
-  toDOM(view: EditorView) {
+  toDOM() {
     let elt = document.createElement("span")
     elt.className = themeClass("lintPoint." + this.value.severity)
     return elt
@@ -299,7 +298,7 @@ class LintPanel implements Panel {
   update() {
     let {diagnostics, selected} = this.view.state.field(lintState)
     let i = 0, needsSync = false, newSelectedItem: PanelItem | null = null
-    diagnostics.between(0, this.view.state.doc.length, (start, end, {spec}) => {
+    diagnostics.between(0, this.view.state.doc.length, (_start, _end, {spec}) => {
       let found = -1, item
       for (let j = i; j < this.items.length; j++)
         if (this.items[j].diagnostic == spec.diagnostic) { found = j; break }

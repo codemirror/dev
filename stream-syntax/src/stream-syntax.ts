@@ -1,6 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateField, Syntax, languageData, Extension, Annotation} from "../../state"
-import {EditorView, ViewPlugin, ViewUpdate} from "../../view"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "../../view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
 
@@ -103,7 +103,7 @@ export class StreamSyntax implements Syntax {
     })
     this.extension = [
       EditorState.syntax.of(this),
-      HighlightWorker.register([this.parser, this.field, setSyntax]),
+      ViewPlugin.define(view => new HighlightWorker(view, this.parser, this.field, setSyntax)),
       this.field,
       EditorState.indentation.of((state: EditorState, pos: number) => {
         return state.field(this.field).getIndent(this.parser, state, pos)
@@ -236,16 +236,13 @@ let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number 
   ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
 let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
 
-class HighlightWorker extends ViewPlugin {
+class HighlightWorker implements PluginValue {
   working: number = -1
-  readonly parser: StreamParserInstance<any>
-  readonly field: StateField<SyntaxState<any>>
-  readonly setSyntax: Annotation<SyntaxState<any>>
 
   constructor(readonly view: EditorView,
-              arg: [StreamParserInstance<any>, StateField<SyntaxState<any>>, Annotation<SyntaxState<any>>]) {
-    super()
-    ;[this.parser, this.field, this.setSyntax] = arg
+              readonly parser: StreamParserInstance<any>,
+              readonly field: StateField<SyntaxState<any>>,
+              readonly setSyntax: Annotation<SyntaxState<any>>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
   }
