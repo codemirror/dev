@@ -251,9 +251,10 @@ export class StateField<Value> {
 /// [provided](#state.EditorStateConfig.extensions) when creating a
 /// state to attach various kinds of configuration and behavior
 /// information. It may an extension object, such as a [state
-/// field](#state.StateField) or facet provider, or an array of other
-/// extensions.
-export type Extension = {[isExtension]: true} | readonly Extension[]
+/// field](#state.StateField) or facet provider, any object with an
+/// extension in its `extension` property, or an array of extension
+/// values.
+export type Extension = {[isExtension]: true} | {extension: Extension} | readonly Extension[]
 
 /// By default extensions are registered in the order they are
 /// provided in a flattening of the nested arrays that were provided.
@@ -366,6 +367,8 @@ function flatten(extension: Extension) {
     seen.add(ext)
     if (Array.isArray(ext)) {
       for (let e of ext) inner(e, prec)
+    } else if ((ext as any).extension) {
+      inner((ext as any).extension, prec)
     } else if (ext instanceof PrecExtension) {
       inner(ext.e, ext.prec)
     } else {
