@@ -35,43 +35,7 @@ class Value extends RangeValue {
   }
 }
 
-function depth(set: RangeSet<Value>): number {
-  return 1 + Math.max(0, ...set.children.map(depth))
-}
-function maxSize(set: RangeSet<Value>): number {
-  return Math.max(set.local.length, ...set.children.map(maxSize))
-}
-function size(set: RangeSet<Value>): number {
-  return set.children.reduce((a, b) => a + size(b), set.local.length)
-}
-function avgSize(set: RangeSet<Value>): number {
-  let total = 0, count = 0
-  function scan(set: RangeSet<Value>) {
-    total += set.local.length + set.children.length
-    count++
-    set.children.forEach(scan)
-  }
-  scan(set)
-  return total / count
-}
-function checkSet(set: RangeSet<Value>, offset: number = 0) {
-  ist(set.length, 0, ">=")
-  ist(size(set), set.size)
-  let off = 0
-  for (let i = 0; i < set.children.length; i++) {
-    let child = set.children[i]
-    checkSet(child, offset + off)
-    off += child.length
-  }
-  ist(off, set.length, "<=")
-  for (let i = 0; i < set.local.length; i++) {
-    let range = set.local[i]
-    if (range.value.pos != null) ist(offset + range.from, range.value.pos)
-    ist(range.to, range.from, ">=")
-    ist(range.from, 0, ">=")
-    ist(range.to, set.length, "<=")
-  }
-}
+function cmp(a: Range<Value>, b: Range<Value>) { return a.from - b.from }
 
 function mk(from: number, to?: any, spec?: any): Range<Value> {
   if (typeof to != "number") { spec = to; to = from }
@@ -86,82 +50,82 @@ for (let i = 0; i < 5000; i++)
 let _set0: RangeSet<Value> | null = null
 function set0() { return _set0 || (_set0 = mkSet(smallRanges)) }
 
+function checkSet(set: RangeSet<Value>) {
+  let count = 0
+  set.between(0, set.length, (from, _, value) => {
+    count++
+    if (value.pos != null) ist(from, value.pos)
+  })
+  ist(count, set.size)
+}
+
 describe("RangeSet", () => {
-  it("creates a balanced tree", () => {
-    let set = mkSet(smallRanges.concat([mk(1000, 4000, {pos: 1000}), mk(2000, 3000, {pos: 2000})]))
+  it("divides a set into chunks and layers", () => {
+    let set = mkSet(smallRanges.concat([mk(1000, 4000, {pos: 1000}), mk(2000, 3000, {pos: 2000})]).sort(cmp))
     ist(set.size, 5002)
-    ist(size(set), 5002)
-    ist(depth(set), 4, "<")
-    ist(maxSize(set), 64, "<=")
-    ist(avgSize(set), 24, ">")
+    ist(set.chunk.length, 1, ">")
+    ist(set.nextLayer.size)
     checkSet(set)
   })
 
-  describe("update", () => {
-    it("can add ranges to an existing set", () => {
-      let set = set0().update([mk(2000, {pos: 2000}), mk(2008, 2200, {pos: 2008})])
-      ist(set.size, 5002)
-      checkSet(set)
-      ist(set.children[0], set0().children[0])
-      ist(set.children[set.children.length - 1], set0().children[set0().children.length - 1])
+  it("complains about misordered ranges", () => {
+    ist.throws(() => mkSet([mk(8, 9), mk(7, 10)]), /sorted/)
+    ist.throws(() => mkSet([mk(1, 1, {startSide: 1}), mk(1, 1, {startSide: -1})]), /sorted/)
+  })
+
+  describe("merge", () => {
+    it("can merge sets", () => {
+      let set = set0().merge(mkSet([mk(4000, {pos: 4000})]))
+      ist(set.size, 5001)
+      ist(set.chunk[0], set0().chunk[0])
     })
 
     it("can add a large amount of ranges", () => {
-      let set0 = mkSet([mk(0, {pos: 0}), mk(100, {pos: 100}), mk(2, 4000, {pos: 2}), mk(10000, {pos: 10000})])
-      let set = set0.update(smallRanges)
-      ist(set.size, 5004)
+      let build = RangeSet.build<Value>()
+      for (let i = 0; i < 4000; i += 2) build.add(i, i, new Value({pos: i}))
+      let set = build.finish().merge(set0())
+      ist(set.size, 2000 + set0().size)
       checkSet(set)
     })
+  })
 
+  describe("filter", () => {
     it("can filter ranges", () => {
-      let set = set0().update([], from => from >= 2500)
+      let set = set0().filter(from => from >= 2500)
       ist(set.size, 2500)
+      ist(set.chunk.length, set0().chunk.length, "<")
       checkSet(set)
-      ist(set.children[set.children.length - 1], set0().children[set0().children.length - 1])
     })
 
     it("can filter all over", () => {
-      let set = set0().update([], from => (from % 200) >= 100)
+      let set = set0().filter(from => (from % 200) >= 100)
       ist(set.size, 2500)
       checkSet(set)
     })
 
-    it("can add and remove in one go", () => {
-      let set = set0().update([mk(25, 30, {pos: 25})], from => from % 1000 > 0)
-      ist(set.size, 4996)
-      checkSet(set)
-    })
-
-    it("collapses the tree when removing almost all ranges", () => {
-      let set = set0().update([], from => from == 500 || from == 501)
+    it("collapses the chunks when removing almost all ranges", () => {
+      let set = set0().filter(from => from == 500 || from == 501)
       ist(set.size, 2)
-      ist(depth(set), 1)
+      ist(set.chunk.length, 1)
     })
 
-    it("doesn't call filter on ranges outside the filter range", () => {
-      let called = 0
-      set0().update([], () => (called++, true), 2000, 2005)
-      ist(called, 10, "<")
+    it("calls filter on precisely those ranges touching the filter range", () => {
+      let ranges = []
+      for (let i = 0; i < 1000; i++) ranges.push(mk(i, i + 1, {pos: i}))
+      let set = mkSet(ranges)
+      let called: [number, number][] = []
+      set.filter((from, to) => (called.push([from, to]), true), 400, 600)
+      ist(called.length, 202)
+      for (let i = 399, j = 0; i <= 600; i++, j++)
+        ist(called[j].join(), `${i},${i+1}`)
     })
 
-    it("reuses unchanged nodes", () => {
-      ist(set0().update([], () => true), set0())
+    it("reuses sets when filter doesn't remove anything", () => {
+      ist(set0().filter(() => true), set0())
     })
 
-    it("creates a sorted set", () => {
-      let set = mkSet([mk(2, 4, "a"), mk(8, 11, "a")])
-        .update([mk(3, 9, "b"), mk(16, 17, "b")])
-      ist(set.local.map(d => d.from).join(","), "2,3,8,16")
-    })
-
-    it("moves locals down when splitting a leaf", () => {
-      let set = mkSet([mk(2), mk(3), mk(4), mk(5)])
-        .update(new Array(200).fill(undefined).map((_, i) => mk(i, i + 1)))
-      ist(set.local.length, 0)
-    })
-
-    it("can add 33 pathological ranges", () => {
-      RangeSet.empty.update(new Array(33).fill(undefined).map((_, i) => mk(0, 1 + i)))
+    it("returns the empty set when filter removes everything", () => {
+      ist(set0().filter(() => false), RangeSet.empty)
     })
   })
 
@@ -169,10 +133,9 @@ describe("RangeSet", () => {
     function test(positions: Range<Value>[], changes: [number, number, number][], newPositions: (number | [number, number])[]) {
       let set = mkSet(positions)
       let mapped = set.map(new ChangeSet(changes.map(([from, to, len]) => new Change(from, to, ["x".repeat(len)]))))
-      let out: Range<Value>[] = []
-      mapped.collect(out, 0)
-      ist(JSON.stringify(out.map(d => d.from + "-" + d.to)),
-          JSON.stringify(newPositions.map(p => Array.isArray(p) ? {from: p[0], to: p[1]} : {from: p, to: p}).map(r => r.from + "-" + r.to)))
+      let out: string[] = []
+      for (let iter = mapped.iter(); iter.value; iter.next()) out.push(iter.from + "-" + iter.to)
+      ist(JSON.stringify(out), JSON.stringify(newPositions.map(p => Array.isArray(p) ? p[0] + "-" + p[1] : p + "-" + p)))
     }
 
     it("can map through changes", () =>
@@ -182,7 +145,7 @@ describe("RangeSet", () => {
        test([mk(1, 2, {startSide: -1, endSide: 1})], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
 
     it("uses side to determine mapping of points", () =>
-       test([mk(1, 1, {startSide: 1}), mk(1, 1, {startSide: -1})], [[1, 1, 2]], [1, 3]))
+       test([mk(1, 1, {startSide: -1}), mk(1, 1, {startSide: 1})], [[1, 1, 2]], [1, 3]))
 
     it("defaults to exclusive on both sides", () =>
        test([mk(1, 2)], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
@@ -199,30 +162,11 @@ describe("RangeSet", () => {
     it("leaves point ranges on change boundaries", () =>
        test([mk(2), mk(4)], [[2, 4, 6]], [2, 8]))
 
-    it("adjusts the set tree shape", () => {
-      let child0Size = set0().children[0].length, child1Size = set0().children[1].length
-      let set = set0().map(new ChangeSet([new Change(0, 0, ["hi"]), new Change(child0Size + 3, child0Size + 5, [""])]))
-      ist(set.size, set0().size, "<=")
-      ist(set.size, set0().size - 2, ">")
-      ist(set.children[0].length, child0Size + 2)
-      ist(set.children[1].length, child1Size - 2)
-      ist(set.children[2].length, set0().children[2].length)
-    })
-
-    it("allows ranges to escape their parent node", () => {
-      let ranges = []
-      for (let i = 0; i < 100; i++)
-        ranges.push(mk(i, i + 1, {startSide: -1, endSide: 1}))
-      let set0 = mkSet(ranges), nodeBoundary = set0.children[0].length
-      let set = set0.map(new ChangeSet([new Change(nodeBoundary, nodeBoundary, ["hello"])]))
-      ist(set.size, set0.size)
-      checkSet(set)
-    })
-
-    it("removes point tree nodes", () => {
-      let set = set0().map(new ChangeSet([new Change(0, 6000, [""])]))
-      ist(set.size, 0)
-      ist(depth(set), 1)
+    it("can collapse chunks", () => {
+      let smaller = set0().map(new ChangeSet([new Change(30, 4500, [""])]))
+      ist(smaller.chunk.length, set0().chunk.length, "<")
+      let empty = smaller.map(new ChangeSet([new Change(0, 1000, [""])]))
+      ist(empty, RangeSet.empty)
     })
   })
 
@@ -242,15 +186,17 @@ describe("RangeSet", () => {
       let newSet = set
       let docRanges: ChangedRange[] = []
       if (update.changes) {
-        let changes = new ChangeSet(update.changes.map(([from, to, len]: [number, number, number]) => new Change(from, to, ["x".repeat(len)])))
+        let changes = new ChangeSet(update.changes.map(([from, to, len]: [number, number, number]) => {
+          return new Change(from, to, ["x".repeat(len)])
+        }))
         newSet = newSet.map(changes)
         docRanges = changes.changedRanges()
       }
-      if (update.add || update.filter)
-        newSet = newSet.update(update.add || [], update.filter)
+      if (update.filter) newSet = newSet.filter(update.filter)
+      if (update.add) newSet = newSet.merge(mkSet(update.add))
       if (update.prepare) update.prepare(newSet)
       let comp = new Comparator
-      set.compare(newSet, docRanges, comp, Math.max(set.length, newSet.length))
+      RangeSet.compare([set], [newSet], 0, 1e8, docRanges, comp)
       ist(JSON.stringify(comp.ranges), JSON.stringify(changes))
     }
 
@@ -278,28 +224,18 @@ describe("RangeSet", () => {
 
     it("ignores identical sub-nodes", () => {
       let ranges = []
-      for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
+      for (let i = 0; i < 1000; i++) ranges.push(mk(i, i + 1, "a"))
       test(ranges, {
         changes: [[900, 1000, 0]],
         add: [mk(850, 860, "b")],
-        prepare: (set: RangeSet<Value>) => Object.defineProperty(set.children[0], "local", {get() { throw new Error("NO TOUCH") }})
+        prepare: (set: RangeSet<Value>) => Object.defineProperty(set.chunk[0], "value", {get() { throw new Error("NO TOUCH") }})
       }, [850, 860])
-    })
-
-    it("ignores point sub-nodes", () => {
-      let ranges = [mk(3, 997, {point: true})]
-      for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
-      let set = mkSet(ranges)
-      test(set, {
-        add: [mk(set.children[0].length + 1, set.children[0].length + 2, "b")],
-        prepare: (set: RangeSet<Value>) => Object.defineProperty(set.children[2], "local", {get() { throw new Error("NO TOUCH") }})
-      }, [])
     })
 
     it("ignores changes in points", () => {
       let ranges = [mk(3, 997, {point: true})]
       for (let i = 0; i < 1000; i += 2) ranges.push(mk(i, i + 1, "a"))
-      let set = mkSet(ranges)
+      let set = mkSet(ranges.sort(cmp))
       test(set, {
         changes: [[300, 500, 100]]
       }, [])
@@ -339,7 +275,6 @@ describe("RangeSet", () => {
     point(from: number, to: number, value: Value) {
       return (to > from ? (to - from) + "=" : "") + (value.name ? "[" + value.name + "]" : "ø")
     }
-    ignore(from: number, to: number, value: Value) { return !value.name && !value.point }
   }
 
   describe("iterateSpans", () => {
@@ -353,19 +288,13 @@ describe("RangeSet", () => {
     it("can retrieve a limited range", () => {
       let decos = [mk(0, 200, "wide")]
       for (let i = 0; i < 100; i++) decos.push(mk(i * 2, i * 2 + 2, "span" + i))
-      let set = mkSet(decos), start = set.children[0].length + set.children[1].length - 3, end = start + 6
+      let set = mkSet(decos), start = 20, end = start + 6
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
         expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "/wide"
       let builder = new Builder
       RangeSet.iterateSpans([set], start, end, builder)
       ist(builder.spans.join(" "), expected)
-    })
-
-    it("ignores decorations that don't affect spans", () => {
-      let decos = [mk(0, 10, "yes"), mk(5, 6)], builder = new Builder
-      RangeSet.iterateSpans([mkSet(decos)], 2, 15, builder)
-      ist(builder.spans.join(" "), "8=yes 5")
     })
 
     it("reads from multiple sets at once", () => {
@@ -379,20 +308,19 @@ describe("RangeSet", () => {
 
   describe("iter", () => {
     it("iterates over ranges", () => {
-      const set = mkSet(smallRanges.concat([mk(1000, 4000, {pos: 1000}), mk(2000, 3000, {pos: 2000})]))
-      const iter = set.iter()
+      const set = mkSet(smallRanges.concat([mk(1000, 4000, {pos: 1000}), mk(2000, 3000, {pos: 2000})]).sort(cmp))
       let count = 0
-      for(let item; item = iter.next(); ++count) {
-        ist(item.from, count > 2001 ? count - 2 : (count > 1000 ? count - 1 : count))
+      for(let iter = set.iter(); iter.value; iter.next(), count++) {
+        ist(iter.from, count > 2001 ? count - 2 : (count > 1000 ? count - 1 : count))
       }
       ist(count, 5002)
     })
 
     it("can iterate over a subset", () => {
-      let iter = set0().iter(1000, 2000), count = 0
-      for (let item; item = iter.next(); count++) {
-        ist(item.from, 2000, "<=")
-        ist(item.to, 1000, ">=")
+      let count = 0
+      for (let iter = set0().iter(1000); iter.value; iter.next(), count++) {
+        if (iter.from > 2000) break
+        ist(iter.to, iter.from + 1 + (iter.from % 4))
       }
       ist(count, 1003)
     })
@@ -401,7 +329,7 @@ describe("RangeSet", () => {
   describe("between", () => {
     it("iterates over ranges", () => {
       let found = 0
-      set0().between(100, 200, (from, to, v) => {
+      set0().between(100, 200, (from, to) => {
         ist(to, from + 1 + (from % 4))
         ist(to, 100, ">=")
         ist(from, 200, "<=")
