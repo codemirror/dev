@@ -137,13 +137,13 @@ export abstract class HeightMap {
   // Base case is to replace a leaf node, which simply builds a tree
   // from the new nodes and returns that (HeightMapBranch and
   // HeightMapGap override this to actually use from/to)
-  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+  replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
     return HeightMap.of(nodes)
   }
 
   // Again, these are base cases, and are overridden for branch and gap nodes.
-  decomposeLeft(to: number, result: (HeightMap | null)[]) { result.push(this) }
-  decomposeRight(from: number, result: (HeightMap | null)[]) { result.push(this) }
+  decomposeLeft(_to: number, result: (HeightMap | null)[]) { result.push(this) }
+  decomposeRight(_from: number, result: (HeightMap | null)[]) { result.push(this) }
 
   applyChanges(decorations: readonly DecorationSet[], oldDoc: Text, oracle: HeightOracle,
                changes: readonly ChangedRange[]): HeightMap {
@@ -214,19 +214,19 @@ HeightMap.prototype.size = 1
 class HeightMapBlock extends HeightMap {
   constructor(length: number, height: number, readonly type: BlockType) { super(length, height) }
 
-  blockAt(height: number, doc: Text, top: number, offset: number) {
+  blockAt(_height: number, _doc: Text, top: number, offset: number) {
     return new BlockInfo(offset, this.length, top, this.height, this.type)
   }
 
-  lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
+  lineAt(_value: number, _type: QueryType, doc: Text, top: number, offset: number) {
     return this.blockAt(0, doc, top, offset)
   }
 
-  forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
+  forEachLine(_from: number, _to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
     f(this.blockAt(0, doc, top, offset))
   }
 
-  updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights) {
+  updateHeight(oracle: HeightOracle, offset: number = 0, _force: boolean = false, measured?: MeasuredHeights) {
     if (measured && measured.from <= offset && measured.more)
       this.setHeight(oracle, measured.heights[measured.index++])
     this.outdated = false
@@ -242,7 +242,7 @@ class HeightMapText extends HeightMapBlock {
 
   constructor(length: number, height: number) { super(length, height, BlockType.Text) }
 
-  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+  replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
     if (nodes.length == 1 && nodes[0] instanceof HeightMapText && Math.abs(this.length - nodes[0]!.length) < 10) {
       nodes[0]!.height = this.height
       return nodes[0]!
@@ -489,7 +489,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
     return this.covering && this.nodes[this.nodes.length - 1] == this.covering
   }
 
-  span(from: number, to: number) {
+  span(_from: number, to: number) {
     if (this.lineStart > -1) {
       let end = Math.min(to, this.lineEnd), last = this.nodes[this.nodes.length - 1]
       if (last instanceof HeightMapText)
@@ -507,12 +507,16 @@ class NodeBuilder implements RangeIterator<Decoration> {
   }
 
   point(from: number, to: number, deco: PointDecoration) {
-    let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
-    let len = to - from
-    if (deco.block) {
-      this.addBlock(new HeightMapBlock(len, height, deco.type))
-    } else if (len || height >= relevantWidgetHeight) {
-      this.addLineDeco(height, len)
+    if (from < to || deco.heightRelevant) {
+      let height = deco.widget ? Math.max(0, deco.widget.estimatedHeight) : 0
+      let len = to - from
+      if (deco.block) {
+        this.addBlock(new HeightMapBlock(len, height, deco.type))
+      } else if (len || height >= relevantWidgetHeight) {
+        this.addLineDeco(height, len)
+      }
+    } else if (to > from) {
+      this.span(from, to)
     }
     if (this.lineEnd > -1 && this.lineEnd < this.pos)
       this.lineEnd = this.oracle.doc.lineAt(this.pos).end
@@ -581,7 +585,7 @@ class NodeBuilder implements RangeIterator<Decoration> {
   static build(oracle: HeightOracle, decorations: readonly DecorationSet[],
                from: number, to: number): (HeightMap | null)[] {
     let builder = new NodeBuilder(from, oracle)
-    RangeSet.iterateSpans(decorations, from, to, builder)
+    RangeSet.spans(decorations, from, to, builder)
     return builder.finish(from)
   }
 }

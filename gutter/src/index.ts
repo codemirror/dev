@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
-import {Range, RangeValue, RangeSet} from "../../rangeset"
-import {combineConfig, fillConfig, ChangeSet, MapMode, Annotation, Facet, Extension} from "../../state"
+import {Range, RangeValue, RangeSet, RangeCursor} from "../../rangeset"
+import {combineConfig, fillConfig, MapMode, Annotation, Facet, Extension} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -14,12 +14,6 @@ export abstract class GutterMarker extends RangeValue {
   /// Compare this marker to another marker of the same type.
   abstract eq(other: GutterMarker): boolean
 
-  /// Map this marker through a position mapping.
-  map(mapping: ChangeSet, pos: number): Range<GutterMarker> | null {
-    pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
-    return pos < 0 ? null : new Range(pos, pos, this)
-  }
-
   /// Render the DOM node for this marker, if any.
   toDOM(_view: EditorView): Node | null { return null }
 
@@ -32,6 +26,7 @@ export abstract class GutterMarker extends RangeValue {
 }
 
 GutterMarker.prototype.elementClass = ""
+GutterMarker.prototype.startMapMode = GutterMarker.prototype.endMapMode = MapMode.TrackBefore
 
 type Handlers = {[event: string]: (view: EditorView, line: BlockInfo, event: any) => boolean}
 
@@ -203,22 +198,20 @@ const gutterView = ViewPlugin.fromClass(class {
 })
 
 class UpdateContext {
-  next: () => (void | Range<GutterMarker>)
+  cursor: RangeCursor<GutterMarker>
   localMarkers: GutterMarker[] = []
-  nextMarker: void | Range<GutterMarker>
   i = 0
   height = 0
 
   constructor(readonly gutter: SingleGutterView, viewport: {from: number, to: number}) {
-    this.next = gutter.markers.iter(viewport.from, viewport.to).next
-    this.nextMarker = this.next()
+    this.cursor = gutter.markers.iter(viewport.from)
   }
 
   line(view: EditorView, line: BlockInfo) {
     if (this.localMarkers.length) this.localMarkers = []
-    while (this.nextMarker && this.nextMarker.from <= line.from) {
-      if (this.nextMarker.from == line.from) this.localMarkers.push(this.nextMarker.value)
-      this.nextMarker = this.next()
+    while (this.cursor.value && this.cursor.from <= line.from) {
+      if (this.cursor.from == line.from) this.localMarkers.push(this.cursor.value)
+      this.cursor.next()
     }
     let forLine = this.gutter.config.lineMarker(view, line, this.localMarkers)
     if (forLine) this.localMarkers.unshift(forLine)
@@ -378,7 +371,7 @@ const lineNumberGutter = gutter({
   updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
     for (let tr of update.transactions) {
       let ann = tr.annotation(lineNumberMarkers)
-      if (ann) markers = markers.update(ann.add || [], ann.filter || null)
+      if (ann) markers = markers.update(ann)
     }
     return markers
   },

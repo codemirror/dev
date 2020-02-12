@@ -256,8 +256,8 @@ export class RangeSet<T extends RangeValue> {
   /// Iterate over a group of range sets at the same time, notifying
   /// the iterator about the ranges covering every given piece of
   /// content.
-  static iterateSpans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
-                                            iterator: RangeIterator<T>) {
+  static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
+                                     iterator: RangeIterator<T>) {
     let cursor = new SpanCursor(sets).goto(from), pos = from
     for (;;) {
       let curTo = Math.min(cursor.to, to)
@@ -543,7 +543,7 @@ class SpanCursor<T extends RangeValue> {
           this.activeTo.push(this.cursor.to)
           this.minActive = findMinIndex(this.active, this.activeTo)
           this.cursor.next()
-        } else if (this.cursor.to <= from) { // Already handled
+        } else if (this.cursor.from < from) { // Already handled
           this.cursor.next()
         } else { // New point
           this.point = nextVal

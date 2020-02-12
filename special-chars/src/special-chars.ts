@@ -98,12 +98,16 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
       this.getDecorationsFor(from, to, decorations)
       replaced.push(from, to)
     }
-    if (decorations.length)
-      this.decorations = this.decorations.update(decorations, pos => {
+    if (replaced.length) this.decorations = this.decorations.update({
+      add: decorations,
+      filter: pos => {
         for (let i = 0; i < replaced.length; i += 2)
           if (pos >= replaced[i] && pos < replaced[i + 1]) return false
         return true
-      }, replaced[0], replaced[replaced.length - 1])
+      },
+      filterFrom: replaced[0],
+      filterTo: replaced[replaced.length - 1]
+    })
   }
 
   updateForViewport() {
@@ -117,7 +121,10 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
     } else {
       if (vp.from < this.from) this.getDecorationsFor(vp.from, this.from, decorations)
       if (this.to < vp.to) this.getDecorationsFor(this.to, vp.to, decorations)
-      this.decorations = this.decorations.update(decorations, (from, to) => from >= vp.from && to <= vp.to)
+      this.decorations = this.decorations.update({
+        add: decorations,
+        filter: (from, to) => from >= vp.from && to <= vp.to
+      })
     }
     this.from = vp.from; this.to = vp.to
   }

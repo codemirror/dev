@@ -261,11 +261,11 @@ describe("RangeSet", () => {
     }
   }
 
-  describe("iterateSpans", () => {
+  describe("spans", () => {
     it("separates the range in covering spans", () => {
       let set = mkSet([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")])
       let builder = new Builder
-      RangeSet.iterateSpans([set], 0, 15, builder)
+      RangeSet.spans([set], 0, 15, builder)
       ist(builder.spans.join(" "), "3 2=one 3=one/two 2 2=three 3")
     })
 
@@ -277,7 +277,7 @@ describe("RangeSet", () => {
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
         expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "/wide"
       let builder = new Builder
-      RangeSet.iterateSpans([set], start, end, builder)
+      RangeSet.spans([set], start, end, builder)
       ist(builder.spans.join(" "), expected)
     })
 
@@ -285,7 +285,7 @@ describe("RangeSet", () => {
       let one = mkSet([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
       let two = mkSet([mk(0, 6, "a"), mk(10, 12, "b")])
       let builder = new Builder
-      RangeSet.iterateSpans([one, two], 0, 12, builder)
+      RangeSet.spans([one, two], 0, 12, builder)
       ist(builder.spans.join(" "), "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
     })
   })

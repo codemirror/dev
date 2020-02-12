@@ -43,7 +43,7 @@ export class ContentBuilder implements RangeIterator<Decoration> {
   }
 
   buildText(length: number, tagName: string | null, clss: string | null, attrs: {[key: string]: string} | null,
-            ranges: Decoration[]) {
+            _ranges: Decoration[]) {
     while (length > 0) {
       if (this.textOff == this.text.length) {
         let {value, lineBreak, done} = this.cursor.next(this.skip)
@@ -119,12 +119,10 @@ export class ContentBuilder implements RangeIterator<Decoration> {
     }
   }
 
-  ignore(): boolean { return false }
-
   static build(text: Text, from: number, to: number, decorations: readonly DecorationSet[]):
     {content: BlockView[], breakAtStart: number} {
     let builder = new ContentBuilder(text, from, to)
-    RangeSet.iterateSpans(decorations, from, to, builder)
+    RangeSet.spans(decorations, from, to, builder)
     builder.finish()
     return builder
   }

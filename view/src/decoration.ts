@@ -1,4 +1,4 @@
-import {ChangeSet, ChangedRange, MapMode} from "../../state"
+import {ChangedRange, MapMode} from "../../state"
 import {RangeValue, Range, RangeSet, RangeComparator} from "../../rangeset"
 import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
@@ -92,7 +92,7 @@ export abstract class WidgetType<T = any> {
   /// to indicate that it could update, false to indicate it couldn't
   /// (in which case the widget will be redrawn). The default
   /// implementation just returns false.
-  updateDOM(dom: HTMLElement): boolean { return false }
+  updateDOM(_dom: HTMLElement): boolean { return false }
 
   /// @internal
   compare(other: WidgetType): boolean {
@@ -108,7 +108,7 @@ export abstract class WidgetType<T = any> {
   /// Can be used to configure which kinds of events inside the widget
   /// should be ignored by the editor. The default is to ignore all
   /// events.
-  ignoreEvent(event: Event): boolean { return true }
+  ignoreEvent(_event: Event): boolean { return true }
 
   //// @internal
   get customView(): null | typeof WidgetView { return null }
@@ -154,8 +154,6 @@ export abstract class Decoration extends RangeValue {
 
   /// @internal
   get heightRelevant() { return false }
-
-  abstract map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null
 
   abstract eq(other: Decoration): boolean
 
@@ -203,20 +201,6 @@ export abstract class Decoration extends RangeValue {
 
   /// @internal
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
-
-  /// @internal
-  mapSimple(mapping: ChangeSet, from: number, to: number) {
-    let newFrom = mapping.mapPos(from, this.startSide, MapMode.TrackDel)
-    if (from == to && this.startSide == this.endSide) return newFrom < 0 ? null : new Range(newFrom, newFrom, this)
-    let newTo = mapping.mapPos(to, this.endSide, MapMode.TrackDel)
-    if (newFrom < 0) {
-      if (newTo < 0) return null
-      newFrom = this.startSide >= 0 ? -(newFrom + 1) : mapping.mapPos(from, 1)
-    } else if (newTo < 0) {
-      newTo = this.endSide < 0 ? -(newTo + 1) : mapping.mapPos(to, -1)
-    }
-    return newFrom < newTo ? new Range(newFrom, newTo, this) : null
-  }
 }
 
 export class MarkDecoration extends Decoration {
@@ -225,10 +209,6 @@ export class MarkDecoration extends Decoration {
     super(INLINE_BIG_SIDE * (start ? -1 : 1),
           INLINE_BIG_SIDE * (end ? 1 : -1),
           null, spec)
-  }
-
-  map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null {
-    return this.mapSimple(mapping, from, to)
   }
 
   eq(other: Decoration): boolean {
@@ -247,15 +227,12 @@ export class LineDecoration extends Decoration {
 
   get point() { return true }
 
-  map(mapping: ChangeSet, pos: number): Range<Decoration> | null {
-    pos = mapping.mapPos(pos, -1, MapMode.TrackBefore)
-    return pos < 0 ? null : new Range(pos, pos, this)
-  }
-
   eq(other: Decoration): boolean {
     return other instanceof LineDecoration && attrsEq(this.spec.attributes, other.spec.attributes)
   }
 }
+
+LineDecoration.prototype.startMapMode = LineDecoration.prototype.endMapMode = MapMode.TrackBefore
 
 export class PointDecoration extends Decoration {
   constructor(spec: any, startSide: number, endSide: number, public block: boolean, widget: WidgetType | null) {
@@ -271,16 +248,8 @@ export class PointDecoration extends Decoration {
 
   get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
 
-  map(mapping: ChangeSet, from: number, to: number): Range<Decoration> | null {
-    if (this.block) {
-      let {type} = this
-      let newFrom = type == BlockType.WidgetAfter ? mapping.mapPos(from, 1, MapMode.TrackAfter) : mapping.mapPos(from, -1, MapMode.TrackBefore)
-      let newTo = type == BlockType.WidgetRange ? mapping.mapPos(to, 1, MapMode.TrackAfter) : newFrom
-      return newFrom < 0 || newTo < 0 ? null : new Range(newFrom, newTo, this)
-    } else {
-      return this.mapSimple(mapping, from, to)
-    }
-  }
+  get startMapMode() { return this.type == BlockType.WidgetAfter ? MapMode.TrackAfter : MapMode.TrackBefore }
+  get endMapMode() { return this.type == BlockType.WidgetBefore ? MapMode.TrackBefore : MapMode.TrackAfter }
 
   eq(other: Decoration): boolean {
     return other instanceof PointDecoration &&
@@ -333,7 +302,7 @@ class DecorationComparator implements RangeComparator<Decoration> {
   changes: Changes = new Changes
   constructor() {}
 
-  compareRange(from: number, to: number, activeA: Decoration[], activeB: Decoration[]) {
+  compareRange(from: number, to: number) {
     addRange(from, to, this.changes.content)
   }
 
@@ -344,8 +313,9 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 }
 
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: readonly ChangedRange[], lengthA: number): Changes {
+// FIXME call with the whole lot of decorations at once
+export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: readonly ChangedRange[], _lengthA: number): Changes {
   let comp = new DecorationComparator()
-  a.compare(b, diff, comp, lengthA)
+  RangeSet.compare([a], [b], 0, 1e9, diff, comp)
   return comp.changes
 }

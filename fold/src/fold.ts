@@ -25,11 +25,13 @@ const foldState = StateField.define<DecorationSet>({
     let ann = tr.annotation(foldAnnotation)
     if (ann) {
       let {fold = [], unfold = []} = ann
-      folded = folded.update(
-        fold.map(({from, to}) => Decoration.replace(from, to, FoldWidget.config)),
-        unfold.length ? (from, to) => !unfold.some(r => r.from == from && r.to == to) : null,
-        unfold.reduce((m, r) => Math.min(m, r.from), 1e8),
-        unfold.reduce((m, r) => Math.max(m, r.to), 0))
+      if (unfold.length || fold.length)
+        folded = folded.update({
+          add: fold.map(({from, to}) => Decoration.replace(from, to, FoldWidget.config)),
+          filter: (from, to) => !unfold.some(r => r.from == from && r.to == to),
+          filterFrom: unfold.reduce((m, r) => Math.min(m, r.from), 1e8),
+          filterTo: unfold.reduce((m, r) => Math.max(m, r.to), 0)
+        })
     }
     return folded
   }

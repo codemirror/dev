@@ -12,7 +12,7 @@ function decos(startState: DecorationSet = Decoration.none) {
     update(value, tr) {
       value = value.map(tr.changes)
       let add = tr.annotation(addDeco), filter = tr.annotation(filterDeco)
-      if (add || filter) value = value.update(add, filter)
+      if (add || filter) value = value.update({add, filter})
       return value
     }
   }).provide(EditorView.decorations)
