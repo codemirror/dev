@@ -8,22 +8,13 @@ class Value extends RangeValue {
   point: boolean
   name: string | null
   pos: number | null
-  constructor(spec: any = {}) {
+  constructor(spec: any = {}, empty: boolean) {
     super()
     this.startSide = spec.startSide || 1
-    this.endSide = spec.endSide || -1
-    this.point = !!spec.point
+    this.endSide = spec.endSide || (empty ? 1 : -1)
+    this.point = empty || !!spec.point
     this.name = spec.name || null
     this.pos = spec.pos == null ? null : spec.pos
-  }
-  map(mapping: Mapping, from: number, to: number): Range<Value> | null {
-    if (from == to) {
-      let pos = mapping.mapPos(from, this.startSide, MapMode.TrackDel)
-      return pos < 0 ? null : new Range(pos, pos, this)
-    } else {
-      let newFrom = mapping.mapPos(from, this.startSide), newTo = mapping.mapPos(to, this.endSide)
-      return newFrom >= newTo ? null : new Range(newFrom, newTo, this)
-    }
   }
   eq(other: RangeValue): boolean {
     return other instanceof Value && other.name == this.name
@@ -40,7 +31,7 @@ function cmp(a: Range<Value>, b: Range<Value>) { return a.from - b.from }
 function mk(from: number, to?: any, spec?: any): Range<Value> {
   if (typeof to != "number") { spec = to; to = from }
   if (typeof spec == "string") spec = {name: spec}
-  return new Range(from, to, new Value(spec))
+  return new Range(from, to, new Value(spec, from == to))
 }
 function mkSet(ranges: Range<Value>[]) { return RangeSet.of<Value>(ranges) }
 
@@ -145,7 +136,7 @@ describe("RangeSet", () => {
        test([mk(1, 2, {startSide: -1, endSide: 1})], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
 
     it("uses side to determine mapping of points", () =>
-       test([mk(1, 1, {startSide: -1}), mk(1, 1, {startSide: 1})], [[1, 1, 2]], [1, 3]))
+       test([mk(1, 1, {startSide: -1, endSide: -1}), mk(1, 1, {startSide: 1, endSide: 1})], [[1, 1, 2]], [1, 3]))
 
     it("defaults to exclusive on both sides", () =>
        test([mk(1, 2)], [[1, 1, 2], [4, 4, 2]], [[3, 4]]))
@@ -156,7 +147,7 @@ describe("RangeSet", () => {
     it("drops ranges in deleted regions", () =>
        test([mk(1, 2), mk(3)], [[0, 4, 0]], []))
 
-    it("shrinks range ranges", () =>
+    it("shrinks ranges", () =>
        test([mk(2, 4), mk(2, 8), mk(6, 8)], [[3, 7, 0]], [[2, 3], [2, 4], [3, 4]]))
 
     it("leaves point ranges on change boundaries", () =>

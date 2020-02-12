@@ -1,15 +1,8 @@
-import {ChangeSet, Change, ChangedRange} from "../../state"
+import {ChangeSet, Change, ChangedRange, MapMode} from "../../state"
 
 /// Each range is associated with a value, which must inherit from
 /// this class.
 export abstract class RangeValue {
-  /// Map the range associated with this value through a position
-  /// mapping. Returning null means the mapping removes the range.
-  /// `from` _must_ be mapped with a bias that has the same sign as
-  /// `this.startSide`, and `to` with `this.endSide`, so that ranges'
-  /// endpoints can't cross those of their neighbors.
-  // FIXME find some one-size-fits-all implementation for this?
-  abstract map(mapping: ChangeSet, from: number, to: number): Range<any> | null
   /// Compare this value with another value. The default
   /// implementation compares by identity.
   eq(other: RangeValue) { return this == other }
@@ -17,6 +10,13 @@ export abstract class RangeValue {
   startSide!: number
   /// The bias value at the end of the range. Defaults to 0.
   endSide!: number
+
+  /// The mode with which the start point of the range should be
+  /// mapped. Determines when a side is counted as deleted. Defaults
+  /// to `MapMode.TrackDel`.
+  startMapMode!: MapMode
+  /// The mode with which the end point of the range should be mapped.
+  endMapMode!: MapMode
   /// Whether this value marks a point range, which shadows the ranges
   /// contained in it.
   point!: boolean
@@ -24,6 +24,7 @@ export abstract class RangeValue {
 
 RangeValue.prototype.startSide = RangeValue.prototype.endSide = 0
 RangeValue.prototype.point = false
+RangeValue.prototype.startMapMode = RangeValue.prototype.endMapMode = MapMode.TrackDel
 
 /// A range associates a value with a range of positions.
 export class Range<T extends RangeValue> {
@@ -116,12 +117,17 @@ class Chunk<T extends RangeValue> {
   map(offset: number, changes: ChangeSet) {
     let value: T[] = [], from = [], to = [], newPos = -1
     for (let i = 0; i < this.value.length; i++) {
-      let mapped = this.value[i].map(changes, this.from[i] + offset, this.to[i] + offset)
-      if (!mapped) continue
-      if (newPos < 0) newPos = mapped.from
-      value.push(mapped.value)
-      from.push(mapped.from - newPos)
-      to.push(mapped.to - newPos)
+      let val = this.value[i]
+      let newFrom = changes.mapPos(this.from[i] + offset, val.startSide, val.startMapMode)
+      let newTo = changes.mapPos(this.to[i] + offset, val.endSide, val.endMapMode)
+      if (newTo < 0 && newFrom < 0) continue
+      if (newTo < 0) newTo = -(newTo + 1)
+      if (newFrom < 0) newFrom = -(newFrom + 1)
+      if ((newTo - newFrom || val.endSide - val.startSide) < 0) continue
+      if (newPos < 0) newPos = newFrom
+      value.push(val)
+      from.push(newFrom - newPos)
+      to.push(newTo - newPos)
     }
     return {mapped: value.length ? new Chunk(from, to, value) : null, pos: newPos}
   }
