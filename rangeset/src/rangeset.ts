@@ -362,8 +362,8 @@ class LayerCursor<T extends RangeValue> {
   to!: number
   value!: T | null
 
-  chunkIndex = 0
-  rangeIndex = 0
+  chunkIndex!: number
+  rangeIndex!: number
 
   constructor(readonly layer: RangeSet<T>, readonly skip: Set<Chunk<T>> | null = null) {}
 
@@ -371,7 +371,12 @@ class LayerCursor<T extends RangeValue> {
   get endSide() { return this.value ? this.value.endSide : 0 }
 
   goto(pos: number, side: number = -Far) {
-    if (this.chunkIndex && this.rangeIndex == 0) this.chunkIndex--
+    this.chunkIndex = this.rangeIndex = 0
+    this.gotoInner(pos, side)
+    return this
+  }
+
+  gotoInner(pos: number, side: number) {
     while (this.chunkIndex < this.layer.chunk.length &&
            (this.skip && this.skip.has(this.layer.chunk[this.chunkIndex]) ||
             this.layer.chunkEnd(this.chunkIndex) < pos))
@@ -379,7 +384,10 @@ class LayerCursor<T extends RangeValue> {
     this.rangeIndex = this.chunkIndex == this.layer.chunk.length ? 0
       : this.layer.chunk[this.chunkIndex].findIndex(pos - this.layer.chunkPos[this.chunkIndex], -1, side)
     this.next()
-    return this
+  }
+
+  forward(pos: number, side: number) {
+    if ((this.to - pos || this.endSide - side) < 0) this.gotoInner(pos, side)
   }
 
   next() {
@@ -441,6 +449,12 @@ class HeapCursor<T extends RangeValue> {
     return this
   }
 
+  forward(pos: number, side: number) {
+    for (let cur of this.heap) cur.forward(pos, side)
+    for (let i = this.heap.length >> 1; i >= 0; i--) heapBubble(this.heap, i)
+    if ((this.to - pos || this.value!.endSide - side) < 0) this.next()
+  }    
+
   next() {
     if (this.heap.length == 0) {
       this.from = this.to = Far
@@ -498,18 +512,26 @@ class SpanCursor<T extends RangeValue> {
     this.cursor = HeapCursor.from(sets, skip)
   }
 
-  gotoInner(pos: number, side: number) {
+  goto(pos: number, side: number = -Far) {
     this.cursor.goto(pos, side)
     this.active.length = this.activeTo.length = 0
     this.minActive = -1
     this.to = pos
     this.endSide = side
-  }
-
-  goto(pos: number, side: number = -Far) {
-    this.gotoInner(pos, side)
     this.next()
     return this
+  }
+
+  forward(pos: number, side: number) {
+    while (this.minActive > -1 && (this.activeTo[this.minActive] - pos || this.active[this.minActive].endSide - side) < 0)
+      this.removeActive(this.minActive)
+    this.cursor.forward(pos, side)
+  }
+
+  removeActive(index: number) {
+    remove(this.active, index)
+    remove(this.activeTo, index)
+    this.minActive = findMinIndex(this.active, this.activeTo)
   }
 
   // After calling this, if `this.point` != null, the next range is a
@@ -525,33 +547,28 @@ class SpanCursor<T extends RangeValue> {
           this.endSide = this.active[a].endSide
           break
         }
-        remove(this.active, a)
-        remove(this.activeTo, a)
-        this.minActive = findMinIndex(this.active, this.activeTo)
+        this.removeActive(a)
       } else if (!this.cursor.value) {
         this.to = this.endSide = Far
         break
+      } else if (this.cursor.from > from) {
+        this.to = this.cursor.from
+        this.endSide = this.cursor.startSide
+        break
       } else {
-        if (this.cursor.from > from) {
-          this.to = this.cursor.from
-          this.endSide = this.cursor.startSide
-          break
-        }
         let nextVal = this.cursor.value
         if (!nextVal.point) { // Opening a range
           this.active.push(nextVal)
           this.activeTo.push(this.cursor.to)
           this.minActive = findMinIndex(this.active, this.activeTo)
           this.cursor.next()
-        } else if (this.cursor.from < from) { // Already handled
-          this.cursor.next()
         } else { // New point
           this.point = nextVal
           this.pointFrom = this.cursor.from
           this.to = this.cursor.to
           this.endSide = nextVal.endSide
-          if (this.cursor.from < this.to) this.gotoInner(this.to, this.endSide)
-          else this.cursor.next()
+          this.cursor.next()
+          this.forward(this.to, this.endSide)
           break
         }
       }
@@ -567,11 +584,9 @@ function compare<T extends RangeValue>(a: SpanCursor<T>, startA: number,
   b.goto(startB)
   let endB = startB + length
   let pos = startB, dPos = startB - startA
-//  console.log("compare", startB, "to", endB)
   for (;;) {
     let diff = (a.to + dPos) - b.to || a.endSide - b.endSide
     let end = diff < 0 ? a.to + dPos : b.to, clipEnd = Math.min(end, endB)
-//    console.log("look at range", pos, end, !!(a.point || b.point), a.active.length, b.active.length, "cursors", a.to, b.to)
     if (a.point || b.point) {
       if (!(a.point && b.point && a.point.eq(b.point))) comparator.comparePoint(pos, clipEnd, a.point, b.point)
     } else {

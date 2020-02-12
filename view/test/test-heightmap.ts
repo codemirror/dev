@@ -74,8 +74,8 @@ describe("HeightMap", () => {
   it("stores information about block widgets", () => {
     let text = doc(3, 3, 3), oracle = o(text)
     let map = mk(text, [Decoration.widget(0, {widget: new MyWidget(10), side: -1, block: true}),
-                        Decoration.widget(3, {widget: new MyWidget(5), side: 1, block: true}),
-                        Decoration.widget(0, {widget: new MyWidget(13), side: -1, block: true})])
+                        Decoration.widget(0, {widget: new MyWidget(13), side: -1, block: true}),
+                        Decoration.widget(3, {widget: new MyWidget(5), side: 1, block: true})])
     ist(map.toString(), "block(0)-block(0)-line(3)-block(0) gap(7)")
     ist(map.height, 28 + 3 * oracle.lineHeight)
     let {type} = map.lineAt(0, byP, text, 0, 0)
@@ -88,8 +88,8 @@ describe("HeightMap", () => {
 
   it("stores information about block ranges", () => {
     let text = doc(3, 3, 3, 3, 3, 3)
-    let map = mk(text, [Decoration.replace(4, 11, {widget: new MyWidget(40), block: true}),
-                        Decoration.widget(4, {widget: new MyWidget(10), side: -1, block: true}),
+    let map = mk(text, [Decoration.widget(4, {widget: new MyWidget(10), side: -1, block: true}),
+                        Decoration.replace(4, 11, {widget: new MyWidget(40), block: true}),
                         Decoration.widget(11, {widget: new MyWidget(15), side: 1, block: true}),
                         // This one covers the block widgets around it (due to being inclusive)
                         Decoration.replace(16, 19, {widget: new MyWidget(50), block: true, inclusive: true}),
