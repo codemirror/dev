@@ -56,8 +56,6 @@ export interface RangeIterator<T extends RangeValue> {
 
 const ChunkSize = 250, Far = 1e9
 
-type RangeFilter<T> = (from: number, to: number, value: T) => boolean
-
 class Chunk<T extends RangeValue> {
   constructor(readonly from: readonly number[],
               readonly to: readonly number[],
@@ -80,38 +78,9 @@ class Chunk<T extends RangeValue> {
     }
   }
 
-  filter(offset: number, filter: RangeFilter<T>, from: number, to: number): Chunk<T> | null {
-    let removed: number[] | undefined
-    for (let i = this.findIndex(from, -1), end = this.findIndex(to, 1, undefined, i); i < end; i++)
-      if (!filter(this.from[i] + offset, this.to[i] + offset, this.value[i])) (removed || (removed = [])).push(i)
-    if (!removed) return this
-    if (removed.length == this.from.length) return null
-    let newFrom = [], newTo = [], newVal = []
-    for (let i = 0, j = 0, k = 0; i < this.from.length; i++) {
-      if (j < removed.length && removed[j] == i) {
-        j++
-      } else {
-        newFrom[k] = this.from[i]
-        newTo[k] = this.to[i]
-        newVal[k++] = this.value[i]
-      }
-    }
-    return new Chunk(newFrom, newTo, newVal)
-  }
-
   between(offset: number, from: number, to: number, f: (from: number, to: number, value: T) => void | false): void | false {
     for (let i = this.findIndex(from, -1), e = this.findIndex(to, 1, undefined, i); i < e; i++)
       if (f(this.from[i] + offset, this.to[i] + offset, this.value[i]) === false) return false
-  }
-
-  append(other: Chunk<T>, offset: number) {
-    let from = this.from.slice(), to = this.to.slice(), value = this.value.slice()
-    for (let i = 0, j = from.length; i < other.from.length; i++) {
-      from[j] = other.from[i] + offset
-      to[j] = other.to[i] + offset
-      value[j++] = other.value[i]
-    }
-    return new Chunk(from, to, value)
   }
 
   map(offset: number, changes: ChangeSet) {
@@ -120,8 +89,10 @@ class Chunk<T extends RangeValue> {
       let val = this.value[i]
       let newFrom = changes.mapPos(this.from[i] + offset, val.startSide, val.startMapMode)
       let newTo = changes.mapPos(this.to[i] + offset, val.endSide, val.endMapMode)
-      if (newTo < 0 && newFrom < 0) continue
-      if (newTo < 0) newTo = -(newTo + 1)
+      if (newTo < 0) {
+        if (newFrom < 0) continue
+        newTo = -(newTo + 1)
+      }
       if (newFrom < 0) newFrom = -(newFrom + 1)
       if ((newTo - newFrom || val.endSide - val.startSide) < 0) continue
       if (newPos < 0) newPos = newFrom
@@ -131,6 +102,13 @@ class Chunk<T extends RangeValue> {
     }
     return {mapped: value.length ? new Chunk(from, to, value) : null, pos: newPos}
   }
+}
+
+export type RangeCursor<T> = {
+  next: () => void
+  value: T | null
+  from: number
+  to: number
 }
 
 /// A range set stores a collection of [ranges](#rangeset.Range) in a
@@ -148,11 +126,13 @@ export class RangeSet<T extends RangeValue> {
     readonly nextLayer: RangeSet<T> = RangeSet.empty
   ) {}
 
+  /// @internal
   get length(): number {
     let last = this.chunk.length - 1
     return last < 0 ? 0 : Math.max(this.chunkEnd(last), this.nextLayer.length)
   }
 
+  /// @internal
   get size(): number {
     if (this == RangeSet.empty) return 0
     let size = this.nextLayer.size
@@ -160,60 +140,42 @@ export class RangeSet<T extends RangeValue> {
     return size
   }
 
-  private chunkEnd(index: number) {
+  /// @internal
+  chunkEnd(index: number) {
     return this.chunkPos[index] + this.chunk[index].length
   }
 
-  merge(other: RangeSet<T>): RangeSet<T> {
-    if (other.size > this.size) return other.merge(this)
-    if (this == RangeSet.empty) return other
-    if (other == RangeSet.empty) return this
+  update({add = [], filter, filterFrom = 0, filterTo = this.length}: {
+    add?: readonly Range<T>[],
+    filter?: (from: number, to: number, value: T) => boolean,
+    filterFrom?: number,
+    filterTo?: number
+  }): RangeSet<T> {
+    if (add.length == 0 && !filter) return this
+    if (this == RangeSet.empty) return add.length ? RangeSet.of(add) : this
 
-    let curThis = new LayerCursor(this).goto(0), curOther = new LayerCursor(other).goto(0)
-    let builder = RangeSet.build<T>()
-    while (curThis.value || curOther.value) {
-      if (curThis.rangeIndex == 1 && curThis.chunkIndex < this.chunk.length &&
-          this.chunkPos[curThis.chunkIndex] + this.chunk[curThis.chunkIndex].length < curOther.from) {
-        builder.addChunk(this.chunkPos[curThis.chunkIndex], this.chunk[curThis.chunkIndex])
-        curThis.nextChunk()
-      } else if ((curThis.from - curOther.from || curThis.startSide - curOther.startSide) < 0) {
-        builder.add(curThis.from, curThis.to, curThis.value!)
-        curThis.next()
+    let cur = new LayerCursor(this).goto(0), i = 0, spill = []
+    let builder = new RangeSetBuilder<T>()
+    while (cur.value || i < add.length) {
+      if (i < add.length && (cur.from - add[i].from || cur.startSide - add[i].value.startSide) >= 0) {
+        let range = add[i++]
+        if (!builder.addInner(range.from, range.to, range.value)) spill.push(range)
+      } else if (cur.rangeIndex == 1 && cur.chunkIndex < this.chunk.length &&
+                 (i == add.length || this.chunkEnd(cur.chunkIndex) < add[i].from) &&
+                 (!filter || filterFrom > this.chunkEnd(cur.chunkIndex) || filterTo < this.chunkPos[cur.chunkIndex]) &&
+                 builder.addChunk(this.chunkPos[cur.chunkIndex], this.chunk[cur.chunkIndex])) {
+        cur.nextChunk()
       } else {
-        builder.add(curOther.from, curOther.to, curOther.value!)
-        curOther.next()
-      }
-    }
-
-    return builder.finish(this.nextLayer.merge(other.nextLayer))
-  }
-
-  /// Remove some ranges from this set, returning the modified set.
-  /// The part that gets filtered can be limited with the `from` and
-  /// `to` arguments (specifying a smaller range makes the operation
-  /// cheaper).
-  filter(filter: RangeFilter<T>, from: number = 0, to: number = this.length): RangeSet<T> {
-    if (this == RangeSet.empty) return this
-    let chunks: Chunk<T>[] = [], chunkPos = [], changed = false
-    for (let i = 0, j = 0; i < this.chunk.length; i++) {
-      let start = this.chunkPos[i], chunk = this.chunk[i]
-      if (to >= start && from <= start + chunk.length) {
-        let filtered = chunk.filter(start, filter, from - start, to - start)
-        if (filtered != chunk) {
-          changed = true
-          if (!filtered) continue
-          chunk = filtered
-          if (chunks.length && chunk.value.length + chunks[j - 1].length <= ChunkSize) {
-            chunks[j - 1] = chunks[j - 1].append(chunk, start - chunkPos[j - 1])
-            continue
-          }
+        if (!filter || filterFrom > cur.to || filterTo < cur.from || filter(cur.from, cur.to, cur.value!)) {
+          if (!builder.addInner(cur.from, cur.to, cur.value!))
+            spill.push(new Range(cur.from, cur.to, cur.value!))
         }
+        cur.next()
       }
-      chunks[j] = chunk
-      chunkPos[j++] = start
     }
-    let next = this.nextLayer.filter(filter, from, to)
-    return !changed && next == this.nextLayer ? this : chunks.length ? new RangeSet(chunkPos, chunks, next) : next
+
+    return builder.finish(this.nextLayer == RangeSet.empty && !spill.length ? RangeSet.empty
+                          : this.nextLayer.update({add: spill, filter, filterFrom, filterTo}))
   }
 
   /// Map this range set through a set of changes, return the new set.
@@ -255,7 +217,7 @@ export class RangeSet<T extends RangeValue> {
 
   /// Iterate over the ranges in the set that touch the area between
   /// from and to, ordered by their start position and side.
-  iter(from: number = 0): {next: () => void, from: number, to: number, value: T | null} {
+  iter(from: number = 0): RangeCursor<T> {
     return HeapCursor.from([this]).goto(from)
   }
 
@@ -310,14 +272,10 @@ export class RangeSet<T extends RangeValue> {
   /// Create a range set for the given range or array of ranges.
   // FIXME determine and document sorting requirement
   static of<T extends RangeValue>(ranges: readonly Range<T>[] | Range<T>): RangeSet<T> {
-    let build = RangeSet.build<T>()
+    let build = new RangeSetBuilder<T>()
     for (let range of ranges instanceof Range ? [ranges] : ranges)
       build.add(range.from, range.to, range.value)
     return build.finish()
-  }
-
-  static build<T extends RangeValue>() {
-    return new RangeSetBuilder<T>()
   }
 
   /// The empty set of ranges.
@@ -326,7 +284,7 @@ export class RangeSet<T extends RangeValue> {
 
 ;(RangeSet.empty as any).nextLayer = RangeSet.empty
 
-class RangeSetBuilder<T extends RangeValue> {
+export class RangeSetBuilder<T extends RangeValue> {
   private chunks: Chunk<T>[] = []
   private chunkPos: number[] = []
   private chunkStart = -1
@@ -346,42 +304,43 @@ class RangeSetBuilder<T extends RangeValue> {
   }
 
   add(from: number, to: number, value: T) {
+    if (!this.addInner(from, to, value))
+      (this.nextLayer || (this.nextLayer = new RangeSetBuilder)).add(from, to, value)
+  }
+
+  /// @internal
+  addInner(from: number, to: number, value: T) {
     let diff = from - this.lastTo || value.startSide - this.last!.endSide
     if (diff <= 0 && (from - this.lastFrom || value.startSide - this.last!.startSide) < 0)
       throw new Error("Ranges must be added sorted by `from` position and `startSide`")
-    if (diff < 0) {
-      ;(this.nextLayer || (this.nextLayer = new RangeSetBuilder)).add(from, to, value)
-    } else {
-      if (this.from.length == ChunkSize) this.finishChunk(true)
-      if (this.chunkStart < 0) this.chunkStart = from
-      this.from.push(from - this.chunkStart)
-      this.to.push(to - this.chunkStart)
-      this.last = value
-      this.lastFrom = from
-      this.lastTo = to
-      this.value.push(value)
-    }
+    if (diff < 0) return false
+    if (this.from.length == ChunkSize) this.finishChunk(true)
+    if (this.chunkStart < 0) this.chunkStart = from
+    this.from.push(from - this.chunkStart)
+    this.to.push(to - this.chunkStart)
+    this.last = value
+    this.lastFrom = from
+    this.lastTo = to
+    this.value.push(value)
+    return true
   }
 
   addChunk(from: number, chunk: Chunk<T>) {
-    if ((from - this.lastTo || chunk.value[0].startSide - this.last!.endSide) < 0) {
-      ;(this.nextLayer || (this.nextLayer = new RangeSetBuilder)).addChunk(from, chunk)
-    } else {
-      if (this.from.length) this.finishChunk(true)
-      this.chunks.push(chunk)
-      this.chunkPos.push(from)
-      let last = chunk.value.length - 1
-      this.last = chunk.value[last]
-      this.lastFrom = chunk.from[last] + from
-      this.lastTo = chunk.to[last] + from
-    }
+    if ((from - this.lastTo || chunk.value[0].startSide - this.last!.endSide) < 0) return false
+    if (this.from.length) this.finishChunk(true)
+    this.chunks.push(chunk)
+    this.chunkPos.push(from)
+    let last = chunk.value.length - 1
+    this.last = chunk.value[last]
+    this.lastFrom = chunk.from[last] + from
+    this.lastTo = chunk.to[last] + from
+    return true
   }
 
-  finish(nextLayer: RangeSet<T> = RangeSet.empty): RangeSet<T> {
+  finish(next: RangeSet<T> = RangeSet.empty): RangeSet<T> {
     if (this.from.length) this.finishChunk(false)
-
-    if (this.chunks.length == 0) return RangeSet.empty
-    let result = new RangeSet(this.chunkPos, this.chunks, this.nextLayer ? this.nextLayer.finish().merge(nextLayer) : nextLayer)
+    if (this.chunks.length == 0) return next
+    let result = new RangeSet(this.chunkPos, this.chunks, this.nextLayer ? this.nextLayer.finish(next) : next)
     this.from = null as any // Make sure further `add` calls produce errors
     return result
   }
@@ -415,7 +374,7 @@ class LayerCursor<T extends RangeValue> {
     if (this.chunkIndex && this.rangeIndex == 0) this.chunkIndex--
     while (this.chunkIndex < this.layer.chunk.length &&
            (this.skip && this.skip.has(this.layer.chunk[this.chunkIndex]) ||
-            this.layer.chunkPos[this.chunkIndex] + this.layer.chunk[this.chunkIndex].length < pos))
+            this.layer.chunkEnd(this.chunkIndex) < pos))
       this.chunkIndex++
     this.rangeIndex = this.chunkIndex == this.layer.chunk.length ? 0
       : this.layer.chunk[this.chunkIndex].findIndex(pos - this.layer.chunkPos[this.chunkIndex], -1, side)
@@ -498,14 +457,14 @@ class HeapCursor<T extends RangeValue> {
   }
 }
 
-function heapPop(heap: LayerCursor<RangeValue>[]) {
+function heapPop<T extends RangeValue>(heap: LayerCursor<T>[]) {
   let last = heap.pop()!
   if (heap.length == 0) return
   heap[0] = last
   heapBubble(heap, 0)
 }
 
-function heapBubble(heap: LayerCursor<RangeValue>[], index: number) {
+function heapBubble<T extends RangeValue>(heap: LayerCursor<T>[], index: number) {
   for (let cur = heap[index];;) {
     let childIndex = (index << 1) + 1
     if (childIndex >= heap.length) break

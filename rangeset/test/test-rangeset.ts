@@ -1,5 +1,5 @@
 import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from ".."
-import {Change, ChangeSet, Mapping, MapMode, ChangedRange} from "../../state"
+import {Change, ChangeSet, ChangedRange} from "../../state"
 import ist from "ist"
 
 class Value extends RangeValue {
@@ -64,38 +64,36 @@ describe("RangeSet", () => {
     ist.throws(() => mkSet([mk(1, 1, {startSide: 1}), mk(1, 1, {startSide: -1})]), /sorted/)
   })
 
-  describe("merge", () => {
-    it("can merge sets", () => {
-      let set = set0().merge(mkSet([mk(4000, {pos: 4000})]))
+  describe("update", () => {
+    it("can add ranges", () => {
+      let set = set0().update({add: [mk(4000, {pos: 4000})]})
       ist(set.size, 5001)
       ist(set.chunk[0], set0().chunk[0])
     })
 
     it("can add a large amount of ranges", () => {
-      let build = RangeSet.build<Value>()
-      for (let i = 0; i < 4000; i += 2) build.add(i, i, new Value({pos: i}))
-      let set = build.finish().merge(set0())
+      let ranges = []
+      for (let i = 0; i < 4000; i += 2) ranges.push(mk(i))
+      let set = set0().update({add: ranges})
       ist(set.size, 2000 + set0().size)
       checkSet(set)
     })
-  })
 
-  describe("filter", () => {
     it("can filter ranges", () => {
-      let set = set0().filter(from => from >= 2500)
+      let set = set0().update({filter: from => from >= 2500})
       ist(set.size, 2500)
       ist(set.chunk.length, set0().chunk.length, "<")
       checkSet(set)
     })
 
     it("can filter all over", () => {
-      let set = set0().filter(from => (from % 200) >= 100)
+      let set = set0().update({filter: from => (from % 200) >= 100})
       ist(set.size, 2500)
       checkSet(set)
     })
 
     it("collapses the chunks when removing almost all ranges", () => {
-      let set = set0().filter(from => from == 500 || from == 501)
+      let set = set0().update({filter: from => from == 500 || from == 501})
       ist(set.size, 2)
       ist(set.chunk.length, 1)
     })
@@ -105,18 +103,14 @@ describe("RangeSet", () => {
       for (let i = 0; i < 1000; i++) ranges.push(mk(i, i + 1, {pos: i}))
       let set = mkSet(ranges)
       let called: [number, number][] = []
-      set.filter((from, to) => (called.push([from, to]), true), 400, 600)
+      set.update({filter: (from, to) => (called.push([from, to]), true), filterFrom: 400, filterTo: 600})
       ist(called.length, 202)
       for (let i = 399, j = 0; i <= 600; i++, j++)
         ist(called[j].join(), `${i},${i+1}`)
     })
 
-    it("reuses sets when filter doesn't remove anything", () => {
-      ist(set0().filter(() => true), set0())
-    })
-
     it("returns the empty set when filter removes everything", () => {
-      ist(set0().filter(() => false), RangeSet.empty)
+      ist(set0().update({filter: () => false}), RangeSet.empty)
     })
   })
 
@@ -183,8 +177,7 @@ describe("RangeSet", () => {
         newSet = newSet.map(changes)
         docRanges = changes.changedRanges()
       }
-      if (update.filter) newSet = newSet.filter(update.filter)
-      if (update.add) newSet = newSet.merge(mkSet(update.add))
+      if (update.filter || update.add) newSet = newSet.update(update)
       if (update.prepare) update.prepare(newSet)
       let comp = new Comparator
       RangeSet.compare([set], [newSet], 0, 1e8, docRanges, comp)
