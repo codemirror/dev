@@ -166,9 +166,9 @@ export class EditorView {
       this.inputState.goalColumns.length = 0
 
     let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1
-    let ranges = this.viewState.update(update, scrollTo)
+    this.viewState.update(update, scrollTo)
     if (!update.empty) this.updatePlugins(update)
-    let redrawn = this.docView.update(update, ranges)
+    let redrawn = this.docView.update(update)
     this.inputState.ensureHandlers(this)
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
@@ -219,7 +219,7 @@ export class EditorView {
       update.flags |= changed
       this.updateState = UpdateState.Updating
       this.updatePlugins(update)
-      if (changed) this.docView.update(update, [])
+      if (changed) this.docView.update(update)
       for (let i = 0; i < measuring.length; i++) measuring[i].write(measured[i], this)
 
       if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break

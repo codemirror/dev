@@ -169,7 +169,7 @@ describe("RangeSet", () => {
     function test(ranges: RangeSet<Value> | Range<Value>[], update: any, changes: number[]) {
       let set = Array.isArray(ranges) ? mkSet(ranges) : ranges
       let newSet = set
-      let docRanges: ChangedRange[] = []
+      let docRanges: readonly ChangedRange[] = []
       if (update.changes) {
         let changes = new ChangeSet(update.changes.map(([from, to, len]: [number, number, number]) => {
           return new Change(from, to, ["x".repeat(len)])

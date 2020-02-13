@@ -1,7 +1,7 @@
 import {Text} from "../../text"
 import {ChangedRange} from "../../state"
 import {RangeSet, SpanIterator} from "../../rangeset"
-import {DecorationSet, PointDecoration, Decoration, BlockType} from "./decoration"
+import {DecorationSet, PointDecoration, Decoration, BlockType, addRange} from "./decoration"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
@@ -587,5 +587,22 @@ class NodeBuilder implements SpanIterator<Decoration> {
     let builder = new NodeBuilder(from, oracle)
     RangeSet.spans(decorations, from, to, builder)
     return builder.finish(from)
+  }
+}
+
+export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
+                                          diff: readonly ChangedRange[], length: number) {
+  let comp = new DecorationComparator()
+  RangeSet.compare(a, b, 0, length, diff, comp)
+  return comp.changes
+}
+
+class DecorationComparator {
+  changes: number[] = []
+
+  compareRange() {}
+
+  comparePoint(from: number, to: number, a: Decoration | null, b: Decoration | null) {
+    if (from < to || a && a.heightRelevant || b && b.heightRelevant) addRange(from, to, this.changes)
   }
 }

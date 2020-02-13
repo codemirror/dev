@@ -59,7 +59,7 @@ const bracketMatchingState = StateField.define<DecorationSet>({
       decorations.push(mark.range(match.start.from, match.start.to))
       if (match.end) decorations.push(mark.range(match.end.from, match.end.to))
     }
-    return Decoration.set(decorations)
+    return Decoration.set(decorations, true)
   }
 }).provide(EditorView.decorations)
 

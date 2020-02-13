@@ -1,5 +1,5 @@
-import {ChangedRange, MapMode} from "../../state"
-import {RangeValue, Range, RangeSet, RangeComparator} from "../../rangeset"
+import {MapMode} from "../../state"
+import {RangeValue, Range, RangeSet} from "../../rangeset"
 import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
 import {EditorView} from "./editorview"
@@ -189,8 +189,8 @@ export abstract class Decoration extends RangeValue {
 
   /// Build a [`DecorationSet`](#view.DecorationSet) from the given
   /// decorated range or ranges.
-  static set(of: Range<Decoration> | readonly Range<Decoration>[]): DecorationSet {
-    return RangeSet.of<Decoration>(of)
+  static set(of: Range<Decoration> | readonly Range<Decoration>[], sort = false): DecorationSet {
+    return RangeSet.of<Decoration>(of, sort)
   }
 
   /// The empty set of decorations.
@@ -295,7 +295,7 @@ function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
 
 const MIN_RANGE_GAP = 4
 
-function addRange(from: number, to: number, ranges: number[]) {
+export function addRange(from: number, to: number, ranges: number[]) {
   let last = ranges.length - 1
   if (last >= 0 && ranges[last] + MIN_RANGE_GAP > from) ranges[last] = Math.max(ranges[last], to)
   else ranges.push(from, to)
@@ -314,32 +314,4 @@ export function joinRanges(a: number[], b: number[]): number[] {
       break
   }
   return result
-}
-
-class Changes {
-  content: number[] = []
-  height: number[] = []
-}
-
-class DecorationComparator implements RangeComparator<Decoration> {
-  changes: Changes = new Changes
-  constructor() {}
-
-  compareRange(from: number, to: number) {
-    addRange(from, to, this.changes.content)
-  }
-
-  comparePoint(from: number, to: number, byA: Decoration | null, byB: Decoration | null) {
-    addRange(from, to, this.changes.content)
-    if (from < to || byA && byA.heightRelevant || byB && byB.heightRelevant)
-      addRange(from, to, this.changes.height)
-  }
-}
-
-// FIXME separate heightmap and content diffing, only run content diffs for drawn ranges
-export function findChangedRanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
-                                  diff: readonly ChangedRange[], length: number): Changes {
-  let comp = new DecorationComparator()
-  RangeSet.compare(a, b, 0, length, diff, comp)
-  return comp.changes
 }

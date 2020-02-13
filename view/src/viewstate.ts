@@ -1,7 +1,6 @@
 import {Text} from "../../text"
 import {EditorState, ChangedRange, Mapping} from "../../state"
-import {findChangedRanges} from "./decoration"
-import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType} from "./heightmap"
+import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRelevantDecoChanges} from "./heightmap"
 import {decorations, ViewUpdate, UpdateFlag} from "./extension"
 import {DocView} from "./docview"
 
@@ -59,9 +58,10 @@ export class ViewState {
     this.state = update.state
     let newDeco = this.state.facet(decorations)
     let contentChanges = update.changes.changedRanges()
-    let {content, height} = findChangedRanges(update.prevState.facet(decorations), newDeco,
-                                              update ? contentChanges : none, this.state.doc.length)
-    let heightChanges = extendWithRanges(contentChanges, height), prevHeight = this.heightMap.height
+    
+    let heightChanges = extendWithRanges(contentChanges, heightRelevantDecoChanges(
+      update.prevState.facet(decorations), newDeco,update ? contentChanges : none, this.state.doc.length))
+    let prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
 
@@ -74,8 +74,6 @@ export class ViewState {
       update.flags |= UpdateFlag.Viewport
     }
     if (scrollTo > -1) this.scrollTo = scrollTo
-
-    return extendWithRanges(contentChanges, content)
   }
 
   measure(docView: DocView, repeated: boolean) {

@@ -4,10 +4,11 @@ import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
 import {Viewport, extendWithRanges} from "./viewstate"
 import browser from "./browser"
-import {Decoration, DecorationSet, WidgetType, BlockType, findChangedRanges} from "./decoration"
+import {Decoration, DecorationSet, WidgetType, BlockType, addRange} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection} from "./dom"
 import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet} from "./extension"
 import {EditorView} from "./editorview"
+import {RangeSet} from "../../rangeset"
 import {ChangedRange} from "../../state"
 
 const none = [] as any
@@ -17,7 +18,7 @@ export class DocView extends ContentView {
   viewports: Viewport[] = none
 
   compositionDeco = Decoration.none
-  localDeco: readonly DecorationSet[] = []
+  decorations: readonly DecorationSet[] = []
   selectionDirty: any = null
 
   // Track a minimum width for the editor. When measuring sizes in
@@ -49,16 +50,16 @@ export class DocView extends ContentView {
     this.setDOM(view.contentDOM)
     this.children = [new LineView]
     this.children[0].setParent(this)
-    let deco = this.gatherLocalDeco().concat(view.state.facet(decorationsFacet))
-    this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], deco, 0)
+    this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], this.gatherDeco(), 0)
   }
 
   // Update the document view to a given state. scrollIntoView can be
   // used as a hint to compute a new viewport that includes that
   // position, if we know the editor is going to scroll that position
   // into view.
-  update(update: ViewUpdate, changedRanges: readonly ChangedRange[]) {
-     if (this.minWidth > 0 && changedRanges.length) {
+  update(update: ViewUpdate) {
+    let changedRanges = update.changes.changedRanges()
+    if (this.minWidth > 0 && changedRanges.length) {
       if (!changedRanges.every(({fromA, toA}) => toA < this.minWidthFrom || fromA > this.minWidthTo)) {
         this.minWidth = 0
       } else {
@@ -78,8 +79,8 @@ export class DocView extends ContentView {
     if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, changedRanges)
 
-    let prevLocal = this.localDeco, localDeco = this.gatherLocalDeco()
-    let decoDiff = findChangedRanges(prevLocal, localDeco, changedRanges, update.state.doc.length).content
+    let prevDeco = this.decorations, deco = this.gatherDeco()
+    let decoDiff = findChangedDeco(prevDeco, deco, changedRanges, update.state.doc.length)
     changedRanges = extendWithRanges(changedRanges, decoDiff)
     
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
@@ -88,8 +89,7 @@ export class DocView extends ContentView {
       this.updateSelection(forceSelection)
       return false
     } else {
-      this.updateInner(changedRanges, localDeco.concat(this.view.state.facet(decorationsFacet)),
-                       update.prevState.doc.length, forceSelection)
+      this.updateInner(changedRanges, deco, update.prevState.doc.length, forceSelection)
       return true
     }
   }
@@ -347,9 +347,13 @@ export class DocView extends ContentView {
     return Decoration.set(deco)
   }
 
-  gatherLocalDeco() {
-    let deco = [this.computeGapDeco(), this.compositionDeco].concat(this.view.pluginField(pluginDecorations))
-    return this.localDeco = deco
+  gatherDeco() {
+    return this.decorations = [
+      ...this.view.state.facet(decorationsFacet),
+      this.computeGapDeco(),
+      this.compositionDeco,
+      ...this.view.pluginField(pluginDecorations)
+    ]
   }
 
   scrollPosIntoView(pos: number) {
@@ -455,4 +459,18 @@ function nearbyTextNode(node: Node, offset: number): Node | null {
       return null
     }
   }
+}
+
+class DecorationComparator {
+  changes: number[] = []
+  compareRange(from: number, to: number) { addRange(from, to, this.changes) }
+  comparePoint(from: number, to: number) { addRange(from, to, this.changes) }
+}
+
+// FIXME separate heightmap and content diffing, only run content diffs for drawn ranges
+export function findChangedDeco(a: readonly DecorationSet[], b: readonly DecorationSet[],
+                                diff: readonly ChangedRange[], length: number) {
+  let comp = new DecorationComparator
+  RangeSet.compare(a, b, 0, length, diff, comp)
+  return comp.changes
 }

@@ -283,12 +283,13 @@ export class RangeSet<T extends RangeValue> {
   /// the _new_ space, after these changes.
   static compare<T extends RangeValue>(
     oldSets: readonly RangeSet<T>[], newSets: readonly RangeSet<T>[],
+    // FIXME remove these arguments?
     from: number, to: number,
     textDiff: readonly ChangedRange[],
     comparator: RangeComparator<T>
   ) {
-    let a = oldSets.filter(set => set != RangeSet.empty && newSets.indexOf(set) < 0)
-    let b = newSets.filter(set => set != RangeSet.empty && oldSets.indexOf(set) < 0)
+    let a = oldSets.filter(set => set.bigPoint || set != RangeSet.empty && newSets.indexOf(set) < 0)
+    let b = newSets.filter(set => set.bigPoint || set != RangeSet.empty && oldSets.indexOf(set) < 0)
     let sharedChunks = findSharedChunks(a, b)
     let sideA = new SpanCursor(a, sharedChunks), sideB = new SpanCursor(b, sharedChunks)
 
