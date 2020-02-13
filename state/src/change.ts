@@ -140,6 +140,8 @@ function textLength(text: readonly string[]) {
 
 /// A change set holds a sequence of changes or change descriptions.
 export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
+  private _changedRanges: null | readonly ChangedRange[] = null
+
   /// @internal
   constructor(
     /// The changes in this set.
@@ -242,8 +244,8 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   /// deleting between 1 and 4 and inserting a character at 1, the
   /// result would be a single range saying 1 to 4 in the old doc was
   /// replaced with range 1 to 2 in the new doc.
-  changedRanges(): ChangedRange[] {
-    // FIXME cache this?
+  changedRanges(): readonly ChangedRange[] {
+    if (this._changedRanges) return this._changedRanges
     let set: ChangedRange[] = []
     for (let i = 0; i < this.length; i++) {
       let change = this.changes[i]
@@ -258,7 +260,7 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
       }
       new ChangedRange(fromA, toA, fromB, toB).addToSet(set)
     }
-    return set
+    return this._changedRanges = set
   }
 
   /// Convert a set of changes to a set of change descriptions.
