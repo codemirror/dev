@@ -79,7 +79,7 @@ export class DocView extends ContentView {
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, changedRanges)
 
     let prevLocal = this.localDeco, localDeco = this.gatherLocalDeco()
-    let decoDiff = decoChanges(changedRanges, localDeco, prevLocal, update.prevState.doc.length).content
+    let decoDiff = decoChanges(changedRanges, localDeco, prevLocal, update.state.doc.length).content
     changedRanges = extendWithRanges(changedRanges, decoDiff)
     
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&

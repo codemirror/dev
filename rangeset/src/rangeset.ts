@@ -239,18 +239,16 @@ export class RangeSet<T extends RangeValue> {
 
     let oldPos = 0, newPos = 0
     for (let range of textDiff) {
-      if (range.fromB > newPos) {
-        let chunkFrom = Math.max(from, newPos), chunkTo = Math.min(to, range.fromB)
-        if (chunkFrom < chunkTo)
-          compare(sideA, oldPos + (chunkFrom - newPos),
-                  sideB, chunkFrom, chunkTo - chunkFrom, comparator)
+      if (range.fromB >= from) {
+        let clipFrom = Math.max(from, newPos), clipTo = Math.min(to, range.fromB)
+        compare(sideA, oldPos + (clipFrom - newPos), sideB, clipFrom, clipTo - clipFrom, comparator)
       }
       oldPos = range.toA
       newPos = range.toB
+      if (newPos > to) return
     }
-    let upto = Math.max(newPos, from)
-    if (upto < to)
-      compare(sideA, oldPos + (upto - newPos), sideB, upto, to - upto, comparator)
+    let clipFrom = Math.max(from, newPos)
+    compare(sideA, oldPos + (clipFrom - newPos), sideB, clipFrom, to - clipFrom, comparator)
   }
 
   /// Iterate over a group of range sets at the same time, notifying
@@ -372,22 +370,26 @@ class LayerCursor<T extends RangeValue> {
 
   goto(pos: number, side: number = -Far) {
     this.chunkIndex = this.rangeIndex = 0
-    this.gotoInner(pos, side)
+    this.gotoInner(pos, side, false)
     return this
   }
 
-  gotoInner(pos: number, side: number) {
+  gotoInner(pos: number, side: number, forward: boolean) {
     while (this.chunkIndex < this.layer.chunk.length &&
            (this.skip && this.skip.has(this.layer.chunk[this.chunkIndex]) ||
-            this.layer.chunkEnd(this.chunkIndex) < pos))
+            this.layer.chunkEnd(this.chunkIndex) < pos)) {
       this.chunkIndex++
-    this.rangeIndex = this.chunkIndex == this.layer.chunk.length ? 0
+      forward = false
+    }
+    let rangeIndex = this.chunkIndex == this.layer.chunk.length ? 0
       : this.layer.chunk[this.chunkIndex].findIndex(pos - this.layer.chunkPos[this.chunkIndex], -1, side)
+    if (!forward || this.rangeIndex < rangeIndex) this.rangeIndex = rangeIndex
     this.next()
   }
 
   forward(pos: number, side: number) {
-    if ((this.to - pos || this.endSide - side) < 0) this.gotoInner(pos, side)
+    if ((this.to - pos || this.endSide - side) < 0)
+      this.gotoInner(pos, side, true)
   }
 
   next() {
@@ -588,7 +590,8 @@ function compare<T extends RangeValue>(a: SpanCursor<T>, startA: number,
     let diff = (a.to + dPos) - b.to || a.endSide - b.endSide
     let end = diff < 0 ? a.to + dPos : b.to, clipEnd = Math.min(end, endB)
     if (a.point || b.point) {
-      if (!(a.point && b.point && a.point.eq(b.point))) comparator.comparePoint(pos, clipEnd, a.point, b.point)
+      if (!(a.point && b.point && (a.point == b.point || a.point.eq(b.point))))
+        comparator.comparePoint(pos, clipEnd, a.point, b.point)
     } else {
       if (clipEnd > pos && !sameSet(a.active, b.active)) comparator.compareRange(pos, clipEnd, a.active, b.active)
     }
@@ -603,7 +606,7 @@ function sameSet<T extends RangeValue>(a: T[], b: T[]) {
   if (a.length != b.length) return false
   outer: for (let i = 0; i < a.length; i++) {
     for (let j = 0; j < b.length; j++)
-      if (a[i].eq(b[j])) continue outer
+      if (a[i] == b[i] || a[i].eq(b[j])) continue outer
     return false
   }
   return true

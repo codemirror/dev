@@ -61,7 +61,7 @@ export class ViewState {
     let contentChanges = update.changes.changedRanges()
     let {content, height} = decoChanges(update ? contentChanges : none,
                                         newDeco, update.prevState.facet(decorations),
-                                        prev.doc.length)
+                                        this.state.doc.length)
     let heightChanges = extendWithRanges(contentChanges, height), prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
@@ -189,12 +189,12 @@ export class Viewport {
 
 // FIXME find some more robust way to do this in the face of changing sets
 export function decoChanges(diff: readonly ChangedRange[], decorations: readonly DecorationSet[],
-                            oldDecorations: readonly DecorationSet[], oldLength: number): {content: number[], height: number[]} {
+                            oldDecorations: readonly DecorationSet[], length: number): {content: number[], height: number[]} {
   let contentRanges: number[] = [], heightRanges: number[] = []
   for (let max = Math.max(decorations.length, oldDecorations.length), i = 0; i < max; i++) {
     let a = decorations[i] || Decoration.none, b = oldDecorations[i] || Decoration.none
     if (a.size == 0 && b.size == 0) continue
-    let newRanges = findChangedRanges(b, a, diff, oldLength)
+    let newRanges = findChangedRanges(b, a, diff, length)
     contentRanges = joinRanges(contentRanges, newRanges.content)
     heightRanges = joinRanges(heightRanges, newRanges.height)
   }

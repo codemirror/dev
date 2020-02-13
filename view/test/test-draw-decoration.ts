@@ -98,13 +98,6 @@ describe("EditorView decoration", () => {
     ist(cm.contentDOM.querySelector("strong"), null)
   })
 
-  it("shrinks inclusive decorations when their sides are replaced", () => {
-    let cm = decoEditor("abcde", [d(1, 4, {inclusiveStart: true, inclusiveEnd: true, tagName: "strong"})])
-    cm.dispatch(cm.state.t().replace(3, 5, "a"))
-    cm.dispatch(cm.state.t().replace(0, 2, "a"))
-    ist(cm.contentDOM.querySelector("strong")!.textContent, "c")
-  })
-
   class WordWidget extends WidgetType<string> {
     eq(otherValue: string) { return this.value.toLowerCase() == otherValue.toLowerCase() }
     toDOM() {
@@ -170,9 +163,9 @@ describe("EditorView decoration", () => {
     })
 
     it("orders widgets by side", () => {
-      let cm = decoEditor("hello", [w(4, new WordWidget("C"), 10),
+      let cm = decoEditor("hello", [w(4, new WordWidget("A"), -1),
                                     w(4, new WordWidget("B")),
-                                    w(4, new WordWidget("A"), -1)])
+                                    w(4, new WordWidget("C"), 10)])
       let widgets = cm.contentDOM.querySelectorAll("strong")
       ist(widgets.length, 3)
       ist(widgets[0].textContent, "A")
@@ -349,7 +342,7 @@ describe("EditorView decoration", () => {
 
   describe("block widgets", () => {
     it("draws block widgets in the right place", () => {
-      let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(3, 2, "C"), bw(3, 1, "B"), bw(4, -2, "D"), bw(4, -1, "E"), bw(7, 1, "F")])
+      let cm = decoEditor("foo\nbar", [bw(0, -1, "A"), bw(3, 1, "B"), bw(3, 2, "C"), bw(4, -2, "D"), bw(4, -1, "E"), bw(7, 1, "F")])
       widgets(cm, ["A"], ["B", "C", "D", "E"], ["F"])
     })
 
@@ -394,7 +387,7 @@ describe("EditorView decoration", () => {
       cm.dispatch(cm.state.t().replace(1, 2, "u").annotate(addDeco, [br(2, 3, "X")]))
       widgets(cm, [], ["X"], [])
       cm.dispatch(cm.state.t().replace(3, 4, "i").annotate(addDeco, [br(2, 3, "X")]))
-      widgets(cm, [], ["X"], [])
+      widgets(cm, [], ["X","X","X"], [])
     })
 
     it("can draw a block range that partially overlaps with a collapsed range", () => {

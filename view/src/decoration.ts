@@ -169,7 +169,7 @@ export abstract class Decoration extends RangeValue {
   static widget(pos: number, spec: WidgetDecorationSpec): Range<Decoration> {
     let side = spec.side || 0
     if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
-    return new Range(pos, pos, new PointDecoration(spec, side, side, !!spec.block, spec.widget))
+    return new Range(pos, pos, new PointDecoration(spec, side, side, !!spec.block, spec.widget || null))
   }
 
   /// Create a replace decoration which replaces the given range with
@@ -237,19 +237,23 @@ LineDecoration.prototype.startMapMode = LineDecoration.prototype.endMapMode = Ma
 export class PointDecoration extends Decoration {
   constructor(spec: any, startSide: number, endSide: number, public block: boolean, widget: WidgetType | null) {
     super(startSide, endSide, widget, spec)
+    if (block) {
+      this.startMapMode = startSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
+      this.endMapMode = endSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
+    } else {
+      this.startMapMode = this.endMapMode = MapMode.TrackDel
+    }
   }
 
   get point() { return true }
 
   // Only relevant when this.block == true
   get type() {
-    return this.startSide < this.endSide ? BlockType.WidgetRange : this.startSide < 0 ? BlockType.WidgetBefore : BlockType.WidgetAfter
+    return this.startSide < this.endSide ? BlockType.WidgetRange
+      : this.startSide < 0 ? BlockType.WidgetBefore : BlockType.WidgetAfter
   }
 
   get heightRelevant() { return this.block || !!this.widget && this.widget.estimatedHeight >= 5 }
-
-  get startMapMode() { return this.type == BlockType.WidgetAfter ? MapMode.TrackAfter : MapMode.TrackBefore }
-  get endMapMode() { return this.type == BlockType.WidgetBefore ? MapMode.TrackBefore : MapMode.TrackAfter }
 
   eq(other: Decoration): boolean {
     return other instanceof PointDecoration &&
@@ -306,16 +310,16 @@ class DecorationComparator implements RangeComparator<Decoration> {
     addRange(from, to, this.changes.content)
   }
 
-  comparePoint(from: number, to: number, byA: Decoration, byB: Decoration | null) {
+  comparePoint(from: number, to: number, byA: Decoration | null, byB: Decoration | null) {
     addRange(from, to, this.changes.content)
-    if (from < to || byA.heightRelevant || byB && byB.heightRelevant)
+    if (from < to || byA && byA.heightRelevant || byB && byB.heightRelevant)
       addRange(from, to, this.changes.height)
   }
 }
 
 // FIXME call with the whole lot of decorations at once
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: readonly ChangedRange[], _lengthA: number): Changes {
+export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: readonly ChangedRange[], length: number): Changes {
   let comp = new DecorationComparator()
-  RangeSet.compare([a], [b], 0, 1e9, diff, comp)
+  RangeSet.compare([a], [b], 0, length, diff, comp)
   return comp.changes
 }

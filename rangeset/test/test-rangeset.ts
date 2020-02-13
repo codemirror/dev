@@ -257,7 +257,7 @@ describe("RangeSet", () => {
       this.spans.push((to - from) + (name ? "=" + name : ""))
     }
     point(from: number, to: number, value: Value) {
-      return (to > from ? (to - from) + "=" : "") + (value.name ? "[" + value.name + "]" : "ø")
+      this.spans.push((to > from ? (to - from) + "=" : "") + (value.name ? "[" + value.name + "]" : "ø"))
     }
   }
 
@@ -287,6 +287,13 @@ describe("RangeSet", () => {
       let builder = new Builder
       RangeSet.spans([one, two], 0, 12, builder)
       ist(builder.spans.join(" "), "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
+    })
+
+    it("doesn't get confused by same-place points", () => {
+      let set = mkSet([mk(1, "a"), mk(1, "b"), mk(1, "c")])
+      let builder = new Builder
+      RangeSet.spans([set], 0, 2, builder)
+      ist(builder.spans.join(" "), "1 [a] [b] [c] 1")
     })
   })
 
