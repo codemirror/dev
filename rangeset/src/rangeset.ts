@@ -283,9 +283,8 @@ export class RangeSet<T extends RangeValue> {
   /// the _new_ space, after these changes.
   static compare<T extends RangeValue>(
     oldSets: readonly RangeSet<T>[], newSets: readonly RangeSet<T>[],
-    // FIXME remove these arguments?
-    from: number, to: number,
     textDiff: readonly ChangedRange[],
+    length: number,
     comparator: RangeComparator<T>
   ) {
     let a = oldSets.filter(set => set.bigPoint || set != RangeSet.empty && newSets.indexOf(set) < 0)
@@ -293,18 +292,13 @@ export class RangeSet<T extends RangeValue> {
     let sharedChunks = findSharedChunks(a, b)
     let sideA = new SpanCursor(a, sharedChunks), sideB = new SpanCursor(b, sharedChunks)
 
-    let oldPos = 0, newPos = 0
+    let posA = 0, posB = 0
     for (let range of textDiff) {
-      if (range.fromB >= from) {
-        let clipFrom = Math.max(from, newPos), clipTo = Math.min(to, range.fromB)
-        compare(sideA, oldPos + (clipFrom - newPos), sideB, clipFrom, clipTo - clipFrom, comparator)
-      }
-      oldPos = range.toA
-      newPos = range.toB
-      if (newPos > to) return
+      compare(sideA, posA, sideB, posB, range.fromB - posB, comparator)
+      posA = range.toA
+      posB = range.toB
     }
-    let clipFrom = Math.max(from, newPos)
-    compare(sideA, oldPos + (clipFrom - newPos), sideB, clipFrom, to - clipFrom, comparator)
+    compare(sideA, posA, sideB, posB, length - posB, comparator)
   }
 
   /// Iterate over a group of range sets at the same time, notifying

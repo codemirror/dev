@@ -180,7 +180,7 @@ describe("RangeSet", () => {
       if (update.filter || update.add) newSet = newSet.update(update)
       if (update.prepare) update.prepare(newSet)
       let comp = new Comparator
-      RangeSet.compare([set], [newSet], 0, 1e8, docRanges, comp)
+      RangeSet.compare([set], [newSet], docRanges, 1e8, comp)
       ist(JSON.stringify(comp.ranges), JSON.stringify(changes))
     }
 
