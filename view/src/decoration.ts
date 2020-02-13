@@ -317,9 +317,10 @@ class DecorationComparator implements RangeComparator<Decoration> {
   }
 }
 
-// FIXME call with the whole lot of decorations at once
-export function findChangedRanges(a: DecorationSet, b: DecorationSet, diff: readonly ChangedRange[], length: number): Changes {
+// FIXME separate heightmap and content diffing, only run content diffs for drawn ranges
+export function findChangedRanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
+                                  diff: readonly ChangedRange[], length: number): Changes {
   let comp = new DecorationComparator()
-  RangeSet.compare([a], [b], 0, length, diff, comp)
+  RangeSet.compare(a, b, 0, length, diff, comp)
   return comp.changes
 }

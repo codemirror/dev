@@ -6,7 +6,9 @@ export abstract class RangeValue {
   /// Compare this value with another value. The default
   /// implementation compares by identity.
   eq(other: RangeValue) { return this == other }
-  /// The bias value at the start of the range. Defaults to 0.
+  /// The bias value at the start of the range. Determines how the
+  /// range is positioned relative to other ranges starting at this
+  /// position. Defaults to 0.
   startSide!: number
   /// The bias value at the end of the range. Defaults to 0.
   endSide!: number

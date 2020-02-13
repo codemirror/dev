@@ -1,6 +1,6 @@
 import {Text} from "../../text"
 import {EditorState, ChangedRange, Mapping} from "../../state"
-import {DecorationSet, Decoration, joinRanges, findChangedRanges} from "./decoration"
+import {findChangedRanges} from "./decoration"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType} from "./heightmap"
 import {decorations, ViewUpdate, UpdateFlag} from "./extension"
 import {DocView} from "./docview"
@@ -59,9 +59,8 @@ export class ViewState {
     this.state = update.state
     let newDeco = this.state.facet(decorations)
     let contentChanges = update.changes.changedRanges()
-    let {content, height} = decoChanges(update ? contentChanges : none,
-                                        newDeco, update.prevState.facet(decorations),
-                                        this.state.doc.length)
+    let {content, height} = findChangedRanges(update.prevState.facet(decorations), newDeco,
+                                              update ? contentChanges : none, this.state.doc.length)
     let heightChanges = extendWithRanges(contentChanges, height), prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
@@ -185,20 +184,6 @@ export class ViewState {
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}
   eq(b: Viewport) { return this.from == b.from && this.to == b.to }
-}
-
-// FIXME find some more robust way to do this in the face of changing sets
-export function decoChanges(diff: readonly ChangedRange[], decorations: readonly DecorationSet[],
-                            oldDecorations: readonly DecorationSet[], length: number): {content: number[], height: number[]} {
-  let contentRanges: number[] = [], heightRanges: number[] = []
-  for (let max = Math.max(decorations.length, oldDecorations.length), i = 0; i < max; i++) {
-    let a = decorations[i] || Decoration.none, b = oldDecorations[i] || Decoration.none
-    if (a.size == 0 && b.size == 0) continue
-    let newRanges = findChangedRanges(b, a, diff, length)
-    contentRanges = joinRanges(contentRanges, newRanges.content)
-    heightRanges = joinRanges(heightRanges, newRanges.height)
-  }
-  return {content: contentRanges, height: heightRanges}
 }
 
 export function extendWithRanges(diff: readonly ChangedRange[], ranges: number[]): readonly ChangedRange[] {

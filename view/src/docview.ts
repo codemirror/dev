@@ -2,9 +2,9 @@ import {ContentView, ChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
-import {Viewport, decoChanges, extendWithRanges} from "./viewstate"
+import {Viewport, extendWithRanges} from "./viewstate"
 import browser from "./browser"
-import {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
+import {Decoration, DecorationSet, WidgetType, BlockType, findChangedRanges} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection} from "./dom"
 import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet} from "./extension"
 import {EditorView} from "./editorview"
@@ -79,7 +79,7 @@ export class DocView extends ContentView {
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, changedRanges)
 
     let prevLocal = this.localDeco, localDeco = this.gatherLocalDeco()
-    let decoDiff = decoChanges(changedRanges, localDeco, prevLocal, update.state.doc.length).content
+    let decoDiff = findChangedRanges(prevLocal, localDeco, changedRanges, update.state.doc.length).content
     changedRanges = extendWithRanges(changedRanges, decoDiff)
     
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
