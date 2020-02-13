@@ -570,7 +570,7 @@ class SpanCursor<T extends RangeValue> {
           this.to = this.cursor.to
           this.endSide = nextVal.endSide
           this.cursor.next()
-          this.forward(this.to, this.endSide)
+          if (this.to > from) this.forward(this.to, this.endSide)
           break
         }
       }

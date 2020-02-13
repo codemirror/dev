@@ -250,23 +250,26 @@ describe("RangeSet", () => {
     })
   })
 
-  class Builder implements RangeIterator<Value> {
-    spans: string[] = []
-    span(from: number, to: number, active: readonly Value[]) {
-      let name = Value.names(active)
-      this.spans.push((to - from) + (name ? "=" + name : ""))
-    }
-    point(from: number, to: number, value: Value) {
-      this.spans.push((to > from ? (to - from) + "=" : "") + (value.name ? "[" + value.name + "]" : "ø"))
-    }
-  }
-
   describe("spans", () => {
-    it("separates the range in covering spans", () => {
-      let set = mkSet([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")])
+    class Builder implements RangeIterator<Value> {
+      spans: string[] = []
+      span(from: number, to: number, active: readonly Value[]) {
+        let name = Value.names(active)
+        this.spans.push((to - from) + (name ? "=" + name : ""))
+      }
+      point(from: number, to: number, value: Value) {
+        this.spans.push((to > from ? (to - from) + "=" : "") + (value.name ? "[" + value.name + "]" : "ø"))
+      }
+    }
+    function test(set: RangeSet<Value> | RangeSet<Value>[], start: number, end: number, expected: string) {
       let builder = new Builder
-      RangeSet.spans([set], 0, 15, builder)
-      ist(builder.spans.join(" "), "3 2=one 3=one/two 2 2=three 3")
+      RangeSet.spans(Array.isArray(set) ? set : [set], start, end, builder)
+      ist(builder.spans.join(" "), expected)
+    }
+
+    it("separates the range in covering spans", () => {
+      test(mkSet([mk(3, 8, "one"), mk(5, 8, "two"), mk(10, 12, "three")]), 0, 15,
+           "3 2=one 3=one/two 2 2=three 3")
     })
 
     it("can retrieve a limited range", () => {
@@ -276,24 +279,23 @@ describe("RangeSet", () => {
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
         expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "/wide"
-      let builder = new Builder
-      RangeSet.spans([set], start, end, builder)
-      ist(builder.spans.join(" "), expected)
+      test(set, start, end, expected)
     })
 
     it("reads from multiple sets at once", () => {
       let one = mkSet([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
       let two = mkSet([mk(0, 6, "a"), mk(10, 12, "b")])
-      let builder = new Builder
-      RangeSet.spans([one, two], 0, 12, builder)
-      ist(builder.spans.join(" "), "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
+      test([one, two], 0, 12, "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
     })
 
     it("doesn't get confused by same-place points", () => {
-      let set = mkSet([mk(1, "a"), mk(1, "b"), mk(1, "c")])
-      let builder = new Builder
-      RangeSet.spans([set], 0, 2, builder)
-      ist(builder.spans.join(" "), "1 [a] [b] [c] 1")
+      test(mkSet([mk(1, "a"), mk(1, "b"), mk(1, "c")]), 0, 2,
+           "1 [a] [b] [c] 1")
+    })
+
+    it("properly resyncs active ranges after points", () => {
+      test(mkSet([mk(0, 20, "r1"), mk(1, 10, "r2"), mk(3, 12, {name: "p", point: true}), mk(4, 8, "r3"), mk(5, 20, "r4")]), 0, 20,
+           "1=r1 2=r1/r2 9=[p] 8=r1/r4")
     })
   })
 
