@@ -1,4 +1,4 @@
-import {RangeIterator, RangeSet} from "../../rangeset"
+import {SpanIterator, RangeSet} from "../../rangeset"
 import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType, WidgetType} from "./decoration"
 import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
@@ -6,7 +6,7 @@ import {Text, TextIterator} from "../../text"
 
 export const enum Open { Start = 1, End = 2 }
 
-export class ContentBuilder implements RangeIterator<Decoration> {
+export class ContentBuilder implements SpanIterator<Decoration> {
   content: BlockView[] = []
   curLine: LineView | null = null
   breakAtStart = 0

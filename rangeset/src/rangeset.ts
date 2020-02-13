@@ -28,7 +28,17 @@ RangeValue.prototype.startMapMode = RangeValue.prototype.endMapMode = MapMode.Tr
 
 /// A range associates a value with a range of positions.
 export class Range<T extends RangeValue> {
-  constructor(readonly from: number, readonly to: number, readonly value: T) {}
+  constructor(
+    /// The range's start position.
+    readonly from: number,
+    /// Its end position.
+    readonly to: number,
+    /// The value associated with this range.
+    readonly value: T) {}
+}
+
+function cmpRange<T extends RangeValue>(a: Range<T>, b: Range<T>) {
+  return a.from - b.from || a.value.startSide - b.value.startSide
 }
 
 /// Collection of methods used when comparing range sets.
@@ -40,10 +50,10 @@ export interface RangeComparator<T extends RangeValue> {
   comparePoint(from: number, to: number, byA: T | null, byB: T | null): void
 }
 
-/// Methods used when iterating over a single range set. The entire
-/// iterated range will be covered with either `span` or `point`
-/// calls.
-export interface RangeIterator<T extends RangeValue> {
+/// Methods used when iterating over the spans created by a set of
+/// ranges. The entire iterated range will be covered with either
+/// `span` or `point` calls.
+export interface SpanIterator<T extends RangeValue> {
   /// Called for any ranges not covered by point decorations. `active`
   /// holds the values that the range is marked with (and may be
   /// empty).
@@ -104,11 +114,38 @@ class Chunk<T extends RangeValue> {
   }
 }
 
+/// A range cursor is an object that moves to the next range every
+/// time you call `next` on it. Note that, unlike ES6 iterators, these
+/// start out pointing at the first element, so you should call `next`
+/// only after reading the first range (if any).
 export type RangeCursor<T> = {
+  /// Move the iterator forward.
   next: () => void
+  /// The next range's value. Holds `null` when the cursor has reached
+  /// its end.
   value: T | null
+  /// The next range's start position.
   from: number
+  /// The next end position.
   to: number
+}
+
+/// Arguments passed to [`RangeSet.update`](#rangeset.RangeSet.update).
+export type RangeSetUpdate<T extends RangeValue> = {
+  /// An array of ranges to add. If given, this should be sorted by
+  /// `from` position and `startSide` unless
+  /// [`sort`](#rangeset.RangeSetUpdate.sort) is given as `true`.
+  add?: readonly Range<T>[]
+  /// Indicates whether the library should sort the ranges in `add`.
+  sort?: boolean
+  /// Filter the ranges already in the set. Only those for which this
+  /// function returns `true` are kept.
+  filter?: (from: number, to: number, value: T) => boolean,
+  filterFrom?: number
+  /// These can be used to limit the range on which the filter is
+  /// applied. Filtering only a small range, as opposed to the entire
+  /// set, can make updates cheaper.
+  filterTo?: number
 }
 
 /// A range set stores a collection of [ranges](#rangeset.Range) in a
@@ -145,13 +182,11 @@ export class RangeSet<T extends RangeValue> {
     return this.chunkPos[index] + this.chunk[index].length
   }
 
-  update({add = [], filter, filterFrom = 0, filterTo = this.length}: {
-    add?: readonly Range<T>[],
-    filter?: (from: number, to: number, value: T) => boolean,
-    filterFrom?: number,
-    filterTo?: number
-  }): RangeSet<T> {
+  /// Update the range set, optionally adding new ranges or filtering
+  /// out existing ones.
+  update({add = [], sort = false, filter, filterFrom = 0, filterTo = this.length}: RangeSetUpdate<T>): RangeSet<T> {
     if (add.length == 0 && !filter) return this
+    if (sort) add.slice().sort(cmpRange)
     if (this == RangeSet.empty) return add.length ? RangeSet.of(add) : this
 
     let cur = new LayerCursor(this).goto(0), i = 0, spill = []
@@ -174,8 +209,8 @@ export class RangeSet<T extends RangeValue> {
       }
     }
 
-    return builder.finish(this.nextLayer == RangeSet.empty && !spill.length ? RangeSet.empty
-                          : this.nextLayer.update({add: spill, filter, filterFrom, filterTo}))
+    return builder.finishInner(this.nextLayer == RangeSet.empty && !spill.length ? RangeSet.empty
+                               : this.nextLayer.update({add: spill, filter, filterFrom, filterTo}))
   }
 
   /// Map this range set through a set of changes, return the new set.
@@ -255,7 +290,7 @@ export class RangeSet<T extends RangeValue> {
   /// the iterator about the ranges covering every given piece of
   /// content.
   static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
-                                     iterator: RangeIterator<T>) {
+                                     iterator: SpanIterator<T>) {
     let cursor = new SpanCursor(sets).goto(from), pos = from
     for (;;) {
       let curTo = Math.min(cursor.to, to)
@@ -267,11 +302,14 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
-  /// Create a range set for the given range or array of ranges.
-  // FIXME determine and document sorting requirement
-  static of<T extends RangeValue>(ranges: readonly Range<T>[] | Range<T>): RangeSet<T> {
+  /// Create a range set for the given range or array of ranges. By
+  /// default, this expects the ranges to be _sorted_ (by start
+  /// position and, if two start at the same position,
+  /// `value.startSide`). You can pass `true` as second argument to
+  /// cause the method to sort them.
+  static of<T extends RangeValue>(ranges: readonly Range<T>[] | Range<T>, sort = false): RangeSet<T> {
     let build = new RangeSetBuilder<T>()
-    for (let range of ranges instanceof Range ? [ranges] : ranges)
+    for (let range of ranges instanceof Range ? [ranges] : sort ? ranges.slice().sort(cmpRange) : ranges)
       build.add(range.from, range.to, range.value)
     return build.finish()
   }
@@ -280,8 +318,12 @@ export class RangeSet<T extends RangeValue> {
   static empty = new RangeSet<any>([], [], null as any)
 }
 
+// Awkward patch-up to create a cyclic structure.
 ;(RangeSet.empty as any).nextLayer = RangeSet.empty
 
+/// A range set builder is a data structure that helps build up a
+/// [range set](#rangeset.RangeSet) directly, without first allocating
+/// an array of [`Range`](#rangeset.Range) objects.
 export class RangeSetBuilder<T extends RangeValue> {
   private chunks: Chunk<T>[] = []
   private chunkPos: number[] = []
@@ -301,6 +343,8 @@ export class RangeSetBuilder<T extends RangeValue> {
     if (newArrays) { this.from = []; this.to = []; this.value = [] }
   }
 
+  /// Add a range. Ranges should be added in sorted (by `from` and
+  /// `value.startSide`) order.
   add(from: number, to: number, value: T) {
     if (!this.addInner(from, to, value))
       (this.nextLayer || (this.nextLayer = new RangeSetBuilder)).add(from, to, value)
@@ -323,6 +367,7 @@ export class RangeSetBuilder<T extends RangeValue> {
     return true
   }
 
+  /// @internal
   addChunk(from: number, chunk: Chunk<T>) {
     if ((from - this.lastTo || chunk.value[0].startSide - this.last!.endSide) < 0) return false
     if (this.from.length) this.finishChunk(true)
@@ -335,10 +380,15 @@ export class RangeSetBuilder<T extends RangeValue> {
     return true
   }
 
-  finish(next: RangeSet<T> = RangeSet.empty): RangeSet<T> {
+  /// Finish the range set. Returns the new set. The builder can't be
+  /// used anymore after this has been called.
+  finish() { return this.finishInner(RangeSet.empty) }
+
+  /// @internal
+  finishInner(next: RangeSet<T>): RangeSet<T> {
     if (this.from.length) this.finishChunk(false)
     if (this.chunks.length == 0) return next
-    let result = new RangeSet(this.chunkPos, this.chunks, this.nextLayer ? this.nextLayer.finish(next) : next)
+    let result = new RangeSet(this.chunkPos, this.chunks, this.nextLayer ? this.nextLayer.finishInner(next) : next)
     this.from = null as any // Make sure further `add` calls produce errors
     return result
   }

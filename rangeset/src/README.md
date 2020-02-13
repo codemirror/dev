@@ -7,8 +7,14 @@ document changes.
 
 @Range
 
+@RangeSetUpdate
+
 @RangeSet
+
+@RangeCursor
+
+@RangeSetBuilder
 
 @RangeComparator
 
-@RangeIterator
+@SpanIterator

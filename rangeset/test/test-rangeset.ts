@@ -1,4 +1,4 @@
-import {Range, RangeSet, RangeValue, RangeComparator, RangeIterator} from ".."
+import {Range, RangeSet, RangeValue, RangeComparator, SpanIterator} from ".."
 import {Change, ChangeSet, ChangedRange} from "../../state"
 import ist from "ist"
 
@@ -251,7 +251,7 @@ describe("RangeSet", () => {
   })
 
   describe("spans", () => {
-    class Builder implements RangeIterator<Value> {
+    class Builder implements SpanIterator<Value> {
       spans: string[] = []
       span(from: number, to: number, active: readonly Value[]) {
         let name = Value.names(active)

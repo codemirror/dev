@@ -1,6 +1,6 @@
 import {Text} from "../../text"
 import {ChangedRange} from "../../state"
-import {RangeSet, RangeIterator} from "../../rangeset"
+import {RangeSet, SpanIterator} from "../../rangeset"
 import {DecorationSet, PointDecoration, Decoration, BlockType} from "./decoration"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
@@ -474,7 +474,7 @@ function mergeGaps(nodes: (HeightMap | null)[], around: number) {
 
 const relevantWidgetHeight = 5
 
-class NodeBuilder implements RangeIterator<Decoration> {
+class NodeBuilder implements SpanIterator<Decoration> {
   nodes: (HeightMap | null)[] = []
   writtenTo: number
   lineStart = -1
