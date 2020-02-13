@@ -70,14 +70,14 @@ const lintState = StateField.define<LintState>({
     if (setDiag) {
       let ranges = Decoration.set(setDiag.map(d => {
         return d.from < d.to
-          ? Decoration.mark(d.from, d.to, {
+          ? Decoration.mark({
             attributes: {class: themeClass("lintRange." + d.severity)},
             diagnostic: d
-          } as MarkDecorationSpec)
-          : Decoration.widget(d.from, {
+          } as MarkDecorationSpec).range(d.from, d.to)
+          : Decoration.widget({
             widget: new DiagnosticWidget(d),
             diagnostic: d
-          } as WidgetDecorationSpec)
+          } as WidgetDecorationSpec).range(d.from)
       }))
       return new LintState(ranges, value.panel, findDiagnostic(ranges))
     }
@@ -99,6 +99,8 @@ const lintState = StateField.define<LintState>({
 }).provideN(showPanel, s => s.panel ? [s.panel] : [])
   .provide(EditorView.decorations, s => s.diagnostics)
 
+const activeMark = Decoration.mark({class: themeClass("lintRange.active")})
+
 /// Returns an extension that enables the linting functionality.
 /// Implicitly enabled by the [`linter`](#lint.linter) function.
 export function linting(): Extension {
@@ -107,7 +109,7 @@ export function linting(): Extension {
     EditorView.decorations.compute([lintState], state => {
       let {selected, panel} = state.field(lintState)
       return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
-        Decoration.mark(selected.from, selected.to, {class: themeClass("lintRange.active")})
+        activeMark.range(selected.from, selected.to)
       ])
     }),
     panels(),

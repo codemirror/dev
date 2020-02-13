@@ -27,7 +27,7 @@ const foldState = StateField.define<DecorationSet>({
       let {fold = [], unfold = []} = ann
       if (unfold.length || fold.length)
         folded = folded.update({
-          add: fold.map(({from, to}) => Decoration.replace(from, to, FoldWidget.config)),
+          add: fold.map(({from, to}) => FoldWidget.decoration.range(from, to)),
           filter: (from, to) => !unfold.some(r => r.from == from && r.to == to),
           filterFrom: unfold.reduce((m, r) => Math.min(m, r.from), 1e8),
           filterTo: unfold.reduce((m, r) => Math.max(m, r.to), 0)
@@ -114,7 +114,7 @@ class FoldWidget extends WidgetType<null> {
     return element
   }
 
-  static config = {widget: new FoldWidget(null)}
+  static decoration = Decoration.replace({widget: new FoldWidget(null)})
 }
 
 export interface FoldGutterConfig {

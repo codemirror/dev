@@ -1,14 +1,12 @@
 import {EditorState, StateField, EditorSelection} from "../../state"
-import {DecorationSet, Decoration, WidgetType, EditorView, MarkDecorationSpec, themeClass} from "../../view"
-
-const rangeConfig = {class: themeClass("secondarySelection")}
+import {DecorationSet, Decoration, WidgetType, EditorView, themeClass} from "../../view"
 
 const field = StateField.define<DecorationSet>({
   create(state) {
-    return decorateSelections(state.selection, rangeConfig)
+    return decorateSelections(state.selection)
   },
   update(deco, tr) {
-    return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection, rangeConfig) : deco
+    return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection) : deco
   }
 }).provide(EditorView.decorations)
 
@@ -30,16 +28,19 @@ class CursorWidget extends WidgetType<null> {
     span.className = themeClass("secondaryCursor")
     return span
   }
+
+  static deco = Decoration.widget({widget: new CursorWidget(null)})
 }
 
-function decorateSelections(selection: EditorSelection, rangeConfig: MarkDecorationSpec): DecorationSet {
+const rangeMark = Decoration.mark({class: themeClass("secondarySelection")})
+
+function decorateSelections(selection: EditorSelection): DecorationSet {
   let {ranges, primaryIndex} = selection
   if (ranges.length == 1) return Decoration.none
   let deco = []
   for (let i = 0; i < ranges.length; i++) if (i != primaryIndex) {
     let range = ranges[i]
-    deco.push(range.empty ? Decoration.widget(range.from, {widget: new CursorWidget(null)})
-              : Decoration.mark(ranges[i].from, ranges[i].to, rangeConfig))
+    deco.push(range.empty ? CursorWidget.deco.range(range.from) : rangeMark.range(ranges[i].from, ranges[i].to))
   }
   return Decoration.set(deco)
 }

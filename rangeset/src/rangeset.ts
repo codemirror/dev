@@ -22,6 +22,9 @@ export abstract class RangeValue {
   /// Whether this value marks a point range, which shadows the ranges
   /// contained in it.
   point!: boolean
+
+  /// Create a [range](#rangeset.Range) with this value.
+  range(from: number, to = from) { return new Range(from, to, this) }
 }
 
 RangeValue.prototype.startSide = RangeValue.prototype.endSide = 0

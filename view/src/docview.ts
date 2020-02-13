@@ -339,7 +339,7 @@ export class DocView extends ContentView {
       let end = next ? next.from - 1 : this.length
       if (end > pos) {
         let height = this.view.viewState.lineAt(end, 0).bottom - this.view.viewState.lineAt(pos, 0).top
-        deco.push(Decoration.replace(pos, end, {widget: new GapWidget(height), block: true, inclusive: true}))
+        deco.push(Decoration.replace({widget: new GapWidget(height), block: true, inclusive: true}).range(pos, end))
       }
       if (!next) break
       pos = next.to + 1
@@ -429,9 +429,7 @@ export function computeCompositionDeco(view: EditorView, changes: readonly Chang
     return Decoration.none
   }
 
-  return Decoration.set(Decoration.replace(newFrom, newTo, {
-    widget: new CompositionWidget({top: topNode, text: textNode})
-  }))
+  return Decoration.set(Decoration.replace({widget: new CompositionWidget({top: topNode, text: textNode})}).range(newFrom, newTo))
 }
 
 class CompositionWidget extends WidgetType<{top: Node, text: Node}> {

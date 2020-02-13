@@ -38,6 +38,9 @@ const bracketMatchingConfig = Facet.define<Config, Required<Config>>({
   }
 })
 
+const matchingMark = Decoration.mark({class: themeClass("matchingBracket")}),
+      nonmatchingMark = Decoration.mark({class: themeClass("nonmatchingBracket")})
+
 const bracketMatchingState = StateField.define<DecorationSet>({
   create() { return Decoration.none },
   update(deco, tr, state) {
@@ -52,9 +55,9 @@ const bracketMatchingState = StateField.define<DecorationSet>({
             (matchBrackets(state, range.head, 1, config) ||
              (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
       if (!match) continue
-      let style = themeClass(match.matched ? "matchingBracket" : "nonmatchingBracket")
-      decorations.push(Decoration.mark(match.start.from, match.start.to, {class: style}))
-      if (match.end) decorations.push(Decoration.mark(match.end.from, match.end.to, {class: style}))
+      let mark = match.matched ? matchingMark : nonmatchingMark
+      decorations.push(mark.range(match.start.from, match.start.to))
+      if (match.end) decorations.push(mark.range(match.end.from, match.end.to))
     }
     return Decoration.set(decorations)
   }

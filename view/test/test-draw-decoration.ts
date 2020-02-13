@@ -20,15 +20,15 @@ function decos(startState: DecorationSet = Decoration.none) {
 }
 
 function d(from: number, to: any, spec: any = null) {
-  return Decoration.mark(from, to, typeof spec == "string" ? {attributes: {[spec]: "y"}} : spec)
+  return Decoration.mark(typeof spec == "string" ? {attributes: {[spec]: "y"}} : spec).range(from, to)
 }
 
 function w(pos: number, widget: WidgetType<any>, side: number = 0) {
-  return Decoration.widget(pos, {widget, side})
+  return Decoration.widget({widget, side}).range(pos)
 }
 
 function l(pos: number, attrs: any) {
-  return Decoration.line(pos, typeof attrs == "string" ? {attributes: {class: attrs}} : attrs)
+  return Decoration.line(typeof attrs == "string" ? {attributes: {class: attrs}} : attrs).range(pos)
 }
 
 function decoEditor(doc: string, decorations: any = []) {
@@ -138,18 +138,18 @@ describe("EditorView decoration", () => {
     })
 
     it("notices replaced replacement decorations", () => {
-      let cm = decoEditor("abc", [Decoration.replace(1, 2, {widget: new WordWidget("X")})])
+      let cm = decoEditor("abc", [Decoration.replace({widget: new WordWidget("X")}).range(1, 2)])
       cm.dispatch(cm.state.t()
-                  .annotate(addDeco, [Decoration.replace(1, 2, {widget: new WordWidget("Y")})])
+                  .annotate(addDeco, [Decoration.replace({widget: new WordWidget("Y")}).range(1, 2)])
                   .annotate(filterDeco, () => false))
       ist(cm.contentDOM.textContent, "aYc")
     })
 
     it("allows replacements to shadow inner replacements", () => {
       let cm = decoEditor("one\ntwo\nthree\nfour", [
-        Decoration.replace(5, 12, {widget: new WordWidget("INNER")})
+        Decoration.replace({widget: new WordWidget("INNER")}).range(5, 12)
       ])
-      cm.dispatch(cm.state.t().annotate(addDeco, [Decoration.replace(1, 17, {widget: new WordWidget("OUTER")})]))
+      cm.dispatch(cm.state.t().annotate(addDeco, [Decoration.replace({widget: new WordWidget("OUTER")}).range(1, 17)]))
       ist(cm.contentDOM.textContent, "oOUTERr")
     })
 
@@ -210,7 +210,7 @@ describe("EditorView decoration", () => {
   })
 
   describe("replaced", () => {
-    function r(from: number, to: number, spec: any = {}) { return Decoration.replace(from, to, spec) }
+    function r(from: number, to: number, spec: any = {}) { return Decoration.replace(spec).range(from, to) }
 
     it("omits replaced content", () => {
       let cm = decoEditor("foobar", [r(1, 4)])
@@ -324,11 +324,11 @@ describe("EditorView decoration", () => {
   }
 
   function bw(pos: number, side = -1, name = "n") {
-    return Decoration.widget(pos, {widget: new BlockWidget(name), side, block: true})
+    return Decoration.widget({widget: new BlockWidget(name), side, block: true}).range(pos)
   }
 
   function br(from: number, to: number, name = "r", inclusive = false) {
-    return Decoration.replace(from, to, {widget: new BlockWidget(name), inclusive, block: true})
+    return Decoration.replace({widget: new BlockWidget(name), inclusive, block: true}).range(from, to)
   }
 
   function widgets(cm: EditorView, ...groups: string[][]) {
@@ -391,7 +391,7 @@ describe("EditorView decoration", () => {
     })
 
     it("can draw a block range that partially overlaps with a collapsed range", () => {
-      let cm = decoEditor("hello", [Decoration.replace(0, 3, {widget: new WordWidget("X")}),
+      let cm = decoEditor("hello", [Decoration.replace({widget: new WordWidget("X")}).range(0, 3),
                                     br(1, 4, "Y")])
       widgets(cm, [], ["Y"], [])
       ist(cm.contentDOM.querySelector("strong"))

@@ -49,7 +49,7 @@ function compose(cm: EditorView, start: () => Text,
 function wordDeco(state: EditorState): DecorationSet {
   let re = /\w+/g, m, deco = [], text = state.doc.toString()
   while (m = re.exec(text))
-    deco.push(Decoration.mark(m.index, m.index + m[0].length, {class: "word"}))
+    deco.push(Decoration.mark({class: "word"}).range(m.index, m.index + m[0].length))
   return Decoration.set(deco)
 }
 
@@ -59,7 +59,7 @@ function widgets(positions: number[], sides: number[]): ViewPlugin<any> {
   let xWidget = new class extends WidgetType<null> {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
   }(null)
-  let startDeco = Decoration.set(positions.map((p, i) => Decoration.widget(p, {widget: xWidget, side: sides[i]})))
+  let startDeco = Decoration.set(positions.map((p, i) => Decoration.widget({widget: xWidget, side: sides[i]}).range(p)))
   return ViewPlugin.define(() => ({
     decorations: startDeco,
     update(update: ViewUpdate) { this.decorations = this.decorations.map(update.changes) }

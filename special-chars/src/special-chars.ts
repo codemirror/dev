@@ -129,6 +129,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
     this.from = vp.from; this.to = vp.to
   }
 
+  // FIXME move to whole-viewport updates (with builder and cached decoration values)?
   getDecorationsFor(from: number, to: number, target: Range<Decoration>[]) {
     let config = this.view.state.facet(specialCharConfig)
 
@@ -145,7 +146,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
           } else {
             widget = new SpecialCharWidget(config, code)
           }
-          target.push(Decoration.replace(pos + m.index, pos + m.index + m[0].length, {widget}))
+          target.push(Decoration.replace({widget}).range(pos + m.index, pos + m.index + m[0].length))
         }
       }
       pos += cursor.value.length

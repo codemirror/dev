@@ -1,7 +1,8 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet, Range} from "../../view"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "../../view"
 import {EditorState} from "../../state"
+import {RangeSetBuilder} from "../../rangeset"
 
 const Inherit = 1
 
@@ -269,11 +270,11 @@ class Highlighter implements PluginValue {
   }
 
   buildDeco({from, to}: {from: number, to: number}, tree: Tree) {
-    let tokens: Range<Decoration>[] = []
+    let builder = new RangeSetBuilder<Decoration>()
     let start = from
     function flush(pos: number, style: string) {
       if (pos > start && style)
-        tokens.push(Decoration.mark(start, pos, {class: style}))
+        builder.add(start, pos, Decoration.mark({class: style})) // FIXME cache these
       start = pos
     }
 
@@ -312,7 +313,7 @@ class Highlighter implements PluginValue {
         }
       }
     })
-    return Decoration.set(tokens)
+    return builder.finish()
   }
 }
 

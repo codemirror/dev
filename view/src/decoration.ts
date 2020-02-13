@@ -159,35 +159,32 @@ export abstract class Decoration extends RangeValue {
 
   /// Create a mark decoration, which influences the styling of the
   /// text in its range.
-  static mark(from: number, to: number, spec: MarkDecorationSpec): Range<Decoration> {
-    if (from >= to) throw new RangeError("Mark decorations may not be empty")
-    return new Range(from, to, new MarkDecoration(spec))
+  static mark(spec: MarkDecorationSpec): Decoration {
+    return new MarkDecoration(spec)
   }
 
   /// Create a widget decoration, which adds an element at the given
   /// position.
-  static widget(pos: number, spec: WidgetDecorationSpec): Range<Decoration> {
+  static widget(spec: WidgetDecorationSpec): Decoration {
     let side = spec.side || 0
     if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
-    return new Range(pos, pos, new PointDecoration(spec, side, side, !!spec.block, spec.widget || null))
+    return new PointDecoration(spec, side, side, !!spec.block, spec.widget || null, false)
   }
 
   /// Create a replace decoration which replaces the given range with
   /// a widget, or simply hides it.
-  static replace(from: number, to: number, spec: ReplaceDecorationSpec): Range<Decoration> {
+  static replace(spec: ReplaceDecorationSpec): Decoration {
     let block = !!spec.block
     let {start, end} = getInclusive(spec)
     let startSide = block ? -BLOCK_BIG_SIDE * (start ? 2 : 1) : INLINE_BIG_SIDE * (start ? -1 : 1)
     let endSide = block ? BLOCK_BIG_SIDE * (end ? 2 : 1) : INLINE_BIG_SIDE * (end ? 1 : -1)
-    if (from > to || (from == to && startSide > 0 && endSide < 0))
-      throw new RangeError("Invalid range for replacement decoration")
-    return new Range(from, Math.max(from, to), new PointDecoration(spec, startSide, endSide, block, spec.widget || null))
+    return new PointDecoration(spec, startSide, endSide, block, spec.widget || null, true)
   }
 
   /// Create a line decoration, which can add DOM attributes to the
   /// line starting at the given position.
-  static line(start: number, spec: LineDecorationSpec): Range<Decoration> {
-    return new Range(start, start, new LineDecoration(spec))
+  static line(spec: LineDecorationSpec): Decoration {
+    return new LineDecoration(spec)
   }
 
   /// Build a [`DecorationSet`](#view.DecorationSet) from the given
@@ -218,6 +215,11 @@ export class MarkDecoration extends Decoration {
       this.spec.class == other.spec.class &&
       attrsEq(this.spec.attributes || null, other.spec.attributes || null)
   }
+
+  range(from: number, to = from) {
+    if (from >= to) throw new RangeError("Mark decorations may not be empty")
+    return super.range(from, to)
+  }
 }
 
 export class LineDecoration extends Decoration {
@@ -230,12 +232,21 @@ export class LineDecoration extends Decoration {
   eq(other: Decoration): boolean {
     return other instanceof LineDecoration && attrsEq(this.spec.attributes, other.spec.attributes)
   }
+
+  range(from: number, to = from) {
+    if (to != from) throw new RangeError("Line decoration ranges must be zero-length")
+    return super.range(from, to)
+  }
 }
 
 LineDecoration.prototype.startMapMode = LineDecoration.prototype.endMapMode = MapMode.TrackBefore
 
 export class PointDecoration extends Decoration {
-  constructor(spec: any, startSide: number, endSide: number, public block: boolean, widget: WidgetType | null) {
+  constructor(spec: any,
+              startSide: number, endSide: number,
+              public block: boolean,
+              widget: WidgetType | null,
+              readonly isReplace: boolean) {
     super(startSide, endSide, widget, spec)
     if (block) {
       this.startMapMode = startSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
@@ -260,6 +271,14 @@ export class PointDecoration extends Decoration {
       widgetsEq(this.widget, other.widget) &&
       this.block == other.block &&
       this.startSide == other.startSide && this.endSide == other.endSide
+  }
+
+  range(from: number, to = from) {
+    if (this.isReplace && (from > to || (from == to && this.startSide > 0 && this.endSide < 0)))
+      throw new RangeError("Invalid range for replacement decoration")
+    if (!this.isReplace && to != from)
+      throw new RangeError("Widget decorations can only create zero-length ranges")
+    return super.range(from, to)
   }
 }
 

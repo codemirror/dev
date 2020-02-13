@@ -41,23 +41,23 @@ describe("HeightMap", () => {
 
   it("separates lines with decorations on them", () => {
     let map = mk(doc(10, 10, 20, 5),
-                 [Decoration.widget(5, {widget: new MyWidget(20)}),
-                  Decoration.replace(25, 46, {})])
+                 [Decoration.widget({widget: new MyWidget(20)}).range(5),
+                  Decoration.replace({}).range(25, 46)])
     ist(map.length, 48)
     ist(map.toString(), "line(10:20) gap(10) line(26-21)")
   })
 
   it("ignores irrelevant decorations", () => {
     let map = mk(doc(10, 10, 20, 5),
-                 [Decoration.widget(5, {widget: new NoHeightWidget(null)}),
-                  Decoration.mark(25, 46, {class: "ahah"})])
+                 [Decoration.widget({widget: new NoHeightWidget(null)}).range(5),
+                  Decoration.mark({class: "ahah"}).range(25, 46)])
     ist(map.length, 48)
     ist(map.toString(), "gap(48)")
   })
 
   it("drops decorations from the tree when they are deleted", () => {
     let text = doc(20)
-    let map = mk(text, [Decoration.widget(5, {widget: new MyWidget(20)})])
+    let map = mk(text, [Decoration.widget({widget: new MyWidget(20)}).range(5)])
     ist(map.toString(), "line(20:20)")
     map = map.applyChanges([], text, o(text), [new ChangedRange(5, 5, 5, 5)])
     ist(map.toString(), "gap(20)")
@@ -65,17 +65,17 @@ describe("HeightMap", () => {
 
   it("updates the length of replaced decorations for changes", () => {
     let text = doc(20)
-    let map = mk(text, [Decoration.replace(5, 15, {})])
-    map = map.applyChanges([Decoration.set(Decoration.replace(5, 10, {}))], text, o(text.replace(7, 12, [""])),
+    let map = mk(text, [Decoration.replace({}).range(5, 15)])
+    map = map.applyChanges([Decoration.set(Decoration.replace({}).range(5, 10))], text, o(text.replace(7, 12, [""])),
                            [new ChangedRange(7, 12, 7, 7)])
     ist(map.toString(), "line(15-5)")
   })
 
   it("stores information about block widgets", () => {
     let text = doc(3, 3, 3), oracle = o(text)
-    let map = mk(text, [Decoration.widget(0, {widget: new MyWidget(10), side: -1, block: true}),
-                        Decoration.widget(0, {widget: new MyWidget(13), side: -1, block: true}),
-                        Decoration.widget(3, {widget: new MyWidget(5), side: 1, block: true})])
+    let map = mk(text, [Decoration.widget({widget: new MyWidget(10), side: -1, block: true}).range(0),
+                        Decoration.widget({widget: new MyWidget(13), side: -1, block: true}).range(0),
+                        Decoration.widget({widget: new MyWidget(5), side: 1, block: true}).range(3)])
     ist(map.toString(), "block(0)-block(0)-line(3)-block(0) gap(7)")
     ist(map.height, 28 + 3 * oracle.lineHeight)
     let {type} = map.lineAt(0, byP, text, 0, 0)
@@ -88,13 +88,13 @@ describe("HeightMap", () => {
 
   it("stores information about block ranges", () => {
     let text = doc(3, 3, 3, 3, 3, 3)
-    let map = mk(text, [Decoration.widget(4, {widget: new MyWidget(10), side: -1, block: true}),
-                        Decoration.replace(4, 11, {widget: new MyWidget(40), block: true}),
-                        Decoration.widget(11, {widget: new MyWidget(15), side: 1, block: true}),
+    let map = mk(text, [Decoration.widget({widget: new MyWidget(10), side: -1, block: true}).range(4),
+                        Decoration.replace({widget: new MyWidget(40), block: true}).range(4, 11),
+                        Decoration.widget({widget: new MyWidget(15), side: 1, block: true}).range(11),
                         // This one covers the block widgets around it (due to being inclusive)
-                        Decoration.replace(16, 19, {widget: new MyWidget(50), block: true, inclusive: true}),
-                        Decoration.widget(16, {widget: new MyWidget(20), side: -1, block: true}),
-                        Decoration.widget(19, {widget: new MyWidget(10), side: 1, block: true})])
+                        Decoration.replace({widget: new MyWidget(50), block: true, inclusive: true}).range(16, 19),
+                        Decoration.widget({widget: new MyWidget(20), side: -1, block: true}).range(16),
+                        Decoration.widget({widget: new MyWidget(10), side: 1, block: true}).range(19)])
     ist(map.toString(), "gap(3) block(0)-block(7)-block(0) gap(3) block(3) gap(3)")
     map = map.updateHeight(o(text), 0, false, new MeasuredHeights(4, [5, 5, 5, 10, 5]))
     ist(map.height, 2 * o(text).lineHeight + 30)
@@ -102,9 +102,9 @@ describe("HeightMap", () => {
 
   it("handles empty lines correctly", () => {
     let text = doc(0, 0, 0, 0, 0)
-    let map = mk(text, [Decoration.widget(1, {widget: new MyWidget(10), side: -1, block: true}),
-                        Decoration.replace(2, 2, {widget: new MyWidget(20), block: true}),
-                        Decoration.widget(3, {widget: new MyWidget(30), side: 1, block: true})])
+    let map = mk(text, [Decoration.widget({widget: new MyWidget(10), side: -1, block: true}).range(1),
+                        Decoration.replace({widget: new MyWidget(20), block: true}).range(2, 2),
+                        Decoration.widget({widget: new MyWidget(30), side: 1, block: true}).range(3)])
     ist(map.toString(), "gap(0) block(0)-line(0) block(0) line(0)-block(0) gap(0)")
     map = map.applyChanges([], text, o(text.replace(1, 3, ["y"])), [new ChangedRange(1, 3, 1, 2)])
     ist(map.toString(), "gap(3)")
@@ -112,7 +112,7 @@ describe("HeightMap", () => {
 
   it("joins ranges", () => {
     let text = doc(10, 10, 10, 10)
-    let map = mk(text, [Decoration.replace(16, 27, {})])
+    let map = mk(text, [Decoration.replace({}).range(16, 27)])
     ist(map.toString(), "gap(10) line(21-11) gap(10)")
     map = map.applyChanges([], text, o(text.replace(5, 38, ["yyy"])), [new ChangedRange(5, 38, 5, 8)])
     ist(map.toString(), "gap(13)")
@@ -120,12 +120,12 @@ describe("HeightMap", () => {
 
   it("joins lines", () => {
     let text = doc(10, 10, 10)
-    let map = mk(text, [Decoration.replace(2, 5, {}),
-                        Decoration.widget(24, {widget: new MyWidget(20)})])
+    let map = mk(text, [Decoration.replace({}).range(2, 5),
+                        Decoration.widget({widget: new MyWidget(20)}).range(24)])
     ist(map.toString(), "line(10-3) gap(10) line(10:20)")
     map = map.applyChanges([
-      Decoration.set([Decoration.replace(2, 5, {}),
-                      Decoration.widget(12, {widget: new MyWidget(20)})])
+      Decoration.set([Decoration.replace({}).range(2, 5),
+                      Decoration.widget({widget: new MyWidget(20)}).range(12)])
     ], text, o(text.replace(10, 22, [""])), [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20-3:20)")
   })
@@ -223,9 +223,9 @@ describe("HeightMap", () => {
 
     it("finds widget blocks", () => {
       let text = doc(3, 3, 3, 3)
-      let map = mk(text, [Decoration.widget(4, {widget: new MyWidget(100), block: true, side: -1}),
-                          Decoration.replace(8, 11, {widget: new MyWidget(30), block: true}),
-                          Decoration.widget(15, {widget: new MyWidget(0), block: true, side: 1})])
+      let map = mk(text, [Decoration.widget({widget: new MyWidget(100), block: true, side: -1}).range(4),
+                          Decoration.replace({widget: new MyWidget(30), block: true}).range(8, 11),
+                          Decoration.widget({widget: new MyWidget(0), block: true, side: 1}).range(15)])
       let block1 = map.blockAt(0, text, 0, 0)
       ist(block1.from, 0); ist(block1.to, 3)
       let block2 = map.blockAt(block1.height + 1, text, 0, 0)
@@ -277,9 +277,9 @@ describe("HeightMap", () => {
 
     it("includes adjacent widgets in lines", () => {
       let text = doc(3, 3, 3, 3)
-      let map = mk(text, [Decoration.widget(4, {widget: new MyWidget(100), block: true, side: -1}),
-                          Decoration.replace(7, 8, {widget: new MyWidget(30), block: true}),
-                          Decoration.widget(15, {widget: new MyWidget(0), block: true, side: 1})])
+      let map = mk(text, [Decoration.widget({widget: new MyWidget(100), block: true, side: -1}).range(4),
+                          Decoration.replace({widget: new MyWidget(30), block: true}).range(7, 8),
+                          Decoration.widget({widget: new MyWidget(0), block: true, side: 1}).range(15)])
       let line1 = map.lineAt(4, byP, text, 0, 0)
       ist(line1.from, 4); ist(line1.to, 11)
       ist((line1.type as any[]).length, 4)

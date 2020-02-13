@@ -3,6 +3,7 @@ import {StateField, Facet, Annotation, EditorSelection, SelectionRange} from "..
 import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
+import {RangeSetBuilder} from "../../rangeset"
 import {SearchCursor} from "./cursor"
 export {SearchCursor}
 
@@ -40,6 +41,9 @@ class SearchState {
   constructor(readonly query: Query, readonly panel: readonly ((view: EditorView) => Panel)[]) {}
 }
 
+const matchMark = Decoration.mark({class: themeClass("searchmatch")}),
+      selectedMatchMark = Decoration.mark({class: themeClass("searchmatch.selected")})
+
 const searchHighlighter = ViewPlugin.fromClass(class {
   decorations: DecorationSet
 
@@ -55,14 +59,15 @@ const searchHighlighter = ViewPlugin.fromClass(class {
 
   highlight(query: Query) {
     let state = this.view.state, viewport = this.view.viewport
-    let deco = [], cursor = query.cursor(state.doc, Math.max(0, viewport.from - query.search.length),
-                                         Math.min(viewport.to + query.search.length, state.doc.length))
+    let cursor = query.cursor(state.doc, Math.max(0, viewport.from - query.search.length),
+                              Math.min(viewport.to + query.search.length, state.doc.length))
+    let builder = new RangeSetBuilder<Decoration>()
     while (!cursor.next().done) {
       let {from, to} = cursor.value
       let selected = state.selection.ranges.some(r => r.from == from && r.to == to)
-      deco.push(Decoration.mark(from, to, {class: themeClass(selected ? "searchMatch.selected" : "searchMatch")}))
+      builder.add(from, to, selected ? selectedMatchMark : matchMark)
     }
-    return Decoration.set(deco)
+    return builder.finish()
   }
 }).decorations()
 

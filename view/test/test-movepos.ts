@@ -17,7 +17,7 @@ const widgetField = StateField.define<DecorationSet>({
   create(state) {
     let doc = state.doc.toString(), deco = []
     for (let i = 0; i < doc.length; i++) if (doc.charAt(i) == "o")
-      deco.push(Decoration.replace(i, i + 1, {widget: new OWidget(undefined)}))
+      deco.push(Decoration.replace({widget: new OWidget(undefined)}).range(i, i + 1))
     return Decoration.set(deco)
   },
   update(deco, tr) { return deco.map(tr.changes) }
@@ -119,8 +119,8 @@ describe("EditorView.movePos", () => {
     const field = StateField.define<DecorationSet>({
       create() {
         return Decoration.set([
-          Decoration.widget(3, {widget: new BigWidget(undefined), side: 1, block: true}),
-          Decoration.widget(4, {widget: new BigWidget(undefined), side: -1, block: true})
+          Decoration.widget({widget: new BigWidget(undefined), side: 1, block: true}).range(3),
+          Decoration.widget({widget: new BigWidget(undefined), side: -1, block: true}).range(4)
         ])
       },
       update(deco) { return deco }
