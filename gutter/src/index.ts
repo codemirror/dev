@@ -161,7 +161,7 @@ const gutterView = ViewPlugin.fromClass(class {
     }, 0)
     for (let cx of contexts) cx.finish()
     this.dom.style.minHeight = this.view.contentHeight + "px"
-    if (update.state.facet(unfixGutters) != this.fixed) {
+    if (update.state.facet(unfixGutters) != !this.fixed) {
       this.fixed = !this.fixed
       this.dom.style.position = this.fixed ? "sticky" : ""
     }
