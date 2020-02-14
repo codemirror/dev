@@ -165,7 +165,7 @@ class SyntaxState {
     this.parse = parser.startParse(new DocStream(doc), {cache: this.updatedTree})
   }
 
-  stopParse(tree?: Tree, upto?: number) {
+  stopParse(tree?: Tree | null, upto?: number) {
     if (!tree) tree = takeTree(this.parse!, this.updatedTree)
     this.updatedTree = tree
     this.upto = upto ?? this.parse!.pos
@@ -214,10 +214,10 @@ class HighlightWorker {
     if (field.upto >= state.doc.length) return
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    if (done)
+    if (done || field.parse!.badness > .8)
       this.view.dispatch(state.t().annotate(this.setSyntax, new SyntaxState(
         field.stopParse(done, state.doc.length), state.doc.length)))
-    else if (field.parse!.badness < .8)
+    else
       this.scheduleWork()
   }
 
