@@ -284,7 +284,7 @@ class Highlighter implements PluginValue {
     let inherited: string[] = []
     tree.iterate({
       from, to,
-      enter: (type, start) => {
+      enter: (type, start, end) => {
         let inheritedClass = inherited.length ? inherited[inherited.length - 1] : ""
         let cls = inheritedClass
         let style = type.prop(this.prop)

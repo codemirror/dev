@@ -133,6 +133,7 @@ export class PluginInstance {
       return this
     } catch (e) {
       console.error("CodeMirror plugin crashed:", e)
+      if (this.value.destroy) try { this.value.destroy() } catch (_) {}
       return PluginInstance.dummy
     }
   }
