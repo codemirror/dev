@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
+import {EditorView, ViewPlugin, PluginField, ViewUpdate, themeClass} from "../../view"
 import {Facet} from "../../state"
 
 /// Enables the panel-managing extension.
@@ -73,11 +73,7 @@ const panelPlugin = ViewPlugin.fromClass(class {
       for (let p of this.panels) if (p.update) p.update(update)
     }
   }
-
-  get scrollMargins() {
-    return {top: this.top.scrollMargin(), bottom: this.bottom.scrollMargin()}
-  }
-})
+}).provide(PluginField.scrollMargins, value => ({top: value.top.scrollMargin(), bottom: value.bottom.scrollMargin()}))
 
 function panelClass(panel: Panel) {
   return themeClass(panel.style ? `panel.${panel.style}` : "panel")

@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
+import {EditorView, ViewPlugin, PluginField, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet, RangeCursor} from "../../rangeset"
 import {combineConfig, fillConfig, MapMode, Annotation, Facet, Extension} from "../../state"
 
@@ -190,11 +190,9 @@ const gutterView = ViewPlugin.fromClass(class {
     }
     return change
   }
-
-  get scrollMargins() {
-    if (this.gutters.length == 0 || !this.fixed) return null
-    return getComputedStyle(this.view.scrollDOM).direction == "ltr" ? {left: this.dom.offsetWidth} : {right: this.dom.offsetWidth}
-  }
+}).provide(PluginField.scrollMargins, value => {
+  if (value.gutters.length == 0 || !value.fixed) return null
+  return getComputedStyle(value.view.scrollDOM).direction == "ltr" ? {left: value.dom.offsetWidth} : {right: value.dom.offsetWidth}
 })
 
 class UpdateContext {
