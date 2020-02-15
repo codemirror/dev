@@ -106,7 +106,7 @@ export class DocView extends ContentView {
       // no relayout is triggered and I cannot imagine how it can
       // recompute the scroll position without a layout)
       this.dom.style.height = this.view.viewState.heightMap.height + "px"
-      this.dom.style.minWidth = this.minWidth + "px"
+      this.dom.style.minWidth = this.minWidth ? this.minWidth + "px" : ""
       this.sync()
       this.dirty = Dirty.Not
       this.updateSelection(forceSelection)
@@ -259,7 +259,7 @@ export class DocView extends ContentView {
 
   measureVisibleLineHeights() {
     let result = [], {from, to} = this.view.viewState.viewport
-    let minWidth = Math.max(this.dom.clientWidth, this.minWidth) + 1
+    let minWidth = Math.max(this.view.scrollDOM.clientWidth, this.minWidth) + 1
     for (let pos = 0, i = 0; i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       if (end > to) break
