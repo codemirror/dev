@@ -150,7 +150,8 @@ const viewTests = {
 
   // FIXME derive automatically? move to separate dir?
   inputFiles: ["test", "test-draw", "test-domchange", "test-selection", "test-draw-decoration",
-               "test-extension", "test-movepos", "test-composition"].map(f => path.join(root, "view/test", f + ".ts")),
+               "test-extension", "test-movepos", "test-composition",
+               "test-coords"].map(f => path.join(root, "view/test", f + ".ts")),
 
   rollupConfig() {
     return this._rollup || (this._rollup = {
