@@ -15,9 +15,9 @@ export interface SpecialCharConfig {
   addSpecialChars?: RegExp | null
 }
 
-const SPECIALS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
+const Specials = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/gu
 
-const NAMES: {[key: number]: string} = {
+const Names: {[key: number]: string} = {
   0: "null",
   7: "bell",
   8: "backspace",
@@ -41,7 +41,7 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
     // FIXME make configurations compose properly
     let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
       render: null,
-      specialChars: SPECIALS,
+      specialChars: Specials,
       addSpecialChars: null
     })
 
@@ -63,7 +63,7 @@ export function specialChars(config: SpecialCharConfig = {}) {
   return [specialCharConfig.of(config), specialCharPlugin, styleExt]
 }
 
-const JOIN_GAP = 10
+const JoinGap = 10
 
 const specialCharPlugin = ViewPlugin.fromClass(class {
   from = 0
@@ -91,7 +91,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
       let {fromB: from, toB: to} = ranges[i]
       // Must redraw all tabs further on the line
       if (config.replaceTabs) to = this.view.state.doc.lineAt(to).end
-      while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JOIN_GAP) to = Math.max(to, ranges[++i].toB)
+      while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JoinGap) to = Math.max(to, ranges[++i].toB)
       // Clip to current viewport, to avoid doing work for invisible text
       from = Math.max(vp.from, from); to = Math.min(vp.to, to)
       if (from >= to) continue
@@ -162,14 +162,14 @@ function placeHolder(code: number): string | null {
   return String.fromCharCode(9216 + code)
 }
 
-const DEFAULT_PLACEHOLDER = "\u2022"
+const DefaultPlaceholder = "\u2022"
 
 class SpecialCharWidget extends WidgetType<number> {
   constructor(private options: Required<SpecialCharConfig>, code: number) { super(code) }
 
   toDOM() {
-    let ph = placeHolder(this.value) || DEFAULT_PLACEHOLDER
-    let desc = "Control character " + (NAMES[this.value] || this.value)
+    let ph = placeHolder(this.value) || DefaultPlaceholder
+    let desc = "Control character " + (Names[this.value] || this.value)
     let custom = this.options.render && this.options.render(this.value, desc, ph)
     if (custom) return custom
     let span = document.createElement("span")

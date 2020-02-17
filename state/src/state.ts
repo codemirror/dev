@@ -25,7 +25,7 @@ export interface EditorStateConfig {
   extensions?: Extension
 }
 
-const DEFAULT_INDENT_UNIT = 2, DEFAULT_TABSIZE = 4, DEFAULT_SPLIT = /\r\n?|\n/
+const DefaultIndentUnit = 2, DefaultTabsize = 4, DefaultSplit = /\r\n?|\n/
 
 /// The editor state class is a persistent (immutable) data structure.
 /// To update a state, you [create](#state.EditorState.t) and
@@ -98,7 +98,7 @@ export class EditorState {
 
   /// Split a string into lines using the state's [line
   /// separator](#state.EditorState^lineSeparator).
-  splitLines(text: string): string[] { return text.split(this.facet(EditorState.lineSeparator) || DEFAULT_SPLIT) }
+  splitLines(text: string): string[] { return text.split(this.facet(EditorState.lineSeparator) || DefaultSplit) }
 
   /// Get the value of a state [behavior](#extension.Behavior).
   facet<Output>(facet: Facet<any, Output>): Output {
@@ -139,7 +139,7 @@ export class EditorState {
   static create(config: EditorStateConfig = {}): EditorState {
     let configuration = Configuration.resolve(config.extensions || [])
     let doc = config.doc instanceof Text ? config.doc
-      : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DEFAULT_SPLIT))
+      : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DefaultSplit))
     let selection = config.selection || EditorSelection.single(0)
     checkSelection(selection, doc)
     if (!configuration.staticFacet(allowMultipleSelections)) selection = selection.asSingle()
@@ -160,7 +160,7 @@ export class EditorState {
   /// Configures the tab size to use in this state. The first
   /// (highest-precedence) value of the behavior is used.
   static tabSize = Facet.define<number, number>({
-    combine: values => values.length ? values[0] : DEFAULT_TABSIZE
+    combine: values => values.length ? values[0] : DefaultTabsize
   })
 
   /// The size (in columns) of a tab in the document, determined by
@@ -182,7 +182,7 @@ export class EditorState {
   /// Facet for overriding the unit (in columns) by which
   /// indentation happens. When not set, this defaults to 2.
   static indentUnit = Facet.define<number, number>({
-    combine: values => values.length ? values[0] : DEFAULT_INDENT_UNIT
+    combine: values => values.length ? values[0] : DefaultIndentUnit
   })
 
   /// The size of an indent unit in the document. Determined by the

@@ -16,7 +16,7 @@ export abstract class InlineView extends ContentView {
   getSide() { return 0 }
 }
 
-const MAX_JOIN_LEN = 256
+const MaxJoinLen = 256
 
 export class TextView extends InlineView {
   textDOM: Node | null = null;
@@ -68,7 +68,7 @@ export class TextView extends InlineView {
     if (source &&
         (!(source instanceof TextView) ||
          source.tagName != this.tagName || source.class != this.class ||
-         !attrsEq(source.attrs, this.attrs) || this.length - (to - from) + source.length > MAX_JOIN_LEN))
+         !attrsEq(source.attrs, this.attrs) || this.length - (to - from) + source.length > MaxJoinLen))
       return false
     this.text = this.text.slice(0, from) + (source ? source.text : "") + this.text.slice(to)
     this.markDirty()

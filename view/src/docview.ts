@@ -378,7 +378,7 @@ export class DocView extends ContentView {
 // styles, and ignore or clip heights above that. For Chrome and
 // Firefox, this is in the 20 million range, so we try to stay below
 // that.
-const MAX_NODE_HEIGHT = 1e7
+const MaxNodeHeight = 1e7
 
 class GapWidget extends WidgetType<number> {
   toDOM() {
@@ -388,14 +388,14 @@ class GapWidget extends WidgetType<number> {
   }
 
   updateDOM(elt: HTMLElement) {
-    if (this.value < MAX_NODE_HEIGHT) {
+    if (this.value < MaxNodeHeight) {
       while (elt.lastChild) elt.lastChild.remove()
       elt.style.height = this.value + "px"
     } else {
       elt.style.height = ""
-      for (let remaining = this.value; remaining > 0; remaining -= MAX_NODE_HEIGHT) {
+      for (let remaining = this.value; remaining > 0; remaining -= MaxNodeHeight) {
         let fill = elt.appendChild(document.createElement("div"))
-        fill.style.height = Math.min(remaining, MAX_NODE_HEIGHT) + "px"
+        fill.style.height = Math.min(remaining, MaxNodeHeight) + "px"
       }
     }
     return true

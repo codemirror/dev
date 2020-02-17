@@ -26,9 +26,13 @@ function visiblePixelRange(dom: HTMLElement, paddingTop: number): {top: number, 
   return {top: top - (rect.top + paddingTop), bottom: bottom - (rect.top + paddingTop)}
 }
 
-const VIEWPORT_MARGIN = 1000 // FIXME look into appropriate value of this through benchmarking etc
-const MIN_COVER_MARGIN = 10  // coveredBy requires at least this many extra pixels to be covered
-const MAX_COVER_MARGIN = VIEWPORT_MARGIN / 4
+const enum VP {
+  // FIXME look into appropriate value of this through benchmarking etc
+  Margin = 1000,
+  // coveredBy requires at least this many extra pixels to be covered
+  MinCoverMargin = 10,
+  MaxCoverMargin = VP.Margin / 4
+}
 
 export class ViewState {
   // These are contentDOM-local coordinates
@@ -124,23 +128,23 @@ export class ViewState {
   }
 
   getViewport(bias: number, scrollTo: number): Viewport {
-    // This will divide VIEWPORT_MARGIN between the top and the
+    // This will divide VP.Margin between the top and the
     // bottom, depending on the bias (the change in viewport position
     // since the last update). It'll hold a number between 0 and 1
-    let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VIEWPORT_MARGIN / 2))
+    let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VP.Margin / 2))
     let map = this.heightMap, doc = this.state.doc, top = this.viewportTop, bottom = this.viewportBottom
-    let viewport = new Viewport(map.lineAt(top - marginTop * VIEWPORT_MARGIN, QueryType.ByHeight, doc, 0, 0).from,
-                                map.lineAt(bottom + (1 - marginTop) * VIEWPORT_MARGIN, QueryType.ByHeight, doc, 0, 0).to)
+    let viewport = new Viewport(map.lineAt(top - marginTop * VP.Margin, QueryType.ByHeight, doc, 0, 0).from,
+                                map.lineAt(bottom + (1 - marginTop) * VP.Margin, QueryType.ByHeight, doc, 0, 0).to)
     // If scrollTo is > -1, make sure the viewport includes that position
     if (scrollTo > -1) {
       if (scrollTo < viewport.from) {
         let {top: newTop} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
-        viewport = new Viewport(map.lineAt(newTop - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
-                                map.lineAt(newTop + (bottom - top) + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
+        viewport = new Viewport(map.lineAt(newTop - VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).from,
+                                map.lineAt(newTop + (bottom - top) + VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).to)
       } else if (scrollTo > viewport.to) {
         let {bottom: newBottom} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
-        viewport = new Viewport(map.lineAt(newBottom - (bottom - top) - VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).from,
-                                map.lineAt(newBottom + VIEWPORT_MARGIN / 2, QueryType.ByHeight, doc, 0, 0).to)
+        viewport = new Viewport(map.lineAt(newBottom - (bottom - top) - VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).from,
+                                map.lineAt(newBottom + VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).to)
       }
     }
     return viewport
@@ -156,8 +160,8 @@ export class ViewState {
   viewportIsCovering({from, to}: Viewport, bias = 0) {
     let {top} = this.heightMap.lineAt(from, QueryType.ByPos, this.state.doc, 0, 0)
     let {bottom} = this.heightMap.lineAt(to, QueryType.ByPos, this.state.doc, 0, 0)
-    return (from == 0 || top <= this.viewportTop - Math.max(MIN_COVER_MARGIN, Math.min(-bias, MAX_COVER_MARGIN))) &&
-      (to == this.state.doc.length || bottom >= this.viewportBottom + Math.max(MIN_COVER_MARGIN, Math.min(bias, MAX_COVER_MARGIN)))
+    return (from == 0 || top <= this.viewportTop - Math.max(VP.MinCoverMargin, Math.min(-bias, VP.MaxCoverMargin))) &&
+      (to == this.state.doc.length || bottom >= this.viewportBottom + Math.max(VP.MinCoverMargin, Math.min(bias, VP.MaxCoverMargin)))
   }
 
   lineAt(pos: number, editorTop: number): BlockInfo {

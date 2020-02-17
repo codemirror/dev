@@ -119,7 +119,7 @@ export abstract class WidgetType<T = any> {
 /// [`RangeSet`](#rangeset.RangeSet) for its methods.
 export type DecorationSet = RangeSet<Decoration>
 
-const INLINE_BIG_SIDE = 1e8, BLOCK_BIG_SIDE = 2e8
+const enum Side { BigInline = 1e8, BigBlock = 2e8 }
 
 /// The different types of blocks that can occur in an editor view.
 export enum BlockType {
@@ -167,7 +167,7 @@ export abstract class Decoration extends RangeValue {
   /// position.
   static widget(spec: WidgetDecorationSpec): Decoration {
     let side = spec.side || 0
-    if (spec.block) side += (BLOCK_BIG_SIDE + 1) * (side > 0 ? 1 : -1)
+    if (spec.block) side += (Side.BigBlock + 1) * (side > 0 ? 1 : -1)
     return new PointDecoration(spec, side, side, !!spec.block, spec.widget || null, false)
   }
 
@@ -176,8 +176,8 @@ export abstract class Decoration extends RangeValue {
   static replace(spec: ReplaceDecorationSpec): Decoration {
     let block = !!spec.block
     let {start, end} = getInclusive(spec)
-    let startSide = block ? -BLOCK_BIG_SIDE * (start ? 2 : 1) : INLINE_BIG_SIDE * (start ? -1 : 1)
-    let endSide = block ? BLOCK_BIG_SIDE * (end ? 2 : 1) : INLINE_BIG_SIDE * (end ? 1 : -1)
+    let startSide = block ? -Side.BigBlock * (start ? 2 : 1) : Side.BigInline * (start ? -1 : 1)
+    let endSide = block ? Side.BigBlock * (end ? 2 : 1) : Side.BigInline * (end ? 1 : -1)
     return new PointDecoration(spec, startSide, endSide, block, spec.widget || null, true)
   }
 
@@ -203,8 +203,8 @@ export abstract class Decoration extends RangeValue {
 export class MarkDecoration extends Decoration {
   constructor(spec: MarkDecorationSpec) {
     let {start, end} = getInclusive(spec)
-    super(INLINE_BIG_SIDE * (start ? -1 : 1),
-          INLINE_BIG_SIDE * (end ? 1 : -1),
+    super(Side.BigInline * (start ? -1 : 1),
+          Side.BigInline * (end ? 1 : -1),
           null, spec)
   }
 
@@ -224,7 +224,7 @@ export class MarkDecoration extends Decoration {
 
 export class LineDecoration extends Decoration {
   constructor(spec: LineDecorationSpec) {
-    super(-INLINE_BIG_SIDE, -INLINE_BIG_SIDE, null, spec)
+    super(-Side.BigInline, -Side.BigInline, null, spec)
   }
 
   get point() { return true }
@@ -293,11 +293,11 @@ function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
   return a == b || !!(a && b && a.compare(b))
 }
 
-const MIN_RANGE_GAP = 4
+const MinRangeGap = 4
 
 export function addRange(from: number, to: number, ranges: number[]) {
   let last = ranges.length - 1
-  if (last >= 0 && ranges[last] + MIN_RANGE_GAP > from) ranges[last] = Math.max(ranges[last], to)
+  if (last >= 0 && ranges[last] + MinRangeGap > from) ranges[last] = Math.max(ranges[last], to)
   else ranges.push(from, to)
 }
 

@@ -26,14 +26,14 @@ const baseTheme = EditorView.baseTheme({
   nonmatchingBracket: {color: "#a22"}
 })
 
-const DEFAULT_SCAN_DIST = 10000, DEFAULT_BRACKETS = "()[]{}"
+const DefaultScanDist = 10000, DefaultBrackets = "()[]{}"
 
 const bracketMatchingConfig = Facet.define<Config, Required<Config>>({
   combine(configs) {
     return combineConfig(configs, {
       afterCursor: true,
-      brackets: DEFAULT_BRACKETS,
-      maxScanDistance: DEFAULT_SCAN_DIST
+      brackets: DefaultBrackets,
+      maxScanDistance: DefaultScanDist
     })
   }
 })
@@ -104,7 +104,7 @@ export interface MatchResult {
 /// properties are used from `config`, if given. Returns null if no
 /// bracket was found at `pos`, or a match result otherwise.
 export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult | null {
-  let maxScanDistance = config.maxScanDistance || DEFAULT_SCAN_DIST, brackets = config.brackets || DEFAULT_BRACKETS
+  let maxScanDistance = config.maxScanDistance || DefaultScanDist, brackets = config.brackets || DefaultBrackets
   let tree = state.tree, sub = tree.resolve(pos, dir), matches
   if (matches = matchingNodes(sub.type, dir, brackets))
     return matchMarkedBrackets(state, pos, dir, sub, matches, brackets)

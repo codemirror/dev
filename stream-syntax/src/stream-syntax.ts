@@ -133,9 +133,9 @@ export class StreamSyntax implements Syntax {
   }
 }
 
-const CACHE_STEP_SHIFT = 6, CACHE_STEP = 1 << CACHE_STEP_SHIFT
+const CacheStepShift = 6, CacheStep = 1 << CacheStepShift
 
-const MAX_RECOMPUTE_DISTANCE = 20e3
+const MaxRecomputeDistance = 20e3
 
 const enum Work { Apply = 25, MinSlice = 50, Slice = 100, Pause = 200 }
 
@@ -159,19 +159,19 @@ class SyntaxState<ParseState> {
   }
 
   cut(line: number, pos: number) {
-    return new SyntaxState(this.updatedTree.cut(pos), this.cache.slice(0, (line >> CACHE_STEP_SHIFT) + 1), line, pos, null)
+    return new SyntaxState(this.updatedTree.cut(pos), this.cache.slice(0, (line >> CacheStepShift) + 1), line, pos, null)
   }
 
   maybeStoreState(parser: StreamParserInstance<ParseState>, lineBefore: number, state: ParseState) {
-    if (lineBefore % CACHE_STEP == 0)
-      this.cache[(lineBefore - 1) >> CACHE_STEP_SHIFT] = parser.copyState(state)
+    if (lineBefore % CacheStep == 0)
+      this.cache[(lineBefore - 1) >> CacheStepShift] = parser.copyState(state)
   }
 
   findState(parser: StreamParserInstance<ParseState>, editorState: EditorState, line: number) {
-    let cacheIndex = Math.min(this.cache.length - 1, (line - 1) >> CACHE_STEP_SHIFT)
-    let cachedLine = (cacheIndex << CACHE_STEP_SHIFT) + 1
+    let cacheIndex = Math.min(this.cache.length - 1, (line - 1) >> CacheStepShift)
+    let cachedLine = (cacheIndex << CacheStepShift) + 1
     let startPos = editorState.doc.line(cachedLine).start
-    if (line - cachedLine > CACHE_STEP && editorState.doc.line(line).start - startPos > MAX_RECOMPUTE_DISTANCE)
+    if (line - cachedLine > CacheStep && editorState.doc.line(line).start - startPos > MaxRecomputeDistance)
       return null
     let state = parser.copyState(this.cache[cacheIndex])
     let cursor = new StringStreamCursor(editorState.doc, startPos, editorState.tabSize)

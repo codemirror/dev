@@ -1,5 +1,4 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection} from "../../state"
 import ist from "ist"
 
 describe("EditorView coords", () => {

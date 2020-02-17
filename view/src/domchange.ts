@@ -4,7 +4,7 @@ import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
 import {EditorSelection, Change, Transaction} from "../../state"
 
-const LINE_SEP = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
+const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
 export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean): boolean {
   let change, newSel
@@ -22,10 +22,10 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       preferredPos = sel.to
       preferredSide = "end"
     }
-    let diff = findDiff(view.state.doc.slice(from, to, LINE_SEP), reader.text,
+    let diff = findDiff(view.state.doc.slice(from, to, LineSep), reader.text,
                         preferredPos - from, preferredSide)
     if (diff) change = new Change(from + diff.from, from + diff.toA,
-                                  reader.text.slice(diff.from, diff.toB).split(LINE_SEP))
+                                  reader.text.slice(diff.from, diff.toB).split(LineSep))
   } else if (view.hasFocus) {
     let domSel = getSelection(view.root)
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
@@ -62,9 +62,9 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
 
     let tr = startState.t()
     if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
-      let before = sel.from < change.from ? startState.doc.slice(sel.from, change.from, LINE_SEP) : ""
-      let after = sel.to > change.to ? startState.doc.slice(change.to, sel.to, LINE_SEP) : ""
-      tr.replaceSelection((before + change.text.join(LINE_SEP) + after).split(LINE_SEP))
+      let before = sel.from < change.from ? startState.doc.slice(sel.from, change.from, LineSep) : ""
+      let after = sel.to > change.to ? startState.doc.slice(change.to, sel.to, LineSep) : ""
+      tr.replaceSelection((before + change.text.join(LineSep) + after).split(LineSep))
     } else {
       tr.change(change)
       if (newSel && !tr.selection.primary.eq(newSel.primary))
@@ -126,7 +126,7 @@ class DOMReader {
       let view = ContentView.get(cur), nextView = ContentView.get(next!)
       if ((view ? view.breakAfter : isBlockElement(cur)) ||
           ((nextView ? nextView.breakAfter : isBlockElement(next!)) && !(cur.nodeName == "BR" && !(cur as any).cmIgnore)))
-        this.text += LINE_SEP
+        this.text += LineSep
       cur = next!
     }
     this.findPointBefore(parent, end)
@@ -137,9 +137,9 @@ class DOMReader {
     let view = ContentView.get(node)
     let fromView = view && view.overrideDOMText
     let text: string | undefined
-    if (fromView != null) text = fromView.join(LINE_SEP)
+    if (fromView != null) text = fromView.join(LineSep)
     else if (node.nodeType == 3) text = node.nodeValue!
-    else if (node.nodeName == "BR") text = node.nextSibling ? LINE_SEP : ""
+    else if (node.nodeName == "BR") text = node.nextSibling ? LineSep : ""
     else if (node.nodeType == 1) this.readRange(node.firstChild, null)
     if (text != null) {
       this.findPointIn(node, text.length)
