@@ -98,6 +98,16 @@ describe("EditorView decoration", () => {
     ist(cm.contentDOM.querySelector("strong"), null)
   })
 
+  it("properly updates the viewport gap when changes fall inside it", () => {
+    let doc = "a\n".repeat(500)
+    let cm = decoEditor(doc, [d(600, 601, "x")])
+    cm.dom.style.height = "100px"
+    cm.scrollDOM.style.overflow = "auto"
+    cm.scrollDOM.scrollTop = 0
+    cm.measure()
+    cm.dispatch(cm.state.t().replace(500, 500, "  ").setSelection(EditorSelection.single(0, doc.length + 2)))
+  })
+
   class WordWidget extends WidgetType<string> {
     eq(otherValue: string) { return this.value.toLowerCase() == otherValue.toLowerCase() }
     toDOM() {
@@ -385,7 +395,7 @@ describe("EditorView decoration", () => {
       let cm = decoEditor("hello", [br(2, 3, "X")])
       widgets(cm, [], ["X"], [])
       cm.dispatch(cm.state.t().replace(1, 2, "u").annotate(addDeco, [br(2, 3, "X")]))
-      widgets(cm, [], ["X"], [])
+      widgets(cm, [], ["X","X"], [])
       cm.dispatch(cm.state.t().replace(3, 4, "i").annotate(addDeco, [br(2, 3, "X")]))
       widgets(cm, [], ["X","X","X"], [])
     })

@@ -545,18 +545,10 @@ class HeapCursor<T extends RangeValue> {
       this.from = top.from
       this.to = top.to
       this.value = top.value
-      top.next()
-      if (top.value == null) heapPop(this.heap)
-      else heapBubble(this.heap, 0)
+      if (top.value) top.next()
+      heapBubble(this.heap, 0)
     }
   }
-}
-
-function heapPop<T extends RangeValue>(heap: LayerCursor<T>[]) {
-  let last = heap.pop()!
-  if (heap.length == 0) return
-  heap[0] = last
-  heapBubble(heap, 0)
 }
 
 function heapBubble<T extends RangeValue>(heap: LayerCursor<T>[], index: number) {

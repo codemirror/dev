@@ -82,7 +82,7 @@ export class DocView extends ContentView {
     let prevDeco = this.decorations, deco = this.gatherDeco()
     let decoDiff = findChangedDeco(prevDeco, deco, changedRanges, update.state.doc.length)
     changedRanges = extendWithRanges(changedRanges, decoDiff)
-    
+
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
         update.state.selection.primary.from >= this.view.viewport.from &&
         update.state.selection.primary.to <= this.view.viewport.to) {
