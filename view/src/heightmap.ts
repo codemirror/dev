@@ -575,8 +575,6 @@ class NodeBuilder implements SpanIterator<Decoration> {
     return this.nodes
   }
 
-  ignore(from: number, to: number, value: Decoration) { return from == to && !value.heightRelevant }
-
   // Always called with a region that on both sides either stretches
   // to a line break or the end of the document.
   // The returned array uses null to indicate line breaks, but never
@@ -588,6 +586,8 @@ class NodeBuilder implements SpanIterator<Decoration> {
     RangeSet.spans(decorations, from, to, builder)
     return builder.finish(from)
   }
+
+  ignore(value: Decoration) { return !value.point }
 }
 
 export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
@@ -605,4 +605,6 @@ class DecorationComparator {
   comparePoint(from: number, to: number, a: Decoration | null, b: Decoration | null) {
     if (from < to || a && a.heightRelevant || b && b.heightRelevant) addRange(from, to, this.changes)
   }
+
+  ignore(value: Decoration) { return !value.point }
 }

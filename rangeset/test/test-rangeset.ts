@@ -297,6 +297,16 @@ describe("RangeSet", () => {
       test(mkSet([mk(0, 20, "r1"), mk(1, 10, "r2"), mk(3, 12, {name: "p", point: true}), mk(4, 8, "r3"), mk(5, 20, "r4")]), 0, 20,
            "1=r1 2=r1/r2 9=[p] 8=r1/r4")
     })
+
+    it("doesn't split spans on ignored ranges", () => {
+      let ranges: number[] = []
+      RangeSet.spans([mkSet([mk(0, 10, "a"), mk(20, 30, "b")])], 0, 30, {
+        span(from, to) { ranges.push(from, to) },
+        point(from, to) { ranges.push(from, to) },
+        ignore(val) { return val.name == "a" }
+      })
+      ist(ranges.join(), "0,20,20,30")
+    })
   })
 
   describe("iter", () => {
