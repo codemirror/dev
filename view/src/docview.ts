@@ -387,6 +387,8 @@ class GapWidget extends WidgetType<number> {
     return elt
   }
 
+  eq() { return true }
+
   updateDOM(elt: HTMLElement) {
     if (this.value < MaxNodeHeight) {
       while (elt.lastChild) elt.lastChild.remove()
@@ -467,7 +469,6 @@ class DecorationComparator {
   comparePoint(from: number, to: number) { addRange(from, to, this.changes) }
 }
 
-// FIXME separate heightmap and content diffing, only run content diffs for drawn ranges
 export function findChangedDeco(a: readonly DecorationSet[], b: readonly DecorationSet[],
                                 diff: readonly ChangedRange[], length: number) {
   let comp = new DecorationComparator

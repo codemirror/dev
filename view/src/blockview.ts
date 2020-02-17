@@ -230,8 +230,10 @@ export class BlockWidgetView extends ContentView implements BlockView {
     if (!(source instanceof BlockWidgetView) || !source.open ||
         from > 0 && !(source.open & Open.Start) ||
         to < this.length && !(source.open & Open.End)) return false
-    if (!this.widget.compare(source.widget))
+    if (!this.widget.compare(source.widget)) {
+      console.log(this.widget, source.widget)
       throw new Error("Trying to merge an open widget with an incompatible node")
+    }
     this.length = from + source.length + (this.length - to)
     return true
   }
