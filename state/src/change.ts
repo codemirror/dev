@@ -232,6 +232,23 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
     return deleted ? -pos - 1 : pos
   }
 
+  /// Check whether these changes touch a given range. When one of the
+  /// changes entirely covers the range, the string `"cover"` is
+  /// returned.
+  touchesRange(from: number, to: number): boolean | "cover" {
+    let result = false
+    for (let change of this.changes) {
+      if (change.to >= from && change.from <= to) {
+        if (change.from < from && change.to > to) return "cover"
+        result = true
+      }
+      let diff = change.length - (change.to - change.from)
+      if (from > change.from) from += diff
+      if (to > change.to) to += diff
+    }
+    return result
+  }
+
   /// Get a partial [mapping](#state.Mapping) covering part of this
   /// change set.
   partialMapping(from: number, to: number = this.length): Mapping {

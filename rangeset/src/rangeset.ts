@@ -1,4 +1,4 @@
-import {ChangeSet, Change, ChangedRange, MapMode} from "../../state"
+import {ChangeSet, ChangedRange, MapMode} from "../../state"
 
 /// Each range is associated with a value, which must inherit from
 /// this class.
@@ -238,12 +238,12 @@ export class RangeSet<T extends RangeValue> {
     let chunks = [], chunkPos = [], bigPoint = false
     for (let i = 0; i < this.chunk.length; i++) {
       let start = this.chunkPos[i], chunk = this.chunk[i]
-      let touch = touchesChanges(start, start + chunk.length, changes.changes)
-      if (touch == Touched.No) {
+      let touch = changes.touchesRange(start, start + chunk.length)
+      if (touch === false) {
         if (chunk.bigPoint) bigPoint = true
         chunks.push(chunk)
         chunkPos.push(changes.mapPos(start))
-      } else if (touch == Touched.Yes) {
+      } else if (touch === true) {
         let {mapped, pos} = chunk.map(start, changes)
         if (mapped) {
           if (mapped.bigPoint) bigPoint = true
@@ -698,20 +698,4 @@ function findMinIndex(value: RangeValue[], array: number[]) {
     foundPos = array[i]
   }
   return found
-}
-
-const enum Touched {Yes, No, Covered}
-
-function touchesChanges(from: number, to: number, changes: readonly Change[]): Touched {
-  let result = Touched.No
-  for (let change of changes) {
-    if (change.to >= from && change.from <= to) {
-      if (change.from < from && change.to > to) result = Touched.Covered
-      else if (result == Touched.No) result = Touched.Yes
-    }
-    let diff = change.length - (change.to - change.from)
-    if (from > change.from) from += diff
-    if (to > change.to) to += diff
-  }
-  return result
 }
