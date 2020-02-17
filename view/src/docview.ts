@@ -320,7 +320,7 @@ export class DocView extends ContentView {
     return new ChildCursor(this.children, pos, i)
   }
 
-  computeGapDeco(): DecorationSet {
+  computeBlockGapDeco(): DecorationSet {
     let visible = this.view.viewState.viewport, viewports: Viewport[] = [visible]
     let {head, anchor} = this.view.state.selection.primary
     if (head < visible.from || head > visible.to) {
@@ -339,7 +339,7 @@ export class DocView extends ContentView {
       let end = next ? next.from - 1 : this.length
       if (end > pos) {
         let height = this.view.viewState.lineAt(end, 0).bottom - this.view.viewState.lineAt(pos, 0).top
-        deco.push(Decoration.replace({widget: new GapWidget(height), block: true, inclusive: true}).range(pos, end))
+        deco.push(Decoration.replace({widget: new BlockGapWidget(height), block: true, inclusive: true}).range(pos, end))
       }
       if (!next) break
       pos = next.to + 1
@@ -347,10 +347,18 @@ export class DocView extends ContentView {
     return Decoration.set(deco)
   }
 
+  computeLineGapDeco() {
+    let {lineGaps, heightOracle} = this.view.viewState
+    return Decoration.set(lineGaps.map(gap => Decoration.replace({
+      widget: new LineGapWidget({size: gap.size, vertical: heightOracle.lineWrapping})
+    }).range(gap.from, gap.to)))
+  }
+
   gatherDeco() {
     return this.decorations = [
       ...this.view.state.facet(decorationsFacet),
-      this.computeGapDeco(),
+      this.computeBlockGapDeco(),
+      this.computeLineGapDeco(),
       this.compositionDeco,
       ...this.view.pluginField(pluginDecorations)
     ]
@@ -380,7 +388,7 @@ export class DocView extends ContentView {
 // that.
 const MaxNodeHeight = 1e7
 
-class GapWidget extends WidgetType<number> {
+class BlockGapWidget extends WidgetType<number> {
   toDOM() {
     let elt = document.createElement("div")
     this.updateDOM(elt)
@@ -402,6 +410,23 @@ class GapWidget extends WidgetType<number> {
   }
 
   get estimatedHeight() { return this.value }
+}
+
+class LineGapWidget extends WidgetType<{size: number, vertical: boolean}> {
+  toDOM() {
+    let elt = document.createElement("div")
+    if (this.value.vertical) {
+      elt.style.height = this.value.size + "px"
+    } else {
+      elt.style.width = this.value.size + "px"
+      elt.style.height = "2px"
+    }
+    return elt
+  }
+
+  eq(other: {size: number, vertical: boolean}) { return this.value.size == other.size && this.value.vertical == other.vertical }
+
+  get estimatedHeight() { return this.value.vertical ? this.value.size : -1 }
 }
 
 export function computeCompositionDeco(view: EditorView, changes: readonly ChangedRange[]): DecorationSet {
