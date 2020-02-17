@@ -1,20 +1,22 @@
 import {Text} from "../../text"
 import {EditorState, ChangedRange, Mapping} from "../../state"
+import {Rect} from "./dom"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRelevantDecoChanges} from "./heightmap"
 import {decorations, ViewUpdate, UpdateFlag} from "./extension"
 import {DocView} from "./docview"
 
-const none: readonly any[] = []
-
-function visiblePixelRange(dom: HTMLElement, paddingTop: number): {top: number, bottom: number} {
+function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
   let rect = dom.getBoundingClientRect()
-  let top = Math.max(0, Math.min(innerHeight, rect.top)), bottom = Math.max(0, Math.min(innerHeight, rect.bottom))
+  let left = Math.max(0, rect.left), right = Math.min(innerWidth, rect.right)
+  let top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom)
   for (let parent = dom.parentNode as any; parent;) { // (Cast to any because TypeScript is useless with Node types)
     if (parent.nodeType == 1) {
-      if (parent.scrollHeight > parent.clientHeight) {
+      if (parent.scrollHeight > parent.clientHeight || parent.scrollWidth > parent.clientWidth) {
         let parentRect = parent.getBoundingClientRect()
-        top = Math.min(parentRect.bottom, Math.max(parentRect.top, top))
-        bottom = Math.min(parentRect.bottom, Math.max(parentRect.top, bottom))
+        left = Math.max(left, parentRect.left)
+        right = Math.min(right, parentRect.right)
+        top = Math.max(top, parentRect.top)
+        bottom = Math.min(bottom, parentRect.bottom)
       }
       parent = parent.parentNode
     } else if (parent.nodeType == 11) { // Shadow root
@@ -23,7 +25,9 @@ function visiblePixelRange(dom: HTMLElement, paddingTop: number): {top: number, 
       break
     }
   }
-  return {top: top - (rect.top + paddingTop), bottom: bottom - (rect.top + paddingTop)}
+  
+  return {left: left - rect.left, right: right - rect.left,
+          top: top - (rect.top + paddingTop), bottom: bottom - (rect.top + paddingTop)}
 }
 
 const enum VP {
@@ -36,8 +40,7 @@ const enum VP {
 
 export class ViewState {
   // These are contentDOM-local coordinates
-  viewportTop = 0
-  viewportBottom = 0
+  pixelViewport: Rect = {left: 0, right: window.innerWidth, top: 0, bottom: 0}
 
   paddingTop = 0
   paddingBottom = 0
@@ -64,7 +67,7 @@ export class ViewState {
     let contentChanges = update.changes.changedRanges()
     
     let heightChanges = extendWithRanges(contentChanges, heightRelevantDecoChanges(
-      update.prevState.facet(decorations), newDeco,update ? contentChanges : none, this.state.doc.length))
+      update.prevState.facet(decorations), newDeco,update ? contentChanges : [], this.state.doc.length))
     let prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
@@ -91,9 +94,11 @@ export class ViewState {
     }
 
     // Pixel viewport
-    let {top, bottom} = this.printing ? {top: -1e8, bottom: 1e8} : visiblePixelRange(dom, this.paddingTop)
-    this.viewportTop = top; this.viewportBottom = bottom
-    if (bottom <= top) return 0
+    let pixelViewport = this.printing ? {top: -1e8, bottom: 1e8, left: -1e8, right: 1e8} : visiblePixelRange(dom, this.paddingTop)
+    let dTop = pixelViewport.top - this.pixelViewport.top, dBottom = pixelViewport.bottom - this.pixelViewport.bottom
+    this.pixelViewport = pixelViewport
+    if (this.pixelViewport.bottom <= this.pixelViewport.top ||
+        this.pixelViewport.right <= this.pixelViewport.left) return 0
 
     let lineHeights = docView.measureVisibleLineHeights()
     let refresh = false, bias = 0
@@ -106,7 +111,6 @@ export class ViewState {
         if (refresh) docView.minWidth = 0
       }
 
-      let dTop = top - this.viewportTop, dBottom = bottom - this.viewportBottom
       if (dTop > 0 && dBottom > 0) bias = Math.max(dTop, dBottom)
       else if (dTop < 0 && dBottom < 0) bias = Math.min(dTop, dBottom)
     }
@@ -132,7 +136,7 @@ export class ViewState {
     // bottom, depending on the bias (the change in viewport position
     // since the last update). It'll hold a number between 0 and 1
     let marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VP.Margin / 2))
-    let map = this.heightMap, doc = this.state.doc, top = this.viewportTop, bottom = this.viewportBottom
+    let map = this.heightMap, doc = this.state.doc, {top, bottom} = this.pixelViewport
     let viewport = new Viewport(map.lineAt(top - marginTop * VP.Margin, QueryType.ByHeight, doc, 0, 0).from,
                                 map.lineAt(bottom + (1 - marginTop) * VP.Margin, QueryType.ByHeight, doc, 0, 0).to)
     // If scrollTo is > -1, make sure the viewport includes that position
@@ -160,8 +164,9 @@ export class ViewState {
   viewportIsCovering({from, to}: Viewport, bias = 0) {
     let {top} = this.heightMap.lineAt(from, QueryType.ByPos, this.state.doc, 0, 0)
     let {bottom} = this.heightMap.lineAt(to, QueryType.ByPos, this.state.doc, 0, 0)
-    return (from == 0 || top <= this.viewportTop - Math.max(VP.MinCoverMargin, Math.min(-bias, VP.MaxCoverMargin))) &&
-      (to == this.state.doc.length || bottom >= this.viewportBottom + Math.max(VP.MinCoverMargin, Math.min(bias, VP.MaxCoverMargin)))
+    return (from == 0 || top <= this.pixelViewport.top - Math.max(VP.MinCoverMargin, Math.min(-bias, VP.MaxCoverMargin))) &&
+      (to == this.state.doc.length ||
+       bottom >= this.pixelViewport.bottom + Math.max(VP.MinCoverMargin, Math.min(bias, VP.MaxCoverMargin)))
   }
 
   lineAt(pos: number, editorTop: number): BlockInfo {
