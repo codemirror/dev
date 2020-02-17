@@ -387,8 +387,6 @@ class GapWidget extends WidgetType<number> {
     return elt
   }
 
-  eq() { return true }
-
   updateDOM(elt: HTMLElement) {
     if (this.value < MaxNodeHeight) {
       while (elt.lastChild) elt.lastChild.remove()
