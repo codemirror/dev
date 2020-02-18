@@ -5,7 +5,6 @@ import {Rect} from "./dom"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRelevantDecoChanges} from "./heightmap"
 import {decorations, ViewUpdate, UpdateFlag} from "./extension"
 import {DocView} from "./docview"
-import {posAtCoords} from "./cursor"
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
   let rect = dom.getBoundingClientRect()
@@ -42,6 +41,15 @@ const enum VP {
 
 export class LineGap {
   constructor(readonly from: number, readonly to: number, readonly size: number) {}
+
+  static same(a: readonly LineGap[], b: readonly LineGap[]) {
+    if (a.length != b.length) return false
+    for (let i = 0; i < a.length; i++) {
+      let gA = a[i], gB = b[i]
+      if (gA.from != gB.from || gA.to != gB.to || gA.size != gB.size) return false
+    }
+    return true
+  }
 }
 
 const enum LG { Margin = 10000, HalfMargin = LG.Margin >> 1,  MinViewPort = LG.Margin * 1.5 }
@@ -89,8 +97,13 @@ export class ViewState {
       this.viewport = viewport
       update.flags |= UpdateFlag.Viewport
     }
-    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
-      this.lineGaps = this.ensureLineGaps(this.mapLineGaps(this.lineGaps, update.changes), null)
+    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort) {
+      let newGaps = this.ensureLineGaps(this.mapLineGaps(this.lineGaps, update.changes))
+      if (!LineGap.same(newGaps, this.lineGaps)) {
+        this.lineGaps = newGaps
+        update.flags |= UpdateFlag.LineGaps
+      }
+    }
 
     if (scrollTo > -1) this.scrollTo = scrollTo
   }
@@ -120,10 +133,7 @@ export class ViewState {
         let {lineHeight, charWidth} = docView.measureTextSize()
         refresh = this.heightOracle.refresh(window.getComputedStyle(dom).whiteSpace!, lineHeight, charWidth,
                                             (docView.dom).clientWidth / charWidth, lineHeights)
-        if (refresh) {
-          docView.minWidth = 0
-          this.lineGaps = []
-        }
+        if (refresh) docView.minWidth = 0
       }
 
       if (dTop > 0 && dBottom > 0) bias = Math.max(dTop, dBottom)
@@ -142,8 +152,13 @@ export class ViewState {
       this.viewport = this.getViewport(bias, scrollTo)
       result |= UpdateFlag.Viewport
     }
-    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
-      this.lineGaps = this.ensureLineGaps(this.lineGaps, docView)
+    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort) {
+      let newGaps = this.ensureLineGaps(refresh ? [] : this.lineGaps)
+      if (!LineGap.same(newGaps, this.lineGaps)) {
+        this.lineGaps = newGaps
+        result |= UpdateFlag.LineGaps
+      }
+    }
 
     if (scrollTo > -1) docView.scrollPosIntoView(scrollTo) // FIXME return instead?
     return result
@@ -195,61 +210,46 @@ export class ViewState {
     return mapped
   }
 
-  ensureLineGaps(current: readonly LineGap[], measure: DocView | null) {
+  ensureLineGaps(current: readonly LineGap[]) {
     // FIXME this falls apart in predominantly right-to-left text
-    // FIXME there are some corner cases, like a wrapped line falling
-    // entirely outside of the line gap margin, that this doesn't
-    // handle propertly
     let gaps: LineGap[] = []
-    let rect = measure ? measure.dom.getBoundingClientRect() : {left: 0, top: 0}
-    this.heightMap.forEachLine(this.viewport.from, this.viewport.to, this.state.doc, rect.top, 0, line => {
+    this.heightMap.forEachLine(this.viewport.from, this.viewport.to, this.state.doc, 0, 0, line => {
       if (line.length < LG.Margin) return
       let structure = lineStructure(line.from, line.to, this.state)
       if (structure.total < LG.Margin) return
       let viewFrom, viewTo
       if (this.heightOracle.lineWrapping) {
         if (line.from != this.viewport.from) viewFrom = line.from
-        else if (measure) viewFrom = posAtCoords(measure.view, {x: rect.left, y: rect.top + this.pixelViewport.top})
         else viewFrom = findPosition(structure, (this.pixelViewport.top - line.top) / line.height)
         if (line.to != this.viewport.to) viewTo = line.to
-        else if (measure) viewTo = posAtCoords(measure.view, {x: rect.left, y: this.pixelViewport.bottom + rect.top})
-        else viewTo = findPosition(structure, (line.top - this.pixelViewport.bottom) / line.height)
-      } else if (measure) {
-        viewFrom = posAtCoords(measure.view, {x: rect.left + this.pixelViewport.left, y: line.top + 2})
-        viewTo = posAtCoords(measure.view, {x: rect.left + this.pixelViewport.right, y: line.top + 2})
+        else viewTo = findPosition(structure, (this.pixelViewport.bottom - line.top) / line.height)
       } else {
         let totalWidth = structure.total * this.heightOracle.charWidth
         viewFrom = findPosition(structure, this.pixelViewport.left / totalWidth)
         viewTo = findPosition(structure, this.pixelViewport.right / totalWidth)
       }
-      if (viewFrom - line.from > LG.Margin) {
-        let gapTo = viewFrom - LG.Margin
-        gaps.push(current.find(gap => gap.from == line.from && gap.to > gapTo - LG.HalfMargin && gap.to < gapTo + LG.HalfMargin) ||
-                  new LineGap(line.from, gapTo, this.gapSize(line, gapTo, true, measure, structure)))
-      }
-      if (line.to - viewTo > LG.Margin) {
-        let gapFrom = viewTo + LG.Margin
-        gaps.push(current.find(gap => gap.to == line.to && gap.from > gapFrom - LG.HalfMargin && gap.from < gapFrom + LG.HalfMargin) ||
-                  new LineGap(gapFrom, line.to, this.gapSize(line, gapFrom, false, measure, structure)))
-      }
+      let sel = this.state.selection.primary
+      // Make sure the gap doesn't cover a selection end
+      if (sel.from <= viewFrom && sel.to >= line.from) viewFrom = sel.from
+      if (sel.from <= line.to && sel.to >= viewTo) viewTo = sel.to
+      let gapTo = viewFrom - LG.Margin, gapFrom = viewTo + LG.Margin
+      if (gapTo > line.from + LG.HalfMargin)
+        gaps.push(find(current, gap => gap.from == line.from && gap.to > gapTo - LG.HalfMargin && gap.to < gapTo + LG.HalfMargin) ||
+                  new LineGap(line.from, gapTo, this.gapSize(line, gapTo, true, structure)))
+      if (gapFrom < line.to - LG.HalfMargin)
+        gaps.push(find(current, gap => gap.to == line.to && gap.from > gapFrom - LG.HalfMargin &&
+                       gap.from < gapFrom + LG.HalfMargin) ||
+                  new LineGap(gapFrom, line.to, this.gapSize(line, gapFrom, false, structure)))
     })
     return gaps
   }
 
-  gapSize(line: BlockInfo, pos: number, start: boolean, measure: DocView | null,
+  gapSize(line: BlockInfo, pos: number, start: boolean,
           structure: {total: number, ranges: {from: number, to: number}[]}) {
     if (this.heightOracle.lineWrapping) {
-      if (measure) {
-        let rect = measure.coordsAt(pos)
-        if (rect) return start ? rect.bottom - line.top : line.bottom - rect.top
-      }
       let height = line.height * findFraction(structure, pos)
       return start ? height : line.height - height
     } else {
-      if (measure) {
-        let rect = measure.coordsAt(pos), other = measure.coordsAt(start ? line.from : line.to)
-        if (rect && other) return start ? rect.left - other.left : other.left - rect.left
-      }
       let ratio = findFraction(structure, pos)
       return structure.total * this.heightOracle.charWidth * (start ? ratio : 1 - ratio)
     }
@@ -333,4 +333,9 @@ function findFraction(structure: {total: number, ranges: {from: number, to: numb
     counted += to - from
   }
   return counted / structure.total
+}
+
+function find<T>(array: readonly T[], f: (value: T) => boolean): T | undefined {
+  for (let val of array) if (f(val)) return val
+  return undefined
 }

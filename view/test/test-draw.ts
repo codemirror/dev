@@ -81,10 +81,8 @@ describe("EditorView drawing", () => {
   })
 
   it("only draws visible content", () => {
-    let cm = tempEditor("a\n".repeat(500) + "b\n".repeat(500))
-    cm.dom.style.height = "300px"
-    cm.scrollDOM.style.overflow = "auto"
-    cm.scrollDOM.scrollTop = 0
+    let cm = tempEditor("a\n".repeat(500) + "b\n".repeat(500), [], {scroll: 300})
+    cm.scrollDOM.scrollTop = 3000
     cm.measure()
     ist(cm.contentDOM.childNodes.length, 500, "<")
     ist(cm.contentDOM.scrollHeight, 10000, ">")
@@ -98,12 +96,8 @@ describe("EditorView drawing", () => {
   })
 
   it("keeps a drawn area around selection ends", () => {
-    let cm = tempEditor("\nsecond\n" + "x\n".repeat(500) + "last")
-    cm.dom.style.height = "300px"
-    cm.scrollDOM.style.overflow = "auto"
-    cm.scrollDOM.scrollTop = 3000
+    let cm = tempEditor("\nsecond\n" + "x\n".repeat(500) + "last", [], {scroll: 300})
     cm.dispatch(cm.state.t().setSelection(EditorSelection.single(1, cm.state.doc.length)))
-    cm.measure()
     cm.focus()
     let text = cm.contentDOM.textContent!
     ist(text.length, 500, "<")
@@ -186,5 +180,38 @@ describe("EditorView drawing", () => {
         ist(cm.contentHeight, 200, ">")
       })
     })
+  })
+
+  it("hides parts of long lines that are horizontally out of view", () => {
+    let cm = tempEditor("one\ntwo\n?" + "three ".repeat(3333) + "!\nfour")
+    let {node} = cm.domAtPos(9)
+    ist(node.nodeValue!.length, 2e4, "<")
+    ist(node.nodeValue!.indexOf("!"), -1)
+    ist(cm.scrollDOM.scrollWidth, cm.defaultCharacterWidth * 1.6e4, ">")
+    cm.scrollDOM.scrollLeft = cm.scrollDOM.scrollWidth
+    cm.measure()
+    ;({node} = cm.domAtPos(20007)!)
+    ist(node.nodeValue!.length, 2e4, "<")
+    ist(node.nodeValue!.indexOf("!"), -1, ">")
+    ist(cm.scrollDOM.scrollWidth, cm.defaultCharacterWidth * 1.6e4, ">")
+  })
+
+  it("hides parts of long lines that are vertically out of view", () => {
+    let cm = tempEditor("<" + "long line ".repeat(4e3) + ">", [], {scroll: 100, wrapping: true})
+    let {node} = cm.domAtPos(1)
+    ist(node.nodeValue!.length, cm.state.doc.length, "<")
+    ist(node.nodeValue!.indexOf("<"), -1, ">")
+    cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2
+    cm.measure()
+    let rect = cm.scrollDOM.getBoundingClientRect()
+    ;({node} = cm.domAtPos(cm.posAtCoords({x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2})))
+    ist(node.nodeValue!.length, cm.state.doc.length, "<")
+    ist(node.nodeValue!.indexOf("<"), -1)
+    ist(node.nodeValue!.indexOf(">"), -1)
+    cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight
+    cm.measure()
+    ;({node} = cm.domAtPos(cm.state.doc.length - 1))
+    ist(node.nodeValue!.length, cm.state.doc.length, "<")
+    ist(node.nodeValue!.indexOf(">"), -1, ">")
   })
 })

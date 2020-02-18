@@ -6,7 +6,7 @@ import {Viewport, extendWithRanges} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType, addRange} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection} from "./dom"
-import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet} from "./extension"
+import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet, UpdateFlag} from "./extension"
 import {EditorView} from "./editorview"
 import {RangeSet} from "../../rangeset"
 import {ChangedRange} from "../../state"
@@ -84,6 +84,7 @@ export class DocView extends ContentView {
     changedRanges = extendWithRanges(changedRanges, decoDiff)
 
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
+        !(update.flags & (UpdateFlag.Viewport | UpdateFlag.LineGaps)) &&
         update.state.selection.primary.from >= this.view.viewport.from &&
         update.state.selection.primary.to <= this.view.viewport.to) {
       this.updateSelection(forceSelection)
@@ -420,6 +421,7 @@ class LineGapWidget extends WidgetType<{size: number, vertical: boolean}> {
     } else {
       elt.style.width = this.value.size + "px"
       elt.style.height = "2px"
+      elt.style.display = "inline-block"
     }
     return elt
   }

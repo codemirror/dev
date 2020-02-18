@@ -6,14 +6,21 @@ const workspace: HTMLElement = document.querySelector("#workspace")! as HTMLElem
 let tempView: EditorView | null = null
 let hide: any = null
 
-export function tempEditor(doc = "", extensions: readonly Extension[] = []): EditorView {
+export function tempEditor(doc = "", extensions: readonly Extension[] = [],
+                           options: {scroll?: number, wrapping?: boolean} = {}): EditorView {
   if (tempView) {
     tempView.destroy()
     tempView = null
   }
 
   tempView = new EditorView({state: EditorState.create({doc, extensions})})
+  if (options.scroll) {
+    tempView.contentDOM.style.overflow = "auto"
+    tempView.scrollDOM.style.height = options.scroll + "px"
+  }
+  if (options.wrapping) tempView.contentDOM.style.whiteSpace = "pre-wrap"
   workspace.appendChild(tempView.dom)
+  if (options.scroll) tempView.scrollDOM.scrollTop = 0
   workspace.style.pointerEvents = ""
   if (hide == null) hide = setTimeout(() => {
     hide = null
