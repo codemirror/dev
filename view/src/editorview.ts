@@ -63,11 +63,19 @@ export class EditorView {
 
   /// To be able to display large documents without consuming too much
   /// memory or overloading the browser, CodeMirror only draws the
-  /// code that is visible, plus a margin around it, to the DOM. This
+  /// code that is visible (plus a margin around it) to the DOM. This
   /// property tells you the extent of the current drawn viewport, in
   /// document positions.
   get viewport(): {from: number, to: number} { return this.viewState.viewport }
 
+  /// When there are, for example, large collapsed ranges in the
+  /// viewport, its size can be a lot bigger than the actual visible
+  /// content. Thus, if you are doing something like styling the
+  /// content in the viewport, it is preferable to only do so for
+  /// these ranges, which are the subset of the viewport that is
+  /// actually drawn.
+  get visibleRanges(): readonly {from: number, to: number}[] { return this.viewState.visibleRanges }
+  
   /// All regular editor state updates should go through this. It
   /// takes a transaction, applies it, and updates the view to show
   /// the new state. Its implementation can be overridden with an

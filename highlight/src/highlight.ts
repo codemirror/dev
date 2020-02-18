@@ -254,7 +254,7 @@ class Highlighter implements PluginValue {
 
   constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
     this.tree = view.state.tree
-    this.decorations = this.buildDeco(view.viewport, this.tree)
+    this.decorations = this.buildDeco(view.visibleRanges, this.tree)
   }
 
   update(update: ViewUpdate) {
@@ -265,54 +265,57 @@ class Highlighter implements PluginValue {
       this.decorations = this.decorations.map(update.changes)
     } else if (this.tree != syntax[0].getTree(update.state) || update.viewportChanged) {
       this.tree = syntax[0].getTree(update.state)
-      this.decorations = this.buildDeco(update.view.viewport, this.tree)
+      this.decorations = this.buildDeco(update.view.visibleRanges, this.tree)
     }
   }
 
-  buildDeco({from, to}: {from: number, to: number}, tree: Tree) {
+  buildDeco(ranges: readonly {from: number, to: number}[], tree: Tree) {
     let builder = new RangeSetBuilder<Decoration>()
-    let start = from
+    let start = 0
     function flush(pos: number, style: string) {
       if (pos > start && style)
         builder.add(start, pos, Decoration.mark({class: style})) // FIXME cache these
       start = pos
     }
 
-    // The current node's own classes
-    let curClass = ""
-    let context: string[] = []
-    let inherited: string[] = []
-    tree.iterate({
-      from, to,
-      enter: (type, start, end) => {
-        let inheritedClass = inherited.length ? inherited[inherited.length - 1] : ""
-        let cls = inheritedClass
-        let style = type.prop(this.prop)
-        if (style != null) {
-          let val = this.styling.match(style)
-          if (val) {
-            if (cls) cls += " "
-            cls += val
+    for (let {from, to} of ranges) {
+      start = from
+      // The current node's own classes
+      let curClass = ""
+      let context: string[] = []
+      let inherited: string[] = []
+      tree.iterate({
+        from, to,
+        enter: (type, start) => {
+          let inheritedClass = inherited.length ? inherited[inherited.length - 1] : ""
+          let cls = inheritedClass
+          let style = type.prop(this.prop)
+          if (style != null) {
+            let val = this.styling.match(style)
+            if (val) {
+              if (cls) cls += " "
+              cls += val
+            }
+            if (style & Inherit) inheritedClass = cls
           }
-          if (style & Inherit) inheritedClass = cls
+          context.push(cls)
+          if (inheritedClass) inherited.push(inheritedClass)
+          if (cls != curClass) {
+            flush(start, curClass)
+            curClass = cls
+          }
+        },
+        leave: (_t, _s, end) => {
+          context.pop()
+          inherited.pop()
+          let backTo = context.length ? context[context.length - 1] : ""
+          if (backTo != curClass) {
+            flush(Math.min(to, end), curClass)
+            curClass = backTo
+          }
         }
-        context.push(cls)
-        if (inheritedClass) inherited.push(inheritedClass)
-        if (cls != curClass) {
-          flush(start, curClass)
-          curClass = cls
-        }
-      },
-      leave: (_t, _s, end) => {
-        context.pop()
-        inherited.pop()
-        let backTo = context.length ? context[context.length - 1] : ""
-        if (backTo != curClass) {
-          flush(Math.min(to, end), curClass)
-          curClass = backTo
-        }
-      }
-    })
+      })
+    }
     return builder.finish()
   }
 }

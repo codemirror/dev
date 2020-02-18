@@ -4,6 +4,7 @@ import {RangeSet} from "../../rangeset"
 import {Rect} from "./dom"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRelevantDecoChanges} from "./heightmap"
 import {decorations, ViewUpdate, UpdateFlag} from "./extension"
+import {WidgetType, Decoration, DecorationSet} from "./decoration"
 import {DocView} from "./docview"
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
@@ -53,6 +54,28 @@ export class LineGap {
     }
     return true
   }
+
+  draw(wrapping: boolean) {
+    return Decoration.replace({widget: new LineGapWidget({size: this.size, vertical: wrapping})}).range(this.from, this.to)
+  }
+}
+
+class LineGapWidget extends WidgetType<{size: number, vertical: boolean}> {
+  toDOM() {
+    let elt = document.createElement("div")
+    if (this.value.vertical) {
+      elt.style.height = this.value.size + "px"
+    } else {
+      elt.style.width = this.value.size + "px"
+      elt.style.height = "2px"
+      elt.style.display = "inline-block"
+    }
+    return elt
+  }
+
+  eq(other: {size: number, vertical: boolean}) { return this.value.size == other.size && this.value.vertical == other.vertical }
+
+  get estimatedHeight() { return this.value.vertical ? this.value.size : -1 }
 }
 
 const enum LG { Margin = 10000, HalfMargin = LG.Margin >> 1,  MinViewPort = LG.Margin * 1.5 }
@@ -72,12 +95,17 @@ export class ViewState {
   printing = false
 
   viewport: Viewport
-  lineGaps: readonly LineGap[] = []
+  visibleRanges: readonly {from: number, to: number}[] = []
+  lineGaps: readonly LineGap[]
+  lineGapDeco: DecorationSet
 
   constructor(public state: EditorState) {
     this.heightMap = this.heightMap.applyChanges(state.facet(decorations), Text.empty, this.heightOracle.setDoc(state.doc),
                                                  [new ChangedRange(0, 0, 0, state.doc.length)])
     this.viewport = this.getViewport(0, -1)
+    this.lineGaps = this.ensureLineGaps([])
+    this.lineGapDeco = Decoration.set(this.lineGaps.map(gap => gap.draw(false)))
+    this.computeVisibleRanges()
   }
 
   update(update: ViewUpdate, scrollTo = -1) {
@@ -100,13 +128,9 @@ export class ViewState {
       this.viewport = viewport
       update.flags |= UpdateFlag.Viewport
     }
-    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort) {
-      let newGaps = this.ensureLineGaps(this.mapLineGaps(this.lineGaps, update.changes))
-      if (!LineGap.same(newGaps, this.lineGaps)) {
-        this.lineGaps = newGaps
-        update.flags |= UpdateFlag.LineGaps
-      }
-    }
+    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
+      update.flags |= this.updateLineGaps(this.ensureLineGaps(this.mapLineGaps(this.lineGaps, update.changes)))
+    this.computeVisibleRanges()
 
     if (scrollTo > -1) this.scrollTo = scrollTo
   }
@@ -117,7 +141,7 @@ export class ViewState {
     if (!repeated) {
       // Vertical padding
       let style = window.getComputedStyle(dom)
-      whiteSpace = style.whiteSpace!, direction = style.direction as any
+      whiteSpace = style.whiteSpace!, direction = (style.direction || "ltr") as any
       this.paddingTop = parseInt(style.paddingTop!) || 0
       this.paddingBottom = parseInt(style.paddingBottom!) || 0
     }
@@ -156,13 +180,9 @@ export class ViewState {
       this.viewport = this.getViewport(bias, scrollTo)
       result |= UpdateFlag.Viewport
     }
-    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort) {
-      let newGaps = this.ensureLineGaps(refresh ? [] : this.lineGaps)
-      if (!LineGap.same(newGaps, this.lineGaps)) {
-        this.lineGaps = newGaps
-        result |= UpdateFlag.LineGaps
-      }
-    }
+    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
+      result |= this.updateLineGaps(this.ensureLineGaps(refresh ? [] : this.lineGaps))
+    this.computeVisibleRanges()
 
     if (scrollTo > -1) docView.scrollPosIntoView(scrollTo) // FIXME return instead?
     return result
@@ -267,6 +287,27 @@ export class ViewState {
     }
   }
 
+  updateLineGaps(gaps: readonly LineGap[]) {
+    if (!LineGap.same(gaps, this.lineGaps)) {
+      this.lineGaps = gaps
+      this.lineGapDeco = Decoration.set(gaps.map(gap => gap.draw(this.heightOracle.lineWrapping)))
+      return UpdateFlag.LineGaps
+    }
+    return 0
+  }
+
+  computeVisibleRanges() {
+    let deco = this.state.facet(decorations)
+    if (this.lineGaps.length) deco = deco.concat(this.lineGapDeco)
+    let ranges: {from: number, to: number}[] = []
+    RangeSet.spans(deco, this.viewport.from, this.viewport.to, {
+      span(from, to) { ranges.push({from, to}) },
+      point() {},
+      minPointSize: 20
+    })
+    this.visibleRanges = ranges
+  }
+
   lineAt(pos: number, editorTop: number): BlockInfo {
     return this.heightMap.lineAt(pos, QueryType.ByPos, this.state.doc, editorTop + this.paddingTop, 0)
   }
@@ -318,7 +359,7 @@ function lineStructure(from: number, to: number, state: EditorState) {
       if (from > pos) { ranges.push({from: pos, to: from}); total += to - pos }
       pos = to
     },
-    minPointSize: 0
+    minPointSize: 20 // We're only interested in collapsed ranges of a significant size
   })
   if (pos < to) { ranges.push({from: pos, to}); total += to - pos }
   return {total, ranges}

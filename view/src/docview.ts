@@ -50,7 +50,7 @@ export class DocView extends ContentView {
     this.setDOM(view.contentDOM)
     this.children = [new LineView]
     this.children[0].setParent(this)
-    this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], this.gatherDeco(), 0)
+    this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], this.updateDeco(), 0)
   }
 
   // Update the document view to a given state. scrollIntoView can be
@@ -79,7 +79,7 @@ export class DocView extends ContentView {
     if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, changedRanges)
 
-    let prevDeco = this.decorations, deco = this.gatherDeco()
+    let prevDeco = this.decorations, deco = this.updateDeco()
     let decoDiff = findChangedDeco(prevDeco, deco, changedRanges, update.state.doc.length)
     changedRanges = extendWithRanges(changedRanges, decoDiff)
 
@@ -348,18 +348,11 @@ export class DocView extends ContentView {
     return Decoration.set(deco)
   }
 
-  computeLineGapDeco() {
-    let {lineGaps, heightOracle} = this.view.viewState
-    return Decoration.set(lineGaps.map(gap => Decoration.replace({
-      widget: new LineGapWidget({size: gap.size, vertical: heightOracle.lineWrapping})
-    }).range(gap.from, gap.to)))
-  }
-
-  gatherDeco() {
+  updateDeco() {
     return this.decorations = [
       ...this.view.state.facet(decorationsFacet),
       this.computeBlockGapDeco(),
-      this.computeLineGapDeco(),
+      this.view.viewState.lineGapDeco,
       this.compositionDeco,
       ...this.view.pluginField(pluginDecorations)
     ]
@@ -411,24 +404,6 @@ class BlockGapWidget extends WidgetType<number> {
   }
 
   get estimatedHeight() { return this.value }
-}
-
-class LineGapWidget extends WidgetType<{size: number, vertical: boolean}> {
-  toDOM() {
-    let elt = document.createElement("div")
-    if (this.value.vertical) {
-      elt.style.height = this.value.size + "px"
-    } else {
-      elt.style.width = this.value.size + "px"
-      elt.style.height = "2px"
-      elt.style.display = "inline-block"
-    }
-    return elt
-  }
-
-  eq(other: {size: number, vertical: boolean}) { return this.value.size == other.size && this.value.vertical == other.vertical }
-
-  get estimatedHeight() { return this.value.vertical ? this.value.size : -1 }
 }
 
 export function computeCompositionDeco(view: EditorView, changes: readonly ChangedRange[]): DecorationSet {
