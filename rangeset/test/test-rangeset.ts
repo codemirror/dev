@@ -300,10 +300,10 @@ describe("RangeSet", () => {
 
     it("doesn't split spans on ignored ranges", () => {
       let ranges: number[] = []
-      RangeSet.spans([mkSet([mk(0, 10, "a"), mk(20, 30, "b")])], 0, 30, {
+      RangeSet.spans([mkSet([mk(0, 10, "a"), mk(20, 30, {name: "b", point: true})])], 0, 30, {
         span(from, to) { ranges.push(from, to) },
         point(from, to) { ranges.push(from, to) },
-        ignore(val) { return val.name == "a" }
+        minPointSize: 0
       })
       ist(ranges.join(), "0,20,20,30")
     })

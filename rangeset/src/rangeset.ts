@@ -53,8 +53,9 @@ export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
   /// Notification for a point range.
   comparePoint(from: number, to: number, byA: T | null, byB: T | null): void
-  /// Can be used to ignore some types of ranges when comparing.
-  ignore?(value: T): boolean
+  /// Can be used to ignore all non-point ranges and points below a
+  /// given size. Specify 0 to get all points.
+  minPointSize?: number
 }
 
 /// Methods used when iterating over the spans created by a set of
@@ -69,9 +70,9 @@ export interface SpanIterator<T extends RangeValue> {
   /// `openEnd` indicate whether the point decoration exceeded the
   /// range we're iterating over at its start and end.
   point(from: number, to: number, value: T, openStart: boolean, openEnd: boolean): void
-  /// When given, ranges whose value matches this predicate are
-  /// ignored by the iteration.
-  ignore?(value: T): boolean
+  /// When given and greater than -1, only points of at least this
+  /// size are taken into account.
+  minPointSize?: number
 }
 
       // The maximum amount of ranges to store in a single chunk
@@ -214,7 +215,7 @@ export class RangeSet<T extends RangeValue> {
     if (sort) add.slice().sort(cmpRange)
     if (this == RangeSet.empty) return add.length ? RangeSet.of(add) : this
 
-    let cur = new LayerCursor(this).goto(0), i = 0, spill = []
+    let cur = new LayerCursor(this, null, -1).goto(0), i = 0, spill = []
     let builder = new RangeSetBuilder<T>()
     while (cur.value || i < add.length) {
       if (i < add.length && (cur.from - add[i].from || cur.startSide - add[i].value.startSide) >= 0) {
@@ -294,11 +295,14 @@ export class RangeSet<T extends RangeValue> {
     length: number,
     comparator: RangeComparator<T>
   ) {
-    let a = oldSets.filter(set => set.maxPoint >= BigPointSize || set != RangeSet.empty && newSets.indexOf(set) < 0)
-    let b = newSets.filter(set => set.maxPoint >= BigPointSize || set != RangeSet.empty && oldSets.indexOf(set) < 0)
-    let sharedChunks = findSharedChunks(a, b), ignore = comparator.ignore ? comparator.ignore.bind(comparator) : null
-    let sideA = new SpanCursor(a, sharedChunks, ignore)
-    let sideB = new SpanCursor(b, sharedChunks, ignore)
+    let minPoint = comparator.minPointSize ?? -1
+    let a = oldSets.filter(set => set.maxPoint >= BigPointSize ||
+                           set != RangeSet.empty && newSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
+    let b = newSets.filter(set => set.maxPoint >= BigPointSize ||
+                           set != RangeSet.empty && oldSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
+    let sharedChunks = findSharedChunks(a, b)
+    let sideA = new SpanCursor(a, sharedChunks, minPoint)
+    let sideB = new SpanCursor(b, sharedChunks, minPoint)
 
     let posA = 0, posB = 0
     for (let range of textDiff) {
@@ -314,7 +318,7 @@ export class RangeSet<T extends RangeValue> {
   /// content.
   static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
                                      iterator: SpanIterator<T>) {
-    let cursor = new SpanCursor(sets, null, iterator.ignore ? iterator.ignore.bind(iterator) : null).goto(from), pos = from
+    let cursor = new SpanCursor(sets, null, iterator.minPointSize ?? -1).goto(from), pos = from
     for (;;) {
       let curTo = Math.min(cursor.to, to)
       if (cursor.point) iterator.point(pos, curTo, cursor.point, cursor.pointFrom < from, cursor.to > to)
@@ -443,7 +447,7 @@ class LayerCursor<T extends RangeValue> {
   chunkIndex!: number
   rangeIndex!: number
 
-  constructor(readonly layer: RangeSet<T>, readonly skip: Set<Chunk<T>> | null = null) {}
+  constructor(readonly layer: RangeSet<T>, readonly skip: Set<Chunk<T>> | null, readonly minPoint: number) {}
 
   get startSide() { return this.value ? this.value.startSide : 0 }
   get endSide() { return this.value ? this.value.endSide : 0 }
@@ -455,9 +459,11 @@ class LayerCursor<T extends RangeValue> {
   }
 
   gotoInner(pos: number, side: number, forward: boolean) {
-    while (this.chunkIndex < this.layer.chunk.length &&
-           (this.skip && this.skip.has(this.layer.chunk[this.chunkIndex]) ||
-            this.layer.chunkEnd(this.chunkIndex) < pos)) {
+    while (this.chunkIndex < this.layer.chunk.length) {
+      let next = this.layer.chunk[this.chunkIndex]
+      if (!(this.skip && this.skip.has(next) ||
+            this.layer.chunkEnd(this.chunkIndex) < pos ||
+            next.maxPoint < this.minPoint)) break
       this.chunkIndex++
       forward = false
     }
@@ -473,22 +479,26 @@ class LayerCursor<T extends RangeValue> {
   }
 
   next() {
-    if (this.chunkIndex == this.layer.chunk.length) {
-      this.from = this.to = Far
-      this.value = null
-    } else {
-      let chunkPos = this.layer.chunkPos[this.chunkIndex], chunk = this.layer.chunk[this.chunkIndex]
-      let from = chunkPos + chunk.from[this.rangeIndex]
-      this.from = from
-      this.to = chunkPos + chunk.to[this.rangeIndex]
-      this.value = chunk.value[this.rangeIndex]
-      if (++this.rangeIndex == chunk.value.length) {
-        this.chunkIndex++
-        if (this.skip) {
-          while (this.chunkIndex < this.layer.chunk.length && this.skip.has(this.layer.chunk[this.chunkIndex]))
-            this.chunkIndex++
+    for (;;) {
+      if (this.chunkIndex == this.layer.chunk.length) {
+        this.from = this.to = Far
+        this.value = null
+        break
+      } else {
+        let chunkPos = this.layer.chunkPos[this.chunkIndex], chunk = this.layer.chunk[this.chunkIndex]
+        let from = chunkPos + chunk.from[this.rangeIndex]
+        this.from = from
+        this.to = chunkPos + chunk.to[this.rangeIndex]
+        this.value = chunk.value[this.rangeIndex]
+        if (++this.rangeIndex == chunk.value.length) {
+          this.chunkIndex++
+          if (this.skip) {
+            while (this.chunkIndex < this.layer.chunk.length && this.skip.has(this.layer.chunk[this.chunkIndex]))
+              this.chunkIndex++
+          }
+          this.rangeIndex = 0
         }
-        this.rangeIndex = 0
+        if (this.minPoint < 0 || this.value.point && this.to - this.from >= this.minPoint) break
       }
     }
   }
@@ -513,12 +523,14 @@ class HeapCursor<T extends RangeValue> {
 
   static from<T extends RangeValue>(
     sets: readonly RangeSet<T>[],
-    skip: Set<Chunk<T>> | null = null
+    skip: Set<Chunk<T>> | null = null,
+    minPoint: number = -1
   ): HeapCursor<T> | LayerCursor<T> {
     let heap = []
-    for (let set of sets)
-      for (let cur = set; cur != RangeSet.empty; cur = cur.nextLayer)
-        heap.push(new LayerCursor(cur, skip))
+    for (let set of sets) for (let cur = set; cur != RangeSet.empty; cur = cur.nextLayer) {
+      if (cur.maxPoint >= minPoint)
+        heap.push(new LayerCursor(cur, skip, minPoint))
+    }
     return heap.length == 1 ? heap[0] : new HeapCursor(heap)
   }
 
@@ -584,8 +596,8 @@ class SpanCursor<T extends RangeValue> {
 
   constructor(sets: readonly RangeSet<T>[],
               skip: Set<Chunk<T>> | null,
-              readonly ignore: ((value: T) => boolean) | null) {
-    this.cursor = HeapCursor.from(sets, skip)
+              readonly minPoint: number) {
+    this.cursor = HeapCursor.from(sets, skip, minPoint)
   }
 
   goto(pos: number, side: number = -Far) {
@@ -633,9 +645,7 @@ class SpanCursor<T extends RangeValue> {
         break
       } else {
         let nextVal = this.cursor.value
-        if (this.ignore && this.ignore(nextVal)) {
-          this.cursor.next()
-        } else if (!nextVal.point) { // Opening a range
+        if (!nextVal.point) { // Opening a range
           this.active.push(nextVal)
           this.activeTo.push(this.cursor.to)
           this.minActive = findMinIndex(this.active, this.activeTo)

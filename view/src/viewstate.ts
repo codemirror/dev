@@ -318,7 +318,7 @@ function lineStructure(from: number, to: number, state: EditorState) {
       if (from > pos) { ranges.push({from: pos, to: from}); total += to - pos }
       pos = to
     },
-    ignore(value) { return !value.point }
+    minPointSize: 0
   })
   if (pos < to) { ranges.push({from: pos, to}); total += to - pos }
   return {total, ranges}

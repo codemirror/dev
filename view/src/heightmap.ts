@@ -592,7 +592,7 @@ class NodeBuilder implements SpanIterator<Decoration> {
     return builder.finish(from)
   }
 
-  ignore(value: Decoration) { return !value.point }
+  get minPointSize() { return 0 }
 }
 
 export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
@@ -611,5 +611,5 @@ class DecorationComparator {
     if (from < to || a && a.heightRelevant || b && b.heightRelevant) addRange(from, to, this.changes)
   }
 
-  ignore(value: Decoration) { return !value.point }
+  get minPointSize() { return 0 }
 }
