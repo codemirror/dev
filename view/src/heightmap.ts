@@ -8,6 +8,7 @@ const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 export class HeightOracle {
   doc: Text = Text.empty
   lineWrapping: boolean = false
+  direction: "ltr" | "rtl" = "ltr"
   heightSamples: {[key: number]: boolean} = {}
   lineHeight: number = 14
   charWidth: number = 7
@@ -30,7 +31,7 @@ export class HeightOracle {
 
   setDoc(doc: Text): this { this.doc = doc; return this }
 
-  mustRefresh(lineHeights: number[]): boolean {
+  mustRefresh(lineHeights: number[], whiteSpace: string, direction: string): boolean {
     let newHeight = false
     for (let i = 0; i < lineHeights.length; i++) {
       let h = lineHeights[i]
@@ -41,13 +42,17 @@ export class HeightOracle {
         this.heightSamples[Math.floor(h * 10)] = true
       }
     }
-    return newHeight
+    return newHeight || (wrappingWhiteSpace.indexOf(whiteSpace) > -1) != this.lineWrapping || this.direction != direction
   }
 
-  refresh(whiteSpace: string, lineHeight: number, charWidth: number, lineLength: number, knownHeights: number[]): boolean {
+  refresh(whiteSpace: string, direction: "ltr" | "rtl", lineHeight: number, charWidth: number,
+          lineLength: number, knownHeights: number[]): boolean {
     let lineWrapping = wrappingWhiteSpace.indexOf(whiteSpace) > -1
-    let changed = Math.round(lineHeight) != Math.round(this.lineHeight) || this.lineWrapping != lineWrapping
+    let changed = Math.round(lineHeight) != Math.round(this.lineHeight) ||
+      this.lineWrapping != lineWrapping ||
+      this.direction != direction
     this.lineWrapping = lineWrapping
+    this.direction = direction
     this.lineHeight = lineHeight
     this.charWidth = charWidth
     this.lineLength = lineLength

@@ -192,7 +192,7 @@ const gutterView = ViewPlugin.fromClass(class {
   }
 }).provide(PluginField.scrollMargins, value => {
   if (value.gutters.length == 0 || !value.fixed) return null
-  return getComputedStyle(value.view.scrollDOM).direction == "ltr" ? {left: value.dom.offsetWidth} : {right: value.dom.offsetWidth}
+  return value.view.textDirection == "ltr" ? {left: value.dom.offsetWidth} : {right: value.dom.offsetWidth}
 })
 
 class UpdateContext {

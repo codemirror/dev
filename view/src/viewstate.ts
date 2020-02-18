@@ -39,6 +39,9 @@ const enum VP {
   MaxCoverMargin = VP.Margin / 4
 }
 
+// Line gaps are placeholder widgets used to hide pieces of overlong
+// lines within the viewport, as a kludge to keep the editor
+// responsive when a ridiculously long line is loaded into it.
 export class LineGap {
   constructor(readonly from: number, readonly to: number, readonly size: number) {}
 
@@ -109,11 +112,12 @@ export class ViewState {
   }
 
   measure(docView: DocView, repeated: boolean) {
-    let dom = docView.dom
+    let dom = docView.dom, whiteSpace = "", direction: "ltr" | "rtl" = "ltr"
 
     if (!repeated) {
       // Vertical padding
       let style = window.getComputedStyle(dom)
+      whiteSpace = style.whiteSpace!, direction = style.direction as any
       this.paddingTop = parseInt(style.paddingTop!) || 0
       this.paddingBottom = parseInt(style.paddingBottom!) || 0
     }
@@ -129,9 +133,9 @@ export class ViewState {
     let refresh = false, bias = 0
 
     if (!repeated) {
-      if (this.heightOracle.mustRefresh(lineHeights)) {
+      if (this.heightOracle.mustRefresh(lineHeights, whiteSpace, direction)) {
         let {lineHeight, charWidth} = docView.measureTextSize()
-        refresh = this.heightOracle.refresh(window.getComputedStyle(dom).whiteSpace!, lineHeight, charWidth,
+        refresh = this.heightOracle.refresh(whiteSpace, direction, lineHeight, charWidth,
                                             (docView.dom).clientWidth / charWidth, lineHeights)
         if (refresh) docView.minWidth = 0
       }
@@ -210,9 +214,17 @@ export class ViewState {
     return mapped
   }
 
+  // Computes positions in the viewport where the start or end of a
+  // line should be hidden, trying to reuse existing line gaps when
+  // appropriate to avoid unneccesary redraws.
+  // Uses crude character-counting for the positioning and sizing,
+  // since actual DOM coordinates aren't always available and
+  // predictable. Relies on generous margins (see LG.Margin) to hide
+  // the artifacts this might produce from the user.
   ensureLineGaps(current: readonly LineGap[]) {
-    // FIXME this falls apart in predominantly right-to-left text
     let gaps: LineGap[] = []
+    // This won't work at all in predominantly right-to-left text.
+    if (this.heightOracle.direction != "ltr") return gaps
     this.heightMap.forEachLine(this.viewport.from, this.viewport.to, this.state.doc, 0, 0, line => {
       if (line.length < LG.Margin) return
       let structure = lineStructure(line.from, line.to, this.state)

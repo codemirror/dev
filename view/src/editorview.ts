@@ -384,6 +384,8 @@ export class EditorView {
   get defaultCharacterWidth() { return this.viewState.heightOracle.charWidth }
   /// The default height of a line in the editor.
   get defaultLineHeight() { return this.viewState.heightOracle.lineHeight }
+  /// The text direction (`direction` CSS property) of the editor.
+  get textDirection() { return this.viewState.heightOracle.direction }
 
   /// Start a custom mouse selection event.
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
