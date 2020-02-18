@@ -76,7 +76,9 @@ export interface SpanIterator<T extends RangeValue> {
 
       // The maximum amount of ranges to store in a single chunk
 const ChunkSize = 250,
-      // The min point size that causes its parent chunk to be marked as containing a big point
+      // Chunks with points of this size are never skipped during
+      // compare, since moving past those points is likely to speed
+      // up, rather than slow down, the comparison.
       BigPointSize = 500,
       // A large (fixnum) value to use for max/min values.
       Far = 1e9
@@ -85,11 +87,11 @@ class Chunk<T extends RangeValue> {
   constructor(readonly from: readonly number[],
               readonly to: readonly number[],
               readonly value: readonly T[],
-              // Chunks with large point ranges inside of them are
-              // marked, in order to avoid skipping them during
-              // diffing, since skipping is likely to be more
-              // expensive than fully diffing them.
-              readonly bigPoint: boolean) {}
+              // Chunks are marked with the largest point that occurs
+              // in them (or -1 for no points), so that scans that are
+              // only interested in points (such as the
+              // heightmap-related logic) can skip range-only chunks.
+              readonly maxPoint: number) {}
 
   get length() { return this.to[this.to.length - 1] }
 
@@ -114,7 +116,7 @@ class Chunk<T extends RangeValue> {
   }
 
   map(offset: number, changes: ChangeSet) {
-    let value: T[] = [], from = [], to = [], newPos = -1, bigPoint = false
+    let value: T[] = [], from = [], to = [], newPos = -1, maxPoint = -1
     for (let i = 0; i < this.value.length; i++) {
       let val = this.value[i]
       let newFrom = changes.mapPos(this.from[i] + offset, val.startSide, val.startMapMode)
@@ -126,12 +128,12 @@ class Chunk<T extends RangeValue> {
       if (newFrom < 0) newFrom = -(newFrom + 1)
       if ((newTo - newFrom || val.endSide - val.startSide) < 0) continue
       if (newPos < 0) newPos = newFrom
-      if (!bigPoint && newTo - newFrom >= BigPointSize && val.point) bigPoint = true
+      if (val.point) maxPoint = Math.max(maxPoint, newTo - newFrom)
       value.push(val)
       from.push(newFrom - newPos)
       to.push(newTo - newPos)
     }
-    return {mapped: value.length ? new Chunk(from, to, value, bigPoint) : null, pos: newPos}
+    return {mapped: value.length ? new Chunk(from, to, value, maxPoint) : null, pos: newPos}
   }
 }
 
@@ -183,7 +185,7 @@ export class RangeSet<T extends RangeValue> {
     /// @internal
     readonly nextLayer: RangeSet<T> = RangeSet.empty,
     /// @internal
-    readonly bigPoint: boolean
+    readonly maxPoint: number
   ) {}
 
   /// @internal
@@ -240,25 +242,25 @@ export class RangeSet<T extends RangeValue> {
   map(changes: ChangeSet): RangeSet<T> {
     if (changes.length == 0 || this == RangeSet.empty) return this
 
-    let chunks = [], chunkPos = [], bigPoint = false
+    let chunks = [], chunkPos = [], maxPoint = -1
     for (let i = 0; i < this.chunk.length; i++) {
       let start = this.chunkPos[i], chunk = this.chunk[i]
       let touch = changes.touchesRange(start, start + chunk.length)
       if (touch === false) {
-        if (chunk.bigPoint) bigPoint = true
+        maxPoint = Math.max(maxPoint, chunk.maxPoint)
         chunks.push(chunk)
         chunkPos.push(changes.mapPos(start))
       } else if (touch === true) {
         let {mapped, pos} = chunk.map(start, changes)
         if (mapped) {
-          if (mapped.bigPoint) bigPoint = true
+          maxPoint = Math.max(maxPoint, mapped.maxPoint)
           chunks.push(mapped)
           chunkPos.push(pos)
         }
       }
     }
     let next = this.nextLayer.map(changes)
-    return chunks.length == 0 ? next : new RangeSet(chunkPos, chunks, next, bigPoint)
+    return chunks.length == 0 ? next : new RangeSet(chunkPos, chunks, next, maxPoint)
   }
 
   /// Iterate over the ranges that touch the region `from` to `to`,
@@ -292,8 +294,8 @@ export class RangeSet<T extends RangeValue> {
     length: number,
     comparator: RangeComparator<T>
   ) {
-    let a = oldSets.filter(set => set.bigPoint || set != RangeSet.empty && newSets.indexOf(set) < 0)
-    let b = newSets.filter(set => set.bigPoint || set != RangeSet.empty && oldSets.indexOf(set) < 0)
+    let a = oldSets.filter(set => set.maxPoint >= BigPointSize || set != RangeSet.empty && newSets.indexOf(set) < 0)
+    let b = newSets.filter(set => set.maxPoint >= BigPointSize || set != RangeSet.empty && oldSets.indexOf(set) < 0)
     let sharedChunks = findSharedChunks(a, b), ignore = comparator.ignore ? comparator.ignore.bind(comparator) : null
     let sideA = new SpanCursor(a, sharedChunks, ignore)
     let sideB = new SpanCursor(b, sharedChunks, ignore)
@@ -336,7 +338,7 @@ export class RangeSet<T extends RangeValue> {
   }
 
   /// The empty set of ranges.
-  static empty = new RangeSet<any>([], [], null as any, false)
+  static empty = new RangeSet<any>([], [], null as any, -1)
 }
 
 // Awkward patch-up to create a cyclic structure.
@@ -355,16 +357,16 @@ export class RangeSetBuilder<T extends RangeValue> {
   private from: number[] = []
   private to: number[] = []
   private value: T[] = []
-  private bigPoint = false
-  private setBigPoint = false
+  private maxPoint = -1
+  private setMaxPoint = -1
   private nextLayer: RangeSetBuilder<T> | null = null
 
   private finishChunk(newArrays: boolean) {
-    this.chunks.push(new Chunk(this.from, this.to, this.value, this.bigPoint))
+    this.chunks.push(new Chunk(this.from, this.to, this.value, this.maxPoint))
     this.chunkPos.push(this.chunkStart)
     this.chunkStart = -1
-    if (this.bigPoint) this.setBigPoint = true
-    this.bigPoint = false
+    this.setMaxPoint = Math.max(this.setMaxPoint, this.maxPoint)
+    this.maxPoint = -1
     if (newArrays) { this.from = []; this.to = []; this.value = [] }
   }
 
@@ -389,8 +391,7 @@ export class RangeSetBuilder<T extends RangeValue> {
     this.lastFrom = from
     this.lastTo = to
     this.value.push(value)
-    if (!this.bigPoint && to - from >= BigPointSize && value.point)
-      this.bigPoint = true
+    if (value.point) this.maxPoint = Math.max(this.maxPoint, to - from)
     return true
   }
 
@@ -398,7 +399,7 @@ export class RangeSetBuilder<T extends RangeValue> {
   addChunk(from: number, chunk: Chunk<T>) {
     if ((from - this.lastTo || chunk.value[0].startSide - this.last!.endSide) < 0) return false
     if (this.from.length) this.finishChunk(true)
-    if (chunk.bigPoint) this.setBigPoint = true
+    this.setMaxPoint = Math.max(this.setMaxPoint, chunk.maxPoint)
     this.chunks.push(chunk)
     this.chunkPos.push(from)
     let last = chunk.value.length - 1
@@ -417,7 +418,7 @@ export class RangeSetBuilder<T extends RangeValue> {
     if (this.from.length) this.finishChunk(false)
     if (this.chunks.length == 0) return next
     let result = new RangeSet(this.chunkPos, this.chunks,
-                              this.nextLayer ? this.nextLayer.finishInner(next) : next, this.setBigPoint)
+                              this.nextLayer ? this.nextLayer.finishInner(next) : next, this.setMaxPoint)
     this.from = null as any // Make sure further `add` calls produce errors
     return result
   }
@@ -426,7 +427,7 @@ export class RangeSetBuilder<T extends RangeValue> {
 function findSharedChunks(a: readonly RangeSet<any>[], b: readonly RangeSet<any>[]) {
   let inA = new Map<Chunk<any>, number>()
   for (let set of a) for (let i = 0; i < set.chunk.length; i++)
-    if (!set.chunk[i].bigPoint) inA.set(set.chunk[i], set.chunkPos[i])
+    if (set.chunk[i].maxPoint < BigPointSize) inA.set(set.chunk[i], set.chunkPos[i])
   let shared = new Set<Chunk<any>>()
   for (let set of b) for (let i = 0; i < set.chunk.length; i++)
     if (inA.get(set.chunk[i]) == set.chunkPos[i])
