@@ -69,12 +69,18 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
   from = 0
   to = 0
   decorations: DecorationSet = Decoration.none
+  decorationCache: {[char: number]: Decoration} = Object.create(null)
 
   constructor(public view: EditorView) {
     this.updateForViewport()
   }
 
   update(update: ViewUpdate) {
+    if (update.prevState.facet(specialCharConfig) != update.state.facet(specialCharConfig)) {
+      this.decorationCache = Object.create(null)
+      this.from = this.to = 0
+      this.decorations = Decoration.none
+    }
     if (update.changes.length) {
       this.decorations = this.decorations.map(update.changes)
       this.from = update.changes.mapPos(this.from, 1)
@@ -129,7 +135,6 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
     this.from = vp.from; this.to = vp.to
   }
 
-  // FIXME move to whole-viewport updates (with builder and cached decoration values)?
   getDecorationsFor(from: number, to: number, target: Range<Decoration>[]) {
     let config = this.view.state.facet(specialCharConfig)
 
@@ -137,16 +142,17 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {
         while (m = config.specialChars.exec(cursor.value)) {
-          let code = m[0].codePointAt ? m[0].codePointAt(0) : m[0].charCodeAt(0), widget
+          let code = m[0].codePointAt ? m[0].codePointAt(0) : m[0].charCodeAt(0), deco
           if (code == null) continue
           if (code == 9) {
             let line = doc.lineAt(pos + m.index)
             let size = this.view.state.tabSize, col = countColumn(doc.slice(line.start, pos + m.index), 0, size)
-            widget = new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth)
+            deco = Decoration.replace({widget: new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth)})
           } else {
-            widget = new SpecialCharWidget(config, code)
+            deco = this.decorationCache[code] ||
+              (this.decorationCache[code] = Decoration.replace({widget: new SpecialCharWidget(config, code)}))
           }
-          target.push(Decoration.replace({widget}).range(pos + m.index, pos + m.index + m[0].length))
+          target.push(deco.range(pos + m.index, pos + m.index + m[0].length))
         }
       }
       pos += cursor.value.length
