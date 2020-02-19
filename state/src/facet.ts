@@ -88,7 +88,7 @@ function sameArray<T>(a: readonly T[], b: readonly T[]) {
 
 type Slot<T> = Facet<any, T> | StateField<T> | "doc" | "selection"
 
-/// Marks a value as an [`Extension`](#state.Extension).
+// Marks a value as an [`Extension`](#state.Extension).
 declare const isExtension: unique symbol
 
 const enum Provider { Static, Single, Multi }
@@ -117,10 +117,10 @@ class FacetProvider<Input> {
         state.values[idx] = getter(state)
         return SlotStatus.Changed
       } else {
-        let depChanged = (depDoc && tr!.docChanged) || (depSel && (tr!.docChanged || tr!.selectionSet)) || 
+        let depChanged = (depDoc && tr.docChanged) || (depSel && (tr.docChanged || tr.selectionSet)) || 
           depAddrs.some(addr => (ensureAddr(state, addr) & SlotStatus.Changed) > 0)
         if (!depChanged) return 0
-        let newVal = getter(state), oldVal = tr!.startState.values[idx]
+        let newVal = getter(state), oldVal = tr.startState.values[idx]
         if (multi ? compareArray(newVal, oldVal, compare) : compare(newVal, oldVal)) return 0
         state.values[idx] = newVal
         return SlotStatus.Changed
@@ -182,7 +182,8 @@ export type StateFieldSpec<Value> = {
 
   /// Compare two values of the field, returning `true` when they are
   /// the same. This is used to avoid recomputing facets that depend
-  /// on the field when its value did not change.
+  /// on the field when its value did not change. Defaults to using
+  /// `==`.
   compare?: (a: Value, b: Value) => boolean,
 }
 
@@ -296,12 +297,33 @@ class PrecExtension {
   [isExtension]!: true
 }
 
+class GroupExtension {
+  constructor(readonly extension: Extension, readonly group: ExtensionGroup) {}
+  [isExtension]!: true
+}
+
+/// Extension groups can be used to make a configuration dynamic.
+/// [Wrapping](#state.ExtensionGroup.of) an extension in a group
+/// allows you to later replace it with
+/// [`Transaction.replaceExtension`](#state.Transaction.replaceExtension).
+/// A given group may only occur once within a given configuration.
+export class ExtensionGroup {
+  /// Define a new group. The name is used only for debugging
+  /// purposes.
+  constructor(readonly name: string) {}
+
+  /// Tag the given extension with this group.
+  of(extension: Extension): Extension { return new GroupExtension(extension, this) }
+}
+
 type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
 
 export class Configuration {
   readonly statusTemplate: SlotStatus[] = []
 
-  constructor(readonly dynamicSlots: DynamicSlot[],
+  constructor(readonly source: Extension,
+              readonly replacements: Map<ExtensionGroup, Extension>,
+              readonly dynamicSlots: DynamicSlot[],
               readonly address: {[id: number]: number},
               readonly staticValues: readonly any[]) {
     while (this.statusTemplate.length < staticValues.length)
@@ -313,11 +335,10 @@ export class Configuration {
     return addr == null ? facet.default : this.staticValues[addr >> 1]
   }
 
-  // Passing EditorState as argument to avoid cyclic dependency
-  static resolve(extension: Extension, oldState?: EditorState) {
+  static resolve(extension: Extension, replacements: Map<ExtensionGroup, Extension> = new Map, oldState?: EditorState) {
     let fields: StateField<any>[] = []
     let facets: {[id: number]: FacetProvider<any>[]} = Object.create(null)
-    for (let ext of flatten(extension)) {
+    for (let ext of flatten(extension, replacements)) {
       if (ext instanceof StateField) fields.push(ext)
       else (facets[ext.facet.id] || (facets[ext.facet.id] = [])).push(ext)
     }
@@ -355,18 +376,24 @@ export class Configuration {
       }
     }
 
-    return new Configuration(dynamicSlots.map(f => f(address)), address, staticValues)
+    return new Configuration(extension, replacements, dynamicSlots.map(f => f(address)), address, staticValues)
   }
 }
 
-function flatten(extension: Extension) {
+function flatten(extension: Extension, replacements: Map<ExtensionGroup, Extension>) {
   let result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], []]
   let seen = new Set<Extension>()
+  let groupsSeen = new Set<ExtensionGroup>()
   ;(function inner(ext, prec: number) {
     if (seen.has(ext)) return
     seen.add(ext)
     if (Array.isArray(ext)) {
       for (let e of ext) inner(e, prec)
+    } else if (ext instanceof GroupExtension) {
+      if (groupsSeen.has(ext.group))
+        throw new RangeError(`Duplicate use of group '${ext.group.name}' in extensions`)
+      groupsSeen.add(ext.group)
+      inner(replacements.get(ext.group) || ext.extension, prec)
     } else if ((ext as any).extension) {
       inner((ext as any).extension, prec)
     } else if (ext instanceof PrecExtension) {

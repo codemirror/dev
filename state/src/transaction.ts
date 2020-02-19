@@ -3,7 +3,7 @@ import {Annotation, allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Change, ChangeSet} from "./change"
-import {Extension, Configuration} from "./facet"
+import {Extension, ExtensionGroup} from "./facet"
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
 
@@ -27,7 +27,7 @@ export class Transaction {
   private _annotations: {[id: number]: any} = Object.create(null)
   private flags: number = 0
   /// @internal
-  reconfigureConfig: Configuration | null = null
+  reconfigureData: {base: Extension, replaced: Map<ExtensionGroup, Extension>} | null = null
   private state: EditorState | null = null
 
   /// @internal
@@ -144,16 +144,31 @@ export class Transaction {
     return (this.flags & Flag.ScrollIntoView) > 0
   }
 
+  /// Provice new content for a given [extension
+  /// group](#state.ExtensionGroup) in the current configuration. (If
+  /// the group isn't present in the configuration, this will not have
+  /// any effect.)
+  replaceExtension(group: ExtensionGroup, content: Extension) {
+    this.ensureOpen()
+    if (!this.reconfigureData) {
+      let replaced = new Map<ExtensionGroup, Extension>()
+      this.startState.config.replacements.forEach((ext, group) => replaced.set(group, ext))
+      this.reconfigureData = {base: this.startState.config.source, replaced}
+    }
+    this.reconfigureData.replaced.set(group, content)
+    return this
+  }
+
   /// Move to an entirely new state configuration.
   reconfigure(extension: Extension) {
     this.ensureOpen()
-    this.reconfigureConfig = Configuration.resolve(extension, this.startState)
+    this.reconfigureData = {base: extension, replaced: new Map}
     return this
   }
 
   /// Indicates whether the transaction reconfigures the state.
   get reconfigured(): boolean {
-    return this.reconfigureConfig != null
+    return this.reconfigureData != null
   }
 
   private ensureOpen() {

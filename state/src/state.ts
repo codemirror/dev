@@ -130,7 +130,8 @@ export class EditorState {
 
   /// @internal
   applyTransaction(tr: Transaction): EditorState {
-    return new EditorState(tr.reconfigureConfig || this.config, tr.doc, tr.selection, tr)
+    let reconf = tr.reconfigureData, config = reconf ? Configuration.resolve(reconf.base, reconf.replaced, this): this.config
+    return new EditorState(config, tr.doc, tr.selection, tr)
   }
 
   /// Create a new state. You'll usually only need this when

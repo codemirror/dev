@@ -67,6 +67,8 @@ extensions for the editor state.
 
 @Precedence
 
+@ExtensionGroup
+
 @Syntax
 
 @languageData

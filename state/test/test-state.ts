@@ -1,5 +1,5 @@
 import ist from "ist"
-import {EditorState, StateField, Facet, Change, EditorSelection, SelectionRange, Annotation} from ".."
+import {EditorState, StateField, Facet, ExtensionGroup, Change, EditorSelection, SelectionRange, Annotation} from ".."
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -69,11 +69,29 @@ describe("EditorState", () => {
   })
 
   it("can preserve fields across reconfiguration", () => {
-    let field = StateField.define({create: () => 0, update: (val, tr) => val + 1})
+    let field = StateField.define({create: () => 0, update: val => val + 1})
     let start = EditorState.create({extensions: [field]}).t().apply()
     ist(start.field(field), 1)
     ist(start.t().reconfigure([field]).apply().field(field), 2)
     ist(start.t().reconfigure([]).apply().field(field, false), undefined)
+  })
+
+  it("can replace extension groups", () => {
+    let g = new ExtensionGroup("A"), f = Facet.define<number>()
+    let state = EditorState.create({extensions: [g.of(f.of(10)), f.of(20)]})
+    ist(state.facet(f).join(), "10,20")
+    let state2 = state.t().replaceExtension(g, [f.of(1), f.of(2)]).apply()
+    ist(state2.facet(f).join(), "1,2,20")
+    let state3 = state2.t().replaceExtension(g, f.of(3)).apply()
+    ist(state3.facet(f).join(), "3,20")
+  })
+
+  it("raises an error on duplicate extension groups", () => {
+    let g = new ExtensionGroup("g"), f = Facet.define<number>()
+    ist.throws(() => EditorState.create({extensions: [g.of(f.of(1)), g.of(f.of(2))]}),
+               /duplicate use of group/i)
+    ist.throws(() => EditorState.create({extensions: g.of(g.of(f.of(1)))}),
+               /duplicate use of group/i)
   })
 
   it("allows facets computed from fields", () => {

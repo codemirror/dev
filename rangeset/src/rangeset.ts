@@ -33,6 +33,7 @@ RangeValue.prototype.startMapMode = RangeValue.prototype.endMapMode = MapMode.Tr
 
 /// A range associates a value with a range of positions.
 export class Range<T extends RangeValue> {
+  /// @internal
   constructor(
     /// The range's start position.
     readonly from: number,
