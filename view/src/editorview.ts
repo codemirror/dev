@@ -455,11 +455,16 @@ export class EditorView {
   static clickAddsSelectionRange = clickAddsSelectionRange
 
   /// A facet that determines which [decorations](#view.Decoration)
-  /// are shown in the view.
+  /// are shown in the view. See also [view
+  /// plugins](#view.EditorView^decorations), which have a separate
+  /// mechanism for providing decorations.
   static decorations = decorations
 
-  /// Facet that provides CSS classes to add to elements identified
-  /// by the given string.
+  /// Create a theme extension. The argument object should map [theme
+  /// selectors](#view.themeClass) to styles, which are (potentially
+  /// nested) [style
+  /// declarations](https://github.com/marijnh/style-mod#documentation)
+  /// providing the CSS styling for the selector.
   static theme(spec: {[name: string]: Style}): Extension {
     let prefix = StyleModule.newName()
     return [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]

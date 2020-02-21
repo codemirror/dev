@@ -4,6 +4,7 @@ import {Facet, Extension} from "../../state"
 /// Enables the panel-managing extension.
 export function panels(): Extension { return [panelPlugin, baseTheme] }
 
+/// Object that describes an active panel.
 export interface Panel {
   /// The element representing this panel.
   dom: HTMLElement,
