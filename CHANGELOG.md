@@ -2,33 +2,33 @@
 
 ### Breaking Changes
 
-Behavior was renamed to [`Facet`](##state.Facet), and works somewhat differently.
+Behavior was renamed to [`Facet`](https://codemirror.net/6/docs/ref/#state.Facet), and works somewhat differently.
 
 The `extension` package no longer exists. Extension-related concepts are now part of the `state` package.
 
 The view no longer has its own extension system. It is entirely configured by state extensions.
 
-[View plugins](##view.ViewPlugin) are specified through a state facet now, and have a simpler interface.
+[View plugins](https://codemirror.net/6/docs/ref/#view.ViewPlugin) are specified through a state facet now, and have a simpler interface.
 
 View plugins may no longer create decorations that significantly impact the height of content, to avoid the cyclic dependency between plugin decorations and the viewport.
 
-[Themes](##view.EditorView^theme) work differently now, using [static CSS classes](##view.themeClass) on DOM elements so that plugins don't have to update their DOM when the editor theme changes.
+[Themes](https://codemirror.net/6/docs/ref/#view.EditorView^theme) work differently now, using [static CSS classes](https://codemirror.net/6/docs/ref/#view.themeClass) on DOM elements so that plugins don't have to update their DOM when the editor theme changes.
 
 Highlighting token types now support a numeric suffix, which replaces the old `typeN` modifiers.
 
-The interface to [syntax extensions](##state.Syntax) and [parse trees](##state.EditorState.tree) changed.
+The interface to [syntax extensions](https://codemirror.net/6/docs/ref/#state.Syntax) and [parse trees](https://codemirror.net/6/docs/ref/#state.EditorState.tree) changed.
 
-The way transaction [annotations](##state.Annotation) work was simplified a bit.
+The way transaction [annotations](https://codemirror.net/6/docs/ref/#state.Annotation) work was simplified a bit.
 
-[Range sets](##rangeset) were rewritten and support a somewhat different interface now.
+[Range sets](https://codemirror.net/6/docs/ref/#rangeset) were rewritten and support a somewhat different interface now.
 
-The way [decorations](##view.Decoration) are created now separates the creation of the decoration value from the creation of the range to which it should apply.
+The way [decorations](https://codemirror.net/6/docs/ref/#view.Decoration) are created now separates the creation of the decoration value from the creation of the range to which it should apply.
 
 ### New features
 
-State facets can provide [decorations](##view.EditorView^decorations) now.
+State facets can provide [decorations](https://codemirror.net/6/docs/ref/#view.EditorView^decorations) now.
 
-Reading DOM layout information and similar things is now done with the [`requestMeasure`](##view.EditorView.requestMeasure) method.
+Reading DOM layout information and similar things is now done with the [`requestMeasure`](https://codemirror.net/6/docs/ref/#view.EditorView.requestMeasure) method.
 
 Facets now explicitly track which fields and other facets they depend on, so that they are recomputed only when necessary.
 
@@ -36,9 +36,9 @@ Any object that has an `extension` property that holds an extension value may no
 
 Overlong lines that are inside the viewport will now be partially hidden to speed up rendering and interaction.
 
-The editor view now has a [`textDirection`](##view.EditorView.textDirection) property telling you whether the main writing direction is left-to-right or right-to-left.
+The editor view now has a [`textDirection`](https://codemirror.net/6/docs/ref/#view.EditorView.textDirection) property telling you whether the main writing direction is left-to-right or right-to-left.
 
-There's now a [`visibleRanges`](##view.EditorView.visibleRanges) property that tells you which part of the viewport is actually going to be drawn, speeding up things like highlighting when there's large amounts of collapsed code in the viewport.
+There's now a [`visibleRanges`](https://codemirror.net/6/docs/ref/#view.EditorView.visibleRanges) property that tells you which part of the viewport is actually going to be drawn, speeding up things like highlighting when there's large amounts of collapsed code in the viewport.
 
 ### Bug fixes
 
