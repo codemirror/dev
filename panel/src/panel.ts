@@ -1,8 +1,8 @@
 import {EditorView, ViewPlugin, PluginField, ViewUpdate, themeClass} from "../../view"
-import {Facet} from "../../state"
+import {Facet, Extension} from "../../state"
 
 /// Enables the panel-managing extension.
-export function panels() { return [panelPlugin, baseTheme] }
+export function panels(): Extension { return [panelPlugin, baseTheme] }
 
 export interface Panel {
   /// The element representing this panel.

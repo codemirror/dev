@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
-import {StateField, Facet, Annotation, EditorSelection, SelectionRange} from "../../state"
+import {StateField, Facet, Annotation, EditorSelection, SelectionRange, Extension} from "../../state"
 import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
@@ -97,7 +97,7 @@ const panelKeymap = Facet.define<Keymap, NormalizedKeymap<Command>>({
 /// Create an extension that enables search/replace functionality.
 /// This needs to be enabled for any of the search-related commands to
 /// work.
-export const search = function(config: SearchConfig) {
+export const search = function(config: SearchConfig): Extension {
   // FIXME make multiple instances of this combine, somehow
   let keys = Object.create(null), panelKeys = Object.create(null)
   if (config.keymap) for (let key of Object.keys(config.keymap)) {

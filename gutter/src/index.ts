@@ -118,7 +118,7 @@ const unfixGutters = Facet.define<boolean, boolean>({
 /// Unless `fixed` is explicitly set to `false`, the gutters are
 /// fixed, meaning they don't scroll along with the content
 /// horizontally.
-export function gutters(config?: {fixed?: boolean}) {
+export function gutters(config?: {fixed?: boolean}): Extension {
   let result = [
     gutterView,
     baseTheme

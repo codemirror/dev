@@ -1,4 +1,4 @@
-import {EditorState, StateField, EditorSelection} from "../../state"
+import {EditorState, StateField, EditorSelection, Extension} from "../../state"
 import {DecorationSet, Decoration, WidgetType, EditorView, themeClass} from "../../view"
 
 const field = StateField.define<DecorationSet>({
@@ -14,7 +14,7 @@ const field = StateField.define<DecorationSet>({
 /// editor. Secondary cursors and selected ranges are drawn with
 /// simple decorations, and might not look the same as the primary
 /// native selection.
-export function multipleSelections() {
+export function multipleSelections(): Extension {
   return [
     EditorState.allowMultipleSelections.of(true),
     field,

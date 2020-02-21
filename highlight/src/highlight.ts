@@ -1,7 +1,7 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "../../view"
-import {EditorState} from "../../state"
+import {EditorState, Extension} from "../../state"
 import {RangeSetBuilder} from "../../rangeset"
 
 const Inherit = 1
@@ -115,7 +115,7 @@ export class TagSystem {
 
   /// Create a highlighter extension for this system, styling the
   /// given tags using the given CSS objects.
-  highlighter(spec: {[tag: string]: Style}) {
+  highlighter(spec: {[tag: string]: Style}): Extension {
     let styling = new Styling(this, spec)
     return [
       ViewPlugin.define(view => new Highlighter(view, this.prop, styling)).decorations(),

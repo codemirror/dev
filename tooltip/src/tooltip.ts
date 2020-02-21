@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {Annotation, Facet, StateField} from "../../state"
+import {Annotation, Facet, StateField, Extension} from "../../state"
 
 const HoverTime = 750, HoverMaxDist = 10
 
@@ -109,7 +109,7 @@ const baseTheme = EditorView.baseTheme({
 /// Supporting extension for displaying tooltips. Allows
 /// [`showTooltip`](#tooltip.showTooltip) to be used to define
 /// tooltips.
-export function tooltips() {
+export function tooltips(): Extension {
   return [tooltipPlugin, baseTheme]
 }
 
@@ -240,7 +240,7 @@ function isOverRange(view: EditorView, from: number, to: number, x: number, y: n
 export function hoverTooltip(
   source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
   options: {hideOnChange?: boolean} = {}
-) {
+): Extension {
   const setHover = Annotation.define<HoverTooltip | null>()
   const hoverState = StateField.define<HoverTooltip | null>({
     create() { return null },

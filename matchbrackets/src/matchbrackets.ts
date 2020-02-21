@@ -1,4 +1,4 @@
-import {combineConfig, EditorState, Facet, StateField} from "../../state"
+import {combineConfig, EditorState, Facet, StateField, Extension} from "../../state"
 import {EditorView, themeClass} from "../../view"
 import {Decoration, DecorationSet} from "../../view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
@@ -72,7 +72,7 @@ const bracketMatchingUnique = [
 /// cursor is next to a bracket, that bracket and the one it matches
 /// are highlighted. Or, when no matching bracket is found, another
 /// highlighting style is used to indicate this.
-export function bracketMatching(config: Config = {}) {
+export function bracketMatching(config: Config = {}): Extension {
   return [bracketMatchingConfig.of(config), bracketMatchingUnique]
 }
 

@@ -1,5 +1,5 @@
 import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {combineConfig, ChangedRange, Facet} from "../../state"
+import {combineConfig, ChangedRange, Facet, Extension} from "../../state"
 import {countColumn} from "../../text"
 import {StyleModule} from "style-mod"
 
@@ -59,7 +59,7 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
 
 /// Returns an extension that installs highlighting of special
 /// characters.
-export function specialChars(config: SpecialCharConfig = {}) {
+export function specialChars(config: SpecialCharConfig = {}): Extension {
   return [specialCharConfig.of(config), specialCharPlugin, styleExt]
 }
 
