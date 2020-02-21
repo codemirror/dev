@@ -13,8 +13,6 @@ export type Command = (target: EditorView) => boolean
 
 const none: readonly any[] = []
 
-export const domEventHandlers = Facet.define<{[key: string]: (view: EditorView, event: any) => boolean}>()
-
 export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boolean>()
 
 export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
@@ -101,10 +99,21 @@ export class ViewPlugin<T extends PluginValue> {
   decorations(get?: (plugin: T) => DecorationSet) {
     return this.provide(pluginDecorations, get || ((value: any) => value.decorations))
   }
+
+  eventHandlers(handlers: {
+    [Type in keyof HTMLElementEventMap]?: (this: T, event: HTMLElementEventMap[Type], view: EditorView) => boolean
+  }): ViewPlugin<T> {
+    return this.provide(domEventHandlers, (value: T) => ({plugin: value, handlers}))
+  }
 }
 
 // FIXME somehow ensure that no replacing decorations end up in here
 export const pluginDecorations = PluginField.define<DecorationSet>()
+
+export const domEventHandlers = PluginField.define<{
+  plugin: PluginValue,
+  handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}
+}>()
 
 export class PluginInstance {
   updateFunc: (update: ViewUpdate) => void

@@ -60,8 +60,8 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 /// returned `true` for a given key, no further handlers are called.
 export const keymap = (map: Keymap) => {
   let set = new NormalizedKeymap(map)
-  return EditorView.domEventHandlers.of({
-    keydown(view: EditorView, event: KeyboardEvent) {
+  return EditorView.domEventHandlers({
+    keydown(event: KeyboardEvent, view: EditorView) {
       let handler = set.get(event)
       return handler ? handler(view) : false
     }

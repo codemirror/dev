@@ -1,7 +1,7 @@
 import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
-import {domEventHandlers, ViewUpdate, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
+import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 import {getSelection} from "./dom"
@@ -14,7 +14,10 @@ export class InputState {
   lastSelectionTime: number = 0
 
   registeredEvents: string[] = []
-  customHandlers: readonly {[key: string]: (view: EditorView, event: any) => boolean}[] = []
+  customHandlers: readonly {
+    plugin: PluginValue,
+    handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}
+  }[] = []
 
   composing = false
 
@@ -50,11 +53,9 @@ export class InputState {
   }
 
   ensureHandlers(view: EditorView) {
-    let handlers = view.state.facet(domEventHandlers)
-    if (handlers == this.customHandlers) return
-    this.customHandlers = handlers
+    let handlers = this.customHandlers = view.pluginField(domEventHandlers)
     for (let set of handlers) {
-      for (let type in set) if (this.registeredEvents.indexOf(type) < 0) {
+      for (let type in set.handlers) if (this.registeredEvents.indexOf(type) < 0) {
         this.registeredEvents.push(type)
         ;(type != "scroll" ? view.contentDOM : view.scrollDOM).addEventListener(type, (event: Event) => {
           if (!eventBelongsToEditor(view, event)) return
@@ -65,11 +66,11 @@ export class InputState {
   }
 
   runCustomHandlers(type: string, view: EditorView, event: Event): boolean {
-    for (let handlers of this.customHandlers) {
-      let handler = handlers[type]
+    for (let set of this.customHandlers) {
+      let handler = set.handlers[type as keyof HTMLElementEventMap] as any
       if (handler) {
         try {
-          if (handler(view, event) || event.defaultPrevented) return true
+          if (handler.call(set.plugin, event, view) || event.defaultPrevented) return true
         } catch (e) {
           console.error(e)
         }
@@ -151,7 +152,7 @@ class MouseSelection {
     this.select()
   }
 
-  up(event: MouseEvent) {
+  up() {
     if (this.dragging == null) this.select()
     this.destroy()
   }
@@ -261,7 +262,7 @@ handlers.keydown = (view, event: KeyboardEvent) => {
   view.inputState.setSelectionOrigin("keyboard")
 }
 
-handlers.touchdown = handlers.touchmove = (view, event: MouseEvent) => {
+handlers.touchdown = handlers.touchmove = view => {
   view.inputState.setSelectionOrigin("pointer")
 }
 

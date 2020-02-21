@@ -8,7 +8,7 @@ import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
-import {ViewUpdate, styleModule, domEventHandlers,
+import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, ViewPlugin, PluginInstance, PluginField,
         decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
@@ -177,7 +177,6 @@ export class EditorView {
     this.viewState.update(update, scrollTo)
     if (!update.empty) this.updatePlugins(update)
     let redrawn = this.docView.update(update)
-    this.inputState.ensureHandlers(this)
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
@@ -201,6 +200,7 @@ export class EditorView {
       for (let plugin of this.plugins)
         if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
       this.plugins = newPlugins
+      this.inputState.ensureHandlers(this)
     } else {
       for (let i = 0; i < this.plugins.length; i++)
         this.plugins[i] = this.plugins[i].update(update)
@@ -426,11 +426,6 @@ export class EditorView {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
   }
 
-  /// Facet that registers [view plugins](#view.ViewPlugin). Usually,
-  /// it is more convenient to use
-  /// [`ViewPlugin.register`](#view.ViewPlugin^register).
-  static plugin = viewPlugin
-
   /// Facet to add a [style
   /// module](https://github.com/marijnh/style-mod#readme) to an editor
   /// view. The view will ensure that the module is registered in its
@@ -442,7 +437,9 @@ export class EditorView {
   /// first such function to return true will be assumed to have handled
   /// that event, and no other handlers or built-in behavior will be
   /// activated for it.
-  static domEventHandlers = domEventHandlers
+  static domEventHandlers(handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}): Extension {
+    return ViewPlugin.define(() => ({})).eventHandlers(handlers)
+  }
 
   /// Facet used to configure whether a given selection drag event
   /// should move or copy the selection. The given predicate will be
