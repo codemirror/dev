@@ -1,3 +1,53 @@
+## 0.4.0 (2020-02-21)
+
+### Breaking Changes
+
+Behavior was renamed to [`Facet`](##state.Facet), and works somewhat differently.
+
+The `extension` package no longer exists. Extension-related concepts are now part of the `state` package.
+
+The view no longer has its own extension system. It is entirely configured by state extensions.
+
+[View plugins](##view.ViewPlugin) are specified through a state facet now, and have a simpler interface.
+
+View plugins may no longer create decorations that significantly impact the height of content, to avoid the cyclic dependency between plugin decorations and the viewport.
+
+[Themes](##view.EditorView^theme) work differently now, using [static CSS classes](##view.themeClass) on DOM elements so that plugins don't have to update their DOM when the editor theme changes.
+
+Highlighting token types now support a numeric suffix, which replaces the old `typeN` modifiers.
+
+The interface to [syntax extensions](##state.Syntax) and [parse trees](##state.EditorState.tree) changed.
+
+The way transaction [annotations](##state.Annotation) work was simplified a bit.
+
+[Range sets](##rangeset) were rewritten and support a somewhat different interface now.
+
+The way [decorations](##view.Decoration) are created now separates the creation of the decoration value from the creation of the range to which it should apply.
+
+### New features
+
+State facets can provide [decorations](##view.EditorView^decorations) now.
+
+Reading DOM layout information and similar things is now done with the [`requestMeasure`](##view.EditorView.requestMeasure) method.
+
+Facets now explicitly track which fields and other facets they depend on, so that they are recomputed only when necessary.
+
+Any object that has an `extension` property that holds an extension value may now be used as an extension.
+
+Overlong lines that are inside the viewport will now be partially hidden to speed up rendering and interaction.
+
+The editor view now has a [`textDirection`](##view.EditorView.textDirection) property telling you whether the main writing direction is left-to-right or right-to-left.
+
+There's now a [`visibleRanges`](##view.EditorView.visibleRanges) property that tells you which part of the viewport is actually going to be drawn, speeding up things like highlighting when there's large amounts of collapsed code in the viewport.
+
+### Bug fixes
+
+Fix issue where mouse dragging would create selections with the the anchor and head reversed.
+
+Make code folding behave better when the folded node doesn't start on the same line as the actual fold.
+
+Fix a number of issues that would make parsing big files slow (or even lock up entirely).
+
 ## 0.3.0 (2019-11-29)
 
 ### Breaking changes
