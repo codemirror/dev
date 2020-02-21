@@ -41,23 +41,24 @@ class SearchState {
   constructor(readonly query: Query, readonly panel: readonly ((view: EditorView) => Panel)[]) {}
 }
 
-const matchMark = Decoration.mark({class: themeClass("searchmatch")}),
-      selectedMatchMark = Decoration.mark({class: themeClass("searchmatch.selected")})
+const matchMark = Decoration.mark({class: themeClass("searchMatch")}),
+      selectedMatchMark = Decoration.mark({class: themeClass("searchMatch.selected")})
 
 const searchHighlighter = ViewPlugin.fromClass(class {
   decorations: DecorationSet
 
   constructor(readonly view: EditorView) {
-    this.decorations = this.highlight(view.state.field(searchState).query)
+    this.decorations = this.highlight(view.state.field(searchState))
   }
 
   update(update: ViewUpdate) {
     let state = update.state.field(searchState)
     if (state != update.prevState.field(searchState) || update.docChanged || update.selectionSet)
-      this.decorations = this.highlight(state.query)
+      this.decorations = this.highlight(state)
   }
 
-  highlight(query: Query) {
+  highlight({query, panel}: SearchState) {
+    if (!panel.length || !query.valid) return Decoration.none
     let state = this.view.state, viewport = this.view.viewport
     let cursor = query.cursor(state.doc, Math.max(0, viewport.from - query.search.length),
                               Math.min(viewport.to + query.search.length, state.doc.length))
