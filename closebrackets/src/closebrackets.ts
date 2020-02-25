@@ -5,21 +5,22 @@ import {codePointAt, fromCodePoint, minPairCodePoint} from "../../text"
 import {keyName} from "w3c-keyname"
 
 /// Configures bracket closing behavior for a syntax (via
-/// [`languageData`](#state.languageData)).
-export interface CloseBracketData {
+/// [`languageData`](#state.languageData)) using the `"closeBrackets"`
+/// identifier.
+export interface CloseBracketConfig {
   /// The opening brackets to close. Defaults to `["(", "[", "{", "'",
   /// '"']`. Brackets may be single characters or a triple of quotes
   /// (as in `"''''"`).
-  closeBrackets?: string[],
+  brackets?: string[],
   /// Characters in front of which newly opened brackets are
   /// automatically closed. Closing always happens in front of
   /// whitespace. Defaults to `")]}'\":;>"`.
-  closeBracketsBefore?: string
+  before?: string
 }
 
-const defaults = {
-  closeBrackets: ["(", "[", "{", "'", '"'],
-  closeBracketsBefore: ")]}'\":;>"
+const defaults: Required<CloseBracketConfig> = {
+  brackets: ["(", "[", "{", "'", '"'],
+  before: ")]}'\":;>"
 }
 
 /// Extension to enable bracket-closing behavior. When a closeable
@@ -38,9 +39,7 @@ function closing(ch: number) {
 }
 
 function config(state: EditorState, pos: number) {
-  let syntax = state.facet(EditorState.syntax)
-  if (syntax.length == 0) return defaults
-  return syntax[0].languageDataAt<CloseBracketData>(state, pos)
+  return state.languageDataAt<CloseBracketConfig>("closeBrackets", pos)[0] || defaults
 }
 
 function keydown(event: KeyboardEvent, view: EditorView) {
@@ -65,7 +64,7 @@ function keydown(event: KeyboardEvent, view: EditorView) {
 /// Exported mostly for testing purposes.
 export function handleBackspace(state: EditorState) {
   let conf = config(state, state.selection.primary.head)
-  let tokens = conf.closeBrackets || defaults.closeBrackets
+  let tokens = conf.brackets || defaults.brackets
   let tr = state.t(), dont = null
   tr.forEachRange(range => {
     if (!range.empty) return dont = range
@@ -85,12 +84,12 @@ export function handleBackspace(state: EditorState) {
 /// exported mostly for testing.
 export function handleInsertion(state: EditorState, ch: string): Transaction | null {
   let conf = config(state, state.selection.primary.head)
-  let tokens = conf.closeBrackets || defaults.closeBrackets
+  let tokens = conf.brackets || defaults.brackets
   for (let tok of tokens) {
     let closed = closing(codePointAt(tok, 0))
     if (ch == tok)
       return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1) 
-        : handleOpen(state, tok, closed, conf.closeBracketsBefore || defaults.closeBracketsBefore)
+        : handleOpen(state, tok, closed, conf.before || defaults.before)
     if (ch == closed)
       return handleClose(state, tok, closed)
   }
@@ -125,7 +124,7 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
   return dont ? null : tr.scrollIntoView()
 }
 
-function handleClose(state: EditorState, open: string, close: string) {
+function handleClose(state: EditorState, _open: string, close: string) {
   let tr = state.t(), dont = null
   tr.forEachRange(range => {
     if (range.empty && close == nextChar(state.doc, range.head))

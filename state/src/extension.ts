@@ -31,7 +31,9 @@ export class Annotation<T> {
 /// associate information with the language. Different extension might
 /// use different properties from this object (which they typically
 /// export as an interface).
-export const languageData = new NodeProp<{}>()
+export const languageData = new NodeProp<{[key: string]: any}>()
+
+export const addLanguageData = Facet.define<{type: NodeType} & {[key: string]: any}>()
 
 /// Syntax [parsing services](#state.EditorState^syntax) must provide
 /// this interface.
@@ -55,12 +57,8 @@ export interface Syntax {
   /// The node type at the root of trees produced by this syntax.
   docNodeType: NodeType
 
-  /// Return the language data object for the given position. This'll
-  /// usually be the be the data for the grammar's top node, but with
-  /// nested grammars it may be the data of some nested grammar.
-  languageDataAt<Interface = any>(state: EditorState, pos: number): Interface
+  /// Return the document node type for the given position. This'll
+  /// usually be the be the grammar's top node, but with nested
+  /// grammars it may be the type of some nested document.
+  docNodeTypeAt(state: EditorState, pos: number): NodeType
 }
-
-// FIXME add a view plugin that schedules background parsing
-
-// FIXME add a way to be notified when the document is fully parsed

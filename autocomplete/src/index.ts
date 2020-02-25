@@ -20,10 +20,11 @@ export interface Completion {
 }
 
 export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | Promise<CompletionResult> {
-  let syntax = state.facet(EditorState.syntax)
-  if (syntax.length == 0) return {items: []}
-  let {completeAt} = syntax[0].languageDataAt<AutocompleteData>(state, pos)
-  return completeAt ? completeAt(state, pos) : {items: []}
+  let found = state.languageDataAt<AutocompleteData>("autocomplete", pos).map(compl => compl.completeAt(state, pos))
+  if (found.length <= 1) return found.length ? found[0] : {items: []}
+  return found.some(r => (r as any).then) ? Promise.all(found.map(r => Promise.resolve(r))).then(results => {
+    return {items: results.reduce((list, {items}) => list.concat(items), [] as Completion[])}
+  }) : {items: found.reduce((list, r) => list.concat((r as CompletionResult).items), [] as Completion[])}
 }
 
 export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<Completion>) {

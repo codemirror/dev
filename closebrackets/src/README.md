@@ -1,4 +1,4 @@
-@CloseBracketData
+@CloseBracketConfig
 
 @closeBrackets
 

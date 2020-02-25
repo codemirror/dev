@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {Tree} from "lezer-tree"
 import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax, allowMultipleSelections} from "./extension"
+import {Syntax, allowMultipleSelections, languageData, addLanguageData} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
@@ -202,9 +202,39 @@ export class EditorState {
     return syntax.length ? syntax[0].getTree(this) : Tree.empty
   }
 
+  /// A facet used to register extra [language
+  /// data](#state.EditorState.languageDataAt) with a language. Values
+  /// are objects with the target [document
+  /// type](#state.Syntax.topNodeType) in their `type` property, and any
+  /// associated data in other properties.
+  static addLanguageData = addLanguageData
+
+  /// Find the values for a given language data field, either provided
+  /// by the [syntax](#state.languageData) or through the
+  /// [`addLanguageData`](#state.EditorState^addLanguageData) facet,
+  /// for the [document type](#state.Syntax.docNodeTypeAt) at the
+  /// given position. Values provided by the facet, in precedence
+  /// order, will appear before those provided by the syntax.
+  languageDataAt<T>(name: string, pos: number): readonly T[] {
+    let syntax = this.facet(EditorState.syntax)
+    if (syntax.length == 0) return none
+    let values: T[] | null = null
+    let type = syntax[0].docNodeTypeAt(this, pos)
+    for (let added of this.facet(addLanguageData)) {
+      if (added.type == type && Object.prototype.hasOwnProperty.call(added, name))
+        (values || (values = [])).push(added[name])
+    }
+    let langData = type.prop(languageData)
+    if (langData && Object.prototype.hasOwnProperty.call(langData, name))
+      (values || (values = [])).push(langData[name])
+    return values || none
+  }
+
   /// A facet that registers a code folding service. When called
   /// with the extent of a line, it'll return a range object when a
   /// foldable that starts on that line (but continues beyond it) can
   /// be found.
   static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 }
+
+const none: any[] = []

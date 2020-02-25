@@ -1,5 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Syntax, languageData, Extension, Annotation} from "../../state"
+import {EditorState, StateField, Syntax, Extension, Annotation} from "../../state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "../../view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
@@ -128,9 +128,8 @@ export class StreamSyntax implements Syntax {
 
   get docNodeType() { return typeArray[this.parser.docType] }
 
-  languageDataAt<Interface = any>() {
-    return (typeArray[this.parser.docType].prop(languageData) || {}) as Interface
-  }
+  // FIXME allow modes to extend this?
+  docNodeTypeAt() { return typeArray[this.parser.docType] }
 }
 
 const CacheStepShift = 6, CacheStep = 1 << CacheStepShift
