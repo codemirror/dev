@@ -222,14 +222,19 @@ export class EditorView {
         console.warn("Viewport failed to stabilize")
         break
       }
-      let measured = measuring.map(m => m.read(this))
+      let measured = measuring.map(m => {
+        try { return m.read(this) }
+        catch(e) { console.error(e); return BadMeasure }
+      })
       let update = new ViewUpdate(this, this.state)
       update.flags |= changed
       this.updateState = UpdateState.Updating
       this.updatePlugins(update)
       if (changed) this.docView.update(update)
-      for (let i = 0; i < measuring.length; i++) measuring[i].write(measured[i], this)
-
+      for (let i = 0; i < measuring.length; i++) if (measured[i] != BadMeasure) {
+        try { measuring[i].write(measured[i], this) }
+        catch(e) { console.error(e) }
+      }
       if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
     }
 
@@ -508,3 +513,5 @@ function handleResize() {
     if (docView) docView.editorView.requestMeasure()
   }
 }
+
+const BadMeasure = {}
