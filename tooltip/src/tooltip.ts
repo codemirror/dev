@@ -82,13 +82,13 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
         continue
       }
       let width = size.right - size.left, height = size.bottom - size.top
-      let align = pos.left + width < measured.innerWidth
+      let left = this.view.textDirection == "ltr" ? Math.min(pos.left, measured.innerWidth - width) : Math.max(0, pos.left - width)
       let above = !!tooltip.above
       if (!tooltip.strictSide &&
           (above ? pos.top - (size.bottom - size.top) < 0 : pos.bottom + (size.bottom - size.top) > measured.innerHeight))
         above = !above
-      tooltip.dom.style.left = ((align ? pos.left : measured.innerWidth - width) - editor.left) + "px"
       tooltip.dom.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
+      tooltip.dom.style.left = (left - editor.left) + "px"
     }
   }
 
