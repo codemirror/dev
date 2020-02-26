@@ -26,11 +26,11 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "lezer": "^0.7.0",
-    "lezer-css": "^0.7.0",
-    "lezer-html": "^0.7.0",
-    "lezer-javascript": "^0.7.0",
-    "lezer-tree": "^0.7.0",
+    "lezer": "^0.8.1",
+    "lezer-css": "^0.8.0",
+    "lezer-html": "^0.8.0",
+    "lezer-javascript": "^0.8.0",
+    "lezer-tree": "^0.8.0",
     "style-mod": "^2.2.0",
     "w3c-keyname": "^2.1.1"
   },

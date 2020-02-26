@@ -54,10 +54,10 @@ export class LezerSyntax implements Syntax {
     return field.parse!.pos < upto ? null : field.stopParse()
   }
 
-  get docNodeType() { return this.parser.group.types[1] }
+  get docNodeType() { return this.parser.topType }
 
   docNodeTypeAt(state: EditorState, pos: number) {
-    let type = this.parser.group.types[1]
+    let type = this.docNodeType
     if (this.parser.hasNested) {
       let tree = this.getTree(state)
       let target: Subtree | null = tree.resolve(pos)
