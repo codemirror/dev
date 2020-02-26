@@ -79,6 +79,7 @@ export abstract class Text {
 
   /// Retrieve the text between the given points.
   slice(from: number, to?: number, lineSeparator: string = "\n"): string {
+    if (from == to) return ""
     return this.sliceLines(from, to).join(lineSeparator)
   }
 

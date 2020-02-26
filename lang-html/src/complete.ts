@@ -1,0 +1,483 @@
+import {EditorState, Text} from "../../state"
+import {AutocompleteContext} from "../../autocomplete"
+import {Subtree} from "lezer-tree"
+
+type AttrSpec = {[attrName: string]: null | readonly string[]}
+type TagSpec = {[tagName: string]: {attrs?: AttrSpec, children?: readonly string[]}}
+
+const Targets = ["_blank", "_self", "_top", "_parent"]
+const Charsets = ["ascii", "utf-8", "utf-16", "latin1", "latin1"]
+const Methods = ["get", "post", "put", "delete"]
+const Encs = ["application/x-www-form-urlencoded", "multipart/form-data", "text/plain"]
+const Bool = ["true", "false"]
+
+const S: TagSpec = {} // Empty tag spec
+
+const Tags: TagSpec = {
+  a: {
+    attrs: {
+      href: null, ping: null, type: null,
+      media: null,
+      target: Targets,
+      hreflang: null
+    }
+  },
+  abbr: S,
+  acronym: S,
+  address: S,
+  applet: S,
+  area: {
+    attrs: {
+      alt: null, coords: null, href: null, target: null, ping: null,
+      media: null, hreflang: null, type: null,
+      shape: ["default", "rect", "circle", "poly"]
+    }
+  },
+  article: S,
+  aside: S,
+  audio: {
+    attrs: {
+      src: null, mediagroup: null,
+      crossorigin: ["anonymous", "use-credentials"],
+      preload: ["none", "metadata", "auto"],
+      autoplay: ["autoplay"],
+      loop: ["loop"],
+      controls: ["controls"]
+    }
+  },
+  b: S,
+  base: { attrs: { href: null, target: Targets } },
+  basefont: S,
+  bdi: S,
+  bdo: S,
+  big: S,
+  blockquote: { attrs: { cite: null } },
+  body: S,
+  br: S,
+  button: {
+    attrs: {
+      form: null, formaction: null, name: null, value: null,
+      autofocus: ["autofocus"],
+      disabled: ["autofocus"],
+      formenctype: Encs,
+      formmethod: Methods,
+      formnovalidate: ["novalidate"],
+      formtarget: Targets,
+      type: ["submit", "reset", "button"]
+    }
+  },
+  canvas: { attrs: { width: null, height: null } },
+  caption: S,
+  center: S,
+  cite: S,
+  code: S,
+  col: { attrs: { span: null } },
+  colgroup: { attrs: { span: null } },
+  command: {
+    attrs: {
+      type: ["command", "checkbox", "radio"],
+      label: null, icon: null, radiogroup: null, command: null, title: null,
+      disabled: ["disabled"],
+      checked: ["checked"]
+    }
+  },
+  data: { attrs: { value: null } },
+  datagrid: { attrs: { disabled: ["disabled"], multiple: ["multiple"] } },
+  datalist: { attrs: { data: null } },
+  dd: S,
+  del: { attrs: { cite: null, datetime: null } },
+  details: { attrs: { open: ["open"] } },
+  dfn: S,
+  dir: S,
+  div: S,
+  dl: S,
+  dt: S,
+  em: S,
+  embed: { attrs: { src: null, type: null, width: null, height: null } },
+  eventsource: { attrs: { src: null } },
+  fieldset: { attrs: { disabled: ["disabled"], form: null, name: null } },
+  figcaption: S,
+  figure: S,
+  font: S,
+  footer: S,
+  form: {
+    attrs: {
+      action: null, name: null,
+      "accept-charset": Charsets,
+      autocomplete: ["on", "off"],
+      enctype: Encs,
+      method: Methods,
+      novalidate: ["novalidate"],
+      target: Targets
+    }
+  },
+  frame: S,
+  frameset: S,
+  h1: S, h2: S, h3: S, h4: S, h5: S, h6: S,
+  head: {
+    children: ["title", "base", "link", "style", "meta", "script", "noscript", "command"]
+  },
+  header: S,
+  hgroup: S,
+  hr: S,
+  html: {
+    attrs: { manifest: null },
+    children: ["head", "body"]
+  },
+  i: S,
+  iframe: {
+    attrs: {
+      src: null, srcdoc: null, name: null, width: null, height: null,
+      sandbox: ["allow-top-navigation", "allow-same-origin", "allow-forms", "allow-scripts"],
+      seamless: ["seamless"]
+    }
+  },
+  img: {
+    attrs: {
+      alt: null, src: null, ismap: null, usemap: null, width: null, height: null,
+      crossorigin: ["anonymous", "use-credentials"]
+    }
+  },
+  input: {
+    attrs: {
+      alt: null, dirname: null, form: null, formaction: null,
+      height: null, list: null, max: null, maxlength: null, min: null,
+      name: null, pattern: null, placeholder: null, size: null, src: null,
+      step: null, value: null, width: null,
+      accept: ["audio/*", "video/*", "image/*"],
+      autocomplete: ["on", "off"],
+      autofocus: ["autofocus"],
+      checked: ["checked"],
+      disabled: ["disabled"],
+      formenctype: Encs,
+      formmethod: Methods,
+      formnovalidate: ["novalidate"],
+      formtarget: Targets,
+      multiple: ["multiple"],
+      readonly: ["readonly"],
+      required: ["required"],
+      type: ["hidden", "text", "search", "tel", "url", "email", "password", "datetime", "date", "month",
+             "week", "time", "datetime-local", "number", "range", "color", "checkbox", "radio",
+             "file", "submit", "image", "reset", "button"]
+    }
+  },
+  ins: { attrs: { cite: null, datetime: null } },
+  kbd: S,
+  keygen: {
+    attrs: {
+      challenge: null, form: null, name: null,
+      autofocus: ["autofocus"],
+      disabled: ["disabled"],
+      keytype: ["RSA"]
+    }
+  },
+  label: { attrs: { for: null, form: null } },
+  legend: S,
+  li: { attrs: { value: null } },
+  link: {
+    attrs: {
+      href: null, type: null,
+      hreflang: null,
+      media: null,
+      sizes: ["all", "16x16", "16x16 32x32", "16x16 32x32 64x64"]
+    }
+  },
+  map: { attrs: { name: null } },
+  mark: S,
+  menu: { attrs: { label: null, type: ["list", "context", "toolbar"] } },
+  meta: {
+    attrs: {
+      content: null,
+      charset: Charsets,
+      name: ["viewport", "application-name", "author", "description", "generator", "keywords"],
+      "http-equiv": ["content-language", "content-type", "default-style", "refresh"]
+    }
+  },
+  meter: { attrs: { value: null, min: null, low: null, high: null, max: null, optimum: null } },
+  nav: S,
+  noframes: S,
+  noscript: S,
+  object: {
+    attrs: {
+      data: null, type: null, name: null, usemap: null, form: null, width: null, height: null,
+      typemustmatch: ["typemustmatch"]
+    }
+  },
+  ol: { attrs: { reversed: ["reversed"], start: null, type: ["1", "a", "A", "i", "I"] } },
+  optgroup: { attrs: { disabled: ["disabled"], label: null } },
+  option: { attrs: { disabled: ["disabled"], label: null, selected: ["selected"], value: null } },
+  output: { attrs: { for: null, form: null, name: null } },
+  p: S,
+  param: { attrs: { name: null, value: null } },
+  pre: S,
+  progress: { attrs: { value: null, max: null } },
+  q: { attrs: { cite: null } },
+  rp: S,
+  rt: S,
+  ruby: S,
+  s: S,
+  samp: S,
+  script: {
+    attrs: {
+      type: ["text/javascript"],
+      src: null,
+      async: ["async"],
+      defer: ["defer"],
+      charset: Charsets
+    }
+  },
+  section: S,
+  select: {
+    attrs: {
+      form: null, name: null, size: null,
+      autofocus: ["autofocus"],
+      disabled: ["disabled"],
+      multiple: ["multiple"]
+    }
+  },
+  small: S,
+  source: { attrs: { src: null, type: null, media: null } },
+  span: S,
+  strike: S,
+  strong: S,
+  style: {
+    attrs: {
+      type: ["text/css"],
+      media: null,
+      scoped: null
+    }
+  },
+  sub: S,
+  summary: S,
+  sup: S,
+  table: S,
+  tbody: S,
+  td: { attrs: { colspan: null, rowspan: null, headers: null } },
+  textarea: {
+    attrs: {
+      dirname: null, form: null, maxlength: null, name: null, placeholder: null,
+      rows: null, cols: null,
+      autofocus: ["autofocus"],
+      disabled: ["disabled"],
+      readonly: ["readonly"],
+      required: ["required"],
+      wrap: ["soft", "hard"]
+    }
+  },
+  tfoot: S,
+  th: { attrs: { colspan: null, rowspan: null, headers: null, scope: ["row", "col", "rowgroup", "colgroup"] } },
+  thead: S,
+  time: { attrs: { datetime: null } },
+  title: S,
+  tr: S,
+  track: {
+    attrs: {
+      src: null, label: null, default: null,
+      kind: ["subtitles", "captions", "descriptions", "chapters", "metadata"],
+      srclang: null
+    }
+  },
+  tt: S,
+  u: S,
+  ul: S,
+  var: S,
+  video: {
+    attrs: {
+      src: null, poster: null, width: null, height: null,
+      crossorigin: ["anonymous", "use-credentials"],
+      preload: ["auto", "metadata", "none"],
+      autoplay: ["autoplay"],
+      mediagroup: ["movie"],
+      muted: ["muted"],
+      controls: ["controls"]
+    }
+  },
+  wbr: S
+}
+
+const GlobalAttrs: AttrSpec = {
+  accesskey: null,
+  class: null,
+  contenteditable: Bool,
+  contextmenu: null,
+  dir: ["ltr", "rtl", "auto"],
+  draggable: ["true", "false", "auto"],
+  dropzone: ["copy", "move", "link", "string:", "file:"],
+  hidden: ["hidden"],
+  id: null,
+  inert: ["inert"],
+  itemid: null,
+  itemprop: null,
+  itemref: null,
+  itemscope: ["itemscope"],
+  itemtype: null,
+  lang: ["en", "es"],
+  spellcheck: Bool,
+  autocorrect: Bool,
+  autocapitalize: Bool,
+  style: null,
+  tabindex: null,
+  title: null,
+  translate: ["yes", "no"],
+  onclick: null,
+  rel: ["stylesheet", "alternate", "author", "bookmark", "help", "license", "next", "nofollow", "noreferrer", "prefetch", "prev", "search", "tag"],
+  role: "alert application article banner button cell checkbox Complementary contentinfo dialog document feed figure form grid gridcell heading img List listbox Listitem Main Navigation Region row rowgroup search switch tab table tabpanel textbox timer".split(" "),
+  "aria-activedescendant": null,
+  "aria-atomic": Bool,
+  "aria-autocomplete": ["inline", "list", "both", "none"],
+  "aria-busy": Bool,
+  "aria-checked": ["true", "false", "mixed", "undefined"],
+  "aria-controls": null,
+  "aria-describedby": null,
+  "aria-disabled": Bool,
+  "aria-dropeffect": null,
+  "aria-expanded": ["true", "false", "undefined"],
+  "aria-flowto": null,
+  "aria-grabbed": ["true", "false", "undefined"],
+  "aria-haspopup": Bool,
+  "aria-hidden": Bool,
+  "aria-invalid": ["true", "false", "grammar", "spelling"],
+  "aria-label": null,
+  "aria-labelledby": null,
+  "aria-level": null,
+  "aria-live": ["off", "polite", "assertive"],
+  "aria-multiline": Bool,
+  "aria-multiselectable": Bool,
+  "aria-owns": null,
+  "aria-posinset": null,
+  "aria-pressed": ["true", "false", "mixed", "undefined"],
+  "aria-readonly": Bool,
+  "aria-relevant": null,
+  "aria-required": Bool,
+  "aria-selected": ["true", "false", "undefined"],
+  "aria-setsize": null,
+  "aria-sort": ["ascending", "descending", "none", "other"],
+  "aria-valuemax": null,
+  "aria-valuemin": null,
+  "aria-valuenow": null,
+  "aria-valuetext": null
+}
+
+const AllTags = Object.keys(Tags), GlobalAttrNames = Object.keys(GlobalAttrs)
+
+function elementName(doc: Text, tree: Subtree) {
+  let tag = tree.firstChild
+  if (!tag || tag.name != "OpenTag") return ""
+  let name = tag.iterate({enter: (type, from, to) => {
+    return type.name == "TagName" ? doc.slice(from, to) : undefined
+  }})
+  return name || ""
+}
+
+function findParentElement(tree: Subtree, skip = false) {
+  for (let cur = tree.parent; cur; cur = cur.parent) if (cur.name == "Element") {
+    if (skip) skip = false
+    else return cur
+  }
+  return null
+}
+
+function allowedChildren(doc: Text, tree: Subtree) {
+  let parent = findParentElement(tree, true)
+  let parentInfo = parent ? Tags[elementName(doc, parent)] : null
+  return parentInfo?.children || AllTags
+}
+
+function openTags(doc: Text, tree: Subtree) {
+  let open = []
+  for (let parent: Subtree | null = tree; parent = findParentElement(parent);) {
+    let tagName = elementName(doc, parent)
+    if (tagName && open.indexOf(tagName) < 0) open.push(tagName)
+  }
+  return open
+}
+
+function completeTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
+  let text = state.doc.slice(from, to).toLowerCase()
+  let result = []
+  for (let tagName of allowedChildren(state.doc, tree))
+    if (context.filter(tagName, text))
+      result.push({label: tagName, start: from, end: to})
+  return result
+}
+
+function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
+  let result = [], text = state.doc.slice(from, to).toLowerCase()
+  let end = /\s*>/.test(state.doc.slice(to, to + 5)) ? "" : ">"
+  for (let open of openTags(state.doc, tree))
+    if (context.filter(open, text))
+      result.push({label: open, start: from, end: to, apply: open + end})
+  return result
+}
+
+function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
+  let result = []
+  for (let tagName of allowedChildren(state.doc, tree))
+    result.push({label: "<" + tagName, start: pos, end: pos})
+  for (let open of openTags(state.doc, tree))
+    result.push({label: "</" + open + ">", start: pos, end: pos})
+  return result
+}
+
+function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
+  let result = []
+  let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
+  let base = state.doc.slice(from, to).toLowerCase()
+  for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
+    if (context.filter(attrName, base))
+      result.push({label: attrName, start: from, end: to})
+  }
+  return result
+}
+
+function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
+  let attrName = tree.parent?.iterate({
+    enter(type, from, to) {
+      return type.name == "AttributeName" ? state.doc.slice(from, to) : undefined
+    },
+    from: tree.start,
+    to: tree.parent.start
+  })
+  let result = []
+  if (attrName) {
+    let options: readonly string[] | null | undefined = GlobalAttrs[attrName]
+    if (!options) {
+      let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
+      options = info?.attrs && info.attrs[attrName]
+    }
+    if (options) {
+      let base = state.doc.slice(from, to).toLowerCase(), quoteStart = '"', quoteEnd = '"'
+      if (/^['"]/.test(base)) {
+        quoteStart = ""
+        quoteEnd = state.doc.slice(to, to + 1) == base[0] ? "" : base[0]
+        base = base.slice(1)
+        from++
+      }
+      for (let value of options) {
+        if (context.filter(value, base))
+          result.push({label: value, start: from, end: to, apply: quoteStart + value + quoteEnd})
+      }
+    }
+  }
+  return result
+}
+
+export function completeHTML(state: EditorState, pos: number, context: AutocompleteContext) {
+  let tree = state.tree.resolve(pos, -1)
+  if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
+    return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos, context)
+      : completeTag(state, tree, tree.start, pos, context)
+  } else if (tree.name == "StartTag") {
+    return completeTag(state, tree, pos, pos, context)
+  } else if (tree.name == "StartCloseTag") {
+    return completeCloseTag(state, tree, pos, pos, context)
+  } else if (context.explicit && tree.name == "Element" || tree.name == "Text" || tree.name == "Document") {
+    return completeStartTag(state, tree, pos)
+  } else if (context.explicit && (tree.name == "OpenTag" || tree.name == "SelfClosingTag") || tree.name == "AttributeName") {
+    return completeAttrName(state, tree, tree.name == "AttributeName" ? tree.start : pos, pos, context)
+  } else if (tree.name == "Is" || tree.name == "AttributeValue" || tree.name == "UnquotedAttributeValue") {
+    return completeAttrValue(state, tree, tree.name == "Is" ? pos : tree.start, pos, context)
+  } else {
+    return []
+  }
+}

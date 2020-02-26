@@ -10,6 +10,9 @@ const statementIndent = continuedIndent({except: /^{/})
 /// parser](https://github.com/lezer-parser/javascript), extended with
 /// highlighting and indentation information.
 export const javascriptSyntax = new LezerSyntax(parser.withProps(
+  languageData.add({
+    Script: {closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}}
+  }),
   indentNodeProp.add(type => {
     if (type.name == "IfStatement") return continuedIndent({except: /^({|else\b)/})
     if (type.name == "TryStatement") return continuedIndent({except: /^({|catch|finally)\b/})
@@ -24,9 +27,6 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
   }),
   foldNodeProp.add({
     Block(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} }
-  }),
-  languageData.add({
-    Script: {closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}}
   }),
   styleTags({
     "get set async static": "modifier",
