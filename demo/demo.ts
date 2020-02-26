@@ -10,7 +10,7 @@ import {closeBrackets} from "../closebrackets"
 import {specialChars} from "../special-chars"
 import {multipleSelections} from "../multiple-selections"
 import {search, defaultSearchKeymap} from "../search"
-import {autocomplete, startCompletion, sortAndFilterCompletion} from "../autocomplete"
+import {autocomplete, startCompletion} from "../autocomplete"
 
 import {html} from "../lang-html"
 import {defaultHighlighter} from "../highlight"
@@ -43,33 +43,7 @@ let state = EditorState.create({doc: `<script>
   defaultHighlighter,
   bracketMatching(),
   closeBrackets,
-  autocomplete({completeAt(state: EditorState, pos: number) {
-    return new Promise(resolve => {
-      let tree = state.tree.resolve(pos, -1)
-      let start = pos
-      // FIXME for StartCloseTag, only suggest open tags
-      // FIXME also "Text" if previous sibling is StartCloseTag
-      if (tree.name == "TagName" || tree.name == "MismatchedTagName") start = tree.start
-      else if (tree.name != "StartTag" && tree.name != "StartCloseTag") return resolve({items: []})
-      // FIXME nvda in einer VM ausprobieren
-      let items = [
-        "a", "abbr", "address", "alu", "area", "article", "aside", "audio", "b",
-        "base", "bdi", "bdo", "blockquote", "body", "br", "button", "canvas",
-        "caption", "cite", "code", "col", "colgroup", "command", "data", "datalist",
-        "dd", "del", "details", "dfn", "div", "dl", "dt", "em", "embed", "fieldset",
-        "figcaption", "figure", "footer", "form", "fram", "h1", "h2", "h3", "h4",
-        "h5", "h6", "head", "header", "hr", "html", "i", "iframe", "img", "input",
-        "ins", "kbd", "keygen", "label", "las", "legend", "li", "link", "main",
-        "map", "mark", "math", "menu", "meta", "meter", "nav", "noscript", "object",
-        "ol", "optgroup", "option", "output", "p", "param", "pre", "progress", "q",
-        "re", "rp", "rt", "ruby", "s", "samp", "script", "section", "select",
-        "small", "source", "span", "strong", "style", "sub", "summary", "sup",
-        "svg", "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "time",
-        "title", "tr", "track", "u", "ul", "var", "video", "wbr", "yp"
-      ].map(s => ({label: s, apply: s + ">", start: start, end: pos}))
-      setTimeout(() => resolve({items: sortAndFilterCompletion(state.doc.slice(start, pos), items)}), 100)
-    })
-  }}),
+  autocomplete(),
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,

@@ -4,12 +4,26 @@ import {combineConfig, Annotation, EditorSelection, EditorState,
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
-export interface AutocompleteData {
-  completeAt: (state: EditorState, pos: number) => CompletionResult | Promise<CompletionResult>
+export enum FilterType { Start, Fuzzy }
+
+export class AutocompleteContext {
+  constructor(readonly explicit: boolean,
+              readonly filterType: FilterType) {}
+
+  filter(completion: string, text: string) {
+    if (this.filterType == FilterType.Start)
+      return completion.length > text.length && completion.slice(0, text.length) == text
+    else
+      return completion.length > text.length && completion.indexOf(text) > -1
+  }
 }
 
-export interface CompletionResult {
-  items: readonly Completion[]
+export type Autocompleter =
+  (state: EditorState, pos: number, context: AutocompleteContext) => readonly Completion[] | Promise<readonly Completion[]>
+
+export interface AutocompleteConfig {
+  override: Autocompleter | null
+  filterType: FilterType
 }
 
 export interface Completion {
@@ -19,41 +33,28 @@ export interface Completion {
   apply?: string | ((view: EditorView) => void)
 }
 
-export function completeFromSyntax(state: EditorState, pos: number): CompletionResult | Promise<CompletionResult> {
-  let found = state.languageDataAt<AutocompleteData>("autocomplete", pos).map(compl => compl.completeAt(state, pos))
-  if (found.length <= 1) return found.length ? found[0] : {items: []}
-  return found.some(r => (r as any).then) ? Promise.all(found.map(r => Promise.resolve(r))).then(results => {
-    return {items: results.reduce((list, {items}) => list.concat(items), [] as Completion[])}
-  }) : {items: found.reduce((list, r) => list.concat((r as CompletionResult).items), [] as Completion[])}
+function retrieveCompletions(state: EditorState, pos: number, context: AutocompleteContext): Promise<readonly Completion[]> {
+  let found = state.languageDataAt<Autocompleter>("autocomplete", pos)
+    .map(compl => Promise.resolve(compl(state, pos, context)))
+  return found.length == 1 ? found[0] : found.length == 0 ? Promise.resolve([]) :
+    Promise.all(found).then(results => results.reduce((list, items) => list.concat(items), [] as Completion[]))
 }
 
-export function sortAndFilterCompletion(substr: string, items: ReadonlyArray<Completion>) {
-  const startMatch = [], inMatch = []
-  for (const item of items) {
-    if (item.label == substr) continue
-    // FIXME: separate key
-    else if (item.label.startsWith(substr)) startMatch.push(item)
-    else if (item.label.includes(substr)) inMatch.push(item)
-  }
-  return startMatch.concat(inMatch)
-}
-
-const autocompleteConfig = Facet.define<Partial<AutocompleteData>, AutocompleteData>({
+const autocompleteConfig = Facet.define<Partial<AutocompleteConfig>, AutocompleteConfig>({
   combine(configs) {
     return combineConfig(configs, {
-      completeAt(state: EditorState, pos: number) {
-        return completeFromSyntax(state, pos) || {start: pos, items: []}
-      }
+      override: null,
+      filterType: FilterType.Start
     })
   }
 })
 
-export function autocomplete(config: Partial<AutocompleteData> = {}): Extension {
+export function autocomplete(config: Partial<AutocompleteConfig> = {}): Extension {
   return [
     activeCompletion,
     autocompleteConfig.of(config),
     autocompletePlugin,
-    Precedence.Fallback.set(style),
+    style,
     tooltips(),
     Precedence.Override.set(keymap({
       ArrowDown: moveCompletion("down"),
@@ -83,8 +84,8 @@ function acceptCompletion(view: EditorView) {
 
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
-  if (active != null) return false
-  view.dispatch(view.state.t().annotate(setActiveCompletion, "pending"))
+  if (active != null && active != "pending") return false
+  view.dispatch(view.state.t().annotate(setActiveCompletion, "pendingExplicit"))
   return true
 }
 
@@ -107,9 +108,14 @@ function closeCompletion(view: EditorView) {
   return true
 }
 
-const setActiveCompletion = Annotation.define<ActiveCompletion | null | "pending">()
+type ActiveState = ActiveCompletion // There is a completion active
+  | null // No completion active
+  | "pending" // Must update after user input
+  | "pendingExplicit" // Must update after explicit completion command
 
-const activeCompletion = StateField.define<ActiveCompletion | null | "pending">({
+const setActiveCompletion = Annotation.define<ActiveState>()
+
+const activeCompletion = StateField.define<ActiveState>({
   create() { return null },
   update(prev, tr) {
     let set = tr.annotation(setActiveCompletion)
@@ -201,22 +207,25 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     this.stateVersion++
     if (this.debounce > -1) clearTimeout(this.debounce)
     let active = update.state.field(activeCompletion)
-    this.debounce = active == "pending" ? setTimeout(() => this.startUpdate(), DebounceTime) : -1
+    this.debounce = active == "pending" || active == "pendingExplicit"
+      ? setTimeout(() => this.startUpdate(active == "pendingExplicit"), DebounceTime) : -1
   }
 
-  startUpdate() {
+  startUpdate(explicit: boolean) {
     this.debounce = -1
-    let version = this.stateVersion, state = this.view.state
+    let version = this.stateVersion, state = this.view.state, pos = state.selection.primary.head
     let config = state.facet(autocompleteConfig)
-    Promise.resolve(config.completeAt(state, state.selection.primary.head)).then(result => {
-      if (this.stateVersion != version || result.items.length == 0) return
-      let tooltip = buildTooltip(result.items)
-      this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result.items, 0, tooltip)))
-    })
+    let context = new AutocompleteContext(explicit, config.filterType)
+    ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
+      .then(result => {
+        if (this.stateVersion != version || result.length == 0) return
+        let tooltip = buildTooltip(result)
+        this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result, 0, tooltip)))
+      })
   }
 })
 
-const style = EditorView.theme({
+const style = Precedence.Fallback.set(EditorView.theme({
   "tooltip.autocomplete": {
     fontFamily: "monospace",
     overflowY: "auto",
@@ -237,4 +246,4 @@ const style = EditorView.theme({
       color: "HighlightText"
     }
   }
-})
+}))
