@@ -253,7 +253,9 @@ export class EditorView {
       spellcheck: "false",
       contenteditable: "true",
       class: themeClass("content"),
-      style: `${browser.tabSize}: ${this.state.tabSize}`
+      style: `${browser.tabSize}: ${this.state.tabSize}`,
+      role: "textbox",
+      "aria-multiline": "true"
     })
     updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs)
     this.contentAttrs = contentAttrs

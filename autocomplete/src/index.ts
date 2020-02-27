@@ -33,6 +33,7 @@ export interface Completion {
   apply?: string | ((view: EditorView) => void)
 }
 
+// FIXME appending multiple providers is probably not a great default
 function retrieveCompletions(state: EditorState, pos: number, context: AutocompleteContext): Promise<readonly Completion[]> {
   let found = state.languageDataAt<Autocompleter>("autocomplete", pos)
     .map(compl => Promise.resolve(compl(state, pos, context)))
@@ -70,7 +71,7 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.t().annotate(setActiveCompletion, new ActiveCompletion(active.options, selected, active.tooltip)))
+    view.dispatch(view.state.t().annotate(setActiveCompletion, new ActiveCompletion(active.options, selected, active.id)))
     return true
   }
 }
@@ -125,48 +126,62 @@ const activeCompletion = StateField.define<ActiveState>({
       : tr.docChanged || tr.selectionSet ? null
       : prev
   }
-}).provideN(showTooltip, active => active instanceof ActiveCompletion ? [active.tooltip] : [])
+})
+  .provideN(showTooltip, active => active instanceof ActiveCompletion ? [completionTooltip] : [])
+  .provide(EditorView.contentAttributes, active => active instanceof ActiveCompletion ? active.attrs : baseAttrs)
+
+const baseAttrs = {"aria-autocomplete": "list"}
 
 class ActiveCompletion {
+  readonly attrs = {
+    "aria-autocomplete": "list",
+    "aria-activedescendant": this.id + "-" + this.selected,
+    "aria-owns": this.id
+  }
+
   constructor(readonly options: readonly Completion[],
               readonly selected: number,
-              readonly tooltip: (view: EditorView) => Tooltip) {}
+              readonly id = "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36)) {}
 }
 
-function createListBox(options: readonly Completion[]) {
+function createListBox(completion: ActiveCompletion) {
   const ul = document.createElement("ul")
-  ul.setAttribute("role", "listbox") // FIXME this won't be focused, so the aria attributes aren't really useful
-  for (let option of options) {
+  ul.id = completion.id
+  ul.setAttribute("role", "listbox")
+  ul.setAttribute("aria-expanded", "true")
+  for (let i = 0; i < completion.options.length; i++) {
     const li = ul.appendChild(document.createElement("li"))
-    li.innerText = option.label
+    li.id = completion.id + "-" + i
+    li.innerText = completion.options[i].label
     li.setAttribute("role", "option")
   }
   return ul
 }
 
-function buildTooltip(options: readonly Completion[]) {
-  return (view: EditorView): Tooltip => {
-    let list = createListBox(options)
-    list.addEventListener("click", (e: MouseEvent) => {
-      let index = 0, dom = e.target as HTMLElement | null
-      for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-      let active = view.state.field(activeCompletion)
-      if (active instanceof ActiveCompletion && index < active.options.length)
-        applyCompletion(view, active.options[index])
-    })
-    function updateSel(view: EditorView) {
-      let cur = view.state.field(activeCompletion)
-      if (cur instanceof ActiveCompletion) updateSelectedOption(list, cur.selected)
-    }
-    return {
-      dom: list,
-      mount: updateSel,
-      update(update: ViewUpdate) {
-        if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion)) updateSel(update.view)
-      },
-      pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
-      style: "autocomplete"
-    }
+function completionTooltip(view: EditorView): Tooltip {
+  // FIXME handle the case where the view moves from one active tooltip to another one
+  let active = view.state.field(activeCompletion) as ActiveCompletion
+  let list = createListBox(active)
+  list.addEventListener("click", (e: MouseEvent) => {
+    let index = 0, dom = e.target as HTMLElement | null
+    for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
+    let active = view.state.field(activeCompletion)
+    if (active instanceof ActiveCompletion && index < active.options.length)
+      applyCompletion(view, active.options[index])
+  })
+  function updateSel(view: EditorView) {
+    let cur = view.state.field(activeCompletion)
+    if (cur instanceof ActiveCompletion) updateSelectedOption(list, cur.selected)
+  }
+  return {
+    dom: list,
+    mount: updateSel,
+    update(update: ViewUpdate) {
+      if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion))
+        updateSel(update.view)
+    },
+    pos: active.options.reduce((m, o) => Math.min(m, o.start), 1e9),
+    style: "autocomplete"
   }
 }
 
@@ -219,8 +234,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
       .then(result => {
         if (this.stateVersion != version || result.length == 0) return
-        let tooltip = buildTooltip(result)
-        this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result, 0, tooltip)))
+        this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result, 0)))
       })
   }
 })
