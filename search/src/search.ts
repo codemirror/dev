@@ -259,12 +259,14 @@ export const openSearchPanel: Command = view => {
 /// Default search-related bindings.
 ///
 ///  * Mod-f: [`openSearchPanel`](#search.openSearchPanel)
-///  * F3: [`findNext`](#search.findNext)
-///  * Shift-F3: [`findPrevious`](#search.findPrevious)
+///  * F3, Mod-g: [`findNext`](#search.findNext)
+///  * Shift-F3, Shift-Mod-g: [`findPrevious`](#search.findPrevious)
 export const defaultSearchKeymap = {
   "Mod-f": openSearchPanel,
   "F3": findNext,
-  "Shift-F3": findPrevious
+  "Mod-g": findNext,
+  "Shift-F3": findPrevious,
+  "Shift-Mod-g": findPrevious
 }
 
 /// Close the search panel.
