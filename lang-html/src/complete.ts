@@ -321,7 +321,7 @@ const GlobalAttrs: AttrSpec = {
   translate: ["yes", "no"],
   onclick: null,
   rel: ["stylesheet", "alternate", "author", "bookmark", "help", "license", "next", "nofollow", "noreferrer", "prefetch", "prev", "search", "tag"],
-  role: "alert application article banner button cell checkbox Complementary contentinfo dialog document feed figure form grid gridcell heading img List listbox Listitem Main Navigation Region row rowgroup search switch tab table tabpanel textbox timer".split(" "),
+  role: "alert application article banner button cell checkbox complementary contentinfo dialog document feed figure form grid gridcell heading img list listbox listitem main navigation region row rowgroup search switch tab table tabpanel textbox timer".split(" "),
   "aria-activedescendant": null,
   "aria-atomic": Bool,
   "aria-autocomplete": ["inline", "list", "both", "none"],
@@ -471,7 +471,7 @@ export function completeHTML(state: EditorState, pos: number, context: Autocompl
     return completeTag(state, tree, pos, pos, context)
   } else if (tree.name == "StartCloseTag") {
     return completeCloseTag(state, tree, pos, pos, context)
-  } else if (context.explicit && tree.name == "Element" || tree.name == "Text" || tree.name == "Document") {
+  } else if (context.explicit && (tree.name == "Element" || tree.name == "Text" || tree.name == "Document")) {
     return completeStartTag(state, tree, pos)
   } else if (context.explicit && (tree.name == "OpenTag" || tree.name == "SelfClosingTag") || tree.name == "AttributeName") {
     return completeAttrName(state, tree, tree.name == "AttributeName" ? tree.start : pos, pos, context)
