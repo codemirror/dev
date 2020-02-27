@@ -298,7 +298,7 @@ function buildPanel(conf: {
   query: Query,
   updateQuery: (query: Query) => void
 }) {
-  function p(phrase: string) { return conf.view.phrase(phrase) }
+  function p(phrase: string) { return conf.view.state.phrase(phrase) }
   let searchField = elt("input", {
     value: conf.query.search,
     placeholder: p("Find"),
@@ -380,7 +380,7 @@ function maybeAnnounceMatch(view: EditorView) {
   let panel = state.panel.length && view.dom.querySelector(".cm-panel-search")
   if (!panel || !panel.contains(view.root.activeElement)) return
   let live = panel.querySelector("div[aria-live]")!
-  live.textContent = view.phrase("current match") + ". " + text
+  live.textContent = view.state.phrase("current match") + ". " + text
 }
 
 const baseTheme = EditorView.baseTheme({

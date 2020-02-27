@@ -252,7 +252,7 @@ class LintPanel implements Panel {
     this.list = this.dom.appendChild(document.createElement("ul"))
     this.list.tabIndex = 0
     this.list.setAttribute("role", "listbox")
-    this.list.setAttribute("aria-label", this.view.phrase("Diagnostics"))
+    this.list.setAttribute("aria-label", this.view.state.phrase("Diagnostics"))
     this.list.addEventListener("keydown", event => {
       if (event.keyCode == 27) { // Escape
         event.preventDefault()
@@ -283,7 +283,7 @@ class LintPanel implements Panel {
     })
     let close = this.dom.appendChild(document.createElement("button"))
     close.setAttribute("name", "close")
-    close.setAttribute("aria-label", this.view.phrase("close"))
+    close.setAttribute("aria-label", this.view.state.phrase("close"))
     close.textContent = "×"
     close.addEventListener("click", () => closeLintPanel(this.view))
 
@@ -358,7 +358,7 @@ class LintPanel implements Panel {
     while (domPos) rm()
     if (!this.list.firstChild) this.list.appendChild(renderDiagnostic(this.view, {
       severity: "info",
-      message: this.view.phrase("No diagnostics")
+      message: this.view.state.phrase("No diagnostics")
     } as Diagnostic))
   }
 

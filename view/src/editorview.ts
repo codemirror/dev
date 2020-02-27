@@ -11,7 +11,7 @@ import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         viewPlugin, ViewPlugin, PluginInstance, PluginField,
-        decorations, phrases, MeasureRequest, UpdateFlag} from "./extension"
+        decorations, MeasureRequest, UpdateFlag} from "./extension"
 import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
@@ -264,16 +264,6 @@ export class EditorView {
     StyleModule.mount(this.root, this.styleModules.concat(baseTheme).reverse())
   }
 
-  /// Look up a translation for the given phrase (via the
-  /// [`phrases`](#view.EditorView^phrases) facet), or return the
-  /// original string if no translation is found.
-  phrase(phrase: string): string {
-    for (let map of this.state.facet(phrases)) {
-      if (Object.prototype.hasOwnProperty.call(map, phrase)) return map[phrase]
-    }
-    return phrase
-  }
-
   /// Find the DOM parent node and offset (child offset if `node` is
   /// an element, character offset when it is a text node) at the
   /// given document position.
@@ -476,12 +466,6 @@ export class EditorView {
   static baseTheme(spec: {[name: string]: Style}): Extension {
     return Precedence.Fallback.set(styleModule.of(buildTheme(baseThemeID, spec)))
   }
-
-  /// Registers translation phrases. The
-  /// [`phrase`](#view.EditorView.phrase) method will look through all
-  /// objects registered with this facet to find translations for
-  /// its argument.
-  static phrases = phrases
 
   /// Facet that provides attributes for the editor's editable DOM
   /// element.

@@ -174,8 +174,6 @@ export const decorations = Facet.define<DecorationSet>()
 
 export const styleModule = Facet.define<StyleModule>()
 
-export const phrases = Facet.define<{[key: string]: string}>()
-
 export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, Oracle = 8, LineGaps = 16 }
 
 /// View [plugins](#view.ViewPlugin) are given instances of this

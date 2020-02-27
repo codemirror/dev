@@ -190,6 +190,21 @@ export class EditorState {
   /// [`indentUnit`](#state.EditorState^indentUnit) facet.
   get indentUnit() { return this.facet(EditorState.indentUnit) }
 
+  /// Registers translation phrases. The
+  /// [`phrase`](#state.EditorState.phrase) method will look through
+  /// all objects registered with this facet to find translations for
+  /// its argument.
+  static phrases = Facet.define<{[key: string]: string}>()
+
+  /// Look up a translation for the given phrase (via the
+  /// [`phrases`](#state.EditorState^phrases) facet), or return the
+  /// original string if no translation is found.
+  phrase(phrase: string): string {
+    for (let map of this.facet(EditorState.phrases))
+      if (Object.prototype.hasOwnProperty.call(map, phrase)) return map[phrase]
+    return phrase
+  }
+
   /// Facet that registers a parsing service for the state.
   static syntax = Facet.define<Syntax>()
 

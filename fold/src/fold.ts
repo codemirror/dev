@@ -96,19 +96,19 @@ class FoldWidget extends WidgetType<null> {
   ignoreEvents() { return false }
 
   toDOM(view: EditorView) {
-    let conf = view.state.facet(foldConfig)
+    let {state} = view, conf = state.facet(foldConfig)
     if (conf.placeholderDOM) return conf.placeholderDOM()
     let element = document.createElement("span")
     element.textContent = conf.placeholderText
     // FIXME should this have a role? does it make sense to allow focusing by keyboard?
-    element.setAttribute("aria-label", view.phrase("folded code"))
-    element.title = view.phrase("unfold")
+    element.setAttribute("aria-label", state.phrase("folded code"))
+    element.title = state.phrase("unfold")
     element.className = themeClass("foldPlaceholder")
 
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
-      let folded = foldInside(view.state, line.from, line.to)
-      if (folded) view.dispatch(view.state.t().annotate(foldAnnotation, {unfold: [folded]}))
+      let folded = foldInside(state, line.from, line.to)
+      if (folded) view.dispatch(state.t().annotate(foldAnnotation, {unfold: [folded]}))
       event.preventDefault()
     }
     return element
@@ -136,7 +136,7 @@ class FoldMarker extends GutterMarker {
   toDOM(view: EditorView) {
     let span = document.createElement("span")
     span.textContent = this.open ? this.config.openText : this.config.closedText
-    span.title = view.phrase(this.open ? "Fold line" : "Unfold line")
+    span.title = view.state.phrase(this.open ? "Fold line" : "Unfold line")
     return span
   }
 }
