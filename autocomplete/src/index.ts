@@ -71,7 +71,8 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.t().annotate(setActiveCompletion, new ActiveCompletion(active.options, selected, active.id)))
+    view.dispatch(view.state.t().annotate(setActiveCompletion,
+                                          new ActiveCompletion(active.options, selected, active.id, active.tooltip)))
     return true
   }
 }
@@ -126,11 +127,10 @@ const activeCompletion = StateField.define<ActiveState>({
       : tr.docChanged || tr.selectionSet ? null
       : prev
   }
-})
-  .provideN(showTooltip, active => active instanceof ActiveCompletion ? [completionTooltip] : [])
+}).provideN(showTooltip, active => active instanceof ActiveCompletion ? active.tooltip : none)
   .provide(EditorView.contentAttributes, active => active instanceof ActiveCompletion ? active.attrs : baseAttrs)
 
-const baseAttrs = {"aria-autocomplete": "list"}
+const baseAttrs = {"aria-autocomplete": "list"}, none: readonly any[] = []
 
 class ActiveCompletion {
   readonly attrs = {
@@ -141,7 +141,8 @@ class ActiveCompletion {
 
   constructor(readonly options: readonly Completion[],
               readonly selected: number,
-              readonly id = "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36)) {}
+              readonly id = "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36),
+              readonly tooltip = [completionTooltip()]) {}
 }
 
 function createListBox(completion: ActiveCompletion) {
@@ -158,30 +159,33 @@ function createListBox(completion: ActiveCompletion) {
   return ul
 }
 
-function completionTooltip(view: EditorView): Tooltip {
-  // FIXME handle the case where the view moves from one active tooltip to another one
-  let active = view.state.field(activeCompletion) as ActiveCompletion
-  let list = createListBox(active)
-  list.addEventListener("click", (e: MouseEvent) => {
-    let index = 0, dom = e.target as HTMLElement | null
-    for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-    let active = view.state.field(activeCompletion)
-    if (active instanceof ActiveCompletion && index < active.options.length)
-      applyCompletion(view, active.options[index])
-  })
-  function updateSel(view: EditorView) {
-    let cur = view.state.field(activeCompletion)
-    if (cur instanceof ActiveCompletion) updateSelectedOption(list, cur.selected)
-  }
-  return {
-    dom: list,
-    mount: updateSel,
-    update(update: ViewUpdate) {
-      if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion))
-        updateSel(update.view)
-    },
-    pos: active.options.reduce((m, o) => Math.min(m, o.start), 1e9),
-    style: "autocomplete"
+// We allocate a new function instance every time the completion
+// changes to force redrawing/repositioning of the tooltip
+function completionTooltip() {
+  return (view: EditorView): Tooltip => {
+    let active = view.state.field(activeCompletion) as ActiveCompletion
+    let list = createListBox(active)
+    list.addEventListener("click", (e: MouseEvent) => {
+      let index = 0, dom = e.target as HTMLElement | null
+      for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
+      let active = view.state.field(activeCompletion)
+      if (active instanceof ActiveCompletion && index < active.options.length)
+        applyCompletion(view, active.options[index])
+    })
+    function updateSel(view: EditorView) {
+      let cur = view.state.field(activeCompletion)
+      if (cur instanceof ActiveCompletion) updateSelectedOption(list, cur.selected)
+    }
+    return {
+      dom: list,
+      mount: updateSel,
+      update(update: ViewUpdate) {
+        if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion))
+          updateSel(update.view)
+      },
+      pos: active.options.reduce((m, o) => Math.min(m, o.start), 1e9),
+      style: "autocomplete"
+    }
   }
 }
 
