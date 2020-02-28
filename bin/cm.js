@@ -58,17 +58,17 @@ class Pkg {
     return this._rollup || (this._rollup = {
       input: this.entrySource,
       external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-      output: [...options.esm ? [{
+      output: [{
         format: "esm",
         file: this.esmFile,
         sourcemap: true,
         externalLiveBindings: false
-      }] : [], {
+      }, ...options.cjs ? [{
         format: "cjs",
         file: this.cjsFile,
         sourcemap: true,
         externalLiveBindings: false
-      }],
+      }] : []],
       plugins: [tsPlugin({lib: this.dom ? ["es6", "dom"] : ["es6"], types: this.dom ? [] : ["console"]})]
     })
   }
@@ -113,10 +113,10 @@ const packages = [
   new Pkg("lint", {entry: "lint", dom: true}),
   new Pkg("highlight", {entry: "highlight", dom: true}),
   new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
+  new Pkg("autocomplete", {dom: true}),
   new Pkg("lang-javascript"),
   new Pkg("lang-css", {entry: "css"}),
   new Pkg("lang-html", {entry: "html"}),
-  new Pkg("autocomplete", {dom: true}),
 ]
 const packageNames = Object.create(null)
 for (let pkg of packages) packageNames[pkg.name] = pkg
@@ -124,7 +124,7 @@ for (let pkg of packages) packageNames[pkg.name] = pkg
 const demo = {
   name: "demo",
 
-  cjsFile: path.join(root, "demo/demo.js"),
+  esmFile: path.join(root, "demo/demo.js"),
 
   inputFiles: [path.join(root, "demo/demo.ts")],
 
@@ -133,8 +133,8 @@ const demo = {
       input: path.join(root, "demo/demo.ts"),
       external(id) { return id != "tslib" && !/^\.?\//.test(id) },
       output: [{
-        format: "cjs",
-        file: this.cjsFile
+        format: "esm",
+        file: this.esmFile
       }],
       plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false, declarationMap: false})]
     })
@@ -146,7 +146,7 @@ const viewTests = {
 
   main: path.join(root, "view/test/test.ts"),
 
-  cjsFile: path.join(root, "demo/test/test.js"),
+  esmFile: path.join(root, "demo/test/test.js"),
 
   // FIXME derive automatically? move to separate dir?
   inputFiles: ["test", "test-draw", "test-domchange", "test-selection", "test-draw-decoration",
@@ -158,8 +158,8 @@ const viewTests = {
       input: this.main,
       external(id) { return id != "tslib" && !/^\.?\//.test(id) },
       output: [{
-        format: "cjs",
-        file: this.cjsFile,
+        format: "esm",
+        file: this.esmFile,
         paths: id => id == ".." ? "../../view" : null
       }],
       plugins: [tsPlugin({lib: ["es6", "dom"], types: ["mocha", "node"], declaration: false, declarationMap: false})]
@@ -226,7 +226,7 @@ async function runRollup(config) {
       let code = file.code || file.source
       if (!/\.d\.ts/.test(file.fileName))
         await fsp.writeFile(path.join(dir, file.fileName), code)
-      else if (output.format == "cjs") // Don't double-emit declaration files
+      else if (output.format == "esm") // Don't double-emit declaration files
         await maybeWriteFile(path.join(dir, file.fileName),
                              /\.d\.ts\.map/.test(file.fileName) ? code.replace(/"sourceRoot":""/, '"sourceRoot":"../.."') : code)
       if (file.map)
@@ -247,7 +247,7 @@ function fileTime(path) {
 
 async function rebuild(pkg, options) {
   if (!options.always) {
-    let time = Math.min(fileTime(pkg.cjsFile), options.esm ? fileTime(pkg.esmFile) : Infinity)
+    let time = Math.min(fileTime(pkg.esmFile), options.cjs ? fileTime(pkg.cjsFile) : Infinity)
     if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
   }
   console.log(`Building ${pkg.name}...`)
@@ -306,16 +306,16 @@ async function build(...args) {
     for (let name of filter) {
       let found = targets.find(t => t.name == name)
       if (!found) throw new Error(`Unknown package ${name}`)
-      await rebuild(found, {esm: !["demo", "view-tests"].includes(name), always})
+      await rebuild(found, {cjs: !["demo", "view-tests"].includes(name), always})
     }
   } else {
-    for (let pkg of packages) await rebuild(pkg, {esm: true, always})
+    for (let pkg of packages) await rebuild(pkg, {cjs: true, always})
   }
 }
 
 function startServer() {
   let serve = path.join(root, "demo")
-  let moduleserver = new (require("moduleserve/moduleserver"))({root: serve})
+  let moduleserver = new (require("esmoduleserve/moduleserver"))({root: serve})
   let ecstatic = require("ecstatic")({root: serve})
   require("http").createServer((req, resp) => {
     moduleserver.handleRequest(req, resp) || ecstatic(req, resp)
@@ -327,10 +327,10 @@ async function devServer() {
   startServer()
   let target = packages.concat([demo, viewTests])
   for (let pkg of target) {
-    try { await rebuild(pkg, {esm: false}) }
+    try { await rebuild(pkg, {cjs: false}) }
     catch(e) { console.log(e) }
   }
-  new Watcher(target, {esm: false})
+  new Watcher(target, {cjs: false})
   console.log("Watching...")
 }
 
