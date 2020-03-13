@@ -1,10 +1,10 @@
 import ist from "ist"
-import {EditorState} from "../../state"
+import {EditorState, IndentContext} from "../../state"
 import {javascript} from ".."
 
 function getIndent(state: EditorState, pos: number): number {
   for (let f of state.facet(EditorState.indentation)) {
-    let result = f(state, pos)
+    let result = f(new IndentContext(state), pos)
     if (result > -1) return result
   }
   return -1

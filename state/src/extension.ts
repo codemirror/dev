@@ -1,7 +1,8 @@
+import {Tree, NodeType, NodeProp} from "lezer-tree"
+import {Line} from "../../text"
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Facet} from "./facet"
-import {Tree, NodeType, NodeProp} from "lezer-tree"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that
@@ -61,4 +62,66 @@ export interface Syntax {
   /// usually be the be the grammar's top node, but with nested
   /// grammars it may be the type of some nested document.
   docNodeTypeAt(state: EditorState, pos: number): NodeType
+}
+
+/// Indentation contexts are used when calling
+/// [`EditorState.indentation`](#state.EditorState^indentation). They
+/// provide helper utilities useful in indentation logic, and can
+/// selectively override the indentation reported for some
+/// lines.
+export class IndentContext {
+  /// Create an indent context. The optional second argument can be
+  /// used to override line indentations provided to the indentation
+  /// helper function, which is useful when implementing region
+  /// indentation, where indentation for later lines needs to refer to
+  /// previous lines, which may have been reindented compared to the
+  /// original start state.
+  constructor(
+    /// The editor state.
+    readonly state: EditorState,
+    /// A function from a line start to an indentation, or `-1` if the
+    /// original indentation in `this.state` should be used. Affects
+    /// the output of `this.lineIndent`.
+    readonly overrideIndentation?: (pos: number) => number
+  ) {}
+
+  /// The indent unit (number of spaces per indentation level).
+  get unit() { return this.state.indentUnit }
+
+  /// Get the text directly after `pos`, either the entire line
+  /// or the next 100 characters, whichever is shorter.
+  textAfterPos(pos: number) {
+    return this.state.doc.slice(pos, Math.min(pos + 100, this.state.doc.lineAt(pos).end)).match(/^\s*(.*)/)![1]
+  }
+
+  /// find the column position (taking tabs into account) of the given
+  /// position in the given string.
+  countColumn(line: string, pos: number) {
+    // FIXME use extending character information
+    if (pos < 0) pos = line.length
+    let tab = this.state.tabSize
+    for (var i = 0, n = 0;;) {
+      let nextTab = line.indexOf("\t", i);
+      if (nextTab < 0 || nextTab >= pos) return n + (pos - i)
+      n += nextTab - i
+      n += tab - (n % tab)
+      i = nextTab + 1
+    }
+  }
+
+  /// Find the indentation column of the given document line.
+  lineIndent(line: Line) {
+    if (this.overrideIndentation) {
+      let override = this.overrideIndentation(line.start)
+      if (override > -1) return override
+    }
+    let text = line.slice(0, Math.min(100, line.length))
+    return this.countColumn(text, text.search(/\S/))
+  }
+
+  /// Find the column for the given position.
+  column(pos: number) {
+    let line = this.state.doc.lineAt(pos)
+    return this.countColumn(line.slice(0, pos - line.start), pos - line.start)
+  }
 }

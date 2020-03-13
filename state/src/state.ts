@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {Tree} from "lezer-tree"
 import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax, allowMultipleSelections, languageData, addLanguageData} from "./extension"
+import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
@@ -156,7 +156,7 @@ export class EditorState {
 
   /// Facet that defines a way to query for automatic indentation
   /// depth at the start of a given line.
-  static indentation = Facet.define<(state: EditorState, pos: number) => number>()
+  static indentation = Facet.define<(context: IndentContext, pos: number) => number>()
 
   /// Configures the tab size to use in this state. The first
   /// (highest-precedence) value of the behavior is used.

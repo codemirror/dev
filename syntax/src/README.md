@@ -10,7 +10,7 @@
 
 @indentNodeProp
 
-@IndentContext
+@TreeIndentContext
 
 @delimitedIndent
 

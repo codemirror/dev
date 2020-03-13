@@ -1,5 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Syntax, Extension, Annotation} from "../../state"
+import {EditorState, StateField, Syntax, Extension, Annotation, IndentContext} from "../../state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "../../view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
@@ -105,8 +105,8 @@ export class StreamSyntax implements Syntax {
       EditorState.syntax.of(this),
       ViewPlugin.define(view => new HighlightWorker(view, this.parser, this.field, setSyntax)),
       this.field,
-      EditorState.indentation.of((state: EditorState, pos: number) => {
-        return state.field(this.field).getIndent(this.parser, state, pos)
+      EditorState.indentation.of((context: IndentContext, pos: number) => {
+        return context.state.field(this.field).getIndent(this.parser, context.state, pos)
       })
     ]
   }

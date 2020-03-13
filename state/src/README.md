@@ -71,6 +71,8 @@ extensions for the editor state.
 
 @Syntax
 
+@IndentContext
+
 @languageData
 
 ### Utilities

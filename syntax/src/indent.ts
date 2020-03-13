@@ -1,22 +1,21 @@
-import {Line} from "../../text"
 import {NodeType, NodeProp, Subtree, Tree} from "lezer-tree"
-import {EditorState, Syntax} from "../../state"
+import {EditorState, Syntax, IndentContext} from "../../state"
 
 /// A syntax tree node prop used to associate indentation strategies
 /// with node types. Such a strategy is a function from an indentation
 /// context to a number. That number may be -1, to indicate that no
 /// definitive indentation can be determined, or a column number to
 /// which the given line should be indented.
-export const indentNodeProp = new NodeProp<(context: IndentContext) => number>()
+export const indentNodeProp = new NodeProp<(context: TreeIndentContext) => number>()
 
 export function syntaxIndentation(syntax: Syntax) {
-  return EditorState.indentation.of((state: EditorState, pos: number) => {
-    return computeIndentation(state, syntax.getTree(state), pos)
+  return EditorState.indentation.of((cx: IndentContext, pos: number) => {
+    return computeIndentation(cx, syntax.getTree(cx.state), pos)
   })
 }
 
 // Compute the indentation for a given position from the syntax tree.
-function computeIndentation(state: EditorState, ast: Tree, pos: number) {
+function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
   let tree: Subtree | null = ast.resolve(pos)
 
   // Enter previous nodes that end in empty error terms, which means
@@ -36,7 +35,7 @@ function computeIndentation(state: EditorState, ast: Tree, pos: number) {
 
   for (; tree; tree = tree.parent) {
     let strategy = indentStrategy(tree.type) || (tree.parent == null ? topIndent : null)
-    if (strategy) return strategy(new IndentContext(state, pos, tree))
+    if (strategy) return strategy(new TreeIndentContext(cx, pos, tree))
   }
   return -1
 }
@@ -54,48 +53,25 @@ function topIndent() { return 0 }
 
 /// Objects of this type provide context information and helper
 /// methods to indentation functions.
-export class IndentContext {
+export class TreeIndentContext extends IndentContext {
   /// @internal
   constructor(
-    /// The editor state.
-    readonly state: EditorState,
+    base: IndentContext,
     /// The position at which indentation is being computed.
     readonly pos: number,
     /// The syntax tree node for which the indentation strategy is
     /// registered.
-    readonly node: Subtree) {}
-
-  /// The indent unit (number of spaces per indentation level).
-  get unit() { return this.state.indentUnit }
+    readonly node: Subtree) {
+    super(base.state, base.overrideIndentation)
+  }
 
   /// Get the text directly after `this.pos`, either the entire line
   /// or the next 50 characters, whichever is shorter.
   get textAfter() {
-    return this.state.doc.slice(this.pos, Math.min(this.pos + 50, this.state.doc.lineAt(this.pos).end)).match(/^\s*(.*)/)![1]
+    return this.textAfterPos(this.pos)
   }
 
-  /// find the column position (taking tabs into account) of the given
-  /// position in the given string.
-  countColumn(line: string, pos: number) {
-    // FIXME use extending character information
-    if (pos < 0) pos = line.length
-    let tab = this.state.tabSize
-    for (var i = 0, n = 0;;) {
-      let nextTab = line.indexOf("\t", i);
-      if (nextTab < 0 || nextTab >= pos) return n + (pos - i)
-      n += nextTab - i
-      n += tab - (n % tab)
-      i = nextTab + 1
-    }
-  }
-
-  /// Find the indentation column of the given document line.
-  lineIndent(line: Line) {
-    let text = line.slice(0, Math.min(50, line.length, this.node.start > line.start ? this.node.start - line.start : 1e8))
-    return this.countColumn(text, text.search(/\S/))
-  }
-
-  /// Get the indentation at the reference line for `this.tree`, which
+  /// Get the indentation at the reference line for `this.node`, which
   /// is the line on which it starts, unless there is a node that is
   /// _not_ a parent of this node covering the start of that line. If
   /// so, the line at the start of that node is tried, again skipping
@@ -111,12 +87,6 @@ export class IndentContext {
     }
     return this.lineIndent(line)
   }
-
-  /// Find the column for the given position.
-  column(pos: number) {
-    let line = this.state.doc.lineAt(pos)
-    return this.countColumn(line.slice(0, pos - line.start), pos - line.start)
-  }
 }
 
 function isParent(parent: Subtree, of: Subtree) {
@@ -127,7 +97,7 @@ function isParent(parent: Subtree, of: Subtree) {
 // Check whether a delimited node is aligned (meaning there are
 // non-skipped nodes on the same line as the opening delimiter). And
 // if so, return the opening token.
-function bracketedAligned(context: IndentContext) {
+function bracketedAligned(context: TreeIndentContext) {
   let tree = context.node
   let openToken = tree.childAfter(tree.start)
   if (!openToken) return null
@@ -151,7 +121,7 @@ function bracketedAligned(context: IndentContext) {
 ///     foo(bar,
 ///         baz)
 export function delimitedIndent({closing, align = true, units = 1}: {closing: string, align?: boolean, units?: number}) {
-  return (context: IndentContext) => {
+  return (context: TreeIndentContext) => {
     let closed = context.textAfter.slice(0, closing.length) == closing
     let aligned = align ? bracketedAligned(context) : null
     if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
@@ -161,7 +131,7 @@ export function delimitedIndent({closing, align = true, units = 1}: {closing: st
 
 /// An indentation strategy that aligns a node content to its base
 /// indentation.
-export const flatIndent = (context: IndentContext) => context.baseIndent
+export const flatIndent = (context: TreeIndentContext) => context.baseIndent
 
 /// Creates an indentation strategy that, by default, indents
 /// continued lines one unit more than the node's base indentation.
@@ -170,7 +140,7 @@ export const flatIndent = (context: IndentContext) => context.baseIndent
 /// constructs), and you can change the amount of units used with the
 /// `units` option.
 export function continuedIndent({except, units = 1}: {except?: RegExp, units?: number} = {}) {
-  return (context: IndentContext) => {
+  return (context: TreeIndentContext) => {
     let matchExcept = except && except.test(context.textAfter)
     return context.baseIndent + (matchExcept ? 0 : units * context.unit)
   }

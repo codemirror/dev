@@ -1,4 +1,4 @@
-import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction} from "../../state"
+import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "../../state"
 import {EditorView, Command} from "../../view"
 
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
@@ -109,7 +109,7 @@ export const deleteCharBackward: Command = view => deleteText(view, "backward")
 /// Delete the character after the cursor.
 export const deleteCharForward: Command = view => deleteText(view, "forward")
 
-// FIXME support indenting by tab, configurable indent units
+// FIXME support indenting by tab
 
 function space(n: number) {
   let result = ""
@@ -117,9 +117,9 @@ function space(n: number) {
   return result
 }
 
-function getIndentation(state: EditorState, pos: number): number {
-  for (let f of state.facet(EditorState.indentation)) {
-    let result = f(state, pos)
+function getIndentation(cx: IndentContext, pos: number): number {
+  for (let f of cx.state.facet(EditorState.indentation)) {
+    let result = f(cx, pos)
     if (result > -1) return result
   }
   return -1
@@ -129,7 +129,7 @@ function getIndentation(state: EditorState, pos: number): number {
 /// line(s).
 export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean => {
   let i = 0, indentation = state.selection.ranges.map(r => {
-    let indent = getIndentation(state, r.from)
+    let indent = getIndentation(new IndentContext(state), r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
   })
   dispatch(state.t().forEachRange(({from, to}, tr) => {
@@ -144,18 +144,22 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
 /// Auto-indent the selected lines. This uses the [indentation
 /// behavor](#state.EditorState^indentation) as source.
 export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
-  // FIXME this will base all indentation on the same state, which is
-  // wrong (indentation looks at the indent of previous lines, which may
-  // be changed).
   let lastLine = -1, positions = []
+  let updated: {[lineStart: number]: number} = Object.create(null)
+  let context = new IndentContext(state, start => {
+    let found = updated[start]
+    return found == null ? -1 : found
+  })
   for (let range of state.selection.ranges) {
     for (let {start, end} = state.doc.lineAt(range.from);;) {
       if (start != lastLine) {
         lastLine = start
-        let indent = getIndentation(state, start), current
+        let indent = getIndentation(context, start), current
         if (indent > -1 &&
-            indent != (current = /^\s*/.exec(state.doc.slice(start, Math.min(end, start + 100)))![0].length))
+            indent != (current = /^\s*/.exec(state.doc.slice(start, Math.min(end, start + 100)))![0].length)) {
+          updated[start] = indent
           positions.push({pos: start, current, indent})
+        }
       }
       if (end + 1 > range.to) break
       ;({start, end} = state.doc.lineAt(end + 1))
