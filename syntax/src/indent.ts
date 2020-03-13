@@ -104,7 +104,7 @@ function bracketedAligned(context: TreeIndentContext) {
   let openLine = context.state.doc.lineAt(openToken.start)
   for (let pos = openToken.end;;) {
     let next = tree.childAfter(pos)
-    if (!next) return null
+    if (!next || next.end == tree.end) return null
     if (!next.type.prop(NodeProp.skipped))
       return next.start < openLine.end ? openToken : null
     pos = next.end
