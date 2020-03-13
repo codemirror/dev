@@ -121,7 +121,10 @@ export class IndentContext {
 
   /// Find the column for the given position.
   column(pos: number) {
-    let line = this.state.doc.lineAt(pos)
-    return this.countColumn(line.slice(0, pos - line.start), pos - line.start)
+    let line = this.state.doc.lineAt(pos), text = line.slice(0, pos - line.start)
+    let result = this.countColumn(text, pos - line.start)
+    let override = this.overrideIndentation ? this.overrideIndentation(line.start) : -1
+    if (override > -1) result += override - this.countColumn(text, text.search(/\S/))
+    return result
   }
 }
