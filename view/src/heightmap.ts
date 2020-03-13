@@ -144,7 +144,7 @@ export abstract class HeightMap {
   // Base case is to replace a leaf node, which simply builds a tree
   // from the new nodes and returns that (HeightMapBranch and
   // HeightMapGap override this to actually use from/to)
-  replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
+  replace(_from: number, _to: number, nodes: (HeightMap | null)[], _doc: Text): HeightMap {
     return HeightMap.of(nodes)
   }
 
@@ -168,7 +168,7 @@ export abstract class HeightMap {
       }
       fromB += start.from - fromA; fromA = start.from
       let nodes = NodeBuilder.build(oracle, decorations, fromB, toB)
-      me = me.replace(fromA, toA, nodes)
+      me = me.replace(fromA, toA, nodes, oracle.doc)
     }
     return me.updateHeight(oracle, 0)
   }
@@ -249,10 +249,13 @@ class HeightMapText extends HeightMapBlock {
 
   constructor(length: number, height: number) { super(length, height, BlockType.Text) }
 
-  replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
-    if (nodes.length == 1 && nodes[0] instanceof HeightMapText && Math.abs(this.length - nodes[0]!.length) < 10) {
-      nodes[0]!.height = this.height
-      return nodes[0]!
+  replace(from: number, to: number, nodes: (HeightMap | null)[], doc: Text): HeightMap {
+    if (nodes.length == 1 && Math.abs(this.length - nodes[0]!.length) < 10 &&
+        (nodes[0] instanceof HeightMapText || nodes[0] instanceof HeightMapGap && doc.lineAt(from).length == nodes[0].length)) {
+      let node = nodes[0]!
+      if (node instanceof HeightMapGap) node = new HeightMapText(node.length, this.height)
+      else node.height = this.height
+      return node
     } else {
       return HeightMap.of(nodes)
     }
@@ -402,12 +405,12 @@ class HeightMapBranch extends HeightMap {
     }
   }
 
-  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
+  replace(from: number, to: number, nodes: (HeightMap | null)[], doc: Text): HeightMap {
     let rightStart = this.left.length + this.break
     if (to < rightStart)
-      return this.balanced(this.left.replace(from, to, nodes), this.right)
+      return this.balanced(this.left.replace(from, to, nodes, doc), this.right)
     if (from > this.left.length)
-      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes))
+      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes, doc))
 
     let result: (HeightMap | null)[] = []
     if (from > 0) this.decomposeLeft(from, result)
