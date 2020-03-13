@@ -33,12 +33,13 @@ export interface Completion {
   apply?: string | ((view: EditorView) => void)
 }
 
-// FIXME appending multiple providers is probably not a great default
 function retrieveCompletions(state: EditorState, pos: number, context: AutocompleteContext): Promise<readonly Completion[]> {
   let found = state.languageDataAt<Autocompleter>("autocomplete", pos)
-    .map(compl => Promise.resolve(compl(state, pos, context)))
-  return found.length == 1 ? found[0] : found.length == 0 ? Promise.resolve([]) :
-    Promise.all(found).then(results => results.reduce((list, items) => list.concat(items), [] as Completion[]))
+  function next(i: number): Promise<readonly Completion[]> {
+    if (i == found.length) return Promise.resolve([])
+    return Promise.resolve(found[i](state, pos, context)).then(result => result.length ? result : next(i + 1))
+  }
+  return next(0)
 }
 
 const autocompleteConfig = Facet.define<Partial<AutocompleteConfig>, AutocompleteConfig>({
