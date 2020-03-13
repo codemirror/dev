@@ -39,12 +39,10 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
     }
   }),
   openNodeProp.add({
-    "StartTag StartCloseTag": ["EndTag", "SelfCloseEndTag"],
-    "OpenTag": ["CloseTag"]
+    "StartTag StartCloseTag": ["EndTag", "SelfCloseEndTag"]
   }),
   closeNodeProp.add({
-    "EndTag SelfCloseEndTag": ["StartTag", "StartCloseTag"],
-    "CloseTag": ["OpenTag"]
+    "EndTag SelfCloseEndTag": ["StartTag", "StartCloseTag"]
   }),
   styleTags({
     AttributeValue: "string",
