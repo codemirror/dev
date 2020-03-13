@@ -113,6 +113,8 @@ export enum QueryType { ByPos, ByHeight, ByPosNoHeight }
 
 const enum Flag { Break = 1, Outdated = 2 }
 
+const Epsilon = 1e-10
+
 export abstract class HeightMap {
   constructor(
     public length: number, // The number of characters covered
@@ -134,8 +136,8 @@ export abstract class HeightMap {
 
   setHeight(oracle: HeightOracle, height: number) {
     if (this.height != height) {
+      if (Math.abs(this.height - height) > Epsilon) oracle.heightChanged = true
       this.height = height
-      oracle.heightChanged = true
     }
   }
 
