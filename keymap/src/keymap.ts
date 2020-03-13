@@ -90,6 +90,9 @@ export class NormalizedKeymap<T> {
         (baseName = base[event.keyCode]) && baseName != name) {
       const fromCode = this.map[modifiers(baseName, event, true)]
       if (fromCode) return fromCode
+    } else if (isChar && event.shiftKey) {
+      let withShift = this.map[modifiers(name, event, true)]
+      if (withShift) return withShift
     }
     return undefined
   }
