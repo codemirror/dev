@@ -186,7 +186,9 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
       } else {
         this.set = false
         // FIXME support async sources
-        this.view.dispatch(this.view.state.t().annotate(setDiagnostics, source(this.view)))
+        let annotations = source(this.view)
+        if (annotations.length || this.view.state.field(lintState).diagnostics.size)
+          this.view.dispatch(this.view.state.t().annotate(setDiagnostics, source(this.view)))
       }
     }
 
