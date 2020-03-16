@@ -5,11 +5,11 @@ import {ContentBuilder} from "./buildview"
 import {Viewport, extendWithRanges} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType, addRange} from "./decoration"
-import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection} from "./dom"
-import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet, UpdateFlag} from "./extension"
+import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection, hasSelection} from "./dom"
+import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet, UpdateFlag, editable} from "./extension"
 import {EditorView} from "./editorview"
 import {RangeSet} from "../../rangeset"
-import {ChangedRange} from "../../state"
+import {ChangedRange, Transaction} from "../../state"
 
 const none = [] as any
 
@@ -83,14 +83,15 @@ export class DocView extends ContentView {
     let decoDiff = findChangedDeco(prevDeco, deco, changedRanges, update.state.doc.length)
     changedRanges = extendWithRanges(changedRanges, decoDiff)
 
+    let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointer")
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
         !(update.flags & (UpdateFlag.Viewport | UpdateFlag.LineGaps)) &&
         update.state.selection.primary.from >= this.view.viewport.from &&
         update.state.selection.primary.to <= this.view.viewport.to) {
-      this.updateSelection(forceSelection)
+      this.updateSelection(forceSelection, pointerSel)
       return false
     } else {
-      this.updateInner(changedRanges, deco, update.prevState.doc.length, forceSelection)
+      this.updateInner(changedRanges, deco, update.prevState.doc.length, forceSelection, pointerSel)
       return true
     }
   }
@@ -98,7 +99,7 @@ export class DocView extends ContentView {
   // Used both by update and checkLayout do perform the actual DOM
   // update
   private updateInner(changes: readonly ChangedRange[], deco: readonly DecorationSet[],
-                      oldLength: number, forceSelection = false) {
+                      oldLength: number, forceSelection = false, pointerSel = false) {
     this.updateChildren(changes, deco, oldLength)
 
     this.view.observer.ignore(() => {
@@ -110,7 +111,7 @@ export class DocView extends ContentView {
       this.dom.style.minWidth = this.minWidth ? this.minWidth + "px" : ""
       this.sync()
       this.dirty = Dirty.Not
-      this.updateSelection(forceSelection)
+      this.updateSelection(forceSelection, pointerSel)
       this.dom.style.height = ""
     })
   }
@@ -189,9 +190,9 @@ export class DocView extends ContentView {
   }
 
   // Sync the DOM selection to this.state.selection
-  updateSelection(force = false) {
+  updateSelection(force = false, fromPointer = false) {
     this.clearSelectionDirty()
-    if (this.root.activeElement != this.dom) return
+    if (!(fromPointer || this.mayControlSelection())) return
 
     let primary = this.view.state.selection.primary
     // FIXME need to handle the case where the selection falls inside a block range
@@ -223,6 +224,10 @@ export class DocView extends ContentView {
 
     this.impreciseAnchor = anchor.precise ? null : new DOMPos(domSel.anchorNode!, domSel.anchorOffset)
     this.impreciseHead = head.precise ? null: new DOMPos(domSel.focusNode!, domSel.focusOffset)
+  }
+
+  mayControlSelection() {
+    return this.view.state.facet(editable) ? this.root.activeElement == this.dom : hasSelection(this.dom, getSelection(this.root))
   }
 
   nearest(dom: Node): ContentView | null {
