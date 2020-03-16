@@ -169,7 +169,7 @@ const LintDelay = 500
 /// Given a diagnostic source, this function returns an extension that
 /// enables linting with that source. It will be called whenever the
 /// editor is idle (after its content changed).
-export function linter(source: (view: EditorView) => readonly Diagnostic[]): Extension {
+export function linter(source: (view: EditorView) => readonly Diagnostic[] | Promise<readonly Diagnostic[]>): Extension {
   const runLintPlugin = ViewPlugin.fromClass(class {
     lintTime = Date.now() + LintDelay
     set = true
@@ -185,10 +185,15 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[]): Ext
         setTimeout(this.run, this.lintTime - now)
       } else {
         this.set = false
-        // FIXME support async sources
-        let annotations = source(this.view)
-        if (annotations.length || this.view.state.field(lintState).diagnostics.size)
-          this.view.dispatch(this.view.state.t().annotate(setDiagnostics, source(this.view)))
+        let {state} = this.view
+        Promise.resolve(source(this.view)).then(
+          annotations => {
+            if (this.view.state.doc == state.doc &&
+                (annotations.length || this.view.state.field(lintState).diagnostics.size))
+              this.view.dispatch(this.view.state.t().annotate(setDiagnostics, annotations))
+          },
+          error => { throw error }
+        )
       }
     }
 
