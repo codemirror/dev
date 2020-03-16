@@ -17,6 +17,25 @@ export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boole
 
 export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
 
+export const exceptionSink = Facet.define<(exception: any) => void>()
+
+/// Log or report an unhandled exception in client code. Should
+/// probably only be used by extension code that allows client code to
+/// provide functions, and calls those functions in a context where an
+/// exception can't be propagated to calling code in a reasonable way
+/// (for example when in an event handler).
+///
+/// Either calls a handler registered with
+/// [`EditorView.exceptionSink`](#view.EditorView^exceptionSink), or
+/// `console.error` (in which case it'll pass `context`, when given,
+/// as first argument).
+export function logException(state: EditorState, exception: any, context?: string) {
+  let handler = state.facet(exceptionSink)
+  if (handler.length) handler[0](exception)
+  else if (context) console.error(context + ":" , exception)
+  else console.error(exception)
+}
+
 /// This is the interface plugin objects conform to.
 export interface PluginValue {
   /// Notifies the plugin of an update that happened in the view. This
@@ -126,7 +145,7 @@ export class PluginInstance {
     let value
     try { value = spec.create(view) }
     catch (e) {
-      console.error("CodeMirror plugin crashed:", e)
+      logException(view.state, e, "CodeMirror plugin crashed")
       return PluginInstance.dummy
     }
     return new PluginInstance(value, spec)
@@ -141,15 +160,15 @@ export class PluginInstance {
       this.updateFunc(update)
       return this
     } catch (e) {
-      console.error("CodeMirror plugin crashed:", e)
+      logException(update.state, e, "CodeMirror plugin crashed")
       if (this.value.destroy) try { this.value.destroy() } catch (_) {}
       return PluginInstance.dummy
     }
   }
 
-  destroy() {
+  destroy(view: EditorView) {
     try { if (this.value.destroy) this.value.destroy() }
-    catch (e) { console.error("CodeMirror plugin crashed:", e) }
+    catch (e) { logException(view.state, e, "CodeMirror plugin crashed") }
   }
 
   static dummy = new PluginInstance({}, ViewPlugin.define(() => ({})))

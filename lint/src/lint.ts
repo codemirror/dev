@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
-        WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass} from "../../view"
+        WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "../../view"
 import {Annotation, EditorSelection, StateField, Extension} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, Panel, showPanel} from "../../panel"
@@ -192,7 +192,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
                 (annotations.length || this.view.state.field(lintState).diagnostics.size))
               this.view.dispatch(this.view.state.t().annotate(setDiagnostics, annotations))
           },
-          error => { throw error }
+          error => { logException(this.view.state, error) }
         )
       }
     }

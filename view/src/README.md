@@ -23,6 +23,8 @@ component that displays the editor state and allows text input.
 
 @ViewUpdate
 
+@logExtension
+
 ### Decorations
 
 Your code should never, _never_ directly change the DOM structure

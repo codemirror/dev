@@ -10,7 +10,7 @@ import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
-        viewPlugin, ViewPlugin, PluginInstance, PluginField,
+        exceptionSink, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
         decorations, MeasureRequest, UpdateFlag} from "./extension"
 import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
@@ -198,7 +198,7 @@ export class EditorView {
         }
       }
       for (let plugin of this.plugins)
-        if (plugin.destroy && reused.indexOf(plugin) < 0) plugin.destroy()
+        if (reused.indexOf(plugin) < 0) plugin.destroy(this)
       this.plugins = newPlugins
       this.inputState.ensureHandlers(this)
     } else {
@@ -224,7 +224,7 @@ export class EditorView {
       }
       let measured = measuring.map(m => {
         try { return m.read(this) }
-        catch(e) { console.error(e); return BadMeasure }
+        catch(e) { logException(this.state, e); return BadMeasure }
       })
       let update = new ViewUpdate(this, this.state)
       update.flags |= changed
@@ -233,7 +233,7 @@ export class EditorView {
       if (changed) this.docView.update(update)
       for (let i = 0; i < measuring.length; i++) if (measured[i] != BadMeasure) {
         try { measuring[i].write(measured[i], this) }
-        catch(e) { console.error(e) }
+        catch(e) { logException(this.state, e) }
       }
       if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
     }
@@ -416,7 +416,7 @@ export class EditorView {
   /// plugins. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    for (let plugin of this.plugins) plugin.destroy()
+    for (let plugin of this.plugins) plugin.destroy(this)
     this.inputState.destroy()
     this.dom.remove()
     this.observer.destroy()
@@ -437,6 +437,15 @@ export class EditorView {
   static domEventHandlers(handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}): Extension {
     return ViewPlugin.define(() => ({})).eventHandlers(handlers)
   }
+
+  /// Allows you to provide a function that should be called when the
+  /// library catches an exception from an extension (mostly from view
+  /// plugins, but may be used by other extensions to route exceptions
+  /// from user-code-provided callbacks). This is mostly useful for
+  /// debugging and logging. The highest-precedence handler is the
+  /// only one called. The default behavior is to just call
+  /// `console.error`.
+  static exceptionSink = exceptionSink
 
   /// Facet used to configure whether a given selection drag event
   /// should move or copy the selection. The given predicate will be

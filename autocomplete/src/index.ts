@@ -1,4 +1,4 @@
-import {ViewPlugin, PluginValue, ViewUpdate, EditorView} from "../../view"
+import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException} from "../../view"
 import {combineConfig, Annotation, EditorSelection, EditorState,
         Transaction, Extension, StateField, Facet, Precedence} from "../../state"
 import {keymap} from "../../keymap"
@@ -241,6 +241,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
         if (this.stateVersion != version || result.length == 0) return
         this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result, 0)))
       })
+      .catch(e => logException(this.view.state, e))
   }
 })
 

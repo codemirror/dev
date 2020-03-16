@@ -1,7 +1,8 @@
 import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
-import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior} from "./extension"
+import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,
+        logException} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
 import {getSelection} from "./dom"
@@ -72,7 +73,7 @@ export class InputState {
         try {
           if (handler.call(set.plugin, event, view) || event.defaultPrevented) return true
         } catch (e) {
-          console.error(e)
+          logException(view.state, e)
         }
       }
     }
