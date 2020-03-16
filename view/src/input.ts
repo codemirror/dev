@@ -145,7 +145,6 @@ class MouseSelection {
   }
 
   move(event: MouseEvent) {
-    console.log("move", event.buttons, this.dragging)
     if (event.buttons == 0) return this.destroy()
     if (this.dragging !== false) return
     let {pos, bias} = this.queryPos(event)
