@@ -11,7 +11,7 @@ import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
         exceptionSink, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
-        decorations, MeasureRequest, UpdateFlag} from "./extension"
+        decorations, MeasureRequest, UpdateFlag, editable} from "./extension"
 import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
@@ -251,7 +251,7 @@ export class EditorView {
     this.editorAttrs = editorAttrs
     let contentAttrs = combineAttrs(this.state.facet(contentAttributes), {
       spellcheck: "false",
-      contenteditable: "true",
+      contenteditable: String(this.state.facet(editable)),
       class: themeClass("content"),
       style: `${browser.tabSize}: ${this.state.tabSize}`,
       role: "textbox",
@@ -446,6 +446,14 @@ export class EditorView {
   /// only one called. The default behavior is to just call
   /// `console.error`.
   static exceptionSink = exceptionSink
+
+  /// Facet that controls whether the editor content is editable. When
+  /// its the highest-precedence value is `false`, editing is
+  /// disabled, and the content element will no longer have its
+  /// `contenteditable` attribute set to `true`. (Note that this
+  /// doesn't affect API calls that change the editor content, even
+  /// when those are bound to keys or buttons.)
+  static editable = editable
 
   /// Facet used to configure whether a given selection drag event
   /// should move or copy the selection. The given predicate will be

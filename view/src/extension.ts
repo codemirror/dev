@@ -36,6 +36,8 @@ export function logException(state: EditorState, exception: any, context?: strin
   else console.error(exception)
 }
 
+export const editable = Facet.define<boolean, boolean>({combine: values => values.length ? values[0] : true })
+
 /// This is the interface plugin objects conform to.
 export interface PluginValue {
   /// Notifies the plugin of an update that happened in the view. This
