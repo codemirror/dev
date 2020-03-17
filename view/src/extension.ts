@@ -26,12 +26,13 @@ export const exceptionSink = Facet.define<(exception: any) => void>()
 /// (for example when in an event handler).
 ///
 /// Either calls a handler registered with
-/// [`EditorView.exceptionSink`](#view.EditorView^exceptionSink), or
-/// `console.error` (in which case it'll pass `context`, when given,
-/// as first argument).
+/// [`EditorView.exceptionSink`](#view.EditorView^exceptionSink),
+/// `window.onerror`, if defined, or `console.error` (in which case
+/// it'll pass `context`, when given, as first argument).
 export function logException(state: EditorState, exception: any, context?: string) {
   let handler = state.facet(exceptionSink)
   if (handler.length) handler[0](exception)
+  else if (window.onerror) window.onerror(String(exception), context, undefined, undefined, exception)
   else if (context) console.error(context + ":" , exception)
   else console.error(exception)
 }

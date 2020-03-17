@@ -442,9 +442,7 @@ export class EditorView {
   /// library catches an exception from an extension (mostly from view
   /// plugins, but may be used by other extensions to route exceptions
   /// from user-code-provided callbacks). This is mostly useful for
-  /// debugging and logging. The highest-precedence handler is the
-  /// only one called. The default behavior is to just call
-  /// `console.error`.
+  /// debugging and logging. See [`logException`](#view.logException).
   static exceptionSink = exceptionSink
 
   /// Facet that controls whether the editor content is editable. When
