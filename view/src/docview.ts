@@ -208,7 +208,7 @@ export class DocView extends ContentView {
         // Selection.extend can be used to create an 'inverted' selection
         // (one where the focus is before the anchor), but not all
         // browsers support it yet.
-        if (domSel.extend) {
+        if (primary.empty || domSel.extend) {
           domSel.collapse(anchor.node, anchor.offset)
           if (!primary.empty) domSel.extend(head.node, head.offset)
         } else {
