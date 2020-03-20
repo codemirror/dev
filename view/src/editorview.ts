@@ -394,7 +394,6 @@ export class EditorView {
 
   /// Start a custom mouse selection event.
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
-    this.focus()
     this.inputState.startMouseSelection(this, event, update)
   }
 
