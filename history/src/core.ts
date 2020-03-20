@@ -26,8 +26,11 @@ function addChanges(branch: Branch, changes: ChangeSet, inverted: ChangeSet | nu
                     mayMerge: (prevItem: Item) => boolean): Branch {
   if (branch.length) {
     const lastItem = branch[branch.length - 1]
-    if (lastItem.selection && lastItem.isChange == Boolean(inverted) && mayMerge(lastItem))
-      return inverted ? updateBranch(branch, branch.length - 1, maxLen, new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), lastItem.selection)) : branch
+    if (lastItem.selection && lastItem.isChange == Boolean(inverted) && mayMerge(lastItem)) {
+      if (!inverted) return branch
+      let item = new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), lastItem.selection)
+      return updateBranch(branch, branch.length - 1, maxLen, item)
+    }
   }
   return updateBranch(branch, branch.length, maxLen, new Item(changes.desc, inverted, selectionBefore))
 }
@@ -106,14 +109,17 @@ export class HistoryState {
     return false
   }
 
-  pop(done: PopTarget, only: ItemFilter, transaction: Transaction, maxLen: number): {transaction: Transaction, state: HistoryState} {
+  pop(
+    done: PopTarget, only: ItemFilter, transaction: Transaction, maxLen: number
+  ): {transaction: Transaction, state: HistoryState} {
     let {changes, branch, selection} = popChanges(done == PopTarget.Done ? this.done : this.undone, only)
 
     let oldSelection = transaction.selection
     for (let change of changes.changes) transaction.change(change)
     transaction.setSelection(selection)
     let otherBranch = (done == PopTarget.Done ? this.undone : this.done)
-    otherBranch = addChanges(otherBranch, transaction.changes, transaction.changes.length > 0 ? transaction.invertedChanges() : null, oldSelection, maxLen, nope)
+    otherBranch = addChanges(otherBranch, transaction.changes,
+                             transaction.changes.length > 0 ? transaction.invertedChanges() : null, oldSelection, maxLen, nope)
     return {transaction, state: new HistoryState(done == PopTarget.Done ? branch : otherBranch,
                                                  done == PopTarget.Done ? otherBranch : branch)}
   }
