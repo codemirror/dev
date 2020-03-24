@@ -8,7 +8,7 @@ const ie_11up = /Trident\/(?:[7-9]|\d{2,})\..*rv:(\d+)/.exec(nav.userAgent)
 const ie = !!(ie_upto10 || ie_11up || ie_edge)
 const gecko = !ie && /gecko\/(\d+)/i.test(nav.userAgent)
 const chrome = !ie && /Chrome\/(\d+)/.exec(nav.userAgent)
-const webkit = "webkitFontSmoothing" in document.documentElement.style
+const webkit = "webkitFontSmoothing" in doc.documentElement.style
 
 export default {
   mac: /Mac/.test(nav.platform),
