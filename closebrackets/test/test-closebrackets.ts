@@ -72,7 +72,7 @@ describe("closeBrackets", () => {
   })
 
   const syntax = new StreamSyntax({
-    docProps: [[languageData, {closeBrackets: ["(", "'", "'''"]}]],
+    docProps: [[languageData, {closeBrackets: {brackets: ["(", "'", "'''"]}}]],
     token(stream) {
       if (stream.match("'''")) {
         while (!stream.match("'''") && !stream.eol()) stream.next()
