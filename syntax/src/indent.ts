@@ -99,12 +99,12 @@ function isParent(parent: Subtree, of: Subtree) {
 // if so, return the opening token.
 function bracketedAligned(context: TreeIndentContext) {
   let tree = context.node
-  let openToken = tree.childAfter(tree.start)
+  let openToken = tree.childAfter(tree.start), last = tree.lastChild
   if (!openToken) return null
   let openLine = context.state.doc.lineAt(openToken.start)
   for (let pos = openToken.end;;) {
     let next = tree.childAfter(pos)
-    if (!next || next.end == tree.end) return null
+    if (!next || next == last) return null
     if (!next.type.prop(NodeProp.skipped))
       return next.start < openLine.end ? openToken : null
     pos = next.end
