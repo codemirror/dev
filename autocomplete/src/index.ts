@@ -127,9 +127,13 @@ const activeCompletion = StateField.define<ActiveState>({
     return tr.annotation(Transaction.userEvent) == "input" ? "pending"
       : tr.docChanged || tr.selectionSet ? null
       : prev
-  }
-}).provideN(showTooltip, active => active instanceof ActiveCompletion ? active.tooltip : none)
-  .provide(EditorView.contentAttributes, active => active instanceof ActiveCompletion ? active.attrs : baseAttrs)
+  },
+
+  provide: [
+    showTooltip.nFrom(active => active instanceof ActiveCompletion ? active.tooltip : none),
+    EditorView.contentAttributes.from(active => active instanceof ActiveCompletion ? active.attrs : baseAttrs)
+  ]
+})
 
 const baseAttrs = {"aria-autocomplete": "list"}, none: readonly any[] = []
 

@@ -20,8 +20,9 @@ const widgetField = StateField.define<DecorationSet>({
       deco.push(Decoration.replace({widget: new OWidget(undefined)}).range(i, i + 1))
     return Decoration.set(deco)
   },
-  update(deco, tr) { return deco.map(tr.changes) }
-}).provide(EditorView.decorations)
+  update(deco, tr) { return deco.map(tr.changes) },
+  provide: [EditorView.decorations]
+})
 const oWidgets = [widgetField]
 
 class BigWidget extends WidgetType<void> {
@@ -123,8 +124,9 @@ describe("EditorView.movePos", () => {
           Decoration.widget({widget: new BigWidget(undefined), side: -1, block: true}).range(4)
         ])
       },
-      update(deco) { return deco }
-    }).provide(EditorView.decorations)
+      update(deco) { return deco },
+      provide: [EditorView.decorations]
+    })
     let cm = tempEditor("one\ntwo", [field])
     ist(cm.contentDOM.offsetHeight, 400, ">")
     ist(cm.movePos(0, "forward", "line"), 4)

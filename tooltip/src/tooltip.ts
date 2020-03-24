@@ -249,8 +249,10 @@ export function hoverTooltip(
       if (value && options.hideOnChange && (tr.docChanged || tr.selectionSet)) return null
       let set = tr.annotation(setHover)
       return set === undefined ? value : set
-    }
-  }).provideN(showTooltip, v => v ? [v.tooltip] : [])
+    },
+
+    provide: [showTooltip.nFrom(v => v ? [v.tooltip] : [])]
+  })
 
   return [
     hoverState,

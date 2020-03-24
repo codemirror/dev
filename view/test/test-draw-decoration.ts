@@ -14,8 +14,9 @@ function decos(startState: DecorationSet = Decoration.none) {
       let add = tr.annotation(addDeco), filter = tr.annotation(filterDeco)
       if (add || filter) value = value.update({add, filter})
       return value
-    }
-  }).provide(EditorView.decorations)
+    },
+    provide: [EditorView.decorations]
+  })
   return [field]
 }
 

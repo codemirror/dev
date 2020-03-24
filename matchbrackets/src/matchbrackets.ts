@@ -60,8 +60,9 @@ const bracketMatchingState = StateField.define<DecorationSet>({
       if (match.end) decorations.push(mark.range(match.end.from, match.end.to))
     }
     return Decoration.set(decorations, true)
-  }
-}).provide(EditorView.decorations)
+  },
+  provide: [EditorView.decorations]
+})
 
 const bracketMatchingUnique = [
   bracketMatchingState,

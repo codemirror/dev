@@ -7,8 +7,9 @@ const field = StateField.define<DecorationSet>({
   },
   update(deco, tr) {
     return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection) : deco
-  }
-}).provide(EditorView.decorations)
+  },
+  provide: [EditorView.decorations]
+})
 
 /// Returns an extension that enables multiple selections for the
 /// editor. Secondary cursors and selected ranges are drawn with

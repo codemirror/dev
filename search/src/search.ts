@@ -34,8 +34,9 @@ const searchState: StateField<SearchState> = StateField.define<SearchState>({
     return ann ? new SearchState(ann.query || search.query,
                                  ann.panel == null ? search.panel :
                                  ann.panel ? [createSearchPanel] : []) : search
-  }
-}).provideN(showPanel, s => s.panel)
+  },
+  provide: [showPanel.nFrom(s => s.panel)]
+})
 
 class SearchState {
   constructor(readonly query: Query, readonly panel: readonly ((view: EditorView) => Panel)[]) {}

@@ -95,9 +95,10 @@ const lintState = StateField.define<LintState>({
     }
 
     return value
-  }
-}).provideN(showPanel, s => s.panel ? [s.panel] : [])
-  .provide(EditorView.decorations, s => s.diagnostics)
+  },
+  provide: [showPanel.nFrom(s => s.panel ? [s.panel] : []),
+            EditorView.decorations.from(s => s.diagnostics)]
+})
 
 const activeMark = Decoration.mark({class: themeClass("lintRange.active")})
 

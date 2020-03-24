@@ -80,6 +80,20 @@ export class Facet<Input, Output> {
     if (this.isStatic) throw new Error("Can't compute a static facet")
     return new FacetProvider<Input>(deps, this, Provider.Multi, get)
   }
+
+  /// Helper method for registering a facet source with a state field
+  /// via its [`provide`](#state.StateFieldSpec.provide) option.
+  /// Returns a value that can be passed to that option to make the
+  /// field automatically provide a value for this facet.
+  from<T>(get: (value: T) => Input, prec?: Precedence): (field: StateField<T>) => Extension {
+    return field => maybePrec(prec, this.compute([field], state => get(state.field(field))))
+  }
+
+  /// Helper for [providing](#state.StateFieldSpec.provide) a dynamic
+  /// number of values for this facet from a state field.
+  nFrom<T>(get: (value: T) => readonly Input[], prec?: Precedence): (field: StateField<T>) => Extension {
+    return field => maybePrec(prec, this.computeN([field], state => get(state.field(field))))
+  }
 }
 
 function sameArray<T>(a: readonly T[], b: readonly T[]) {
@@ -185,6 +199,13 @@ export type StateFieldSpec<Value> = {
   /// on the field when its value did not change. Defaults to using
   /// `==`.
   compare?: (a: Value, b: Value) => boolean,
+
+  /// Provide values for facets based on the value of this field. You
+  /// can pass facets that directly take the field value as input, or
+  /// use facet's [`from`](#state.Facet.from) and
+  /// [`nFrom`](#state.Facet.nFrom) methods to provide a getter
+  /// function.
+  provide?: readonly (Facet<Value, any> | ((field: StateField<Value>) => Extension))[]
 }
 
 /// Fields can store additional information in an editor state, and
@@ -202,26 +223,13 @@ export class StateField<Value> {
 
   /// Define a state field.
   static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
-    return new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b), [])
-  }
-
-  /// Extends the field to also provide a facet value. Returns a new
-  /// `StateField` instance that, when used to extend a state,
-  /// provides an input to the given facet that's derived from the
-  /// field. When no `get` value is given, the entire value of the
-  /// field is used as facet input.
-  provide(facet: Facet<Value, any>): StateField<Value>
-  provide<T>(facet: Facet<T, any>, get: (value: Value) => T, prec?: Precedence): StateField<Value>
-  provide<T>(facet: Facet<T, any>, get?: (value: Value) => T, prec?: Precedence) {
-    let provider = facet.compute([this], get ? state => get(state.field(this)) : state => state.field(this) as any)
-    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
-  }
-
-  /// Extends the field to provide zero or more input values for the
-  /// given facet.
-  provideN<T>(facet: Facet<T, any>, get: (value: Value) => readonly T[], prec?: Precedence): StateField<Value> {
-    let provider = facet.computeN([this], state => get(state.field(this)))
-    return new StateField(this.id, this.createF, this.updateF, this.compareF, this.facets.concat(maybePrec(prec, provider)))
+    let facets: Extension[] = []
+    let field = new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b), facets)
+    if (config.provide) for (let p of config.provide) {
+      if (p instanceof Facet) facets.push(p.compute([field], state => state.field(field)))
+      else facets.push(p(field))
+    }
+    return field
   }
 
   /// @internal

@@ -121,8 +121,9 @@ describe("DOM changes", () => {
   it("doesn't drop collapsed text", () => {
     let field = StateField.define<DecorationSet>({
       create() { return Decoration.set(Decoration.replace({}).range(1, 3)) },
-      update(d, u) { return Decoration.none }
-    }).provide(EditorView.decorations)
+      update() { return Decoration.none },
+      provide: [EditorView.decorations]
+    })
     let cm = tempEditor("abcd", [field])
     cm.domAtPos(0).node.firstChild!.textContent = "x"
     flush(cm)
@@ -156,8 +157,9 @@ describe("DOM changes", () => {
     }
     let field = StateField.define<DecorationSet>({
       create() { return Decoration.set(Decoration.widget({widget: new Widget(null) }).range(4)) },
-      update(v) { return v }
-    }).provide(EditorView.decorations)
+      update(v) { return v },
+      provide: [EditorView.decorations]
+    })
     let cm = tempEditor("abcd", [field])
     cm.domAtPos(0).node.appendChild(document.createTextNode("x"))
     flush(cm)
