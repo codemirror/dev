@@ -60,7 +60,7 @@ describe("HeightMap", () => {
     let map = mk(text, [Decoration.widget({widget: new MyWidget(20)}).range(5)])
     ist(map.toString(), "line(20:20)")
     map = map.applyChanges([], text, o(text), [new ChangedRange(5, 5, 5, 5)])
-    ist(map.toString(), "gap(20)")
+    ist(map.toString(), "line(20)")
   })
 
   it("updates the length of replaced decorations for changes", () => {
