@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {Annotation, Facet, StateField, Extension} from "../../state"
+import {StateEffect, StateEffectType, Facet, StateField, Extension} from "../../state"
 
 const HoverTime = 750, HoverMaxDist = 10
 
@@ -159,7 +159,7 @@ class HoverPlugin {
   constructor(readonly view: EditorView,
               readonly source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
               readonly field: StateField<HoverTooltip | null>,
-              readonly setHover: Annotation<HoverTooltip | null>) {
+              readonly setHover: StateEffectType<HoverTooltip | null>) {
     this.checkHover = this.checkHover.bind(this)
     view.dom.addEventListener("mouseenter", this.mouseenter = this.mouseenter.bind(this))
     view.dom.addEventListener("mouseleave", this.mouseleave = this.mouseleave.bind(this))
@@ -182,7 +182,7 @@ class HoverPlugin {
     let open = pos < 0 ? null : this.source(this.view, (from, to) => {
       return from <= pos && to >= pos && (from == to || isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY))
     })
-    if (open) this.view.dispatch(this.view.state.t().annotate(this.setHover, open))
+    if (open) this.view.dispatch(this.view.state.t().effect(this.setHover.of(open)))
   }
 
   mousemove(event: MouseEvent) {
@@ -193,7 +193,7 @@ class HoverPlugin {
         (active.start == active.end
          ? this.view.posAtCoords({x: event.clientX, y: event.clientY}) != active.start
          : !isOverRange(this.view, active.start, active.end, event.clientX, event.clientY, HoverMaxDist)))
-      this.view.dispatch(this.view.state.t().annotate(this.setHover, null))
+      this.view.dispatch(this.view.state.t().effect(this.setHover.of(null)))
   }
 
   mouseenter() {
@@ -203,7 +203,7 @@ class HoverPlugin {
   mouseleave() {
     this.mouseInside = false
     if (this.active)
-      this.view.dispatch(this.view.state.t().annotate(this.setHover, null))
+      this.view.dispatch(this.view.state.t().effect(this.setHover.of(null)))
   }
 
   destroy() {
@@ -241,14 +241,14 @@ export function hoverTooltip(
   source: (view: EditorView, check: (from: number, to: number) => boolean) => HoverTooltip | null,
   options: {hideOnChange?: boolean} = {}
 ): Extension {
-  const setHover = Annotation.define<HoverTooltip | null>()
+  const setHover = StateEffect.define<HoverTooltip | null>()
   const hoverState = StateField.define<HoverTooltip | null>({
     create() { return null },
 
     update(value, tr) {
       if (value && options.hideOnChange && (tr.docChanged || tr.selectionSet)) return null
-      let set = tr.annotation(setHover)
-      return set === undefined ? value : set
+      for (let effect of tr.effects) if (effect.is(setHover)) return effect.value
+      return value
     },
 
     provide: [showTooltip.nFrom(v => v ? [v.tooltip] : [])]
