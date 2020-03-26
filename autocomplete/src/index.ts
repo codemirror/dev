@@ -72,7 +72,7 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.t().effect(new SelectCompletion(selected)))
+    view.dispatch(view.state.t().effect(selectCompletion.of(selected)))
     return true
   }
 }
@@ -87,7 +87,7 @@ function acceptCompletion(view: EditorView) {
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active != null && active != "pending") return false
-  view.dispatch(view.state.t().effect(new ToggleCompletion(true)))
+  view.dispatch(view.state.t().effect(toggleCompletion.of(true)))
   return true
 }
 
@@ -106,7 +106,7 @@ function applyCompletion(view: EditorView, option: Completion) {
 function closeCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active == null) return false
-  view.dispatch(view.state.t().effect(new ToggleCompletion(false)))
+  view.dispatch(view.state.t().effect(toggleCompletion.of(false)))
   return true
 }
 
@@ -115,17 +115,9 @@ type ActiveState = ActiveCompletion // There is a completion active
   | "pending" // Must update after user input
   | "pendingExplicit" // Must update after explicit completion command
 
-class OpenCompletion extends StateEffect {
-  constructor(readonly completions: readonly Completion[]) { super() }
-}
-
-class ToggleCompletion extends StateEffect {
-  constructor(readonly open: boolean) { super() }
-}
-
-class SelectCompletion extends StateEffect {
-  constructor(readonly index: number) { super() }
-}
+const openCompletion = StateEffect.define<readonly Completion[]>()
+const toggleCompletion = StateEffect.define<boolean>()
+const selectCompletion = StateEffect.define<number>()
 
 const activeCompletion = StateField.define<ActiveState>({
   create() { return null },
@@ -134,12 +126,12 @@ const activeCompletion = StateField.define<ActiveState>({
     if (tr.annotation(Transaction.userEvent) == "input") value = "pending"
     else if (tr.docChanged || tr.selectionSet) value = null
     for (let effect of tr.effects) {
-      if (effect instanceof OpenCompletion)
-        value = new ActiveCompletion(effect.completions, 0)
-      else if (effect instanceof ToggleCompletion)
-        value = effect.open ? "pendingExplicit" : null
-      else if (effect instanceof SelectCompletion && value instanceof ActiveCompletion)
-        value = new ActiveCompletion(value.options, effect.index, value.id, value.tooltip)
+      if (effect.is(openCompletion))
+        value = new ActiveCompletion(effect.value, 0)
+      else if (effect.is(toggleCompletion))
+        value = effect.value ? "pendingExplicit" : null
+      else if (effect.is(selectCompletion) && value instanceof ActiveCompletion)
+        value = new ActiveCompletion(value.options, effect.value, value.id, value.tooltip)
     }
     return value
   },
@@ -258,7 +250,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
       .then(result => {
         if (this.stateVersion != version || result.length == 0) return
-        this.view.dispatch(this.view.state.t().effect(new OpenCompletion(result)))
+        this.view.dispatch(this.view.state.t().effect(openCompletion.of(result)))
       })
       .catch(e => logException(this.view.state, e))
   }

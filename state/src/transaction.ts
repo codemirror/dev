@@ -19,14 +19,45 @@ export class Annotation<T> {
   static define<T>() { return new Annotation<T>() }
 }
 
-export abstract class StateEffect {
-  map(_mapping: Mapping): StateEffect | null { return this }
+export interface StateEffectSpec<Value> {
+  map?: (value: Value, mapping: Mapping) => Value | undefined,
+  invert?: (value: Value, state: EditorState) => Value,
+  history?: boolean
+}
 
-  invert(_state: EditorState): StateEffect {
-    throw new Error(`${this.constructor.name} has not implemented 'invert'`)
+export class StateEffect<Value> {
+  constructor(readonly type: StateEffectType<Value>,
+              readonly value: Value) {}
+
+  map(mapping: Mapping): StateEffect<Value> | undefined {
+    let mapped = this.type.map(this.value, mapping)
+    return mapped === undefined ? undefined : mapped == this.value ? this : new StateEffect(this.type, mapped)
   }
 
-  get history() { return false }
+  invert(state: EditorState): StateEffect<Value> {
+    if (!this.type.invert) throw new Error("No invert method defined for this effect type")
+    return new StateEffect(this.type, this.type.invert(this.value, state))
+  }
+
+  is<T>(type: StateEffectType<T>): this is StateEffect<T> { return this.type == type as any }
+
+  static define<Value = null>(spec: StateEffectSpec<Value> = {}) {
+    if (spec.history && !spec.invert) throw new Error("An effect needs to have an invert method to be usable with the history")
+    return new StateEffectType(spec.map || (v => v), spec.invert, !!spec.history)
+  }
+}
+
+export class StateEffectType<Value> {
+  /// @internal
+  constructor(
+    /// @internal
+    readonly map: (value: Value, mapping: Mapping) => Value | undefined,
+    /// @internal
+    readonly invert: ((value: Value, state: EditorState) => Value) | undefined,
+    readonly history: boolean
+  ) {}
+
+  of(value: Value) { return new StateEffect(this, value) }
 }
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
@@ -48,7 +79,7 @@ export class Transaction {
   docs: Text[] = []
   /// The selection at the end of the transaction.
   selection: EditorSelection
-  effects: StateEffect[] = []
+  effects: StateEffect<any>[] = []
   private _annotations: {[id: number]: any} = Object.create(null)
   private flags: number = 0
   /// @internal
@@ -84,9 +115,9 @@ export class Transaction {
     return this._annotations[annotation.id]
   }
 
-  effect(effect: StateEffect) {
+  effect(effect: StateEffect<any> | StateEffectType<null>) {
     this.ensureOpen()
-    this.effects.push(effect)
+    this.effects.push(effect instanceof StateEffect ? effect : effect.of(null))
     return this
   }
 
