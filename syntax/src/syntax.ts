@@ -1,7 +1,7 @@
 import {Parser, InputStream, ParseContext} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
 import {Text, TextIterator} from "../../text"
-import {EditorState, StateField, Transaction, Syntax, Extension, Annotation} from "../../state"
+import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType} from "../../state"
 import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
@@ -19,7 +19,7 @@ export class LezerSyntax implements Syntax {
   /// method to register CodeMirror-specific syntax node props in the
   /// parser, before passing it to this constructor.
   constructor(readonly parser: Parser) {
-    let setSyntax = Annotation.define<SyntaxState>()
+    let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
       create(state) { return SyntaxState.advance(Tree.empty, parser, state.doc) },
       update(value, tr) { return value.apply(tr, parser, setSyntax) }
@@ -149,9 +149,9 @@ class SyntaxState {
     return done ? new SyntaxState(done, doc.length) : new SyntaxState(takeTree(parse, tree), parse.pos)
   }
 
-  apply(tr: Transaction, parser: Parser, annotation: Annotation<SyntaxState>) {
-    let given = tr.annotation(annotation)
-    return given || (!tr.docChanged && this) || SyntaxState.advance(
+  apply(tr: Transaction, parser: Parser, effect: StateEffectType<SyntaxState>) {
+    for (let e of tr.effects) if (e.is(effect)) return e.value
+    return (!tr.docChanged && this) || SyntaxState.advance(
       (this.parse ? takeTree(this.parse, this.updatedTree) : this.updatedTree).applyChanges(tr.changes.changedRanges()),
       parser, tr.doc)
   }
@@ -187,7 +187,7 @@ class HighlightWorker {
 
   constructor(readonly view: EditorView, 
               readonly syntax: LezerSyntax,
-              readonly setSyntax: Annotation<SyntaxState>) {
+              readonly setSyntax: StateEffectType<SyntaxState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
   }
@@ -210,8 +210,8 @@ class HighlightWorker {
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (done || field.parse!.badness > .8)
-      this.view.dispatch(state.t().annotate(this.setSyntax, new SyntaxState(
-        field.stopParse(done, state.doc.length), state.doc.length)))
+      this.view.dispatch(state.t().effect(this.setSyntax.of(new SyntaxState(
+        field.stopParse(done, state.doc.length), state.doc.length))))
     else
       this.scheduleWork()
   }

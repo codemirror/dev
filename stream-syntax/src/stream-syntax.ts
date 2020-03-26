@@ -1,5 +1,5 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Syntax, Extension, Annotation, IndentContext} from "../../state"
+import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType, IndentContext} from "../../state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "../../view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "../../highlight"
@@ -82,7 +82,7 @@ export class StreamSyntax implements Syntax {
   /// Create a stream syntax.
   constructor(parser: StreamParser<any>) {
     let parserInst = this.parser = new StreamParserInstance(parser)
-    let setSyntax = Annotation.define<SyntaxState<any>>()
+    let setSyntax = StateEffect.define<SyntaxState<any>>()
     this.field = StateField.define<SyntaxState<any>>({
       create(state) {
         let start = new SyntaxState(Tree.empty, [parserInst.startState(state)], 1, 0, null)
@@ -91,8 +91,7 @@ export class StreamSyntax implements Syntax {
         return start
       },
       update(value, tr, state) {
-        let set = tr.annotation(setSyntax)
-        if (set) return set
+        for (let effect of tr.effects) if (effect.is(setSyntax)) return effect.value
         if (!tr.docChanged) return value
         let {start, number} = tr.doc.lineAt(tr.changes.changedRanges()[0].fromA)
         let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, start)
@@ -241,7 +240,7 @@ class HighlightWorker implements PluginValue {
   constructor(readonly view: EditorView,
               readonly parser: StreamParserInstance<any>,
               readonly field: StateField<SyntaxState<any>>,
-              readonly setSyntax: Annotation<SyntaxState<any>>) {
+              readonly setSyntax: StateEffectType<SyntaxState<any>>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
   }
@@ -265,7 +264,7 @@ class HighlightWorker implements PluginValue {
     let end = this.view.viewport.to
     field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice, end)
     if (field.frontierPos < end) this.scheduleWork()
-    else this.view.dispatch(state.t().annotate(this.setSyntax, field.copy()))
+    else this.view.dispatch(state.t().effect(this.setSyntax.of(field.copy())))
   }
 
   destroy() {
