@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
-import {Change, ChangeSet} from "./change"
+import {Change, ChangeSet, Mapping} from "./change"
 import {Extension, ExtensionGroup} from "./facet"
 
 let annotationID = 0
@@ -17,6 +17,16 @@ export class Annotation<T> {
 
   /// Define a new type of annotation.
   static define<T>() { return new Annotation<T>() }
+}
+
+export abstract class StateEffect {
+  map(_mapping: Mapping): StateEffect | null { return this }
+
+  invert(_state: EditorState): StateEffect {
+    throw new Error(`${this.constructor.name} has not implemented 'invert'`)
+  }
+
+  get history() { return false }
 }
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
@@ -38,6 +48,7 @@ export class Transaction {
   docs: Text[] = []
   /// The selection at the end of the transaction.
   selection: EditorSelection
+  effects: StateEffect[] = []
   private _annotations: {[id: number]: any} = Object.create(null)
   private flags: number = 0
   /// @internal
@@ -73,6 +84,12 @@ export class Transaction {
     return this._annotations[annotation.id]
   }
 
+  effect(effect: StateEffect) {
+    this.ensureOpen()
+    this.effects.push(effect)
+    return this
+  }
+
   /// Add a change to this transaction. If `mirror` is given, it
   /// should be the index (in `this.changes.changes`) at which the
   /// mirror image of this change sits.
@@ -84,6 +101,11 @@ export class Transaction {
     this.changes = this.changes.append(change, mirror)
     this.docs.push(change.apply(this.doc))
     this.selection = this.selection.map(change)
+    for (let i = 0; i < this.effects.length; i++) {
+      let mapped = this.effects[i].map(change)
+      if (!mapped) this.effects.splice(i--, 1)
+      else this.effects[i] = mapped
+    }
     return this
   }
 
