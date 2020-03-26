@@ -394,6 +394,7 @@ export class EditorView {
 
   /// Start a custom mouse selection event.
   startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
+    focusPreventScroll(this.contentDOM)
     this.inputState.startMouseSelection(this, event, update)
   }
 
