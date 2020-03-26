@@ -1,6 +1,6 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException} from "../../view"
-import {combineConfig, Annotation, EditorSelection, EditorState,
-        Transaction, Extension, StateField, Facet, Precedence} from "../../state"
+import {combineConfig, EditorSelection, EditorState,
+        Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "../../state"
 import {keymap} from "../../keymap"
 import {Tooltip, tooltips, showTooltip} from "../../tooltip"
 
@@ -72,8 +72,7 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.t().annotate(setActiveCompletion,
-                                          new ActiveCompletion(active.options, selected, active.id, active.tooltip)))
+    view.dispatch(view.state.t().effect(new SelectCompletion(selected)))
     return true
   }
 }
@@ -88,7 +87,7 @@ function acceptCompletion(view: EditorView) {
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active != null && active != "pending") return false
-  view.dispatch(view.state.t().annotate(setActiveCompletion, "pendingExplicit"))
+  view.dispatch(view.state.t().effect(new ToggleCompletion(true)))
   return true
 }
 
@@ -107,7 +106,7 @@ function applyCompletion(view: EditorView, option: Completion) {
 function closeCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active == null) return false
-  view.dispatch(view.state.t().annotate(setActiveCompletion, null))
+  view.dispatch(view.state.t().effect(new ToggleCompletion(false)))
   return true
 }
 
@@ -116,17 +115,33 @@ type ActiveState = ActiveCompletion // There is a completion active
   | "pending" // Must update after user input
   | "pendingExplicit" // Must update after explicit completion command
 
-const setActiveCompletion = Annotation.define<ActiveState>()
+class OpenCompletion extends StateEffect {
+  constructor(readonly completions: readonly Completion[]) { super() }
+}
+
+class ToggleCompletion extends StateEffect {
+  constructor(readonly open: boolean) { super() }
+}
+
+class SelectCompletion extends StateEffect {
+  constructor(readonly index: number) { super() }
+}
 
 const activeCompletion = StateField.define<ActiveState>({
   create() { return null },
-  update(prev, tr) {
-    let set = tr.annotation(setActiveCompletion)
-    if (set !== undefined) return set
 
-    return tr.annotation(Transaction.userEvent) == "input" ? "pending"
-      : tr.docChanged || tr.selectionSet ? null
-      : prev
+  update(value, tr) {
+    if (tr.annotation(Transaction.userEvent) == "input") value = "pending"
+    else if (tr.docChanged || tr.selectionSet) value = null
+    for (let effect of tr.effects) {
+      if (effect instanceof OpenCompletion)
+        value = new ActiveCompletion(effect.completions, 0)
+      else if (effect instanceof ToggleCompletion)
+        value = effect.open ? "pendingExplicit" : null
+      else if (effect instanceof SelectCompletion && value instanceof ActiveCompletion)
+        value = new ActiveCompletion(value.options, effect.index, value.id, value.tooltip)
+    }
+    return value
   },
 
   provide: [
@@ -226,8 +241,8 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   constructor(readonly view: EditorView) {}
 
   update(update: ViewUpdate) {
-    if (!(update.docChanged || update.selectionSet ||
-          update.transactions.some(t => t.annotation(setActiveCompletion) !== undefined))) return
+    if (!update.docChanged && !update.selectionSet &&
+        update.prevState.field(activeCompletion) == update.state.field(activeCompletion)) return
     this.stateVersion++
     if (this.debounce > -1) clearTimeout(this.debounce)
     let active = update.state.field(activeCompletion)
@@ -243,7 +258,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
       .then(result => {
         if (this.stateVersion != version || result.length == 0) return
-        this.view.dispatch(this.view.state.t().annotate(setActiveCompletion, new ActiveCompletion(result, 0)))
+        this.view.dispatch(this.view.state.t().effect(new OpenCompletion(result)))
       })
       .catch(e => logException(this.view.state, e))
   }
