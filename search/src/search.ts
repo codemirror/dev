@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
-import {StateField, Facet, Annotation, EditorSelection, SelectionRange, Extension} from "../../state"
+import {StateField, Facet, StateEffect, EditorSelection, SelectionRange, Extension} from "../../state"
 import {panels, Panel, showPanel} from "../../panel"
 import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
 import {Text, isWordChar} from "../../text"
@@ -23,17 +23,20 @@ class Query {
   get valid() { return !!this.search }
 }
 
-const searchAnnotation = Annotation.define<{query?: Query, panel?: boolean}>()
+const setQuery = StateEffect.define<Query>()
+
+const togglePanel = StateEffect.define<boolean>()
 
 const searchState: StateField<SearchState> = StateField.define<SearchState>({
   create() {
     return new SearchState(new Query("", "", false), [])
   },
-  update(search, tr) {
-    let ann = tr.annotation(searchAnnotation)
-    return ann ? new SearchState(ann.query || search.query,
-                                 ann.panel == null ? search.panel :
-                                 ann.panel ? [createSearchPanel] : []) : search
+  update(value, tr) {
+    for (let effect of tr.effects) {
+      if (effect.is(setQuery)) value = new SearchState(effect.value, value.panel)
+      else if (effect.is(togglePanel)) value = new SearchState(value.query, effect.value ? [createSearchPanel] : [])
+    }
+    return value
   },
   provide: [showPanel.nFrom(s => s.panel)]
 })
@@ -236,7 +239,7 @@ function createSearchPanel(view: EditorView) {
       updateQuery(q: Query) {
         if (!query.eq(q)) {
           query = q
-          view.dispatch(view.state.t().annotate(searchAnnotation, {query}))
+          view.dispatch(view.state.t().effect(setQuery.of(query)))
         }
       }
     }),
@@ -253,7 +256,7 @@ export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState)!
   if (!state) return false
   if (!state.panel.length)
-    view.dispatch(view.state.t().annotate(searchAnnotation, {panel: true}))
+    view.dispatch(view.state.t().effect(togglePanel.of(true)))
   return true
 }
 
@@ -276,7 +279,7 @@ export const closeSearchPanel: Command = view => {
   if (!state || !state.panel.length) return false
   let panel = view.dom.querySelector(".cm-panel-search")
   if (panel && panel.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.t().annotate(searchAnnotation, {panel: false}))
+  view.dispatch(view.state.t().effect(togglePanel.of(false)))
   return true
 }
 
