@@ -279,10 +279,15 @@ export class RangeSet<T extends RangeValue> {
     this.nextLayer.between(from, to, f)
   }
 
-  /// Iterate over the ranges in the set that touch the area between
-  /// from and to, ordered by their start position and side.
+  /// Iterate over the ranges in this set, in order, including all
+  /// ranges that end at or after `from`.
   iter(from: number = 0): RangeCursor<T> {
     return HeapCursor.from([this]).goto(from)
+  }
+
+  /// Iterate over the given sets, starting from `from`.
+  static iter<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number = 0): RangeCursor<T> {
+    return HeapCursor.from(sets).goto(from)
   }
 
   /// Iterate over two groups of sets, calling methods on `comparator`

@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, PluginField, ViewUpdate, BlockType, BlockInfo, themeClass} from "../../view"
 import {Range, RangeValue, RangeSet, RangeCursor} from "../../rangeset"
-import {combineConfig, fillConfig, MapMode, Annotation, Facet, Extension} from "../../state"
+import {combineConfig, fillConfig, MapMode, Facet, Extension, EditorState} from "../../state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -39,14 +39,9 @@ export interface GutterConfig {
   /// Controls whether empty gutter elements should be rendered.
   /// Defaults to false.
   renderEmptyElements?: boolean
-  /// A function that computes the initial set of markers for the
-  /// gutter, if any. Defaults to the empty set.
-  initialMarkers?: (view: EditorView) => RangeSet<GutterMarker>
-  /// A function that updates the set of markers when the view
-  /// updates. This is where you could read transaction information to
-  /// add or remove markers, depending on the kind of gutter you are
-  /// implementing.
-  updateMarkers?: (markers: RangeSet<GutterMarker>, update: ViewUpdate) => RangeSet<GutterMarker>
+  /// Retrieve a set of markers to use in this gutter from the
+  /// current editor state.
+  markers?: (state: EditorState) => (RangeSet<GutterMarker> | readonly RangeSet<GutterMarker>[])
   /// Can be used to optionally add a single marker to every line.
   lineMarker?: (view: EditorView, line: BlockInfo, markers: readonly GutterMarker[]) => GutterMarker | null
   /// Use a spacer element that gives the gutter its base width.
@@ -61,8 +56,7 @@ const defaults = {
   style: "",
   renderEmptyElements: false,
   elementStyle: "",
-  initialMarkers: () => RangeSet.empty,
-  updateMarkers: (markers: RangeSet<GutterMarker>) => markers,
+  markers: () => RangeSet.empty,
   lineMarker: () => null,
   initialSpacer: null,
   updateSpacer: null,
@@ -202,7 +196,7 @@ class UpdateContext {
   height = 0
 
   constructor(readonly gutter: SingleGutterView, viewport: {from: number, to: number}) {
-    this.cursor = gutter.markers.iter(viewport.from)
+    this.cursor = RangeSet.iter(Array.isArray(gutter.markers) ? gutter.markers : [gutter.markers], viewport.from)
   }
 
   line(view: EditorView, line: BlockInfo) {
@@ -243,7 +237,7 @@ class UpdateContext {
 class SingleGutterView {
   dom: HTMLElement
   elements: GutterElement[] = []
-  markers: RangeSet<GutterMarker>
+  markers: RangeSet<GutterMarker> | readonly RangeSet<GutterMarker>[]
   spacer: GutterElement | null = null
   elementClass!: string
 
@@ -257,7 +251,7 @@ class SingleGutterView {
         if (config.domEventHandlers[prop](view, line, event)) event.preventDefault()
       })
     }
-    this.markers = config.initialMarkers(view)
+    this.markers = config.markers(view.state)
     if (config.initialSpacer) {
       this.spacer = new GutterElement(view, 0, 0, [config.initialSpacer(view)], this.elementClass)
       this.dom.appendChild(this.spacer.dom)
@@ -267,7 +261,7 @@ class SingleGutterView {
 
   update(update: ViewUpdate) {
     let prevMarkers = this.markers
-    this.markers = this.config.updateMarkers(this.markers.map(update.changes), update)
+    this.markers = this.config.markers(update.state)
     if (this.spacer && this.config.updateSpacer) {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
       if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)
@@ -327,15 +321,8 @@ export interface LineNumberConfig {
   domEventHandlers?: Handlers
 }
 
-/// Used to insert markers into the line number gutter.
-export const lineNumberMarkers = Annotation.define<LineNumberMarkerUpdate>()
-
-export type LineNumberMarkerUpdate = {
-  /// When given, adds these markers.
-  add?: Range<GutterMarker>[],
-  /// Filter the line number markers through this function.
-  filter?: (from: number, to: number, marker: GutterMarker) => boolean
-}
+/// Facet used to provide markers to the line number gutter.
+export const lineNumberMarkers = Facet.define<RangeSet<GutterMarker>>()
 
 const lineNumberConfig = Facet.define<LineNumberConfig, Required<LineNumberConfig>>({
   combine(values) {
@@ -366,13 +353,7 @@ class NumberMarker extends GutterMarker {
 
 const lineNumberGutter = gutter({
   style: "lineNumber",
-  updateMarkers(markers: RangeSet<GutterMarker>, update: ViewUpdate) {
-    for (let tr of update.transactions) {
-      let ann = tr.annotation(lineNumberMarkers)
-      if (ann) markers = markers.update(ann)
-    }
-    return markers
-  },
+  markers(state: EditorState) { return state.facet(lineNumberMarkers) },
   lineMarker(view, line, others) {
     if (others.length) return null
     // FIXME try to make the line number queries cheaper?

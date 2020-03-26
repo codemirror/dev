@@ -11,5 +11,3 @@
 @GutterMarker
 
 @lineNumberMarkers
-
-@LineNumberMarkerUpdate
