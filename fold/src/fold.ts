@@ -1,11 +1,16 @@
-import {combineConfig, fillConfig, EditorState, Annotation, Facet, StateField} from "../../state"
+import {combineConfig, fillConfig, EditorState, StateEffect, Mapping, Facet, StateField, Transaction} from "../../state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
 import {gutter, GutterMarker} from "../../gutter"
 
 type Range = {from: number, to: number}
 
-const foldAnnotation = Annotation.define<{fold?: readonly Range[],
-                                          unfold?: readonly Range[]}>()
+function mapRange(range: Range, mapping: Mapping) {
+  let from = mapping.mapPos(range.from, 1), to = mapping.mapPos(range.to, -1)
+  return from >= to ? undefined : {from, to}
+}
+
+const foldEffect = StateEffect.define<Range>({map: mapRange})
+const unfoldEffect = StateEffect.define<Range>({map: mapRange})
 
 function selectedLines(view: EditorView) {
   let lines: BlockInfo[] = []
@@ -22,16 +27,13 @@ const foldState = StateField.define<DecorationSet>({
   },
   update(folded, tr) {
     folded = folded.map(tr.changes)
-    let ann = tr.annotation(foldAnnotation)
-    if (ann) {
-      let {fold = [], unfold = []} = ann
-      if (unfold.length || fold.length)
-        folded = folded.update({
-          add: fold.map(({from, to}) => FoldWidget.decoration.range(from, to)),
-          filter: (from, to) => !unfold.some(r => r.from == from && r.to == to),
-          filterFrom: unfold.reduce((m, r) => Math.min(m, r.from), 1e8),
-          filterTo: unfold.reduce((m, r) => Math.max(m, r.to), 0)
-        })
+    for (let e of tr.effects) {
+      if (e.is(foldEffect))
+        folded = folded.update({add: [FoldWidget.decoration.range(e.value.from, e.value.to)]})
+      else if (e.is(unfoldEffect)) {
+        folded = folded.update({filter: (from, to) => e.value.from != from || e.value.to != to,
+                                filterFrom: e.value.from, filterTo: e.value.to})
+      }
     }
     return folded
   },
@@ -48,27 +50,26 @@ function foldInside(state: EditorState, from: number, to: number) {
 
 export const foldCode: Command = view => {
   if (!view.state.field(foldState, false)) return false
-  let fold = []
   for (let line of selectedLines(view)) {
     let range = view.state.facet(EditorState.foldable)
       .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
-    if (range) fold.push(range)
+    if (range) {
+      view.dispatch(view.state.t().effect(foldEffect.of(range)))
+      return true
+    }
   }
-  if (!fold.length) return false
-  view.dispatch(view.state.t().annotate(foldAnnotation, {fold}))
-  return true
+  return false
 }
 
 export const unfoldCode: Command = view => {
   if (!view.state.field(foldState, false)) return false
-  let unfold: Range[] = []
+  let tr: Transaction | null = null
   for (let line of selectedLines(view)) {
     let folded = foldInside(view.state, line.from, line.to)
-    if (folded) unfold.push(folded)
+    if (folded) (tr || (tr = view.state.t())).effect(unfoldEffect.of(folded))
   }
-  if (!unfold.length) return false
-  view.dispatch(view.state.t().annotate(foldAnnotation, {unfold}))
-  return true
+  if (tr) view.dispatch(tr)
+  return !!tr
 }
 
 export interface FoldConfig {
@@ -109,7 +110,7 @@ class FoldWidget extends WidgetType<null> {
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
       let folded = foldInside(view.state, line.from, line.to)
-      if (folded) view.dispatch(view.state.t().annotate(foldAnnotation, {unfold: [folded]}))
+      if (folded) view.dispatch(view.state.t().effect(unfoldEffect.of(folded)))
       event.preventDefault()
     }
     return element
@@ -163,13 +164,13 @@ export function foldGutter(config: FoldGutterConfig = {}) {
         click: (view, line) => {
           let folded = foldInside(view.state, line.from, line.to)
           if (folded) {
-            view.dispatch(view.state.t().annotate(foldAnnotation, {unfold: [folded]}))
+            view.dispatch(view.state.t().effect(unfoldEffect.of(folded)))
             return true
           }
           let range = view.state.facet(EditorState.foldable)
             .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
           if (range) {
-            view.dispatch(view.state.t().annotate(foldAnnotation, {fold: [range]}))
+            view.dispatch(view.state.t().effect(foldEffect.of(range)))
             return true
           }
           return false
