@@ -41,7 +41,7 @@ export class StateEffect<Value> {
 
   is<T>(type: StateEffectType<T>): this is StateEffect<T> { return this.type == type as any }
 
-  static define<Value = null>(spec: StateEffectSpec<Value> = {}) {
+  static define<Value = null>(spec: StateEffectSpec<Value> = {}): StateEffectType<Value> {
     if (spec.history && !spec.invert) throw new Error("An effect needs to have an invert method to be usable with the history")
     return new StateEffectType(spec.map || (v => v), spec.invert, !!spec.history)
   }
@@ -50,14 +50,18 @@ export class StateEffect<Value> {
 export class StateEffectType<Value> {
   /// @internal
   constructor(
+    // The `any` types in these function types are there to work
+    // around TypeScript issue #37631, where the type guard on
+    // `StateEffect.is` mysteriously stops working when these properly
+    // have type `Value`.
     /// @internal
-    readonly map: (value: Value, mapping: Mapping) => Value | undefined,
+    readonly map: (value: any, mapping: Mapping) => any | undefined,
     /// @internal
-    readonly invert: ((value: Value, state: EditorState) => Value) | undefined,
+    readonly invert: ((value: any, state: EditorState) => any) | undefined,
     readonly history: boolean
   ) {}
 
-  of(value: Value) { return new StateEffect(this, value) }
+  of(value: Value): StateEffect<Value> { return new StateEffect(this, value) }
 }
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
