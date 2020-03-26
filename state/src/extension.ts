@@ -14,20 +14,6 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   static: true
 })
 
-let annotationID = 0
-
-/// Annotations are tagged values that are used to add metadata to
-/// transactions in an extensible way.
-export class Annotation<T> {
-  /// @internal
-  id = annotationID++
-
-  private constructor() {}
-
-  /// Define a new type of annotation.
-  static define<T>() { return new Annotation<T>() }
-}
-
 /// A node prop that can be stored on a grammar's top node to
 /// associate information with the language. Different extension might
 /// use different properties from this object (which they typically

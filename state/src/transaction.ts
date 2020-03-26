@@ -1,9 +1,23 @@
 import {Text} from "../../text"
-import {Annotation, allowMultipleSelections} from "./extension"
+import {allowMultipleSelections} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Change, ChangeSet} from "./change"
 import {Extension, ExtensionGroup} from "./facet"
+
+let annotationID = 0
+
+/// Annotations are tagged values that are used to add metadata to
+/// transactions in an extensible way.
+export class Annotation<T> {
+  /// @internal
+  id = annotationID++
+
+  private constructor() {}
+
+  /// Define a new type of annotation.
+  static define<T>() { return new Annotation<T>() }
+}
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
 
