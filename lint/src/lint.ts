@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
         WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "../../view"
-import {Annotation, EditorSelection, StateField, Extension} from "../../state"
+import {StateEffect, EditorSelection, StateField, Extension} from "../../state"
 import {hoverTooltip} from "../../tooltip"
 import {panels, Panel, showPanel} from "../../panel"
 
@@ -55,43 +55,47 @@ function findDiagnostic(diagnostics: DecorationSet, diagnostic: Diagnostic | nul
   return found
 }
 
-/// Transaction annotation that is used to update the current set of
+/// State effect that is used to update the current set of
 /// diagnostics.
-export const setDiagnostics = Annotation.define<readonly Diagnostic[]>()
+export const setDiagnostics = StateEffect.define<readonly Diagnostic[]>()
 
-const setState = Annotation.define<LintState>()
+const togglePanel = StateEffect.define<boolean>()
+
+const movePanelSelection = StateEffect.define<SelectedDiagnostic>()
 
 const lintState = StateField.define<LintState>({
   create() {
     return new LintState(Decoration.none, null, null)
   },
   update(value, tr) {
-    let setDiag = tr.annotation(setDiagnostics)
-    if (setDiag) {
-      let ranges = Decoration.set(setDiag.map(d => {
-        return d.from < d.to
-          ? Decoration.mark({
-            attributes: {class: themeClass("lintRange." + d.severity)},
-            diagnostic: d
-          } as MarkDecorationSpec).range(d.from, d.to)
-          : Decoration.widget({
-            widget: new DiagnosticWidget(d),
-            diagnostic: d
-          } as WidgetDecorationSpec).range(d.from)
-      }))
-      return new LintState(ranges, value.panel, findDiagnostic(ranges))
-    }
-
-    let newState = tr.annotation(setState)
-    if (newState) return newState
-
     if (tr.docChanged) {
       let mapped = value.diagnostics.map(tr.changes), selected = null
       if (value.selected) {
         let selPos = tr.changes.mapPos(value.selected.from, 1)
         selected = findDiagnostic(mapped, value.selected.diagnostic, selPos) || findDiagnostic(mapped, null, selPos)
       }
-      return new LintState(mapped, value.panel, selected)
+      value = new LintState(mapped, value.panel, selected)
+    }
+
+    for (let effect of tr.effects) {
+      if (effect.is(setDiagnostics)) {
+        let ranges = Decoration.set(effect.value.map((d: Diagnostic) => {
+          return d.from < d.to
+            ? Decoration.mark({
+              attributes: {class: themeClass("lintRange." + d.severity)},
+              diagnostic: d
+            } as MarkDecorationSpec).range(d.from, d.to)
+          : Decoration.widget({
+            widget: new DiagnosticWidget(d),
+            diagnostic: d
+          } as WidgetDecorationSpec).range(d.from)
+        }))
+        value = new LintState(ranges, value.panel, findDiagnostic(ranges))
+      } else if (effect.is(togglePanel)) {
+        value = new LintState(value.diagnostics, effect.value ? LintPanel.open : null, value.selected)
+      } else if (effect.is(movePanelSelection)) {
+        value = new LintState(value.diagnostics, value.panel, effect.value)
+      }
     }
 
     return value
@@ -151,7 +155,7 @@ export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
   if (!field.panel)
-    view.dispatch(view.state.t().annotate(setState, new LintState(field.diagnostics, LintPanel.open, field.selected)))
+    view.dispatch(view.state.t().effect(togglePanel.of(true)))
   if (view.state.field(lintState).panel)
     (view.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
@@ -161,7 +165,7 @@ export const openLintPanel: Command = (view: EditorView) => {
 export const closeLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field || !field.panel) return false
-  view.dispatch(view.state.t().annotate(setState, new LintState(field.diagnostics, null, field.selected)))
+  view.dispatch(view.state.t().effect(togglePanel.of(false)))
   return true
 }
 
@@ -191,7 +195,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
           annotations => {
             if (this.view.state.doc == state.doc &&
                 (annotations.length || this.view.state.field(lintState).diagnostics.size))
-              this.view.dispatch(this.view.state.t().annotate(setDiagnostics, annotations))
+              this.view.dispatch(this.view.state.t().effect(setDiagnostics.of(annotations)))
           },
           error => { logException(this.view.state, error) }
         )
@@ -379,7 +383,7 @@ class LintPanel implements Panel {
     this.view.dispatch(this.view.state.t()
                        .setSelection(EditorSelection.single(selection.from, selection.to))
                        .scrollIntoView()
-                       .annotate(setState, new LintState(field.diagnostics, field.panel, selection)))
+                       .effect(movePanelSelection.of(selection)))
   }
 
   get style() { return "lint" }
