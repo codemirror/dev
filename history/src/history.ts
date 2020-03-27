@@ -1,9 +1,17 @@
-import {combineConfig, EditorState, Transaction, StateField, StateCommand,
-        Annotation, Facet, Extension, ChangeSet, ChangeDesc, EditorSelection} from "../../state"
+import {combineConfig, EditorState, Transaction, StateField, StateCommand, StateEffect,
+        Facet, Extension, ChangeSet, ChangeDesc, EditorSelection} from "../../state"
 
-const historyStateAnnotation = Annotation.define<HistoryState>()
+const enum BranchName { Done, Undone }
 
-const closeHistoryAnnotation = Annotation.define<boolean>()
+// FIXME this would make more sense as an annotation, maybe
+const historyMoveEffect = StateEffect.define<{side: BranchName, rest: Branch}>()
+
+/// Transaction effect that will prevent further steps from being
+/// appended to an existing history event (so that they require a
+/// separate undo command to undo).
+export const closeHistory = StateEffect.define()
+
+const none: readonly any[] = []
 
 /// Options given when creating a history extension.
 export interface HistoryConfig {
@@ -29,17 +37,26 @@ const historyField = StateField.define({
   },
 
   update(state: HistoryState, tr: Transaction, newState: EditorState): HistoryState {
-    const fromMeta = tr.annotation(historyStateAnnotation)
-    if (fromMeta) return fromMeta
-    if (tr.annotation(closeHistoryAnnotation)) state = state.resetTime()
-    if (!tr.changes.length && !tr.selectionSet) return state
-
     let config = newState.facet(historyConfig)
-    if (tr.annotation(Transaction.addToHistory) !== false)
-      return state.addChanges(tr.changes, tr.changes.length ? tr.invertedChanges() : null,
-                              tr.startState.selection, tr.annotation(Transaction.time)!,
-                              tr.annotation(Transaction.userEvent), config.newGroupDelay, config.minDepth)
-    return state.addMapping(tr.changes.desc, config.minDepth)
+
+    for (let effect of tr.effects) if (effect.is(historyMoveEffect)) {
+      let item = Item.fromTransaction(tr), from = effect.value.side
+      let other = from == BranchName.Done ? state.undone : state.done
+      if (item) other = addChangeItem(other, item, config.minDepth, nope)
+      return new HistoryState(from == BranchName.Done ? effect.value.rest : other,
+                              from == BranchName.Done ? other : effect.value.rest)
+    }
+
+    if (tr.effects.some(e => e.is(closeHistory))) state = state.resetTime()
+
+    if (tr.annotation(Transaction.addToHistory) === false)
+      return tr.changes.length ? state.addMapping(tr.changes.desc, config.minDepth) : state
+
+    
+    let item = Item.fromTransaction(tr)
+    if (!item) return state
+    return state.addChangeItem(item, tr.annotation(Transaction.time)!, tr.annotation(Transaction.userEvent),
+                               config.newGroupDelay, config.minDepth)
   }
 })
 
@@ -51,59 +68,93 @@ export function history(config: HistoryConfig = {}): Extension {
   ]
 }
 
-function cmd(target: PopTarget, only: ItemFilter): StateCommand {
+function cmd(side: BranchName, only: ItemFilter): StateCommand {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    let config = state.facet(historyConfig)
     let historyState = state.field(historyField, false)
-    if (!historyState || !historyState.canPop(target, only)) return false
-    const {transaction, state: newState} = historyState.pop(target, only, state.t(), config.minDepth)
-    dispatch(transaction.annotate(historyStateAnnotation, newState))
+    if (!historyState || !historyState.canPop(side, only)) return false
+    const {transaction, rest} = historyState.pop(side, only, state)
+    dispatch(transaction.effect(historyMoveEffect.of({side, rest})))
     return true
   }
 }
 
 /// Undo a single group of history events. Returns false if no group
 /// was available.
-export const undo = cmd(PopTarget.Done, ItemFilter.OnlyChanges)
+export const undo = cmd(BranchName.Done, ItemFilter.OnlyChanges)
 /// Redo a group of history events. Returns false if no group was
 /// available.
-export const redo = cmd(PopTarget.Undone, ItemFilter.OnlyChanges)
+export const redo = cmd(BranchName.Undone, ItemFilter.OnlyChanges)
 
 /// Undo a selection change.
-export const undoSelection = cmd(PopTarget.Done, ItemFilter.Any)
+export const undoSelection = cmd(BranchName.Done, ItemFilter.Any)
 
 /// Redo a selection change.
-export const redoSelection = cmd(PopTarget.Undone, ItemFilter.Any)
+export const redoSelection = cmd(BranchName.Undone, ItemFilter.Any)
 
-/// Set a flag on the given transaction that will prevent further steps
-/// from being appended to an existing history event (so that they
-/// require a separate undo command to undo).
-export function closeHistory(tr: Transaction): Transaction {
-  return tr.annotate(closeHistoryAnnotation, true)
-}
-
-function depth(target: PopTarget, only: ItemFilter) {
+function depth(side: BranchName, only: ItemFilter) {
   return function(state: EditorState): number {
     let histState = state.field(historyField, false)
-    return histState ? histState.eventCount(target, only) : 0
+    return histState ? histState.eventCount(side, only) : 0
   }
 }
 
 /// The amount of undoable change events available in a given state.
-export const undoDepth = depth(PopTarget.Done, ItemFilter.OnlyChanges)
+export const undoDepth = depth(BranchName.Done, ItemFilter.OnlyChanges)
 /// The amount of redoable change events available in a given state.
-export const redoDepth = depth(PopTarget.Undone, ItemFilter.OnlyChanges)
+export const redoDepth = depth(BranchName.Undone, ItemFilter.OnlyChanges)
 /// The amount of undoable events available in a given state.
-export const redoSelectionDepth = depth(PopTarget.Done, ItemFilter.Any)
+export const redoSelectionDepth = depth(BranchName.Done, ItemFilter.Any)
 /// The amount of redoable events available in a given state.
-export const undoSelectionDepth = depth(PopTarget.Undone, ItemFilter.Any)
+export const undoSelectionDepth = depth(BranchName.Undone, ItemFilter.Any)
 
 class Item {
-  constructor(readonly map: ChangeSet<ChangeDesc>,
-              readonly inverted: ChangeSet | null = null,
-              readonly selection: EditorSelection | null = null) {}
+  constructor(
+    // The forward position mapping for this item. Some items _only_
+    // have a mapping, and nothing else. These indicate the place of
+    // changes that can't be undone.
+    readonly map: ChangeSet<ChangeDesc>,
+    // The inverted changes that make up this item, if any. Will be
+    // null for map-only or selection-only items. Will hold the empty
+    // change set for items that have no changes but do have events.
+    readonly inverted: ChangeSet | null = null,
+    // The inverted effects that are associated with these changes.
+    // Only significant when inverted != null.
+    readonly effects: readonly StateEffect<any>[] = none,
+    // The selection before this item (or after its inverted version).
+    readonly selection: EditorSelection | null = null
+  ) {}
+
   get isChange(): boolean { return this.inverted != null }
+
+  merge(other: Item) {
+    let map = this.map.appendSet(other.map)
+    return this.isChange
+      ? new Item(map, other.inverted!.appendSet(this.inverted!),
+                 other.effects.length ? other.effects.concat(this.effects) : this.effects, this.selection)
+      : new Item(map, null, none, this.selection)
+  }
+
+  // This does not check `addToHistory` and such, it assumes the
+  // transaction needs to be converted to an item. Returns null when
+  // there are no changes or effects or selection changes in the
+  // transaction.
+  static fromTransaction(tr: Transaction) {
+    let effects = []
+    let inverted: ChangeSet | null = tr.invertedChanges()
+    for (let i = tr.effects.length, effect; i >= 0; i--) if ((effect = tr.effects[i]) && effect.type.history) {
+      let mapped = effect.map(inverted)
+      // FIXME using the original state as reference will fall apart
+      // when other effect before this one change the state somehow
+      if (mapped) effects.push(mapped.invert(tr.startState))
+    }
+    if (!effects.length && !inverted.length) {
+      if (!tr.selectionSet) return null
+      inverted = null
+    }
+    return new Item(tr.changes.desc, inverted, effects.length ? effects : none, tr.startState.selection)
+  }
 }
+
 const enum ItemFilter { OnlyChanges, Any }
 
 type Branch = readonly Item[]
@@ -119,21 +170,22 @@ function isAdjacent(prev: ChangeDesc | null, cur: ChangeDesc): boolean {
   return !!prev && cur.from <= prev.mapPos(prev.to, 1) && cur.to >= prev.mapPos(prev.from)
 }
 
-function addChanges(branch: Branch, changes: ChangeSet, inverted: ChangeSet | null,
-                    selectionBefore: EditorSelection, maxLen: number,
-                    mayMerge: (prevItem: Item) => boolean): Branch {
+function addChangeItem(branch: Branch, item: Item, maxLen: number,
+                       mayMerge: (prevItem: Item) => boolean): Branch {
   if (branch.length) {
     const lastItem = branch[branch.length - 1]
-    if (lastItem.selection && lastItem.isChange == Boolean(inverted) && mayMerge(lastItem)) {
-      if (!inverted) return branch
-      let item = new Item(lastItem.map.appendSet(changes.desc), inverted.appendSet(lastItem.inverted!), lastItem.selection)
-      return updateBranch(branch, branch.length - 1, maxLen, item)
-    }
+    if (lastItem.selection && lastItem.isChange == item.isChange && mayMerge(lastItem))
+      return updateBranch(branch, branch.length - 1, maxLen, lastItem.merge(item))
   }
-  return updateBranch(branch, branch.length, maxLen, new Item(changes.desc, inverted, selectionBefore))
+  return updateBranch(branch, branch.length, maxLen, item)
 }
 
-function popChanges(branch: Branch, only: ItemFilter): {changes: ChangeSet, branch: Branch, selection: EditorSelection} {
+function popChanges(branch: Branch, only: ItemFilter): {
+  changes: ChangeSet,
+  effects: readonly StateEffect<any>[],
+  branch: Branch,
+  selection: EditorSelection
+} {
   let map: ChangeSet<ChangeDesc> | null = null
   let idx = branch.length - 1
   for (;; idx--) {
@@ -144,7 +196,10 @@ function popChanges(branch: Branch, only: ItemFilter): {changes: ChangeSet, bran
   }
 
   let changeItem = branch[idx]
-  let newBranch = branch.slice(0, idx), changes = changeItem.inverted || ChangeSet.empty, selection = changeItem.selection!
+  let newBranch = branch.slice(0, idx)
+  let changes = changeItem.inverted || ChangeSet.empty
+  let effects = changeItem.effects
+  let selection = changeItem.selection!
 
   if (map) {
     let startIndex = changeItem.map.length
@@ -158,10 +213,18 @@ function popChanges(branch: Branch, only: ItemFilter): {changes: ChangeSet, bran
       }
     }
     newBranch.push(new Item(map))
-    changes = new ChangeSet(mappedChanges) // FIXME preserve mirror data?
+    changes = new ChangeSet(mappedChanges)
+
+    let mappedEffects = []
+    for (let effect of effects) {
+      let mapped = effect.map(map)
+      if (mapped) mappedEffects.push(mapped)
+    }
+    effects = mappedEffects
+    
     selection = selection.map(map)
   }
-  return {changes, branch: newBranch, selection}
+  return {changes, effects, branch: newBranch, selection}
 }
 
 function nope() { return false }
@@ -171,28 +234,25 @@ function eqSelectionShape(a: EditorSelection, b: EditorSelection) {
          a.ranges.filter((r, i) => r.empty != b.ranges[i].empty).length === 0
 }
 
-const enum PopTarget { Done, Undone }
-
 class HistoryState {
-  private constructor(public readonly done: Branch,
-                      public readonly undone: Branch,
-                      private readonly prevTime: number | null = null,
-                      private readonly prevUserEvent: string | undefined = undefined) {}
+  constructor(public readonly done: Branch,
+              public readonly undone: Branch,
+              private readonly prevTime: number | null = null,
+              private readonly prevUserEvent: string | undefined = undefined) {}
 
   resetTime(): HistoryState {
     return new HistoryState(this.done, this.undone)
   }
 
-  addChanges(changes: ChangeSet, inverted: ChangeSet | null, selection: EditorSelection,
-             time: number, userEvent: string | undefined, newGroupDelay: number, maxLen: number): HistoryState {
+  addChangeItem(item: Item, time: number, userEvent: string | undefined,
+                newGroupDelay: number, maxLen: number): HistoryState {
     let mayMerge: (item: Item) => boolean = nope
     if (this.prevTime !== null && time - this.prevTime < newGroupDelay &&
-        (inverted || (this.prevUserEvent == userEvent && userEvent == "keyboard")))
-      mayMerge = inverted
-                 ? prev => isAdjacent(prev.map.changes[prev.map.length - 1], changes.changes[0])
-                 : prev => eqSelectionShape(prev.selection!, selection)
-    return new HistoryState(addChanges(this.done, changes, inverted, selection, maxLen, mayMerge),
-                            this.undone, time, userEvent)
+        (item.isChange || (this.prevUserEvent == userEvent && userEvent == "keyboard")))
+      mayMerge = item.isChange
+                 ? prev => isAdjacent(prev.map.changes[prev.map.length - 1], item.map.changes[0])
+                 : prev => eqSelectionShape(prev.selection!, item.selection!)
+    return new HistoryState(addChangeItem(this.done, item, maxLen, mayMerge), this.undone, time, userEvent)
   }
 
   addMapping(map: ChangeSet<ChangeDesc>, maxLen: number): HistoryState {
@@ -200,30 +260,25 @@ class HistoryState {
     return new HistoryState(updateBranch(this.done, this.done.length, maxLen, new Item(map)), this.undone)
   }
 
-  canPop(done: PopTarget, only: ItemFilter): boolean {
-    const target = done == PopTarget.Done ? this.done : this.undone
+  canPop(done: BranchName, only: ItemFilter): boolean {
+    const target = done == BranchName.Done ? this.done : this.undone
     for (const {isChange, selection} of target)
       if (isChange || (only == ItemFilter.Any && selection)) return true
     return false
   }
 
-  pop(
-    done: PopTarget, only: ItemFilter, transaction: Transaction, maxLen: number
-  ): {transaction: Transaction, state: HistoryState} {
-    let {changes, branch, selection} = popChanges(done == PopTarget.Done ? this.done : this.undone, only)
+  pop(done: BranchName, only: ItemFilter, state: EditorState): {transaction: Transaction, rest: Branch} {
+    let {changes, effects, branch, selection} = popChanges(done == BranchName.Done ? this.done : this.undone, only)
 
-    let oldSelection = transaction.selection
-    for (let change of changes.changes) transaction.change(change)
-    transaction.setSelection(selection)
-    let otherBranch = (done == PopTarget.Done ? this.undone : this.done)
-    otherBranch = addChanges(otherBranch, transaction.changes,
-                             transaction.changes.length > 0 ? transaction.invertedChanges() : null, oldSelection, maxLen, nope)
-    return {transaction, state: new HistoryState(done == PopTarget.Done ? branch : otherBranch,
-                                                 done == PopTarget.Done ? otherBranch : branch)}
+    let tr = state.t()
+    for (let change of changes.changes) tr.change(change)
+    for (let effect of effects) tr.effect(effect)
+    tr.setSelection(selection)
+    return {transaction: tr, rest: branch}
   }
 
-  eventCount(done: PopTarget, only: ItemFilter) {
-    let count = 0, branch = done == PopTarget.Done ? this.done : this.undone
+  eventCount(done: BranchName, only: ItemFilter) {
+    let count = 0, branch = done == BranchName.Done ? this.done : this.undone
     for (const {isChange, selection} of branch)
       if (isChange || (only == ItemFilter.Any && selection)) ++count
     return count
