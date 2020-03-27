@@ -141,11 +141,9 @@ class Item {
   static fromTransaction(tr: Transaction) {
     let effects = []
     let inverted: ChangeSet | null = tr.invertedChanges()
-    for (let i = tr.effects.length, effect; i >= 0; i--) if ((effect = tr.effects[i]) && effect.type.history) {
-      let mapped = effect.map(inverted)
-      // FIXME using the original state as reference will fall apart
-      // when other effect before this one change the state somehow
-      if (mapped) effects.push(mapped.invert(tr.startState))
+    for (let i = tr.effects.length; i >= 0; i--) {
+      let effect = tr.effects[i], mapped = effect.type.history && effect.invert().map(inverted)
+      if (mapped) effects.push(mapped)
     }
     if (!effects.length && !inverted.length) {
       if (!tr.selectionSet) return null

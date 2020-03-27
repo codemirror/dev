@@ -20,8 +20,8 @@ export class Annotation<T> {
 }
 
 export interface StateEffectSpec<Value> {
-  map?: (value: Value, mapping: Mapping) => Value | undefined,
-  invert?: (value: Value, state: EditorState) => Value,
+  map?: (value: Value, mapping: Mapping) => Value | undefined
+  invert?: (value: Value) => StateEffect<any>
   history?: boolean
 }
 
@@ -34,9 +34,9 @@ export class StateEffect<Value> {
     return mapped === undefined ? undefined : mapped == this.value ? this : new StateEffect(this.type, mapped)
   }
 
-  invert(state: EditorState): StateEffect<Value> {
+  invert(): StateEffect<Value> {
     if (!this.type.invert) throw new Error("No invert method defined for this effect type")
-    return new StateEffect(this.type, this.type.invert(this.value, state))
+    return this.type.invert(this.value)
   }
 
   is<T>(type: StateEffectType<T>): this is StateEffect<T> { return this.type == type as any }
@@ -57,7 +57,7 @@ export class StateEffectType<Value> {
     /// @internal
     readonly map: (value: any, mapping: Mapping) => any | undefined,
     /// @internal
-    readonly invert: ((value: any, state: EditorState) => any) | undefined,
+    readonly invert: ((value: any) => any) | undefined,
     readonly history: boolean
   ) {}
 
