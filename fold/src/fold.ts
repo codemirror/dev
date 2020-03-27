@@ -108,8 +108,8 @@ class FoldWidget extends WidgetType<null> {
 
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
-      let folded = foldInside(state, line.from, line.to)
-      if (folded) view.dispatch(state.t().annotate(foldAnnotation, {unfold: [folded]}))
+      let folded = foldInside(view.state, line.from, line.to)
+      if (folded) view.dispatch(view.state.t().annotate(foldAnnotation, {unfold: [folded]}))
       event.preventDefault()
     }
     return element
