@@ -225,7 +225,7 @@ function popChanges(branch: Branch, only: ItemFilter): {
   return {changes, effects, branch: newBranch, selection}
 }
 
-const nope = () => false, yep = () => true
+const nope = () => false
 
 function eqSelectionShape(a: EditorSelection, b: EditorSelection) {
   return a.ranges.length == b.ranges.length &&

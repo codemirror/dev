@@ -111,7 +111,7 @@ export class Change extends ChangeDesc {
   /// the mapping completely replaces the region this change would
   /// apply to.
   map(mapping: Mapping): Change | null {
-    let from = mapping.mapPos(this.from, 1), to = mapping.mapPos(this.to, -1)
+    let from = mapping.mapPos(this.from, 1), to = this.from == this.to ? from : mapping.mapPos(this.to, -1)
     return from > to ? null : new Change(from, to, this.text)
   }
 
@@ -168,8 +168,14 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   /// may be the index of a change already in the set, which
   /// [mirrors](#state.ChangeSet.getMirror) the new change.
   append(change: C, mirror?: number): ChangeSet<C> {
-    return new ChangeSet(this.changes.concat(change),
-                         mirror != null ? this.mirror.concat(this.length, mirror) : this.mirror)
+    return new ChangeSet(this.changes.concat(change), mirror != null ? this.mirror.concat(this.length, mirror) : this.mirror)
+  }
+
+  /// Add a change to the start of this set, returning an extended
+  /// set.
+  prepend(change: C, mirror?: number): ChangeSet<C> {
+    let newMirror = this.mirror.length ? this.mirror.map(i => i + 1) : empty
+    return new ChangeSet([change].concat(this.changes), mirror == null ? newMirror : newMirror.concat(0, mirror + 1))
   }
 
   /// Append another change set to this one.
@@ -181,7 +187,7 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   }
 
   /// The empty change set.
-  static empty: ChangeSet<any> = new ChangeSet(empty)
+  static empty: ChangeSet<Change> = new ChangeSet(empty)
 
   /// @internal
   mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {

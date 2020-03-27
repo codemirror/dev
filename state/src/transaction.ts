@@ -1,5 +1,5 @@
 import {Text} from "../../text"
-import {allowMultipleSelections} from "./extension"
+import {allowMultipleSelections, changeFilter} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Change, ChangeSet, Mapping} from "./change"
@@ -128,23 +128,89 @@ export class Transaction {
     return this
   }
 
-  /// Add a change to this transaction. If `mirror` is given, it
-  /// should be the index (in `this.changes.changes`) at which the
-  /// mirror image of this change sits.
-  change(change: Change, mirror?: number): Transaction {
+  /// Add a change to this transaction. Like with
+  /// [`replace`](#state.Transaction.replace), such a change may be
+  /// influenced by [change filters](#state.EditorState^changeFilter).
+  change(change: Change): Transaction {
     this.ensureOpen()
-    if (change.from == change.to && change.length == 0) return this
-    if (change.from < 0 || change.to < change.from || change.to > this.doc.length)
-      throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
-    this.changes = this.changes.append(change, mirror)
-    this.docs.push(change.apply(this.doc))
-    this.selection = this.selection.map(change)
+    let startIndex = this.changes.length, changes = this.filterChange(change)
+    for (let i = startIndex; i < changes.length; i++) this.docs.push(changes.changes[i].apply(this.doc))
+    this.changes = changes
+    let mapping = changes.partialMapping(startIndex)
+    this.selection = this.selection.map(mapping)
+    this.mapEffects(mapping)
+    return this
+  }
+
+  private mapEffects(mapping: Mapping) {
     for (let i = 0; i < this.effects.length; i++) {
-      let mapped = this.effects[i].map(change)
+      let mapped = this.effects[i].map(mapping)
       if (!mapped) this.effects.splice(i--, 1)
       else this.effects[i] = mapped
     }
+  }
+
+  /// Add a change to this transaction, bypassing the
+  /// [`changeFilter`](#state.EditorState^changeFilter) facet. You
+  /// usually do not need this, and it might sabotage the behavior of
+  /// some extensions, but in some cases, such as applying remote
+  /// collaborative changes, it is appropriate.
+  ///
+  /// If `mirror` is given, it should be the index (in
+  /// `this.changes.changes`) at which the mirror image of this change
+  /// sits.
+  changeNoFilter(change: Change, mirror?: number): Transaction {
+    this.changes = this.changes.append(change, mirror)
+    this.selection = this.selection.map(change)
+    this.mapEffects(change)
     return this
+  }
+
+  private filterChange(change: Change) {
+    // FIXME try to find a less hideous way to do this
+    let filters = this.startState.facet(changeFilter)
+    let pending = [change], upto = [filters.length]
+    let result = this.changes
+    let docLen = this.doc.length
+    work: while (pending.length) {
+      let change = pending.pop()!, i = upto.pop()! - 1
+      if (change.from == change.to && change.length == 0) continue
+      if (change.from < 0 || change.to < change.from || change.to > docLen)
+        throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
+      for (; i >= 0; i--) {
+        let filtered = filters[i](change, this.startState, result)
+        if (!filtered || filtered.length == 1 && filtered[0] == change) continue
+        if (pending.length) { // Map remaining changes
+          let remap = new ChangeSet([change.invertedDesc].concat(filtered.map(c => c.desc)))
+          for (let j = pending.length - 1;; j--) {
+            let next = pending[j], mapped = next.map(remap)
+            if (mapped) pending[j] = mapped
+            if (j == 0) break
+            remap = remap.prepend(next.invertedDesc)
+            if (mapped) remap = remap.append(mapped.desc, 0)
+          }
+        }
+        // Filtered results are provided in a single coordinate
+        // system. Must map changes past the first to make it possible
+        // to apply them after each other.
+        if (filtered.length > 1) {
+          let remapped = [filtered[0]]
+          for (let j = 1; j < filtered.length; j++) {
+            let mapped = filtered[j].map(new ChangeSet(remapped))
+            if (mapped) remapped.push(mapped)
+          }
+          filtered = remapped
+        }
+        for (let j = filtered.length - 1; j >= 0; j--) {
+          pending.push(filtered[j])
+          upto.push(i)
+        }
+        continue work
+      }
+      result = result.append(change)
+      docLen += change.length - (change.to - change.from)
+    }
+    return result
   }
 
   /// Indicates whether the transaction changed the document.
@@ -153,7 +219,11 @@ export class Transaction {
   }
 
   /// Add a change replacing the given document range with the given
-  /// content.
+  /// content. Note that, due to [change
+  /// filters](#state.EditorState^changeFilter), the change may not go
+  /// exactly as you provide it, so you should use position mapping,
+  /// rather than hard coded calculations, to compute positions after
+  /// the change.
   replace(from: number, to: number, text: string | readonly string[]): Transaction {
     return this.change(new Change(from, to, typeof text == "string" ? this.startState.splitLines(text) : text))
   }

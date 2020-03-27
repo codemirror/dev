@@ -106,4 +106,35 @@ describe("EditorState", () => {
     let state3 = state.t().replace(0, 0, "hi").apply()
     ist(state3.facet(facet).join(), "2,1")
   })
+
+  describe("changeFilter", () => {
+    it("can cancel changes", () => {
+      // Cancels changes that start on an odd position
+      let state = EditorState.create({extensions: [EditorState.changeFilter.of(change => change.from % 2 ? [] : null)],
+                                      doc: "one two"})
+      state = state.t().replace(1, 5, "x").apply()
+      ist(state.doc.toString(), "one two")
+      state = state.t().replace(0, 1, "x").replace(1, 2, "x").replace(2, 3, "x").apply()
+      ist(state.doc.toString(), "xnx two")
+    })
+
+    it("can split changes", () => {
+      let state = EditorState.create({
+        extensions: [EditorState.changeFilter.of(change => {
+          return [new Change(change.from, change.from + 1, change.text),
+                  new Change(change.to - 1, change.to, ["."])]
+        })],
+        doc: "one two"
+      })
+      ist(state.t().replace(0, 7, "--").doc.toString(), "--ne tw.")
+    })
+
+    it("properly maps changes for multiple splits", () => {
+      let state = EditorState.create({
+        extensions: [EditorState.changeFilter.of(ch => [new Change(ch.from, ch.from, ["x"]), new Change(ch.from, ch.from, ch.text)]),
+                     EditorState.changeFilter.of(ch => [new Change(ch.from, ch.from, ["y"]), new Change(ch.from, ch.from, ch.text)])]
+      })
+      ist(state.t().replace(0, 0, "?").doc.toString(), "xyx?")
+    })
+  })
 })

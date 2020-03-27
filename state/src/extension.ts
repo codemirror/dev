@@ -3,6 +3,7 @@ import {Line} from "../../text"
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Facet} from "./facet"
+import {Change, ChangeSet} from "./change"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that
@@ -13,6 +14,8 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   combine: values => values.some(v => v),
   static: true
 })
+
+export const changeFilter = Facet.define<(change: Change, state: EditorState, before: ChangeSet) => readonly Change[] | null>()
 
 /// A node prop that can be stored on a grammar's top node to
 /// associate information with the language. Different extension might

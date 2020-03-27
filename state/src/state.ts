@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {Tree} from "lezer-tree"
 import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData} from "./extension"
+import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData, changeFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
@@ -245,11 +245,22 @@ export class EditorState {
     return values || none
   }
 
-  /// A facet that registers a code folding service. When called
-  /// with the extent of a line, it'll return a range object when a
-  /// foldable that starts on that line (but continues beyond it) can
-  /// be found.
+  /// A facet that registers a code folding service. When called with
+  /// the extent of a line, such a function should return a range
+  /// object when a foldable that starts on that line (but continues
+  /// beyond it), if one can be found.
   static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
+
+  /// Facet used to register change filters, which are called for each
+  /// change applied in a transaction, and can modify those changes.
+  /// Such a function should return null to indicate that it doesn't
+  /// want to do anything about the given change, or an array of
+  /// replacement changes.
+  ///
+  /// Change filters are called from lower to higher precedence. When
+  /// a change is replaced by a given filter, only filters with higher
+  /// precedence are called on the newly produced changes.
+  static changeFilter = changeFilter
 }
 
 const none: any[] = []
