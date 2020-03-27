@@ -214,4 +214,16 @@ describe("EditorView drawing", () => {
     ist(node.nodeValue!.length, cm.state.doc.length, "<")
     ist(node.nodeValue!.indexOf(">"), -1, ">")
   })
+
+  it("properly attaches styles in shadow roots", () => {
+    let ws = document.querySelector("#workspace")!
+    let wrap = ws.appendChild(document.createElement("div"))
+    if (!wrap.attachShadow) return
+    let shadow = wrap.attachShadow({mode: "open"})
+    let editor = new EditorView({root: shadow})
+    shadow.appendChild(editor.dom)
+    editor.measure()
+    ist(getComputedStyle(editor.dom).display, "flex")
+    wrap.remove()
+  })
 })
