@@ -1,6 +1,7 @@
 import ist from "ist"
 
-import {EditorState, EditorSelection, SelectionRange, Transaction, StateEffect, StateEffectType, StateField} from "../../state"
+import {EditorState, EditorSelection, SelectionRange, Transaction,
+        StateEffect, StateEffectType, StateField, Mapping} from "../../state"
 import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection} from ".."
 
@@ -455,6 +456,68 @@ describe("history", () => {
       ist(state.field(field), 10)
       state = command(state, redo)
       ist(state.field(field), 20)
+    })
+
+    it("can map effects", () => {
+      class Comment {
+        constructor(readonly from: number,
+                    readonly to: number,
+                    readonly text: string) {}
+
+        eq(other: Comment) { return this.from == other.from && this.to == other.to && this.text == other.text }
+      }
+      function mapComment(comment: Comment, mapping: Mapping) {
+        let from = mapping.mapPos(comment.from, 1), to = mapping.mapPos(comment.to, -1)
+        return from >= to ? undefined : new Comment(from, to, comment.text)
+      }
+      let addComment: StateEffectType<Comment> = StateEffect.define<Comment>({
+        map: mapComment,
+        addToHistory: {separate: true},
+        invert(val) { return rmComment.of(val) }
+      })
+      let rmComment: StateEffectType<Comment> = StateEffect.define<Comment>({
+        map: mapComment,
+        addToHistory: {separate: true},
+        invert(val) { return addComment.of(val) }
+      })
+      let comments = StateField.define<Comment[]>({
+        create: () => [],
+        update(value, tr) {
+          value = value.map(c => mapComment(c, tr.changes)).filter(x => x) as any
+          for (let effect of tr.effects) {
+            if (effect.is(addComment)) value = value.concat(effect.value)
+            else if (effect.is(rmComment)) value = value.filter(c => !c.eq(effect.value))
+          }
+          return value.sort((a, b) => a.from - b.from)
+        }
+      })
+      function str(state: EditorState) { return state.field(comments).map(c => c.text + "@" + c.from).join(",") }
+
+      let state = EditorState.create({extensions: [history(), comments], doc: "one two foo"})
+      state = state.t().effect(addComment.of(new Comment(0, 3, "c1"))).apply()
+      ist(str(state), "c1@0")
+      state = state.t().replace(3, 4, "---").effect(addComment.of(new Comment(6, 9, "c2"))).apply()
+      ist(str(state), "c1@0,c2@6")
+      state = state.t().replace(0, 0, "---").annotate(Transaction.addToHistory, false).apply()
+      ist(str(state), "c1@3,c2@9")
+      state = command(state, undo)
+      ist(state.doc.toString(), "---one two foo")
+      ist(str(state), "c1@3")
+      state = command(state, undo)
+      ist(str(state), "")
+      state = command(state, redo)
+      ist(str(state), "c1@3")
+      state = command(state, redo)
+      ist(str(state), "c1@3,c2@9")
+      ist(state.doc.toString(), "---one---two foo")
+      state = command(state, undo).t().replace(10, 11, "---").annotate(Transaction.addToHistory, false).apply()
+      state = state.t().effect(addComment.of(new Comment(13, 16, "c3"))).apply()
+      ist(str(state), "c1@3,c3@13")
+      state = command(state, undo)
+      ist(state.doc.toString(), "---one two---foo")
+      ist(str(state), "c1@3")
+      state = command(state, redo)
+      ist(str(state), "c1@3,c3@13")
     })
   })
 })
