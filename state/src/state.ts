@@ -11,7 +11,7 @@ export interface EditorStateConfig {
   /// The initial document. Defaults to an empty document. Can be
   /// provided either as a plain string (which will be split into
   /// lines according to the value of the [`lineSeparator`
-  /// behavior](#state.EditorState^lineSeparator)), or an instance of
+  /// facet](#state.EditorState^lineSeparator)), or an instance of
   /// the [`Text`](#text.Text) class (which is what the state will use
   /// to represent the document).
   doc?: string | Text
@@ -100,7 +100,7 @@ export class EditorState {
   /// separator](#state.EditorState^lineSeparator).
   splitLines(text: string): string[] { return text.split(this.facet(EditorState.lineSeparator) || DefaultSplit) }
 
-  /// Get the value of a state [behavior](#extension.Behavior).
+  /// Get the value of a state [facet](#state.Facet).
   facet<Output>(facet: Facet<any, Output>): Output {
     let addr = this.config.address[facet.id]
     if (addr == null) return facet.default
@@ -159,13 +159,13 @@ export class EditorState {
   static indentation = Facet.define<(context: IndentContext, pos: number) => number>()
 
   /// Configures the tab size to use in this state. The first
-  /// (highest-precedence) value of the behavior is used.
+  /// (highest-precedence) value of the facet is used.
   static tabSize = Facet.define<number, number>({
     combine: values => values.length ? values[0] : DefaultTabsize
   })
 
   /// The size (in columns) of a tab in the document, determined by
-  /// the [`tabSize`](#state.EditorState^tabSize) behavior.
+  /// the [`tabSize`](#state.EditorState^tabSize) facet.
   get tabSize() { return this.facet(EditorState.tabSize) }
 
   /// The line separator to use. By default, any of `"\n"`, `"\r\n"`

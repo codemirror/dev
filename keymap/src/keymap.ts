@@ -54,7 +54,7 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
 
 /// Create a view extension that registers a keymap.
 ///
-/// You can add multiple keymap behaviors to an editor. Their
+/// You can add multiple keymap extensions to an editor. Their
 /// priorities determine their precedence (the ones specified early or
 /// with high priority get to dispatch first). When a handler has
 /// returned `true` for a given key, no further handlers are called.

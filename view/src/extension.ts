@@ -44,8 +44,9 @@ export interface PluginValue {
   /// Notifies the plugin of an update that happened in the view. This
   /// is called _before_ the view updates its DOM. It is responsible
   /// for updating the plugin's internal state (including any state
-  /// that may be read by behaviors). It should _not_ change the DOM,
-  /// or read the DOM in a way that triggers a layout recomputation.
+  /// that may be read by plugin fields). It should _not_ change the
+  /// DOM, or read the DOM in a way that triggers a layout
+  /// recomputation.
   update?(_update: ViewUpdate): void
 
   /// Called when the plugin is no longer going to be used. Should
