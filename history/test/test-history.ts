@@ -1,6 +1,6 @@
 import ist from "ist"
 
-import {EditorState, EditorSelection, SelectionRange, Transaction} from "../../state"
+import {EditorState, EditorSelection, SelectionRange, Transaction, StateEffect, StateEffectType, StateField} from "../../state"
 import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection} from ".."
 
@@ -423,6 +423,38 @@ describe("history", () => {
       state = command(state, undoSelection)
       ist(state.doc.toString(), "oopshello!")
       ist(state.selection.eq(selection))
+    })
+  })
+
+  describe("effects", () => {
+    it("includes effects in the history", () => {
+      let set: StateEffectType<{prev: number, next: number}> = StateEffect.define<{prev: number, next: number}>({
+        addToHistory: {separate: true},
+        invert(value) { return set.of({prev: value.next, next: value.prev}) }
+      })
+      let field = StateField.define({
+        create: () => 0,
+        update(val, tr) {
+          for (let effect of tr.effects) if (effect.is(set)) val = effect.value.next
+          return val
+        }
+      })
+      let state = EditorState.create({extensions: [history(), field]})
+      state = state.t().effect(set.of({prev: state.field(field), next: 10})).apply()
+      state = state.t().effect(set.of({prev: state.field(field), next: 20})).apply()
+      ist(state.field(field), 20)
+      state = command(state, undo)
+      ist(state.field(field), 10)
+      state = command(state, undo)
+      ist(state.field(field), 0)
+      state = command(state, redo)
+      ist(state.field(field), 10)
+      state = command(state, redo)
+      ist(state.field(field), 20)
+      state = command(state, undo)
+      ist(state.field(field), 10)
+      state = command(state, redo)
+      ist(state.field(field), 20)
     })
   })
 })

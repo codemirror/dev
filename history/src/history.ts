@@ -141,8 +141,8 @@ class Item {
   static fromTransaction(tr: Transaction) {
     let effects = []
     let inverted: ChangeSet | null = tr.invertedChanges()
-    for (let i = tr.effects.length; i >= 0; i--) {
-      let effect = tr.effects[i], mapped = effect.type.history && effect.invert().map(inverted)
+    for (let i = tr.effects.length - 1; i >= 0; i--) {
+      let effect = tr.effects[i], mapped = effect.type.spec.addToHistory && effect.invert().map(inverted)
       if (mapped) effects.push(mapped)
     }
     if (!effects.length && !inverted.length) {
@@ -225,7 +225,7 @@ function popChanges(branch: Branch, only: ItemFilter): {
   return {changes, effects, branch: newBranch, selection}
 }
 
-function nope() { return false }
+const nope = () => false, yep = () => true
 
 function eqSelectionShape(a: EditorSelection, b: EditorSelection) {
   return a.ranges.length == b.ranges.length &&
@@ -246,10 +246,13 @@ class HistoryState {
                 newGroupDelay: number, maxLen: number): HistoryState {
     let mayMerge: (item: Item) => boolean = nope
     if (this.prevTime !== null && time - this.prevTime < newGroupDelay &&
-        (item.isChange || (this.prevUserEvent == userEvent && userEvent == "keyboard")))
-      mayMerge = item.isChange
-                 ? prev => isAdjacent(prev.map.changes[prev.map.length - 1], item.map.changes[0])
-                 : prev => eqSelectionShape(prev.selection!, item.selection!)
+        (item.isChange || (this.prevUserEvent == userEvent && userEvent == "keyboard"))) {
+      if (!item.isChange) mayMerge = prev => eqSelectionShape(prev.selection!, item.selection!)
+      else if (item.effects.some(e => e.type.spec.addToHistory!.separate)) mayMerge = nope
+      else mayMerge = prev => prev.map.length > 0 && item.map.length > 0 &&
+        isAdjacent(prev.map.changes[prev.map.length - 1], item.map.changes[0])
+    }
+
     return new HistoryState(addChangeItem(this.done, item, maxLen, mayMerge), this.undone, time, userEvent)
   }
 

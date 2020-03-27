@@ -22,7 +22,9 @@ export class Annotation<T> {
 export interface StateEffectSpec<Value> {
   map?: (value: Value, mapping: Mapping) => Value | undefined
   invert?: (value: Value) => StateEffect<any>
-  history?: boolean
+  addToHistory?: {separate?: boolean}
+  broadcast?: boolean
+  [key: string]: any
 }
 
 export class StateEffect<Value> {
@@ -42,8 +44,9 @@ export class StateEffect<Value> {
   is<T>(type: StateEffectType<T>): this is StateEffect<T> { return this.type == type as any }
 
   static define<Value = null>(spec: StateEffectSpec<Value> = {}): StateEffectType<Value> {
-    if (spec.history && !spec.invert) throw new Error("An effect needs to have an invert method to be usable with the history")
-    return new StateEffectType(spec.map || (v => v), spec.invert, !!spec.history)
+    if (spec.addToHistory && !spec.invert)
+      throw new Error("An effect needs to have an invert method to be usable with the history")
+    return new StateEffectType(spec.map || (v => v), spec.invert, spec)
   }
 }
 
@@ -58,7 +61,7 @@ export class StateEffectType<Value> {
     readonly map: (value: any, mapping: Mapping) => any | undefined,
     /// @internal
     readonly invert: ((value: any) => any) | undefined,
-    readonly history: boolean
+    readonly spec: StateEffectSpec<Value>
   ) {}
 
   of(value: Value): StateEffect<Value> { return new StateEffect(this, value) }
