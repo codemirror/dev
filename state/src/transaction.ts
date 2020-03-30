@@ -1,5 +1,5 @@
 import {Text} from "../../text"
-import {allowMultipleSelections, changeFilter} from "./extension"
+import {allowMultipleSelections, changeFilter, selectionFilter} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Change, ChangeSet, Mapping} from "./change"
@@ -150,7 +150,7 @@ export class Transaction {
       this.changes = this.changes.append(change)
     }
     let mapping = this.changes.partialMapping(startIndex)
-    this.selection = this.selection.map(mapping)
+    this.updateSelection(this.selection.map(mapping))
     this.mapEffects(mapping)
     return this
   }
@@ -174,7 +174,7 @@ export class Transaction {
   /// sits.
   changeNoFilter(change: Change, mirror?: number): Transaction {
     this.changes = this.changes.append(change, mirror)
-    this.selection = this.selection.map(change)
+    this.updateSelection(this.selection.map(change))
     this.mapEffects(change)
     return this
   }
@@ -249,9 +249,15 @@ export class Transaction {
     this.ensureOpen()
     if (!this.startState.facet(allowMultipleSelections)) selection = selection.asSingle()
     checkSelection(selection, this.doc)
-    this.selection = selection
+    this.updateSelection(selection)
     this.flags |= Flag.SelectionSet
     return this
+  }
+
+  private updateSelection(selection: EditorSelection) {
+    for (let filters = this.startState.facet(selectionFilter), i = filters.length - 1; i >= 0; i--)
+      selection = filters[i](selection, this.startState, this.changes)
+    this.selection = selection
   }
 
   /// Tells you whether this transaction explicitly sets a new

@@ -2,7 +2,8 @@ import {Text} from "../../text"
 import {Tree} from "lezer-tree"
 import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"
-import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData, changeFilter} from "./extension"
+import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData,
+        changeFilter, selectionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 
 /// Options passed when [creating](#state.EditorState^create) an
@@ -261,6 +262,11 @@ export class EditorState {
   /// a change is replaced by a given filter, only filters with higher
   /// precedence are called on the newly produced changes.
   static changeFilter = changeFilter
+
+  /// Facet used to register selection filters. Whenever a transaction
+  /// updates its selection, such filters get a chance to replace the
+  /// new selection with another one.
+  static selectionFilter = selectionFilter
 }
 
 const none: any[] = []

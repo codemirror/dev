@@ -137,4 +137,19 @@ describe("EditorState", () => {
       ist(state.t().replace(0, 0, "?").doc.toString(), "xyx?")
     })
   })
+
+  describe("selectionFilter", () => {
+    it("can constrain the selection", () => {
+      let state = EditorState.create({
+        extensions: [EditorState.selectionFilter.of(sel => sel.primary.to < 4 ? sel : EditorSelection.single(4))],
+        doc: "one two"
+      })
+      let tr = state.t()
+      tr.setSelection(EditorSelection.single(3))
+      ist(tr.selection.primary.to, 3)
+      tr.setSelection(EditorSelection.single(7))
+      ist(tr.selection.primary.to, 4)
+      ist(tr.apply().selection.primary.to, 4)
+    })
+  })
 })
