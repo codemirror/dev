@@ -58,8 +58,8 @@ describe("EditorState", () => {
   })
 
   it("stores and updates fields", () => {
-    let field1 = StateField.define<number>({create: () => 0, update: (val, tr) => val + 1})
-    let field2 = StateField.define<number>({create: state => state.field(field1) + 10, update: (val, tr) => val})
+    let field1 = StateField.define<number>({create: () => 0, update: val => val + 1})
+    let field2 = StateField.define<number>({create: state => state.field(field1) + 10, update: val => val})
     let state = EditorState.create({extensions: [field1, field2]})
     ist(state.field(field1), 0)
     ist(state.field(field2), 10)

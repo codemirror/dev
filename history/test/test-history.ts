@@ -2,8 +2,8 @@ import ist from "ist"
 
 import {EditorState, EditorSelection, SelectionRange, Transaction,
         StateEffect, StateEffectType, StateField, Mapping} from "../../state"
-import {closeHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
-        undoSelection} from ".."
+import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
+        undoSelection, invertedEffects} from ".."
 
 const mkState = (config?: any, doc?: string) => EditorState.create({
   extensions: [history(config), EditorState.allowMultipleSelections.of(true)],
@@ -111,7 +111,7 @@ describe("history", () => {
 
   function unsyncedComplex(state: EditorState) {
     state = type(state, "hello")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = type(state, "!")
     state = receive(state, "....", 0)
     state = type(state, "\n\n", 2)
@@ -131,7 +131,7 @@ describe("history", () => {
   it("supports overlapping edits", () => {
     let state = mkState()
     state = type(state, "hello")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = state.t().replace(0, 5, "").apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
@@ -144,7 +144,7 @@ describe("history", () => {
     let state = mkState()
     state = receive(state, "h", 0)
     state = type(state, "ello")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = state.t().replace(0, 5, "").apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
@@ -156,7 +156,7 @@ describe("history", () => {
   it("supports overlapping unsynced deletes", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = type(state, "hello")
     state = state.t().replace(0, 7, "").annotate(Transaction.addToHistory, false).apply()
     ist(state.doc.toString(), "")
@@ -168,10 +168,10 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "one")
     state = type(state, " two")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = type(state, " three")
     state = type(state, "zero ", 0)
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = type(state, "\n\n", 0)
     state = type(state, "top", 0)
     for (let i = 0; i < 6; i++) {
@@ -194,11 +194,11 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "one")
     state = type(state, " two")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = receive(state, "xxx", state.doc.length)
     state = type(state, " three")
     state = type(state, "zero ", 0)
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = type(state, "\n\n", 0)
     state = type(state, "top", 0)
     state = receive(state, "yyy", 0)
@@ -213,7 +213,7 @@ describe("history", () => {
   it("restores selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
     const selection = state.selection
     state = state.t().replaceSelection("hello").apply()
@@ -244,7 +244,7 @@ describe("history", () => {
   it("rebases selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().effect(closeHistory).apply()
+    state = state.t().annotate(isolateHistory, "before").apply()
     state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
     state = type(state, "hello", 0)
     state = receive(state, "---", 0)
@@ -280,7 +280,7 @@ describe("history", () => {
     let state = mkState({minDepth: 10})
     for (let i = 0; i < 40; ++i) {
       state = type(state, "a")
-      state = state.t().effect(closeHistory).apply()
+      state = state.t().annotate(isolateHistory, "before").apply()
     }
     ist(undoDepth(state) < 40)
   })
@@ -308,6 +308,10 @@ describe("history", () => {
     state = state.t().setSelection(EditorSelection.single(2)).apply()
     state = command(state, undo, false)
     ist(state.selection.primary.head, 2)
+  })
+
+  it("isolates transactions when asked to", () => {
+
   })
 
   describe("undoSelection", () => {
@@ -396,7 +400,7 @@ describe("history", () => {
     it("only changes selection", () => {
       let state = mkState()
       state = type(state, "hi")
-      state = state.t().effect(closeHistory).apply()
+      state = state.t().annotate(isolateHistory, "before").apply()
       const selection = state.selection
       state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
       const selection2 = state.selection
@@ -428,21 +432,22 @@ describe("history", () => {
   })
 
   describe("effects", () => {
-    it("includes effects in the history", () => {
-      let set: StateEffectType<{prev: number, next: number}> = StateEffect.define<{prev: number, next: number}>({
-        addToHistory: {separate: true},
-        invert(value) { return set.of({prev: value.next, next: value.prev}) }
-      })
+    it("includes inverted effects in the history", () => {
+      let set = StateEffect.define<number>()
       let field = StateField.define({
         create: () => 0,
         update(val, tr) {
-          for (let effect of tr.effects) if (effect.is(set)) val = effect.value.next
+          for (let effect of tr.effects) if (effect.is(set)) val = effect.value
           return val
         }
       })
-      let state = EditorState.create({extensions: [history(), field]})
-      state = state.t().effect(set.of({prev: state.field(field), next: 10})).apply()
-      state = state.t().effect(set.of({prev: state.field(field), next: 20})).apply()
+      let invert = invertedEffects.of(tr => {
+        for (let e of tr.effects) if (e.is(set)) return [set.of(tr.startState.field(field))]
+        return []
+      })
+      let state = EditorState.create({extensions: [history(), field, invert]})
+      state = state.t().effect(set.of(10)).annotate(isolateHistory, "before").apply()
+      state = state.t().effect(set.of(20)).annotate(isolateHistory, "before").apply()
       ist(state.field(field), 20)
       state = command(state, undo)
       ist(state.field(field), 10)
@@ -458,66 +463,84 @@ describe("history", () => {
       ist(state.field(field), 20)
     })
 
-    it("can map effects", () => {
-      class Comment {
-        constructor(readonly from: number,
-                    readonly to: number,
-                    readonly text: string) {}
+    class Comment {
+      constructor(readonly from: number,
+                  readonly to: number,
+                  readonly text: string) {}
 
-        eq(other: Comment) { return this.from == other.from && this.to == other.to && this.text == other.text }
-      }
-      function mapComment(comment: Comment, mapping: Mapping) {
-        let from = mapping.mapPos(comment.from, 1), to = mapping.mapPos(comment.to, -1)
-        return from >= to ? undefined : new Comment(from, to, comment.text)
-      }
-      let addComment: StateEffectType<Comment> = StateEffect.define<Comment>({
-        map: mapComment,
-        addToHistory: {separate: true},
-        invert(val) { return rmComment.of(val) }
-      })
-      let rmComment: StateEffectType<Comment> = StateEffect.define<Comment>({
-        map: mapComment,
-        addToHistory: {separate: true},
-        invert(val) { return addComment.of(val) }
-      })
-      let comments = StateField.define<Comment[]>({
-        create: () => [],
-        update(value, tr) {
-          value = value.map(c => mapComment(c, tr.changes)).filter(x => x) as any
-          for (let effect of tr.effects) {
-            if (effect.is(addComment)) value = value.concat(effect.value)
-            else if (effect.is(rmComment)) value = value.filter(c => !c.eq(effect.value))
-          }
-          return value.sort((a, b) => a.from - b.from)
+      eq(other: Comment) { return this.from == other.from && this.to == other.to && this.text == other.text }
+    }
+    function mapComment(comment: Comment, mapping: Mapping) {
+      let from = mapping.mapPos(comment.from, 1), to = mapping.mapPos(comment.to, -1)
+      return from >= to ? undefined : new Comment(from, to, comment.text)
+    }
+    let addComment: StateEffectType<Comment> = StateEffect.define<Comment>({map: mapComment})
+    let rmComment: StateEffectType<Comment> = StateEffect.define<Comment>({map: mapComment})
+    let comments = StateField.define<Comment[]>({
+      create: () => [],
+      update(value, tr) {
+        value = value.map(c => mapComment(c, tr.changes)).filter(x => x) as any
+        for (let effect of tr.effects) {
+          if (effect.is(addComment)) value = value.concat(effect.value)
+          else if (effect.is(rmComment)) value = value.filter(c => !c.eq(effect.value))
         }
-      })
-      function str(state: EditorState) { return state.field(comments).map(c => c.text + "@" + c.from).join(",") }
+        return value.sort((a, b) => a.from - b.from)
+      }
+    })
+    let invertComments = invertedEffects.of(tr => {
+      let effects = []
+      for (let effect of tr.effects) {
+        if (effect.is(addComment) || effect.is(rmComment)) {
+          let src = mapComment(effect.value, tr.invertedChanges())
+          if (src) effects.push((effect.is(addComment) ? rmComment : addComment).of(src))
+        }
+      }
+      for (let comment of tr.startState.field(comments)) {
+        if (!mapComment(comment, tr.changes)) effects.push(addComment.of(comment))
+      }
+      return effects
+    })
 
-      let state = EditorState.create({extensions: [history(), comments], doc: "one two foo"})
-      state = state.t().effect(addComment.of(new Comment(0, 3, "c1"))).apply()
-      ist(str(state), "c1@0")
-      state = state.t().replace(3, 4, "---").effect(addComment.of(new Comment(6, 9, "c2"))).apply()
-      ist(str(state), "c1@0,c2@6")
+    function commentStr(state: EditorState) { return state.field(comments).map(c => c.text + "@" + c.from).join(",") }
+
+    it("can map effects", () => {
+      let state = EditorState.create({extensions: [history(), comments, invertComments],
+                                      doc: "one two foo"})
+      state = state.t().effect(addComment.of(new Comment(0, 3, "c1"))).annotate(isolateHistory, "full").apply()
+      ist(commentStr(state), "c1@0")
+      state = state.t().replace(3, 4, "---").annotate(isolateHistory, "full").
+        effect(addComment.of(new Comment(6, 9, "c2"))).apply()
+      ist(commentStr(state), "c1@0,c2@6")
       state = state.t().replace(0, 0, "---").annotate(Transaction.addToHistory, false).apply()
-      ist(str(state), "c1@3,c2@9")
+      ist(commentStr(state), "c1@3,c2@9")
       state = command(state, undo)
       ist(state.doc.toString(), "---one two foo")
-      ist(str(state), "c1@3")
+      ist(commentStr(state), "c1@3")
       state = command(state, undo)
-      ist(str(state), "")
+      ist(commentStr(state), "")
       state = command(state, redo)
-      ist(str(state), "c1@3")
+      ist(commentStr(state), "c1@3")
       state = command(state, redo)
-      ist(str(state), "c1@3,c2@9")
+      ist(commentStr(state), "c1@3,c2@9")
       ist(state.doc.toString(), "---one---two foo")
       state = command(state, undo).t().replace(10, 11, "---").annotate(Transaction.addToHistory, false).apply()
-      state = state.t().effect(addComment.of(new Comment(13, 16, "c3"))).apply()
-      ist(str(state), "c1@3,c3@13")
+      state = state.t().effect(addComment.of(new Comment(13, 16, "c3"))).annotate(isolateHistory, "full").apply()
+      ist(commentStr(state), "c1@3,c3@13")
       state = command(state, undo)
       ist(state.doc.toString(), "---one two---foo")
-      ist(str(state), "c1@3")
+      ist(commentStr(state), "c1@3")
       state = command(state, redo)
-      ist(str(state), "c1@3,c3@13")
+      ist(commentStr(state), "c1@3,c3@13")
+    })
+
+    it("can restore comments lost through deletion", () => {
+      let state = EditorState.create({extensions: [history(), comments, invertComments],
+                                      doc: "123456"})
+      state = state.t().effect(addComment.of(new Comment(3, 5, "c1"))).annotate(isolateHistory, "full").apply()
+      state = state.t().replace(2, 6, "").apply()
+      ist(commentStr(state), "")
+      state = command(state, undo)
+      ist(commentStr(state), "c1@3")
     })
   })
 })

@@ -1,15 +1,24 @@
 import {combineConfig, EditorState, Transaction, StateField, StateCommand, StateEffect,
-        Facet, Extension, ChangeSet, ChangeDesc, EditorSelection} from "../../state"
+        Facet, Annotation, Extension, ChangeSet, ChangeDesc, EditorSelection} from "../../state"
 
 const enum BranchName { Done, Undone }
 
 // FIXME this would make more sense as an annotation, maybe
 const historyMoveEffect = StateEffect.define<{side: BranchName, rest: Branch}>()
 
-/// Transaction effect that will prevent further steps from being
-/// appended to an existing history event (so that they require a
-/// separate undo command to undo).
-export const closeHistory = StateEffect.define()
+/// Transaction annotation that will prevent that annotation from
+/// being combined with other annotations in the undo history. Given
+/// `"before"`, it'll prevent merging with previous transactions. With
+/// `"after"`, subsequent transactions won't be combined with this
+/// one. With `"full"`, the transaction is isolated on both sides.
+export const isolateHistory = Annotation.define<"before" | "after" | "full">()
+
+/// This facet provides a way to register functions that, given a
+/// transaction, provide a set of effects that the history should
+/// store when inverting the transaction. This can be used to
+/// integrate some kinds of effects in the history, so that they can
+/// be undone (and redone again).
+export const invertedEffects = Facet.define<(tr: Transaction) => readonly StateEffect<any>[]>()
 
 const none: readonly any[] = []
 
@@ -47,16 +56,18 @@ const historyField = StateField.define({
                               from == BranchName.Done ? other : effect.value.rest)
     }
 
-    if (tr.effects.some(e => e.is(closeHistory))) state = state.resetTime()
+    let isolate = tr.annotation(isolateHistory)
+    if (isolate == "full" || isolate == "before") state = new HistoryState(state.done, state.undone)
 
     if (tr.annotation(Transaction.addToHistory) === false)
       return tr.changes.length ? state.addMapping(tr.changes.desc, config.minDepth) : state
-
     
     let item = Item.fromTransaction(tr)
     if (!item) return state
-    return state.addChangeItem(item, tr.annotation(Transaction.time)!, tr.annotation(Transaction.userEvent),
-                               config.newGroupDelay, config.minDepth)
+    state = state.addChangeItem(item, tr.annotation(Transaction.time)!, tr.annotation(Transaction.userEvent),
+                                config.newGroupDelay, config.minDepth)
+    if (isolate == "full" || isolate == "after") state = new HistoryState(state.done, state.undone)
+    return state
   }
 })
 
@@ -139,17 +150,17 @@ class Item {
   // there are no changes or effects or selection changes in the
   // transaction.
   static fromTransaction(tr: Transaction) {
-    let effects = []
+    let effects: readonly StateEffect<any>[] = none
     let inverted: ChangeSet | null = tr.invertedChanges()
-    for (let i = tr.effects.length - 1; i >= 0; i--) {
-      let effect = tr.effects[i], mapped = effect.type.spec.addToHistory && effect.invert().map(inverted)
-      if (mapped) effects.push(mapped)
+    for (let invert of tr.startState.facet(invertedEffects)) {
+      let result = invert(tr)
+      if (result.length) effects = effects.concat(result)
     }
     if (!effects.length && !inverted.length) {
       if (!tr.selectionSet) return null
       inverted = null
     }
-    return new Item(tr.changes.desc, inverted, effects.length ? effects : none, tr.startState.selection)
+    return new Item(tr.changes.desc, inverted, effects, tr.startState.selection)
   }
 }
 
@@ -235,20 +246,14 @@ function eqSelectionShape(a: EditorSelection, b: EditorSelection) {
 class HistoryState {
   constructor(public readonly done: Branch,
               public readonly undone: Branch,
-              private readonly prevTime: number | null = null,
+              private readonly prevTime: number = 0,
               private readonly prevUserEvent: string | undefined = undefined) {}
 
-  resetTime(): HistoryState {
-    return new HistoryState(this.done, this.undone)
-  }
-
-  addChangeItem(item: Item, time: number, userEvent: string | undefined,
-                newGroupDelay: number, maxLen: number): HistoryState {
+  addChangeItem(item: Item, time: number, userEvent: string | undefined, newGroupDelay: number, maxLen: number): HistoryState {
     let mayMerge: (item: Item) => boolean = nope
-    if (this.prevTime !== null && time - this.prevTime < newGroupDelay &&
-        (item.isChange || (this.prevUserEvent == userEvent && userEvent == "keyboard"))) {
+    if (time - this.prevTime < newGroupDelay &&
+        (item.isChange || (userEvent == "keyboard" && this.prevUserEvent == "keyboard"))) {
       if (!item.isChange) mayMerge = prev => eqSelectionShape(prev.selection!, item.selection!)
-      else if (item.effects.some(e => e.type.spec.addToHistory!.separate)) mayMerge = nope
       else mayMerge = prev => prev.map.length > 0 && item.map.length > 0 &&
         isAdjacent(prev.map.changes[prev.map.length - 1], item.map.changes[0])
     }

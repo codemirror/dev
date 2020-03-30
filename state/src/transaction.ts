@@ -21,10 +21,6 @@ export class Annotation<T> {
 
 export interface StateEffectSpec<Value> {
   map?: (value: Value, mapping: Mapping) => Value | undefined
-  invert?: (value: Value) => StateEffect<any>
-  addToHistory?: {separate?: boolean}
-  broadcast?: boolean
-  [key: string]: any
 }
 
 export class StateEffect<Value> {
@@ -36,17 +32,10 @@ export class StateEffect<Value> {
     return mapped === undefined ? undefined : mapped == this.value ? this : new StateEffect(this.type, mapped)
   }
 
-  invert(): StateEffect<Value> {
-    if (!this.type.invert) throw new Error("No invert method defined for this effect type")
-    return this.type.invert(this.value)
-  }
-
   is<T>(type: StateEffectType<T>): this is StateEffect<T> { return this.type == type as any }
 
   static define<Value = null>(spec: StateEffectSpec<Value> = {}): StateEffectType<Value> {
-    if (spec.addToHistory && !spec.invert)
-      throw new Error("An effect needs to have an invert method to be usable with the history")
-    return new StateEffectType(spec.map || (v => v), spec.invert, spec)
+    return new StateEffectType(spec.map || (v => v))
   }
 }
 
@@ -58,10 +47,7 @@ export class StateEffectType<Value> {
     // `StateEffect.is` mysteriously stops working when these properly
     // have type `Value`.
     /// @internal
-    readonly map: (value: any, mapping: Mapping) => any | undefined,
-    /// @internal
-    readonly invert: ((value: any) => any) | undefined,
-    readonly spec: StateEffectSpec<Value>
+    readonly map: (value: any, mapping: Mapping) => any | undefined
   ) {}
 
   of(value: Value): StateEffect<Value> { return new StateEffect(this, value) }
