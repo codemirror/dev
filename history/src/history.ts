@@ -3,8 +3,7 @@ import {combineConfig, EditorState, Transaction, StateField, StateCommand, State
 
 const enum BranchName { Done, Undone }
 
-// FIXME this would make more sense as an annotation, maybe
-const historyMoveEffect = StateEffect.define<{side: BranchName, rest: Branch}>()
+const fromHistory = Annotation.define<{side: BranchName, rest: Branch}>()
 
 /// Transaction annotation that will prevent that annotation from
 /// being combined with other annotations in the undo history. Given
@@ -48,12 +47,13 @@ const historyField = StateField.define({
   update(state: HistoryState, tr: Transaction, newState: EditorState): HistoryState {
     let config = newState.facet(historyConfig)
 
-    for (let effect of tr.effects) if (effect.is(historyMoveEffect)) {
-      let item = Item.fromTransaction(tr), from = effect.value.side
+    let fromHist = tr.annotation(fromHistory)
+    if (fromHist) {
+      let item = Item.fromTransaction(tr), from = fromHist.side
       let other = from == BranchName.Done ? state.undone : state.done
       if (item) other = addChangeItem(other, item, config.minDepth, nope)
-      return new HistoryState(from == BranchName.Done ? effect.value.rest : other,
-                              from == BranchName.Done ? other : effect.value.rest)
+      return new HistoryState(from == BranchName.Done ? fromHist.rest : other,
+                              from == BranchName.Done ? other : fromHist.rest)
     }
 
     let isolate = tr.annotation(isolateHistory)
@@ -84,7 +84,7 @@ function cmd(side: BranchName, only: ItemFilter): StateCommand {
     let historyState = state.field(historyField, false)
     if (!historyState || !historyState.canPop(side, only)) return false
     const {transaction, rest} = historyState.pop(side, only, state)
-    dispatch(transaction.effect(historyMoveEffect.of({side, rest})))
+    dispatch(transaction.annotate(fromHistory, {side, rest}))
     return true
   }
 }
