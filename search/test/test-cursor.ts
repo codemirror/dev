@@ -45,4 +45,8 @@ describe("SearchCursor", () => {
     testMatches(new SearchCursor(Text.of(["one two", "three four"]), "two\nthree"),
                 [[4, 13]])
   })
+
+  it("can search an empty document", () => {
+    testMatches(new SearchCursor(Text.empty, "aaaa"), [])
+  })
 })

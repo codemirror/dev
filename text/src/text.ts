@@ -471,7 +471,7 @@ class RawTextCursor implements TextIterator {
           this.offsets.pop()
         }
         this.lineBreak = false
-        if (next.length > skip) {
+        if (next.length > Math.max(0, skip)) {
           this.value = skip == 0 ? next : this.dir > 0 ? next.slice(skip) : next.slice(0, next.length - skip)
           return this
         }
@@ -514,13 +514,14 @@ class PartialTextCursor implements TextIterator {
     if (this.limit <= 0) {
       this.limit = -1
     } else {
-      let {value, lineBreak} = this.cursor.next(this.skip)
+      let {value, lineBreak, done} = this.cursor.next(this.skip)
       this.skip = 0
       this.value = value
       let len = lineBreak ? 1 : value.length
       if (len > this.limit)
         this.value = this.cursor.dir > 0 ? value.slice(0, this.limit) : value.slice(len - this.limit)
-      this.limit -= this.value.length
+      if (done || this.value.length == 0) this.limit = -1
+      else this.limit -= this.value.length
     }
     return this
   }
