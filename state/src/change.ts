@@ -111,8 +111,10 @@ export class Change extends ChangeDesc {
   /// the mapping completely replaces the region this change would
   /// apply to.
   map(mapping: Mapping): Change | null {
-    let from = mapping.mapPos(this.from, 1), to = this.from == this.to ? from : mapping.mapPos(this.to, -1)
-    return from > to ? null : new Change(from, to, this.text)
+    let from = mapping.mapPos(this.from, 1, MapMode.TrackDel)
+    let to = this.from == this.to ? from : mapping.mapPos(this.to, -1, MapMode.TrackDel)
+    if (from < 0 && to < 0 && (-from - 1) >= (-to - 1)) return null
+    return new Change(from < 0 ? -from - 1 : from, to < 0 ? -to - 1 : to, this.text)
   }
 
   /// A change description for this change.
