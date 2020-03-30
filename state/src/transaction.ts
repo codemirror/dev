@@ -8,7 +8,12 @@ import {Extension, ExtensionGroup} from "./facet"
 let annotationID = 0
 
 /// Annotations are tagged values that are used to add metadata to
-/// transactions in an extensible way.
+/// transactions in an extensible way. They should be used to model
+/// things that effect the entire transaction (such as its [time
+/// stamp](#state.Transaction^time) or information about its
+/// [origin](#state.Transaction^userEvent)). For effects that happen
+/// _alongside_ the other changes made by the transaction, [state
+/// effects](#state.StateEffect) are more appropriate.
 export class Annotation<T> {
   /// @internal
   id = annotationID++
