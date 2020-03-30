@@ -19,26 +19,49 @@ export class Annotation<T> {
   static define<T>() { return new Annotation<T>() }
 }
 
+/// Values passed to
+/// [`StateEffect.define`](#state.StateEffect^define).
 export interface StateEffectSpec<Value> {
+  /// Provides a way to map an effect like this through a position
+  /// mapping. When not given, the effects will simply not be mapped.
+  /// When the function returns `undefined`, that means the mapping
+  /// deletes the effect.
   map?: (value: Value, mapping: Mapping) => Value | undefined
 }
 
+/// State effects can be used to represent additional effects
+/// associated with a [transaction](#state.Transaction.effects). They
+/// are often useful to model changes to custom [state
+/// fields](#state.StateField), when those changes aren't implicit in
+/// document or selection changes.
 export class StateEffect<Value> {
-  constructor(readonly type: StateEffectType<Value>,
-              readonly value: Value) {}
+  /// @internal
+  constructor(
+    /// @internal
+    readonly type: StateEffectType<Value>,
+    /// The value of this effect.
+    readonly value: Value) {}
 
+  /// Map this effect through a position mapping. Will return
+  /// `undefined` when that ends up deleting the effect.
   map(mapping: Mapping): StateEffect<Value> | undefined {
     let mapped = this.type.map(this.value, mapping)
     return mapped === undefined ? undefined : mapped == this.value ? this : new StateEffect(this.type, mapped)
   }
 
+  /// Tells you whether this effect object is of a given
+  /// [type](#state.StateEffectType).
   is<T>(type: StateEffectType<T>): this is StateEffect<T> { return this.type == type as any }
 
+  /// Define a new effect type. The type parameter indicates the type
+  /// of values that his effect holds.
   static define<Value = null>(spec: StateEffectSpec<Value> = {}): StateEffectType<Value> {
     return new StateEffectType(spec.map || (v => v))
   }
 }
 
+/// Representation of a type of state effect. Defined with
+/// [`StateEffect.define`](#state.StateEffect^define).
 export class StateEffectType<Value> {
   /// @internal
   constructor(
@@ -50,6 +73,8 @@ export class StateEffectType<Value> {
     readonly map: (value: any, mapping: Mapping) => any | undefined
   ) {}
 
+  /// Create a [state effect](#state.StateEffect) instance of this
+  /// type.
   of(value: Value): StateEffect<Value> { return new StateEffect(this, value) }
 }
 
@@ -72,6 +97,9 @@ export class Transaction {
   docs: Text[] = []
   /// The selection at the end of the transaction.
   selection: EditorSelection
+  /// The effects stored in this transaction
+  /// ([mapped](#state.StateEffect.map) forward to the end of the
+  /// transaction).
   effects: StateEffect<any>[] = []
   private _annotations: {[id: number]: any} = Object.create(null)
   private flags: number = 0
@@ -108,6 +136,7 @@ export class Transaction {
     return this._annotations[annotation.id]
   }
 
+  /// Add a [state effect](#state.StateEffect) to this transaction.
   effect(effect: StateEffect<any> | StateEffectType<null>) {
     this.ensureOpen()
     this.effects.push(effect instanceof StateEffect ? effect : effect.of(null))

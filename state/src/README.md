@@ -42,6 +42,12 @@ let newState = transaction.apply()
 
 @Annotation
 
+@StateEffect
+
+@StateEffectSpec
+
+@StateEffectType
+
 @MapMode
 
 @Mapping
