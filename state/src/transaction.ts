@@ -128,15 +128,28 @@ export class Transaction {
     return this
   }
 
-  /// Add a change to this transaction. Like with
-  /// [`replace`](#state.Transaction.replace), such a change may be
-  /// influenced by [change filters](#state.EditorState^changeFilter).
-  change(change: Change): Transaction {
+  /// Add a change, or an array of changes, to this transaction. Like
+  /// with [`replace`](#state.Transaction.replace), such a change may
+  /// be influenced by [change
+  /// filters](#state.EditorState^changeFilter).
+  ///
+  /// When an array is given, all changes are interpreted as pointing
+  /// at positions in the _current_ document. Note that this differs
+  /// from calling this method on the changes one at a time, which
+  /// would interpret later changes to point into positions in the
+  /// documents produced by previous changes.
+  change(change: Change | readonly Change[]): Transaction {
     this.ensureOpen()
-    let startIndex = this.changes.length, changes = this.filterChange(change)
-    for (let i = startIndex; i < changes.length; i++) this.docs.push(changes.changes[i].apply(this.doc))
-    this.changes = changes
-    let mapping = changes.partialMapping(startIndex)
+    let changes = Array.isArray(change) ? change : [change]
+    let startIndex = this.changes.length
+    for (let change of this.filterChanges(changes)) {
+      if (change.from == change.to && change.length == 0) continue
+      if (change.from < 0 || change.to < change.from || change.to > this.doc.length)
+        throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
+      this.docs.push(change.apply(this.doc))
+      this.changes = this.changes.append(change)
+    }
+    let mapping = this.changes.partialMapping(startIndex)
     this.selection = this.selection.map(mapping)
     this.mapEffects(mapping)
     return this
@@ -166,51 +179,25 @@ export class Transaction {
     return this
   }
 
-  private filterChange(change: Change) {
-    // FIXME try to find a less hideous way to do this
+  private filterChanges(changes: Change[]) {
     let filters = this.startState.facet(changeFilter)
-    let pending = [change], upto = [filters.length]
-    let result = this.changes
-    let docLen = this.doc.length
-    work: while (pending.length) {
-      let change = pending.pop()!, i = upto.pop()! - 1
-      if (change.from == change.to && change.length == 0) continue
-      if (change.from < 0 || change.to < change.from || change.to > docLen)
-        throw new RangeError(`Invalid change ${change.from} to ${change.to}`)
-      for (; i >= 0; i--) {
-        let filtered = filters[i](change, this.startState, result)
-        if (!filtered || filtered.length == 1 && filtered[0] == change) continue
-        if (pending.length) { // Map remaining changes
-          let remap = new ChangeSet([change.invertedDesc].concat(filtered.map(c => c.desc)))
-          for (let j = pending.length - 1;; j--) {
-            let next = pending[j], mapped = next.map(remap)
-            if (mapped) pending[j] = mapped
-            if (j == 0) break
-            remap = remap.prepend(next.invertedDesc)
-            if (mapped) remap = remap.append(mapped.desc, 0)
-          }
+    for (let i = filters.length - 1; i >= 0; i--) {
+      for (let j = 0; j < changes.length;) {
+        let result = filters[i](changes[j], this.startState, this.changes)
+        if (result && !(result.length == 1 && result[0] == changes[j])) {
+          changes.splice(j, 1, ...result)
+          j += result.length
+        } else {
+          j++
         }
-        // Filtered results are provided in a single coordinate
-        // system. Must map changes past the first to make it possible
-        // to apply them after each other.
-        if (filtered.length > 1) {
-          let remapped = [filtered[0]]
-          for (let j = 1; j < filtered.length; j++) {
-            let mapped = filtered[j].map(new ChangeSet(remapped))
-            if (mapped) remapped.push(mapped)
-          }
-          filtered = remapped
-        }
-        for (let j = filtered.length - 1; j >= 0; j--) {
-          pending.push(filtered[j])
-          upto.push(i)
-        }
-        continue work
       }
-      result = result.append(change)
-      docLen += change.length - (change.to - change.from)
     }
-    return result
+    for (let i = 1; i < changes.length; i++) {
+      let mapped = changes[i].map(new ChangeSet(changes.slice(0, i)))
+      if (mapped) changes[i] = mapped
+      else changes.splice(i--, 1)
+    }
+    return changes
   }
 
   /// Indicates whether the transaction changed the document.
