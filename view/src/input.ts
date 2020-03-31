@@ -328,9 +328,9 @@ handlers.drop = (view, event: DragEvent) => {
     tr.replace(mouseSelection.dragging.from, mouseSelection.dragging.to, "")
     dropPos = tr.changes.mapPos(dropPos)
   }
-  let change = new Change(dropPos, dropPos, view.state.splitLines(text))
+  let ref = tr.mapRef(), change = new Change(dropPos, dropPos, view.state.splitLines(text))
   tr.change(change)
-    .setSelection(EditorSelection.single(dropPos, dropPos + change.length))
+    .setSelection(EditorSelection.single(ref.mapPos(dropPos, -1), ref.mapPos(dropPos, 1)))
     .annotate(Transaction.userEvent, "drop")
   view.focus()
   view.dispatch(tr)

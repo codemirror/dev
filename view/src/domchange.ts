@@ -67,7 +67,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       tr.replaceSelection((before + change.text.join(LineSep) + after).split(LineSep))
     } else {
       tr.change(change)
-      if (newSel && !tr.selection.primary.eq(newSel.primary))
+      if (newSel && !tr.selection.primary.eq(newSel.primary) && newSel.primary.to <= tr.doc.length)
         tr.setSelection(tr.selection.replaceRange(newSel.primary))
     }
     view.dispatch(tr.scrollIntoView().annotate(Transaction.userEvent, "input"))

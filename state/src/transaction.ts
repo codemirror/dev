@@ -248,9 +248,9 @@ export class Transaction {
   replaceSelection(text: string | readonly string[]): Transaction {
     let content = typeof text == "string" ? this.startState.splitLines(text) : text
     return this.forEachRange(range => {
-      let change = new Change(range.from, range.to, content)
-      this.change(change)
-      return new SelectionRange(range.from + change.length)
+      let ref = this.mapRef()
+      this.replace(range.from, range.to, content)
+      return new SelectionRange(ref.mapPos(range.from, 1))
     })
   }
 

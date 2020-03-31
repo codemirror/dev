@@ -71,8 +71,9 @@ export function handleBackspace(state: EditorState) {
     let before = prevChar(state.doc, range.head)
     for (let token of tokens) {
       if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0))) {
+        let ref = tr.mapRef()
         tr.replace(range.head - token.length, range.head + token.length, "")
-        return new SelectionRange(range.head - token.length)
+        return new SelectionRange(ref.mapPos(range.head))
       }
     }
     return dont = range
@@ -110,14 +111,15 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
   let tr = state.t(), dont = null
   tr.forEachRange(range => {
     if (!range.empty) {
+      let ref = tr.mapRef(), dir = range.head - range.anchor
       tr.replace(range.to, range.to, close)
-      tr.replace(range.from, range.from, open)
-      return new SelectionRange(range.anchor + open.length, range.head + open.length)
+      tr.replace(ref.mapPos(range.from), ref.mapPos(range.from), open)
+      return new SelectionRange(ref.mapPos(range.anchor, dir), ref.mapPos(range.head, -dir))
     }
     let next = nextChar(state.doc, range.head)
     if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1) {
       tr.replace(range.head, range.head, open + close)
-      return new SelectionRange(range.head + open.length, range.head + open.length)
+      return new SelectionRange(Math.min(tr.doc.length, range.head + open.length))
     }
     return dont = range
   })
@@ -140,15 +142,16 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
   let tr = state.t(), dont = null
   tr.forEachRange(range => {
     if (!range.empty) {
+      let ref = tr.mapRef(), dir = range.head - range.anchor
       tr.replace(range.to, range.to, token)
-      tr.replace(range.from, range.from, token)
-      return new SelectionRange(range.anchor + token.length, range.head + token.length)
+      tr.replace(ref.mapPos(range.from), ref.mapPos(range.from), token)
+      return new SelectionRange(ref.mapPos(range.anchor, dir), ref.mapPos(range.head, -dir))
     }
     let pos = range.head, next = nextChar(state.doc, pos)
     if (next == token) {
       if (nodeStart(state, pos)) {
         tr.replace(pos, pos, token + token)
-        return new SelectionRange(pos + token.length)
+        return new SelectionRange(Math.min(tr.doc.length, pos + token.length))
       } else {
         let isTriple = allowTriple && state.doc.slice(pos, pos + token.length * 3) == token + token + token
         return new SelectionRange(pos + token.length * (isTriple ? 3 : 1))
@@ -156,12 +159,12 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
     } else if (allowTriple && state.doc.slice(pos - 2 * token.length, pos) == token + token &&
                nodeStart(state, pos - 2 * token.length)) {
       tr.replace(pos, pos, token + token + token + token)
-      return new SelectionRange(pos + token.length)
+      return new SelectionRange(Math.min(tr.doc.length, pos + token.length))
     } else if (!isWordChar(next)) {
       let prev = state.doc.slice(pos - 1, pos)
       if (!isWordChar(prev) && prev != token) {
         tr.replace(pos, pos, token + token)
-        return new SelectionRange(pos + token.length)
+        return new SelectionRange(Math.min(tr.doc.length, pos + token.length))
       }
     }
     return dont = range
