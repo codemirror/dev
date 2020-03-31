@@ -1,8 +1,15 @@
 /node_modules
 package-lock.json
 /demo/demo.js*
+/demo/demo.d.ts*
 /demo/test/test.js*
 /.rpt2_cache
 /website
 /*/dist
+/*/src/*.js
+/*/src/*.d.ts
+/*/src/*.d.ts.map
+/*/test/*.js
+/*/test/*.d.ts
+/*/test/*.d.ts.map
 .tern-*

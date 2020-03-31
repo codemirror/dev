@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "dist/keymap.d.ts",
-  "module": "dist/index.es.js"
+  "types": "src/keymap",
+  "type": "module"
 }

@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "dist/special-chars.d.ts",
-  "module": "dist/index.es.js"
+  "types": "src/special-chars",
+  "type": "module"
 }

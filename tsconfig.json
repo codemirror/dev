@@ -4,5 +4,5 @@
     "lib": ["es6", "dom"],
     "types": ["mocha"]
   },
-  "include": ["*/src/*.ts", "*/test/*.ts"]
+  "include": ["*/src/*.ts", "*/test/*.ts", "demo/demo.ts"]
 }

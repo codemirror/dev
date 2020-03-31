@@ -231,7 +231,7 @@ export class EditorState {
   /// for the [document type](#state.Syntax.docNodeTypeAt) at the
   /// given position. Values provided by the facet, in precedence
   /// order, will appear before those provided by the syntax.
-  languageDataAt<T>(name: string, pos: number): readonly T[] {
+   languageDataAt<T>(name: string, pos: number): readonly T[] {
     let syntax = this.facet(EditorState.syntax)
     if (syntax.length == 0) return none
     let values: T[] | null = null

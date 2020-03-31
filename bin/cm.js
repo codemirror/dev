@@ -5,167 +5,63 @@ const child = require("child_process"), fs = require("fs"), fsp = fs.promises, p
 let root = path.join(__dirname, "..")
 
 class Pkg {
-  constructor(name, options = {}) {
+  constructor(name) {
     this.name = name
-    this.entry = options.entry || "index"
-    this.dom = !!options.dom
     this.dir = path.join(root, name)
-    this._dependencies = null
+    this.json = require(path.join(this.dir, "package.json"))
+    this.tsEntry = path.join(this.dir, this.json.types + ".ts")
+    this.jsEntry = path.join(this.dir, this.json.types + ".js")
   }
 
-  get sources() {
-    let src = path.join(this.dir, "src")
-    return fs.readdirSync(src).filter(file => /\.ts$/.test(file)).map(file => path.join(src, file))
-  }
-
-  get declarations() {
-    let dist = path.join(this.dir, "dist")
-    return !fs.existsSync(dist) ? [] :
-      fs.readdirSync(dist).filter(file => /\.d\.ts$/.test(file)).map(file => path.join(dist, file))
-  }
-
-  get entrySource() {
-    return path.join(this.dir, "src", this.entry + ".ts")
-  }
-
-  get esmFile() {
-    return path.join(this.dir, "dist", "index.es.js")
-  }
-
-  get cjsFile() {
+  get outFile() {
     return path.join(this.dir, "dist", "index.js")
   }
 
-  get dependencies() {
-    if (!this._dependencies) {
-      this._dependencies = []
-      for (let file of this.sources) {
-        let text = fs.readFileSync(file, "utf8")
-        let imp = /(?:^|\n)\s*import.* from "\.\.\/\.\.\/([\w-]+)"/g, m
-        while (m = imp.exec(text))
-          if (!this._dependencies.includes(m[1]) && packageNames[m[1]])
-            this._dependencies.push(packageNames[m[1]])
-      }
-    }
-    return this._dependencies
-  }
-
-  get inputFiles() {
-    return this.sources.concat(this.dependencies.reduce((arr, dep) => arr.concat(dep.declarations), []))
-  }
-
-  rollupConfig(options) {
+  rollupConfig() {
     return this._rollup || (this._rollup = {
-      input: this.entrySource,
-      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
+      input: this.jsEntry,
+      external,
       output: [{
         format: "esm",
-        file: this.esmFile,
+        file: this.outFile,
         sourcemap: true,
         externalLiveBindings: false
-      }, ...options.cjs ? [{
-        format: "cjs",
-        file: this.cjsFile,
-        sourcemap: true,
-        externalLiveBindings: false
-      }] : []],
-      plugins: [tsPlugin({lib: this.dom ? ["es6", "dom"] : ["es6"], types: this.dom ? [] : ["console"]})]
+      }]
     })
   }
-}
-
-const baseCompilerOptions = {
-  noImplicitReturns: false,
-  noUnusedLocals: false,
-  sourceMap: true
-}
-
-function tsPlugin(options) {
-  return require("rollup-plugin-typescript2")({
-    clean: true,
-    tsconfig: path.join(root, "tsconfig.base.json"),
-    tsconfigOverride: {
-      references: [],
-      compilerOptions: {...baseCompilerOptions, ...options},
-      include: []
-    }
-  })
 }
 
 const packages = [
-  new Pkg("text"),
-  new Pkg("state"),
-  new Pkg("rangeset", {entry: "rangeset"}),
-  new Pkg("history", {entry: "history"}),
-  new Pkg("view", {dom: true}),
-  new Pkg("gutter", {dom: true}),
-  new Pkg("commands", {entry: "commands", dom: true}),
-  new Pkg("syntax", {dom: true}),
-  new Pkg("fold", {entry: "fold", dom: true}),
-  new Pkg("matchbrackets", {entry: "matchbrackets", dom: true}),
-  new Pkg("closebrackets", {entry: "closebrackets", dom: true}),
-  new Pkg("keymap", {entry: "keymap", dom: true}),
-  new Pkg("multiple-selections", {entry: "multiple-selections", dom: true}),
-  new Pkg("special-chars", {entry: "special-chars", dom: true}),
-  new Pkg("panel", {entry: "panel", dom: true}),
-  new Pkg("tooltip", {entry: "tooltip", dom: true}),
-  new Pkg("search", {entry: "search", dom: true}),
-  new Pkg("lint", {entry: "lint", dom: true}),
-  new Pkg("highlight", {entry: "highlight", dom: true}),
-  new Pkg("stream-syntax", {entry: "stream-syntax", dom: true}),
-  new Pkg("autocomplete", {dom: true}),
-  new Pkg("lang-javascript"),
-  new Pkg("lang-css", {entry: "css"}),
-  new Pkg("lang-html", {entry: "html"}),
-]
+  "text",
+  "state",
+  "rangeset",
+  "history",
+  "view",
+  "gutter",
+  "commands",
+  "syntax",
+  "fold",
+  "matchbrackets",
+  "closebrackets",
+  "keymap",
+  "multiple-selections",
+  "special-chars",
+  "panel",
+  "tooltip",
+  "search",
+  "lint",
+  "highlight",
+  "stream-syntax",
+  "autocomplete",
+  "lang-javascript",
+  "lang-css",
+  "lang-html",
+].map(name => new Pkg(name))
+
+function external(id) { return id != "tslib" && !/^\.?\//.test(id) }
+
 const packageNames = Object.create(null)
 for (let pkg of packages) packageNames[pkg.name] = pkg
-
-const demo = {
-  name: "demo",
-
-  esmFile: path.join(root, "demo/demo.js"),
-
-  inputFiles: [path.join(root, "demo/demo.ts")],
-
-  rollupConfig() {
-    return this._rollup || (this._rollup = {
-      input: path.join(root, "demo/demo.ts"),
-      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-      output: [{
-        format: "esm",
-        file: this.esmFile
-      }],
-      plugins: [tsPlugin({lib: ["es6", "dom"], declaration: false, declarationMap: false})]
-    })
-  }
-}
-
-const viewTests = {
-  name: "view-tests",
-
-  main: path.join(root, "view/test/test.ts"),
-
-  esmFile: path.join(root, "demo/test/test.js"),
-
-  // FIXME derive automatically? move to separate dir?
-  inputFiles: ["test", "test-draw", "test-domchange", "test-selection", "test-draw-decoration",
-               "test-extension", "test-movepos", "test-composition",
-               "test-coords"].map(f => path.join(root, "view/test", f + ".ts")),
-
-  rollupConfig() {
-    return this._rollup || (this._rollup = {
-      input: this.main,
-      external(id) { return id != "tslib" && !/^\.?\//.test(id) },
-      output: [{
-        format: "esm",
-        file: this.esmFile,
-        paths: id => id == ".." ? "../../view" : null
-      }],
-      plugins: [tsPlugin({lib: ["es6", "dom"], types: ["mocha", "node"], declaration: false, declarationMap: false})]
-    })
-  }
-}
 
 function start() {
   let command = process.argv[2]
@@ -204,18 +100,6 @@ function listPackages() {
   console.log(packages.map(p => p.name).join("\n"))
 }
 
-async function maybeWriteFile(path, content) {
-  let buffer = Buffer.from(content)
-  let size = -1
-  try {
-    size = (await fsp.stat(path)).size
-  } catch (e) {
-    if (e.code != "ENOENT") throw e
-  }
-  if (size != buffer.length || !buffer.equals(await fsp.readFile(path)))
-    await fsp.writeFile(path, buffer)
-}
-
 async function runRollup(config) {
   let bundle = await require("rollup").rollup(config)
   for (let output of config.output) {
@@ -223,93 +107,31 @@ async function runRollup(config) {
     let dir = path.dirname(output.file)
     await fsp.mkdir(dir, {recursive: true}).catch(() => null)
     for (let file of result.output) {
-      let code = file.code || file.source
-      if (!/\.d\.ts/.test(file.fileName))
-        await fsp.writeFile(path.join(dir, file.fileName), code)
-      else if (output.format == "esm") // Don't double-emit declaration files
-        await maybeWriteFile(path.join(dir, file.fileName),
-                             /\.d\.ts\.map/.test(file.fileName) ? code.replace(/"sourceRoot":""/, '"sourceRoot":"../.."') : code)
+      await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
       if (file.map)
         await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
     }
   }
 }
 
-function fileTime(path) {
-  try {
-    let stat = fs.statSync(path)
-    return stat.mtimeMs
-  } catch(e) {
-    if (e.code == "ENOENT") return -1
-    throw e
-  }
-}
-
-async function rebuild(pkg, options) {
-  if (!options.always) {
-    let time = Math.min(fileTime(pkg.esmFile), options.cjs && pkg.cjsFile ? fileTime(pkg.cjsFile) : Infinity)
-    if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
-  }
+async function rebuild(pkg) {
   console.log(`Building ${pkg.name}...`)
   let t0 = Date.now()
-  await runRollup(pkg.rollupConfig(options))
+  await runRollup(pkg.rollupConfig())
   console.log(`Done in ${Date.now() - t0}ms`)
 }
 
-class Watcher {
-  constructor(pkgs, options) {
-    this.pkgs = pkgs
-    this.options = options
-    this.work = []
-    this.working = false
-    let self = this
-    for (let pkg of pkgs) {
-      for (let file of pkg.inputFiles) fs.watch(file, function trigger(type) {
-        self.trigger(pkg)
-        if (type == "rename") setTimeout(() => {
-          try { fs.watch(file, trigger) } catch {}
-        }, 50)
-      })
-    }
-  }
-
-  trigger(pkg) {
-    if (!this.work.includes(pkg)) {
-      this.work.push(pkg)
-      setTimeout(() => this.startWork(), 20)
-    }
-  }
-
-  startWork() {
-    if (this.working) return
-    this.working = true
-    this.run().catch(e => console.log(e.stack || String(e))).then(() => this.working = false)
-  }
-
-  async run() {
-    while (this.work.length) {
-      for (let pkg of this.pkgs) {
-        let index = this.work.indexOf(pkg)
-        if (index < 0) continue
-        this.work.splice(index, 1)
-        await rebuild(pkg, this.options)
-        break
-      }
-    }
-  }
-}
-
+// FIXME needs to run tsc
 async function build(...args) {
-  let filter = args.filter(a => a[0] != "-"), always = args.includes("--force")
+  let filter = args.filter(a => a[0] != "-")
   if (filter.length) {
-    let targets = packages.concat([demo, viewTests])
     for (let name of filter) {
-      let found = targets.find(t => t.name == name)
+      let found = packages.find(t => t.name == name)
       if (!found) throw new Error(`Unknown package ${name}`)
-      await rebuild(found, {cjs: !["demo", "view-tests"].includes(name), always})
+      await rebuild(found)
     }
   } else {
-    for (let pkg of packages) await rebuild(pkg, {cjs: true, always})
+    for (let pkg of packages) await rebuild(pkg)
   }
 }
 
@@ -323,15 +145,37 @@ function startServer() {
   console.log("Dev server listening on 8090")
 }
 
+const watchConfig = {clearScreen: false}
+
+function tsWatch() {
+  const ts = require("typescript")
+  const formatHost = {
+    getCanonicalFileName: path => path,
+    getCurrentDirectory: ts.sys.getCurrentDirectory,
+    getNewLine: () => "\n"
+  }
+  ts.createWatchProgram(ts.createWatchCompilerHost(
+    path.join(__dirname, "../tsconfig.json"),
+    {},
+    ts.sys,
+    ts.createEmitAndSemanticDiagnosticsBuilderProgram,
+    diag => console.error(ts.formatDiagnostic(diag, formatHost)),
+    diag => console.info(ts.flattenDiagnosticMessageText(diag.messageText, "\n"))
+  ))
+}
+
 async function devServer() {
   startServer()
-  let target = packages.concat([demo, viewTests])
-  for (let pkg of target) {
-    try { await rebuild(pkg, {cjs: true}) }
-    catch(e) { console.log(e) }
-  }
-  new Watcher(target, {cjs: true})
+  tsWatch()
   console.log("Watching...")
+  for (let pkg of packages) {
+    let watcher = require("rollup").watch(Object.assign(pkg.rollupConfig(), watchConfig))
+    watcher.on("event", event => {
+      if (event.code == "START") console.info("Start bundling " + pkg.name + "...")
+      else if (event.code == "END") console.info("Finished bundling " + pkg.name)
+      else if (event.code == "ERROR") console.error("Bundling error: " + event.error)
+    })
+  }
 }
 
 function changelog(since) {
