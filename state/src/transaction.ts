@@ -2,7 +2,7 @@ import {Text} from "../../text"
 import {allowMultipleSelections, changeFilter, selectionFilter} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
-import {Change, ChangeSet, Mapping} from "./change"
+import {Change, ChangeSet, Mapping, MapMode} from "./change"
 import {Extension, ExtensionGroup} from "./facet"
 
 let annotationID = 0
@@ -84,6 +84,15 @@ export class StateEffectType<Value> {
 }
 
 const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
+
+class MapRef {
+  constructor(readonly tr: Transaction,
+              readonly index: number) {}
+
+  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
+    return this.tr.changes.mapInner(pos, bias, mode, this.index, this.tr.changes.length)
+  }
+}
 
 /// Changes to the editor state are grouped into transactions.
 /// Usually, a user action creates a single transaction, which may
@@ -348,6 +357,15 @@ export class Transaction {
       changes.push(set.changes[i].invert(i == 0 ? this.startState.doc : this.docs[i - 1]))
     return new ChangeSet(changes, set.mirror.length ? set.mirror.map(i => set.length - i - 1) : set.mirror)
   }
+
+  /// Returns a [position mapping](#state.Mapping) that can map
+  /// positions in this transaction's _current_ document forward to
+  /// later documents, when more changes have happened. (This differs
+  /// from mapping through the transaction's `changes` property in
+  /// that that always maps through all changes in the transaction,
+  /// whereas this only maps through changes added since the ref was
+  /// created.)
+  mapRef(): Mapping { return new MapRef(this, this.changes.length) }
 
   /// Annotation used to store transaction timestamps.
   static time = Annotation.define<number>()
