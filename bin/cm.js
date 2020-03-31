@@ -327,10 +327,10 @@ async function devServer() {
   startServer()
   let target = packages.concat([demo, viewTests])
   for (let pkg of target) {
-    try { await rebuild(pkg, {cjs: false}) }
+    try { await rebuild(pkg, {cjs: true}) }
     catch(e) { console.log(e) }
   }
-  new Watcher(target, {cjs: false})
+  new Watcher(target, {cjs: true})
   console.log("Watching...")
 }
 
