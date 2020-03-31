@@ -247,7 +247,7 @@ function fileTime(path) {
 
 async function rebuild(pkg, options) {
   if (!options.always) {
-    let time = Math.min(fileTime(pkg.esmFile), options.cjs ? fileTime(pkg.cjsFile) : Infinity)
+    let time = Math.min(fileTime(pkg.esmFile), options.cjs && pkg.cjsFile ? fileTime(pkg.cjsFile) : Infinity)
     if (time >= 0 && !pkg.inputFiles.some(file => fileTime(file) >= time)) return
   }
   console.log(`Building ${pkg.name}...`)
