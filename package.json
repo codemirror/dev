@@ -73,5 +73,9 @@
     "ts-node": "^8.2.0",
     "typescript": "^3.8.3",
     "@codemirror/next": "."
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codemirror/codemirror.next.git"
   }
 }
