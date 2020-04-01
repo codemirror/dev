@@ -1,4 +1,4 @@
-import {ChangeSet, ChangedRange, MapMode} from "../../state"
+import {ChangeSet, ChangedRange, MapMode} from "@codemirror/next/state"
 
 /// Each range is associated with a value, which must inherit from
 /// this class.

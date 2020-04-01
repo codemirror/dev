@@ -2,7 +2,7 @@ import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
-import {EditorSelection, Change, Transaction} from "../../state"
+import {EditorSelection, Change, Transaction} from "@codemirror/next/state"
 
 const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 

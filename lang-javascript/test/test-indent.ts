@@ -1,6 +1,6 @@
 import ist from "ist"
-import {EditorState, IndentContext} from "../../state"
-import {javascript} from ".."
+import {EditorState, IndentContext} from "@codemirror/next/state"
+import {javascript} from "@codemirror/next/lang-javascript"
 
 function getIndent(state: EditorState, pos: number): number {
   for (let f of state.facet(EditorState.indentation)) {

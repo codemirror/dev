@@ -1,8 +1,8 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType, IndentContext} from "../../state"
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "../../view"
+import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType, IndentContext} from "@codemirror/next/state"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "@codemirror/next/view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
-import {defaultTags} from "../../highlight"
+import {defaultTags} from "@codemirror/next/highlight"
 
 export {StringStream}
 

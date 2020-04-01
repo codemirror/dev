@@ -1,4 +1,4 @@
-import {Text} from "../../text"
+import {Text} from "@codemirror/next/text"
 import {allowMultipleSelections, changeFilter, selectionFilter} from "./extension"
 import {EditorState} from "./state"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"

@@ -1,5 +1,5 @@
-import {EditorState, StateField, EditorSelection, Extension} from "../../state"
-import {DecorationSet, Decoration, WidgetType, EditorView, themeClass} from "../../view"
+import {EditorState, StateField, EditorSelection, Extension} from "@codemirror/next/state"
+import {DecorationSet, Decoration, WidgetType, EditorView, themeClass} from "@codemirror/next/view"
 
 const field = StateField.define<DecorationSet>({
   create(state) {

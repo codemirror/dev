@@ -1,5 +1,5 @@
-import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "../../view"
-import {StateEffect, StateEffectType, Facet, StateField, Extension} from "../../state"
+import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "@codemirror/next/view"
+import {StateEffect, StateEffectType, Facet, StateField, Extension} from "@codemirror/next/state"
 
 const HoverTime = 750, HoverMaxDist = 10
 

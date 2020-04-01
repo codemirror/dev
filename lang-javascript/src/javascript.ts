@@ -1,8 +1,8 @@
 import {parser} from "lezer-javascript"
-import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "../../syntax"
-import {languageData} from "../../state"
+import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {languageData} from "@codemirror/next/state"
 import {Subtree} from "lezer-tree"
-import {styleTags} from "../../highlight"
+import {styleTags} from "@codemirror/next/highlight"
 
 const statementIndent = continuedIndent({except: /^{/})
 

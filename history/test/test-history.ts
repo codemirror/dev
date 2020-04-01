@@ -1,9 +1,9 @@
 import ist from "ist"
 
 import {EditorState, EditorSelection, SelectionRange, Transaction,
-        StateEffect, StateEffectType, StateField, Mapping} from "../../state"
+        StateEffect, StateEffectType, StateField, Mapping} from "@codemirror/next/state"
 import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
-        undoSelection, invertedEffects} from ".."
+        undoSelection, invertedEffects} from "@codemirror/next/history"
 
 const mkState = (config?: any, doc?: string) => EditorState.create({
   extensions: [history(config), EditorState.allowMultipleSelections.of(true)],

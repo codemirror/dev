@@ -1,5 +1,5 @@
-import {SearchCursor} from ".."
-import {Text} from "../../text"
+import {SearchCursor} from "@codemirror/next/search"
+import {Text} from "@codemirror/next/text"
 import ist from "ist"
 
 function testMatches(cursor: SearchCursor, expected: [number, number][]) {

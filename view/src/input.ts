@@ -1,4 +1,4 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "../../state"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "@codemirror/next/state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,

@@ -1,4 +1,4 @@
-import {StreamParser} from "../../stream-syntax"
+import {StreamParser} from "@codemirror/next/stream-syntax"
 
 declare const javascript: (options?: any) => StreamParser<any>
 

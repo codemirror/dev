@@ -3,8 +3,8 @@
   "version": "0.4.0",
   "description": "Text/code editor component",
   "scripts": {
-    "test": "mocha -r ts-node/register/transpile-only text/test/test-*.ts state/test/test-*.ts history/test/test-*.ts rangeset/test/test-rangeset.ts keymap/test/test-*.ts view/test/test-heightmap.ts lang-javascript/test/test-*.ts closebrackets/test/test-*.ts search/test/test-*.ts",
-    "prepare": "bin/cm.js build --force",
+    "test": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js keymap/test/test-*.js view/test/test-heightmap.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js",
+    "prepare": "bin/cm.js build",
     "dev": "bin/cm.js devserver"
   },
   "keywords": [
@@ -24,26 +24,54 @@
     }
   ],
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
+  "type": "module",
+  "exports": {
+    "./text": "./text/dist/index.js",
+    "./state": "./state/dist/index.js",
+    "./rangeset": "./rangeset/dist/index.js",
+    "./history": "./history/dist/index.js",
+    "./view": "./view/dist/index.js",
+    "./gutter": "./gutter/dist/index.js",
+    "./commands": "./commands/dist/index.js",
+    "./syntax": "./syntax/dist/index.js",
+    "./fold": "./fold/dist/index.js",
+    "./matchbrackets": "./matchbrackets/dist/index.js",
+    "./closebrackets": "./closebrackets/dist/index.js",
+    "./keymap": "./keymap/dist/index.js",
+    "./multiple-selections": "./multiple-selections/dist/index.js",
+    "./special-chars": "./special-chars/dist/index.js",
+    "./panel": "./panel/dist/index.js",
+    "./tooltip": "./tooltip/dist/index.js",
+    "./search": "./search/dist/index.js",
+    "./lint": "./lint/dist/index.js",
+    "./highlight": "./highlight/dist/index.js",
+    "./stream-syntax": "./stream-syntax/dist/index.js",
+    "./autocomplete": "./autocomplete/dist/index.js",
+    "./lang-javascript": "./lang-javascript/dist/index.js",
+    "./lang-css": "./lang-css/dist/index.js",
+    "./lang-html": "./lang-html/dist/index.js"
+  },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "lezer": "^0.8.2",
-    "lezer-css": "^0.8.1",
-    "lezer-html": "^0.8.2",
-    "lezer-javascript": "^0.8.1",
-    "lezer-tree": "^0.8.3",
-    "style-mod": "^2.2.1",
-    "w3c-keyname": "^2.2.2"
+    "lezer": "^0.8.3",
+    "lezer-css": "^0.8.2",
+    "lezer-html": "^0.8.3",
+    "lezer-javascript": "^0.8.2",
+    "lezer-tree": "^0.8.4",
+    "style-mod": "^2.2.2",
+    "w3c-keyname": "^2.2.4"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
-    "ecstatic": "^4.1.2",
+    "serve-static": "^1.14.1",
     "eslint4b-prebuilt": "^6.7.1",
-    "ist": "^1.1.3",
-    "mocha": "^5.1.1",
-    "esmoduleserve": "^0.1.0",
+    "ist": "^1.1.6",
+    "mocha": "^7.1.1",
+    "esmoduleserve": "^0.1.2",
     "rollup": "^1.25.3",
     "rollup-plugin-typescript2": "^0.25.2",
     "ts-node": "^8.2.0",
-    "typescript": "^3.8.3"
+    "typescript": "^3.8.3",
+    "@codemirror/next": "."
   }
 }

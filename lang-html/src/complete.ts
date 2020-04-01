@@ -1,5 +1,5 @@
-import {EditorState, Text} from "../../state"
-import {AutocompleteContext} from "../../autocomplete"
+import {EditorState, Text} from "@codemirror/next/state"
+import {AutocompleteContext} from "@codemirror/next/autocomplete"
 import {Subtree} from "lezer-tree"
 
 type AttrSpec = {[attrName: string]: null | readonly string[]}

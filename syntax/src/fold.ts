@@ -1,5 +1,5 @@
 import {NodeProp, Subtree} from "lezer-tree"
-import {EditorState, Syntax} from "../../state"
+import {EditorState, Syntax} from "@codemirror/next/state"
 
 /// This node prop is used to associate folding information with node
 /// types. Given a subtree, it should check whether that tree is

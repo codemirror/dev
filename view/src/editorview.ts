@@ -1,4 +1,4 @@
-import {EditorState, Transaction, Extension, Precedence} from "../../state"
+import {EditorState, Transaction, Extension, Precedence} from "@codemirror/next/state"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"

@@ -1,8 +1,8 @@
-import {SpanIterator, RangeSet} from "../../rangeset"
+import {SpanIterator, RangeSet} from "@codemirror/next/rangeset"
 import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType, WidgetType} from "./decoration"
 import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {WidgetView, TextView} from "./inlineview"
-import {Text, TextIterator} from "../../text"
+import {Text, TextIterator} from "@codemirror/next/text"
 
 export const enum Open { Start = 1, End = 2 }
 

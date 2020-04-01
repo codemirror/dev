@@ -4,7 +4,7 @@ export {Decoration, DecorationSet, WidgetType,
         MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec, BlockType} from "./decoration"
 export {BlockInfo} from "./heightmap"
 export {themeClass} from "./theme"
-export {Range} from "../../rangeset"
+export {Range} from "@codemirror/next/rangeset"
 
 import {HeightMap, HeightOracle, MeasuredHeights, QueryType} from "./heightmap"
 /// @internal

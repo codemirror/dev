@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection, Text} from "../../state"
-import {EditorView, ViewPlugin, ViewUpdate} from ".."
+import {EditorSelection, Text} from "@codemirror/next/state"
+import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/next/view"
 import ist from "ist"
 
 describe("EditorView extension", () => {

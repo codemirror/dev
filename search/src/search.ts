@@ -1,9 +1,9 @@
-import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "../../view"
-import {StateField, Facet, StateEffect, EditorSelection, SelectionRange, Extension} from "../../state"
-import {panels, Panel, showPanel} from "../../panel"
-import {Keymap, NormalizedKeymap, keymap} from "../../keymap"
-import {Text, isWordChar} from "../../text"
-import {RangeSetBuilder} from "../../rangeset"
+import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "@codemirror/next/view"
+import {StateField, Facet, StateEffect, EditorSelection, SelectionRange, Extension} from "@codemirror/next/state"
+import {panels, Panel, showPanel} from "@codemirror/next/panel"
+import {Keymap, NormalizedKeymap, keymap} from "@codemirror/next/keymap"
+import {Text, isWordChar} from "@codemirror/next/text"
+import {RangeSetBuilder} from "@codemirror/next/rangeset"
 import {SearchCursor} from "./cursor"
 export {SearchCursor}
 

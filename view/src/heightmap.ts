@@ -1,6 +1,6 @@
-import {Text} from "../../text"
-import {ChangedRange} from "../../state"
-import {RangeSet, SpanIterator} from "../../rangeset"
+import {Text} from "@codemirror/next/text"
+import {ChangedRange} from "@codemirror/next/state"
+import {RangeSet, SpanIterator} from "@codemirror/next/rangeset"
 import {DecorationSet, PointDecoration, Decoration, BlockType, addRange} from "./decoration"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]

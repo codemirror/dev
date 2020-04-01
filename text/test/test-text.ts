@@ -1,4 +1,4 @@
-import {Text} from ".."
+import {Text} from "@codemirror/next/text"
 import ist from "ist"
 
 function depth(node: Text): number {

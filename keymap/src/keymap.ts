@@ -1,5 +1,5 @@
 import {base, keyName} from "w3c-keyname"
-import {EditorView, Command} from "../../view"
+import {EditorView, Command} from "@codemirror/next/view"
 
 /// A keymap associates key names with
 /// [command](#view.Command)-style functions.

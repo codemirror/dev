@@ -1,4 +1,4 @@
-import {Text} from "../../text"
+import {Text} from "@codemirror/next/text"
 import {Tree} from "lezer-tree"
 import {EditorSelection, checkSelection} from "./selection"
 import {Transaction} from "./transaction"

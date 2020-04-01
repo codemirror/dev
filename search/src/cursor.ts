@@ -1,4 +1,4 @@
-import {Text, TextIterator, isExtendingChar} from "../../text"
+import {Text, TextIterator, isExtendingChar} from "@codemirror/next/text"
 
 const basicNormalize: (string: string) => string = String.prototype.normalize ? x => x.normalize("NFKD") : x => x
 

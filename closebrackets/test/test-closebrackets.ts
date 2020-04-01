@@ -1,8 +1,8 @@
 import ist from "ist"
-import {handleInsertion, handleBackspace} from ".."
-import {EditorState, EditorSelection, languageData} from "../../state"
-import {Text} from "../../text"
-import {StreamSyntax} from "../../stream-syntax"
+import {handleInsertion, handleBackspace} from "@codemirror/next/closebrackets"
+import {EditorState, EditorSelection, languageData} from "@codemirror/next/state"
+import {Text} from "@codemirror/next/text"
+import {StreamSyntax} from "@codemirror/next/stream-syntax"
 
 function s(doc = "", anchor = 0, head = anchor) {
   return EditorState.create({doc, selection: EditorSelection.single(anchor, head)})

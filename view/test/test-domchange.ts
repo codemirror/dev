@@ -1,6 +1,6 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection, StateField} from "../../state"
-import {Decoration, DecorationSet, EditorView, WidgetType} from ".."
+import {EditorSelection, StateField} from "@codemirror/next/state"
+import {Decoration, DecorationSet, EditorView, WidgetType} from "@codemirror/next/view"
 import ist from "ist"
 
 function flush(cm: EditorView) {

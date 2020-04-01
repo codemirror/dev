@@ -1,5 +1,5 @@
-import {EditorView, ViewPlugin, PluginField, ViewUpdate, themeClass} from "../../view"
-import {Facet, Extension} from "../../state"
+import {EditorView, ViewPlugin, PluginField, ViewUpdate, themeClass} from "@codemirror/next/view"
+import {Facet, Extension} from "@codemirror/next/state"
 
 /// Enables the panel-managing extension.
 export function panels(): Extension { return [panelPlugin, baseTheme] }

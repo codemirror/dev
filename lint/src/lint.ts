@@ -1,8 +1,8 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
-        WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "../../view"
-import {StateEffect, EditorSelection, StateField, Extension} from "../../state"
-import {hoverTooltip} from "../../tooltip"
-import {panels, Panel, showPanel} from "../../panel"
+        WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "@codemirror/next/view"
+import {StateEffect, EditorSelection, StateField, Extension} from "@codemirror/next/state"
+import {hoverTooltip} from "@codemirror/next/tooltip"
+import {panels, Panel, showPanel} from "@codemirror/next/panel"
 
 /// Describes a problem or hint for a piece of code.
 export interface Diagnostic {

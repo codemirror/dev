@@ -1,8 +1,8 @@
-import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException} from "../../view"
+import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException} from "@codemirror/next/view"
 import {combineConfig, EditorSelection, EditorState,
-        Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "../../state"
-import {keymap} from "../../keymap"
-import {Tooltip, tooltips, showTooltip} from "../../tooltip"
+        Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "@codemirror/next/state"
+import {keymap} from "@codemirror/next/keymap"
+import {Tooltip, tooltips, showTooltip} from "@codemirror/next/tooltip"
 
 export enum FilterType { Start, Fuzzy }
 

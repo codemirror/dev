@@ -1,8 +1,8 @@
 import {Parser, InputStream, ParseContext} from "lezer"
 import {Tree, Subtree, NodeProp} from "lezer-tree"
-import {Text, TextIterator} from "../../text"
-import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType} from "../../state"
-import {ViewPlugin, ViewUpdate, EditorView} from "../../view"
+import {Text, TextIterator} from "@codemirror/next/text"
+import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType} from "@codemirror/next/state"
+import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
 

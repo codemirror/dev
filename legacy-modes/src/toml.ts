@@ -1,4 +1,4 @@
-import {StreamSyntax, StringStream} from "../../stream-syntax"
+import {StreamSyntax, StringStream} from "@codemirror/next/stream-syntax"
 
 class ParseState {
   constructor(public inString = false,

@@ -1,7 +1,7 @@
-import {EditorView} from "../../view"
-import {EditorState, SelectionRange, Transaction} from "../../state"
-import {Text, isWordChar} from "../../text"
-import {codePointAt, fromCodePoint, minPairCodePoint} from "../../text"
+import {EditorView} from "@codemirror/next/view"
+import {EditorState, SelectionRange, Transaction} from "@codemirror/next/state"
+import {Text, isWordChar} from "@codemirror/next/text"
+import {codePointAt, fromCodePoint, minPairCodePoint} from "@codemirror/next/text"
 import {keyName} from "w3c-keyname"
 
 /// Configures bracket closing behavior for a syntax (via

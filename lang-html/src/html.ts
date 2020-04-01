@@ -1,10 +1,10 @@
 import {configureHTML} from "lezer-html"
 import {Subtree} from "lezer-tree"
-import {cssSyntax} from "../../lang-css"
-import {javascriptSyntax} from "../../lang-javascript"
-import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp, openNodeProp, closeNodeProp} from "../../syntax"
-import {languageData} from "../../state"
-import {styleTags} from "../../highlight"
+import {cssSyntax} from "@codemirror/next/lang-css"
+import {javascriptSyntax} from "@codemirror/next/lang-javascript"
+import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp, openNodeProp, closeNodeProp} from "@codemirror/next/syntax"
+import {languageData} from "@codemirror/next/state"
+import {styleTags} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 
 /// A syntax provider based on the [Lezer HTML

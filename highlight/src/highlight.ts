@@ -1,8 +1,8 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "../../view"
-import {EditorState, Extension} from "../../state"
-import {RangeSetBuilder} from "../../rangeset"
+import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
+import {EditorState, Extension} from "@codemirror/next/state"
+import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
 const Inherit = 1
 

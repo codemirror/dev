@@ -1,6 +1,6 @@
 import ist from "ist"
-import {EditorState} from "../../state"
-import {javascriptSyntax} from ".."
+import {EditorState} from "@codemirror/next/state"
+import {javascriptSyntax} from "@codemirror/next/lang-javascript"
 import {Tree} from "lezer"
 
 function s(doc: string) {

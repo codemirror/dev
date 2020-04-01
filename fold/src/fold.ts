@@ -1,6 +1,6 @@
-import {combineConfig, fillConfig, EditorState, StateEffect, Mapping, Facet, StateField, Transaction} from "../../state"
-import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "../../view"
-import {gutter, GutterMarker} from "../../gutter"
+import {combineConfig, fillConfig, EditorState, StateEffect, Mapping, Facet, StateField, Transaction} from "@codemirror/next/state"
+import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "@codemirror/next/view"
+import {gutter, GutterMarker} from "@codemirror/next/gutter"
 
 type Range = {from: number, to: number}
 

@@ -1,5 +1,5 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
-import {Line} from "../../text"
+import {Line} from "@codemirror/next/text"
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Facet} from "./facet"

@@ -8,8 +8,8 @@ import {Decoration, DecorationSet, WidgetType, BlockType, addRange} from "./deco
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection, hasSelection} from "./dom"
 import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet, UpdateFlag, editable} from "./extension"
 import {EditorView} from "./editorview"
-import {RangeSet} from "../../rangeset"
-import {ChangedRange, Transaction} from "../../state"
+import {RangeSet} from "@codemirror/next/rangeset"
+import {ChangedRange, Transaction} from "@codemirror/next/state"
 
 const none = [] as any
 

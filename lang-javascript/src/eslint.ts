@@ -1,8 +1,8 @@
-import {Diagnostic} from "../../lint"
-import {Text, EditorState} from "../../state"
-import {EditorView} from "../../view"
+import {Diagnostic} from "@codemirror/next/lint"
+import {Text, EditorState} from "@codemirror/next/state"
+import {EditorView} from "@codemirror/next/view"
 import {javascriptSyntax} from "./javascript"
-import {LezerSyntax} from "../../syntax"
+import {LezerSyntax} from "@codemirror/next/syntax"
 
 /// Connects an [ESLint](https://eslint.org/) linter to CodeMirror's
 /// [lint](#lint) integration. `eslint` should be an instance of the

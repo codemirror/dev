@@ -1,4 +1,4 @@
-import {NormalizedKeymap} from ".."
+import {NormalizedKeymap} from "@codemirror/next/keymap"
 import ist from "ist"
 
 function mk(map: {[key: string]: string}) {

@@ -1,4 +1,4 @@
-import {Facet} from "../../state"
+import {Facet} from "@codemirror/next/state"
 import {StyleModule, Style} from "style-mod"
 
 export const theme = Facet.define<string>()

@@ -1,5 +1,5 @@
-import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "../../state"
-import {EditorView, Command} from "../../view"
+import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "@codemirror/next/state"
+import {EditorView, Command} from "@codemirror/next/view"
 
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "word" | "line" | "lineboundary"): boolean {

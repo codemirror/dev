@@ -1,5 +1,5 @@
 import {combineConfig, EditorState, Transaction, StateField, StateCommand, StateEffect,
-        Facet, Annotation, Extension, ChangeSet, ChangeDesc, EditorSelection} from "../../state"
+        Facet, Annotation, Extension, ChangeSet, ChangeDesc, EditorSelection} from "@codemirror/next/state"
 
 const enum BranchName { Done, Undone }
 

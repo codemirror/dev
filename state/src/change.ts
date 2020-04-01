@@ -1,4 +1,4 @@
-import {Text} from "../../text"
+import {Text} from "@codemirror/next/text"
 
 const empty: readonly any[] = []
 

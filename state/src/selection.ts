@@ -1,6 +1,6 @@
 import {Mapping} from "./change"
 import {EditorState} from "./state"
-import {Text, charType} from "../../text"
+import {Text, charType} from "@codemirror/next/text"
 
 /// A single selection range. When
 /// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)

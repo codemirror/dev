@@ -9,68 +9,27 @@ class Pkg {
     this.name = name
     this.dir = path.join(root, name)
     this.json = require(path.join(this.dir, "package.json"))
-    this.tsEntry = path.join(this.dir, this.json.types + ".ts")
-    this.jsEntry = path.join(this.dir, this.json.types + ".js")
-  }
-
-  get outFile() {
-    return path.join(this.dir, "dist", "index.js")
-  }
-
-  rollupConfig() {
-    return this._rollup || (this._rollup = {
-      input: this.jsEntry,
-      external,
-      output: [{
-        format: "esm",
-        file: this.outFile,
-        sourcemap: true,
-        externalLiveBindings: false
-      }]
-    })
   }
 }
 
-const packages = [
-  "text",
-  "state",
-  "rangeset",
-  "history",
-  "view",
-  "gutter",
-  "commands",
-  "syntax",
-  "fold",
-  "matchbrackets",
-  "closebrackets",
-  "keymap",
-  "multiple-selections",
-  "special-chars",
-  "panel",
-  "tooltip",
-  "search",
-  "lint",
-  "highlight",
-  "stream-syntax",
-  "autocomplete",
-  "lang-javascript",
-  "lang-css",
-  "lang-html",
-].map(name => new Pkg(name))
-
+const packageFile = path.join(root, "package.json"), packageJSON = JSON.parse(fs.readFileSync(packageFile, "utf8"))
+const packages = [], packageNames = Object.create(null)
+for (let exp of Object.keys(packageJSON.exports)) {
+  let pkg = new Pkg(/\.\/(.*)/.exec(exp)[1])
+  packages.push(pkg)
+  packageNames[pkg.name] = pkg
+}
+  
 function external(id) { return id != "tslib" && !/^\.?\//.test(id) }
-
-const packageNames = Object.create(null)
-for (let pkg of packages) packageNames[pkg.name] = pkg
 
 function start() {
   let command = process.argv[2]
   let args = process.argv.slice(3)
   let cmdFn = {
     packages: listPackages,
-    build: build,
-    devserver: devServer,
-    release: release,
+    build,
+    devserver,
+    release,
     "--help": () => help(0)
   }[command]
   if (!cmdFn || cmdFn.length > args.length) help(1)
@@ -80,7 +39,7 @@ function start() {
 function help(status) {
   console.log(`Usage:
   cm packages             Emit a list of all pkg names
-  cm build [-w]           Build the bundle files
+  cm build                Build the bundle files
   cm devserver            Start a dev server on port 8090
   cm release              Create commits to tag a release
   cm --help`)
@@ -100,11 +59,11 @@ function listPackages() {
   console.log(packages.map(p => p.name).join("\n"))
 }
 
-async function runRollup(config) {
-  let bundle = await require("rollup").rollup(config)
-  for (let output of config.output) {
-    let result = await bundle.generate(output)
-    let dir = path.dirname(output.file)
+async function runRollup(configs) {
+  for (let config of Array.isArray(configs) ? configs : [configs]) {
+    let bundle = await require("rollup").rollup(config)
+    let result = await bundle.generate(config.output)
+    let dir = path.dirname(config.output.file)
     await fsp.mkdir(dir, {recursive: true}).catch(() => null)
     for (let file of result.output) {
       await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
@@ -114,33 +73,39 @@ async function runRollup(config) {
   }
 }
 
-async function rebuild(pkg) {
-  console.log(`Building ${pkg.name}...`)
-  let t0 = Date.now()
-  await runRollup(pkg.rollupConfig())
-  console.log(`Done in ${Date.now() - t0}ms`)
+function rollupConfig(pkg) {
+  return {
+    input: path.join(pkg.dir, pkg.json.types + ".js"),
+    external,
+    output: {
+      format: "esm",
+      file: path.join(pkg.dir, "dist", "index.js"),
+      sourcemap: true,
+      externalLiveBindings: false
+    }
+  }
 }
 
-// FIXME needs to run tsc
-async function build(...args) {
-  let filter = args.filter(a => a[0] != "-")
-  if (filter.length) {
-    for (let name of filter) {
-      let found = packages.find(t => t.name == name)
-      if (!found) throw new Error(`Unknown package ${name}`)
-      await rebuild(found)
-    }
-  } else {
-    for (let pkg of packages) await rebuild(pkg)
-  }
+async function build() {
+  console.info("Running TypeScript compiler...")
+  let t0 = Date.now()
+  tsBuild()
+  console.info(`Done in ${Date.now() - t0}ms`)
+  console.info("Building bundles...")
+  t0 = Date.now()
+  await runRollup(packages.map(rollupConfig))
+  console.log(`Done in ${Date.now() - t0}ms`)
 }
 
 function startServer() {
   let serve = path.join(root, "demo")
-  let moduleserver = new (require("esmoduleserve/moduleserver"))({root: serve})
-  let ecstatic = require("ecstatic")({root: serve})
+  let moduleserver = new (require("esmoduleserve/moduleserver"))({root: serve, maxDepth: 2})
+  let serveStatic = require("serve-static")(serve)
   require("http").createServer((req, resp) => {
-    moduleserver.handleRequest(req, resp) || ecstatic(req, resp)
+    moduleserver.handleRequest(req, resp) || serveStatic(req, resp, err => {
+      resp.statusCode = 404
+      resp.end('Not found')
+    })
   }).listen(8090, process.env.OPEN ? undefined : "127.0.0.1")
   console.log("Dev server listening on 8090")
 }
@@ -155,7 +120,7 @@ function tsWatch() {
     getNewLine: () => "\n"
   }
   ts.createWatchProgram(ts.createWatchCompilerHost(
-    path.join(__dirname, "../tsconfig.json"),
+    path.join(root, "tsconfig.json"),
     {},
     ts.sys,
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
@@ -164,18 +129,35 @@ function tsWatch() {
   ))
 }
 
-async function devServer() {
-  startServer()
+function tsBuild() {
+  const ts = require("typescript")
+  const formatHost = {
+    getCanonicalFileName: path => path,
+    getCurrentDirectory: ts.sys.getCurrentDirectory,
+    getNewLine: () => "\n"
+  }
+  let conf = ts.getParsedCommandLineOfConfigFile(path.join(root, "tsconfig.json"), {}, ts.sys)
+  let program = ts.createProgram(conf.fileNames, conf.options)
+  let emitResult = program.emit()
+
+  for (let diag of ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics))
+    console.error(ts.formatDiagnostic(diag, formatHost))
+
+  if (emitResult.emitSkipped) error("TS build failed")
+}
+
+function devserver() {
   tsWatch()
   console.log("Watching...")
   for (let pkg of packages) {
-    let watcher = require("rollup").watch(Object.assign(pkg.rollupConfig(), watchConfig))
+    let watcher = require("rollup").watch(Object.assign(rollupConfig(pkg), watchConfig))
     watcher.on("event", event => {
       if (event.code == "START") console.info("Start bundling " + pkg.name + "...")
       else if (event.code == "END") console.info("Finished bundling " + pkg.name)
       else if (event.code == "ERROR") console.error("Bundling error: " + event.error)
     })
   }
+  startServer()
 }
 
 function changelog(since) {
@@ -211,12 +193,11 @@ function releaseNotes(changes, version) {
 }
 
 function setModuleVersion(version) {
-  let file = path.join(root, "package.json")
-  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/"version":\s*".*?"/, `"version": "${version}"`))
+  fs.writeFileSync(packageFile, fs.readFileSync(packageFile, "utf8").replace(/"version":\s*".*?"/, `"version": "${version}"`))
 }
 
 function release() {
-  let currentVersion = require(path.join(root, "package.json")).version
+  let currentVersion = packageJSON.version
   let changes = changelog(currentVersion)
   let newVersion = bumpVersion(currentVersion, changes)
   console.log(`Creating @codemirror/next ${newVersion}`)

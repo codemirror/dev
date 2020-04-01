@@ -1,6 +1,6 @@
-import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "../../view"
-import {combineConfig, ChangedRange, Facet, Extension} from "../../state"
-import {countColumn} from "../../text"
+import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
+import {combineConfig, ChangedRange, Facet, Extension} from "@codemirror/next/state"
+import {countColumn} from "@codemirror/next/text"
 import {StyleModule} from "style-mod"
 
 /// Configure the special character highlighter.

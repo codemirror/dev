@@ -1,5 +1,5 @@
 import ist from "ist"
-import {ChangeDesc, ChangeSet} from ".."
+import {ChangeDesc, ChangeSet} from "@codemirror/next/state"
 
 function testMapping(mapping: ChangeSet<ChangeDesc>, ...cases: any[][]) {
   let inverted = mapping.partialMapping(mapping.length, 0)
