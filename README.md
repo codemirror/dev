@@ -4,6 +4,16 @@ This is the prototype of the next version of [CodeMirror](https://codemirror.net
 
 Eventually, the content of this repository will move into different packages. For now, to reduce friction during development, it is a monorepo. Its content is published as the `@codemirror/next` package on [npm](https://npmjs.com).
 
+To get started, make sure you are running [node.js](https://nodejs.org/) version 13. After cloning the repository, run
+
+    npm install
+
+to install dependencies, and
+
+    npm run dev
+
+to start a server that automatically rebuilds the bundles when the code changes and exposes a dev server on port 8090 running the [demo](http://localhost:8090) and [tests](http://localhost:8090/test).
+
 Please see [the website](https://codemirror.net/6/) for more information and [docs](https://codemirror.net/6/docs/ref).
 
 There's a Matrix room for dev discussion at [#codemirror6:matrix.org](https://matrix.to/#/#codemirror6:matrix.org).
