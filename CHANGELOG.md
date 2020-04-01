@@ -1,3 +1,45 @@
+## 0.5.0 (2020-04-01)
+
+### Breaking changes
+
+`EditorView.domEventHandlers` is now a function, and the handlers receive their arguments in a different order.
+
+Syntax objects no longer have a `languageDataAt` method (this was moved to `EditorState`, and changed somewhat).
+
+Completion functions now return a plain list of results, rather than an object.
+
+The interface to `EditorState.indentation` changed, taking an `IndentContext` object.
+
+Facets provided by a state field are now declared in an option to `StateField.define`, instead of in method calls on the field object.
+
+Isolating transactions so that they become their own undo history item is now done with the `isolateHistory` annotation.
+
+The packages are no longer available as CommonJS files. To run the code on node.js, you'll need node 13 or pass `--experimental-modules` to node 12.
+
+### New features
+
+View plugins now have an `eventHandlers` method to attach plugin-specific DOM event handlers.
+
+The editor state now has a `languageDataAt` that collects values stored under a given property name in the main language data and in object attached for a given document type with the `addLanguageData` facet.
+
+It is now possible to provide indentation functions with information about already-reindented lines through an `IndentContext` object, making it possible to reindent a region in one go without re-parsing.
+
+Lint sources can now be asynchronous.
+
+The `EditorView.editable` facet can now be used to control whether the content is editable.
+
+The [`selectionFilter`](https://codemirror.net/6/docs/ref/#state.EditorState^selectionFilter) facet can now be used to control selection updates.
+
+The new [`changeFilter`](https://codemirror.net/6/docs/ref/#state.EditorState^changeFilter) facet can be used to stop or modify document changes.
+
+[`Transaction.change`](https://codemirror.net/6/docs/ref/#state.Transaction.change) now also accepts an array of changes to apply in one go.
+
+The history module now exports a facet that allows you to create inverted effects from a transaction, which will be stored in the history. (This allows making non-document state un/redoable.)
+
+Transactions can now contains [state effects](https://codemirror.net/6/docs/ref/#state.StateEffect), which can describe state changes for extensions, and be [integrated](https://codemirror.net/6/docs/ref/#history.invertedEffects) with the undo history.
+
+Transactions now have a `mapRef` method to easily create a position mapping from a given intermediate document to the current document.
+
 ## 0.4.0 (2020-02-21)
 
 ### Breaking Changes
