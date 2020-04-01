@@ -23,7 +23,7 @@ component that displays the editor state and allows text input.
 
 @ViewUpdate
 
-@logExtension
+@logException
 
 ### Decorations
 
