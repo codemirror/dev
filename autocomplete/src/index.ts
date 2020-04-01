@@ -267,7 +267,8 @@ const style = Precedence.Fallback.set(EditorView.theme({
 
     "& > li": {
       cursor: "pointer",
-      padding: "1px 1em 1px 3px"
+      padding: "1px 1em 1px 3px",
+      lineHeight: 1.2
     },
 
     "& > li[aria-selected]": {
