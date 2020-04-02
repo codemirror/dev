@@ -61,3 +61,57 @@ let state = EditorState.create({doc: `<script>
 
 let view = (window as any).view = new EditorView({state})
 document.querySelector("#editor")!.appendChild(view.dom)
+
+
+// let tr = state.t().replace(6, 11, "from transaction")
+// console.log(tr.doc.toString()) // "hello editor"
+// let newState = transaction.apply()
+// view.dispatch(tr)
+
+enum CommentOption {
+  Toggle,
+  OnlyComment,
+  OnlyUncomment,
+}
+
+const toggleComment = function(option: CommentOption = CommentOption.Toggle) {
+  const lineCommentToken = "//"
+  let s = view.state
+  let f = s.selection.primary.from
+  let t = s.selection.primary.to
+  let l = s.doc.lineAt(f)
+  console.log(f, t, l.start)
+  let str = (l.content as string)
+  if (str.startsWith(lineCommentToken)) {
+    if (option != CommentOption.OnlyComment) {
+      let tr = view.state.t().replace(l.start, l.start + lineCommentToken.length, "")
+      view.dispatch(tr)
+    }
+
+  } else {
+    if (option != CommentOption.OnlyUncomment) {
+      let tr = view.state.t().replace(l.start, l.start, lineCommentToken)
+      view.dispatch(tr)
+    }
+  }
+}
+
+const comment = function() {
+  toggleComment(CommentOption.OnlyComment)
+}
+
+const uncomment = function() {
+  toggleComment(CommentOption.OnlyUncomment)
+}
+
+document.querySelector("#toggleComment")!.addEventListener("click", function() {
+  toggleComment()
+});
+
+document.querySelector("#comment")!.addEventListener("click", function() {
+  comment()
+});
+
+document.querySelector("#uncomment")!.addEventListener("click", function() {
+  uncomment()
+});
