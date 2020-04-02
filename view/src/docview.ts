@@ -9,7 +9,7 @@ import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoVie
 import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet, UpdateFlag, editable} from "./extension"
 import {EditorView} from "./editorview"
 import {RangeSet} from "@codemirror/next/rangeset"
-import {ChangedRange, Transaction} from "@codemirror/next/state"
+import {ChangedRange, ChangeSet, Transaction} from "@codemirror/next/state"
 
 const none = [] as any
 
@@ -63,8 +63,8 @@ export class DocView extends ContentView {
       if (!changedRanges.every(({fromA, toA}) => toA < this.minWidthFrom || fromA > this.minWidthTo)) {
         this.minWidth = 0
       } else {
-        this.minWidthFrom = ChangedRange.mapPos(this.minWidthFrom, 1, changedRanges)
-        this.minWidthTo = ChangedRange.mapPos(this.minWidthTo, 1, changedRanges)
+        this.minWidthFrom = update.changes.mapPos(this.minWidthFrom, 1)
+        this.minWidthTo = update.changes.mapPos(this.minWidthTo, 1)
       }
     }
 
@@ -77,7 +77,7 @@ export class DocView extends ContentView {
       update.changes.changes.some(ch => ch.text.length > 1)
 
     if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
-    else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, changedRanges)
+    else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, update.changes)
 
     let prevDeco = this.decorations, deco = this.updateDeco()
     let decoDiff = findChangedDeco(prevDeco, deco, changedRanges, update.state.doc.length)
@@ -411,7 +411,7 @@ class BlockGapWidget extends WidgetType<number> {
   get estimatedHeight() { return this.value }
 }
 
-export function computeCompositionDeco(view: EditorView, changes: readonly ChangedRange[]): DecorationSet {
+export function computeCompositionDeco(view: EditorView, changes: ChangeSet): DecorationSet {
   let sel = getSelection(view.root)
   let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset)
   if (!textNode) return Decoration.none
@@ -430,7 +430,7 @@ export function computeCompositionDeco(view: EditorView, changes: readonly Chang
     return Decoration.none
   }
 
-  let newFrom = ChangedRange.mapPos(from, 1, changes), newTo = Math.max(newFrom, ChangedRange.mapPos(to, -1, changes))
+  let newFrom = changes.mapPos(from, 1), newTo = Math.max(newFrom, changes.mapPos(to, -1))
   let text = textNode.nodeValue!, doc = view.state.doc
   if (newTo - newFrom < text.length) {
     if (doc.slice(newFrom, Math.min(doc.length, newFrom + text.length)) == text) newTo = newFrom + text.length
