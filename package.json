@@ -32,6 +32,7 @@
     "./commands": "./commands/dist/index.js",
     "./keymap": "./keymap/dist/index.js",
     "./history": "./history/dist/index.js",
+    "./collab": "./collab/dist/index.js",
     "./gutter": "./gutter/dist/index.js",
     "./rangeset": "./rangeset/dist/index.js",
     "./syntax": "./syntax/dist/index.js",
