@@ -51,7 +51,8 @@
     "./lang-javascript": "./lang-javascript/dist/index.js",
     "./lang-python": "./lang-python/dist/index.js",
     "./lang-css": "./lang-css/dist/index.js",
-    "./lang-html": "./lang-html/dist/index.js"
+    "./lang-html": "./lang-html/dist/index.js",
+    "./comment": "./comment/dist/index.js"
   },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
