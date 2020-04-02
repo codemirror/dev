@@ -26,7 +26,7 @@ export abstract class GutterMarker extends RangeValue {
 }
 
 GutterMarker.prototype.elementClass = ""
-GutterMarker.prototype.startMapMode = GutterMarker.prototype.endMapMode = MapMode.TrackBefore
+GutterMarker.prototype.mapMode = MapMode.TrackBefore
 
 type Handlers = {[event: string]: (view: EditorView, line: BlockInfo, event: any) => boolean}
 

@@ -7,16 +7,11 @@ export enum MapMode {
   /// Map a position to a valid new position, even when its context
   /// was deleted.
   Simple,
-  /// Return a negative number if a deletion happens across the
-  /// position. This number will be `-(newPos + 1)`, where `newPos` is
-  /// the result you'd get with `MapMode.Simple`.
+  /// Return -1 if a deletion happens across the position.
   TrackDel,
-  /// Return a negative number if the character _before_ the position
-  /// is deleted. The result is encoded the same way as with
-  /// `MapMode.TrackDel`.
+  /// Return -1 if the character _before_ the position is deleted.
   TrackBefore,
-  /// Return a negative number if the character _after_ the position is
-  /// deleted.
+  /// Return -1 if the character _after_ the position is deleted.
   TrackAfter
 }
 
@@ -60,11 +55,11 @@ export class ChangeDesc implements Mapping {
     if (pos < from) return pos
     if (pos > to) return pos + (length - (to - from))
     if (pos == to || pos == from) {
-      if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) return -pos - 1
+      if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) return -1
       return (from == to ? bias <= 0 : pos == from) ? from : from + length
     }
     pos = from + (bias <= 0 ? 0 : length)
-    return mode != MapMode.Simple ? -pos - 1 : pos
+    return mode != MapMode.Simple ? -1 : pos
   }
 
   /// Return a JSON-serializeable object representing this value.
@@ -111,10 +106,13 @@ export class Change extends ChangeDesc {
   /// the mapping completely replaces the region this change would
   /// apply to.
   map(mapping: Mapping): Change | null {
-    let from = mapping.mapPos(this.from, 1, MapMode.TrackDel)
-    let to = this.from == this.to ? from : mapping.mapPos(this.to, -1, MapMode.TrackDel)
-    if (from < 0 && to < 0 && (-from - 1) >= (-to - 1)) return null
-    return new Change(from < 0 ? -from - 1 : from, to < 0 ? -to - 1 : to, this.text)
+    if (this.from == this.to) {
+      let pos = mapping.mapPos(this.from, 1, MapMode.TrackDel)
+      return pos == this.from ? this : pos < 0 ? null : new Change(pos, pos, this.text)
+    } else {
+      let from = mapping.mapPos(this.from, 1), to = mapping.mapPos(this.to, -1)
+      return from >= to ? null : new Change(from, to, this.text)
+    }
   }
 
   /// A change description for this change.
@@ -199,7 +197,7 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   /// @internal
   mapInner(pos: number, bias: number, mode: MapMode, fromI: number, toI: number): number {
     let dir = toI < fromI ? -1 : 1
-    let hasMirrors = this.mirror.length > 0, mirror, deleted = false
+    let hasMirrors = this.mirror.length > 0, mirror
     for (let i = fromI - (dir < 0 ? 1 : 0), endI = toI - (dir < 0 ? 1 : 0); i != endI; i += dir) {
       let {from, to, length} = this.changes[i]
       if (dir < 0) {
@@ -221,14 +219,14 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
         continue
       }
       if (pos > from && pos < to) {
-        if (mode != MapMode.Simple) deleted = true
+        if (mode != MapMode.Simple) return -1
         pos = bias <= 0 ? from : from + length
       } else {
-        if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) deleted = true
+        if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) return -1
         pos = (from == to ? bias <= 0 : pos == from) ? from : from + length
       }
     }
-    return deleted ? -pos - 1 : pos
+    return pos
   }
 
   /// Check whether these changes touch a given range. When one of the
@@ -256,7 +254,7 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   }
 
   /// Summarize this set of changes as a minimal sequence of changed
-  /// ranges, sored by position. For example, if you have changes
+  /// ranges, sorted by position. For example, if you have changes
   /// deleting between 1 and 4 and inserting a character at 1, the
   /// result would be a single range saying 1 to 4 in the old doc was
   /// replaced with range 1 to 2 in the new doc.
@@ -268,11 +266,11 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
       let fromA = change.from, toA = change.to, fromB = change.from, toB = change.from + change.length
       if (i < this.length - 1) {
         let mapping = this.partialMapping(i + 1)
-        fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, -1)
+        fromB = mapping.mapPos(fromB, 1); toB = mapping.mapPos(toB, 1)
       }
       if (i > 0) {
         let mapping = this.partialMapping(i, 0)
-        fromA = mapping.mapPos(fromA, 1); toA = mapping.mapPos(toA, -1)
+        fromA = mapping.mapPos(fromA, 1); toA = mapping.mapPos(toA, 1)
       }
       new ChangedRange(fromA, toA, fromB, toB).addToSet(set)
     }

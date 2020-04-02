@@ -221,8 +221,8 @@ export const replaceAll: Command = view => {
   if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc), tr = view.state.t()
   while (!cursor.next().done) {
-    let {from, to} = cursor.value
-    tr.replace(tr.changes.mapPos(from, 1), tr.changes.mapPos(to, -1), plugin.query.replace)
+    let {from, to} = cursor.value, newFrom = tr.changes.mapPos(from, 1)
+    tr.replace(newFrom, Math.max(newFrom, tr.changes.mapPos(to, -1)), plugin.query.replace)
   }
   if (!tr.docChanged) return false
   view.dispatch(tr)
