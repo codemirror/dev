@@ -126,8 +126,9 @@ export function receiveTransaction(state: EditorState, changes: readonly Change[
     unconfirmed = []
   }
 
-  // FIXME notify history/other of rebase shape
-  return tr.annotate(Transaction.addToHistory, false).annotate(collabReceive, new CollabState(version, unconfirmed))
+  return tr.annotate(Transaction.addToHistory, false)
+    .annotate(collabReceive, new CollabState(version, unconfirmed))
+    .annotate(Transaction.rebasedChanges, nUnconfirmed)
 }
 
 /// Returns the set of locally made steps that still have to be sent
