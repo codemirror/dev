@@ -122,18 +122,14 @@ export class EditorSelection {
   /// Convert this selection to an object that can be serialized to
   /// JSON.
   toJSON(): any {
-    return this.ranges.length == 1 ? this.ranges[0].toJSON() :
-      {ranges: this.ranges.map(r => r.toJSON()), primaryIndex: this.primaryIndex}
+    return {ranges: this.ranges.map(r => r.toJSON()), primaryIndex: this.primaryIndex}
   }
 
   /// Create a selection from a JSON representation.
   static fromJSON(json: any): EditorSelection {
-    if (json && Array.isArray(json.ranges)) {
-      if (typeof json.primaryIndex != "number" || json.primaryIndex >= json.ranges.length)
-        throw new RangeError("Invalid JSON representation for EditorSelection")
-      return new EditorSelection(json.ranges.map((r: any) => SelectionRange.fromJSON(r)), json.primaryIndex)
-    }
-    return new EditorSelection([SelectionRange.fromJSON(json)])
+    if (!json || !Array.isArray(json.ranges) || typeof json.primaryIndex != "number" || json.primaryIndex >= json.ranges.length)
+      throw new RangeError("Invalid JSON representation for EditorSelection")
+    return new EditorSelection(json.ranges.map((r: any) => SelectionRange.fromJSON(r)), json.primaryIndex)
   }
 
   /// Create a selection holding a single range.
