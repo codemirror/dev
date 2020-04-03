@@ -1,7 +1,7 @@
 import ist from "ist"
 
 import {EditorState, EditorSelection, SelectionRange, Transaction,
-        StateEffect, StateEffectType, StateField, Mapping} from "@codemirror/next/state"
+        StateEffect, StateEffectType, StateField, Mapping, Change} from "@codemirror/next/state"
 import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection, invertedEffects} from "@codemirror/next/history"
 
@@ -542,5 +542,70 @@ describe("history", () => {
       state = command(state, undo)
       ist(commentStr(state), "c1@3")
     })
+  })
+
+  it("behaves properly with rebasing changes", () => {
+    let state = EditorState.create({extensions: [history()], doc: "one three", selection: {anchor: 3}})
+    let changes: {forward: Change, backward: Change}[] = []
+    function dispatch(tr: Transaction) {
+      for (let inv = tr.invertedChanges(), i = 0, j = inv.length - 1; j >= 0; i++, j--)
+        changes.push({forward: tr.changes.changes[i], backward: inv.changes[j]})
+      state = tr.apply()
+    }
+    function receive(confirmedTo: number, f: (tr: Transaction) => void) {
+      let tr = state.t(), newChanges = changes.slice(0, confirmedTo)
+      for (let i = changes.length - 1; i >= confirmedTo; i--) tr.changeNoFilter(changes[i].backward)
+      f(tr)
+      for (let i = confirmedTo, refIndex = changes.length - confirmedTo; i < changes.length; i++) {
+        let mapped = changes[i].forward.map(tr.changes.partialMapping(refIndex))
+        refIndex--
+        if (mapped) {
+          newChanges.push({forward: mapped, backward: mapped.invert(tr.doc)})
+          tr.changeNoFilter(mapped, refIndex)
+        }          
+      }
+      state = tr.annotate(Transaction.rebasedChanges, changes.length - confirmedTo)
+        .annotate(Transaction.addToHistory, false).apply()
+      changes = newChanges
+    }
+
+    for (let ch of " two") dispatch(state.t().replaceSelection(ch))
+    dispatch(state.t().setSelection(13))
+    dispatch(state.t().replaceSelection("!"))
+    ist(changes.length, 5)
+    ist(state.doc.toString(), "one two three!")
+    // Say the last 3 changes (adding "wo" and "!") are unconfirmed,
+    // and remote changes come in replacing "three" -> "four"
+    receive(2, tr => tr.replace(6, 11, "four"))
+    ist(state.doc.toString(), "one two four!")
+    // Another remote change, adding " five" after "four"
+    receive(2, tr => tr.replace(10, 10, " five"))
+    dispatch(state.t().replace(18, 18, "?"))
+    ist(state.doc.toString(), "one two four five!?")
+
+    undo({state, dispatch})
+    ist(state.doc.toString(), "one two four five!")
+    undo({state, dispatch})
+    ist(state.doc.toString(), "one two four five")
+
+    // Run through the full undo/redo to verify that still works, but
+    // leave `state` at two undos
+    let undone3 = command(state, undo)
+    ist(undone3.doc.toString(), "one four five")
+    let redone = command(undone3, redo), redone2 = command(redone, redo), redone3 = command(redone2, redo)
+    ist(redone.doc.toString(), "one two four five")
+    ist(redone2.doc.toString(), "one two four five!")
+    ist(redone3.doc.toString(), "one two four five!?")
+
+    receive(3, tr => tr.replace(16, 16, " six"))
+    ist(state.doc.toString(), "one two four five six")
+    undo({state, dispatch})
+    ist(state.doc.toString(), "one four five six")
+    redo({state, dispatch})
+    ist(state.doc.toString(), "one two four five six")
+    redo({state, dispatch})
+    ist(state.doc.toString(), "one two four five! six")
+    redo({state, dispatch})
+    ist(state.doc.toString(), "one two four five!? six")
   })
 })
