@@ -250,7 +250,7 @@ export class Transaction {
     return this.forEachRange(range => {
       let ref = this.mapRef()
       this.replace(range.from, range.to, content)
-      return new SelectionRange(ref.mapPos(range.from, 1))
+      return new SelectionRange(ref.mapPos(range.to, 1))
     })
   }
 

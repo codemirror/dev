@@ -4,7 +4,7 @@ class Rebaseable { // FIXME store metadata with these?
   constructor(readonly forward: Change, readonly backward: Change) {}
 }
 
-// Undo a given set of steps, apply a set of other steps, and then
+// Undo a given set of changes, apply a set of other changes, and then
 // redo them. Return the mapped set of rebaseable objects.
 export function rebaseChanges(changes: readonly Rebaseable[], over: readonly Change[], tr: Transaction) {
   for (let i = changes.length - 1; i >= 0; i--) tr.changeNoFilter(changes[i].backward)
@@ -33,7 +33,7 @@ class CollabState {
     // in the option object, for the editor's value when the option
     // was enabled.
     readonly version: number,
-    // The local steps that havent been successfully sent to the
+    // The local changes that havent been successfully sent to the
     // server yet.
     readonly unconfirmed: readonly Rebaseable[]) {}
 }
@@ -49,6 +49,9 @@ const defaultClientID = mkID()
 
 const collabConfig = Facet.define<CollabConfig & {generatedID: string}, Required<CollabConfig>>({
   combine(configs: readonly (CollabConfig & {generatedID: string})[]) {
+    // FIXME does this have to be so complicated? (The issue this
+    // addresses is that we don't want to regenerate the client id on
+    // reconfiguration.)
     let version = 0, clientID: string | null = null
     for (let conf of configs) {
       if (conf.startVersion != null) {
@@ -85,7 +88,6 @@ function unconfirmedFrom(tr: Transaction) {
 }
 
 export function collab(config: CollabConfig = {}) {
-  // FIXME include some facet that controls history behavior?
   return [
     collabField,
     collabConfig.of({startVersion: config.startVersion,
@@ -94,26 +96,26 @@ export function collab(config: CollabConfig = {}) {
   ]
 }
 
-/// Create a transaction that represents a set of new steps received from
-/// the authority. Applying this transaction moves the state forward to
-/// adjust to the authority's view of the document.
-export function receiveTransaction(state: EditorState, changes: readonly Change[], clientIDs: readonly string[]) {
-  // Pushes a set of steps (received from the central authority) into
-  // the editor state (which should have the collab plugin enabled).
-  // Will recognize its own changes, and confirm unconfirmed steps as
-  // appropriate. Remaining unconfirmed steps will be rebased over
-  // remote steps.
+/// Create a transaction that represents a set of new changes received
+/// from the authority. Applying this transaction moves the state
+/// forward to adjust to the authority's view of the document.
+export function receiveChanges(state: EditorState, changes: readonly Change[], clientIDs: readonly string[]) {
+  // Pushes a set of changes (received from the central authority)
+  // into the editor state (which should have the collab plugin
+  // enabled). Will recognize its own changes, and confirm unconfirmed
+  // changes as appropriate. Remaining unconfirmed changes will be
+  // rebased over remote changes.
   let collabState = state.field(collabField)
   let version = collabState.version + changes.length
   let ourID = state.facet(collabConfig).clientID
 
-  // Find out which prefix of the steps originated with us
+  // Find out which prefix of the changes originated with us
   let ours = 0
   while (ours < clientIDs.length && clientIDs[ours] == ourID) ++ours
   let unconfirmed = collabState.unconfirmed.slice(ours)
   changes = ours ? changes.slice(ours) : changes
 
-  // If all steps originated with us, we're done.
+  // If all changes originated with us, we're done.
   if (!changes.length)
     return state.t().annotate(collabReceive, new CollabState(version, unconfirmed))
 
@@ -131,9 +133,9 @@ export function receiveTransaction(state: EditorState, changes: readonly Change[
     .annotate(Transaction.rebasedChanges, nUnconfirmed)
 }
 
-/// Returns the set of locally made steps that still have to be sent
+/// Returns the set of locally made changes that still have to be sent
 /// to the authority.
-export function sendableSteps(state: EditorState) {
+export function sendableChanges(state: EditorState) {
   return state.field(collabField).unconfirmed.map(u => u.forward)
 }
 

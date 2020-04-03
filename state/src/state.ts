@@ -21,8 +21,7 @@ export interface EditorStateConfig {
   selection?: EditorSelection
   /// [State](#state.EditorState^extend) or
   /// [view](#view.EditorView^extend) extensions to associate with
-  /// this state. View extensions provided here only take effect when
-  /// the state is put into an editor view.
+  /// this state.
   extensions?: Extension
 }
 
