@@ -28,10 +28,21 @@ let isMac = /Mac/.test(navigator.platform)
 let state = EditorState.create({doc: `<script>
   const {readFile} = require("fs");
 
+  // This is a line comment
+
+  /* This is a block comment
+     spanning multiple lines */
+
+  /* But a block comment can be in one line as well */
+
   readFile("package.json", "utf8", (err, data) => {
     console.log(data);
   });
-</script>`, extensions: [
+</script>
+
+<!-- HTML only provides 
+     block comments -->
+<p>Paragraph</p>`, extensions: [
   lineNumbers(),
   specialChars(),
   history(),
