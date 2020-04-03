@@ -274,8 +274,11 @@ export class Transaction {
   }
 
   /// Update the selection.
-  setSelection(selection: EditorSelection): Transaction {
+  setSelection(selection: EditorSelection): Transaction
+  setSelection(anchor: number, head?: number): Transaction
+  setSelection(selection: EditorSelection | number, head?: number): Transaction {
     this.ensureOpen()
+    if (typeof selection == "number") selection = EditorSelection.single(selection, head)
     if (!this.startState.facet(allowMultipleSelections)) selection = selection.asSingle()
     checkSelection(selection, this.doc)
     this.updateSelection(selection)

@@ -18,7 +18,7 @@ export interface EditorStateConfig {
   doc?: string | Text
   /// The starting selection. Defaults to a cursor at the very start
   /// of the document.
-  selection?: EditorSelection
+  selection?: EditorSelection | {anchor: number, head?: number}
   /// [State](#state.EditorState^extend) or
   /// [view](#view.EditorView^extend) extensions to associate with
   /// this state.
@@ -141,7 +141,9 @@ export class EditorState {
     let configuration = Configuration.resolve(config.extensions || [])
     let doc = config.doc instanceof Text ? config.doc
       : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DefaultSplit))
-    let selection = config.selection || EditorSelection.single(0)
+    let selection = !config.selection ? EditorSelection.single(0)
+      : config.selection instanceof EditorSelection ? config.selection
+      : EditorSelection.single(config.selection.anchor, config.selection.head)
     checkSelection(selection, doc)
     if (!configuration.staticFacet(allowMultipleSelections)) selection = selection.asSingle()
     return new EditorState(configuration, doc, selection)
