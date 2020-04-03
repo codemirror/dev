@@ -203,6 +203,7 @@ export class Transaction {
   /// sits.
   changeNoFilter(change: Change, mirror?: number): Transaction {
     this.changes = this.changes.append(change, mirror)
+    this.docs.push(change.apply(this.doc))
     this.updateSelection(this.selection.map(change))
     this.mapEffects(change)
     return this
