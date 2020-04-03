@@ -1,7 +1,11 @@
 import {EditorView, Command} from "@codemirror/next/view"
+// import { CloseBracketConfig } from "../../closebrackets/src/closebrackets"
+import { EditorState } from "../../state/src/state"
+import { Autocompleter } from "../../autocomplete/src"
+import { addLanguageData, languageData } from "../../state/src/extension"
+import { CloseBracketConfig } from "../../closebrackets/src/closebrackets"
 
 export const toggleCommentCmd: Command = view => {
-    console.log("toggle asdf")
     return toggleCommentWithOption(CommentOption.Toggle, view)
 }
 
@@ -22,23 +26,38 @@ enum CommentOption {
 }
 
 const toggleCommentWithOption = function(option: CommentOption, view: EditorView) {
+  console.log("view.state", view.state)
+  console.log("view.state.facet(addLanguageData)", view.state.facet(addLanguageData))
+  console.log("view.state.tree", view.state.tree)
+
   const lineCommentToken = "//"
-  let s = view.state
-  let f = s.selection.primary.from
-  let t = s.selection.primary.to
-  let l = s.doc.lineAt(f)
-  console.log(f, t, l.start)
-  let str = (l.content as string)
+  let pos = view.state.selection.primary.from
+  let to = view.state.selection.primary.to
+  let line = view.state.doc.lineAt(pos)
+  console.log("from/pos", pos, "to", to, "start", line.start)
+
+  console.log("resolveAt(pos)", view.state.tree.resolveAt(pos))
+  console.log("autocomplete(pos)", view.state.languageDataAt<Autocompleter>("autocomplete", pos))
+  console.log("closeBrackets(pos)", view.state.languageDataAt<CloseBracketConfig>("closeBrackets", pos))
+  
+  let syntax = view.state.facet(EditorState.syntax)
+  console.log(syntax)
+  // syntax[0].
+  let nodeType = syntax[0].docNodeTypeAt(view.state, pos)
+  console.log(nodeType)
+  console.log("prop", nodeType.prop(languageData))
+
+  let str = (line.content as string)
   if (str.startsWith(lineCommentToken)) {
     if (option != CommentOption.OnlyComment) {
-      let tr = view.state.t().replace(l.start, l.start + lineCommentToken.length, "")
+      let tr = view.state.t().replace(line.start, line.start + lineCommentToken.length, "")
       view.dispatch(tr)
       return true
     }
 
   } else {
     if (option != CommentOption.OnlyUncomment) {
-      let tr = view.state.t().replace(l.start, l.start, lineCommentToken)
+      let tr = view.state.t().replace(line.start, line.start, lineCommentToken)
       view.dispatch(tr)
       return true
     }
