@@ -1,5 +1,4 @@
 import {EditorView, Command} from "@codemirror/next/view"
-// import { CloseBracketConfig } from "../../closebrackets/src/closebrackets"
 import { EditorState } from "../../state/src/state"
 import { Autocompleter } from "../../autocomplete/src"
 import { addLanguageData, languageData } from "../../state/src/extension"
