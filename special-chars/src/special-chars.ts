@@ -84,7 +84,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
     if (update.changes.length) {
       this.decorations = this.decorations.map(update.changes)
       this.from = update.changes.mapPos(this.from, -1)
-      this.to = update.changes.mapPos(this.to, 1)
+      this.to = Math.max(this.from, update.changes.mapPos(this.to, 1))
       this.closeHoles(update.changes.changedRanges())
     }
     this.updateForViewport()

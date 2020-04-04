@@ -13,12 +13,10 @@ export abstract class RangeValue {
   /// The bias value at the end of the range. Defaults to 0.
   endSide!: number
 
-  /// The mode with which the start point of the range should be
-  /// mapped. Determines when a side is counted as deleted. Defaults
-  /// to `MapMode.TrackDel`.
-  startMapMode!: MapMode
-  /// The mode with which the end point of the range should be mapped.
-  endMapMode!: MapMode
+  /// The mode with which the location of the range should be mapped
+  /// when it's `from` and `to` are the same, to decide whether a
+  /// change deletes the range. Defaults to `MapMode.TrackDel`.
+  mapMode!: MapMode
   /// Whether this value marks a point range, which shadows the ranges
   /// contained in it.
   point!: boolean
@@ -29,7 +27,7 @@ export abstract class RangeValue {
 
 RangeValue.prototype.startSide = RangeValue.prototype.endSide = 0
 RangeValue.prototype.point = false
-RangeValue.prototype.startMapMode = RangeValue.prototype.endMapMode = MapMode.TrackDel
+RangeValue.prototype.mapMode = MapMode.TrackDel
 
 /// A range associates a value with a range of positions.
 export class Range<T extends RangeValue> {
@@ -120,14 +118,16 @@ class Chunk<T extends RangeValue> {
   map(offset: number, changes: ChangeSet) {
     let value: T[] = [], from = [], to = [], newPos = -1, maxPoint = -1
     for (let i = 0; i < this.value.length; i++) {
-      let val = this.value[i]
-      let newFrom = changes.mapPos(this.from[i] + offset, val.startSide, val.startMapMode)
-      let newTo = changes.mapPos(this.to[i] + offset, val.endSide, val.endMapMode)
-      if (newTo < 0) {
-        if (newFrom < 0) continue
-        newTo = -(newTo + 1)
+      let val = this.value[i], curFrom = this.from[i] + offset, curTo = this.to[i] + offset, newFrom, newTo
+      if (curFrom == curTo) {
+        let mapped = changes.mapPos(curFrom, val.startSide, val.mapMode)
+        if (mapped < 0) continue
+        newFrom = newTo = mapped
+      } else {
+        newFrom = changes.mapPos(curFrom, val.startSide)
+        newTo = changes.mapPos(curTo, val.endSide)
+        if (newFrom > newTo || newFrom == newTo && val.startSide > 0 && val.endSide <= 0) continue
       }
-      if (newFrom < 0) newFrom = -(newFrom + 1)
       if ((newTo - newFrom || val.endSide - val.startSide) < 0) continue
       if (newPos < 0) newPos = newFrom
       if (val.point) maxPoint = Math.max(maxPoint, newTo - newFrom)

@@ -52,7 +52,7 @@ describe("Mapping", () => {
 
   it("tracks deletions when asked", () => {
     let t = {trackDel: true}
-    testMapping(mk([0, 3, 0], [2, 6, 6]), [0, 0, t], [1, -1, t], [4, 1, t], [5, 2, t], [6, -9, t], [11, 10, t], [14, 13, t])
+    testMapping(mk([0, 3, 0], [2, 6, 6]), [0, 0, t], [1, -1, t], [4, 1, t], [5, 2, t], [6, -1, t], [11, 10, t], [14, 13, t])
   })
 
   it("maps back when bias equals 0", () => {

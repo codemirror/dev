@@ -3,7 +3,7 @@
   "version": "0.5.0",
   "description": "Text/code editor component",
   "scripts": {
-    "test": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js keymap/test/test-*.js view/test/test-heightmap.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js",
+    "test": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js keymap/test/test-*.js view/test/test-heightmap.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js",
     "prepare": "bin/cm.js build",
     "dev": "bin/cm.js devserver"
   },
@@ -32,6 +32,7 @@
     "./commands": "./commands/dist/index.js",
     "./keymap": "./keymap/dist/index.js",
     "./history": "./history/dist/index.js",
+    "./collab": "./collab/dist/index.js",
     "./gutter": "./gutter/dist/index.js",
     "./rangeset": "./rangeset/dist/index.js",
     "./syntax": "./syntax/dist/index.js",
@@ -70,7 +71,6 @@
     "mocha": "^7.1.1",
     "esmoduleserve": "^0.1.2",
     "rollup": "^1.25.3",
-    "rollup-plugin-typescript2": "^0.25.2",
     "ts-node": "^8.2.0",
     "typescript": "^3.8.3",
     "@codemirror/next": "."

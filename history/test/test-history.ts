@@ -1,21 +1,27 @@
 import ist from "ist"
 
 import {EditorState, EditorSelection, SelectionRange, Transaction,
-        StateEffect, StateEffectType, StateField, Mapping} from "@codemirror/next/state"
+        StateEffect, StateEffectType, StateField, Mapping, Change} from "@codemirror/next/state"
 import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection, invertedEffects} from "@codemirror/next/history"
 
-const mkState = (config?: any, doc?: string) => EditorState.create({
-  extensions: [history(config), EditorState.allowMultipleSelections.of(true)],
-  doc
-})
+function mkState(config?: any, doc?: string) {
+  return EditorState.create({
+    extensions: [history(config), EditorState.allowMultipleSelections.of(true)],
+    doc
+  })
+}
 
-const type = (state: EditorState, text: string, at = state.doc.length) => state.t().replace(at, at, text).apply()
-const timedType = (state: EditorState, text: string, atTime: number) => state.t(atTime).replace(state.doc.length, state.doc.length, text).apply()
-const receive = (state: EditorState, text: string, from: number, to = from) => {
+function type(state: EditorState, text: string, at = state.doc.length) {
+  return state.t().replace(at, at, text).apply()
+}
+function timedType(state: EditorState, text: string, atTime: number) {
+  return state.t(atTime).replace(state.doc.length, state.doc.length, text).apply()
+}
+function receive(state: EditorState, text: string, from: number, to = from) {
   return state.t().replace(from, to, text).annotate(Transaction.addToHistory, false).apply()
 }
-const command = (state: EditorState, cmd: any, success: boolean = true) => {
+function command(state: EditorState, cmd: any, success: boolean = true) {
   ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), success)
   return state
 }
@@ -96,8 +102,8 @@ describe("history", () => {
     let state = mkState({}, "ab")
     state = type(state, "cd", 1)
     state = receive(state, "123", 0, 4)
-    state = command(state, undo)
-    ist(command(state, redo, false))
+    state = command(state, undo, false)
+    command(state, redo, false)
   })
 
   it("accurately maps changes through each other", () => {
@@ -160,7 +166,7 @@ describe("history", () => {
     state = type(state, "hello")
     state = state.t().replace(0, 7, "").annotate(Transaction.addToHistory, false).apply()
     ist(state.doc.toString(), "")
-    state = command(state, undo)
+    state = command(state, undo, false)
     ist(state.doc.toString(), "")
   })
 
@@ -272,8 +278,8 @@ describe("history", () => {
     let state = EditorState.create()
     ist(undoDepth(state), 0)
     ist(redoDepth(state), 0)
-    ist(command(state, undo, false))
-    ist(command(state, redo, false))
+    command(state, undo, false)
+    command(state, redo, false)
   })
 
   it("truncates history", () => {
@@ -311,7 +317,23 @@ describe("history", () => {
   })
 
   it("isolates transactions when asked to", () => {
+    let state = mkState()
+    state = state.t().replace(0, 0, "a").annotate(isolateHistory, "after").apply()
+    state = state.t().replace(1, 1, "b").apply()
+    state = state.t().replace(2, 2, "c").annotate(isolateHistory, "after").apply()
+    state = state.t().replace(3, 3, "d").apply()
+    state = state.t().replace(4, 4, "e").annotate(isolateHistory, "full").apply()
+    state = state.t().replace(5, 5, "f").apply()
+    ist(undoDepth(state), 5)
+  })
 
+  it.skip("can group events around a non-history transaction", () => {
+    let state = mkState()
+    state = state.t().replace(0, 0, "a").apply()
+    state = state.t().replace(1, 1, "b").annotate(Transaction.addToHistory, false).apply()
+    state = state.t().replace(2, 2, "c").apply()
+    state = command(state, undo)
+    ist(state.doc.toString(), "b")
   })
 
   describe("undoSelection", () => {
@@ -542,5 +564,70 @@ describe("history", () => {
       state = command(state, undo)
       ist(commentStr(state), "c1@3")
     })
+  })
+
+  it.skip("behaves properly with rebasing changes", () => {
+    let state = EditorState.create({extensions: [history()], doc: "one three", selection: {anchor: 3}})
+    let changes: {forward: Change, backward: Change}[] = []
+    function dispatch(tr: Transaction) {
+      for (let inv = tr.invertedChanges(), i = 0, j = inv.length - 1; j >= 0; i++, j--)
+        changes.push({forward: tr.changes.changes[i], backward: inv.changes[j]})
+      state = tr.apply()
+    }
+    function receive(confirmedTo: number, f: (tr: Transaction) => void) {
+      let tr = state.t(), newChanges = changes.slice(0, confirmedTo)
+      for (let i = changes.length - 1; i >= confirmedTo; i--) tr.changeNoFilter(changes[i].backward)
+      f(tr)
+      for (let i = confirmedTo, refIndex = changes.length - confirmedTo; i < changes.length; i++) {
+        let mapped = changes[i].forward.map(tr.changes.partialMapping(refIndex))
+        refIndex--
+        if (mapped) {
+          newChanges.push({forward: mapped, backward: mapped.invert(tr.doc)})
+          tr.changeNoFilter(mapped, refIndex)
+        }          
+      }
+      state = tr.annotate(Transaction.rebasedChanges, changes.length - confirmedTo)
+        .annotate(Transaction.addToHistory, false).apply()
+      changes = newChanges
+    }
+
+    for (let ch of " two") dispatch(state.t().replaceSelection(ch))
+    dispatch(state.t().setSelection(13))
+    dispatch(state.t().replaceSelection("!"))
+    ist(changes.length, 5)
+    ist(state.doc.toString(), "one two three!")
+    // Say the last 3 changes (adding "wo" and "!") are unconfirmed,
+    // and remote changes come in replacing "three" -> "four"
+    receive(2, tr => tr.replace(6, 11, "four"))
+    ist(state.doc.toString(), "one two four!")
+    // Another remote change, adding " five" after "four"
+    receive(2, tr => tr.replace(10, 10, " five"))
+    dispatch(state.t().replace(18, 18, "?"))
+    ist(state.doc.toString(), "one two four five!?")
+
+    undo({state, dispatch})
+    ist(state.doc.toString(), "one two four five!")
+    undo({state, dispatch})
+    ist(state.doc.toString(), "one two four five")
+
+    // Run through the full undo/redo to verify that still works, but
+    // leave `state` at two undos
+    let undone3 = command(state, undo)
+    ist(undone3.doc.toString(), "one four five")
+    let redone = command(undone3, redo), redone2 = command(redone, redo), redone3 = command(redone2, redo)
+    ist(redone.doc.toString(), "one two four five")
+    ist(redone2.doc.toString(), "one two four five!")
+    ist(redone3.doc.toString(), "one two four five!?")
+
+    receive(3, tr => tr.replace(16, 16, " six"))
+    ist(state.doc.toString(), "one two four five six")
+    undo({state, dispatch})
+    ist(state.doc.toString(), "one four five six")
+    redo({state, dispatch})
+    ist(state.doc.toString(), "one two four five six")
+    redo({state, dispatch})
+    ist(state.doc.toString(), "one two four five! six")
+    redo({state, dispatch})
+    ist(state.doc.toString(), "one two four five!? six")
   })
 })

@@ -83,8 +83,9 @@ function cmd(side: BranchName, only: ItemFilter): StateCommand {
   return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
     let historyState = state.field(historyField, false)
     if (!historyState || !historyState.canPop(side, only)) return false
-    const {transaction, rest} = historyState.pop(side, only, state)
-    dispatch(transaction.annotate(fromHistory, {side, rest}))
+    let found = historyState.pop(side, only, state)
+    if (!found) return false
+    dispatch(found.transaction.annotate(fromHistory, {side, rest: found.rest}))
     return true
   }
 }
@@ -210,7 +211,7 @@ function popChanges(branch: Branch, only: ItemFilter): {
   let effects = changeItem.effects
   let selection = changeItem.selection!
 
-  if (map) {
+  if (map && map.length) {
     let startIndex = changeItem.map.length
     map = changeItem.map.appendSet(map)
     let mappedChanges = []
@@ -262,25 +263,31 @@ class HistoryState {
   }
 
   addMapping(map: ChangeSet<ChangeDesc>, maxLen: number): HistoryState {
-    if (this.done.length == 0) return this
-    return new HistoryState(updateBranch(this.done, this.done.length, maxLen, new Item(map)), this.undone)
+    return new HistoryState(this.done.length ? updateBranch(this.done, this.done.length, maxLen, new Item(map)) : this.done,
+                            this.undone.length ? updateBranch(this.undone, this.undone.length, maxLen, new Item(map)) : this.undone,
+                            this.prevTime, this.prevUserEvent)
   }
 
   canPop(done: BranchName, only: ItemFilter): boolean {
-    const target = done == BranchName.Done ? this.done : this.undone
-    for (const {isChange, selection} of target)
-      if (isChange || (only == ItemFilter.Any && selection)) return true
-    return false
+    return canPop(done == BranchName.Done ? this.done : this.undone, only)
   }
 
-  pop(done: BranchName, only: ItemFilter, state: EditorState): {transaction: Transaction, rest: Branch} {
-    let {changes, effects, branch, selection} = popChanges(done == BranchName.Done ? this.done : this.undone, only)
-
-    let tr = state.t()
-    for (let change of changes.changes) tr.change(change)
-    for (let effect of effects) tr.effect(effect)
-    tr.setSelection(selection)
-    return {transaction: tr, rest: branch}
+  pop(done: BranchName, only: ItemFilter, state: EditorState): {transaction: Transaction, rest: Branch} | null {
+    let source = done == BranchName.Done ? this.done : this.undone
+    for (;;) {
+      let {changes, effects, branch, selection} = popChanges(source, only)
+      if (only == ItemFilter.Any || changes.length || effects.length) {
+        let tr = state.t()
+        for (let change of changes.changes) tr.change(change)
+        for (let effect of effects) tr.effect(effect)
+        tr.setSelection(selection)
+        return {transaction: tr, rest: branch}
+      } else if (!canPop(branch, only)) {
+        return null
+      } else {
+        source = branch
+      }
+    }
   }
 
   eventCount(done: BranchName, only: ItemFilter) {
@@ -291,4 +298,10 @@ class HistoryState {
   }
 
   static empty: HistoryState = new HistoryState([], [])
+}
+
+function canPop(branch: Branch, only: ItemFilter): boolean {
+  for (const {isChange, selection} of branch)
+    if (isChange || (only == ItemFilter.Any && selection)) return true
+  return false
 }

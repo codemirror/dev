@@ -83,7 +83,7 @@ export class StateEffectType<Value> {
   of(value: Value): StateEffect<Value> { return new StateEffect(this, value) }
 }
 
-const enum Flag { SelectionSet = 1, ScrollIntoView = 2 }
+const scrollIntoView = Annotation.define<boolean>()
 
 class MapRef {
   constructor(readonly tr: Transaction,
@@ -115,8 +115,8 @@ export class Transaction {
   /// ([mapped](#state.StateEffect.map) forward to the end of the
   /// transaction).
   effects: StateEffect<any>[] = []
-  private _annotations: {[id: number]: any} = Object.create(null)
-  private flags: number = 0
+  private annotations: {[id: number]: any} = Object.create(null)
+  private selectionSetAt: null | {selection: EditorSelection, at: number} = null
   /// @internal
   reconfigureData: {base: Extension, replaced: Map<ExtensionGroup, Extension>} | null = null
   private state: EditorState | null = null
@@ -128,7 +128,7 @@ export class Transaction {
     time: number = Date.now()
   ) {
     this.selection = startState.selection
-    this._annotations[Transaction.time.id] = time
+    this.annotations[Transaction.time.id] = time
   }
 
   /// The document at the end of the transaction.
@@ -141,13 +141,13 @@ export class Transaction {
   /// additional information about the transaction.
   annotate<T>(annotation: Annotation<T>, value: T): Transaction {
     this.ensureOpen()
-    this._annotations[annotation.id] = value
+    this.annotations[annotation.id] = value
     return this
   }
 
   /// Get the value of the given annotation type, if any.
   annotation<T>(annotation: Annotation<T>): T | undefined {
-    return this._annotations[annotation.id]
+    return this.annotations[annotation.id]
   }
 
   /// Add a [state effect](#state.StateEffect) to this transaction.
@@ -203,7 +203,10 @@ export class Transaction {
   /// sits.
   changeNoFilter(change: Change, mirror?: number): Transaction {
     this.changes = this.changes.append(change, mirror)
-    this.updateSelection(this.selection.map(change))
+    this.docs.push(change.apply(this.doc))
+    let at = this.selectionSetAt
+    this.updateSelection(at ? at.selection.map(this.changes.partialMapping(at.at))
+                         : this.startState.selection.map(this.changes))
     this.mapEffects(change)
     return this
   }
@@ -250,7 +253,7 @@ export class Transaction {
     return this.forEachRange(range => {
       let ref = this.mapRef()
       this.replace(range.from, range.to, content)
-      return new SelectionRange(ref.mapPos(range.from, 1))
+      return new SelectionRange(ref.mapPos(range.to, 1))
     })
   }
 
@@ -274,12 +277,15 @@ export class Transaction {
   }
 
   /// Update the selection.
-  setSelection(selection: EditorSelection): Transaction {
+  setSelection(selection: EditorSelection): Transaction
+  setSelection(anchor: number, head?: number): Transaction
+  setSelection(selection: EditorSelection | number, head?: number): Transaction {
     this.ensureOpen()
+    if (typeof selection == "number") selection = EditorSelection.single(selection, head)
     if (!this.startState.facet(allowMultipleSelections)) selection = selection.asSingle()
     checkSelection(selection, this.doc)
     this.updateSelection(selection)
-    this.flags |= Flag.SelectionSet
+    this.selectionSetAt = {selection, at: this.changes.length}
     return this
   }
 
@@ -293,21 +299,19 @@ export class Transaction {
   /// selection (as opposed to just mapping the selection through
   /// changes).
   get selectionSet(): boolean {
-    return (this.flags & Flag.SelectionSet) > 0
+    return !!this.selectionSetAt
   }
 
   /// Set a flag on this transaction that indicates that the editor
   /// should scroll the selection into view after applying it.
   scrollIntoView(): Transaction {
-    this.ensureOpen()
-    this.flags |= Flag.ScrollIntoView
-    return this
+    return this.annotate(scrollIntoView, true)
   }
 
   /// Query whether the selection should be scrolled into view after
   /// applying this transaction.
   get scrolledIntoView(): boolean {
-    return (this.flags & Flag.ScrollIntoView) > 0
+    return !!this.annotation(scrollIntoView)
   }
 
   /// Provice new content for a given [extension
@@ -390,4 +394,14 @@ export class Transaction {
   /// Annotation indicating whether a transaction should be added to
   /// the undo history or not.
   static addToHistory = Annotation.define<boolean>()
+
+  /// Annotation that should be used by transactions that reorder
+  /// changes (typically for collaborative editing), introducing new
+  /// changes before existing changes by first undoing a sequence of
+  /// changes (the count of which is the value of the annotation),
+  /// then applying other changes, and then re-doing (a mapped form
+  /// of) the old changes. The transaction's `changes.getMirror`
+  /// method can be used to figure out which forward change (if any)
+  /// corresponds to each inverted change.
+  static rebasedChanges = Annotation.define<number>()
 }

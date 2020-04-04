@@ -239,7 +239,7 @@ export class LineDecoration extends Decoration {
   }
 }
 
-LineDecoration.prototype.startMapMode = LineDecoration.prototype.endMapMode = MapMode.TrackBefore
+LineDecoration.prototype.mapMode = MapMode.TrackBefore
 
 export class PointDecoration extends Decoration {
   constructor(spec: any,
@@ -248,12 +248,7 @@ export class PointDecoration extends Decoration {
               widget: WidgetType | null,
               readonly isReplace: boolean) {
     super(startSide, endSide, widget, spec)
-    if (block) {
-      this.startMapMode = startSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
-      this.endMapMode = endSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
-    } else {
-      this.startMapMode = this.endMapMode = MapMode.TrackDel
-    }
+    this.mapMode = !block ? MapMode.TrackDel : startSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
   }
 
   get point() { return true }
