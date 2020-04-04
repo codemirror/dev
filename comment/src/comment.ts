@@ -39,6 +39,7 @@ const toggleCommentWithOption = function(option: CommentOption, view: EditorView
   console.log("resolveAt(pos)", view.state.tree.resolveAt(pos))
   console.log("autocomplete(pos)", view.state.languageDataAt<Autocompleter>("autocomplete", pos))
   console.log("closeBrackets(pos)", view.state.languageDataAt<CloseBracketConfig>("closeBrackets", pos))
+  console.log("comment(pos)", view.state.languageDataAt("Comment", pos))
   
   let syntax = view.state.facet(EditorState.syntax)
   console.log(syntax)
