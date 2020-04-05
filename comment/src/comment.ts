@@ -14,7 +14,7 @@ export const uncommentCmd: Command = view => {
     return dispatchToggleComment(CommentOption.OnlyUncomment, view)
 }
 
-enum CommentOption {
+export enum CommentOption {
   Toggle,
   OnlyComment,
   OnlyUncomment,
@@ -27,7 +27,7 @@ const dispatchToggleComment = function(option: CommentOption, view: EditorView):
   return true
 }
 
-const toggleComment = function(option: CommentOption, state: EditorState): Transaction | null {
+export const toggleComment = function(option: CommentOption, state: EditorState): Transaction | null {
   console.log("view.state", state)
   // console.log("view.state.facet(addLanguageData)", state.facet(addLanguageData))
   console.log("view.state.tree", state.tree)
@@ -63,7 +63,7 @@ const toggleComment = function(option: CommentOption, state: EditorState): Trans
 export const getLinesAcrossRange = function(doc: Text, range: SelectionRange): Line[] {
   let line = doc.lineAt(range.from)
   let lines = []
-  while (line.start + line.length < range.to || 
+  while (line.start + line.length < range.to ||
         (line.start <= range.to && range.to <= line.end)) {
     lines.push(line)
     line = doc.line(line.number + 1)
