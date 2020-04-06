@@ -3,15 +3,22 @@ import {EditorView, Command} from "@codemirror/next/view"
 import { EditorState, Transaction, SelectionRange } from "@codemirror/next/state"
 
 export const toggleCommentCmd: Command = view => {
-    return false // dispatchToggleComment(CommentOption.Toggle, view)
+  // console.log("view.state", state)
+  // // console.log("view.state.facet(addLanguageData)", state.facet(addLanguageData))
+  // console.log("view.state.tree", state.tree)
+  // let node = state.tree.resolveAt(pos)
+  // console.log("resolveAt(pos)", node.name)
+  // let syntax = state.facet(EditorState.syntax)
+  // console.log(syntax)
+  return dispatchToggleComment(CommentOption.Toggle, view)
 }
 
 export const commentCmd: Command = view => {
-    return false // dispatchToggleComment(CommentOption.OnlyComment, view)
+    return dispatchToggleComment(CommentOption.OnlyComment, view)
 }
 
 export const uncommentCmd: Command = view => {
-    return false // dispatchToggleComment(CommentOption.OnlyUncomment, view)
+    return dispatchToggleComment(CommentOption.OnlyUncomment, view)
 }
 
 export enum CommentOption {
@@ -21,27 +28,14 @@ export enum CommentOption {
 }
 
 export const dispatchToggleComment = function(option: CommentOption, view: EditorView): boolean {
-  // let tr = toggleComment(option, view.state)
-  // if (!tr) return false
-  // view.dispatch(tr)
+  let tr = toggleLineComment(option, "//")(view.state, view.state.selection.primary)
+  if (!tr) return false
+  view.dispatch(tr)
   return true
 }
 
-  // console.log("view.state", state)
-  // // console.log("view.state.facet(addLanguageData)", state.facet(addLanguageData))
-  // console.log("view.state.tree", state.tree)
 
-  // const lineCommentToken = "//"
-  // let pos = state.selection.primary.from
-  // let to = state.selection.primary.to
-  // console.log("from/pos", pos, "to", to, "start", line.start)
-
-  // let node = state.tree.resolveAt(pos)
-  // console.log("resolveAt(pos)", node.name)
-  
-  // let syntax = state.facet(EditorState.syntax)
-  // console.log(syntax)
-
+/// TODO: Add docs
 export const toggleLineComment = (option: CommentOption, lineCommentToken: string) => (state: EditorState, range: SelectionRange): Transaction | null => {
   let lines = getLinesAcrossRange(state.doc, range)
   let column = isRangeLineCommented(lineCommentToken)(state, lines)
@@ -51,7 +45,6 @@ export const toggleLineComment = (option: CommentOption, lineCommentToken: strin
       let mapRef = tr.mapRef()
       for (const line of lines) {
         let margin = (line.content as string).startsWith(" ", column.minCol + lineCommentToken.length) ? 1 : 0
-        // let pos = line.start + column.minCol
         let pos = mapRef.mapPos(line.start + column.minCol)
         tr = removeLineComment(tr, pos, lineCommentToken, margin)
       }
@@ -72,7 +65,7 @@ export const toggleLineComment = (option: CommentOption, lineCommentToken: strin
   return null
 }
 
-///
+/// TODO: Add docs
 const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): {minCol:number} & {iscommented:boolean} => {
   let minCol = Infinity
   let iscommented = true
@@ -101,8 +94,6 @@ export const insertLineComment = (tr: Transaction, pos: number, lineCommentToken
 
 /// See `insertLineComment`.
 export const removeLineComment = (tr: Transaction, pos: number, lineCommentToken: string, marginLen: number = 1): Transaction => {
-
-      // pos = tr.mapRef().mapPos(pos,)
   return tr.replace(pos, pos + lineCommentToken.length + marginLen, "")
 }
 
