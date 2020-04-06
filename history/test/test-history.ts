@@ -327,13 +327,35 @@ describe("history", () => {
     ist(undoDepth(state), 5)
   })
 
-  it.skip("can group events around a non-history transaction", () => {
+  it("can group events around a non-history transaction", () => {
+    let state = mkState()
+    state = state.t().replace(0, 0, "a").apply()
+    state = state.t().replace(1, 1, "b").annotate(Transaction.addToHistory, false).apply()
+    state = state.t().replace(1, 1, "c").apply()
+    state = command(state, undo)
+    ist(state.doc.toString(), "b")
+  })
+
+  it("survives compression", () => {
     let state = mkState()
     state = state.t().replace(0, 0, "a").apply()
     state = state.t().replace(1, 1, "b").annotate(Transaction.addToHistory, false).apply()
     state = state.t().replace(2, 2, "c").apply()
+    state = state.t().replace(3, 3, "d").apply()
+    state = state.t().replace(4, 4, "e").apply()
+    state = state.t().replace(0, 0, ">").apply()
+    for (let i = 0; i < 500; i++) state = state.t().replace(0, 0, "*").annotate(Transaction.addToHistory, false).apply()
+    state = state.t().replace(0, 500, "=").annotate(Transaction.addToHistory, false).apply()
+    ist(state.doc.toString(), "=>abcde")
     state = command(state, undo)
-    ist(state.doc.toString(), "b")
+    state = command(state, undo)
+    ist(state.doc.toString(), "=ab")
+    state = command(state, undo)
+    ist(state.doc.toString(), "=b")
+    state = command(state, redo)
+    state = command(state, redo)
+    state = command(state, redo)
+    ist(state.doc.toString(), "=>abcde")
   })
 
   describe("undoSelection", () => {
@@ -566,7 +588,7 @@ describe("history", () => {
     })
   })
 
-  it.skip("behaves properly with rebasing changes", () => {
+  it("behaves properly with rebasing changes", () => {
     let state = EditorState.create({extensions: [history()], doc: "one three", selection: {anchor: 3}})
     let changes: {forward: Change, backward: Change}[] = []
     function dispatch(tr: Transaction) {
@@ -602,7 +624,7 @@ describe("history", () => {
     ist(state.doc.toString(), "one two four!")
     // Another remote change, adding " five" after "four"
     receive(2, tr => tr.replace(10, 10, " five"))
-    dispatch(state.t().replace(18, 18, "?"))
+    dispatch(state.t().replace(18, 18, "?").annotate(isolateHistory, "full"))
     ist(state.doc.toString(), "one two four five!?")
 
     undo({state, dispatch})
@@ -626,8 +648,8 @@ describe("history", () => {
     redo({state, dispatch})
     ist(state.doc.toString(), "one two four five six")
     redo({state, dispatch})
-    ist(state.doc.toString(), "one two four five! six")
+    ist(state.doc.toString(), "one two four five six!")
     redo({state, dispatch})
-    ist(state.doc.toString(), "one two four five!? six")
+    ist(state.doc.toString(), "one two four five six!?")
   })
 })
