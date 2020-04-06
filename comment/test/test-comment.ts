@@ -87,37 +87,76 @@ describe("comment", () => {
       same(st3, st1)
     })
 
-    const toggle = (state: EditorState) => 
-      toggleLineComment(CommentOption.Toggle, k)(state, state.selection.primary)!
+    function applyToggleChain(...states: EditorState[]) {
+      const toggle = (state: EditorState) => 
+        toggleLineComment(CommentOption.Toggle, k)(state, state.selection.primary)!
 
-    it(`toggles '${k}' comments in a single empty selection`, () => {
-      let st0 = s(`\nline 1\n  ${k}line| 2\nline 3\n`)
-      let st1 = toggle(st0)?.apply()
-      same(st1, s(`\nline 1\n  line| 2\nline 3\n`))
-      let st2 = toggle(st1)?.apply()
-      same(st2, s(`\nline 1\n  ${k} line| 2\nline 3\n`))
-      let st3 = toggle(st2)?.apply()
-      same(st3, st1)
+      let st = states[0]
+      for (let i = 1; i < states.length; i++) {
+        st = toggle(st)?.apply()
+        same(st, states[i])
+      }
+      return {
+        tie: (index: number) => {
+          st = toggle(st)?.apply()
+          same(st, states[index])
+        }
+      }
+    }
+
+    it(`toggles '${k}' comments in an empty single selection`, () => {
+      applyToggleChain(
+        s(`\nline 1\n  ${k}line| 2\nline 3\n`),
+        s(`\nline 1\n  line| 2\nline 3\n`),
+        s(`\nline 1\n  ${k} line| 2\nline 3\n`)
+        ).tie(1)
+
+      applyToggleChain(
+        s(`\nline 1\n  ${k}line 2|\nline 3\n`),
+        s(`\nline 1\n  line 2|\nline 3\n`),
+        s(`\nline 1\n  ${k} line 2|\nline 3\n`)
+        ).tie(1)
+
+      applyToggleChain(
+        s(`\nline 1\n|  ${k}line 2\nline 3\n`),
+        s(`\nline 1\n|  line 2\nline 3\n`),
+        s(`\nline 1\n|  ${k} line 2\nline 3\n`)
+        ).tie(1)
+
+      applyToggleChain(
+        s(`\nline 1\n|${k}\nline 3\n`),
+        s(`\nline 1\n|\nline 3\n`),
+        s(`\nline 1\n|${k} \nline 3\n`)
+        ).tie(1)
+
+      applyToggleChain(
+        s(`\nline 1\n line 2\nline 3\n|${k}`),
+        s(`\nline 1\n line 2\nline 3\n|`),
+        s(`\nline 1\n line 2\nline 3\n|${k} `)
+        ).tie(1)
     })
 
     it(`toggles '${k}' comments in a single line selection`, () => {
-      let st0 = s(`line 1\n  ${k}li|ne |2\nline 3\n`)
-      let st1 = toggle(st0)?.apply()
-      same(st1, s(`line 1\n  li|ne |2\nline 3\n`))
-      let st2 = toggle(st1)?.apply()
-      same(st2, s(`line 1\n  ${k} li|ne |2\nline 3\n`))
-      let st3 = toggle(st2)?.apply()
-      same(st3, st1)
+      applyToggleChain(
+        s(`line 1\n  ${k}li|ne |2\nline 3\n`),
+        s(`line 1\n  li|ne |2\nline 3\n`),
+        s(`line 1\n  ${k} li|ne |2\nline 3\n`)
+        ).tie(1)
     })
 
     it(`toggles '${k}' comments in a multi-line selection`, () => {
-      let st0 =  s(`\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`)
-      let st1 = toggle(st0)?.apply()
-      same(st1, s(`\n  lin|e 1\n   line 2\n  line |3\n`))
-      let st2 = toggle(st1)?.apply()
-      same(st2, s(`\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`))
-      let st3 = toggle(st2)?.apply()
-      same(st3, st1)
+      applyToggleChain(
+        s(`\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
+        s(`\n  lin|e 1\n   line 2\n  line |3\n`),
+        s(`\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`)
+        ).tie(1)
+    })
+
+    it(`toggles '${k}' comments in a multi-line (partially commented) selection`, () => {
+      applyToggleChain(
+        s(`\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`),
+        s(`\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`)
+        ).tie(0)
     })
 
   }
