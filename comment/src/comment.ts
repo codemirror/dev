@@ -34,15 +34,17 @@ export const dispatchToggleComment = function(option: CommentOption, view: Edito
   return true
 }
 
-
 /// TODO: Add docs
 export const toggleLineComment = (option: CommentOption, lineCommentToken: string) => (state: EditorState, range: SelectionRange): Transaction | null => {
   let lines = getLinesAcrossRange(state.doc, range)
   let column = isRangeLineCommented(lineCommentToken)(state, lines)
-  if (column.iscommented) {
+  if (column.isRangeLineSkipped) {
     if (option != CommentOption.OnlyComment) {
       let tr = state.t()
       let mapRef = tr.mapRef()
+      tr.forEachRange((range) => {
+        return range
+      })
       for (const line of lines) {
         let margin = (line.content as string).startsWith(" ", column.minCol + lineCommentToken.length) ? 1 : 0
         let pos = mapRef.mapPos(line.start + column.minCol)
@@ -66,23 +68,25 @@ export const toggleLineComment = (option: CommentOption, lineCommentToken: strin
 }
 
 /// TODO: Add docs
-const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): {minCol:number} & {iscommented:boolean} => {
+const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): {minCol:number} & {isRangeLineSkipped:boolean} & {ls: boolean[]} => {
   let minCol = Infinity
-  let iscommented = true
+  let isRangeLineSkipped = true
+  let ls = []
   for (const line of lines) {
     let str = (line.content as string)
     let col = eatSpace(str)
     if (col < minCol) {
       minCol = col
     }
-    if (iscommented && !str.startsWith(lineCommentToken, col)) {
-      iscommented = false
+    if (isRangeLineSkipped && !str.startsWith(lineCommentToken, col)) {
+      isRangeLineSkipped = false
     }
+    ls.push(col == str.length)
   }
-  return {minCol: minCol, iscommented: iscommented}
+  return {minCol: minCol, isRangeLineSkipped: isRangeLineSkipped, ls: ls}
 }
 
-/// Comments a single line by inserting a line comment.
+/// Inserts a line-comment.
 /// The `pos` argument indicates the absolute position to 
 /// insert the line comment within the `state`.
 /// The line is commented by inserting a `lineCommentToken`.
@@ -104,7 +108,7 @@ export const getLinesAcrossRange = (doc: Text, range: SelectionRange): Line[] =>
   while (line.start + line.length < range.to ||
         (line.start <= range.to && range.to <= line.end)) {
     lines.push(line)
-    doc.lines
+    // doc.lines
     if (line.number + 1 <= doc.lines ) {
       line = doc.line(line.number + 1)
     } else {
@@ -117,7 +121,7 @@ export const getLinesAcrossRange = (doc: Text, range: SelectionRange): Line[] =>
 /// Consume whitespace starting from 0 in `str`.
 /// Return the number of spaces found in `str` to the first
 /// non-whitespace character.
-/// Note that in case of all characters are non-whitespace,
+/// Note that in case of all characters are whitespace,
 /// it will return the length of `str`.
 function eatSpace(str: string): number {
   let pos = 0
