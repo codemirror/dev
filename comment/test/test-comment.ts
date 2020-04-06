@@ -3,59 +3,6 @@ import {SelectionRange, EditorState, EditorSelection } from "@codemirror/next/st
 import {Text} from "@codemirror/next/text"
 import { toggleLineComment, getLinesAcrossRange, insertLineComment, removeLineComment, CommentOption } from "@codemirror/next/comment"
 
-function s(doc: string): EditorState {
-  let anchors = []
-  let pos = doc.indexOf("|", 0)
-  while (pos >= 0) {
-    anchors.push(pos)
-    doc = doc.slice(0, pos) + doc.slice(pos + 1)
-    pos = doc.indexOf("|", pos)
-  }
-
-  let selection = []
-  for (let i = 0; i < anchors.length; i++) {
-    if (i + 1 < anchors.length) {
-      selection.push(new SelectionRange(anchors[i], anchors[i+1]))
-    } else {
-      selection.push(new SelectionRange(anchors[i]))
-    }
-  }
-  if (selection.length == 0) {
-      selection.push(new SelectionRange(0))
-  }
-
-  return EditorState.create({doc, selection: new EditorSelection(selection)})
-}
-
-function same(actualState: null | {doc: Text, selection: EditorSelection}, expectedState: {doc: Text, selection: EditorSelection}) {
-  ist(actualState)
-  ist(actualState!.doc.toString(), expectedState.doc.toString())
-  ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
-}
-
-let lines = [
-      '<script>',
-      '  // This is a line comment',
-      '  const {readFile} = require("fs");',
-      '',
-      '  /* This is an inline block-comment */',
-      '  /* This is a block comment',
-      '     spanning multiple lines */',
-      '  readFile("package.json", "utf8", (err, data) => { });',
-      '</script>',
-      '<!-- HTML only provides',
-      '     block comments -->']
-
-export let testDoc = Text.of(lines)
-
-export function find(line: number, column: number): number {
-  let pos = 0;
-  for (let i = 0; i < line - 1; i++) {
-    pos += lines[i].length + 1;
-  }
-  return pos + column - 1;
-}
-
 describe("comment", () => {
   it("get lines across range", () => {
     //                 0          1          2           3
@@ -75,7 +22,50 @@ describe("comment", () => {
     t(3, 17, [0,7,14])
   })
 
+  /// Runs all tests for the given line-comment token, `k`.
   function runCommentTests(k: string) {
+
+    /// Creates a new `EditorState` using `doc` as the document text.
+    /// The selection ranges in the returned state can be specified
+    /// within the `doc` argument:
+    /// The character `|` is used a marker to indicate both the
+    /// start and the end of a `SelectionRange`, *e.g.*,
+    /// ```typescript
+    /// s("line 1\nlin|e 2\nline 3")
+    /// ```
+    function s(doc: string): EditorState {
+      let markers = []
+      let pos = doc.indexOf("|", 0)
+      while (pos >= 0) {
+        markers.push(pos)
+        doc = doc.slice(0, pos) + doc.slice(pos + 1)
+        pos = doc.indexOf("|", pos)
+      }
+
+      if (markers.length > 2 && markers.length % 2 != 0) {
+        throw "Markers for multiple selections need to be even.";
+      }
+
+      let selection = []
+      for (let i = 0; i < markers.length; i++) {
+        if (i + 1 < markers.length) {
+          selection.push(new SelectionRange(markers[i], markers[i+1]))
+        } else {
+          selection.push(new SelectionRange(markers[i]))
+        }
+      }
+      if (selection.length == 0) {
+          selection.push(new SelectionRange(0))
+      }
+
+      return EditorState.create({doc, selection: new EditorSelection(selection)})
+    }
+
+    function same(actualState: null | {doc: Text, selection: EditorSelection}, expectedState: {doc: Text, selection: EditorSelection}) {
+      ist(actualState)
+      ist(actualState!.doc.toString(), expectedState.doc.toString())
+      ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
+    }
 
     it(`inserts/removes '${k}' line comment in a single line`, () => {
       let st0 = s(`line 1\n${k}line 2\nline 3`)
@@ -106,10 +96,13 @@ describe("comment", () => {
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
       applyToggleChain(
+        s(`\nline 1\n  ${k} ${k} ${k} ${k}line| 2\nline 3\n`),
+        s(`\nline 1\n  ${k} ${k} ${k}line| 2\nline 3\n`),
+        s(`\nline 1\n  ${k} ${k}line| 2\nline 3\n`),
         s(`\nline 1\n  ${k}line| 2\nline 3\n`),
         s(`\nline 1\n  line| 2\nline 3\n`),
         s(`\nline 1\n  ${k} line| 2\nline 3\n`)
-        ).tie(1)
+        ).tie(4)
 
       applyToggleChain(
         s(`\nline 1\n  ${k}line 2|\nline 3\n`),
@@ -148,14 +141,19 @@ describe("comment", () => {
       applyToggleChain(
         s(`\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
         s(`\n  lin|e 1\n   line 2\n  line |3\n`),
-        s(`\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`)
+        s(`\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
         ).tie(1)
-    })
 
-    it(`toggles '${k}' comments in a multi-line (partially commented) selection`, () => {
       applyToggleChain(
         s(`\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`),
-        s(`\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`)
+        s(`\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`),
+        ).tie(0)
+    })
+
+    it.skip(`toggles '${k}' comments in a multi-line multi-range selection`, () => {
+      applyToggleChain(
+        s(`\n  lin|e 1\n  line |2\n  line 3\n  l|ine 4\n  line| 5\n`),
+        s(`\n  ${k}lin|e 1\n  ${k}line |2\n  line 3\n  ${k}l|ine 4\n  ${k}line| 5\n`),
         ).tie(0)
     })
 
