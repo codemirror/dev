@@ -8,7 +8,8 @@ function s(doc: string): EditorState {
   let pos = doc.indexOf("|", 0)
   while (pos >= 0) {
     anchors.push(pos)
-    pos = doc.indexOf("|", pos + 1)
+    doc = doc.slice(0, pos) + doc.slice(pos + 1)
+    pos = doc.indexOf("|", pos)
   }
 
   let selection = []
