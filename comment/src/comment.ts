@@ -41,41 +41,38 @@ export const toggleLineComment = (option: CommentOption, lineCommentToken: strin
   const linesAcrossSelection: Line[] = []
   const linesAcrossRange : { [id: string] : Line[]; } = {};
   for (const range of state.selection.ranges) {
-    const lines = getLinesAcrossRange(state.doc, range)
+    const lines = getLinesInRange(state.doc, range)
     linesAcrossSelection.push(...lines)
     linesAcrossRange[k(range)] = lines
   }
-  let column = isRangeLineCommented(lineCommentToken)(state, linesAcrossSelection)
+  const column = isRangeLineCommented(lineCommentToken)(state, linesAcrossSelection)
   if (column.isRangeLineSkipped) {
     if (option != CommentOption.OnlyComment) {
-      let tr = state.t()
-      // tr.forEachRange((range) => {
-      let mapRef = tr.mapRef()
+      const tr = state.t()
+      const mapRef = tr.mapRef()
       for (const range of state.selection.ranges) {
-        for (const line of linesAcrossRange[k(range)]) {
-          let margin = (line.content as string).startsWith(" ", column.minCol + lineCommentToken.length) ? 1 : 0
-          let pos = mapRef.mapPos(line.start + column.minCol)
-          tr = removeLineComment(tr, pos, lineCommentToken, margin)
+        const lines = linesAcrossRange[k(range)]
+        for (const line of lines) {
+          if (lines.length > 1 && column.isLineSkipped[line.number]) continue
+          const pos = mapRef.mapPos(line.start + column.minCol)
+          const margin = (line.content as string).startsWith(" ", column.minCol + lineCommentToken.length) ? 1 : 0
+          removeLineComment(tr, pos, lineCommentToken, margin)
         }
-        // return range
       }
-      // })
       return tr
     }
   } else {
     if (option != CommentOption.OnlyUncomment) {
-      let tr = state.t()
-      // tr.forEachRange((range) => {
-        let mapRef = tr.mapRef()
-        for (const range of state.selection.ranges) {
-          for (const line of linesAcrossRange[k(range)]) {
-          // for (const line of lines) {
-          let pos = mapRef.mapPos(line.start + column.minCol)
-          tr = insertLineComment(tr, pos, lineCommentToken)
+      const tr = state.t()
+      const mapRef = tr.mapRef()
+      for (const range of state.selection.ranges) {
+        const lines = linesAcrossRange[k(range)]
+        for (const line of lines) {
+          if (lines.length > 1 && column.isLineSkipped[line.number]) continue
+          const pos = mapRef.mapPos(line.start + column.minCol)
+          insertLineComment(tr, pos, lineCommentToken)
         }
       }
-        // return range
-      // })
       return tr
     }
   }
@@ -84,22 +81,22 @@ export const toggleLineComment = (option: CommentOption, lineCommentToken: strin
 }
 
 /// TODO: Add docs
-const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): {minCol:number} & {isRangeLineSkipped:boolean} & {ls: boolean[]} => {
+const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): {minCol:number} & {isRangeLineSkipped:boolean} & {isLineSkipped: { [id: number]: boolean } } => {
   let minCol = Infinity
-  let isRangeLineSkipped = true
-  let ls = []
+  let isRangeLineDiscarded = true
+  const isLineSkipped: { [id: number]: boolean } = []
   for (const line of lines) {
-    let str = (line.content as string)
-    let col = eatSpace(str)
-    if (col < minCol) {
+    const str = (line.content as string)
+    const col = eatSpace(str)
+    if ((lines.length == 1 || col < str.length) && col < minCol) {
       minCol = col
     }
-    if (isRangeLineSkipped && !str.startsWith(lineCommentToken, col)) {
-      isRangeLineSkipped = false
+    if (isRangeLineDiscarded && (lines.length == 1 || col < str.length) && !str.startsWith(lineCommentToken, col)) {
+      isRangeLineDiscarded = false
     }
-    ls.push(col == str.length)
+    isLineSkipped[line.number] = col == str.length
   }
-  return {minCol: minCol, isRangeLineSkipped: isRangeLineSkipped, ls: ls}
+  return {minCol: minCol, isRangeLineSkipped: isRangeLineDiscarded, isLineSkipped: isLineSkipped}
 }
 
 /// Inserts a line-comment.
@@ -108,6 +105,7 @@ const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, 
 /// The line is commented by inserting a `lineCommentToken`.
 /// Additionally, a `margin` is inserted between the
 /// `lineCommentToken` and the position following `pos`.
+/// It returns the `tr` transaction to allow you to chain calls on `tr`/
 export const insertLineComment = (tr: Transaction, pos: number, lineCommentToken: string, margin: string = " "): Transaction => {
   return tr.replace(pos, pos, lineCommentToken + margin)
 }
@@ -118,7 +116,7 @@ export const removeLineComment = (tr: Transaction, pos: number, lineCommentToken
 }
 
 /// This function is exported for testing purposes.
-export const getLinesAcrossRange = (doc: Text, range: SelectionRange): Line[] => {
+export const getLinesInRange = (doc: Text, range: SelectionRange): Line[] => {
   let line: Line = doc.lineAt(range.from)
   let lines = []
   while (line.start + line.length < range.to ||
@@ -138,7 +136,7 @@ export const getLinesAcrossRange = (doc: Text, range: SelectionRange): Line[] =>
 /// non-whitespace character.
 /// Note that in case of all characters are whitespace,
 /// it will return the length of `str`.
-function eatSpace(str: string): number {
+const eatSpace = (str: string): number => {
   let pos = 0
   while (/[\s\u00a0]/.test(str.charAt(pos))) ++pos
   return pos
