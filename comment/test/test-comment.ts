@@ -96,10 +96,10 @@ describe("comment", () => {
       same(st3, st1)
     })
 
-    const applyToggleChain = checkToggleChain(toggleLineComment(CommentOption.Toggle, k))
+    const check = checkToggleChain(toggleLineComment(CommentOption.Toggle, k))
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
-      applyToggleChain(
+      check(
         s(`\nline 1\n  ${k} ${k} ${k} ${k}line| 2\nline 3\n`),
         s(`\nline 1\n  ${k} ${k} ${k}line| 2\nline 3\n`),
         s(`\nline 1\n  ${k} ${k}line| 2\nline 3\n`),
@@ -108,25 +108,25 @@ describe("comment", () => {
         s(`\nline 1\n  ${k} line| 2\nline 3\n`)
         ).tie(4)
 
-      applyToggleChain(
+      check(
         s(`\nline 1\n  ${k}line 2|\nline 3\n`),
         s(`\nline 1\n  line 2|\nline 3\n`),
         s(`\nline 1\n  ${k} line 2|\nline 3\n`)
         ).tie(1)
 
-      applyToggleChain(
+      check(
         s(`\nline 1\n|  ${k}line 2\nline 3\n`),
         s(`\nline 1\n|  line 2\nline 3\n`),
         s(`\nline 1\n|  ${k} line 2\nline 3\n`)
         ).tie(1)
 
-      applyToggleChain(
+      check(
         s(`\nline 1\n|${k}\nline 3\n`),
         s(`\nline 1\n|\nline 3\n`),
         s(`\nline 1\n|${k} \nline 3\n`)
         ).tie(1)
 
-      applyToggleChain(
+      check(
         s(`\nline 1\n line 2\nline 3\n|${k}`),
         s(`\nline 1\n line 2\nline 3\n|`),
         s(`\nline 1\n line 2\nline 3\n|${k} `)
@@ -134,7 +134,7 @@ describe("comment", () => {
     })
 
     it(`toggles '${k}' comments in a single line selection`, () => {
-      applyToggleChain(
+      check(
         s(`line 1\n  ${k}li|ne |2\nline 3\n`),
         s(`line 1\n  li|ne |2\nline 3\n`),
         s(`line 1\n  ${k} li|ne |2\nline 3\n`)
@@ -142,40 +142,40 @@ describe("comment", () => {
     })
 
     it(`toggles '${k}' comments in a multi-line selection`, () => {
-      applyToggleChain(
+      check(
         s(`\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
         s(`\n  lin|e 1\n   line 2\n  line |3\n`),
         s(`\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
         ).tie(1)
 
-      applyToggleChain(
+      check(
         s(`\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`),
         s(`\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`),
         ).tie(0)
 
-      applyToggleChain(
+      check(
         s(`\n  ${k} lin|e 1\n\n  ${k} line |3\n`),
         s(`\n  lin|e 1\n\n  line |3\n`),
         ).tie(0)
 
-      applyToggleChain(
+      check(
         s(`\n  ${k} lin|e 1\n     \n  ${k} line |3\n`),
         s(`\n  lin|e 1\n     \n  line |3\n`),
         ).tie(0)
 
-      applyToggleChain(
+      check(
         s(`\n|\n  ${k} line 2\n    | \n`),
         s(`\n|\n  line 2\n    | \n`),
         ).tie(0)
 
-      applyToggleChain(
+      check(
         s(`\n|\n\n    | \n`),
         s(`\n|\n\n    | \n`),
         ).tie(0)
     })
 
     it(`toggles '${k}' comments in a multi-line multi-range selection`, () => {
-      applyToggleChain(
+      check(
         s(`\n  lin|e 1\n  line |2\n  line 3\n  l|ine 4\n  line| 5\n`),
         s(`\n  ${k} lin|e 1\n  ${k} line |2\n  line 3\n  ${k} l|ine 4\n  ${k} line| 5\n`),
         ).tie(0)
