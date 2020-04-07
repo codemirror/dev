@@ -1,7 +1,7 @@
 import ist from "ist"
 import {SelectionRange, EditorState, EditorSelection } from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
-import { toggleLineComment, getLinesAcrossRange, insertLineComment, removeLineComment, CommentOption } from "@codemirror/next/comment"
+import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption } from "@codemirror/next/comment"
 
 describe("comment", () => {
   it("get lines across range", () => {
@@ -9,7 +9,7 @@ describe("comment", () => {
     //                 0123456 7890123 4567890 1234567 8901234 5
     let doc = Text.of("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n\n".split("\n"))
     const t = (from: number, to: number, expectedLinesNo: number[]) => {
-      let lines = getLinesAcrossRange(doc, new SelectionRange(from, to))
+      let lines = getLinesInRange(doc, new SelectionRange(from, to))
       ist(lines.map(l => l.start).join(","), expectedLinesNo.join(","))
     }
 
@@ -152,6 +152,26 @@ describe("comment", () => {
       applyToggleChain(
         s(`\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`),
         s(`\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`),
+        ).tie(0)
+
+      applyToggleChain(
+        s(`\n  ${k} lin|e 1\n\n  ${k} line |3\n`),
+        s(`\n  lin|e 1\n\n  line |3\n`),
+        ).tie(0)
+
+      applyToggleChain(
+        s(`\n  ${k} lin|e 1\n     \n  ${k} line |3\n`),
+        s(`\n  lin|e 1\n     \n  line |3\n`),
+        ).tie(0)
+
+      applyToggleChain(
+        s(`\n|\n  ${k} line 2\n    | \n`),
+        s(`\n|\n  line 2\n    | \n`),
+        ).tie(0)
+
+      applyToggleChain(
+        s(`\n|\n\n    | \n`),
+        s(`\n|\n\n    | \n`),
         ).tie(0)
     })
 
