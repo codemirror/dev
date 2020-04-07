@@ -42,8 +42,12 @@ describe("Mapping", () => {
     testMapping(mk([2, 6, 0], [2, 2, 4], {0: 1}), [0, 0], [2, 2], [4, 4], [6, 6], [7, 7])
   })
 
-  it("cap map through a mirrored insert-delete", () => {
+  it("can map through a mirrored insert-delete", () => {
     testMapping(mk([2, 2, 4], [2, 6, 0], {0: 1}), [0, 0], [2, 2], [3, 3])
+  })
+
+  it("allows insertions next to a mirrored change to influence mapping", () => {
+    testMapping(mk([2, 2, 4], [2, 2, 1], [3, 7, 0], {0: 2}), [2, 2, {bias: -1}])
   })
 
   it("can map through an delete-insert with an insert in between", () => {

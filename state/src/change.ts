@@ -197,7 +197,9 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   /// @internal
   mapInner(pos: number, bias: number, mode: MapMode, fromI: number, toI: number): number {
     let dir = toI < fromI ? -1 : 1
-    let hasMirrors = this.mirror.length > 0, mirror
+    let recoverables: {[key: number]: number} | null = null
+    let hasMirrors = this.mirror.length > 0, rec, mirror
+
     for (let i = fromI - (dir < 0 ? 1 : 0), endI = toI - (dir < 0 ? 1 : 0); i != endI; i += dir) {
       let {from, to, length} = this.changes[i]
       if (dir < 0) {
@@ -212,11 +214,19 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
         continue
       }
       // Change touches this position
+      if (recoverables && (rec = recoverables[i]) != null) { // There's a recovery for this change, and it applies
+        pos = from + rec
+        continue
+      }
       if (hasMirrors && (mirror = this.getMirror(i)) != null &&
           (dir > 0 ? mirror > i && mirror < toI : mirror < i && mirror >= toI)) { // A mirror exists
-        i = mirror
-        pos = this.changes[i].from + (pos - from)
-        continue
+        if (pos > from && pos < to) { // If this change deletes the position, skip forward to the mirror
+          i = mirror
+          pos = this.changes[i].from + (pos - from)
+          continue
+        }
+        // Else store a recoverable
+        ;(recoverables || (recoverables = {}))[mirror] = pos - from
       }
       if (pos > from && pos < to) {
         if (mode != MapMode.Simple) return -1
