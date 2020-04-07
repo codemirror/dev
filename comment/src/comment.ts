@@ -35,6 +35,10 @@ const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean
   return true
 }
 
+export const toggleBlockComment = (option: CommentOption, blockCommentTokens: {open: string, close: string}) => (state: EditorState): Transaction | null => {
+  return null
+}
+
 /// TODO: Add docs
 export const toggleLineComment = (option: CommentOption, lineCommentToken: string) => (state: EditorState): Transaction | null => {
   const k = (range: SelectionRange): string => range.anchor + "," + range.head

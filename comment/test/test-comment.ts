@@ -1,7 +1,7 @@
 import ist from "ist"
-import {SelectionRange, EditorState, EditorSelection } from "@codemirror/next/state"
+import {SelectionRange, EditorState, EditorSelection, Transaction } from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption } from "@codemirror/next/comment"
+import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, toggleBlockComment } from "@codemirror/next/comment"
 
 describe("comment", () => {
   it("get lines across range", () => {
@@ -22,55 +22,69 @@ describe("comment", () => {
     t(3, 17, [0,7,14])
   })
 
+  /// Creates a new `EditorState` using `doc` as the document text.
+  /// The selection ranges in the returned state can be specified
+  /// within the `doc` argument:
+  /// The character `|` is used a marker to indicate both the
+  /// start and the end of a `SelectionRange`, *e.g.*,
+  ///
+  /// ```typescript
+  /// s("line 1\nlin|e 2\nline 3")
+  /// ```
+  function s(doc: string): EditorState {
+    const markers = []
+    let pos = doc.indexOf("|", 0)
+    while (pos >= 0) {
+      markers.push(pos)
+      doc = doc.slice(0, pos) + doc.slice(pos + 1)
+      pos = doc.indexOf("|", pos)
+    }
+
+    if (markers.length > 2 && markers.length % 2 != 0) {
+      throw "Markers for multiple selections need to be even.";
+    }
+
+    const ranges: SelectionRange[] = []
+    for (let i = 0; i < markers.length; i += 2) {
+      if (i + 1 < markers.length) {
+        ranges.push(new SelectionRange(markers[i], markers[i+1]))
+      } else {
+        ranges.push(new SelectionRange(markers[i]))
+      }
+    }
+    if (ranges.length == 0) {
+        ranges.push(new SelectionRange(0))
+    }
+
+    return EditorState.create({
+      doc,
+      selection: EditorSelection.create(ranges),
+      extensions: EditorState.allowMultipleSelections.of(true),
+      })
+  }
+
+  function same(actualState: null | {doc: Text, selection: EditorSelection}, expectedState: {doc: Text, selection: EditorSelection}) {
+    ist(actualState)
+    ist(actualState!.doc.toString(), expectedState.doc.toString())
+    ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
+  }
+
+  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null) => (...states: EditorState[]) => {
+    let st = states[0]
+    for (let i = 1; i < states.length; i++) {
+      st = toggle(st)!.apply()
+      same(st, states[i])
+    }
+    return {
+      tie: (index: number) => {
+        st = toggle(st)!.apply()
+        same(st, states[index])
+      }
+    }
+  }
+
   /// Runs all tests for the given line-comment token, `k`.
-  function runCommentTests(k: string) {
-
-    /// Creates a new `EditorState` using `doc` as the document text.
-    /// The selection ranges in the returned state can be specified
-    /// within the `doc` argument:
-    /// The character `|` is used a marker to indicate both the
-    /// start and the end of a `SelectionRange`, *e.g.*,
-    ///
-    /// ```typescript
-    /// s("line 1\nlin|e 2\nline 3")
-    /// ```
-    function s(doc: string): EditorState {
-      const markers = []
-      let pos = doc.indexOf("|", 0)
-      while (pos >= 0) {
-        markers.push(pos)
-        doc = doc.slice(0, pos) + doc.slice(pos + 1)
-        pos = doc.indexOf("|", pos)
-      }
-
-      if (markers.length > 2 && markers.length % 2 != 0) {
-        throw "Markers for multiple selections need to be even.";
-      }
-
-      const ranges: SelectionRange[] = []
-      for (let i = 0; i < markers.length; i += 2) {
-        if (i + 1 < markers.length) {
-          ranges.push(new SelectionRange(markers[i], markers[i+1]))
-        } else {
-          ranges.push(new SelectionRange(markers[i]))
-        }
-      }
-      if (ranges.length == 0) {
-          ranges.push(new SelectionRange(0))
-      }
-
-      return EditorState.create({
-        doc,
-        selection: EditorSelection.create(ranges),
-        extensions: EditorState.allowMultipleSelections.of(true),
-        })
-    }
-
-    function same(actualState: null | {doc: Text, selection: EditorSelection}, expectedState: {doc: Text, selection: EditorSelection}) {
-      ist(actualState)
-      ist(actualState!.doc.toString(), expectedState.doc.toString())
-      ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
-    }
+  function runLineCommentTests(k: string) {
 
     it(`inserts/removes '${k}' line comment in a single line`, () => {
       let st0 = s(`line 1\n${k}line 2\nline 3`)
@@ -82,22 +96,7 @@ describe("comment", () => {
       same(st3, st1)
     })
 
-    function applyToggleChain(...states: EditorState[]) {
-      const toggle = (state: EditorState) => 
-        toggleLineComment(CommentOption.Toggle, k)(state)!
-
-      let st = states[0]
-      for (let i = 1; i < states.length; i++) {
-        st = toggle(st)?.apply()
-        same(st, states[i])
-      }
-      return {
-        tie: (index: number) => {
-          st = toggle(st)?.apply()
-          same(st, states[index])
-        }
-      }
-    }
+    const applyToggleChain = checkToggleChain(toggleLineComment(CommentOption.Toggle, k))
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
       applyToggleChain(
@@ -184,8 +183,26 @@ describe("comment", () => {
 
   }
 
-  runCommentTests("//")
+  /// Runs all tests for the given block-comment tokens.
+  function runBlockCommentTests(o: string, c: string) {
 
-  runCommentTests("#")
+    const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle, {open: o, close: c}))
+
+    it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
+      check(
+        s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`),
+        s(`\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`),
+        ).tie(0)
+    })
+
+  }
+
+  runLineCommentTests("//")
+
+  runLineCommentTests("#")
+
+  runBlockCommentTests("/*", "*/")
+
+  runBlockCommentTests("<!--", "-->")
 
 })
