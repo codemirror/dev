@@ -21,45 +21,61 @@ export const uncommentCmd: Command = view => {
     return dispatchToggleComment(CommentOption.OnlyUncomment, view)
 }
 
+/// The action to be taken when toggling comments.
 export enum CommentOption {
   Toggle,
   OnlyComment,
   OnlyUncomment,
 }
 
-export const dispatchToggleComment = function(option: CommentOption, view: EditorView): boolean {
-  let tr = toggleLineComment(option, "//")(view.state, view.state.selection.primary)
+const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean => {
+  let tr = toggleLineComment(option, "//")(view.state)
   if (!tr) return false
   view.dispatch(tr)
   return true
 }
 
 /// TODO: Add docs
-export const toggleLineComment = (option: CommentOption, lineCommentToken: string) => (state: EditorState, range: SelectionRange): Transaction | null => {
-  let lines = getLinesAcrossRange(state.doc, range)
-  let column = isRangeLineCommented(lineCommentToken)(state, lines)
+export const toggleLineComment = (option: CommentOption, lineCommentToken: string) => (state: EditorState): Transaction | null => {
+  const k = (range: SelectionRange): string => range.anchor + "," + range.head
+  const linesAcrossSelection: Line[] = []
+  const linesAcrossRange : { [id: string] : Line[]; } = {};
+  for (const range of state.selection.ranges) {
+    const lines = getLinesAcrossRange(state.doc, range)
+    linesAcrossSelection.push(...lines)
+    linesAcrossRange[k(range)] = lines
+  }
+  let column = isRangeLineCommented(lineCommentToken)(state, linesAcrossSelection)
   if (column.isRangeLineSkipped) {
     if (option != CommentOption.OnlyComment) {
       let tr = state.t()
+      // tr.forEachRange((range) => {
       let mapRef = tr.mapRef()
-      tr.forEachRange((range) => {
-        return range
-      })
-      for (const line of lines) {
-        let margin = (line.content as string).startsWith(" ", column.minCol + lineCommentToken.length) ? 1 : 0
-        let pos = mapRef.mapPos(line.start + column.minCol)
-        tr = removeLineComment(tr, pos, lineCommentToken, margin)
+      for (const range of state.selection.ranges) {
+        for (const line of linesAcrossRange[k(range)]) {
+          let margin = (line.content as string).startsWith(" ", column.minCol + lineCommentToken.length) ? 1 : 0
+          let pos = mapRef.mapPos(line.start + column.minCol)
+          tr = removeLineComment(tr, pos, lineCommentToken, margin)
+        }
+        // return range
       }
+      // })
       return tr
     }
   } else {
     if (option != CommentOption.OnlyUncomment) {
       let tr = state.t()
-      let mapRef = tr.mapRef()
-      for (const line of lines) {
-        let pos = mapRef.mapPos(line.start + column.minCol)
-        tr = insertLineComment(tr, pos, lineCommentToken)
+      // tr.forEachRange((range) => {
+        let mapRef = tr.mapRef()
+        for (const range of state.selection.ranges) {
+          for (const line of linesAcrossRange[k(range)]) {
+          // for (const line of lines) {
+          let pos = mapRef.mapPos(line.start + column.minCol)
+          tr = insertLineComment(tr, pos, lineCommentToken)
+        }
       }
+        // return range
+      // })
       return tr
     }
   }
@@ -108,7 +124,6 @@ export const getLinesAcrossRange = (doc: Text, range: SelectionRange): Line[] =>
   while (line.start + line.length < range.to ||
         (line.start <= range.to && range.to <= line.end)) {
     lines.push(line)
-    // doc.lines
     if (line.number + 1 <= doc.lines ) {
       line = doc.line(line.number + 1)
     } else {

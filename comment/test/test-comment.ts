@@ -30,11 +30,12 @@ describe("comment", () => {
     /// within the `doc` argument:
     /// The character `|` is used a marker to indicate both the
     /// start and the end of a `SelectionRange`, *e.g.*,
+    ///
     /// ```typescript
     /// s("line 1\nlin|e 2\nline 3")
     /// ```
     function s(doc: string): EditorState {
-      let markers = []
+      const markers = []
       let pos = doc.indexOf("|", 0)
       while (pos >= 0) {
         markers.push(pos)
@@ -46,19 +47,23 @@ describe("comment", () => {
         throw "Markers for multiple selections need to be even.";
       }
 
-      let selection = []
-      for (let i = 0; i < markers.length; i++) {
+      const ranges: SelectionRange[] = []
+      for (let i = 0; i < markers.length; i += 2) {
         if (i + 1 < markers.length) {
-          selection.push(new SelectionRange(markers[i], markers[i+1]))
+          ranges.push(new SelectionRange(markers[i], markers[i+1]))
         } else {
-          selection.push(new SelectionRange(markers[i]))
+          ranges.push(new SelectionRange(markers[i]))
         }
       }
-      if (selection.length == 0) {
-          selection.push(new SelectionRange(0))
+      if (ranges.length == 0) {
+          ranges.push(new SelectionRange(0))
       }
 
-      return EditorState.create({doc, selection: new EditorSelection(selection)})
+      return EditorState.create({
+        doc,
+        selection: EditorSelection.create(ranges),
+        extensions: EditorState.allowMultipleSelections.of(true),
+        })
     }
 
     function same(actualState: null | {doc: Text, selection: EditorSelection}, expectedState: {doc: Text, selection: EditorSelection}) {
@@ -79,7 +84,7 @@ describe("comment", () => {
 
     function applyToggleChain(...states: EditorState[]) {
       const toggle = (state: EditorState) => 
-        toggleLineComment(CommentOption.Toggle, k)(state, state.selection.primary)!
+        toggleLineComment(CommentOption.Toggle, k)(state)!
 
       let st = states[0]
       for (let i = 1; i < states.length; i++) {
@@ -150,10 +155,10 @@ describe("comment", () => {
         ).tie(0)
     })
 
-    it.skip(`toggles '${k}' comments in a multi-line multi-range selection`, () => {
+    it(`toggles '${k}' comments in a multi-line multi-range selection`, () => {
       applyToggleChain(
         s(`\n  lin|e 1\n  line |2\n  line 3\n  l|ine 4\n  line| 5\n`),
-        s(`\n  ${k}lin|e 1\n  ${k}line |2\n  line 3\n  ${k}l|ine 4\n  ${k}line| 5\n`),
+        s(`\n  ${k} lin|e 1\n  ${k} line |2\n  line 3\n  ${k} l|ine 4\n  ${k} line| 5\n`),
         ).tie(0)
     })
 
