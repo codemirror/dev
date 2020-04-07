@@ -63,22 +63,22 @@ describe("comment", () => {
       })
   }
 
-  function same(actualState: null | {doc: Text, selection: EditorSelection}, expectedState: {doc: Text, selection: EditorSelection}) {
+  function same(actualState: EditorState, expectedState: EditorState) {
     ist(actualState)
     ist(actualState!.doc.toString(), expectedState.doc.toString())
     ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
   }
 
-  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null) => (...states: EditorState[]) => {
-    let st = states[0]
-    for (let i = 1; i < states.length; i++) {
+  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null) => (...docs: string[]) => {
+    let st = s(docs[0])
+    for (let i = 1; i < docs.length; i++) {
       st = toggle(st)!.apply()
-      same(st, states[i])
+      same(st, s(docs[i]))
     }
     return {
       tie: (index: number) => {
         st = toggle(st)!.apply()
-        same(st, states[index])
+        same(st, s(docs[index]))
       }
     }
   }
@@ -100,84 +100,84 @@ describe("comment", () => {
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
       check(
-        s(`\nline 1\n  ${k} ${k} ${k} ${k}line| 2\nline 3\n`),
-        s(`\nline 1\n  ${k} ${k} ${k}line| 2\nline 3\n`),
-        s(`\nline 1\n  ${k} ${k}line| 2\nline 3\n`),
-        s(`\nline 1\n  ${k}line| 2\nline 3\n`),
-        s(`\nline 1\n  line| 2\nline 3\n`),
-        s(`\nline 1\n  ${k} line| 2\nline 3\n`)
+        `\nline 1\n  ${k} ${k} ${k} ${k}line| 2\nline 3\n`,
+        `\nline 1\n  ${k} ${k} ${k}line| 2\nline 3\n`,
+        `\nline 1\n  ${k} ${k}line| 2\nline 3\n`,
+        `\nline 1\n  ${k}line| 2\nline 3\n`,
+        `\nline 1\n  line| 2\nline 3\n`,
+        `\nline 1\n  ${k} line| 2\nline 3\n`,
         ).tie(4)
 
       check(
-        s(`\nline 1\n  ${k}line 2|\nline 3\n`),
-        s(`\nline 1\n  line 2|\nline 3\n`),
-        s(`\nline 1\n  ${k} line 2|\nline 3\n`)
+        `\nline 1\n  ${k}line 2|\nline 3\n`,
+        `\nline 1\n  line 2|\nline 3\n`,
+        `\nline 1\n  ${k} line 2|\nline 3\n`,
         ).tie(1)
 
       check(
-        s(`\nline 1\n|  ${k}line 2\nline 3\n`),
-        s(`\nline 1\n|  line 2\nline 3\n`),
-        s(`\nline 1\n|  ${k} line 2\nline 3\n`)
+        `\nline 1\n|  ${k}line 2\nline 3\n`,
+        `\nline 1\n|  line 2\nline 3\n`,
+        `\nline 1\n|  ${k} line 2\nline 3\n`,
         ).tie(1)
 
       check(
-        s(`\nline 1\n|${k}\nline 3\n`),
-        s(`\nline 1\n|\nline 3\n`),
-        s(`\nline 1\n|${k} \nline 3\n`)
+        `\nline 1\n|${k}\nline 3\n`,
+        `\nline 1\n|\nline 3\n`,
+        `\nline 1\n|${k} \nline 3\n`,
         ).tie(1)
 
       check(
-        s(`\nline 1\n line 2\nline 3\n|${k}`),
-        s(`\nline 1\n line 2\nline 3\n|`),
-        s(`\nline 1\n line 2\nline 3\n|${k} `)
+        `\nline 1\n line 2\nline 3\n|${k}`,
+        `\nline 1\n line 2\nline 3\n|`,
+        `\nline 1\n line 2\nline 3\n|${k} `,
         ).tie(1)
     })
 
     it(`toggles '${k}' comments in a single line selection`, () => {
       check(
-        s(`line 1\n  ${k}li|ne |2\nline 3\n`),
-        s(`line 1\n  li|ne |2\nline 3\n`),
-        s(`line 1\n  ${k} li|ne |2\nline 3\n`)
+        `line 1\n  ${k}li|ne |2\nline 3\n`,
+        `line 1\n  li|ne |2\nline 3\n`,
+        `line 1\n  ${k} li|ne |2\nline 3\n`,
         ).tie(1)
     })
 
     it(`toggles '${k}' comments in a multi-line selection`, () => {
       check(
-        s(`\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
-        s(`\n  lin|e 1\n   line 2\n  line |3\n`),
-        s(`\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`),
+        `\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`,
+        `\n  lin|e 1\n   line 2\n  line |3\n`,
+        `\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`,
         ).tie(1)
 
       check(
-        s(`\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`),
-        s(`\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`),
+        `\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`,
+        `\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`,
         ).tie(0)
 
       check(
-        s(`\n  ${k} lin|e 1\n\n  ${k} line |3\n`),
-        s(`\n  lin|e 1\n\n  line |3\n`),
+        `\n  ${k} lin|e 1\n\n  ${k} line |3\n`,
+        `\n  lin|e 1\n\n  line |3\n`,
         ).tie(0)
 
       check(
-        s(`\n  ${k} lin|e 1\n     \n  ${k} line |3\n`),
-        s(`\n  lin|e 1\n     \n  line |3\n`),
+        `\n  ${k} lin|e 1\n     \n  ${k} line |3\n`,
+        `\n  lin|e 1\n     \n  line |3\n`,
         ).tie(0)
 
       check(
-        s(`\n|\n  ${k} line 2\n    | \n`),
-        s(`\n|\n  line 2\n    | \n`),
+        `\n|\n  ${k} line 2\n    | \n`,
+        `\n|\n  line 2\n    | \n`,
         ).tie(0)
 
       check(
-        s(`\n|\n\n    | \n`),
-        s(`\n|\n\n    | \n`),
+        `\n|\n\n    | \n`,
+        `\n|\n\n    | \n`,
         ).tie(0)
     })
 
     it(`toggles '${k}' comments in a multi-line multi-range selection`, () => {
       check(
-        s(`\n  lin|e 1\n  line |2\n  line 3\n  l|ine 4\n  line| 5\n`),
-        s(`\n  ${k} lin|e 1\n  ${k} line |2\n  line 3\n  ${k} l|ine 4\n  ${k} line| 5\n`),
+        `\n  lin|e 1\n  line |2\n  line 3\n  l|ine 4\n  line| 5\n`,
+        `\n  ${k} lin|e 1\n  ${k} line |2\n  line 3\n  ${k} l|ine 4\n  ${k} line| 5\n`,
         ).tie(0)
     })
 
@@ -190,8 +190,8 @@ describe("comment", () => {
 
     it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
       check(
-        s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`),
-        s(`\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`),
+        `\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`,
+        `\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`,
         ).tie(0)
     })
 
