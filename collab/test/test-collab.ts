@@ -1,4 +1,4 @@
-import {EditorState, Change, Transaction} from "@codemirror/next/state"
+import {EditorState, Change, Transaction, StateField, Extension} from "@codemirror/next/state"
 import {history, undo, redo, isolateHistory} from "@codemirror/next/history"
 import ist from "ist"
 import {collab, receiveChanges, sendableChanges, getClientID, getSyncedVersion} from "@codemirror/next/collab"
@@ -9,9 +9,9 @@ class DummyServer {
   clientIDs: string[] = []
   delayed: number[] = []
 
-  constructor(doc: string = "", n = 2) {
+  constructor(doc: string = "", n = 2, extensions: Extension[] = []) {
     for (let i = 0; i < n; i++)
-      this.states.push(EditorState.create({doc, extensions: [history(), collab()]}))
+      this.states.push(EditorState.create({doc, extensions: [history(), collab(), ...extensions]}))
   }
 
   sync(n: number) {
@@ -205,5 +205,26 @@ describe("collab", () => {
     s.conv("A Bxy")
     s.undo(1)
     s.conv("A B")
+  })
+
+  it("includes rebased changes when necessary", () => {
+    let counter = StateField.define<number>({
+      create() { return 0 },
+      update(val, tr) { return val + tr.changes.length }
+    })
+    let s = new DummyServer("___ ___", 2, [counter])
+    s.delay(0, () => {
+      s.type(0, "a", 1)
+      s.type(1, "b", 5)
+    })
+    ist(s.states[0].field(counter), 2)
+    ist(s.states[1].field(counter), 2)
+    s.delay(0, () => {
+      s.type(0, "x", 3)
+      s.type(1, "y", 3)
+    })
+    ist(s.states[0].field(counter), 6)
+    ist(s.states[1].field(counter), 4)
+    s.conv("_a_yx_ _b__")
   })
 })

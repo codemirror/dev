@@ -122,7 +122,17 @@ export function receiveChanges(state: EditorState, changes: readonly Change[], c
   let nUnconfirmed = unconfirmed.length
   let tr = state.t()
   if (nUnconfirmed) {
+    let interference = checkInterference(unconfirmed, changes)
     unconfirmed = rebaseChanges(unconfirmed, changes, tr)
+    // If the changes don't occur near each other, we can dispatch a
+    // simplified transaction that just applies the mapped remote
+    // changes, without rebasing.
+    if (!interference) {
+      let newTr = state.t()
+      for (let i = 0; i < changes.length; i++)
+        newTr.changeNoFilter(changes[i].map(tr.changes.partialMapping(unconfirmed.length + i, 0))!)
+      tr = newTr
+    }
   } else {
     for (let change of changes) tr.changeNoFilter(change)
     unconfirmed = []
@@ -131,6 +141,32 @@ export function receiveChanges(state: EditorState, changes: readonly Change[], c
   return tr.annotate(Transaction.addToHistory, false)
     .annotate(collabReceive, new CollabState(version, unconfirmed))
     .annotate(Transaction.rebasedChanges, nUnconfirmed)
+}
+
+function checkInterference(unconfirmed: readonly Rebaseable[], remote: readonly Change[]) {
+  // Map the extent of all changes back to the original document
+  // coordinate space, and check for overlap.
+  let localTouched: number[] = []
+  for (let i = 0; i < unconfirmed.length; i++) {
+    let {from, to} = unconfirmed[i].forward
+    for (let j = i - 1; j >= 0; j--) {
+      from = unconfirmed[j].backward.mapPos(from, -1)
+      to = unconfirmed[j].backward.mapPos(to, 1)
+    }
+    localTouched.push(from, to)
+  }
+  for (let i = 0; i < remote.length; i++) {
+    let {from, to} = remote[i]
+    for (let j = i - 1; j >= 0; j--) {
+      let inv = remote[j].invertedDesc
+      from = inv.mapPos(from, -1)
+      to = inv.mapPos(to, 1)
+    }
+    for (let j = 0; j < localTouched.length; j += 2)
+      if (to >= localTouched[j] && from <= localTouched[j + 1])
+        return true
+  }
+  return false
 }
 
 /// Returns the set of locally made changes that still have to be sent
