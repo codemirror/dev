@@ -115,7 +115,8 @@ describe("history", () => {
     ist(state.doc.toString(), "ab!!!!!!!!cdef")
   })
 
-  function unsyncedComplex(state: EditorState) {
+  it("can handle complex editing sequences", () => {
+    let state = mkState()
     state = type(state, "hello")
     state = state.t().annotate(isolateHistory, "before").apply()
     state = type(state, "!")
@@ -128,10 +129,6 @@ describe("history", () => {
     ist(state.doc.toString(), ".\n\n...hello")
     state = command(state, undo)
     ist(state.doc.toString(), ".\n\n...")
-  }
-
-  it("can handle complex editing sequences", () => {
-    unsyncedComplex(mkState())
   })
 
   it("supports overlapping edits", () => {
@@ -614,8 +611,7 @@ describe("history", () => {
     }
 
     for (let ch of " two") dispatch(state.t().replaceSelection(ch))
-    dispatch(state.t().setSelection(13))
-    dispatch(state.t().replaceSelection("!"))
+    dispatch(state.t().setSelection(13).replaceSelection("!"))
     ist(changes.length, 5)
     ist(state.doc.toString(), "one two three!")
     // Say the last 3 changes (adding "wo" and "!") are unconfirmed,

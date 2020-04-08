@@ -119,6 +119,22 @@ export const undoDepth = depth(BranchName.Done)
 /// The amount of redoable change events available in a given state.
 export const redoDepth = depth(BranchName.Undone)
 
+// Event mappings store the way an event _has been_ mapped, which
+// means events below it need to also be mapped.
+class EventMapping {
+  constructor(
+    // A mapping that contains the event's _original_ (before any
+    // mapping) forward changes (up to `local`), followed by the
+    // externally added mapping, followed by the event's mapped,
+    // inverted changes.
+    readonly mapping: ChangeSet<ChangeDesc>,
+    readonly end: number,
+    // The amount of changes (at the start of the mapping) that are
+    // local to this event.
+    readonly local: number
+  ) {}
+}
+
 // History events store groups of changes or effects that need to be
 // undone/redone together.
 class HistEvent {
@@ -127,10 +143,7 @@ class HistEvent {
     readonly changes: readonly Change[],
     // The effects associated with this event
     readonly effects: readonly StateEffect<any>[],
-    // Any position mapping that needs to happen between this event
-    // and the next one. Added in the `addMapping` method, applied in
-    // `addMappingToBranch`.
-    readonly mapBefore: ChangeSet<ChangeDesc>,
+    readonly mapped: EventMapping | null,
     // Normal events hold at least one change or effect. But it may be
     // necessary to store selection events before the first change, in
     // which case special type of instance is created which doesn't
@@ -143,41 +156,8 @@ class HistEvent {
 
   get isChange() { return this.startSelection != null }
 
-  // Adds a mapping to this change. This involves mapping all changes,
-  // effects, and selections forward, over this mapping, and storing
-  // it in `mapBefore`. Mappings are applied eagerly so that we can
-  // immediately see if a given event can be dropped (because its
-  // changes and effects are mapped away). This method may return an
-  // event without changes and effects, but its caller will check for
-  // that and drop such an event.
-  addMapping(mapping: ChangeSet<ChangeDesc>, extraSelections: readonly EditorSelection[]) {
-    let selections = conc(this.selectionsAfter.length ? this.selectionsAfter.map(s => s.map(mapping)) : none,
-                          extraSelections)
-    // Change-less events don't store mappings (they are always the last event in a branch)
-    if (!this.isChange) return new HistEvent(none, none, ChangeSet.empty, null, selections)
-
-    let inner = new ChangeSet(this.changes.map(ch => ch.invertedDesc).reverse()).appendSet(mapping)
-    let  newChanges: Change[] = [], mapFrom = this.changes.length
-    for (let change of this.changes) {
-      let mapped = change.map(inner.partialMapping(mapFrom))
-      mapFrom--
-      if (mapped) {
-        newChanges.push(mapped)
-        inner = inner.append(mapped, mapFrom)
-      }
-    }
-    let effects: StateEffect<any>[] = this.effects.length ? [] : none as StateEffect<any>[]
-    for (let effect of this.effects) {
-      let mapped = effect.map(inner)
-      if (mapped) effects.push(mapped)
-    }
-    
-    return new HistEvent(newChanges, effects, this.mapBefore.appendSet(mapping),
-                         this.startSelection!.map(inner), selections)
-  }
-
   setSelAfter(after: readonly EditorSelection[]) {
-    return new HistEvent(this.changes, this.effects, this.mapBefore, this.startSelection, after)
+    return new HistEvent(this.changes, this.effects, this.mapped, this.startSelection, after)
   }
 
   // This does not check `addToHistory` and such, it assumes the
@@ -191,7 +171,7 @@ class HistEvent {
     }
     if (!effects.length && !tr.changes.length) return null
     let inverted: ChangeSet | null = tr.invertedChanges() // FIXME make this return an array?
-    return new HistEvent(inverted.changes, effects, ChangeSet.empty, tr.startState.selection, none)
+    return new HistEvent(inverted.changes, effects, null, tr.startState.selection, none)
   }
 }
 
@@ -219,18 +199,11 @@ function conc<T>(a: readonly T[], b: readonly T[]) {
 
 const none: readonly any[] = []
 
-function popBranch(branch: Branch): Branch {
-  if (branch.length == 0) return none
-  let {mapBefore} = branch[branch.length - 1]
-  let rest = branch.length == 1 ? none : branch.slice(0, branch.length - 1)
-  return mapBefore.length ? addMappingToBranch(rest, mapBefore) : rest
-}
-
 const MaxSelectionsPerEvent = 200, MaxMappingPerEvent = 200
 
 function addSelection(branch: Branch, selection: EditorSelection) {
   if (!branch.length) {
-    return [new HistEvent(none, none, ChangeSet.empty, null, [selection])]
+    return [new HistEvent(none, none, null, null, [selection])]
   } else {
     let lastEvent = branch[branch.length - 1]
     let sels = lastEvent.selectionsAfter.slice(Math.max(0, lastEvent.selectionsAfter.length - MaxSelectionsPerEvent))
@@ -251,40 +224,88 @@ function popSelection(branch: Branch): Branch {
 // Add a mapping to the top event in the given branch. If this maps
 // away all the changes and effects in that item, drop it and
 // propagate the mapping to the next item.
-function addMappingToBranch(branch: Branch, mapping: ChangeSet<ChangeDesc>) {
+function addMappingToBranch(branch: Branch, mapping: EventMapping) {
   if (!branch.length) return branch
   let length = branch.length, selections = none
   while (length) {
-    let last = branch[length - 1].addMapping(mapping, selections)
-    if (last.changes.length || last.effects.length) { // Not mapped to a no-op
+    let event = mapEvent(branch[length - 1], mapping, selections)
+    if (event.changes.length || event.effects.length) { // Event survived mapping
       let result = branch.slice(0, length)
-      if (selections) 
-      result[length - 1] = last
-      return last.mapBefore.length > MaxMappingPerEvent ? compressBranch(result) : result
+      result[length - 1] = event
+      return event.mapped!.mapping.length > MaxMappingPerEvent ? compressBranch(result) : result
     } else { // Drop this event, since there's no changes or effects left
+      mapping = event.mapped!
       length--
-      selections = last.selectionsAfter
-      mapping = last.mapBefore
+      selections = event.selectionsAfter
     }
   }
-  return selections.length ? [new HistEvent(none, none, ChangeSet.empty, null, selections)] : none
+  return selections.length ? [new HistEvent(none, none, null, null, selections)] : none
+}
+
+function mapEvent(event: HistEvent, newMapping: EventMapping,
+                  extraSelections: readonly EditorSelection[]) {
+  let {mapping} = newMapping
+  let selections = conc(event.selectionsAfter.length ? event.selectionsAfter.map(s => s.map(mapping)) : none,
+                        extraSelections)
+  // Change-less events don't store mappings (they are always the last event in a branch)
+  if (!event.isChange) return new HistEvent(none, none, null, null, selections)
+
+  // To map this event's changes, create a mapping that includes this
+  // event's forward changes and the new changes from the given
+  // mapping.
+  let forward = event.mapped ? event.mapped.mapping.changes.slice(0, event.mapped.local)
+    : event.changes.map(ch => ch.invertedDesc).reverse()
+  let local = new ChangeSet(forward).appendSet(mapping)
+
+  let  newChanges: Change[] = [], mapFrom = forward.length
+  for (let change of event.changes) {
+    let mapped = change.map(local.partialMapping(mapFrom))
+    mapFrom--
+    if (mapped) {
+      newChanges.push(mapped)
+      local = local.append(mapped, mapFrom)
+    }
+  }
+  let effects: StateEffect<any>[] = event.effects.length ? [] : none as StateEffect<any>[]
+  for (let effect of event.effects) {
+    let mapped = effect.map(local)
+    if (mapped) effects.push(mapped)
+  }
+
+  let eventMapping: EventMapping, prev = event.mapped
+  if (prev) {
+    let changes = prev.mapping.changes.slice(0, prev.end).concat(mapping.changes).concat(newChanges.map(ch => ch.desc))
+    let mirror = mapping.mirror.map(i => i + prev!.end)
+    for (let i = 0; i < prev.mapping.mirror.length; i += 2) {
+      let a = prev.mapping.mirror[i], b = prev.mapping.mirror[i + 1]
+      if (a > prev.local && b > prev.local) mirror.push(a, b)
+    }
+    for (let i = 0; i < forward.length; i++) {
+      let found = local.getMirror(i)
+      if (found != null) mirror.push(i, changes.length - (local.length - found))
+    }
+    eventMapping = new EventMapping(new ChangeSet(changes, mirror), changes.length - newChanges.length, forward.length)
+  } else {
+    eventMapping = new EventMapping(local, local.length - newChanges.length, forward.length)
+  }
+  return new HistEvent(newChanges, effects, eventMapping, event.startSelection!.map(local), selections)
 }
 
 // Eagerly apply all the mappings in the given branch, so that they
 // don't endlessly accumulate in memory.
 function compressBranch(branch: Branch) {
-  let compressed = [], mapping: ChangeSet<ChangeDesc> = ChangeSet.empty, selections = none
+  let compressed = [], mapping = new EventMapping(ChangeSet.empty, 0, 0), selections = none
   for (let i = branch.length - 1; i >= 0; i--) {
-    let event = branch[i].addMapping(mapping, selections)
-    if (event.isChange) {
+    let event = mapEvent(branch[i], mapping, selections)
+    mapping = event.mapped!
+    if (event.changes.length || event.effects.length) {
       selections = none
-      compressed.push(new HistEvent(event.changes, event.effects, ChangeSet.empty, event.startSelection, event.selectionsAfter))
+      compressed.push(new HistEvent(event.changes, event.effects, null, event.startSelection, event.selectionsAfter))
     } else {
       selections = event.selectionsAfter
     }
-    mapping = event.mapBefore
   }
-  if (selections) compressed.push(new HistEvent(none, none, ChangeSet.empty, null, selections))
+  if (selections) compressed.push(new HistEvent(none, none, null, null, selections))
   return compressed.reverse()
 }
 
@@ -307,7 +328,7 @@ class HistoryState {
         isAdjacent(lastEvent.changes[0], event.changes[event.changes.length - 1])) {
       done = updateBranch(done, done.length - 1, maxLen,
                           new HistEvent(conc(event.changes, lastEvent.changes), conc(event.effects, lastEvent.effects),
-                                        lastEvent.mapBefore, lastEvent.startSelection, none))
+                                        lastEvent.mapped, lastEvent.startSelection, none))
     } else {
       done = updateBranch(done, done.length, maxLen, event)
     }
@@ -325,8 +346,8 @@ class HistoryState {
   }
 
   addMapping(mapping: ChangeSet<ChangeDesc>): HistoryState {
-    return new HistoryState(addMappingToBranch(this.done, mapping),
-                            addMappingToBranch(this.undone, mapping),
+    return new HistoryState(addMappingToBranch(this.done, new EventMapping(mapping, 0, 0)),
+                            addMappingToBranch(this.undone, new EventMapping(mapping, 0, 0)),
                             this.prevTime, this.prevUserEvent)
   }
 
@@ -341,10 +362,13 @@ class HistoryState {
     } else {
       if (!event.isChange) return null
       let tr = state.t()
-      for (let change of event.changes) tr.change(change)
+      for (let change of event.changes) tr.changeNoFilter(change)
       for (let effect of event.effects) tr.effect(effect)
       tr.setSelection(event.startSelection!)
-      return tr.annotate(fromHistory, {side, rest: popBranch(branch)})
+      let rest = branch.length == 1 ? none : branch.slice(0, branch.length - 1)
+      if (event.mapped)
+        rest = addMappingToBranch(rest, event.mapped!)
+      return tr.annotate(fromHistory, {side, rest})
     }
   }
 

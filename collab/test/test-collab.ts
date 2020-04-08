@@ -134,7 +134,7 @@ describe("collab", () => {
     s.conv("abABC")
   })
 
-  it.skip("supports deep undo", () => {
+  it("supports deep undo", () => {
     let s = new DummyServer("hello bye")
     s.update(0, s => s.t().setSelection(5))
     s.update(1, s => s.t().setSelection(9))
