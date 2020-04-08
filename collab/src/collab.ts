@@ -103,7 +103,7 @@ export function collab(config: CollabConfig = {}) {
 /// Create a transaction that represents a set of new changes received
 /// from the authority. Applying this transaction moves the state
 /// forward to adjust to the authority's view of the document.
-export function receiveChanges(state: EditorState, changes: readonly Change[], clientIDs: readonly string[]) {
+export function receiveChanges(state: EditorState, changes: readonly Change[], ownChangeCount: number) {
   // Pushes a set of changes (received from the central authority)
   // into the editor state (which should have the collab plugin
   // enabled). Will recognize its own changes, and confirm unconfirmed
@@ -111,13 +111,9 @@ export function receiveChanges(state: EditorState, changes: readonly Change[], c
   // rebased over remote changes.
   let collabState = state.field(collabField)
   let version = collabState.version + changes.length
-  let ourID = state.facet(collabConfig).clientID
 
-  // Find out which prefix of the changes originated with us
-  let ours = 0
-  while (ours < clientIDs.length && clientIDs[ours] == ourID) ++ours
-  let unconfirmed = collabState.unconfirmed.slice(ours)
-  changes = ours ? changes.slice(ours) : changes
+  let unconfirmed = collabState.unconfirmed.slice(ownChangeCount)
+  if (ownChangeCount) changes = changes.slice(ownChangeCount)
 
   // If all changes originated with us, we're done.
   if (!changes.length)

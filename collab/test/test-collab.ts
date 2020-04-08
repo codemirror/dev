@@ -16,8 +16,14 @@ class DummyServer {
 
   sync(n: number) {
     let state = this.states[n], version = getSyncedVersion(state)
-    if (version != this.changes.length)
-      this.states[n] = receiveChanges(state, this.changes.slice(version), this.clientIDs.slice(version)).apply()
+    if (version != this.changes.length) {
+      let count = 0
+      for (let i = version; i < this.clientIDs.length; i++) {
+        if (this.clientIDs[i] == getClientID(this.states[n])) count++
+        else break
+      }
+      this.states[n] = receiveChanges(state, this.changes.slice(version), count).apply()
+    }
   }
 
   send(n: number) {
