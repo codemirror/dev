@@ -23,7 +23,7 @@ class DummyServer {
   send(n: number) {
     let state = this.states[n], sendable = sendableChanges(state)
     if (sendable.length) {
-      this.changes = this.changes.concat(sendable)
+      this.changes = this.changes.concat(sendable.map(s => s.change))
       for (let i = 0; i < sendable.length; i++) this.clientIDs.push(getClientID(state))
     }
   }

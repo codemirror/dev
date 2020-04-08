@@ -3,9 +3,9 @@ import {rebaseChanges} from "@codemirror/next/collab"
 import ist from "ist"
 
 function changePairs(tr: Transaction) {
-  let pairs: {forward: Change, backward: Change}[] = []
+  let pairs: {change: Change, inverted: Change, origin: any}[] = []
   for (let inv = tr.invertedChanges(), i = 0, j = inv.length - 1; j >= 0; i++, j--)
-    pairs.push({forward: tr.changes.changes[i], backward: inv.changes[j]})
+    pairs.push({change: tr.changes.changes[i], inverted: inv.changes[j], origin: null})
   return pairs
 }
 

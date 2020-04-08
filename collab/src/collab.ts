@@ -1,20 +1,24 @@
 import {Facet, Change, StateField, Annotation, EditorState, Transaction} from "@codemirror/next/state"
 
-class Rebaseable { // FIXME store metadata with these?
-  constructor(readonly forward: Change, readonly backward: Change) {}
+class Rebaseable {
+  constructor(
+    readonly change: Change,
+    readonly inverted: Change,
+    readonly origin: Transaction
+  ) {}
 }
 
 // Undo a given set of changes, apply a set of other changes, and then
 // redo them. Return the mapped set of rebaseable objects.
 export function rebaseChanges(changes: readonly Rebaseable[], over: readonly Change[], tr: Transaction) {
-  for (let i = changes.length - 1; i >= 0; i--) tr.changeNoFilter(changes[i].backward)
+  for (let i = changes.length - 1; i >= 0; i--) tr.changeNoFilter(changes[i].inverted)
   for (let change of over) tr.changeNoFilter(change)
   let result = [], mapFrom = changes.length
-  for (let {forward} of changes) {
-    let mapped = forward.map(tr.changes.partialMapping(mapFrom))
+  for (let {change, origin} of changes) {
+    let mapped = change.map(tr.changes.partialMapping(mapFrom))
     mapFrom--
     if (mapped) {
-      result.push(new Rebaseable(mapped, mapped.invert(tr.doc)))
+      result.push(new Rebaseable(mapped, mapped.invert(tr.doc), origin))
       tr.changeNoFilter(mapped, mapFrom)
     }
   }
@@ -76,7 +80,7 @@ const collabField = StateField.define({
 
   update(collab: CollabState, tr: Transaction) {
     let isSync = tr.annotation(collabReceive)
-    if (isSync) return isSync // FIXME store whole new state, or derive at update time?
+    if (isSync) return isSync
     if (tr.docChanged)
       return new CollabState(collab.version, collab.unconfirmed.concat(unconfirmedFrom(tr)))
     return collab
@@ -84,7 +88,7 @@ const collabField = StateField.define({
 })
 
 function unconfirmedFrom(tr: Transaction) {
-  return tr.changes.changes.map((ch, i) => new Rebaseable(ch, ch.invert(i ? tr.docs[i - 1] : tr.startState.doc)))
+  return tr.changes.changes.map((ch, i) => new Rebaseable(ch, ch.invert(i ? tr.docs[i - 1] : tr.startState.doc), tr))
 }
 
 export function collab(config: CollabConfig = {}) {
@@ -148,10 +152,10 @@ function checkInterference(unconfirmed: readonly Rebaseable[], remote: readonly 
   // coordinate space, and check for overlap.
   let localTouched: number[] = []
   for (let i = 0; i < unconfirmed.length; i++) {
-    let {from, to} = unconfirmed[i].forward
+    let {from, to} = unconfirmed[i].change
     for (let j = i - 1; j >= 0; j--) {
-      from = unconfirmed[j].backward.mapPos(from, -1)
-      to = unconfirmed[j].backward.mapPos(to, 1)
+      from = unconfirmed[j].inverted.mapPos(from, -1)
+      to = unconfirmed[j].inverted.mapPos(to, 1)
     }
     localTouched.push(from, to)
   }
@@ -170,9 +174,14 @@ function checkInterference(unconfirmed: readonly Rebaseable[], remote: readonly 
 }
 
 /// Returns the set of locally made changes that still have to be sent
-/// to the authority.
-export function sendableChanges(state: EditorState) {
-  return state.field(collabField).unconfirmed.map(u => u.forward)
+/// to the authority. The changes are wrapped in object that also
+/// point at the transaction that created them, which may be useful if
+/// you want to send along metadata like timestamps. (But note that
+/// the change may have been mapped in the meantime, whereas the
+/// transaction is just the original transaction that created the
+/// change.)
+export function sendableChanges(state: EditorState): readonly {change: Change, origin: Transaction}[] {
+  return state.field(collabField).unconfirmed
 }
 
 /// Get the version up to which the collab plugin has synced with the
