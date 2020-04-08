@@ -1,6 +1,6 @@
 /website
-/*/src
+/*/src/*.js
+/*/test
 /node_modules
 /demo
-/.rpt2_cache
 .tern-*
