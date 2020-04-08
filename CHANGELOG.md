@@ -1,3 +1,9 @@
+## 0.5.1 (2020-04-08)
+
+### Bug fixes
+
+Include the TypeScript declaration files in the npm package.
+
 ## 0.5.0 (2020-04-01)
 
 ### Breaking changes
