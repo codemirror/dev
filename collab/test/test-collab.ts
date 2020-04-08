@@ -227,4 +227,21 @@ describe("collab", () => {
     ist(s.states[1].field(counter), 4)
     s.conv("_a_yx_ _b__")
   })
+
+  it("allows you to set your client id", () => {
+    ist(getClientID(EditorState.create({extensions: [collab({clientID: "my id"})]})), "my id")
+  })
+
+  it("client ids survive reconfiguration", () => {
+    let ext = collab()
+    let state = EditorState.create({extensions: [ext]})
+    let state2 = state.t().reconfigure([ext]).apply()
+    ist(getClientID(state), getClientID(state2))
+  })
+
+  it("associates transaction info with local changes", () => {
+    let state = EditorState.create({extensions: [collab()]})
+    let tr = state.t().replace(0, 0, "hi")
+    ist(sendableChanges(tr.apply())[0].origin, tr)
+  })
 })
