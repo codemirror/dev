@@ -253,11 +253,9 @@ function mapEvent(event: HistEvent, newMapping: EventMapping,
   // To map this event's changes, create a mapping that includes this
   // event's forward changes and the new changes from the given
   // mapping.
-  let forward = event.mapped ? event.mapped.mapping.changes.slice(0, event.mapped.local)
-    : event.changes.map(ch => ch.invertedDesc).reverse()
-  let local = new ChangeSet(forward).appendSet(mapping)
+  let local = new ChangeSet(event.changes.map(ch => ch.invertedDesc).reverse()).appendSet(mapping)
 
-  let  newChanges: Change[] = [], mapFrom = forward.length
+  let  newChanges: Change[] = [], mapFrom = event.changes.length
   for (let change of event.changes) {
     let mapped = change.map(local.partialMapping(mapFrom))
     mapFrom--
@@ -280,13 +278,14 @@ function mapEvent(event: HistEvent, newMapping: EventMapping,
       let a = prev.mapping.mirror[i], b = prev.mapping.mirror[i + 1]
       if (a > prev.local && b > prev.local) mirror.push(a, b)
     }
-    for (let i = 0; i < forward.length; i++) {
+
+    for (let i = 0; i < prev.local; i++) {
       let found = local.getMirror(i)
       if (found != null) mirror.push(i, changes.length - (local.length - found))
     }
-    eventMapping = new EventMapping(new ChangeSet(changes, mirror), changes.length - newChanges.length, forward.length)
+    eventMapping = new EventMapping(new ChangeSet(changes, mirror), changes.length - newChanges.length, prev.local)
   } else {
-    eventMapping = new EventMapping(local, local.length - newChanges.length, forward.length)
+    eventMapping = new EventMapping(local, local.length - newChanges.length, event.changes.length)
   }
   return new HistEvent(newChanges, effects, eventMapping, event.startSelection!.map(local), selections)
 }

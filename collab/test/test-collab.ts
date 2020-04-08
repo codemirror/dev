@@ -134,7 +134,7 @@ describe("collab", () => {
     s.conv("abABC")
   })
 
-  it.skip("supports deep undo", () => {
+  it("supports deep undo", () => {
     let s = new DummyServer("hello bye")
     s.update(0, s => s.t().setSelection(5))
     s.update(1, s => s.t().setSelection(9))
@@ -192,7 +192,7 @@ describe("collab", () => {
     s.conv("ae")
   })
 
-  it.skip("can undo simultaneous typing", () => {
+  it("can undo simultaneous typing", () => {
     let s = new DummyServer("A B")
     s.delay(0, () => {
       s.type(0, "1", 1)
