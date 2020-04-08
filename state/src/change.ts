@@ -19,15 +19,18 @@ export enum MapMode {
 export interface Mapping {
   /// Map a given position through a set of changes.
   ///
-  /// `bias` indicates whether, when content is inserted at the
-  /// position or the content around the position is replaced, the
-  /// position at the end (positive) or start (negative or zero) of
-  /// that change should be used. It defaults to `-1`.
+  /// `assoc` indicates which side the position should be associated
+  /// with. When it is negative or zero, the mapping will try to keep
+  /// the position close to the character before it (if any), and will
+  /// move it before insertions at that point or replacements across
+  /// that point. When it is positive, the position is associated with
+  /// the character after it, and will be moved forward for insertions
+  /// at or replacements across the position. Defaults to -1.
   ///
   /// `mode` determines whether deletions should be
   /// [reported](#state.MapMode). It defaults to `MapMode.Simple`
   /// (don't report deletions).
-  mapPos(pos: number, bias?: number, mode?: MapMode): number
+  mapPos(pos: number, assoc?: number, mode?: MapMode): number
 }
 
 /// A change description describes a document change. This is usually
@@ -50,17 +53,20 @@ export class ChangeDesc implements Mapping {
   get invertedDesc() { return new ChangeDesc(this.from, this.from + this.length, this.to - this.from) }
 
   /// @internal
-  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
+  mapPos(pos: number, assoc: number = -1, mode: MapMode = MapMode.Simple): number {
     let {from, to, length} = this
     if (pos < from) return pos
     if (pos > to) return pos + (length - (to - from))
     if (pos == to || pos == from) {
       if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) return -1
-      return (from == to ? bias <= 0 : pos == from) ? from : from + length
+      return (from == to ? assoc <= 0 : pos == from) ? from : from + length
     }
-    pos = from + (bias <= 0 ? 0 : length)
+    pos = from + (assoc <= 0 ? 0 : length)
     return mode != MapMode.Simple ? -1 : pos
   }
+
+  /// @internal
+  toString() { return `${this.from}-${this.to}:${this.length}` }
 
   /// Return a JSON-serializeable object representing this value.
   toJSON(): any { return this }
@@ -190,15 +196,14 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
   static empty: ChangeSet<Change> = new ChangeSet(empty)
 
   /// @internal
-  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
-    return this.mapInner(pos, bias, mode, 0, this.length)
+  mapPos(pos: number, assoc: number = -1, mode: MapMode = MapMode.Simple): number {
+    return this.mapInner(pos, assoc, mode, 0, this.length)
   }
 
   /// @internal
-  mapInner(pos: number, bias: number, mode: MapMode, fromI: number, toI: number): number {
+  mapInner(pos: number, assoc: number, mode: MapMode, fromI: number, toI: number): number {
     let dir = toI < fromI ? -1 : 1
-    let recoverables: {[key: number]: number} | null = null
-    let hasMirrors = this.mirror.length > 0, rec, mirror
+    let hasMirrors = this.mirror.length > 0, mirror
 
     for (let i = fromI - (dir < 0 ? 1 : 0), endI = toI - (dir < 0 ? 1 : 0); i != endI; i += dir) {
       let {from, to, length} = this.changes[i]
@@ -214,26 +219,19 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
         continue
       }
       // Change touches this position
-      if (recoverables && (rec = recoverables[i]) != null) { // There's a recovery for this change, and it applies
-        pos = from + rec
-        continue
-      }
       if (hasMirrors && (mirror = this.getMirror(i)) != null &&
-          (dir > 0 ? mirror > i && mirror < toI : mirror < i && mirror >= toI)) { // A mirror exists
-        if (pos > from && pos < to) { // If this change deletes the position, skip forward to the mirror
-          i = mirror
-          pos = this.changes[i].from + (pos - from)
-          continue
-        }
-        // Else store a recoverable
-        ;(recoverables || (recoverables = {}))[mirror] = pos - from
+          (dir > 0 ? mirror > i && mirror < toI : mirror < i && mirror >= toI) && // A mirror exists
+          (assoc > 0 ? pos < to : pos > from)) {
+        i = mirror
+        pos = this.changes[i].from + (pos - from)
+        continue
       }
       if (pos > from && pos < to) {
         if (mode != MapMode.Simple) return -1
-        pos = bias <= 0 ? from : from + length
+        pos = assoc <= 0 ? from : from + length
       } else {
         if (from < pos && mode == MapMode.TrackBefore || to > pos && mode == MapMode.TrackAfter) return -1
-        pos = (from == to ? bias <= 0 : pos == from) ? from : from + length
+        pos = (from == to ? assoc <= 0 : pos == from) ? from : from + length
       }
     }
     return pos
@@ -316,8 +314,8 @@ export class ChangeSet<C extends ChangeDesc = Change> implements Mapping {
 
 class PartialMapping implements Mapping {
   constructor(readonly changes: ChangeSet<any>, readonly from: number, readonly to: number) {}
-  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
-    return this.changes.mapInner(pos, bias, mode, this.from, this.to)
+  mapPos(pos: number, assoc: number = -1, mode: MapMode = MapMode.Simple): number {
+    return this.changes.mapInner(pos, assoc, mode, this.from, this.to)
   }
 }
 

@@ -89,8 +89,8 @@ class MapRef {
   constructor(readonly tr: Transaction,
               readonly index: number) {}
 
-  mapPos(pos: number, bias: number = -1, mode: MapMode = MapMode.Simple): number {
-    return this.tr.changes.mapInner(pos, bias, mode, this.index, this.tr.changes.length)
+  mapPos(pos: number, assoc: number = -1, mode: MapMode = MapMode.Simple): number {
+    return this.tr.changes.mapInner(pos, assoc, mode, this.index, this.tr.changes.length)
   }
 }
 

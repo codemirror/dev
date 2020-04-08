@@ -50,6 +50,10 @@ describe("Mapping", () => {
     testMapping(mk([2, 2, 4], [2, 2, 1], [3, 7, 0], {0: 2}), [2, 2, {bias: -1}])
   })
 
+  it("keeps positions next to the character their bias points at", () => {
+    testMapping(mk([2, 3, 0], [2, 2, 5], [7, 7, 1], {0: 2}), [3, 8, {bias: -1}], [2, 7, {bias: 1}])
+  })
+
   it("can map through an delete-insert with an insert in between", () => {
     testMapping(mk([2, 6, 0], [1, 1, 1], [3, 3, 4], {0: 2}), [0, 0], [1, 2], [4, 5], [6, 7], [7, 8])
   })
