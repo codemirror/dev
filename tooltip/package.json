@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/tooltip",
+  "types": "src/tooltip.d.ts",
   "type": "module"
 }

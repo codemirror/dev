@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/highlight",
+  "types": "src/highlight.d.ts",
   "type": "module"
 }

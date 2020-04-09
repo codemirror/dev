@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/matchbrackets",
+  "types": "src/matchbrackets.d.ts",
   "type": "module"
 }

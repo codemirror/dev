@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/history",
+  "types": "src/history.d.ts",
   "type": "module"
 }

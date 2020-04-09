@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/commands",
+  "types": "src/commands.d.ts",
   "type": "module"
 }

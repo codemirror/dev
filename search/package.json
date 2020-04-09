@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/search",
+  "types": "src/search.d.ts",
   "type": "module"
 }

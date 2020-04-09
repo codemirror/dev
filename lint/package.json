@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/lint",
+  "types": "src/lint.d.ts",
   "type": "module"
 }

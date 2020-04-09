@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/fold",
+  "types": "src/fold.d.ts",
   "type": "module"
 }
