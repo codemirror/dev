@@ -1,11 +1,11 @@
-import {EditorState, Change, Transaction, StateField, Extension} from "@codemirror/next/state"
+import {EditorState, Transaction, StateField, Extension} from "@codemirror/next/state"
 import {history, undo, redo, isolateHistory} from "@codemirror/next/history"
 import ist from "ist"
-import {collab, receiveChanges, sendableChanges, getClientID, getSyncedVersion} from "@codemirror/next/collab"
+import {collab, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
 
 class DummyServer {
   states: EditorState[] = []
-  changes: Change[] = []
+  updates: Update[] = []
   clientIDs: string[] = []
   delayed: number[] = []
 
@@ -16,20 +16,20 @@ class DummyServer {
 
   sync(n: number) {
     let state = this.states[n], version = getSyncedVersion(state)
-    if (version != this.changes.length) {
+    if (version != this.updates.length) {
       let count = 0
       for (let i = version; i < this.clientIDs.length; i++) {
         if (this.clientIDs[i] == getClientID(this.states[n])) count++
         else break
       }
-      this.states[n] = receiveChanges(state, this.changes.slice(version), count).apply()
+      this.states[n] = receiveUpdates(state, this.updates.slice(version), count).apply()
     }
   }
 
   send(n: number) {
-    let state = this.states[n], sendable = sendableChanges(state)
+    let state = this.states[n], sendable = sendableUpdates(state)
     if (sendable.length) {
-      this.changes = this.changes.concat(sendable.map(s => s.change))
+      this.updates = this.updates.concat(sendable)
       for (let i = 0; i < sendable.length; i++) this.clientIDs.push(getClientID(state))
     }
   }
@@ -248,6 +248,6 @@ describe("collab", () => {
   it("associates transaction info with local changes", () => {
     let state = EditorState.create({extensions: [collab()]})
     let tr = state.t().replace(0, 0, "hi")
-    ist(sendableChanges(tr.apply())[0].origin, tr)
+    ist(sendableUpdates(tr.apply())[0].origin, tr)
   })
 })
