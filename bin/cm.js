@@ -9,6 +9,7 @@ class Pkg {
     this.name = name
     this.dir = path.join(root, name)
     this.json = require(path.join(this.dir, "package.json"))
+    this.main = path.join(this.dir, this.json.types.replace(/\.d\.ts$/, ".ts"))
   }
 }
 
@@ -75,7 +76,7 @@ async function runRollup(configs) {
 
 function rollupConfig(pkg) {
   return {
-    input: path.join(pkg.dir, pkg.json.types + ".js"),
+    input: pkg.main.replace(/\.ts$/, ".js"),
     external,
     output: {
       format: "esm",
@@ -112,6 +113,18 @@ function startServer() {
 
 const watchConfig = {clearScreen: false}
 
+function customResolve(host, ts) {
+  host.resolveModuleNames = (moduleNames, containingFile, reusedNames, redirectedReference, options) => {
+    return moduleNames.map(m => {
+      let ours = /^@codemirror\/next\/(.*)/.exec(m)
+      if (!ours) return ts.resolveModuleName(m, containingFile, options, host).resolvedModule
+      let pkg = packageNames[ours[1]]
+      return {resolvedFileName: pkg.main}
+    })
+  }
+  return host
+}
+
 function tsWatch() {
   const ts = require("typescript")
   const formatHost = {
@@ -119,14 +132,14 @@ function tsWatch() {
     getCurrentDirectory: ts.sys.getCurrentDirectory,
     getNewLine: () => "\n"
   }
-  ts.createWatchProgram(ts.createWatchCompilerHost(
+  ts.createWatchProgram(customResolve(ts.createWatchCompilerHost(
     path.join(root, "tsconfig.json"),
     {},
     ts.sys,
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
     diag => console.error(ts.formatDiagnostic(diag, formatHost)),
     diag => console.info(ts.flattenDiagnosticMessageText(diag.messageText, "\n"))
-  ))
+  ), ts))
 }
 
 function tsBuild() {
@@ -137,7 +150,7 @@ function tsBuild() {
     getNewLine: () => "\n"
   }
   let conf = ts.getParsedCommandLineOfConfigFile(path.join(root, "tsconfig.json"), {}, ts.sys)
-  let program = ts.createProgram(conf.fileNames, conf.options)
+  let program = ts.createProgram(conf.fileNames, conf.options, customResolve(ts.createCompilerHost(conf.options), ts))
   let emitResult = program.emit()
 
   for (let diag of ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics))

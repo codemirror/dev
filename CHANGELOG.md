@@ -1,3 +1,9 @@
+## 0.5.2 (2020-04-09)
+
+### Bug fixes
+
+Fix an issue where external TypeScript builds would try to recompile the library code.
+
 ## 0.5.1 (2020-04-08)
 
 ### Bug fixes
