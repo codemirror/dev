@@ -1,5 +1,8 @@
 /website
 /*/src/*.js
+/*/src/*.ts
+/*/src/*.map
+/*/src/README.md
 /*/test
 /node_modules
 /demo
