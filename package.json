@@ -55,9 +55,9 @@
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
     "lezer": "^0.8.3",
-    "lezer-css": "^0.8.2",
-    "lezer-html": "^0.8.3",
-    "lezer-javascript": "^0.8.2",
+    "lezer-css": "^0.8.3",
+    "lezer-html": "^0.8.4",
+    "lezer-javascript": "^0.8.3",
     "lezer-tree": "^0.8.4",
     "style-mod": "^2.2.2",
     "w3c-keyname": "^2.2.4"
