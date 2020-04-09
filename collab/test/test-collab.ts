@@ -1,7 +1,7 @@
-import {EditorState, Transaction, StateField, Extension} from "@codemirror/next/state"
+import {EditorState, Transaction, StateField, StateEffect, Extension, Mapping} from "@codemirror/next/state"
 import {history, undo, redo, isolateHistory} from "@codemirror/next/history"
 import ist from "ist"
-import {collab, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
+import {collab, CollabConfig, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
 
 class DummyServer {
   states: EditorState[] = []
@@ -9,9 +9,10 @@ class DummyServer {
   clientIDs: string[] = []
   delayed: number[] = []
 
-  constructor(doc: string = "", n = 2, extensions: Extension[] = []) {
+  constructor(doc: string = "", config: {n?: number, extensions?: Extension[], collabConf?: CollabConfig} = {}) {
+    let {n = 2, extensions = [], collabConf = {}} = config
     for (let i = 0; i < n; i++)
-      this.states.push(EditorState.create({doc, extensions: [history(), collab(), ...extensions]}))
+      this.states.push(EditorState.create({doc, extensions: [history(), collab(collabConf), ...extensions]}))
   }
 
   sync(n: number) {
@@ -93,7 +94,7 @@ describe("collab", () => {
   })
 
   it("converges with three peers", () => {
-    let s = new DummyServer(undefined, 3)
+    let s = new DummyServer(undefined, {n: 3})
     s.type(0, "A")
     s.type(1, "U")
     s.type(2, "X")
@@ -104,7 +105,7 @@ describe("collab", () => {
   })
 
   it("converges with three peers with multiple steps", () => {
-    let s = new DummyServer(undefined, 3)
+    let s = new DummyServer(undefined, {n: 3})
     s.type(0, "A")
     s.delay(1, () => {
       s.type(1, "U")
@@ -218,7 +219,7 @@ describe("collab", () => {
       create() { return 0 },
       update(val, tr) { return val + tr.changes.length }
     })
-    let s = new DummyServer("___ ___", 2, [counter])
+    let s = new DummyServer("___ ___", {extensions: [counter]})
     s.delay(0, () => {
       s.type(0, "a", 1)
       s.type(1, "b", 5)
@@ -249,5 +250,47 @@ describe("collab", () => {
     let state = EditorState.create({extensions: [collab()]})
     let tr = state.t().replace(0, 0, "hi")
     ist(sendableUpdates(tr.apply())[0].origin, tr)
+  })
+
+  it("supports shared effects", () => {
+    class Mark {
+      constructor(readonly from: number,
+                  readonly to: number,
+                  readonly id: string) {}
+
+      map(mapping: Mapping) {
+        let from = mapping.mapPos(this.from, 1), to = mapping.mapPos(this.to, -1)
+        return from >= to ? undefined : new Mark(from, to, this.id)
+      }
+
+      toString() { return `${this.from}-${this.to}=${this.id}` }
+    }
+    let addMark = StateEffect.define<Mark>({map: (v, m) => v.map(m)})
+    let marks = StateField.define<Mark[]>({
+      create: () => [],
+      update(value, tr) {
+        value = value.map(m => m.map(tr.changes)).filter(x => x) as any
+        for (let effect of tr.effects) if (effect.is(addMark)) value = value.concat(effect.value)
+        return value.sort((a, b) => a.id < b.id ? -1 : 1)
+      }
+    })
+
+    let s = new DummyServer("hello", {
+      extensions: [marks],
+      collabConf: {sharedEffects(tr) { return tr.effects.filter(e => e.is(addMark)) }}
+    })
+    s.delay(0, () => {
+      s.delay(1, () => {
+        s.update(0, s => s.t().effect(addMark.of(new Mark(1, 3, "a"))))
+        s.update(1, s => s.t().effect(addMark.of(new Mark(3, 5, "b"))))
+        s.type(0, "A", 4)
+        s.type(1, "B", 0)
+        ist(s.states[0].field(marks).join(), "1-3=a")
+        ist(s.states[1].field(marks).join(), "4-6=b")
+      })
+    })
+    s.conv("BhellAo")
+    ist(s.states[0].field(marks).join(), "2-4=a,4-7=b")
+    ist(s.states[1].field(marks).join(), "2-4=a,4-7=b")
   })
 })
