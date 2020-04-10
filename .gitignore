@@ -3,7 +3,6 @@ package-lock.json
 /demo/demo.js*
 /demo/demo.d.ts*
 /demo/test/test.js*
-/.rpt2_cache
 /website
 /*/dist
 /*/src/*.js

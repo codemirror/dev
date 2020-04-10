@@ -1,11 +1,13 @@
 import {EditorState, Transaction, Change, MapMode} from "@codemirror/next/state"
-import {rebaseChanges} from "@codemirror/next/collab"
+import {collab} from "@codemirror/next/collab"
 import ist from "ist"
 
+let rebaseUpdates = (collab as any).rebase
+
 function changePairs(tr: Transaction) {
-  let pairs: {forward: Change, backward: Change}[] = []
+  let pairs: {change: Change, inverted: Change, origin: any}[] = []
   for (let inv = tr.invertedChanges(), i = 0, j = inv.length - 1; j >= 0; i++, j--)
-    pairs.push({forward: tr.changes.changes[i], backward: inv.changes[j]})
+    pairs.push({change: tr.changes.changes[i], inverted: inv.changes[j], origin: null})
   return pairs
 }
 
@@ -28,7 +30,7 @@ function runRebase(tags: {[name: string]: number}, transactions: Transaction[], 
   for (let tr of transactions) {
     let rebased = tr.startState.t()
     let start = tr.changes.length + full.changes.length
-    rebaseChanges(changePairs(tr), full.changes.changes, rebased)
+    rebaseUpdates(changePairs(tr), full.changes.changes.map(change => ({change})), rebased)
     for (let i = start; i < rebased.changes.length; i++) full.change(rebased.changes.changes[i])
   }
 

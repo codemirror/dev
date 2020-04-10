@@ -1,29 +1,36 @@
-import {EditorState, Change, Transaction} from "@codemirror/next/state"
+import {EditorState, Transaction, StateField, StateEffect, Extension, Mapping} from "@codemirror/next/state"
 import {history, undo, redo, isolateHistory} from "@codemirror/next/history"
 import ist from "ist"
-import {collab, receiveChanges, sendableChanges, getClientID, getSyncedVersion} from "@codemirror/next/collab"
+import {collab, CollabConfig, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
 
 class DummyServer {
   states: EditorState[] = []
-  changes: Change[] = []
+  updates: Update[] = []
   clientIDs: string[] = []
   delayed: number[] = []
 
-  constructor(doc: string = "", n = 2) {
+  constructor(doc: string = "", config: {n?: number, extensions?: Extension[], collabConf?: CollabConfig} = {}) {
+    let {n = 2, extensions = [], collabConf = {}} = config
     for (let i = 0; i < n; i++)
-      this.states.push(EditorState.create({doc, extensions: [history(), collab()]}))
+      this.states.push(EditorState.create({doc, extensions: [history(), collab(collabConf), ...extensions]}))
   }
 
   sync(n: number) {
     let state = this.states[n], version = getSyncedVersion(state)
-    if (version != this.changes.length)
-      this.states[n] = receiveChanges(state, this.changes.slice(version), this.clientIDs.slice(version)).apply()
+    if (version != this.updates.length) {
+      let count = 0
+      for (let i = version; i < this.clientIDs.length; i++) {
+        if (this.clientIDs[i] == getClientID(this.states[n])) count++
+        else break
+      }
+      this.states[n] = receiveUpdates(state, this.updates.slice(version), count).apply()
+    }
   }
 
   send(n: number) {
-    let state = this.states[n], sendable = sendableChanges(state)
+    let state = this.states[n], sendable = sendableUpdates(state)
     if (sendable.length) {
-      this.changes = this.changes.concat(sendable)
+      this.updates = this.updates.concat(sendable)
       for (let i = 0; i < sendable.length; i++) this.clientIDs.push(getClientID(state))
     }
   }
@@ -87,7 +94,7 @@ describe("collab", () => {
   })
 
   it("converges with three peers", () => {
-    let s = new DummyServer(undefined, 3)
+    let s = new DummyServer(undefined, {n: 3})
     s.type(0, "A")
     s.type(1, "U")
     s.type(2, "X")
@@ -98,7 +105,7 @@ describe("collab", () => {
   })
 
   it("converges with three peers with multiple steps", () => {
-    let s = new DummyServer(undefined, 3)
+    let s = new DummyServer(undefined, {n: 3})
     s.type(0, "A")
     s.delay(1, () => {
       s.type(1, "U")
@@ -134,7 +141,7 @@ describe("collab", () => {
     s.conv("abABC")
   })
 
-  it.skip("supports deep undo", () => {
+  it("supports deep undo", () => {
     let s = new DummyServer("hello bye")
     s.update(0, s => s.t().setSelection(5))
     s.update(1, s => s.t().setSelection(9))
@@ -205,5 +212,85 @@ describe("collab", () => {
     s.conv("A Bxy")
     s.undo(1)
     s.conv("A B")
+  })
+
+  it("includes rebased changes when necessary", () => {
+    let counter = StateField.define<number>({
+      create() { return 0 },
+      update(val, tr) { return val + tr.changes.length }
+    })
+    let s = new DummyServer("___ ___", {extensions: [counter]})
+    s.delay(0, () => {
+      s.type(0, "a", 1)
+      s.type(1, "b", 5)
+    })
+    ist(s.states[0].field(counter), 2)
+    ist(s.states[1].field(counter), 2)
+    s.delay(0, () => {
+      s.type(0, "x", 3)
+      s.type(1, "y", 3)
+    })
+    ist(s.states[0].field(counter), 6)
+    ist(s.states[1].field(counter), 4)
+    s.conv("_a_yx_ _b__")
+  })
+
+  it("allows you to set your client id", () => {
+    ist(getClientID(EditorState.create({extensions: [collab({clientID: "my id"})]})), "my id")
+  })
+
+  it("client ids survive reconfiguration", () => {
+    let ext = collab()
+    let state = EditorState.create({extensions: [ext]})
+    let state2 = state.t().reconfigure([ext]).apply()
+    ist(getClientID(state), getClientID(state2))
+  })
+
+  it("associates transaction info with local changes", () => {
+    let state = EditorState.create({extensions: [collab()]})
+    let tr = state.t().replace(0, 0, "hi")
+    ist(sendableUpdates(tr.apply())[0].origin, tr)
+  })
+
+  it("supports shared effects", () => {
+    class Mark {
+      constructor(readonly from: number,
+                  readonly to: number,
+                  readonly id: string) {}
+
+      map(mapping: Mapping) {
+        let from = mapping.mapPos(this.from, 1), to = mapping.mapPos(this.to, -1)
+        return from >= to ? undefined : new Mark(from, to, this.id)
+      }
+
+      toString() { return `${this.from}-${this.to}=${this.id}` }
+    }
+    let addMark = StateEffect.define<Mark>({map: (v, m) => v.map(m)})
+    let marks = StateField.define<Mark[]>({
+      create: () => [],
+      update(value, tr) {
+        value = value.map(m => m.map(tr.changes)).filter(x => x) as any
+        for (let effect of tr.effects) if (effect.is(addMark)) value = value.concat(effect.value)
+        return value.sort((a, b) => a.id < b.id ? -1 : 1)
+      }
+    })
+
+    let s = new DummyServer("hello", {
+      extensions: [marks],
+      collabConf: {sharedEffects(tr) { return tr.effects.filter(e => e.is(addMark)) }}
+    })
+    s.delay(0, () => {
+      s.delay(1, () => {
+        s.update(0, s => s.t().effect(addMark.of(new Mark(1, 3, "a"))))
+        s.update(1, s => s.t().effect(addMark.of(new Mark(3, 5, "b"))))
+        s.type(0, "A", 4)
+        s.type(1, "B", 0)
+        ist(s.states[0].field(marks).join(), "1-3=a")
+        ist(s.states[1].field(marks).join(), "4-6=b")
+      })
+    })
+    s.conv("BhellAo")
+    ist(s.states[0].field(marks).join(), "2-4=a,4-7=b")
+    ist(s.states[1].field(marks).join(), "2-4=a,4-7=b")
   })
 })
