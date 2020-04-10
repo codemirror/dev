@@ -1,7 +1,7 @@
 import ist from "ist"
 import {SelectionRange, EditorState, EditorSelection, Transaction } from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, toggleBlockComment } from "@codemirror/next/comment"
+import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter} from "@codemirror/next/comment"
 
 describe("comment", () => {
   it("get lines across range", () => {
@@ -186,23 +186,50 @@ describe("comment", () => {
   /// Runs all tests for the given block-comment tokens.
   function runBlockCommentTests(o: string, c: string) {
 
-    const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle, {open: o, close: c}))
+    const cc = new BlockCommenter(o, c)
 
-    it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
-      check(
-        `\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`,
-        `\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`,
-        ).tie(0)
+    it.skip(`detects a range is surrounded by block comments`, () => {
+      const check = (state: string) => {
+        let st = s(state)
+        ist(cc.isRangeCommented(st, st.selection.primary))
+      }
+
+        check(`\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`)
+        check(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`)
+        check(`\n  lin$  {o}   |e 1\n  line 2\n  line 3\n  line |    ${c} 4\n  line 5\n`)
     })
+
+    it.skip(`test for surrounding block comments`, () => {
+      let st = s(`\n  lin${o}|e 1\n  line 2\n  l|${c}ine 3\n  line ${o}|4\n  li|${c}ne 5\n`)
+      let res = cc.isSelectionCommented(st)
+      ist(res)
+    })
+
+    it.skip(`inserts/removes surrounding block comment`, () => {
+      const st = s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`)
+
+      const st0 = cc.insert(st.t(), st.selection.primary).apply()
+      same(st0, s(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`))
+    })
+
+
+    // const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle, {open: o, close: c}))
+
+    // it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
+    //   check(
+    //     `\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`,
+    //     `\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`,
+    //     ).tie(0)
+    // })
 
   }
 
   runLineCommentTests("//")
 
-  runLineCommentTests("#")
+  // runLineCommentTests("#")
 
   runBlockCommentTests("/*", "*/")
 
-  runBlockCommentTests("<!--", "-->")
+  // runBlockCommentTests("<!--", "-->")
 
 })
