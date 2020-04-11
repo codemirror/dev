@@ -199,28 +199,27 @@ describe("comment", () => {
 
     const cc = new BlockCommenter(o, c)
 
-    it.skip(`detects a range is surrounded by block comments`, () => {
+    it(`detects a range is surrounded by block comments`, () => {
       const check = (state: string) => {
         let st = s(state)
         ist(cc.isRangeCommented(st, st.selection.primary))
       }
 
         check(`\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`)
-        check(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`)
-        check(`\n  lin$  {o}   |e 1\n  line 2\n  line 3\n  line |    ${c} 4\n  line 5\n`)
+        check(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line |  ${c}4\n  line 5\n`)
+        check(`\n  lin${o}     |e 1\n  line 2\n  line 3\n  line |    ${c} 4\n  line 5\n`)
     })
 
-    it.skip(`test for surrounding block comments`, () => {
+    it(`test for surrounding block comments`, () => {
       let st = s(`\n  lin${o}|e 1\n  line 2\n  l|${c}ine 3\n  line ${o}|4\n  li|${c}ne 5\n`)
       let res = cc.isSelectionCommented(st)
       ist(res)
     })
 
-    it.skip(`inserts/removes surrounding block comment`, () => {
-      const st = s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`)
-
-      const st0 = cc.insert(st.t(), st.selection.primary).apply()
-      same(st0, s(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`))
+    it.skip(`inserts surrounding block comment`, () => {
+      const st0 = s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`)
+      const st1 = cc.insert(st0.t(), st0.selection.primary).apply()
+      same(st1, s(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`))
     })
 
 
@@ -255,9 +254,8 @@ describe("comment", () => {
 
   })
 
-
   runBlockCommentTests("/*", "*/")
 
-  // runBlockCommentTests("<!--", "-->")
+  runBlockCommentTests("<!--", "-->")
 
 })
