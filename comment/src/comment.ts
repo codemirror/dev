@@ -1,6 +1,6 @@
 import {Text, Line} from "@codemirror/next/text"
 import {EditorView, Command} from "@codemirror/next/view"
-import { EditorState, Transaction, SelectionRange } from "@codemirror/next/state"
+import { EditorState, Transaction, SelectionRange, Change } from "@codemirror/next/state"
 
 export const toggleCommentCmd: Command = view => {
   return dispatchToggleComment(CommentOption.Toggle, view)
@@ -75,9 +75,13 @@ export class BlockCommenter {
 
     ///
     insert(tr: Transaction, range: SelectionRange, margin: string = " "): Transaction {
-        tr.replace(range.from, range.from, this.open + margin)
-        tr.replace(range.to, range.to, margin + this.close)
-        return tr
+      const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
+      const cclose = new Change(range.to, range.to, tr.startState.splitLines(margin + this.close))
+      tr.change([copen, cclose])
+      return tr
+
+        // tr.replace(range.from, range.from, this.open + margin)
+        // tr.replace(range.to, range.to, margin + this.close)
     }
 }
 
