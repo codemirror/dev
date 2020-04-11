@@ -3,6 +3,7 @@ import { SelectionRange, EditorState, EditorSelection, Transaction, languageData
 import {Text} from "@codemirror/next/text"
 import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter} from "@codemirror/next/comment"
 import { StreamSyntax } from "@codemirror/next/stream-syntax"
+import { html } from "@codemirror/next/lang-html"
 
 describe("comment", () => {
 
@@ -237,6 +238,23 @@ describe("comment", () => {
   runLineCommentTests("//")
 
   runLineCommentTests("#")
+
+  it(`toggle line comment in multi-language doc`, () => {
+    const s0 = s(`<script>
+  // This is a |line comment
+  console.log("Hello");
+</script>
+<!-- HTML only provides block comments -->`, [html()])
+
+    const s1 = toggleLineComment(CommentOption.Toggle)(s0)!.apply()
+    same(s1, s(`<script>
+  This is a |line comment
+  console.log("Hello");
+</script>
+<!-- HTML only provides block comments -->`))
+
+  })
+
 
   runBlockCommentTests("/*", "*/")
 
