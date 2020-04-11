@@ -1,9 +1,11 @@
 import ist from "ist"
-import {SelectionRange, EditorState, EditorSelection, Transaction } from "@codemirror/next/state"
+import { SelectionRange, EditorState, EditorSelection, Transaction, languageData, Extension } from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
 import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter} from "@codemirror/next/comment"
+import { StreamSyntax } from "@codemirror/next/stream-syntax"
 
 describe("comment", () => {
+
   it("get lines across range", () => {
     //                 0          1          2           3
     //                 0123456 7890123 4567890 1234567 8901234 5
@@ -31,7 +33,7 @@ describe("comment", () => {
   /// ```typescript
   /// s("line 1\nlin|e 2\nline 3")
   /// ```
-  function s(doc: string): EditorState {
+  function s(doc: string, extensions: Extension[] = []): EditorState {
     const markers = []
     let pos = doc.indexOf("|", 0)
     while (pos >= 0) {
@@ -59,7 +61,7 @@ describe("comment", () => {
     return EditorState.create({
       doc,
       selection: EditorSelection.create(ranges),
-      extensions: EditorState.allowMultipleSelections.of(true),
+      extensions: [EditorState.allowMultipleSelections.of(true)].concat(extensions),
       })
   }
 
@@ -69,21 +71,21 @@ describe("comment", () => {
     ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
   }
 
-  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null) => (...docs: string[]) => {
-    let st = s(docs[0])
+  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null, syntax: StreamSyntax) => (...docs: string[]) => {
+    let st = s(docs[0], [syntax.extension])
     for (let i = 1; i < docs.length; i++) {
-      st = toggle(st)!.apply()
+      st = toggle(st)?.apply() ?? st
       same(st, s(docs[i]))
     }
     return {
       tie: (index: number) => {
-        st = toggle(st)!.apply()
+        st = toggle(st)?.apply() ?? st
         same(st, s(docs[index]))
       }
     }
   }
 
-  /// Runs all tests for the given line-comment token, `k`.
+  // Runs all tests for the given line-comment token, `k`.
   function runLineCommentTests(k: string) {
 
     it(`inserts/removes '${k}' line comment in a single line`, () => {
@@ -96,7 +98,15 @@ describe("comment", () => {
       same(st3, st1)
     })
 
-    const check = checkToggleChain(toggleLineComment(CommentOption.Toggle, k))
+    const syntax = new StreamSyntax({
+      docProps: [[languageData, {commentTokens: {lineComment: k}}]],
+      token(stream) {
+          stream.next()
+          return ""
+        }
+    })
+
+    const check = checkToggleChain(toggleLineComment(CommentOption.Toggle), syntax)
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
       check(
@@ -226,7 +236,7 @@ describe("comment", () => {
 
   runLineCommentTests("//")
 
-  // runLineCommentTests("#")
+  runLineCommentTests("#")
 
   runBlockCommentTests("/*", "*/")
 

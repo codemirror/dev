@@ -3,13 +3,6 @@ import {EditorView, Command} from "@codemirror/next/view"
 import { EditorState, Transaction, SelectionRange } from "@codemirror/next/state"
 
 export const toggleCommentCmd: Command = view => {
-  // console.log("view.state", state)
-  // // console.log("view.state.facet(addLanguageData)", state.facet(addLanguageData))
-  // console.log("view.state.tree", state.tree)
-  // let node = state.tree.resolveAt(pos)
-  // console.log("resolveAt(pos)", node.name)
-  // let syntax = state.facet(EditorState.syntax)
-  // console.log(syntax)
   return dispatchToggleComment(CommentOption.Toggle, view)
 }
 
@@ -29,13 +22,11 @@ export enum CommentOption {
 }
 
 const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean => {
-  let tr = toggleLineComment(option, "//")(view.state)
+  let tr = toggleLineComment(option)(view.state)
   if (!tr) return false
   view.dispatch(tr)
   return true
 }
-
-type LineCommentToken = string
 
 export class BlockCommenter {
     open: string
@@ -91,7 +82,11 @@ export class BlockCommenter {
 }
 
 /// TODO: Add docs
-export const toggleLineComment = (option: CommentOption, lineCommentToken: LineCommentToken) => (state: EditorState): Transaction | null => {
+export const toggleLineComment = (option: CommentOption) => (state: EditorState): Transaction | null => {
+  const commentTokens = state.languageDataAt<{lineComment: string | undefined} | undefined>("commentTokens", state.selection.primary.from)[0]
+  if (commentTokens === undefined || commentTokens.lineComment === undefined) return null
+  const lineCommentToken = commentTokens.lineComment
+
   const k = (range: SelectionRange): string => range.anchor + "," + range.head
   const linesAcrossSelection: Line[] = []
   const linesAcrossRange : { [id: string] : Line[]; } = {};

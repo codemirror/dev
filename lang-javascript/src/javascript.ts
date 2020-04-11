@@ -11,7 +11,10 @@ const statementIndent = continuedIndent({except: /^{/})
 /// highlighting and indentation information.
 export const javascriptSyntax = new LezerSyntax(parser.withProps(
   languageData.add({
-    Script: {closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}}
+    Script: {
+      closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
+      commentTokens: {lineComment: "//", blockComment: {open: "/*", close: "*/"}},
+    }
   }),
   indentNodeProp.add(type => {
     if (type.name == "IfStatement") return continuedIndent({except: /^({|else\b)/})
