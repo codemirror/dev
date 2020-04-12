@@ -74,14 +74,16 @@ export class BlockCommenter {
     }
 
     ///
-    insert(tr: Transaction, range: SelectionRange, margin: string = " "): Transaction {
-      const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
-      const cclose = new Change(range.to, range.to, tr.startState.splitLines(margin + this.close))
-      tr.change([copen, cclose])
-      return tr
+    insert(tr: Transaction, margin: string = " "): Transaction {
+      tr.forEachRange((range: SelectionRange, tr: Transaction) => {
+        const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
+        const cclose = new Change(range.to, range.to, tr.startState.splitLines(margin + this.close))
+        tr.change([copen, cclose])
+        const shift = (this.open + margin).length
+        return new SelectionRange(range.anchor + shift, range.head + shift)
+      })
 
-        // tr.replace(range.from, range.from, this.open + margin)
-        // tr.replace(range.to, range.to, margin + this.close)
+      return tr
     }
 }
 
