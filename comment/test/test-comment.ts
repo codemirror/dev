@@ -216,12 +216,17 @@ describe("comment", () => {
       ist(res)
     })
 
-    it.skip(`inserts surrounding block comment`, () => {
+    it(`inserts surrounding block comment ${o} ${c} in a single range selection`, () => {
       const st0 = s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`)
-      const st1 = cc.insert(st0.t(), st0.selection.primary).apply()
+      const st1 = cc.insert(st0.t()).apply()
       same(st1, s(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`))
     })
 
+    it(`inserts surrounding block comment ${o} ${c} in a multi-range selection`, () => {
+      const st0 = s(`\n  lin|e 1\n  l|ine 2\n  line 3\n  |line 4\n  line 5|\n`)
+      const st1 = cc.insert(st0.t()).apply()
+      same(st1, s(`\n  lin${o} |e 1\n  l| ${c}ine 2\n  line 3\n  ${o} |line 4\n  line 5| ${c}\n`))
+    })
 
     // const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle, {open: o, close: c}))
 
@@ -237,6 +242,10 @@ describe("comment", () => {
   runLineCommentTests("//")
 
   runLineCommentTests("#")
+
+  runBlockCommentTests("/*", "*/")
+
+  runBlockCommentTests("<!--", "-->")
 
   it(`toggle line comment in multi-language doc`, () => {
     const s0 = s(`<script>
@@ -254,8 +263,6 @@ describe("comment", () => {
 
   })
 
-  runBlockCommentTests("/*", "*/")
 
-  runBlockCommentTests("<!--", "-->")
 
 })
