@@ -1,5 +1,5 @@
-import {Text, Line} from "@codemirror/next/text"
-import {EditorView, Command} from "@codemirror/next/view"
+import { Text, Line } from "@codemirror/next/text"
+import { EditorView, Command } from "@codemirror/next/view"
 import { EditorState, Transaction, SelectionRange, Change } from "@codemirror/next/state"
 
 export const toggleCommentCmd: Command = view => {
@@ -33,78 +33,78 @@ const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean
 /// The `open` and `close` arguments refer to the open and close
 /// tokens of which this `BlockCommenter` is made up.
 export class BlockCommenter {
-    open: string
-    close: string
-    constructor(open: string, close: string) {
-        this.open = open
-        this.close = close
-    }
+  open: string
+  close: string
+  constructor(open: string, close: string) {
+    this.open = open
+    this.close = close
+  }
 
-    toggle(option: CommentOption, state: EditorState): Transaction | null {
-      // for (const range of state.selection.ranges) {
-      //   const lines = getLinesInRange(state.doc, range)
-      //   linesAcrossSelection.push(...lines)
-      //   linesAcrossRange[k(range)] = lines
-      // }
-        // tr.replace(range.from, range.from, this.open + margin)
-        // tr.replace(range.to, range.to, margin + this.close)
-        // return tr
-      return null
-    }
+  toggle(option: CommentOption, state: EditorState): Transaction | null {
+    // for (const range of state.selection.ranges) {
+    //   const lines = getLinesInRange(state.doc, range)
+    //   linesAcrossSelection.push(...lines)
+    //   linesAcrossRange[k(range)] = lines
+    // }
+    // tr.replace(range.from, range.from, this.open + margin)
+    // tr.replace(range.to, range.to, margin + this.close)
+    // return tr
+    return null
+  }
 
-    /// Determines whether all selection ranges in `state` are block-commented.
-    isSelectionCommented(state: EditorState): {openPos: number, closePos: number}[] | null {
-        let result = []
-        for (const range of state.selection.ranges) {
-        const x = this.isRangeCommented(state, range)
-          if (x === null) return null
-            result.push(x)
-        }
-        return result
+  /// Determines whether all selection ranges in `state` are block-commented.
+  isSelectionCommented(state: EditorState): { openPos: number, closePos: number }[] | null {
+    let result = []
+    for (const range of state.selection.ranges) {
+      const x = this.isRangeCommented(state, range)
+      if (x === null) return null
+      result.push(x)
     }
+    return result
+  }
 
-    /// Determines if the `range` is block-commented in the given `state`.
-    /// The `range` must be a valid range in `state`.
-    isRangeCommented(state: EditorState, range: SelectionRange): {openPos: number, closePos: number} | null {
-        type SearchWithType = (this: string, searchString: string, pos?: number) => boolean
-        const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): number | null => {
-            const line = state.doc.lineAt(pos)
-            const str = line.content as string
-          const ss = eatSpace(str, pos - line.start - i, d)
-          return searchWith.call(str, searchString, pos + d*ss - line.start)
-          ? pos + d*ss
-          : null
-        }
-        const startsWithOpen = search(range.from, this.open, String.prototype.endsWith, -1, 1)
-        const endsWithClose = search(range.to, this.close, String.prototype.startsWith, 1, 0)
-        return startsWithOpen !== null && endsWithClose !== null
-        ? {openPos: startsWithOpen , closePos: endsWithClose }
+  /// Determines if the `range` is block-commented in the given `state`.
+  /// The `range` must be a valid range in `state`.
+  isRangeCommented(state: EditorState, range: SelectionRange): { openPos: number, closePos: number } | null {
+    type SearchWithType = (this: string, searchString: string, pos?: number) => boolean
+    const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): number | null => {
+      const line = state.doc.lineAt(pos)
+      const str = line.content as string
+      const ss = eatSpace(str, pos - line.start - i, d)
+      return searchWith.call(str, searchString, pos + d * ss - line.start)
+        ? pos + d * ss
         : null
     }
+    const startsWithOpen = search(range.from, this.open, String.prototype.endsWith, -1, 1)
+    const endsWithClose = search(range.to, this.close, String.prototype.startsWith, 1, 0)
+    return startsWithOpen !== null && endsWithClose !== null
+      ? { openPos: startsWithOpen, closePos: endsWithClose }
+      : null
+  }
 
-    /// Inserts a block comment in the given transaction `tr`.
-    insert(tr: Transaction, margin: string = " "): Transaction {
-      tr.forEachRange((range: SelectionRange, tr: Transaction) => {
-        const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
-        const cclose = new Change(range.to, range.to, tr.startState.splitLines(margin + this.close))
-        tr.change([copen, cclose])
-        const shift = (this.open + margin).length
-        return new SelectionRange(range.anchor + shift, range.head + shift)
-      })
+  /// Inserts a block comment in the given transaction `tr`.
+  insert(tr: Transaction, margin: string = " "): Transaction {
+    tr.forEachRange((range: SelectionRange, tr: Transaction) => {
+      const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
+      const cclose = new Change(range.to, range.to, tr.startState.splitLines(margin + this.close))
+      tr.change([copen, cclose])
+      const shift = (this.open + margin).length
+      return new SelectionRange(range.anchor + shift, range.head + shift)
+    })
 
-      return tr
-    }
+    return tr
+  }
 }
 
 /// TODO: Add docs
 export const toggleLineComment = (option: CommentOption) => (state: EditorState): Transaction | null => {
-  const commentTokens = state.languageDataAt<{lineComment: string | undefined} | undefined>("commentTokens", state.selection.primary.from)[0]
+  const commentTokens = state.languageDataAt<{ lineComment: string | undefined } | undefined>("commentTokens", state.selection.primary.from)[0]
   if (commentTokens === undefined || commentTokens.lineComment === undefined) return null
   const lineCommentToken = commentTokens.lineComment
 
   const k = (range: SelectionRange): string => range.anchor + "," + range.head
   const linesAcrossSelection: Line[] = []
-  const linesAcrossRange : { [id: string] : Line[]; } = {};
+  const linesAcrossRange: { [id: string]: Line[]; } = {};
   for (const range of state.selection.ranges) {
     const lines = getLinesInRange(state.doc, range)
     linesAcrossSelection.push(...lines)
@@ -146,7 +146,7 @@ export const toggleLineComment = (option: CommentOption) => (state: EditorState)
 }
 
 /// TODO: Add docs
-const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): {minCol:number} & {isRangeLineSkipped:boolean} & {isLineSkipped: { [id: number]: boolean } } => {
+const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): { minCol: number } & { isRangeLineSkipped: boolean } & { isLineSkipped: { [id: number]: boolean } } => {
   let minCol = Infinity
   let isRangeLineDiscarded = true
   const isLineSkipped: { [id: number]: boolean } = []
@@ -161,7 +161,7 @@ const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, 
     }
     isLineSkipped[line.number] = col == str.length
   }
-  return {minCol: minCol, isRangeLineSkipped: isRangeLineDiscarded, isLineSkipped: isLineSkipped}
+  return { minCol: minCol, isRangeLineSkipped: isRangeLineDiscarded, isLineSkipped: isLineSkipped }
 }
 
 /// Inserts a line-comment.
@@ -187,16 +187,16 @@ export const getLinesInRange = (doc: Text, range: SelectionRange): Line[] => {
   let line: Line = doc.lineAt(range.from)
   let lines = []
   while (line.start + line.length < range.to ||
-        (line.start <= range.to && range.to <= line.end)) {
+    (line.start <= range.to && range.to <= line.end)) {
     lines.push(line)
-    if (line.number + 1 <= doc.lines ) {
+    if (line.number + 1 <= doc.lines) {
       line = doc.line(line.number + 1)
     } else {
       break
     }
   }
   return lines
-} 
+}
 
 /// Consume whitespace starting from 0 in `str`.
 /// Return the number of spaces found in `str` to the first

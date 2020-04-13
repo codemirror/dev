@@ -1,7 +1,7 @@
 import ist from "ist"
 import { SelectionRange, EditorState, EditorSelection, Transaction, languageData, Extension } from "@codemirror/next/state"
-import {Text} from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter} from "@codemirror/next/comment"
+import { Text } from "@codemirror/next/text"
+import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter } from "@codemirror/next/comment"
 import { StreamSyntax } from "@codemirror/next/stream-syntax"
 import { html } from "@codemirror/next/lang-html"
 
@@ -19,10 +19,10 @@ describe("comment", () => {
     t(0, 0, [0])
     t(7, 7, [7])
     t(16, 16, [14])
-    t(0, 35, [0,7,14,21,28,35])
+    t(0, 35, [0, 7, 14, 21, 28, 35])
     t(0, 6, [0])
-    t(4, 8, [0,7])
-    t(3, 17, [0,7,14])
+    t(4, 8, [0, 7])
+    t(3, 17, [0, 7, 14])
   })
 
   /// Creates a new `EditorState` using `doc` as the document text.
@@ -50,20 +50,20 @@ describe("comment", () => {
     const ranges: SelectionRange[] = []
     for (let i = 0; i < markers.length; i += 2) {
       if (i + 1 < markers.length) {
-        ranges.push(new SelectionRange(markers[i], markers[i+1]))
+        ranges.push(new SelectionRange(markers[i], markers[i + 1]))
       } else {
         ranges.push(new SelectionRange(markers[i]))
       }
     }
     if (ranges.length == 0) {
-        ranges.push(new SelectionRange(0))
+      ranges.push(new SelectionRange(0))
     }
 
     return EditorState.create({
       doc,
       selection: EditorSelection.create(ranges),
       extensions: [EditorState.allowMultipleSelections.of(true)].concat(extensions),
-      })
+    })
   }
 
   function same(actualState: EditorState, expectedState: EditorState) {
@@ -100,11 +100,11 @@ describe("comment", () => {
     })
 
     const syntax = new StreamSyntax({
-      docProps: [[languageData, {commentTokens: {lineComment: k}}]],
+      docProps: [[languageData, { commentTokens: { lineComment: k } }]],
       token(stream) {
-          stream.next()
-          return ""
-        }
+        stream.next()
+        return ""
+      }
     })
 
     const check = checkToggleChain(toggleLineComment(CommentOption.Toggle), syntax)
@@ -117,31 +117,31 @@ describe("comment", () => {
         `\nline 1\n  ${k}line| 2\nline 3\n`,
         `\nline 1\n  line| 2\nline 3\n`,
         `\nline 1\n  ${k} line| 2\nline 3\n`,
-        ).tie(4)
+      ).tie(4)
 
       check(
         `\nline 1\n  ${k}line 2|\nline 3\n`,
         `\nline 1\n  line 2|\nline 3\n`,
         `\nline 1\n  ${k} line 2|\nline 3\n`,
-        ).tie(1)
+      ).tie(1)
 
       check(
         `\nline 1\n|  ${k}line 2\nline 3\n`,
         `\nline 1\n|  line 2\nline 3\n`,
         `\nline 1\n|  ${k} line 2\nline 3\n`,
-        ).tie(1)
+      ).tie(1)
 
       check(
         `\nline 1\n|${k}\nline 3\n`,
         `\nline 1\n|\nline 3\n`,
         `\nline 1\n|${k} \nline 3\n`,
-        ).tie(1)
+      ).tie(1)
 
       check(
         `\nline 1\n line 2\nline 3\n|${k}`,
         `\nline 1\n line 2\nline 3\n|`,
         `\nline 1\n line 2\nline 3\n|${k} `,
-        ).tie(1)
+      ).tie(1)
     })
 
     it(`toggles '${k}' comments in a single line selection`, () => {
@@ -149,7 +149,7 @@ describe("comment", () => {
         `line 1\n  ${k}li|ne |2\nline 3\n`,
         `line 1\n  li|ne |2\nline 3\n`,
         `line 1\n  ${k} li|ne |2\nline 3\n`,
-        ).tie(1)
+      ).tie(1)
     })
 
     it(`toggles '${k}' comments in a multi-line selection`, () => {
@@ -157,39 +157,39 @@ describe("comment", () => {
         `\n  ${k}lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`,
         `\n  lin|e 1\n   line 2\n  line |3\n`,
         `\n  ${k} lin|e 1\n  ${k}  line 2\n  ${k} line |3\n`,
-        ).tie(1)
+      ).tie(1)
 
       check(
         `\n  ${k}lin|e 1\n  ${k}  line 2\n   line 3\n  ${k} li|ne 4\n`,
         `\n  ${k} ${k}lin|e 1\n  ${k} ${k}  line 2\n  ${k}  line 3\n  ${k} ${k} li|ne 4\n`,
-        ).tie(0)
+      ).tie(0)
 
       check(
         `\n  ${k} lin|e 1\n\n  ${k} line |3\n`,
         `\n  lin|e 1\n\n  line |3\n`,
-        ).tie(0)
+      ).tie(0)
 
       check(
         `\n  ${k} lin|e 1\n     \n  ${k} line |3\n`,
         `\n  lin|e 1\n     \n  line |3\n`,
-        ).tie(0)
+      ).tie(0)
 
       check(
         `\n|\n  ${k} line 2\n    | \n`,
         `\n|\n  line 2\n    | \n`,
-        ).tie(0)
+      ).tie(0)
 
       check(
         `\n|\n\n    | \n`,
         `\n|\n\n    | \n`,
-        ).tie(0)
+      ).tie(0)
     })
 
     it(`toggles '${k}' comments in a multi-line multi-range selection`, () => {
       check(
         `\n  lin|e 1\n  line |2\n  line 3\n  l|ine 4\n  line| 5\n`,
         `\n  ${k} lin|e 1\n  ${k} line |2\n  line 3\n  ${k} l|ine 4\n  ${k} line| 5\n`,
-        ).tie(0)
+      ).tie(0)
     })
 
   }
