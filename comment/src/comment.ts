@@ -2,30 +2,49 @@ import { Text, Line } from "@codemirror/next/text"
 import { EditorView, Command } from "@codemirror/next/view"
 import { EditorState, Transaction, SelectionRange, Change } from "@codemirror/next/state"
 
-export const toggleCommentCmd: Command = view => {
-  return dispatchToggleComment(CommentOption.Toggle, view)
+export const toggleLineCommentCmd: Command = view => {
+  return dispatchToggleComment(toggleLineComment(CommentOption.Toggle), view)
 }
 
-export const commentCmd: Command = view => {
-  return dispatchToggleComment(CommentOption.OnlyComment, view)
+export const lineCommentCmd: Command = view => {
+  return dispatchToggleComment(toggleLineComment(CommentOption.OnlyComment), view)
 }
 
-export const uncommentCmd: Command = view => {
-  return dispatchToggleComment(CommentOption.OnlyUncomment, view)
+export const lineUncommentCmd: Command = view => {
+  return dispatchToggleComment(toggleLineComment(CommentOption.OnlyUncomment), view)
 }
 
-/// The action to be taken when toggling comments.
+export const toggleBlockCommentCmd: Command = view => {
+  return dispatchToggleComment(toggleBlockComment(CommentOption.Toggle), view)
+}
+
+export const blockCommentCmd: Command = view => {
+  return dispatchToggleComment(toggleBlockComment(CommentOption.OnlyComment), view)
+}
+
+export const blockUncommentCmd: Command = view => {
+  return dispatchToggleComment(toggleBlockComment(CommentOption.OnlyUncomment), view)
+}
+
+const dispatchToggleComment = (cmd: (st: EditorState) => Transaction | null, view: EditorView): boolean => {
+  let tr = cmd(view.state)
+  if (!tr) return false
+  view.dispatch(tr)
+  return true
+}
+
 export enum CommentOption {
   Toggle,
   OnlyComment,
   OnlyUncomment,
 }
 
-const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean => {
-  let tr = toggleLineComment(option)(view.state)
-  if (!tr) return false
-  view.dispatch(tr)
-  return true
+export const toggleBlockComment = (option: CommentOption) => (state: EditorState): Transaction | null => {
+  type BlockCommentData = { blockComment: { open: string, close: string } | undefined } | undefined
+  const data = state.languageDataAt<BlockCommentData>("commentTokens", state.selection.primary.from)[0]
+  return data === undefined || data.blockComment === undefined || data.blockComment.open === undefined || data.blockComment.close === undefined
+    ? null
+    : new BlockCommenter(data.blockComment.open, data.blockComment.close).toggle(option, state)
 }
 
 /// This class performs toggle, comment and uncomment
@@ -35,25 +54,52 @@ const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean
 export class BlockCommenter {
   open: string
   close: string
-  constructor(open: string, close: string) {
+  margin: string
+  constructor(open: string, close: string, margin: string = " ") {
     this.open = open
     this.close = close
+    this.margin = margin
   }
 
   toggle(option: CommentOption, state: EditorState): Transaction | null {
-    // for (const range of state.selection.ranges) {
-    //   const lines = getLinesInRange(state.doc, range)
-    //   linesAcrossSelection.push(...lines)
-    //   linesAcrossRange[k(range)] = lines
-    // }
-    // tr.replace(range.from, range.from, this.open + margin)
-    // tr.replace(range.to, range.to, margin + this.close)
-    // return tr
+    const selectionCommented = this.isSelectionCommented(state)
+    if (selectionCommented !== null) {
+      if (option !== CommentOption.OnlyComment) {
+        const tr = state.t()
+        let i = 0
+        tr.forEachRange((range: SelectionRange, tr: Transaction) => {
+          const open = selectionCommented[i].open
+          const close = selectionCommented[i].close
+          const copen = new Change(open.pos - this.open.length, open.pos + open.margin, [""])
+          const cclose = new Change(close.pos - close.margin, close.pos + this.close.length, [""])
+          tr.change([copen, cclose])
+          // return new SelectionRange(range.anchor + shift, range.head + shift)
+          return range
+          i++
+        })
+
+        return tr
+      }
+    } else {
+      if (option !== CommentOption.OnlyUncomment) {
+        const tr = state.t()
+        tr.forEachRange((range: SelectionRange, tr: Transaction) => {
+          const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + this.margin))
+          const cclose = new Change(range.to, range.to, tr.startState.splitLines(this.margin + this.close))
+          tr.change([copen, cclose])
+          const shift = (this.open + this.margin).length
+          return new SelectionRange(range.anchor + shift, range.head + shift)
+        })
+
+        return tr
+      }
+    }
+
     return null
   }
 
   /// Determines whether all selection ranges in `state` are block-commented.
-  isSelectionCommented(state: EditorState): { openPos: number, closePos: number }[] | null {
+  isSelectionCommented(state: EditorState): { open: { pos: number, margin: number }, close: { pos: number, margin: number } }[] | null {
     let result = []
     for (const range of state.selection.ranges) {
       const x = this.isRangeCommented(state, range)
@@ -65,20 +111,20 @@ export class BlockCommenter {
 
   /// Determines if the `range` is block-commented in the given `state`.
   /// The `range` must be a valid range in `state`.
-  isRangeCommented(state: EditorState, range: SelectionRange): { openPos: number, closePos: number } | null {
+  isRangeCommented(state: EditorState, range: SelectionRange): { open: { pos: number, margin: number }, close: { pos: number, margin: number } } | null {
     type SearchWithType = (this: string, searchString: string, pos?: number) => boolean
-    const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): number | null => {
+    const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): { pos: number, margin: number } | null => {
       const line = state.doc.lineAt(pos)
       const str = line.content as string
       const ss = eatSpace(str, pos - line.start - i, d)
       return searchWith.call(str, searchString, pos + d * ss - line.start)
-        ? pos + d * ss
+        ? { pos: pos + d * ss, margin: ss == 0 ? 0 : 1 }
         : null
     }
     const startsWithOpen = search(range.from, this.open, String.prototype.endsWith, -1, 1)
     const endsWithClose = search(range.to, this.close, String.prototype.startsWith, 1, 0)
     return startsWithOpen !== null && endsWithClose !== null
-      ? { openPos: startsWithOpen, closePos: endsWithClose }
+      ? { open: startsWithOpen, close: endsWithClose }
       : null
   }
 
