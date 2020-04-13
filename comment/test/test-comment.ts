@@ -1,7 +1,7 @@
 import ist from "ist"
 import { SelectionRange, EditorState, EditorSelection, Transaction, languageData, Extension } from "@codemirror/next/state"
 import { Text } from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter } from "@codemirror/next/comment"
+import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter, toggleBlockComment } from "@codemirror/next/comment"
 import { StreamSyntax } from "@codemirror/next/stream-syntax"
 import { html } from "@codemirror/next/lang-html"
 
@@ -144,6 +144,13 @@ describe("comment", () => {
       ).tie(1)
     })
 
+    it.skip(`toggles '${k}' comments in a single line when the cursor is at the beginning`, () => {
+      check(
+        `line 1\n  |line 2\nline 3\n`,
+        `line 1\n  ${k} |line 2\nline 3\n`,
+      ).tie(0)
+    })
+
     it(`toggles '${k}' comments in a single line selection`, () => {
       check(
         `line 1\n  ${k}li|ne |2\nline 3\n`,
@@ -216,6 +223,16 @@ describe("comment", () => {
       ist(res)
     })
 
+    const syntax = new StreamSyntax({
+      docProps: [[languageData, { commentTokens: { blockComment: { open: o, close: c } } }]],
+      token(stream) {
+        stream.next()
+        return ""
+      }
+    })
+
+    const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle), syntax)
+
     it(`inserts surrounding block comment ${o} ${c} in a single range selection`, () => {
       const st0 = s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`)
       const st1 = cc.insert(st0.t()).apply()
@@ -228,14 +245,12 @@ describe("comment", () => {
       same(st1, s(`\n  lin${o} |e 1\n  l| ${c}ine 2\n  line 3\n  ${o} |line 4\n  line 5| ${c}\n`))
     })
 
-    // const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle, {open: o, close: c}))
-
-    // it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
-    //   check(
-    //     `\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`,
-    //     `\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`,
-    //     ).tie(0)
-    // })
+    it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
+      check(
+        `\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`,
+        `\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`,
+      ).tie(0)
+    })
 
   }
 
