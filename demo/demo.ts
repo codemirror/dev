@@ -11,7 +11,7 @@ import {specialChars} from "@codemirror/next/special-chars"
 import {multipleSelections} from "@codemirror/next/multiple-selections"
 import {search, defaultSearchKeymap} from "@codemirror/next/search"
 import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
-import {toggleCommentCmd, commentCmd, uncommentCmd} from "@codemirror/next/comment"
+import {toggleLineCommentCmd, lineCommentCmd, lineUncommentCmd} from "@codemirror/next/comment"
 
 import {html} from "@codemirror/next/lang-html"
 import {defaultHighlighter} from "@codemirror/next/highlight"
@@ -67,9 +67,9 @@ let state = EditorState.create({doc: `<script>
     "Mod-Alt-]": unfoldCode,
     "Mod-Space": startCompletion,
     "Shift-Mod-m": openLintPanel,
-    "Mod-/": toggleCommentCmd,
-    "Mod-Alt-/": commentCmd,
-    "Mod-Alt-Shift-/": uncommentCmd
+    "Mod-/": toggleLineCommentCmd,
+    "Mod-Alt-/": lineCommentCmd,
+    "Mod-Alt-Shift-/": lineUncommentCmd
   }),
   keymap(baseKeymap),
 ]})
@@ -78,13 +78,13 @@ let view = (window as any).view = new EditorView({state})
 document.querySelector("#editor")!.appendChild(view.dom)
 
 document.querySelector("#toggleComment")!.addEventListener("click", function() {
-  toggleCommentCmd(view)
+  toggleLineCommentCmd(view)
 });
 
 document.querySelector("#comment")!.addEventListener("click", function() {
-  commentCmd(view)
+  lineCommentCmd(view)
 });
 
 document.querySelector("#uncomment")!.addEventListener("click", function() {
-  uncommentCmd(view)
+  lineUncommentCmd(view)
 });
