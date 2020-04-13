@@ -205,9 +205,9 @@ describe("comment", () => {
         ist(cc.isRangeCommented(st, st.selection.primary))
       }
 
-        check(`\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`)
-        check(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line |  ${c}4\n  line 5\n`)
-        check(`\n  lin${o}     |e 1\n  line 2\n  line 3\n  line |    ${c} 4\n  line 5\n`)
+      check(`\n  lin${o}|e 1\n  line 2\n  line 3\n  line |${c}4\n  line 5\n`)
+      check(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line |  ${c}4\n  line 5\n`)
+      check(`\n  lin${o}     |e 1\n  line 2\n  line 3\n  line |    ${c} 4\n  line 5\n`)
     })
 
     it(`test for surrounding block comments`, () => {
