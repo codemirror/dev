@@ -28,6 +28,10 @@ const dispatchToggleComment = (option: CommentOption, view: EditorView): boolean
   return true
 }
 
+/// This class performs toggle, comment and uncomment
+/// of block comments in languages that support them.
+/// The `open` and `close` arguments refer to the open and close
+/// tokens of which this `BlockCommenter` is made up.
 export class BlockCommenter {
     open: string
     close: string
@@ -48,32 +52,37 @@ export class BlockCommenter {
       return null
     }
 
-    /// Determines whether all selection ranges in `state`
-    /// are block-commented, i.e., if `isRangeCommented` returns
-    /// `true` for all selection ranges.
-    isSelectionCommented(state: EditorState): boolean {
-        let result = true
+    /// Determines whether all selection ranges in `state` are block-commented.
+    isSelectionCommented(state: EditorState): {openPos: number, closePos: number}[] | null {
+        let result = []
         for (const range of state.selection.ranges) {
-            result = result && this.isRangeCommented(state, range)
+        const x = this.isRangeCommented(state, range)
+          if (x === null) return null
+            result.push(x)
         }
         return result
     }
 
+    /// Determines if the `range` is block-commented in the given `state`.
     /// The `range` must be a valid range in `state`.
-    isRangeCommented(state: EditorState, range: SelectionRange): boolean {
+    isRangeCommented(state: EditorState, range: SelectionRange): {openPos: number, closePos: number} | null {
         type SearchWithType = (this: string, searchString: string, pos?: number) => boolean
-        const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): boolean => {
+        const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): number | null => {
             const line = state.doc.lineAt(pos)
             const str = line.content as string
           const ss = eatSpace(str, pos - line.start - i, d)
-          return searchWith.call(str, searchString, pos + (d*ss) - line.start)
+          return searchWith.call(str, searchString, pos + d*ss - line.start)
+          ? pos + d*ss
+          : null
         }
         const startsWithOpen = search(range.from, this.open, String.prototype.endsWith, -1, 1)
         const endsWithClose = search(range.to, this.close, String.prototype.startsWith, 1, 0)
-        return startsWithOpen && endsWithClose
+        return startsWithOpen !== null && endsWithClose !== null
+        ? {openPos: startsWithOpen , closePos: endsWithClose }
+        : null
     }
 
-    ///
+    /// Inserts a block comment in the given transaction `tr`.
     insert(tr: Transaction, margin: string = " "): Transaction {
       tr.forEachRange((range: SelectionRange, tr: Transaction) => {
         const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
