@@ -1,7 +1,7 @@
 import ist from "ist"
 import { SelectionRange, EditorState, EditorSelection, Transaction, languageData, Extension } from "@codemirror/next/state"
 import { Text } from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, insertLineComment, removeLineComment, CommentOption, BlockCommenter, toggleBlockComment } from "@codemirror/next/comment"
+import { toggleLineComment, getLinesInRange, CommentOption, BlockCommenter, toggleBlockComment, LineCommenter } from "@codemirror/next/comment"
 import { StreamSyntax } from "@codemirror/next/stream-syntax"
 import { html } from "@codemirror/next/lang-html"
 
@@ -90,12 +90,14 @@ describe("comment", () => {
   function runLineCommentTests(k: string) {
 
     it(`inserts/removes '${k}' line comment in a single line`, () => {
+      const cc = new LineCommenter(k)
+
       let st0 = s(`line 1\n${k}line 2\nline 3`)
-      let st1 = removeLineComment(st0.t(), 7, k, 0).apply()
+      let st1 = cc.removeLineComment(st0.t(), 7, 0).apply()
       same(st1, s(`line 1\nline 2\nline 3`))
-      let st2 = insertLineComment(st1.t(), 7, k).apply()
+      let st2 = cc.insertLineComment(st1.t(), 7).apply()
       same(st2, s(`line 1\n${k} line 2\nline 3`))
-      let st3 = removeLineComment(st2.t(), 7, k).apply()
+      let st3 = cc.removeLineComment(st2.t(), 7).apply()
       same(st3, st1)
     })
 
