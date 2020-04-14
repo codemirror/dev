@@ -77,15 +77,3 @@ let state = EditorState.create({doc: `<script>
 
 let view = (window as any).view = new EditorView({state})
 document.querySelector("#editor")!.appendChild(view.dom)
-
-document.querySelector("#toggleComment")!.addEventListener("click", function() {
-  toggleLineCommentCmd(view)
-});
-
-document.querySelector("#comment")!.addEventListener("click", function() {
-  lineCommentCmd(view)
-});
-
-document.querySelector("#uncomment")!.addEventListener("click", function() {
-  lineUncommentCmd(view)
-});
