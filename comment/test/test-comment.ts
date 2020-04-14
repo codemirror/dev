@@ -144,10 +144,10 @@ describe("comment", () => {
       ).tie(1)
     })
 
-    it.skip(`toggles '${k}' comments in a single line when the cursor is at the beginning`, () => {
+    it(`toggles '${k}' comments in a single line when the cursor is at the beginning`, () => {
       check(
         `line 1\n  |line 2\nline 3\n`,
-        `line 1\n  ${k} |line 2\nline 3\n`,
+        `line 1\n  |${k} line 2\nline 3\n`,
       ).tie(0)
     })
 
