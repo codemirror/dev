@@ -245,7 +245,7 @@ describe("comment", () => {
       same(st1, s(`\n  lin${o} |e 1\n  l| ${c}ine 2\n  line 3\n  ${o} |line 4\n  line 5| ${c}\n`))
     })
 
-    it.skip(`toggles ${o} ${c} block comment in multi-line selection`, () => {
+    it(`toggles ${o} ${c} block comment in multi-line selection`, () => {
       check(
         `\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`,
         `\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`,
