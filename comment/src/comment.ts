@@ -66,17 +66,15 @@ export class BlockCommenter {
     if (selectionCommented !== null) {
       if (option !== CommentOption.OnlyComment) {
         const tr = state.t()
-        let i = 0
-        tr.forEachRange((range: SelectionRange, tr: Transaction) => {
-          const open = selectionCommented[i].open
-          const close = selectionCommented[i].close
-          const copen = new Change(open.pos - this.open.length, open.pos + open.margin, [""])
-          const cclose = new Change(close.pos - close.margin, close.pos + this.close.length, [""])
-          tr.change([copen, cclose])
-          // return new SelectionRange(range.anchor + shift, range.head + shift)
-          return range
-          i++
-        })
+        const mapRef = tr.mapRef()
+        for (const range of selectionCommented) {
+          const open = range.open
+          const close = range.close
+          open.pos = mapRef.mapPos(open.pos)
+          tr.replace(open.pos - this.open.length, open.pos + open.margin, "")
+          close.pos = mapRef.mapPos(close.pos)
+          tr.replace(close.pos - close.margin, close.pos + this.close.length, "")
+        }
 
         return tr
       }
