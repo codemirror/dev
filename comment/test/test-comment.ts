@@ -254,6 +254,13 @@ describe("comment", () => {
       ).tie(0)
     })
 
+    it(`toggles ${o} ${c} block comment in multi-line multi-range selection`, () => {
+      check(
+        `\n  lin|e 1\n  line |2\n  l|ine 3\n  line 4\n  line |5\n`,
+        `\n  lin${o} |e 1\n  line | ${c}2\n  l${o} |ine 3\n  line 4\n  line | ${c}5\n`,
+      ).tie(0)
+    })
+
   }
 
   runLineCommentTests("//")
