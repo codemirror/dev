@@ -2,26 +2,38 @@ import { Text, Line } from "@codemirror/next/text"
 import { EditorView, Command } from "@codemirror/next/view"
 import { EditorState, Transaction, SelectionRange, Change } from "@codemirror/next/state"
 
+/// Comments or uncomments the current `SelectionRange` using line-comments.
+/// The line-comment token is defined on a language basis.
 export const toggleLineCommentCmd: Command = view => {
   return dispatchToggleComment(toggleLineComment(CommentOption.Toggle), view)
 }
 
+/// Comments the current `SelectionRange` using line-comments.
+/// The line-comment token is defined on a language basis.
 export const lineCommentCmd: Command = view => {
   return dispatchToggleComment(toggleLineComment(CommentOption.OnlyComment), view)
 }
 
+/// Uncomments the current `SelectionRange` using line-comments.
+/// The line-comment token is defined on a language basis.
 export const lineUncommentCmd: Command = view => {
   return dispatchToggleComment(toggleLineComment(CommentOption.OnlyUncomment), view)
 }
 
+/// Comments or uncomments the current `SelectionRange` using block-comments.
+/// The block-comment tokens are defined on a language basis.
 export const toggleBlockCommentCmd: Command = view => {
   return dispatchToggleComment(toggleBlockComment(CommentOption.Toggle), view)
 }
 
+/// Comments the current `SelectionRange` using block-comments.
+/// The block-comment tokens are defined on a language basis.
 export const blockCommentCmd: Command = view => {
   return dispatchToggleComment(toggleBlockComment(CommentOption.OnlyComment), view)
 }
 
+/// Uncomments the current `SelectionRange` using block-comments.
+/// The block-comment tokens are defined on a language basis.
 export const blockUncommentCmd: Command = view => {
   return dispatchToggleComment(toggleBlockComment(CommentOption.OnlyUncomment), view)
 }
@@ -47,10 +59,10 @@ export const toggleBlockComment = (option: CommentOption) => (state: EditorState
     : new BlockCommenter(data.blockComment.open, data.blockComment.close).toggle(option, state)
 }
 
-/// This class performs toggle, comment and uncomment
-/// of block comments in languages that support them.
-/// The `open` and `close` arguments refer to the open and close
-/// tokens of which this `BlockCommenter` is made up.
+// This class performs toggle, comment and uncomment
+// of block comments in languages that support them.
+// The `open` and `close` arguments refer to the open and close
+// tokens of which this `BlockCommenter` is made up.
 export class BlockCommenter {
   open: string
   close: string
@@ -96,7 +108,7 @@ export class BlockCommenter {
     return null
   }
 
-  /// Determines whether all selection ranges in `state` are block-commented.
+  // Determines whether all selection ranges in `state` are block-commented.
   isSelectionCommented(state: EditorState): { open: { pos: number, margin: number }, close: { pos: number, margin: number } }[] | null {
     let result = []
     for (const range of state.selection.ranges) {
@@ -107,8 +119,8 @@ export class BlockCommenter {
     return result
   }
 
-  /// Determines if the `range` is block-commented in the given `state`.
-  /// The `range` must be a valid range in `state`.
+  // Determines if the `range` is block-commented in the given `state`.
+  // The `range` must be a valid range in `state`.
   isRangeCommented(state: EditorState, range: SelectionRange): { open: { pos: number, margin: number }, close: { pos: number, margin: number } } | null {
     type SearchWithType = (this: string, searchString: string, pos?: number) => boolean
     const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): { pos: number, margin: number } | null => {
@@ -126,7 +138,7 @@ export class BlockCommenter {
       : null
   }
 
-  /// Inserts a block comment in the given transaction `tr`.
+  // Inserts a block comment in the given transaction `tr`.
   insert(tr: Transaction, margin: string = " "): Transaction {
     tr.forEachRange((range: SelectionRange, tr: Transaction) => {
       const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + margin))
@@ -140,7 +152,6 @@ export class BlockCommenter {
   }
 }
 
-/// TODO: Add docs
 export const toggleLineComment = (option: CommentOption) => (state: EditorState): Transaction | null => {
   const commentTokens = state.languageDataAt<{ lineComment: string | undefined } | undefined>("commentTokens", state.selection.primary.from)[0]
   if (commentTokens === undefined || commentTokens.lineComment === undefined) return null
@@ -189,7 +200,6 @@ export const toggleLineComment = (option: CommentOption) => (state: EditorState)
   return null
 }
 
-/// TODO: Add docs
 const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, lines: Line[]): { minCol: number } & { isRangeLineSkipped: boolean } & { isLineSkipped: { [id: number]: boolean } } => {
   let minCol = Infinity
   let isRangeLineDiscarded = true
@@ -208,25 +218,25 @@ const isRangeLineCommented = (lineCommentToken: string) => (state: EditorState, 
   return { minCol: minCol, isRangeLineSkipped: isRangeLineDiscarded, isLineSkipped: isLineSkipped }
 }
 
-/// Inserts a line-comment.
-/// The `pos` argument indicates the absolute position to 
-/// insert the line comment within the `state`.
-/// The line is commented by inserting a `lineCommentToken`.
-/// Additionally, a `margin` is inserted between the
-/// `lineCommentToken` and the position following `pos`.
-/// It returns the `tr` transaction to allow you to chain calls on `tr`/
+// Inserts a line-comment.
+// The `pos` argument indicates the absolute position to 
+// insert the line comment within the `state`.
+// The line is commented by inserting a `lineCommentToken`.
+// Additionally, a `margin` is inserted between the
+// `lineCommentToken` and the position following `pos`.
+// It returns the `tr` transaction to allow you to chain calls on `tr`/
 export const insertLineComment = (tr: Transaction, pos: number, lineCommentToken: string, margin: string = " "): Transaction => {
   return tr.replace(pos, pos, lineCommentToken + margin)
 }
 
-/// Removes a line-comment at the given `pos`.
-/// See `insertLineComment`.
+// Removes a line-comment at the given `pos`.
+// See `insertLineComment`.
 export const removeLineComment = (tr: Transaction, pos: number, lineCommentToken: string, marginLen: number = 1): Transaction => {
   return tr.replace(pos, pos + lineCommentToken.length + marginLen, "")
 }
 
-/// Computes the lines spanned by `range`.
-/// This function is exported for testing purposes.
+// Computes the lines spanned by `range`.
+// This function is exported for testing purposes.
 export const getLinesInRange = (doc: Text, range: SelectionRange): Line[] => {
   let line: Line = doc.lineAt(range.from)
   let lines = []
@@ -240,17 +250,6 @@ export const getLinesInRange = (doc: Text, range: SelectionRange): Line[] => {
     }
   }
   return lines
-}
-
-/// Consume whitespace starting from 0 in `str`.
-/// Return the number of spaces found in `str` to the first
-/// non-whitespace character.
-/// Note that in case of all characters are whitespace,
-/// it will return the length of `str`.
-export const _eatSpace = (str: string): number => {
-  let pos = 0
-  while (/[\s\u00a0]/.test(str.charAt(pos))) ++pos
-  return pos
 }
 
 const eatSpace = (str: string, pos: number = 0, direction: 1 | -1 = 1): number => {
