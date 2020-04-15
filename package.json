@@ -49,6 +49,7 @@
     "./stream-syntax": "./stream-syntax/dist/index.js",
     "./autocomplete": "./autocomplete/dist/index.js",
     "./lang-javascript": "./lang-javascript/dist/index.js",
+    "./lang-python": "./lang-python/dist/index.js",
     "./lang-css": "./lang-css/dist/index.js",
     "./lang-html": "./lang-html/dist/index.js"
   },
@@ -58,6 +59,7 @@
     "lezer-css": "^0.8.3",
     "lezer-html": "^0.8.4",
     "lezer-javascript": "^0.8.3",
+    "lezer-python": "^0.8.0",
     "lezer-tree": "^0.8.4",
     "style-mod": "^2.2.2",
     "w3c-keyname": "^2.2.4"
