@@ -24,7 +24,10 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
    parser: cssSyntax.parser}
 ]).withProps(
   languageData.add({
-     Document: {autocomplete: completeHTML}
+     Document: {
+       autocomplete: completeHTML,
+       commentTokens: {blockComment: {open: "<!--", close: "-->"}},
+    },
   }),
   indentNodeProp.add(type => {
     if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
