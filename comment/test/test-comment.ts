@@ -1,7 +1,7 @@
 import ist from "ist"
 import { SelectionRange, EditorState, EditorSelection, Transaction, languageData, Extension } from "@codemirror/next/state"
 import { Text } from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, CommentOption, BlockCommenter, toggleBlockComment, LineCommenter } from "@codemirror/next/comment"
+import { toggleLineCommentWithOption, getLinesInRange, CommentOption, BlockCommenter, toggleBlockCommentWithOption } from "@codemirror/next/comment"
 import { StreamSyntax } from "@codemirror/next/stream-syntax"
 import { html } from "@codemirror/next/lang-html"
 
@@ -89,18 +89,6 @@ describe("comment", () => {
   // Runs all tests for the given line-comment token, `k`.
   function runLineCommentTests(k: string) {
 
-    it(`inserts/removes '${k}' line comment in a single line`, () => {
-      const cc = new LineCommenter(k)
-
-      let st0 = s(`line 1\n${k}line 2\nline 3`)
-      let st1 = cc.removeLineComment(st0.t(), 7, 0).apply()
-      same(st1, s(`line 1\nline 2\nline 3`))
-      let st2 = cc.insertLineComment(st1.t(), 7).apply()
-      same(st2, s(`line 1\n${k} line 2\nline 3`))
-      let st3 = cc.removeLineComment(st2.t(), 7).apply()
-      same(st3, st1)
-    })
-
     const syntax = new StreamSyntax({
       docProps: [[languageData, { commentTokens: { lineComment: k } }]],
       token(stream) {
@@ -109,7 +97,7 @@ describe("comment", () => {
       }
     })
 
-    const check = checkToggleChain(toggleLineComment(CommentOption.Toggle), syntax)
+    const check = checkToggleChain(toggleLineCommentWithOption(CommentOption.Toggle), syntax)
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
       check(
@@ -233,19 +221,7 @@ describe("comment", () => {
       }
     })
 
-    const check = checkToggleChain(toggleBlockComment(CommentOption.Toggle), syntax)
-
-    it(`inserts surrounding block comment ${o} ${c} in a single range selection`, () => {
-      const st0 = s(`\n  lin|e 1\n  line 2\n  line 3\n  line |4\n  line 5\n`)
-      const st1 = cc.insert(st0.t()).apply()
-      same(st1, s(`\n  lin${o} |e 1\n  line 2\n  line 3\n  line | ${c}4\n  line 5\n`))
-    })
-
-    it(`inserts surrounding block comment ${o} ${c} in a multi-range selection`, () => {
-      const st0 = s(`\n  lin|e 1\n  l|ine 2\n  line 3\n  |line 4\n  line 5|\n`)
-      const st1 = cc.insert(st0.t()).apply()
-      same(st1, s(`\n  lin${o} |e 1\n  l| ${c}ine 2\n  line 3\n  ${o} |line 4\n  line 5| ${c}\n`))
-    })
+    const check = checkToggleChain(toggleBlockCommentWithOption(CommentOption.Toggle), syntax)
 
     it(`toggles ${o} ${c} block comment in multi-line selection`, () => {
       check(
@@ -278,7 +254,7 @@ describe("comment", () => {
 </script>
 <!-- HTML only provides block comments -->`, [html()])
 
-    const s1 = toggleLineComment(CommentOption.Toggle)(s0)!.apply()
+    const s1 = toggleLineCommentWithOption(CommentOption.Toggle)(s0)!.apply()
     same(s1, s(`<script>
   This is a |line comment
   console.log("Hello");
