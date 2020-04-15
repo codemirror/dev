@@ -11,7 +11,7 @@ import {specialChars} from "@codemirror/next/special-chars"
 import {multipleSelections} from "@codemirror/next/multiple-selections"
 import {search, defaultSearchKeymap} from "@codemirror/next/search"
 import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
-import {toggleLineCommentCmd, lineCommentCmd, lineUncommentCmd, toggleBlockCommentCmd} from "@codemirror/next/comment"
+import {toggleLineComment, lineComment, lineUncomment, toggleBlockComment} from "@codemirror/next/comment"
 
 import {html} from "@codemirror/next/lang-html"
 import {defaultHighlighter} from "@codemirror/next/highlight"
@@ -67,10 +67,10 @@ let state = EditorState.create({doc: `<script>
     "Mod-Alt-]": unfoldCode,
     "Mod-Space": startCompletion,
     "Shift-Mod-m": openLintPanel,
-    "Mod-/": toggleLineCommentCmd,
-    "Mod-Alt-/": lineCommentCmd,
-    "Mod-Alt-Shift-/": lineUncommentCmd,
-    "Mod-*": toggleBlockCommentCmd,
+    "Mod-/": toggleLineComment,
+    "Mod-Alt-/": lineComment,
+    "Mod-Alt-Shift-/": lineUncomment,
+    "Mod-*": toggleBlockComment,
   }),
   keymap(baseKeymap),
 ]})
