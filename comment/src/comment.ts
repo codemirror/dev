@@ -83,9 +83,7 @@ export class BlockCommenter {
       if (option !== CommentOption.OnlyComment) {
         const tr = state.t()
         const mapRef = tr.mapRef()
-        for (const range of selectionCommented) {
-          const open = range.open
-          const close = range.close
+        for (const {open, close} of selectionCommented) {
           open.pos = mapRef.mapPos(open.pos)
           tr.replace(open.pos - this.open.length, open.pos + open.margin, "")
           close.pos = mapRef.mapPos(close.pos)
@@ -126,23 +124,38 @@ export class BlockCommenter {
   /// Determines if the `range` is block-commented in the given `state`.
   /// The `range` must be a valid range in `state`.
   isRangeCommented(state: EditorState, range: SelectionRange): { open: { pos: number, margin: number }, close: { pos: number, margin: number } } | null {
-    type SearchWithType = (str: string, searchString: string, pos: number) => boolean
-    const search = (pos: number, searchString: string, searchWith: SearchWithType, d: 1 | -1, i: 1 | 0): { pos: number, margin: number } | null => {
-      const line = state.doc.lineAt(pos)
-      const str = line.slice()
-      const ss = eatSpace(str, pos - line.start - i, d)
-      return searchWith(str, searchString, pos + d * ss - line.start)
-        ? { pos: pos + d * ss, margin: ss == 0 ? 0 : 1 }
-        : null
+    let textBefore = state.doc.slice(range.from - SearchMargin, range.from)
+    let textAfter = state.doc.slice(range.to, range.to + SearchMargin)
+    let spaceBefore = /\s*$/.exec(textBefore)![0].length, spaceAfter = /^\s*/.exec(textAfter)![0].length
+    let beforeOff = textBefore.length - spaceBefore
+    if (textBefore.slice(beforeOff - this.open.length, beforeOff) == this.open &&
+        textAfter.slice(spaceAfter, spaceAfter + this.close.length) == this.close) {
+      return {open: {pos: range.from - spaceBefore, margin: spaceBefore && 1},
+              close: {pos: range.to + spaceAfter, margin: spaceAfter && 1}}
     }
-    const startsWithOpen = search(range.from, this.open, finishesWith, -1, 1)
-    const endsWithClose = search(range.to, this.close, beginsWith, 1, 0)
-    return startsWithOpen !== null && endsWithClose !== null
-      ? { open: startsWithOpen, close: endsWithClose }
-      : null
-  }
 
+    let startText: string, endText: string
+    if (range.to - range.from <= 2 * SearchMargin) {
+      startText = endText = state.doc.slice(range.from, range.to)
+    } else {
+      startText = state.doc.slice(range.from, range.from + SearchMargin)
+      endText = state.doc.slice(range.to - SearchMargin, range.to)
+    }
+    let startSpace = /^\s*/.exec(startText)![0].length, endSpace = /\s*$/.exec(endText)![0].length
+    let endOff = endText.length - endSpace - this.close.length
+    if (startText.slice(startSpace, startSpace + this.open.length) == this.open &&
+        endText.slice(endOff, endOff + this.close.length) == this.close) {
+      return {open: {pos: range.from + startSpace + this.open.length,
+                     margin: /\s/.test(startText.charAt(startSpace + this.open.length)) ? 1 : 0},
+              close: {pos: range.to - endSpace - this.close.length,
+                      margin: /\s/.test(endText.charAt(endOff - 1)) ? 1 : 0}}
+    }
+
+    return null
+  }
 }
+
+const SearchMargin = 50
 
 /// This class performs toggle, comment and uncomment
 /// of line comments in languages that support them.
@@ -170,7 +183,8 @@ export class LineCommenter {
           for (const line of lines) {
             if (lines.length > 1 && column.isLineSkipped[line.number]) continue
             const pos = mapRef.mapPos(line.start + column.minCol)
-            const marginLen = beginsWith(line.slice(), " ", column.minCol + this.lineCommentToken.length) ? 1 : 0
+            const posAfter = column.minCol + this.lineCommentToken.length
+            const marginLen = line.slice(posAfter, posAfter + 1) == " " ? 1 : 0
             tr.replace(pos, pos + this.lineCommentToken.length + marginLen, "")
           }
         }
@@ -195,17 +209,18 @@ export class LineCommenter {
     return null
   }
 
-  isRangeCommented(state: EditorState, lines: Line[]): { minCol: number } & { isRangeLineSkipped: boolean } & { isLineSkipped: { [id: number]: boolean } } {
+  isRangeCommented(_state: EditorState, lines: Line[]): { minCol: number } & { isRangeLineSkipped: boolean } & { isLineSkipped: { [id: number]: boolean } } {
     let minCol = Infinity
     let isRangeLineDiscarded = true
     const isLineSkipped: { [id: number]: boolean } = []
     for (const line of lines) {
-      const str = line.slice()
-      const col = eatSpace(str)
+      const str = line.slice(0, Math.min(line.length, SearchMargin))
+      const col = /^\s*/.exec(str)![0].length
       if ((lines.length == 1 || col < str.length) && col < minCol) {
         minCol = col
       }
-      if (isRangeLineDiscarded && (lines.length == 1 || col < str.length) && !beginsWith(str, this.lineCommentToken, col)) {
+      if (isRangeLineDiscarded && (lines.length == 1 || col < str.length) &&
+          str.slice(col, col + this.lineCommentToken.length) != this.lineCommentToken) {
         isRangeLineDiscarded = false
       }
       isLineSkipped[line.number] = col == str.length
@@ -231,26 +246,4 @@ export function getLinesInRange(doc: Text, range: SelectionRange): Line[] {
     }
   }
   return lines
-}
-
-function eatSpace(str: string, pos: number = 0, direction: 1 | -1 = 1): number {
-  let count = 0
-  while (/[\s\u00a0]/.test(str.charAt(pos))) {
-    count++
-    pos += direction
-  }
-  return count
-}
-
-function beginsWith(str: string, searchString: string, pos: number): boolean {
-  let searchPos = 0
-  while (pos < str.length && searchPos < searchString.length && str.charAt(pos) == searchString.charAt(searchPos)) {
-    pos++
-    searchPos++
-  }
-  return searchPos == searchString.length
-}
-
-function finishesWith(str: string, searchString: string, length: number): boolean {
-  return beginsWith(str, searchString, length - searchString.length)
 }
