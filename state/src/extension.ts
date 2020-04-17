@@ -27,7 +27,7 @@ export const selectionFilter = Facet.define<(selection: EditorSelection,
 /// export as an interface).
 export const languageData = new NodeProp<{[key: string]: any}>()
 
-export const addLanguageData = Facet.define<{type: NodeType} & {[key: string]: any}>()
+export const addLanguageData = Facet.define<{type?: NodeType} & {[key: string]: any}>()
 
 /// Syntax [parsing services](#state.EditorState^syntax) must provide
 /// this interface.

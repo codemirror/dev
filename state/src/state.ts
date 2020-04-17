@@ -233,17 +233,18 @@ export class EditorState {
   /// given position. Values provided by the facet, in precedence
   /// order, will appear before those provided by the syntax.
   languageDataAt<T>(name: string, pos: number): readonly T[] {
-    let syntax = this.facet(EditorState.syntax)
-    if (syntax.length == 0) return none
     let values: T[] | null = null
-    let type = syntax[0].docNodeTypeAt(this, pos)
+    let syntax = this.facet(EditorState.syntax)
+    let type = syntax.length ? syntax[0].docNodeTypeAt(this, pos) : null
     for (let added of this.facet(addLanguageData)) {
-      if (added.type == type && Object.prototype.hasOwnProperty.call(added, name))
+      if ((added.type == null || added.type == type) && Object.prototype.hasOwnProperty.call(added, name))
         (values || (values = [])).push(added[name])
     }
-    let langData = type.prop(languageData)
-    if (langData && Object.prototype.hasOwnProperty.call(langData, name))
-      (values || (values = [])).push(langData[name])
+    if (type) {
+      let langData = type.prop(languageData)
+      if (langData && Object.prototype.hasOwnProperty.call(langData, name))
+        (values || (values = [])).push(langData[name])
+    }
     return values || none
   }
 
