@@ -10,7 +10,7 @@ import {styleTags} from "@codemirror/next/highlight"
 export const pythonSyntax = new LezerSyntax(parser.withProps(
   languageData.add({
     Script: {closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']},
-             commentTokens: {lineComment: "#"}}
+             commentTokens: {line: "#"}}
   }),
   indentNodeProp.add({
     Body: continuedIndent()

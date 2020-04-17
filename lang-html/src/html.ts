@@ -26,7 +26,7 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
   languageData.add({
      Document: {
        autocomplete: completeHTML,
-       commentTokens: {blockComment: {open: "<!--", close: "-->"}},
+       commentTokens: {block: {open: "<!--", close: "-->"}},
     },
   }),
   indentNodeProp.add(type => {

@@ -1,8 +1,7 @@
 import ist from "ist"
-import { SelectionRange, EditorState, EditorSelection, Transaction, languageData, Extension } from "@codemirror/next/state"
+import { SelectionRange, EditorState, EditorSelection, Transaction, Extension } from "@codemirror/next/state"
 import { Text } from "@codemirror/next/text"
-import { toggleLineCommentWithOption, getLinesInRange, CommentOption, BlockCommenter, toggleBlockCommentWithOption } from "@codemirror/next/comment"
-import { StreamSyntax } from "@codemirror/next/stream-syntax"
+import { toggleLineCommentWithOption, getLinesInRange, CommentTokens, CommentOption, BlockCommenter, toggleBlockCommentWithOption } from "@codemirror/next/comment"
 import { html } from "@codemirror/next/lang-html"
 
 describe("comment", () => {
@@ -35,28 +34,21 @@ describe("comment", () => {
   /// s("line 1\nlin|e 2\nline 3")
   /// ```
   function s(doc: string, extensions: Extension[] = []): EditorState {
-    const markers = []
-    let pos = doc.indexOf("|", 0)
-    while (pos >= 0) {
+    let markers = [], pos
+    while ((pos = doc.indexOf("|", 0)) >= 0) {
       markers.push(pos)
       doc = doc.slice(0, pos) + doc.slice(pos + 1)
-      pos = doc.indexOf("|", pos)
-    }
-
-    if (markers.length > 2 && markers.length % 2 != 0) {
-      throw "Markers for multiple selections need to be even.";
     }
 
     const ranges: SelectionRange[] = []
-    for (let i = 0; i < markers.length; i += 2) {
-      if (i + 1 < markers.length) {
+    if (markers.length == 1) {
+      ranges.push(new SelectionRange(markers[0]))
+    } else if (markers.length % 2 != 0) {
+      throw "Markers for multiple selections need to be even.";
+    } else {
+      for (let i = 0; i < markers.length; i += 2)
         ranges.push(new SelectionRange(markers[i], markers[i + 1]))
-      } else {
-        ranges.push(new SelectionRange(markers[i]))
-      }
-    }
-    if (ranges.length == 0) {
-      ranges.push(new SelectionRange(0))
+      if (ranges.length == 0) ranges.push(new SelectionRange(0))
     }
 
     return EditorState.create({
@@ -67,13 +59,12 @@ describe("comment", () => {
   }
 
   function same(actualState: EditorState, expectedState: EditorState) {
-    ist(actualState)
-    ist(actualState!.doc.toString(), expectedState.doc.toString())
-    ist(JSON.stringify(actualState!.selection), JSON.stringify(expectedState.selection))
+    ist(actualState.doc.toString(), expectedState.doc.toString())
+    ist(JSON.stringify(actualState.selection), JSON.stringify(expectedState.selection))
   }
 
-  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null, syntax: StreamSyntax) => (...docs: string[]) => {
-    let st = s(docs[0], [syntax.extension])
+  const checkToggleChain = (toggle: (st: EditorState) => Transaction | null, config: CommentTokens) => (...docs: string[]) => {
+    let st = s(docs[0], [EditorState.addLanguageData.of({commentTokens: config})])
     for (let i = 1; i < docs.length; i++) {
       st = toggle(st)?.apply() ?? st
       same(st, s(docs[i]))
@@ -89,15 +80,7 @@ describe("comment", () => {
   // Runs all tests for the given line-comment token, `k`.
   function runLineCommentTests(k: string) {
 
-    const syntax = new StreamSyntax({
-      docProps: [[languageData, { commentTokens: { lineComment: k } }]],
-      token(stream) {
-        stream.next()
-        return ""
-      }
-    })
-
-    const check = checkToggleChain(toggleLineCommentWithOption(CommentOption.Toggle), syntax)
+    const check = checkToggleChain(toggleLineCommentWithOption(CommentOption.Toggle), {line: k})
 
     it(`toggles '${k}' comments in an empty single selection`, () => {
       check(
@@ -213,15 +196,7 @@ describe("comment", () => {
       ist(res)
     })
 
-    const syntax = new StreamSyntax({
-      docProps: [[languageData, { commentTokens: { blockComment: { open: o, close: c } } }]],
-      token(stream) {
-        stream.next()
-        return ""
-      }
-    })
-
-    const check = checkToggleChain(toggleBlockCommentWithOption(CommentOption.Toggle), syntax)
+    const check = checkToggleChain(toggleBlockCommentWithOption(CommentOption.Toggle), {block: {open: o, close: c}})
 
     it(`toggles ${o} ${c} block comment in multi-line selection`, () => {
       check(
@@ -262,7 +237,4 @@ describe("comment", () => {
 <!-- HTML only provides block comments -->`))
 
   })
-
-
-
 })

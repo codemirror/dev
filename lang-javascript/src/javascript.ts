@@ -13,7 +13,7 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
   languageData.add({
     Script: {
       closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
-      commentTokens: {lineComment: "//", blockComment: {open: "/*", close: "*/"}},
+      commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
     }
   }),
   indentNodeProp.add(type => {

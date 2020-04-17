@@ -1,6 +1,17 @@
 import { Text, Line } from "@codemirror/next/text"
 import { EditorState, Transaction, SelectionRange, Change, StateCommand } from "@codemirror/next/state"
 
+/// An object of this type can be provided as [language
+/// data](#state.EditorState.languageDataAt) under a `"commentTokens"`
+/// property to configure comment syntax for a language.
+export type CommentTokens = {
+  /// The block comment syntax, if any. For example, for JavaScript
+  /// you'd provide `{open: "/*", close: "*/"}`.
+  block?: {open: string, close: string},
+  /// The line comment syntax. For example `"//"`.
+  line?: string
+}
+
 /// Comments or uncomments the current `SelectionRange` using line-comments.
 /// The line-comment token is defined on a language basis.
 export const toggleLineComment: StateCommand = target => {
@@ -53,20 +64,18 @@ export enum CommentOption {
 
 /// @internal
 export const toggleBlockCommentWithOption = (option: CommentOption) => (state: EditorState): Transaction | null => {
-  type BlockCommentData = { blockComment: { open: string, close: string } | undefined } | undefined
-  const data = state.languageDataAt<BlockCommentData>("commentTokens", state.selection.primary.from)[0]
-  return data === undefined || data.blockComment === undefined || data.blockComment.open === undefined || data.blockComment.close === undefined
+  const data = state.languageDataAt<CommentTokens>("commentTokens", state.selection.primary.from)[0]
+  return !data || !data.block
     ? null
-    : new BlockCommenter(data.blockComment.open, data.blockComment.close).toggle(option, state)
+    : new BlockCommenter(data.block.open, data.block.close).toggle(option, state)
 }
 
 /// @internal
 export const toggleLineCommentWithOption = (option: CommentOption) => (state: EditorState): Transaction | null => {
-  type LineCommentData = { lineComment: string | undefined } | undefined
-  const data = state.languageDataAt<LineCommentData>("commentTokens", state.selection.primary.from)[0]
-  return data === undefined || data.lineComment === undefined
+  const data = state.languageDataAt<CommentTokens>("commentTokens", state.selection.primary.from)[0]
+  return !data || !data.line
     ? null
-    : new LineCommenter(data.lineComment).toggle(option, state)
+    : new LineCommenter(data.line).toggle(option, state)
 }
 
 /// This class performs toggle, comment and uncomment
