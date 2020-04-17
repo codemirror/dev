@@ -48,42 +48,39 @@ export const blockUncomment: StateCommand = target => {
   return dispatch(toggleBlockCommentWithOption(CommentOption.OnlyUncomment), target)
 }
 
-const dispatch = (cmd: (st: EditorState) => Transaction | null, target: { state: EditorState, dispatch: (transaction: Transaction) => void }): boolean => {
+function dispatch(cmd: (st: EditorState) => Transaction | null,
+                  target: { state: EditorState, dispatch: (transaction: Transaction) => void }): boolean {
   const tr = cmd(target.state)
   if (!tr) return false
   target.dispatch(tr)
   return true
 }
 
-/// @internal
-export enum CommentOption {
+enum CommentOption {
   Toggle,
   OnlyComment,
   OnlyUncomment,
 }
 
-/// @internal
-export const toggleBlockCommentWithOption = (option: CommentOption) => (state: EditorState): Transaction | null => {
-  const data = state.languageDataAt<CommentTokens>("commentTokens", state.selection.primary.from)[0]
-  return !data || !data.block
-    ? null
-    : new BlockCommenter(data.block.open, data.block.close).toggle(option, state)
+function getConfig(state: EditorState, pos = state.selection.primary.head) {
+  return state.languageDataAt<CommentTokens>("commentTokens", pos)[0] || {}
 }
 
-/// @internal
-export const toggleLineCommentWithOption = (option: CommentOption) => (state: EditorState): Transaction | null => {
-  const data = state.languageDataAt<CommentTokens>("commentTokens", state.selection.primary.from)[0]
-  return !data || !data.line
-    ? null
-    : new LineCommenter(data.line).toggle(option, state)
+const toggleBlockCommentWithOption = (option: CommentOption) => (state: EditorState): Transaction | null => {
+  const config = getConfig(state)
+  return config.block ? new BlockCommenter(config.block.open, config.block.close).toggle(option, state) : null
 }
 
-/// This class performs toggle, comment and uncomment
-/// of block comments in languages that support them.
-/// The `open` and `close` arguments refer to the open and close
-/// tokens of which this `BlockCommenter` is made up.
-/// @internal
-export class BlockCommenter {
+const toggleLineCommentWithOption = (option: CommentOption) => (state: EditorState): Transaction | null => {
+  const config = getConfig(state)
+  return config.line ? new LineCommenter(config.line).toggle(option, state) : null
+}
+
+// This class performs toggle, comment and uncomment
+// of block comments in languages that support them.
+// The `open` and `close` arguments refer to the open and close
+// tokens of which this `BlockCommenter` is made up.
+class BlockCommenter {
   constructor(readonly open: string, readonly close: string, readonly margin: string = " ") { }
 
   toggle(option: CommentOption, state: EditorState): Transaction | null {
@@ -166,12 +163,11 @@ export class BlockCommenter {
 
 const SearchMargin = 50
 
-/// This class performs toggle, comment and uncomment
-/// of line comments in languages that support them.
-/// The `lineCommentToken` argument refer to the token of
-/// which this `LineCommenter` is made up.
-/// @internal
-export class LineCommenter {
+// This class performs toggle, comment and uncomment
+// of line comments in languages that support them.
+// The `lineCommentToken` argument refer to the token of
+// which this `LineCommenter` is made up.
+class LineCommenter {
   constructor(readonly lineCommentToken: string, readonly margin: string = " ") { }
 
   toggle(option: CommentOption, state: EditorState): Transaction | null {
@@ -239,8 +235,7 @@ export class LineCommenter {
 
 }
 
-/// Computes the lines spanned by `range`.
-/// This function is exported mostly for testing purposes.
+// Computes the lines spanned by `range`.
 /// @internal
 export function getLinesInRange(doc: Text, range: SelectionRange): Line[] {
   let line: Line = doc.lineAt(range.from)
