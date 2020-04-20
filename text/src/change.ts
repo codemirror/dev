@@ -1,16 +1,14 @@
 import {textLength, sliceText} from "./text"
 
-// Internally, change sections are represented by integers, with the
-// section type in the first two bits and its length in the rest.
+// Internally, change sections are represented by pairs of integers,
+// with the type in the first value and its length in the second.
 const enum Type {
   Keep = 0,
   Del = 1,
+  // With an insert, the data structure might store the index into the
+  // insert table in the higher bits.
   Ins = 2,
-
-  Bits = 2, // FIXME this encoding is problematic since it'll require
-            // bit-shifting, which is lossy once you need more than 29 bits in the length
-  Scale = 4,
-  Mask = Type.Scale - 1
+  Mask = 3
 }
 
 export type ChangeSpec<Insert = readonly string[]> =
@@ -131,7 +129,7 @@ export class ChangeSet {
   static of(length: number, changes: ChangeSpec<readonly string[]>): ChangeSet {
     if (Array.isArray(changes)) {
       return changes.length ? flatten(changes.map(ch => ChangeSet.of(length, ch))) :
-        new ChangeSet(length ? [Type.Keep | (length * Type.Scale)] : empty, empty)
+        new ChangeSet(length ? [Type.Keep, length] : empty, empty)
     } else {
       let sections: number[] = [], inserted = empty, change = changes as any
       if (change.delete != null) {
@@ -180,7 +178,7 @@ export class ChangeDesc {
 
   map(other: ChangeDesc, before = false) {
     return joinSets(this, other, (typeA, typeB) => {
-      if (typeA == Type.Ins && (before || typeB != Type.Ins)) return typeA | Join.A
+      if (typeA == Type.Ins && (before || typeB < Type.Ins)) return typeA | Join.A
       if (typeB == Type.Ins) return Type.Keep | Join.B
       return typeB == Type.Del ? Join.Drop : typeA
     })
@@ -190,27 +188,31 @@ export class ChangeDesc {
 
   /// @internal
   toString() {
-    return this.sections
-      .map(s => ((s & Type.Mask) == Type.Ins ? "i" : (s & Type.Mask) == Type.Del ? "d" : "k") + (s >> Type.Bits))
-      .join("")
+    let result = ""
+    for (let i = 0, s = this.sections; i < s.length; i += 2)
+      result += (s[i] == Type.Del ? "d" : s[i] == Type.Keep ? "k" : "i") + s[i + 1]
+    return result
   }
 
   /// @internal
   static of(sections: readonly ["keep" | "ins" | "del", number][]) {
-    return new ChangeDesc(sections.map(([tp, len]) =>
-                                       (tp == "keep" ? Type.Keep : tp == "ins" ? Type.Ins : Type.Del) | (len * Type.Scale)))
+    let values = []
+    for (let [type, len] of sections) values.push(type == "keep" ? Type.Keep : type == "ins" ? Type.Ins : Type.Del, len)
+    return new ChangeDesc(values)
   }
 }
 
 function getLen(sections: readonly number[], ignore: Type) {
-  return sections.reduce((len, val) => len + ((val & Type.Mask) != ignore ? val >> Type.Bits : 0), 0)
+  let length = 0
+  for (let i = 0; i < sections.length; i += 2) if ((sections[i] & Type.Mask) != ignore) length += sections[i + 1]
+  return length
 }
 
 function mapThrough(sections: readonly number[], pos: number, assoc: number) {
   // FIXME mapping modes
   let result = pos
-  for (let i = 0, off = 0; i < sections.length; i++) {
-    let cur = sections[i], type = cur & Type.Mask, len = cur >> Type.Bits
+  for (let i = 0, off = 0; i < sections.length;) {
+    let type = sections[i++] & Type.Mask, len = sections[i++]
     if (type == Type.Ins) {
       if (off < pos || assoc > 0) result += len
     } else if (type == Type.Del) {
@@ -235,11 +237,9 @@ function flatten(descs: ChangeSet[], from = 0, to = descs.length): ChangeSet {
 
 function addSection(array: number[], type: Type, len: number) {
   if (len == 0) return
-  let last = array.length - 1
-  if (last >= 0 && (array[last] & Type.Mask) == type)
-    array[last] += len * Type.Scale
-  else
-    array.push(type | (len * Type.Scale))
+  let last = array.length - 2
+  if (last >= 0 && type == Type.Ins ? array[last] == Type.Ins : array[last] == type) array[last + 1] += len
+  else array.push(type, len)
 }
 
 function appendText(a: readonly string[], b: readonly string[]) {
@@ -250,7 +250,7 @@ function appendText(a: readonly string[], b: readonly string[]) {
 }
 
 function addInserted(inserted: (readonly string[])[], value: readonly string[], sections: readonly number[]) {
-  if (sections.length && (sections[sections.length - 1] & Type.Mask) == Type.Ins)
+  if (sections.length && (sections[sections.length - 2] & Type.Mask) == Type.Ins)
     inserted[inserted.length - 1] = appendText(inserted[inserted.length - 1], value)
   else
     inserted.push(value)
@@ -270,9 +270,8 @@ function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: numb
 
   function nextA() {
     if (iA < a.sections.length) {
-      let next = a.sections[iA++]
-      typeA = next & Type.Mask
-      lenA = next >> Type.Bits
+      typeA = a.sections[iA++] & Type.Mask
+      lenA = a.sections[iA++]
     } else {
       typeA = Type.Keep
       lenA = 0
@@ -282,9 +281,8 @@ function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: numb
 
   function nextB() {
     if (iB < b.sections.length) {
-      let next = b.sections[iB++]
-      typeB = next & Type.Mask
-      lenB = next >> Type.Bits
+      typeB = b.sections[iB++] & Type.Mask
+      lenB = b.sections[iB++]
     } else {
       typeB = Type.Keep
       lenB = 0
@@ -323,9 +321,8 @@ function iterSets(a: ChangeSet, b: ChangeSet, f: (typeA: number, lenA: number, t
   for (let move = 0;;) {
     if (move == Next.A || lenA == move) {
       if (iA < aArray.length) {
-        let next = aArray[iA++]
-        typeA = next & Type.Mask
-        lenA = next >> Type.Bits
+        typeA = aArray[iA++] & Type.Mask
+        lenA = aArray[iA++]
       } else {
         typeA = Type.Keep
         lenA = 0
@@ -335,9 +332,8 @@ function iterSets(a: ChangeSet, b: ChangeSet, f: (typeA: number, lenA: number, t
     }
     if (move == Next.B || lenB == move) {
       if (iB < bArray.length) {
-        let next = bArray[iB++]
-        typeB = next & Type.Mask
-        lenB = next >> Type.Bits
+        typeB = bArray[iB++] & Type.Mask
+        lenB = bArray[iB++]
       } else {
         typeB = Type.Keep
         lenB = 0
