@@ -1,4 +1,4 @@
-import {textLength, sliceText} from "./text"
+import {Text, textLength, sliceText} from "./text"
 
 // Internally, change sections are represented by pairs of integers,
 // with the type in the first value and its length in the second.
@@ -8,11 +8,18 @@ const enum Type {
   Ins = 2
 }
 
+/// This type is used a the argument type to methods that build up
+/// change sets. A spec can either be an insertion (specified as its
+/// content, typed by the type parameter, and its position), a
+/// deletion, or an array of change specs.
 export type ChangeSpec<Insert = readonly string[]> =
   {insert: Insert, at: number} |
   {delete: number, to: number} |
   readonly ChangeSpec<Insert>[]
 
+/// A change set represents a group of modifications to a document. It
+/// stores the document length, and can only be applied to documents
+/// with exactly that length.
 export class ChangeSet {
   /// @internal
   constructor(
@@ -28,11 +35,61 @@ export class ChangeSet {
   /// The length of the document after the change.
   get newLength() { return getLen(this.sections, Type.Del) }
 
+  /// Apply the changes to a document, returning the modified
+  /// document.
+  apply(doc: Text) {
+    if (this.length != doc.length) throw new RangeError("Applying change set to a document with the wrong length")
+    for (let pos = 0, i = 0; i < this.sections.length;) {
+      let type = this.sections[i++], len = this.sections[i++]
+      if (type == Type.Keep) {
+        pos += len
+      } else {
+        let start = pos, end = pos, text: readonly string[] = noText
+        for (;;) {
+          if (type == Type.Ins) {
+            pos += len
+            let ins = this.inserted[(i - 2) >> 1] as readonly string[]
+            text = text == noText ? ins : appendText(text, ins)
+          } else {
+            end += len
+          }
+          if (i == this.sections.length || this.sections[i] == Type.Keep) break
+          type = this.sections[i++]; len = this.sections[i++]
+        }
+        doc = doc.replace(start, end, text)
+      }
+    }
+    return doc
+  }
+
+  /// Given the document as it existed _before_ the changes, return a
+  /// change set that represents the inverse of this set, which could
+  /// be used to go from the document created by the changes back to
+  /// the document as it existed before the changes.
+  invert(doc: Text) {
+    let sections = this.sections.slice(), inserted = []
+    for (let i = 0, pos = 0; i < sections.length; i += 2) {
+      let type = sections[i], len = sections[i + 1]
+      if (type == Type.Ins) {
+        sections[i] = Type.Del
+      } else if (type == Type.Del) {
+        sections[i] = Type.Ins
+        let index = i >> 1
+        while (inserted.length < index) inserted.push(null)
+        inserted.push(doc.sliceLines(pos, pos + len))
+        pos += len
+      } else {
+        pos += len
+      }
+    }
+    return new ChangeSet(sections, inserted)
+  }
+
   // Combine two subsequent change sets into a single set. `other`
   // must start in the document produced by `this`. If `this` goes
   // `docA` → `docB` and `other` represents `docB` → `docC`, the
   // returned value will represent the change `docA` → `docC`.
-  compose(other: ChangeSet): ChangeDesc { return joinSets(this, other, joinCompose) }
+  compose(other: ChangeSet) { return joinSets(this, other, joinCompose) }
 
   /// Combine two change sets that start in the same document to
   /// create a change set that represents the union of both.
@@ -49,6 +106,10 @@ export class ChangeSet {
   /// corresponding position in the new document.
   mapPos(pos: number, assoc = -1) { return mapThrough(this.sections, pos, assoc) }
 
+  /// Get a [change description](#text.ChangeDesc) for this change
+  /// set.
+  get desc() { return new ChangeDesc(this.sections) }
+
   /// Create a change set for the given collection of changes.
   static of(length: number, changes: ChangeSpec<readonly string[]>): ChangeSet {
     if (Array.isArray(changes)) {
@@ -62,7 +123,7 @@ export class ChangeSet {
         addSection(sections, Type.Keep, length - change.to)
       } else {
         let insertLen = textLength(change.insert)
-        if (insertLen) inserted = [change.insert]
+        if (insertLen) inserted = change.at ? [null, change.insert] : [change.insert]
         addSection(sections, Type.Keep, change.at)
         addSection(sections, Type.Ins, insertLen)
         addSection(sections, Type.Keep, length - change.at)
@@ -72,6 +133,10 @@ export class ChangeSet {
   }
 }
 
+/// A change description is a variant of [change set](#text.ChangeSet)
+/// that doesn't store the inserted text. As such, it can't be
+/// applied, but is cheaper to store and manipulate. It has most of
+/// the same methods and properties as [`ChangeSet`](#text.ChangeSet).
 export class ChangeDesc {
   /// @internal
   constructor(
@@ -83,7 +148,11 @@ export class ChangeDesc {
 
   get newLength() { return getLen(this.sections, Type.Del) }
 
-  compose(other: ChangeDesc): ChangeDesc { return joinSets(this, other, joinCompose) }
+  invert() {
+    return new ChangeDesc(this.sections.map((v, i) => i % 2 || v == Type.Keep ? v : v == Type.Del ? Type.Ins : Type.Del))
+  }
+
+  compose(other: ChangeDesc) { return joinSets(this, other, joinCompose) }
 
   combine(other: ChangeDesc) { return joinSets(this, other, joinCombine) }
 
@@ -131,7 +200,7 @@ function mapThrough(sections: readonly number[], pos: number, assoc: number) {
   return result
 }
 
-const empty: readonly any[] = []
+const empty: readonly any[] = [], noText = [""]
 
 // Recursively combine a set of changes
 function flatten(descs: ChangeSet[], from = 0, to = descs.length): ChangeSet {
@@ -205,13 +274,13 @@ function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: numb
     if (type != Join.Drop) {
       addSection(sections, type, len)
       if (type == Type.Ins && insert) {
-        let value = join & Join.A || !(join & Join.B) || typeA == Type.Ins
-          ? takeInsert(a.inserted!, iA, offA, lenA) : takeInsert(b.inserted!, iB, offB, lenB)
+        let value = join & Join.A || !(join & Join.B) && typeA == Type.Ins
+          ? takeInsert(a.inserted!, iA, offA, len) : takeInsert(b.inserted!, iB, offB, len)
         let index = (sections.length - 2) >> 1
-        if (insert.length == index - 1) { // Already exists
-          insert[index - 1] = appendText(insert[index - 1] as readonly string[], value)
+        if (insert.length > index) { // Already exists
+          insert[index] = appendText(insert[index] as readonly string[], value)
         } else {
-          while (insert.length < index - 1) insert.push(null)
+          while (insert.length < index) insert.push(null)
           insert.push(value)
         }
       }
@@ -224,8 +293,8 @@ function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: numb
 }
 
 function takeInsert(array: readonly (readonly string[] | null)[], index: number, off: number, len: number): readonly string[] {
-  let value = array[index] as readonly string[]
-  return off < 0 || off + len < textLength(value) ? sliceText(value, off, off + len) : value
+  let value = array[(index - 2) >> 1] as readonly string[]
+  return off > 0 || off + len < textLength(value) ? sliceText(value, off, off + len) : value
 }
 
 function joinCompose(typeA: Type, typeB: Type) {

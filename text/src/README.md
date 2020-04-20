@@ -17,6 +17,14 @@ and count each line break and UTF-16 code unit as one unit.
 
 @TextIterator
 
+### Changes
+
+@ChangeSpec
+
+@ChangeSet
+
+@ChangeDesc
+
 ### Column Utilities
 
 @countColumn
