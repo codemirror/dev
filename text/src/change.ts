@@ -5,10 +5,7 @@ import {textLength, sliceText} from "./text"
 const enum Type {
   Keep = 0,
   Del = 1,
-  // With an insert, the data structure might store the index into the
-  // insert table in the higher bits.
-  Ins = 2,
-  Mask = 3
+  Ins = 2
 }
 
 export type ChangeSpec<Insert = readonly string[]> =
@@ -22,7 +19,7 @@ export class ChangeSet {
     /// @internal
     readonly sections: readonly number[],
     /// @internal
-    readonly inserted: readonly (readonly string[])[]
+    readonly inserted: readonly (readonly string[] | null)[]
   ) {}
 
   /// The length of the document before the change.
@@ -35,91 +32,18 @@ export class ChangeSet {
   // must start in the document produced by `this`. If `this` goes
   // `docA` → `docB` and `other` represents `docB` → `docC`, the
   // returned value will represent the change `docA` → `docC`.
-  compose(other: ChangeSet) {
-    let sections: number[] = []
-    let inserted: (readonly string[])[] = []
-    let insIndexA = 0, insIndexB = 0, insOffA = 0
-    iterSets(this, other, (typeA, lenA, typeB, lenB) => {
-      if (typeA == Type.Del) {
-        addSection(sections, typeA, lenA)
-        return Next.A
-      } else if (typeB == Type.Ins) {
-        addInserted(inserted, other.inserted![insIndexB++], sections)
-        addSection(sections, typeB, lenB)
-        return Next.B
-      } else if (lenA == 0 || lenB == 0) {
-        return Next.Stop
-      } else {
-        let len = Math.min(lenA, lenB)
-        if (typeA == Type.Ins) {
-          if (typeB != Type.Del)
-            addInserted(inserted, sliceText(this.inserted[insIndexA], insOffA, insOffA + len), sections)
-          insOffA += len
-          if (insOffA == textLength(this.inserted[insIndexA])) {
-            insIndexA++
-            insOffA = 0
-          }
-        }
-        if (typeA != Type.Ins || typeB != Type.Del) // These cancel each other
-          addSection(sections, typeA == Type.Keep ? typeB : typeA, len)
-        return len
-      }
-    })
-    return new ChangeSet(sections, inserted)
-  }
+  compose(other: ChangeSet): ChangeDesc { return joinSets(this, other, joinCompose) }
 
   /// Combine two change sets that start in the same document to
   /// create a change set that represents the union of both.
-  combine(other: ChangeSet) {
-    let sections: number[] = []
-    let inserted: (readonly string[])[] = [], insIndexA = 0, insIndexB = 0
-    iterSets(this, other, (typeA, lenA, typeB, lenB) => {
-      if (typeA == Type.Ins) {
-        if (inserted) addInserted(inserted, this.inserted![insIndexA++], sections)
-        addSection(sections, typeA, lenA)
-        return Next.A
-      } else if (typeB == Type.Ins) {
-        if (inserted) addInserted(inserted, other.inserted![insIndexB++], sections)
-        addSection(sections, typeB, lenB)
-        return Next.B
-      } else if (lenA == 0 || lenB == 0) {
-        return Next.Stop
-      } else {
-        let len = Math.min(lenA, lenB)
-        addSection(sections, typeA == Type.Del ? typeA : typeB, len)
-        return len
-      }
-    })
-    return new ChangeSet(sections, inserted)
-  }
+  combine(other: ChangeSet) { return joinSets(this, other, joinCombine) }
 
   // Given another change set starting in the same document, maps this
   // change set over the other, producing a new change set that can be
   // applied to the document produced by applying `other`. When
   // `before` is `true`, order changes as if `this` comes before
   // `other`, otherwise (the default) treat `other` as coming first.
-  map(other: ChangeSet, before = false) {
-    let sections: number[] = []
-    let inserted: (readonly string[])[] = [], insIndexA = 0, insIndexB = 0
-    iterSets(this, other, (typeA, lenA, typeB, lenB) => {
-      if (typeB == Type.Ins && (!before || typeA != Type.Ins)) {
-        if (inserted) addInserted(inserted, other.inserted![insIndexB++], sections)
-        addSection(sections, Type.Keep, lenB)
-        return Next.B
-      } else if (typeA == Type.Ins) {
-        if (inserted) addInserted(inserted, this.inserted![insIndexA++], sections)
-        addSection(sections, typeA, lenA)
-        return Next.A
-      } else if (lenA == 0 || lenB == 0) {
-        return Next.Stop
-      } else {
-        let len = Math.min(lenA, lenB)
-        if (typeB != Type.Del) addSection(sections, typeA, len)
-        return len
-      }
-    })
-    return new ChangeSet(sections, inserted)
-  }
+  map(other: ChangeSet, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
 
   /// Map a position through this set of changes, returning the
   /// corresponding position in the new document.
@@ -159,30 +83,11 @@ export class ChangeDesc {
 
   get newLength() { return getLen(this.sections, Type.Del) }
 
-  compose(other: ChangeDesc): ChangeDesc {
-    return joinSets(this, other, (typeA, typeB) => {
-      if (typeA == Type.Del) return typeA | Join.A
-      if (typeB == Type.Ins) return typeB | Join.B
-      if (typeA == Type.Ins && typeB == Type.Del) return Join.Drop
-      return typeA == Type.Keep ? typeB : typeA
-    })
-  }
+  compose(other: ChangeDesc): ChangeDesc { return joinSets(this, other, joinCompose) }
 
-  combine(other: ChangeDesc) {
-    return joinSets(this, other, (typeA, typeB) => {
-      if (typeA == Type.Ins) return typeA | Join.A
-      if (typeB == Type.Ins) return typeB | Join.B
-      return typeA == Type.Del ? typeA : typeB
-    })
-  }
+  combine(other: ChangeDesc) { return joinSets(this, other, joinCombine) }
 
-  map(other: ChangeDesc, before = false) {
-    return joinSets(this, other, (typeA, typeB) => {
-      if (typeA == Type.Ins && (before || typeB < Type.Ins)) return typeA | Join.A
-      if (typeB == Type.Ins) return Type.Keep | Join.B
-      return typeB == Type.Del ? Join.Drop : typeA
-    })
-  }
+  map(other: ChangeDesc, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
 
   mapPos(pos: number, assoc = -1) { return mapThrough(this.sections, pos, assoc) }
 
@@ -204,7 +109,7 @@ export class ChangeDesc {
 
 function getLen(sections: readonly number[], ignore: Type) {
   let length = 0
-  for (let i = 0; i < sections.length; i += 2) if ((sections[i] & Type.Mask) != ignore) length += sections[i + 1]
+  for (let i = 0; i < sections.length; i += 2) if (sections[i] != ignore) length += sections[i + 1]
   return length
 }
 
@@ -212,7 +117,7 @@ function mapThrough(sections: readonly number[], pos: number, assoc: number) {
   // FIXME mapping modes
   let result = pos
   for (let i = 0, off = 0; i < sections.length;) {
-    let type = sections[i++] & Type.Mask, len = sections[i++]
+    let type = sections[i++], len = sections[i++]
     if (type == Type.Ins) {
       if (off < pos || assoc > 0) result += len
     } else if (type == Type.Del) {
@@ -249,102 +154,101 @@ function appendText(a: readonly string[], b: readonly string[]) {
   return result
 }
 
-function addInserted(inserted: (readonly string[])[], value: readonly string[], sections: readonly number[]) {
-  if (sections.length && (sections[sections.length - 2] & Type.Mask) == Type.Ins)
-    inserted[inserted.length - 1] = appendText(inserted[inserted.length - 1], value)
-  else
-    inserted.push(value)
-}
-
-const enum Join { Drop = 3, A = 4, B = 8 }
+const enum Join { Drop = 3, A = 4, B = 8, TypeMask = 3 }
 
 interface Joinable {
   sections: readonly number[],
-  inserted?: readonly (readonly string[])[]
+  inserted?: readonly (readonly string[] | null)[]
 }
 
-function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: number) => number): ChangeDesc {
+function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: number) => number): T {
   let sections: number[] = []
-  let iA = 0, typeA = Type.Keep, lenA = 0
-  let iB = 0, typeB = Type.Keep, lenB = 0
+  let insert: null | (readonly string[] | null)[] = a.inserted ? [] : null
+  let iA = 0, typeA = Type.Keep, lenA = 0, offA = 0
+  let iB = 0, typeB = Type.Keep, lenB = 0, offB = 0
 
-  function nextA() {
-    if (iA < a.sections.length) {
-      typeA = a.sections[iA++] & Type.Mask
+  for (let moveA = 0, moveB = 0;;) {
+    if (moveA < lenA) {
+      lenA -= moveA
+      offA += moveA
+    } else if (iA < a.sections.length) {
+      typeA = a.sections[iA++]
       lenA = a.sections[iA++]
+      offA = 0
     } else {
       typeA = Type.Keep
-      lenA = 0
+      lenA = offA = 0
     }
-  }
-  nextA()
-
-  function nextB() {
-    if (iB < b.sections.length) {
-      typeB = b.sections[iB++] & Type.Mask
+    if (moveB < lenB) {
+      lenB -= moveB
+      offB += moveB
+    } else if (iB < b.sections.length) {
+      typeB = b.sections[iB++]
       lenB = b.sections[iB++]
+      offB = 0
     } else {
       typeB = Type.Keep
-      lenB = 0
+      lenB = offB = 0
     }
-  }
-  nextB()
 
-  for (;;) {
     let join = f(typeA, typeB)
-    let len, type = join & Type.Mask
+    let len, type = join & Join.TypeMask
     if (join & Join.A) {
-      len = lenA
-      nextA()
+      len = moveA = lenA
+      moveB = 0
     } else if (join & Join.B) {
-      len = lenB
-      nextB()
+      len = moveB = lenB
+      moveA = 0
     } else {
-      len = Math.min(lenA, lenB)
-      if (!(lenA -= len)) nextA()
-      if (!(lenB -= len)) nextB()
+      moveA = moveB = len = Math.min(lenA, lenB)
     }
-    if (type != Join.Drop) addSection(sections, type, len)
+    if (type != Join.Drop) {
+      addSection(sections, type, len)
+      if (type == Type.Ins && insert) {
+        let value = join & Join.A || !(join & Join.B) || typeA == Type.Ins
+          ? takeInsert(a.inserted!, iA, offA, lenA) : takeInsert(b.inserted!, iB, offB, lenB)
+        let index = (sections.length - 2) >> 1
+        if (insert.length == index - 1) { // Already exists
+          insert[index - 1] = appendText(insert[index - 1] as readonly string[], value)
+        } else {
+          while (insert.length < index - 1) insert.push(null)
+          insert.push(value)
+        }
+      }
+    }
     if (len == 0) {
       if (lenA != lenB) throw new RangeError("Mismatched change set lengths")
-      return new ChangeDesc(sections)
+      return new (a.constructor as any)(sections, insert)
     }
   }
 }
 
-const enum Next { A = -1, B = -2, Stop = 0 }
+function takeInsert(array: readonly (readonly string[] | null)[], index: number, off: number, len: number): readonly string[] {
+  let value = array[index] as readonly string[]
+  return off < 0 || off + len < textLength(value) ? sliceText(value, off, off + len) : value
+}
 
-function iterSets(a: ChangeSet, b: ChangeSet, f: (typeA: number, lenA: number, typeB: number, lenB: number) => number) {
-  let aArray = a.sections, iA = 0, typeA = Type.Keep, lenA = 0
-  let bArray = b.sections, iB = 0, typeB = Type.Keep, lenB = 0
+function joinCompose(typeA: Type, typeB: Type) {
+  if (typeA == Type.Del) return typeA | Join.A
+  if (typeB == Type.Ins) return typeB | Join.B
+  if (typeA == Type.Ins && typeB == Type.Del) return Join.Drop
+  return typeA == Type.Keep ? typeB : typeA
+}
 
-  for (let move = 0;;) {
-    if (move == Next.A || lenA == move) {
-      if (iA < aArray.length) {
-        typeA = aArray[iA++] & Type.Mask
-        lenA = aArray[iA++]
-      } else {
-        typeA = Type.Keep
-        lenA = 0
-      }
-    } else if (move != Next.B) {
-      lenA -= move
-    }
-    if (move == Next.B || lenB == move) {
-      if (iB < bArray.length) {
-        typeB = bArray[iB++] & Type.Mask
-        lenB = bArray[iB++]
-      } else {
-        typeB = Type.Keep
-        lenB = 0
-      }
-    } else if (move != Next.A) {
-      lenB -= move
-    }
-    move = f(typeA, lenA, typeB, lenB)
-    if (move == Next.Stop) {
-      if (lenA == 0 && lenB == 0) break
-      throw new RangeError("Mismatched change set lengths")
-    }
-  }
+function joinCombine(typeA: Type, typeB: Type) {
+  if (typeA == Type.Ins) return typeA | Join.A
+  if (typeB == Type.Ins) return typeB | Join.B
+  return typeA == Type.Del ? typeA : typeB
+}
+
+function joinMapBefore(typeA: Type, typeB: Type) {
+  if (typeA == Type.Ins) return typeA | Join.A
+  if (typeB == Type.Ins) return Type.Keep | Join.B
+  return typeB == Type.Del ? Join.Drop : typeA
+}
+
+function joinMapAfter(typeA: Type, typeB: Type) {
+  if (typeB == Type.Ins) return Type.Keep | Join.B
+  if (typeA == Type.Ins) return typeA | Join.A
+  return typeB == Type.Del ? Join.Drop : typeA
 }
