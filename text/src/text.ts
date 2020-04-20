@@ -154,7 +154,7 @@ class TextLeaf extends Text {
 
   get children() { return null }
 
-  replaceInner(from: number, to: number, text: readonly string[], length: number): Text {
+  replaceInner(from: number, to: number, text: readonly string[]): Text {
     return Text.of(appendText(this.text, appendText(text, sliceText(this.text, 0, from)), to))
   }
 
@@ -374,7 +374,7 @@ class TextNode extends Text {
 
 Text.empty = Text.of([""])
 
-function textLength(text: readonly string[]) {
+export function textLength(text: readonly string[]) {
   let length = -1
   for (let line of text) length += line.length + 1
   return length
@@ -394,7 +394,7 @@ function appendText(text: readonly string[], target: string[], from = 0, to = 1e
   return target
 }
 
-function sliceText(text: readonly string[], from?: number, to?: number): string[] {
+export function sliceText(text: readonly string[], from?: number, to?: number): string[] {
   return appendText(text, [""], from, to)
 }
 
