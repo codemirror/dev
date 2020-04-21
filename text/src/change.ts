@@ -1,7 +1,30 @@
 import {Text, textLength, sliceText} from "./text"
 
-// Internally, change sections are represented by pairs of integers,
-// with the type in the first value and its length in the second.
+/// Changes are represented as a sequence of sections. Each section
+/// either keeps a span of old content, deletes a span, or inserts new
+/// content.
+export enum Section {
+  Keep = 0,
+  Delete = 1,
+  Insert = 2
+}
+
+/// Distinguishes different ways in which positions can be mapped.
+export enum MapMode {
+  /// Map a position to a valid new position, even when its context
+  /// was deleted.
+  Simple,
+  /// Return -1 if deletion happens across the position.
+  TrackDel,
+  /// Return -1 if the character _before_ the position is deleted.
+  TrackBefore,
+  /// Return -1 if the character _after_ the position is deleted.
+  TrackAfter
+}
+
+// And the same enum again, inlined (just because). Internally, change
+// sections are represented by pairs of integers, with the type in the
+// first value and its length in the second.
 const enum Type {
   Keep = 0,
   Del = 1,
@@ -34,6 +57,12 @@ export class ChangeSet {
 
   /// The length of the document after the change.
   get newLength() { return getLen(this.sections, Type.Del) }
+
+  /// Iterate over the sections in this change set, calling `f` for
+  /// each.
+  iter(f: (type: Section, fromA: number, toA: number, fromB: number, toB: number, inserted: null | readonly string[]) => void) {
+    iter(this.sections, this.inserted, f)
+  }
 
   /// Apply the changes to a document, returning the modified
   /// document.
@@ -104,7 +133,7 @@ export class ChangeSet {
 
   /// Map a position through this set of changes, returning the
   /// corresponding position in the new document.
-  mapPos(pos: number, assoc = -1) { return mapThrough(this.sections, pos, assoc) }
+  mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
 
   /// Get a [change description](#text.ChangeDesc) for this change
   /// set.
@@ -148,6 +177,10 @@ export class ChangeDesc {
 
   get newLength() { return getLen(this.sections, Type.Del) }
 
+  iter(f: (type: Section, fromA: number, toA: number, fromB: number, toB: number) => void) {
+    iter(this.sections, null, f)
+  }
+
   invert() {
     return new ChangeDesc(this.sections.map((v, i) => i % 2 || v == Type.Keep ? v : v == Type.Del ? Type.Ins : Type.Del))
   }
@@ -158,7 +191,7 @@ export class ChangeDesc {
 
   map(other: ChangeDesc, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
 
-  mapPos(pos: number, assoc = -1) { return mapThrough(this.sections, pos, assoc) }
+  mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
 
   /// @internal
   toString() {
@@ -182,14 +215,36 @@ function getLen(sections: readonly number[], ignore: Type) {
   return length
 }
 
-function mapThrough(sections: readonly number[], pos: number, assoc: number) {
-  // FIXME mapping modes
+function iter(sections: readonly number[], inserted: null | readonly (null | readonly string[])[],
+              f: (type: Section, fromA: number, toA: number, fromB: number, toB: number,
+                  inserted: null | readonly string[]) => void) {
+  let posA = 0, posB = 0
+  for (let i = 0; i < sections.length;) {
+    let type = sections[i++], len = sections[i++], endA = posA, endB = posB, ins: null | readonly string[] = null
+    if (type == Type.Keep) {
+      endA += len; endB += len
+    } else if (type == Type.Ins) {
+      endB += len
+      if (inserted) ins = inserted[(i - 2) >> 1]
+    } else {
+      endA += len
+    }
+    f(type, posA, endA, posB, endB, ins)
+    posA = endA; posB = endB
+  }
+}
+
+function mapThrough(sections: readonly number[], pos: number, assoc: number, mode: MapMode) {
   let result = pos
   for (let i = 0, off = 0; i < sections.length;) {
     let type = sections[i++], len = sections[i++]
     if (type == Type.Ins) {
       if (off < pos || assoc > 0) result += len
     } else if (type == Type.Del) {
+      if (mode != MapMode.Simple &&
+          (mode == MapMode.TrackDel && off < pos && off + len > pos ||
+           mode == MapMode.TrackBefore && off < pos && off + len >= pos ||
+           mode == MapMode.TrackAfter && off <= pos && off + len > pos)) return -1
       result -= Math.min(len, pos - off)
       off += len
     } else {

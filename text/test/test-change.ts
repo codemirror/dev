@@ -1,4 +1,4 @@
-import {ChangeDesc, ChangeSet, Text} from "@codemirror/next/text"
+import {ChangeDesc, ChangeSet, Text, MapMode, Section} from "@codemirror/next/text"
 import ist from "ist"
 
 function mk(spec: string) {
@@ -77,16 +77,22 @@ describe("ChangeDesc", () => {
   })
 
   describe("mapPos", () => {
-    function map(spec: string, ...cases: ([number, number] | [number, number, number])[]) {
+    function map(spec: string, ...cases: [number, number, number?, number?][]) {
       let set = mk(spec)
-      for (let [from, to, assoc = -1] of cases) ist(set.mapPos(from, assoc), to)
+      for (let [from, to, assoc = -1, mode = MapMode.Simple] of cases) ist(set.mapPos(from, assoc, mode), to)
     }
 
     it("maps through an insertion",
        () => map("k4i2k4", [0, 0], [4, 4], [4, 6, 1], [5, 7], [8, 10]))
 
     it("maps through deletion",
-       () => map("k4d4k4", [0, 0], [4, 4], [5, 4], [7, 4], [8, 4], [9, 5], [12, 8]))
+       () => map("k4d4k4", [0, 0],
+                 [4, 4],
+                 [4, 4, 0, MapMode.TrackDel], [4, 4, 0, MapMode.TrackBefore], [4, -1, 0, MapMode.TrackAfter],
+                 [5, 4], [5, -1, 0, MapMode.TrackDel], [5, -1, 0, MapMode.TrackBefore], [5, -1, 0, MapMode.TrackAfter],
+                 [7, 4],
+                 [8, 4], [8, 4, 0, MapMode.TrackDel], [8, -1, 0, MapMode.TrackBefore], [8, 4, 0, MapMode.TrackAfter],
+                 [9, 5], [12, 8]))
 
     it("maps through multiple insertions",
        () => map("i2k2i2k2i2", [0, 0], [0, 2, 1], [1, 3], [2, 4], [2, 6, 1], [3, 7], [4, 8], [4, 10, 1]))
@@ -139,6 +145,21 @@ describe("ChangeSet", () => {
   it("can apply inverted sets", () => {
     let set0 = ChangeSet.of(10, [{insert: ["hi"], at: 5}, {delete: 8, to: 10}])
     ist(set0.invert(doc10).apply(set0.apply(doc10)).toString(), doc10.toString())
+  })
+
+  it("can be iterated", () => {
+    let set = ChangeSet.of(10, [{insert: ["ok"], at: 4}, {delete: 6, to: 8}])
+    let result: any[] = []
+    set.iter((type, fromA, toA, fromB, toB, inserted) => {
+      result.push([type == Section.Keep ? "k" : type == Section.Delete ? "d" : "i",
+                   fromA, toA, fromB, toB, inserted])
+    })
+    ist(JSON.stringify(result),
+        JSON.stringify([["k", 0, 4, 0, 4, null],
+                        ["i", 4, 4, 4, 6, ["ok"]],
+                        ["k", 4, 6, 6, 8, null],
+                        ["d", 6, 8, 8, 8, null],
+                        ["k", 8, 10, 8, 10, null]]))
   })
 
   function r(n: number) { return Math.floor(Math.random() * n) }
