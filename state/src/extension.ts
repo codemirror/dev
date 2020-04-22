@@ -1,9 +1,8 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
-import {Line} from "@codemirror/next/text"
+import {Line, ChangeSet} from "@codemirror/next/text"
 import {EditorState} from "./state"
 import {Transaction} from "./transaction"
 import {Facet} from "./facet"
-import {Change, ChangeSet} from "./change"
 import {EditorSelection} from "./selection"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
@@ -16,7 +15,7 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   static: true
 })
 
-export const changeFilter = Facet.define<(change: Change, state: EditorState, before: ChangeSet) => readonly Change[] | null>()
+export const changeFilter = Facet.define<(changes: ChangeSet, state: EditorState) => ChangeSet>()
 
 export const selectionFilter = Facet.define<(selection: EditorSelection,
                                              state: EditorState, changes: ChangeSet) => EditorSelection>()

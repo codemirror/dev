@@ -1,7 +1,7 @@
-import {Text} from "@codemirror/next/text"
+import {Text, ChangeSet, ChangeDesc, ChangeSpec as TextChangeSpec} from "@codemirror/next/text"
 import {Tree} from "lezer-tree"
-import {EditorSelection, checkSelection} from "./selection"
-import {Transaction} from "./transaction"
+import {EditorSelection, SelectionRange, checkSelection} from "./selection"
+import {Transaction, scrollIntoView, TransactionSpec} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData,
         changeFilter, selectionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
@@ -24,6 +24,19 @@ export interface EditorStateConfig {
   /// this state.
   extensions?: Extension
 }
+
+/// This type is used as argument to
+/// [`EditorState.changeSet`](#state.EditorState.changeSet) and in the
+/// [`changes` field](#state.TransactionSpec.changes) of transaction
+/// specs to succinctly describe document changes. Depending on its
+/// object shape, it represents an insertion, a deletion, or a
+/// replacement.
+export type ChangeSpec =
+  ChangeSet |
+  {insert: string, at: number} |
+  {delete: number, to: number} |
+  {replace: number, to: number, with: string} |
+  readonly ChangeSpec[]
 
 const DefaultIndentUnit = 2, DefaultTabsize = 4, DefaultSplit = /\r\n?|\n/
 
@@ -85,11 +98,80 @@ export class EditorState {
     return getAddr(this, addr)
   }
 
-  /// Start a new transaction from this state. When not given, the
-  /// timestamp defaults to
-  /// [`Date.now()`](https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Date/now).
-  t(timestamp?: number): Transaction {
-    return new Transaction(this, timestamp)
+  tr(spec: TransactionSpec): Transaction {
+    let changes = this.changes(spec.changes)
+    let annotations = (spec.annotations || none).slice()
+    if (!annotations.some(a => a.type == Transaction.time))
+      annotations.push(Transaction.time.of(Date.now()))
+    if (spec.scrollIntoView) annotations.push(scrollIntoView.of(true))
+    let selection = spec.selection && (spec.selection instanceof EditorSelection ? spec.selection
+                                       : EditorSelection.single(spec.selection.anchor, spec.selection.head))
+    let reconf = !(spec.reconfigure || spec.replaceExtensions) ? undefined
+      : {base: spec.reconfigure || this.config.source, replace: spec.replaceExtensions || Object.create(null)}
+    return new Transaction(this, changes, selection, spec.effects || none, annotations, reconf)
+  }
+
+  /// @internal
+  applyTransaction(tr: Transaction) {
+    let conf = tr.reconfigure ? Configuration.resolve(tr.reconfigure.base, tr.reconfigure.replace, this) : this.config
+    return new EditorState(conf, tr.changes.apply(this.doc), tr.selection || this.selection.map(tr.changes), tr)
+  }
+
+  replaceSelection(text: string): Transaction {
+    return this.changeByRange(range => ({changes: [{replace: range.from, to: range.to, with: text}],
+                                         range: new SelectionRange(range.from + text.length)}))
+  }
+
+  changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}) {
+    let sel = this.selection
+    if (sel.ranges.length == 1) {
+      let {changes, range} = f(sel.primary)
+      return this.tr({changes, selection: EditorSelection.create([range])})
+    } else {
+      let allChanges: ChangeSet | undefined, changeSets = [], newRanges = []
+      for (let r of sel.ranges) {
+        let {changes, range} = f(r)
+        let resolved = changes && this.changes(changes)
+        if (resolved) allChanges = allChanges ? allChanges.combine(resolved) : resolved
+        newRanges.push(range)
+        changeSets.push(resolved)
+      }
+      for (let i = 0; i < newRanges.length; i++) {
+        let others: ChangeDesc | undefined
+        for (let j = 0; j < changeSets.length; j++) if (j != i && changeSets[j])
+          others = others ? others.combine(changeSets[j]!.desc) : changeSets[j]!.desc
+        if (others)
+          newRanges[i] = newRanges[i].map(changeSets[i] ? others.map(changeSets[i]!) : others)
+      }
+      return this.tr({changes: allChanges, selection: EditorSelection.create(newRanges, sel.primaryIndex)})
+    }
+  }
+
+  changes(spec: ChangeSpec | undefined) {
+    if (spec instanceof ChangeSet) return spec
+    let changes: TextChangeSpec[] = [], set: ChangeSet | undefined
+    let len = this.doc.length
+    let convert = (spec: any) => {
+      if (!spec) {
+      } else if (Array.isArray(spec)) {
+        for (let part of spec) convert(part)
+      } else if (spec instanceof ChangeSet) {
+        set = ChangeSet.of(len, changes).combine(spec)
+        changes = []
+      } else if (spec.insert != null) {
+        checkRange(spec.at, spec.at, len)
+        changes.push({insert: this.splitLines(spec.insert), at: spec.at})
+      } else if (spec.delete != null) {
+        checkRange(spec.delete, spec.to, len)
+        changes.push(spec)
+      } else {
+        checkRange(spec.replace, spec.to, len)
+        if (spec.with) changes.push({insert: this.splitLines(spec.with), at: spec.replace})
+        if (spec.to > spec.replace) changes.push({delete: spec.replace, to: spec.to})
+      }
+    }
+    convert(spec)
+    return set ? set.combine(ChangeSet.of(len, changes)) : ChangeSet.of(len, changes)
   }
 
   /// Join an array of lines using the state's [line
@@ -126,12 +208,6 @@ export class EditorState {
       selection: EditorSelection.fromJSON(json.selection),
       extensions: config.extensions
     })
-  }
-
-  /// @internal
-  applyTransaction(tr: Transaction): EditorState {
-    let reconf = tr.reconfigureData, config = reconf ? Configuration.resolve(reconf.base, reconf.replaced, this): this.config
-    return new EditorState(config, tr.doc, tr.selection, tr)
   }
 
   /// Create a new state. You'll usually only need this when
@@ -271,4 +347,9 @@ export class EditorState {
   static selectionFilter = selectionFilter
 }
 
-const none: any[] = []
+function checkRange(a: number, b: number, len: number) {
+  if (a > b || a < 0 || b > len)
+    throw new RangeError(`Invalid change range ${a} to ${b} (in doc of length ${len})`)
+}
+
+const none: readonly any[] = []

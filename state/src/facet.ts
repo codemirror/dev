@@ -131,7 +131,7 @@ class FacetProvider<Input> {
         state.values[idx] = getter(state)
         return SlotStatus.Changed
       } else {
-        let depChanged = (depDoc && tr.docChanged) || (depSel && (tr.docChanged || tr.selectionSet)) || 
+        let depChanged = (depDoc && tr.docChanged) || (depSel && (tr.docChanged || tr.selection)) || 
           depAddrs.some(addr => (ensureAddr(state, addr) & SlotStatus.Changed) > 0)
         if (!depChanged) return 0
         let newVal = getter(state), oldVal = tr.startState.values[idx]
@@ -305,24 +305,21 @@ class PrecExtension {
   [isExtension]!: true
 }
 
-class GroupExtension {
-  constructor(readonly extension: Extension, readonly group: ExtensionGroup) {}
+class TaggedExtension {
+  constructor(readonly tag: string | symbol, readonly extension: Extension) {}
   [isExtension]!: true
 }
 
-/// Extension groups can be used to make a configuration dynamic.
-/// [Wrapping](#state.ExtensionGroup.of) an extension in a group
-/// allows you to later replace it with
-/// [`Transaction.replaceExtension`](#state.Transaction.replaceExtension).
-/// A given group may only occur once within a given configuration.
-export class ExtensionGroup {
-  /// Define a new group. The name is used only for debugging
-  /// purposes.
-  constructor(readonly name: string) {}
-
-  /// Tag the given extension with this group.
-  of(extension: Extension): Extension { return new GroupExtension(extension, this) }
+/// Tagged extensions can be used to make a configuration dynamic.
+/// Tagging an extension allows you to later
+/// [replace](#state.TransactionSpec.replaceExtensions) it with
+/// another extension. A given tag may only occur once within a given
+/// configuration.
+export function tagExtension(tag: string | symbol, extension: Extension) {
+  return new TaggedExtension(tag, extension)
 }
+
+export type ExtensionMap = {[tag: string]: Extension}
 
 type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
 
@@ -330,7 +327,7 @@ export class Configuration {
   readonly statusTemplate: SlotStatus[] = []
 
   constructor(readonly source: Extension,
-              readonly replacements: Map<ExtensionGroup, Extension>,
+              readonly replacements: ExtensionMap,
               readonly dynamicSlots: DynamicSlot[],
               readonly address: {[id: number]: number},
               readonly staticValues: readonly any[]) {
@@ -343,7 +340,7 @@ export class Configuration {
     return addr == null ? facet.default : this.staticValues[addr >> 1]
   }
 
-  static resolve(extension: Extension, replacements: Map<ExtensionGroup, Extension> = new Map, oldState?: EditorState) {
+  static resolve(extension: Extension, replacements: ExtensionMap = Object.create(null), oldState?: EditorState) {
     let fields: StateField<any>[] = []
     let facets: {[id: number]: FacetProvider<any>[]} = Object.create(null)
     for (let ext of flatten(extension, replacements)) {
@@ -388,20 +385,20 @@ export class Configuration {
   }
 }
 
-function flatten(extension: Extension, replacements: Map<ExtensionGroup, Extension>) {
+function flatten(extension: Extension, replacements: ExtensionMap) {
   let result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], []]
   let seen = new Set<Extension>()
-  let groupsSeen = new Set<ExtensionGroup>()
+  let tagsSeen = Object.create(null)
   ;(function inner(ext, prec: number) {
     if (seen.has(ext)) return
     seen.add(ext)
     if (Array.isArray(ext)) {
       for (let e of ext) inner(e, prec)
-    } else if (ext instanceof GroupExtension) {
-      if (groupsSeen.has(ext.group))
-        throw new RangeError(`Duplicate use of group '${ext.group.name}' in extensions`)
-      groupsSeen.add(ext.group)
-      inner(replacements.get(ext.group) || ext.extension, prec)
+    } else if (ext instanceof TaggedExtension) {
+      if (ext.tag in tagsSeen)
+        throw new RangeError(`Duplicate use of tag '${String(ext.tag)}' in extensions`)
+      tagsSeen[ext.tag] = true
+      inner(replacements[ext.tag as any] || ext.extension, prec)
     } else if ((ext as any).extension) {
       inner((ext as any).extension, prec)
     } else if (ext instanceof PrecExtension) {

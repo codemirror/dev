@@ -1,5 +1,5 @@
 import ist from "ist"
-import {EditorState, EditorSelection, Facet, Extension, Precedence} from "@codemirror/next/state"
+import {EditorState, Facet, Extension, Precedence} from "@codemirror/next/state"
 
 function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
@@ -54,35 +54,35 @@ describe("EditorState facets", () => {
     let st = mk(num.of(1), num.compute([str], s => s.facet(str).join().length), str.of("hello"))
     let array = st.facet(num)
     ist(array.join(), "1,5")
-    ist(st.t().apply().facet(num), array)
+    ist(st.tr({}).apply().facet(num), array)
   })
 
   it("can specify a dependency on the document", () => {
     let count = 0
-    let st = mk(num.compute(["doc"], s => count++))
+    let st = mk(num.compute(["doc"], _ => count++))
     ist(st.facet(num).join(), "0")
-    st = st.t().replace(0, 0, "hello").apply()
+    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
     ist(st.facet(num).join(), "1")
-    st = st.t().apply()
+    st = st.tr({}).apply()
     ist(st.facet(num).join(), "1")
   })
 
   it("can specify a dependency on the selection", () => {
     let count = 0
-    let st = mk(num.compute(["selection"], s => count++))
+    let st = mk(num.compute(["selection"], _ => count++))
     ist(st.facet(num).join(), "0")
-    st = st.t().replace(0, 0, "hello").apply()
+    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
     ist(st.facet(num).join(), "1")
-    st = st.t().setSelection(EditorSelection.single(2)).apply()
+    st = st.tr({selection: {anchor: 2}}).apply()
     ist(st.facet(num).join(), "2")
-    st = st.t().apply()
+    st = st.tr({}).apply()
     ist(st.facet(num).join(), "2")
   })
 
   it("can provide multiple values at once", () => {
     let st = mk(num.computeN(["doc"], s => s.doc.length % 2 ? [100, 10] : []), num.of(1))
     ist(st.facet(num).join(), "1")
-    st = st.t().replace(0, 0, "hello").apply()
+    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
     ist(st.facet(num).join(), "100,10,1")
   })
 
@@ -96,20 +96,20 @@ describe("EditorState facets", () => {
     let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
     let st = mk(f.of(1), f.compute(["doc"], s => s.doc.length), f.of(3))
     ist(st.facet(f), 4)
-    st = st.t().replace(0, 0, "hello").apply()
+    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
     ist(st.facet(f), 9)
   })
 
   it("survives reconfiguration", () => {
     let st = mk(num.compute(["doc"], s => s.doc.length), num.of(2), str.of("3"))
-    let st2 = st.t().reconfigure([num.compute(["doc"], s => s.doc.length), num.of(2)]).apply()
+    let st2 = st.tr({reconfigure: [num.compute(["doc"], s => s.doc.length), num.of(2)]}).apply()
     ist(st.facet(num), st2.facet(num))
     ist(st2.facet(str).length, 0)
   })
 
   it("preserves static facets across reconfiguration", () => {
     let st = mk(num.of(1), num.of(2), str.of("3"))
-    let st2 = st.t().reconfigure([num.of(1), num.of(2)]).apply()
+    let st2 = st.tr({reconfigure: [num.of(1), num.of(2)]}).apply()
     ist(st.facet(num), st2.facet(num))
   })
 
