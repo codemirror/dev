@@ -2,11 +2,11 @@ import {ChangeDesc, ChangeSet, Text, MapMode, Section} from "@codemirror/next/te
 import ist from "ist"
 
 function mk(spec: string) {
-  let sections: ["keep" | "del" | "ins", number][] = []
+  let sections: [Section, number][] = []
   while (spec.length) {
     let next = /^([idk])(\d+)/.exec(spec)!
     spec = spec.slice(next[0].length)
-    sections.push([next[1] == "i" ? "ins" : next[1] == "d" ? "del" : "keep", Number(next[2])])
+    sections.push([next[1] == "i" ? Section.Insert : next[1] == "d" ? Section.Delete : Section.Keep, Number(next[2])])
   }
   return ChangeDesc.of(sections)
 }
@@ -107,8 +107,8 @@ describe("ChangeDesc", () => {
 
 describe("ChangeSet", () => {
   it("can create change sets", () => {
-    ist(ChangeSet.of(10, {insert: ["hi"], at: 5}).desc.toString(), "k5i2k5")
-    ist(ChangeSet.of(10, {delete: 5, to: 7}).desc.toString(), "k5d2k3")
+    ist(ChangeSet.of(10, [{insert: ["hi"], at: 5}]).desc.toString(), "k5i2k5")
+    ist(ChangeSet.of(10, [{delete: 5, to: 7}]).desc.toString(), "k5d2k3")
     ist(ChangeSet.of(10, [
       {insert: ["hi"], at: 5}, {insert: ["ok"], at: 5},
       {delete: 0, to: 3}, {delete: 4, to: 6},
@@ -119,8 +119,8 @@ describe("ChangeSet", () => {
   let doc10 = Text.of(["0123456789"])
 
   it("can apply change sets", () => {
-    ist(ChangeSet.of(10, {insert: ["ok"], at: 2}).apply(doc10).toString(), "01ok23456789")
-    ist(ChangeSet.of(10, {delete: 1, to: 9}).apply(doc10).toString(), "09")
+    ist(ChangeSet.of(10, [{insert: ["ok"], at: 2}]).apply(doc10).toString(), "01ok23456789")
+    ist(ChangeSet.of(10, [{delete: 1, to: 9}]).apply(doc10).toString(), "09")
     ist(ChangeSet.of(10, [{delete: 2, to: 8}, {insert: ["hi"], at: 5}]).apply(doc10).toString(), "01hi89")
   })
 
@@ -132,7 +132,7 @@ describe("ChangeSet", () => {
 
   it("can clip inserted strings on compose", () => {
     ist(ChangeSet.of(10, [{insert: ["abc"], at: 2}, {insert: ["def"], at: 4}])
-        .compose(ChangeSet.of(16, {delete: 4, to: 8}))
+        .compose(ChangeSet.of(16, [{delete: 4, to: 8}]))
         .apply(doc10).toString(), "01abef456789")
   })
 
@@ -177,11 +177,11 @@ describe("ChangeSet", () => {
         if (r(2) == 1 || doc.length == 0) {
           let insert = rT(r(5) + 1), at = r(doc.length)
           txt = txt.slice(0, at) + insert + txt.slice(at)
-          set = ChangeSet.of(doc.length, {insert: [insert], at})
+          set = ChangeSet.of(doc.length, [{insert: [insert], at}])
         } else {
           let from = r(doc.length - 1), to = Math.min(from + r(5) + 1, doc.length)
           txt = txt.slice(0, from) + txt.slice(to)
-          set = ChangeSet.of(doc.length, {delete: from, to})
+          set = ChangeSet.of(doc.length, [{delete: from, to}])
         }
         all.push(set)
         inv.push(set.invert(doc))

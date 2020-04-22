@@ -22,6 +22,28 @@ export enum MapMode {
   TrackAfter
 }
 
+/// Used to represent changes when building up a change set. Inserted
+/// content must already be split into lines.
+export type ChangeSpec = {insert: readonly string[], at: number} | {delete: number, to: number}
+
+/// Interface for things that support position mapping.
+export interface Mapping {
+  /// Map a given position through a set of changes.
+  ///
+  /// `assoc` indicates which side the position should be associated
+  /// with. When it is negative or zero, the mapping will try to keep
+  /// the position close to the character before it (if any), and will
+  /// move it before insertions at that point or replacements across
+  /// that point. When it is positive, the position is associated with
+  /// the character after it, and will be moved forward for insertions
+  /// at or replacements across the position. Defaults to -1.
+  ///
+  /// `mode` determines whether deletions should be
+  /// [reported](#state.MapMode). It defaults to `MapMode.Simple`
+  /// (don't report deletions).
+  mapPos(pos: number, assoc?: number, mode?: MapMode): number
+}
+
 // And the same enum again, inlined (just because). Internally, change
 // sections are represented by pairs of integers, with the type in the
 // first value and its length in the second.
@@ -31,19 +53,10 @@ const enum Type {
   Ins = 2
 }
 
-/// This type is used a the argument type to methods that build up
-/// change sets. A spec can either be an insertion (specified as its
-/// content, typed by the type parameter, and its position), a
-/// deletion, or an array of change specs.
-export type ChangeSpec<Insert = readonly string[]> =
-  {insert: Insert, at: number} |
-  {delete: number, to: number} |
-  readonly ChangeSpec<Insert>[]
-
 /// A change set represents a group of modifications to a document. It
 /// stores the document length, and can only be applied to documents
 /// with exactly that length.
-export class ChangeSet {
+export class ChangeSet implements Mapping {
   /// @internal
   constructor(
     /// @internal
@@ -57,6 +70,9 @@ export class ChangeSet {
 
   /// The length of the document after the change.
   get newLength() { return getLen(this.sections, Type.Del) }
+
+  /// False when the change set makes changes to the document.
+  get empty() { return this.sections.length == 0 || this.sections.length == 2 && this.sections[0] == Type.Keep }
 
   /// Iterate over the sections in this change set, calling `f` for
   /// each.
@@ -132,7 +148,8 @@ export class ChangeSet {
   map(other: ChangeSet, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
 
   /// Map a position through this set of changes, returning the
-  /// corresponding position in the new document.
+  /// corresponding position in the new document. See
+  /// [`Mapping.mapPos`](#text.Mapping).
   mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
 
   /// Get a [change description](#text.ChangeDesc) for this change
@@ -140,25 +157,25 @@ export class ChangeSet {
   get desc() { return new ChangeDesc(this.sections) }
 
   /// Create a change set for the given collection of changes.
-  static of(length: number, changes: ChangeSpec<readonly string[]>): ChangeSet {
-    if (Array.isArray(changes)) {
-      return changes.length ? flatten(changes.map(ch => ChangeSet.of(length, ch))) :
-        new ChangeSet(length ? [Type.Keep, length] : empty, empty)
-    } else {
-      let sections: number[] = [], inserted = empty, change = changes as any
-      if (change.delete != null) {
-        addSection(sections, Type.Keep, change.delete)
-        addSection(sections, Type.Del, change.to - change.delete)
-        addSection(sections, Type.Keep, length - change.to)
-      } else {
+  static of(length: number, changes: readonly ChangeSpec[]): ChangeSet {
+    if (!changes.length) return new ChangeSet(length ? [Type.Keep, length] : empty, empty)
+    let sets = []
+    for (let change of changes as readonly any[]) {
+      let sections: number[] = [], inserted = empty
+      if (change.insert) {
         let insertLen = textLength(change.insert)
         if (insertLen) inserted = change.at ? [null, change.insert] : [change.insert]
         addSection(sections, Type.Keep, change.at)
         addSection(sections, Type.Ins, insertLen)
         addSection(sections, Type.Keep, length - change.at)
+      } else {
+        addSection(sections, Type.Keep, change.delete)
+        addSection(sections, Type.Del, change.to - change.delete)
+        addSection(sections, Type.Keep, length - change.to)
       }
-      return new ChangeSet(sections, inserted)
+      sets.push(new ChangeSet(sections, inserted))
     }
+    return flatten(sets, 0, sets.length)
   }
 }
 
@@ -166,7 +183,7 @@ export class ChangeSet {
 /// that doesn't store the inserted text. As such, it can't be
 /// applied, but is cheaper to store and manipulate. It has most of
 /// the same methods and properties as [`ChangeSet`](#text.ChangeSet).
-export class ChangeDesc {
+export class ChangeDesc implements Mapping {
   /// @internal
   constructor(
     /// @internal
@@ -176,6 +193,8 @@ export class ChangeDesc {
   get length() { return getLen(this.sections, Type.Ins) }
 
   get newLength() { return getLen(this.sections, Type.Del) }
+
+  get empty() { return this.sections.length == 0 || this.sections.length == 2 && this.sections[0] == Type.Keep }
 
   iter(f: (type: Section, fromA: number, toA: number, fromB: number, toB: number) => void) {
     iter(this.sections, null, f)
@@ -189,7 +208,7 @@ export class ChangeDesc {
 
   combine(other: ChangeDesc) { return joinSets(this, other, joinCombine) }
 
-  map(other: ChangeDesc, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
+  map(other: ChangeDesc | ChangeSet, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
 
   mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
 
@@ -202,9 +221,9 @@ export class ChangeDesc {
   }
 
   /// @internal
-  static of(sections: readonly ["keep" | "ins" | "del", number][]) {
+  static of(sections: readonly [Section, number][]) {
     let values = []
-    for (let [type, len] of sections) values.push(type == "keep" ? Type.Keep : type == "ins" ? Type.Ins : Type.Del, len)
+    for (let [type, len] of sections) values.push(type, len)
     return new ChangeDesc(values)
   }
 }
@@ -258,10 +277,10 @@ function mapThrough(sections: readonly number[], pos: number, assoc: number, mod
 const empty: readonly any[] = [], noText = [""]
 
 // Recursively combine a set of changes
-function flatten(descs: ChangeSet[], from = 0, to = descs.length): ChangeSet {
-  if (to == from + 1) return descs[from]
+function flatten(sets: ChangeSet[], from: number, to: number): ChangeSet {
+  if (to == from + 1) return sets[from]
   let mid = (from + to) >> 1
-  return flatten(descs, from, mid).combine(flatten(descs, mid, to))
+  return flatten(sets, from, mid).combine(flatten(sets, mid, to))
 }
 
 function addSection(array: number[], type: Type, len: number) {

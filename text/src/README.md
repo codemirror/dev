@@ -25,6 +25,12 @@ and count each line break and UTF-16 code unit as one unit.
 
 @ChangeDesc
 
+@MapMode
+
+@Mapping
+
+@Section
+
 ### Column Utilities
 
 @countColumn
