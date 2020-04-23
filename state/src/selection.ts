@@ -1,5 +1,5 @@
 import {EditorState} from "./state"
-import {Text, charType, Mapping} from "@codemirror/next/text"
+import {Text, charType, ChangeDesc} from "@codemirror/next/text"
 
 /// A single selection range. When
 /// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)
@@ -23,7 +23,7 @@ export class SelectionRange {
   get empty(): boolean { return this.anchor == this.head }
 
   /// Map this range through a mapping.
-  map(mapping: Mapping): SelectionRange {
+  map(mapping: ChangeDesc): SelectionRange {
     let anchor = mapping.mapPos(this.anchor), head = mapping.mapPos(this.head)
     if (anchor == this.anchor && head == this.head) return this
     else return new SelectionRange(anchor, head)
@@ -81,7 +81,7 @@ export class EditorSelection {
 
   /// Map a selection through a mapping. Mostly used to adjust the
   /// selection position for changes.
-  map(mapping: Mapping): EditorSelection {
+  map(mapping: ChangeDesc): EditorSelection {
     return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)
   }
 

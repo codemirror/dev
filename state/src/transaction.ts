@@ -1,4 +1,4 @@
-import {ChangeSet, Mapping} from "@codemirror/next/text"
+import {ChangeSet, ChangeDesc} from "@codemirror/next/text"
 import {EditorState, ChangeSpec} from "./state"
 import {EditorSelection} from "./selection"
 import {Extension, ExtensionMap} from "./facet"
@@ -32,7 +32,7 @@ export interface StateEffectSpec<Value> {
   /// mapping. When not given, the effects will simply not be mapped.
   /// When the function returns `undefined`, that means the mapping
   /// deletes the effect.
-  map?: (value: Value, mapping: Mapping) => Value | undefined
+  map?: (value: Value, mapping: ChangeDesc) => Value | undefined
 }
 
 /// State effects can be used to represent additional effects
@@ -50,7 +50,7 @@ export class StateEffect<Value> {
 
   /// Map this effect through a position mapping. Will return
   /// `undefined` when that ends up deleting the effect.
-  map(mapping: Mapping): StateEffect<Value> | undefined {
+  map(mapping: ChangeDesc): StateEffect<Value> | undefined {
     let mapped = this.type.map(this.value, mapping)
     return mapped === undefined ? undefined : mapped == this.value ? this : new StateEffect(this.type, mapped)
   }
@@ -76,7 +76,7 @@ export class StateEffectType<Value> {
     // `StateEffect.is` mysteriously stops working when these properly
     // have type `Value`.
     /// @internal
-    readonly map: (value: any, mapping: Mapping) => any | undefined
+    readonly map: (value: any, mapping: ChangeDesc) => any | undefined
   ) {}
 
   /// Create a [state effect](#state.StateEffect) instance of this
@@ -147,8 +147,8 @@ export class Transaction {
   and(tr: Transaction | TransactionSpec) {
     if (!(tr instanceof Transaction)) tr = this.startState.tr(tr)
     if (tr.startState != this.startState) throw new Error("Trying to combine mismatched transaction (different start state)")
-    let trMap = this.effects.length || this.selection && !tr.selection ? tr.changes.desc.map(this.changes) : null
-    let thisMap = tr.effects.length || tr.selection ? this.changes.desc.map(tr.changes) : null
+    let trMap = this.effects.length || this.selection && !tr.selection ? tr.changes.mapDesc(this.changes) : null
+    let thisMap = tr.effects.length || tr.selection ? this.changes.mapDesc(tr.changes) : null
     return new Transaction(this.startState, this.changes.combine(tr.changes),
                            tr.selection ? tr.selection.map(thisMap!) : this.selection ? this.selection.map(trMap!) : undefined,
                            mapEffects(this.effects, trMap!).concat(mapEffects(tr.effects, thisMap!)),
@@ -201,7 +201,7 @@ function combineReconf(a: {base: Extension, replace: ExtensionMap} | undefined,
   return {base: b.base, replace}
 }
 
-function mapEffects(effects: readonly StateEffect<any>[], mapping: Mapping) {
+function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
   if (!effects.length) return effects
   let result = []
   for (let effect of effects) {

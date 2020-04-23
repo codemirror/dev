@@ -26,9 +26,89 @@ export enum MapMode {
 /// content must already be split into lines.
 export type ChangeSpec = {insert: readonly string[], at: number} | {delete: number, to: number}
 
-/// Interface for things that support position mapping.
-export interface Mapping {
-  /// Map a given position through a set of changes.
+// And the same enum again, inlined (just because). Internally, change
+// sections are represented by pairs of integers, with the type in the
+// first value and its length in the second.
+const enum Type {
+  Keep = 0,
+  Del = 1,
+  Ins = 2
+}
+
+/// A change description is a variant of [change set](#text.ChangeSet)
+/// that doesn't store the inserted text. As such, it can't be
+/// applied, but is cheaper to store and manipulate.
+export class ChangeDesc {
+  /// @internal
+  constructor(readonly sections: readonly number[]) {}
+
+  /// The length of the document before the change.
+  get length() { return getLen(this.sections, Type.Ins) }
+
+  /// The length of the document after the change.
+  get newLength() { return getLen(this.sections, Type.Del) }
+
+  /// False when there are actual changes in this set.
+  get empty() { return this.sections.length == 0 || this.sections.length == 2 && this.sections[0] == Type.Keep }
+
+  /// Iterate over the sections in this change set, calling `f` for
+  /// each. If this is a `ChangeSet`, this will pass the inserted text
+  /// as last argument to the function when reporting an insertion.
+  iter(f: (type: Section, fromA: number, toA: number, fromB: number, toB: number, inserted: readonly string[] | null) => void) {
+    let posA = 0, posB = 0, inserted = (this as any).inserted
+    for (let i = 0; i < this.sections.length;) {
+      let type = this.sections[i++], len = this.sections[i++], endA = posA, endB = posB, ins: null | readonly string[] = null
+      if (type == Type.Keep) {
+        endA += len; endB += len
+      } else if (type == Type.Ins) {
+        endB += len
+        if (inserted) ins = inserted[(i - 2) >> 1]
+      } else {
+        endA += len
+      }
+      f(type, posA, endA, posB, endB, ins)
+      posA = endA; posB = endB
+    }
+  }
+
+  /// Iterate over the unchanged parts left by these changes.
+  gaps(f: (posA: number, posB: number, length: number) => void) {
+    for (let i = 0, posA = 0, posB = 0; i < this.sections.length;) {
+      let type = this.sections[i++], len = this.sections[i++]
+      if (type == Type.Keep) {
+        f(posA, posB, len)
+        posA += len
+        posB += len
+      } else if (type == Type.Ins) {
+        posB += len
+      } else {
+        posA += len
+      }
+    }
+  }
+
+  /// Get the inverted form of thes changes.
+  invertedDesc() {
+    return new ChangeDesc(this.sections.map((v, i) => i % 2 || v == Type.Keep ? v : v == Type.Del ? Type.Ins : Type.Del))
+  }
+
+  /// Compute the combined effect of applying another set of changes
+  /// after this one. The length of the document after this set should
+  /// match the length before `other`.
+  composeDesc(other: ChangeDesc) { return joinSets(this, other, joinCompose) }
+
+  /// Compute the combined effect of applying both this set and
+  /// another set to the same document.
+  combineDesc(other: ChangeDesc) { return joinSets(this, other, joinCombine) }
+
+  /// Map this description, which should start with the same document
+  /// as `other`, over another set of changes, so that it can be
+  /// applied after it.
+  mapDesc(other: ChangeDesc | ChangeSet, before = false): ChangeDesc {
+    return joinSets(this, other, before ? joinMapBefore : joinMapAfter)
+  }
+
+  /// Map a given position through these changes.
   ///
   /// `assoc` indicates which side the position should be associated
   /// with. When it is negative or zero, the mapping will try to keep
@@ -41,46 +121,75 @@ export interface Mapping {
   /// `mode` determines whether deletions should be
   /// [reported](#state.MapMode). It defaults to `MapMode.Simple`
   /// (don't report deletions).
-  mapPos(pos: number, assoc?: number, mode?: MapMode): number
-}
+  mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) {
+    let result = pos
+    for (let i = 0, off = 0; i < this.sections.length;) {
+      let type = this.sections[i++], len = this.sections[i++]
+      if (type == Type.Ins) {
+        if (off < pos || assoc > 0) result += len
+      } else if (type == Type.Del) {
+        if (mode != MapMode.Simple &&
+            (mode == MapMode.TrackDel && off < pos && off + len > pos ||
+             mode == MapMode.TrackBefore && off < pos && off + len >= pos ||
+             mode == MapMode.TrackAfter && off <= pos && off + len > pos)) return -1
+        result -= Math.min(len, pos - off)
+        off += len
+      } else {
+        off += len
+      }
+      if (off > pos) break
+    }
+    return result
+  }
 
-// And the same enum again, inlined (just because). Internally, change
-// sections are represented by pairs of integers, with the type in the
-// first value and its length in the second.
-const enum Type {
-  Keep = 0,
-  Del = 1,
-  Ins = 2
+  /// Check whether these changes touch a given range. When one of the
+  /// changes entirely covers the range, the string `"cover"` is
+  /// returned.
+  touchesRange(from: number, to: number): boolean | "cover" {
+    for (let i = 0, pos = 0; i < this.sections.length && pos <= to;) {
+      let type = this.sections[i++], len = this.sections[i++]
+      if (type == Type.Keep) {
+        pos += len
+      } else if (type == Type.Del) {
+        let end = pos + len
+        if (pos <= to && end >= from)
+          return pos < from && end > to ? "cover" : true
+        pos = end
+      } else {
+        if (pos >= from && pos <= to) return true
+      }
+    }
+    return false
+  }
+
+  /// @internal
+  toString() {
+    let result = ""
+    for (let i = 0, s = this.sections; i < s.length; i += 2)
+      result += (s[i] == Type.Del ? "d" : s[i] == Type.Keep ? "k" : "i") + s[i + 1]
+    return result
+  }
+
+  /// @internal
+  static make(sections: readonly [Section, number][]) {
+    let values = []
+    for (let [type, len] of sections) values.push(type, len)
+    return new ChangeDesc(values)
+  }
 }
 
 /// A change set represents a group of modifications to a document. It
 /// stores the document length, and can only be applied to documents
 /// with exactly that length.
-export class ChangeSet implements Mapping {
+export class ChangeSet extends ChangeDesc {
   /// @internal
   constructor(
-    /// @internal
-    readonly sections: readonly number[],
+    sections: readonly number[],
     /// @internal
     readonly inserted: readonly (readonly string[] | null)[]
-  ) {}
-
-  /// The length of the document before the change.
-  get length() { return getLen(this.sections, Type.Ins) }
-
-  /// The length of the document after the change.
-  get newLength() { return getLen(this.sections, Type.Del) }
-
-  /// False when the change set makes changes to the document.
-  get empty() { return this.sections.length == 0 || this.sections.length == 2 && this.sections[0] == Type.Keep }
-
-  /// Iterate over the sections in this change set, calling `f` for
-  /// each.
-  iter(f: (type: Section, fromA: number, toA: number, fromB: number, toB: number, inserted: null | readonly string[]) => void) {
-    iter(this.sections, this.inserted, f)
+  ) {
+    super(sections)
   }
-
-  gaps(f: (posA: number, posB: number, length: number) => void) { iterGaps(this.sections, f) }
 
   /// Apply the changes to a document, returning the modified
   /// document.
@@ -136,28 +245,20 @@ export class ChangeSet implements Mapping {
   // must start in the document produced by `this`. If `this` goes
   // `docA` → `docB` and `other` represents `docB` → `docC`, the
   // returned value will represent the change `docA` → `docC`.
-  compose(other: ChangeSet) { return joinSets(this, other, joinCompose) }
+  compose(other: ChangeSet) { return joinSets(this, other, joinCompose, true) }
 
   /// Combine two change sets that start in the same document to
   /// create a change set that represents the union of both.
-  combine(other: ChangeSet) { return joinSets(this, other, joinCombine) }
+  combine(other: ChangeSet) { return joinSets(this, other, joinCombine, true) }
 
   // Given another change set starting in the same document, maps this
   // change set over the other, producing a new change set that can be
   // applied to the document produced by applying `other`. When
   // `before` is `true`, order changes as if `this` comes before
   // `other`, otherwise (the default) treat `other` as coming first.
-  map(other: ChangeSet, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
-
-  /// Map a position through this set of changes, returning the
-  /// corresponding position in the new document. See
-  /// [`Mapping.mapPos`](#text.Mapping).
-  mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
-
-  /// Check whether these changes touch a given range. When one of the
-  /// changes entirely covers the range, the string `"cover"` is
-  /// returned.
-  touchesRange(from: number, to: number): boolean | "cover" { return touches(this.sections, from, to) }
+  map(other: ChangeSet | ChangeDesc, before = false): ChangeSet {
+    return joinSets(this, other, before ? joinMapBefore : joinMapAfter, true)
+  }
 
   /// Get a [change description](#text.ChangeDesc) for this change
   /// set.
@@ -186,135 +287,10 @@ export class ChangeSet implements Mapping {
   }
 }
 
-/// A change description is a variant of [change set](#text.ChangeSet)
-/// that doesn't store the inserted text. As such, it can't be
-/// applied, but is cheaper to store and manipulate. It has most of
-/// the same methods and properties as [`ChangeSet`](#text.ChangeSet).
-export class ChangeDesc implements Mapping {
-  /// @internal
-  constructor(
-    /// @internal
-    readonly sections: readonly number[],
-  ) {}
-
-  get length() { return getLen(this.sections, Type.Ins) }
-
-  get newLength() { return getLen(this.sections, Type.Del) }
-
-  get empty() { return this.sections.length == 0 || this.sections.length == 2 && this.sections[0] == Type.Keep }
-
-  iter(f: (type: Section, fromA: number, toA: number, fromB: number, toB: number) => void) {
-    iter(this.sections, null, f)
-  }
-
-  gaps(f: (posA: number, posB: number, length: number) => void) { iterGaps(this.sections, f) }
-
-  invert() {
-    return new ChangeDesc(this.sections.map((v, i) => i % 2 || v == Type.Keep ? v : v == Type.Del ? Type.Ins : Type.Del))
-  }
-
-  compose(other: ChangeDesc) { return joinSets(this, other, joinCompose) }
-
-  combine(other: ChangeDesc) { return joinSets(this, other, joinCombine) }
-
-  map(other: ChangeDesc | ChangeSet, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
-
-  mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
-
-  touchesRange(from: number, to: number): boolean | "cover" { return touches(this.sections, from, to) }
-
-  /// @internal
-  toString() {
-    let result = ""
-    for (let i = 0, s = this.sections; i < s.length; i += 2)
-      result += (s[i] == Type.Del ? "d" : s[i] == Type.Keep ? "k" : "i") + s[i + 1]
-    return result
-  }
-
-  /// @internal
-  static of(sections: readonly [Section, number][]) {
-    let values = []
-    for (let [type, len] of sections) values.push(type, len)
-    return new ChangeDesc(values)
-  }
-}
-
 function getLen(sections: readonly number[], ignore: Type) {
   let length = 0
   for (let i = 0; i < sections.length; i += 2) if (sections[i] != ignore) length += sections[i + 1]
   return length
-}
-
-function touches(sections: readonly number[], from: number, to: number) {
-  for (let i = 0, pos = 0; i < sections.length && pos <= to;) {
-    let type = sections[i++], len = sections[i++]
-    if (type == Type.Keep) {
-      pos += len
-    } else if (type == Type.Del) {
-      let end = pos + len
-      if (pos <= to && end >= from)
-        return pos < from && end > to ? "cover" : true
-      pos = end
-    } else {
-      if (pos >= from && pos <= to) return true
-    }
-  }
-  return false
-}
-
-function iter(sections: readonly number[], inserted: null | readonly (null | readonly string[])[],
-              f: (type: Section, fromA: number, toA: number, fromB: number, toB: number,
-                  inserted: null | readonly string[]) => void) {
-  let posA = 0, posB = 0
-  for (let i = 0; i < sections.length;) {
-    let type = sections[i++], len = sections[i++], endA = posA, endB = posB, ins: null | readonly string[] = null
-    if (type == Type.Keep) {
-      endA += len; endB += len
-    } else if (type == Type.Ins) {
-      endB += len
-      if (inserted) ins = inserted[(i - 2) >> 1]
-    } else {
-      endA += len
-    }
-    f(type, posA, endA, posB, endB, ins)
-    posA = endA; posB = endB
-  }
-}
-
-function iterGaps(sections: readonly number[], f: (posA: number, posB: number, length: number) => void) {
-  for (let i = 0, posA = 0, posB = 0; i < sections.length;) {
-    let type = sections[i++], len = sections[i++]
-    if (type == Type.Keep) {
-      f(posA, posB, len)
-      posA += len
-      posB += len
-    } else if (type == Type.Ins) {
-      posB += len
-    } else {
-      posA += len
-    }
-  }
-}
-
-function mapThrough(sections: readonly number[], pos: number, assoc: number, mode: MapMode) {
-  let result = pos
-  for (let i = 0, off = 0; i < sections.length;) {
-    let type = sections[i++], len = sections[i++]
-    if (type == Type.Ins) {
-      if (off < pos || assoc > 0) result += len
-    } else if (type == Type.Del) {
-      if (mode != MapMode.Simple &&
-          (mode == MapMode.TrackDel && off < pos && off + len > pos ||
-           mode == MapMode.TrackBefore && off < pos && off + len >= pos ||
-           mode == MapMode.TrackAfter && off <= pos && off + len > pos)) return -1
-      result -= Math.min(len, pos - off)
-      off += len
-    } else {
-      off += len
-    }
-    if (off > pos) break
-  }
-  return result
 }
 
 const empty: readonly any[] = [], noText = [""]
@@ -342,14 +318,12 @@ function appendText(a: readonly string[], b: readonly string[]) {
 
 const enum Join { Drop = 3, A = 4, B = 8, TypeMask = 3 }
 
-interface Joinable {
-  sections: readonly number[],
-  inserted?: readonly (readonly string[] | null)[]
-}
 
-function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: number) => number): T {
+function joinSets(a: ChangeDesc, b: ChangeDesc, f: (typeA: number, typeB: number) => number): ChangeDesc
+function joinSets(a: ChangeDesc, b: ChangeDesc, f: (typeA: number, typeB: number) => number, mkSet: true): ChangeSet
+function joinSets(a: ChangeDesc, b: ChangeDesc, f: (typeA: number, typeB: number) => number, mkSet = false): any {
   let sections: number[] = []
-  let insert: null | (readonly string[] | null)[] = a.inserted ? [] : null
+  let insert: (readonly string[] | null)[] = mkSet ? [] : null as any
   let iA = 0, typeA = Type.Keep, lenA = 0, offA = 0
   let iB = 0, typeB = Type.Keep, lenB = 0, offB = 0
 
@@ -390,9 +364,9 @@ function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: numb
     }
     if (type != Join.Drop) {
       addSection(sections, type, len)
-      if (type == Type.Ins && insert) {
+      if (type == Type.Ins && mkSet) {
         let value = join & Join.A || !(join & Join.B) && typeA == Type.Ins
-          ? takeInsert(a.inserted!, iA, offA, len) : takeInsert(b.inserted!, iB, offB, len)
+          ? takeInsert((a as ChangeSet).inserted, iA, offA, len) : takeInsert((b as ChangeSet).inserted, iB, offB, len)
         let index = (sections.length - 2) >> 1
         if (insert.length > index) { // Already exists
           insert[index] = appendText(insert[index] as readonly string[], value)
@@ -404,7 +378,7 @@ function joinSets<T extends Joinable>(a: T, b: T, f: (typeA: number, typeB: numb
     }
     if (len == 0) {
       if (lenA != lenB) throw new RangeError("Mismatched change set lengths")
-      return new (a.constructor as any)(sections, insert)
+      return mkSet ? new ChangeSet(sections, insert) : new ChangeDesc(sections)
     }
   }
 }

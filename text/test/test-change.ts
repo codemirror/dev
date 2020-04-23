@@ -8,14 +8,14 @@ function mk(spec: string) {
     spec = spec.slice(next[0].length)
     sections.push([next[1] == "i" ? Section.Insert : next[1] == "d" ? Section.Delete : Section.Keep, Number(next[2])])
   }
-  return ChangeDesc.of(sections)
+  return ChangeDesc.make(sections)
 }
 
 describe("ChangeDesc", () => {
   describe("composition", () => {
     function comp(...specs: string[]) {
       let result = specs.pop(), sets = specs.map(mk)
-      ist(String(sets.reduce((a, b) => a.compose(b))), result)
+      ist(String(sets.reduce((a, b) => a.composeDesc(b))), result)
     }
 
     it("can compose unrelated changes",
@@ -37,17 +37,17 @@ describe("ChangeDesc", () => {
        () => comp("", "i8", "d8", "", ""))
 
     it("throws for inconsistent lengths", () => {
-      ist.throws(() => mk("k2i2").compose(mk("k1d1")))
-      ist.throws(() => mk("k2i2").compose(mk("k30d1")))
+      ist.throws(() => mk("k2i2").composeDesc(mk("k1d1")))
+      ist.throws(() => mk("k2i2").composeDesc(mk("k30d1")))
     })
   })
 
   describe("mapping", () => {
     function over(a: string, b: string, result: string) {
-      ist(String(mk(a).map(mk(b))), result)
+      ist(String(mk(a).mapDesc(mk(b))), result)
     }
     function under(a: string, b: string, result: string) {
-      ist(String(mk(a).map(mk(b), true)), result)
+      ist(String(mk(a).mapDesc(mk(b), true)), result)
     }
 
     it("can map over an insertion",

@@ -140,9 +140,9 @@ export class EditorState {
       for (let i = 0; i < newRanges.length; i++) {
         let others: ChangeDesc | undefined
         for (let j = 0; j < changeSets.length; j++) if (j != i && changeSets[j])
-          others = others ? others.combine(changeSets[j]!.desc) : changeSets[j]!.desc
+          others = others ? others.combineDesc(changeSets[j]!.desc) : changeSets[j]!.desc
         if (others)
-          newRanges[i] = newRanges[i].map(changeSets[i] ? others.map(changeSets[i]!) : others)
+          newRanges[i] = newRanges[i].map(changeSets[i] ? others.mapDesc(changeSets[i]!) : others)
       }
       return this.tr({changes: allChanges, selection: EditorSelection.create(newRanges, sel.primaryIndex)})
     }
