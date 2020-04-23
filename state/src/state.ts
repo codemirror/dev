@@ -123,6 +123,7 @@ export class EditorState {
   }
 
   changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}) {
+    // FIXME this is not quite obvious and practical yet, revisit
     let sel = this.selection
     if (sel.ranges.length == 1) {
       let {changes, range} = f(sel.primary)

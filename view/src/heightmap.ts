@@ -601,9 +601,9 @@ class NodeBuilder implements SpanIterator<Decoration> {
 }
 
 export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
-                                          diff: readonly ChangedRange[], length: number) {
+                                          diff: readonly ChangedRange[]) {
   let comp = new DecorationComparator()
-  RangeSet.compare(a, b, diff, length, comp)
+  RangeSet.compare(a, b, diff, comp)
   return comp.changes
 }
 

@@ -1,4 +1,4 @@
-import {ChangeSet, ChangedRange, MapMode} from "@codemirror/next/state"
+import {ChangeSet, MapMode} from "@codemirror/next/text"
 
 /// Each range is associated with a value, which must inherit from
 /// this class.
@@ -297,8 +297,7 @@ export class RangeSet<T extends RangeValue> {
   /// the _new_ space, after these changes.
   static compare<T extends RangeValue>(
     oldSets: readonly RangeSet<T>[], newSets: readonly RangeSet<T>[],
-    textDiff: readonly ChangedRange[],
-    length: number,
+    textDiff: ChangeSet,
     comparator: RangeComparator<T>
   ) {
     let minPoint = comparator.minPointSize ?? -1
@@ -307,16 +306,10 @@ export class RangeSet<T extends RangeValue> {
     let b = newSets.filter(set => set.maxPoint >= BigPointSize ||
                            set != RangeSet.empty && oldSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
     let sharedChunks = findSharedChunks(a, b)
+
     let sideA = new SpanCursor(a, sharedChunks, minPoint)
     let sideB = new SpanCursor(b, sharedChunks, minPoint)
-
-    let posA = 0, posB = 0
-    for (let range of textDiff) {
-      compare(sideA, posA, sideB, posB, range.fromB - posB, comparator)
-      posA = range.toA
-      posB = range.toB
-    }
-    compare(sideA, posA, sideB, posB, length - posB, comparator)
+    textDiff.gaps((fromA, fromB, length) => compare(sideA, fromA, sideB, fromB, length, comparator))
   }
 
   /// Iterate over a group of range sets at the same time, notifying

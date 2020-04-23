@@ -80,7 +80,7 @@ export class DocView extends ContentView {
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, update.changes)
 
     let prevDeco = this.decorations, deco = this.updateDeco()
-    let decoDiff = findChangedDeco(prevDeco, deco, changedRanges, update.state.doc.length)
+    let decoDiff = findChangedDeco(prevDeco, deco, changedRanges)
     changedRanges = extendWithRanges(changedRanges, decoDiff)
 
     let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointer")
@@ -474,9 +474,8 @@ class DecorationComparator {
   comparePoint(from: number, to: number) { addRange(from, to, this.changes) }
 }
 
-export function findChangedDeco(a: readonly DecorationSet[], b: readonly DecorationSet[],
-                                diff: readonly ChangedRange[], length: number) {
+function findChangedDeco(a: readonly DecorationSet[], b: readonly DecorationSet[], diff: readonly ChangedRange[]) {
   let comp = new DecorationComparator
-  RangeSet.compare(a, b, diff, length, comp)
+  RangeSet.compare(a, b, diff, comp)
   return comp.changes
 }

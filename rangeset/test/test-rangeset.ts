@@ -1,5 +1,5 @@
 import {Range, RangeSet, RangeValue, RangeComparator, SpanIterator} from "@codemirror/next/rangeset"
-import {Change, ChangeSet, ChangedRange} from "@codemirror/next/state"
+import {ChangeSet} from "@codemirror/next/text"
 import ist from "ist"
 
 class Value extends RangeValue {
@@ -34,6 +34,15 @@ function mk(from: number, to?: any, spec?: any): Range<Value> {
   return new Range(from, to, new Value(spec, from == to))
 }
 function mkSet(ranges: Range<Value>[]) { return RangeSet.of<Value>(ranges) }
+
+function changeSet(changes: [number, number, number][]) {
+  let collect: any[] = []
+  for (let [from, to, len] of changes) {
+    if (len) collect.push({insert: ["x".repeat(len)], at: from})
+    if (from < to) collect.push({delete: from, to})
+  }
+  return ChangeSet.of(5000, collect)
+}
 
 let smallRanges: Range<Value>[] = []
 for (let i = 0; i < 5000; i++)
@@ -117,7 +126,7 @@ describe("RangeSet", () => {
   describe("map", () => {
     function test(positions: Range<Value>[], changes: [number, number, number][], newPositions: (number | [number, number])[]) {
       let set = mkSet(positions)
-      let mapped = set.map(new ChangeSet(changes.map(([from, to, len]) => new Change(from, to, ["x".repeat(len)]))))
+      let mapped = set.map(changeSet(changes))
       let out: string[] = []
       for (let iter = mapped.iter(); iter.value; iter.next()) out.push(iter.from + "-" + iter.to)
       ist(JSON.stringify(out), JSON.stringify(newPositions.map(p => Array.isArray(p) ? p[0] + "-" + p[1] : p + "-" + p)))
@@ -127,7 +136,7 @@ describe("RangeSet", () => {
        test([mk(1), mk(4), mk(10)], [[0, 0, 1], [2, 3, 0], [8, 8, 20]], [2, 4, 30]))
 
     it("takes inclusivity into account", () =>
-       test([mk(1, 2, {startSide: -1, endSide: 1})], [[1, 1, 2], [4, 4, 2]], [[1, 6]]))
+       test([mk(1, 2, {startSide: -1, endSide: 1})], [[1, 1, 2], [2, 2, 2]], [[1, 6]]))
 
     it("uses side to determine mapping of points", () =>
        test([mk(1, 1, {startSide: -1, endSide: -1}), mk(1, 1, {startSide: 1, endSide: 1})], [[1, 1, 2]], [1, 3]))
@@ -148,9 +157,9 @@ describe("RangeSet", () => {
        test([mk(2), mk(4)], [[2, 4, 6]], [2, 8]))
 
     it("can collapse chunks", () => {
-      let smaller = set0().map(new ChangeSet([new Change(30, 4500, [""])]))
+      let smaller = set0().map(changeSet([[30, 4500, 0]]))
       ist(smaller.chunk.length, set0().chunk.length, "<")
-      let empty = smaller.map(new ChangeSet([new Change(0, 1000, [""])]))
+      let empty = smaller.map(changeSet([[0, 1000, 0]]))
       ist(empty, RangeSet.empty)
     })
   })
@@ -168,19 +177,12 @@ describe("RangeSet", () => {
   describe("compare", () => {
     function test(ranges: RangeSet<Value> | Range<Value>[], update: any, changes: number[]) {
       let set = Array.isArray(ranges) ? mkSet(ranges) : ranges
-      let newSet = set
-      let docRanges: readonly ChangedRange[] = []
-      if (update.changes) {
-        let changes = new ChangeSet(update.changes.map(([from, to, len]: [number, number, number]) => {
-          return new Change(from, to, ["x".repeat(len)])
-        }))
-        newSet = newSet.map(changes)
-        docRanges = changes.changedRanges()
-      }
+      let newSet = set, docChanges = changeSet(update.changes || [])
+      if (update.changes) newSet = newSet.map(docChanges)
       if (update.filter || update.add) newSet = newSet.update(update)
       if (update.prepare) update.prepare(newSet)
       let comp = new Comparator
-      RangeSet.compare([set], [newSet], docRanges, 1e8, comp)
+      RangeSet.compare([set], [newSet], docChanges, comp)
       ist(JSON.stringify(comp.ranges), JSON.stringify(changes))
     }
 
@@ -244,7 +246,7 @@ describe("RangeSet", () => {
         ranges.push(mk(i, end, `${i}-${end}`))
       }
       test(ranges, {
-        changes: [[0, 0, 50], [100, 150, 0], [150, 200, 0]],
+        changes: [[0, 0, 50], [50, 100, 0], [150, 200, 0]],
         filter: (from: number) => from % 50 > 0
       }, [50, 51, 100, 103, 150, 153])
     })
