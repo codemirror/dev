@@ -207,6 +207,19 @@ export class EditorView {
     }
   }
 
+  /// Scrolls the given `pos` position into the viewport.
+  /// In other words, it makes `pos` visible,
+  /// without changing the current selection.
+  scrollIntoView(pos: number) {
+    const update = new ViewUpdate(this, this.state, [])
+    this.viewState.update(update, pos)
+    this.docView.update(update)
+    if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
+    this.updateAttrs()
+    this.updateState = UpdateState.Idle
+    this.requestMeasure()
+  }
+
   /// @internal
   measure() {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
