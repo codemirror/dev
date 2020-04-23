@@ -80,6 +80,8 @@ export class ChangeSet implements Mapping {
     iter(this.sections, this.inserted, f)
   }
 
+  gaps(f: (posA: number, posB: number, length: number) => void) { iterGaps(this.sections, f) }
+
   /// Apply the changes to a document, returning the modified
   /// document.
   apply(doc: Text) {
@@ -152,6 +154,11 @@ export class ChangeSet implements Mapping {
   /// [`Mapping.mapPos`](#text.Mapping).
   mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
 
+  /// Check whether these changes touch a given range. When one of the
+  /// changes entirely covers the range, the string `"cover"` is
+  /// returned.
+  touchesRange(from: number, to: number): boolean | "cover" { return touches(this.sections, from, to) }
+
   /// Get a [change description](#text.ChangeDesc) for this change
   /// set.
   get desc() { return new ChangeDesc(this.sections) }
@@ -200,6 +207,8 @@ export class ChangeDesc implements Mapping {
     iter(this.sections, null, f)
   }
 
+  gaps(f: (posA: number, posB: number, length: number) => void) { iterGaps(this.sections, f) }
+
   invert() {
     return new ChangeDesc(this.sections.map((v, i) => i % 2 || v == Type.Keep ? v : v == Type.Del ? Type.Ins : Type.Del))
   }
@@ -211,6 +220,8 @@ export class ChangeDesc implements Mapping {
   map(other: ChangeDesc | ChangeSet, before = false) { return joinSets(this, other, before ? joinMapBefore : joinMapAfter) }
 
   mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) { return mapThrough(this.sections, pos, assoc, mode) }
+
+  touchesRange(from: number, to: number): boolean | "cover" { return touches(this.sections, from, to) }
 
   /// @internal
   toString() {
@@ -234,6 +245,23 @@ function getLen(sections: readonly number[], ignore: Type) {
   return length
 }
 
+function touches(sections: readonly number[], from: number, to: number) {
+  for (let i = 0, pos = 0; i < sections.length && pos <= to;) {
+    let type = sections[i++], len = sections[i++]
+    if (type == Type.Keep) {
+      pos += len
+    } else if (type == Type.Del) {
+      let end = pos + len
+      if (pos <= to && end >= from)
+        return pos < from && end > to ? "cover" : true
+      pos = end
+    } else {
+      if (pos >= from && pos <= to) return true
+    }
+  }
+  return false
+}
+
 function iter(sections: readonly number[], inserted: null | readonly (null | readonly string[])[],
               f: (type: Section, fromA: number, toA: number, fromB: number, toB: number,
                   inserted: null | readonly string[]) => void) {
@@ -250,6 +278,21 @@ function iter(sections: readonly number[], inserted: null | readonly (null | rea
     }
     f(type, posA, endA, posB, endB, ins)
     posA = endA; posB = endB
+  }
+}
+
+function iterGaps(sections: readonly number[], f: (posA: number, posB: number, length: number) => void) {
+  for (let i = 0, posA = 0, posB = 0; i < sections.length;) {
+    let type = sections[i++], len = sections[i++]
+    if (type == Type.Keep) {
+      f(posA, posB, len)
+      posA += len
+      posB += len
+    } else if (type == Type.Ins) {
+      posB += len
+    } else {
+      posA += len
+    }
   }
 }
 
