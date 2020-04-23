@@ -1,5 +1,5 @@
 import {EditorView} from "@codemirror/next/view"
-import {EditorState, SelectionRange, Transaction} from "@codemirror/next/state"
+import {EditorState, EditorSelection, SelectionRange, Transaction} from "@codemirror/next/state"
 import {Text, isWordChar} from "@codemirror/next/text"
 import {codePointAt, fromCodePoint, minPairCodePoint} from "@codemirror/next/text"
 import {keyName} from "w3c-keyname"
@@ -65,20 +65,18 @@ function keydown(event: KeyboardEvent, view: EditorView) {
 export function handleBackspace(state: EditorState) {
   let conf = config(state, state.selection.primary.head)
   let tokens = conf.brackets || defaults.brackets
-  let tr = state.t(), dont = null
-  tr.forEachRange(range => {
-    if (!range.empty) return dont = range
-    let before = prevChar(state.doc, range.head)
-    for (let token of tokens) {
-      if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0))) {
-        let ref = tr.mapRef()
-        tr.replace(range.head - token.length, range.head + token.length, "")
-        return new SelectionRange(ref.mapPos(range.head))
+  let dont = null, tr = state.changeByRange(range => {
+    if (range.empty) {
+      let before = prevChar(state.doc, range.head)
+      for (let token of tokens) {
+        if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
+          return {changes: {delete: range.head, to: range.head + token.length},
+                  range: new SelectionRange(range.head)}
       }
     }
-    return dont = range
+    return {range: dont = range}
   })
-  return dont ? null : tr.scrollIntoView()
+  return dont ? null : tr.and({scrollIntoView: true})
 }
 
 /// Implements the extension's behavior on text insertion. Again,
@@ -108,68 +106,57 @@ function prevChar(doc: Text, pos: number) {
 }
 
 function handleOpen(state: EditorState, open: string, close: string, closeBefore: string) {
-  let tr = state.t(), dont = null
-  tr.forEachRange(range => {
-    if (!range.empty) {
-      let ref = tr.mapRef(), dir = range.head - range.anchor
-      tr.replace(range.to, range.to, close)
-      tr.replace(ref.mapPos(range.from), ref.mapPos(range.from), open)
-      return new SelectionRange(ref.mapPos(range.anchor, dir), ref.mapPos(range.head, -dir))
-    }
+  let dont = null, tr = state.changeByRange(range => {
+    if (!range.empty)
+      return {changes: [{insert: open, at: range.from}, {insert: close, at: range.to}],
+              range: new SelectionRange(range.anchor + open.length, range.head + open.length)}
     let next = nextChar(state.doc, range.head)
-    if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1) {
-      tr.replace(range.head, range.head, open + close)
-      return new SelectionRange(Math.min(tr.doc.length, range.head + open.length))
-    }
-    return dont = range
+    if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
+      return {changes: {insert: open + close, at: range.head},
+              range: new SelectionRange(range.head + open.length)}
+    return {range: dont = range}
   })
-  return dont ? null : tr.scrollIntoView()
+  return dont ? null : tr.and({scrollIntoView: true})
 }
 
 function handleClose(state: EditorState, _open: string, close: string) {
-  let tr = state.t(), dont = null
-  tr.forEachRange(range => {
-    if (range.empty && close == nextChar(state.doc, range.head))
-      return new SelectionRange(range.head + close.length)
+  let dont = null, moved = state.selection.ranges.map(range => {
+    if (range.empty && nextChar(state.doc, range.head) == close) return new SelectionRange(range.head + close.length)
     return dont = range
   })
-  return dont ? null : tr.scrollIntoView()
+  return dont ? null : state.tr({selection: EditorSelection.create(moved, state.selection.primaryIndex),
+                                 scrollIntoView: true})
 }
 
 // Handles cases where the open and close token are the same, and
 // possibly triple quotes (as in `"""abc"""`-style quoting).
 function handleSame(state: EditorState, token: string, allowTriple: boolean) {
-  let tr = state.t(), dont = null
-  tr.forEachRange(range => {
-    if (!range.empty) {
-      let ref = tr.mapRef(), dir = range.head - range.anchor
-      tr.replace(range.to, range.to, token)
-      tr.replace(ref.mapPos(range.from), ref.mapPos(range.from), token)
-      return new SelectionRange(ref.mapPos(range.anchor, dir), ref.mapPos(range.head, -dir))
-    }
+  let dont = null, tr = state.changeByRange(range => {
+    if (!range.empty)
+      return {changes: [{insert: token, at: range.from}, {insert: token, at: range.to}],
+              range: new SelectionRange(range.anchor + token.length, range.head + token.length)}
     let pos = range.head, next = nextChar(state.doc, pos)
     if (next == token) {
       if (nodeStart(state, pos)) {
-        tr.replace(pos, pos, token + token)
-        return new SelectionRange(Math.min(tr.doc.length, pos + token.length))
+        return {changes: {insert: token + token, at: pos},
+                range: new SelectionRange(pos + token.length)}
       } else {
         let isTriple = allowTriple && state.doc.slice(pos, pos + token.length * 3) == token + token + token
-        return new SelectionRange(pos + token.length * (isTriple ? 3 : 1))
+        return {range: new SelectionRange(pos + token.length * (isTriple ? 3 : 1))}
       }
     } else if (allowTriple && state.doc.slice(pos - 2 * token.length, pos) == token + token &&
                nodeStart(state, pos - 2 * token.length)) {
-      tr.replace(pos, pos, token + token + token + token)
-      return new SelectionRange(Math.min(tr.doc.length, pos + token.length))
+      return {changes: {insert: token + token + token, at: pos},
+              range: new SelectionRange(pos + token.length)}
     } else if (!isWordChar(next)) {
       let prev = state.doc.slice(pos - 1, pos)
-      if (!isWordChar(prev) && prev != token) {
-        tr.replace(pos, pos, token + token)
-        return new SelectionRange(Math.min(tr.doc.length, pos + token.length))
-      }
+      if (!isWordChar(prev) && prev != token)
+        return {change: {insert: token + token, at: pos},
+                range: new SelectionRange(pos + token.length)}
     }
-    return dont = range
+    return {range: dont = range}
   })
-  return dont ? null : tr.scrollIntoView()
+  return dont ? null : tr.and({scrollIntoView: true})
 }
 
 function nodeStart(state: EditorState, pos: number) {

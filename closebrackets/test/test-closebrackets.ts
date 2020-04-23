@@ -1,6 +1,6 @@
 import ist from "ist"
 import {handleInsertion, handleBackspace} from "@codemirror/next/closebrackets"
-import {EditorState, EditorSelection, languageData} from "@codemirror/next/state"
+import {EditorState, Transaction, EditorSelection, languageData} from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
 import {StreamSyntax} from "@codemirror/next/stream-syntax"
 
@@ -8,9 +8,9 @@ function s(doc = "", anchor = 0, head = anchor) {
   return EditorState.create({doc, selection: EditorSelection.single(anchor, head)})
 }
 
-function same(s0: null | {doc: Text, selection: EditorSelection}, s1: {doc: Text, selection: EditorSelection}) {
+function same(s0: null | Transaction, s1: EditorState) {
   ist(s0)
-  ist(s0!.doc.toString(), s1.doc.toString())
+  ist(s0!.apply().doc.toString(), s1.doc.toString())
   ist(JSON.stringify(s0!.selection), JSON.stringify(s1.selection))
 }
 
