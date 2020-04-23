@@ -1,4 +1,4 @@
-import {ChangeDesc, ChangeSet, Text, MapMode, Section} from "@codemirror/next/text"
+import {ChangeDesc, ChangeSet, Text, MapMode, Section} from "@codemirror/next/state"
 import ist from "ist"
 
 function mk(spec: string) {

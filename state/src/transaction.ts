@@ -1,4 +1,4 @@
-import {ChangeSet, ChangeDesc} from "@codemirror/next/text"
+import {ChangeSet, ChangeDesc} from "./change"
 import {EditorState, ChangeSpec} from "./state"
 import {EditorSelection} from "./selection"
 import {Extension, ExtensionMap} from "./facet"

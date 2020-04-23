@@ -1,4 +1,4 @@
-import {Text, textLength, sliceText} from "./text"
+import {Text} from "@codemirror/next/text"
 
 /// Changes are represented as a sequence of sections. Each section
 /// either keeps a span of old content, deletes a span, or inserts new
@@ -21,10 +21,6 @@ export enum MapMode {
   /// Return -1 if the character _after_ the position is deleted.
   TrackAfter
 }
-
-/// Used to represent changes when building up a change set. Inserted
-/// content must already be split into lines.
-export type ChangeSpec = {insert: readonly string[], at: number} | {delete: number, to: number}
 
 // And the same enum again, inlined (just because). Internally, change
 // sections are represented by pairs of integers, with the type in the
@@ -264,8 +260,9 @@ export class ChangeSet extends ChangeDesc {
   /// set.
   get desc() { return new ChangeDesc(this.sections) }
 
-  /// Create a change set for the given collection of changes.
-  static of(length: number, changes: readonly ChangeSpec[]): ChangeSet {
+  /// @internal
+    static of(length: number,
+              changes: readonly ({insert: readonly string[], at: number} | {delete: number, to: number})[]): ChangeSet {
     if (!changes.length) return new ChangeSet(length ? [Type.Keep, length] : empty, empty)
     let sets = []
     for (let change of changes as readonly any[]) {
@@ -386,6 +383,22 @@ function joinSets(a: ChangeDesc, b: ChangeDesc, f: (typeA: number, typeB: number
 function takeInsert(array: readonly (readonly string[] | null)[], index: number, off: number, len: number): readonly string[] {
   let value = array[(index - 2) >> 1] as readonly string[]
   return off > 0 || off + len < textLength(value) ? sliceText(value, off, off + len) : value
+}
+
+function textLength(text: readonly string[]) {
+  let length = -1
+  for (let line of text) length += line.length + 1
+  return length
+}
+
+function sliceText(text: readonly string[], from: number, to: number): string[] {
+  let result = []
+  for (let off = 0, i = 0; i < text.length && off <= to; i++) {
+    let line = text[i], end = off + line.length
+    if (end >= from) result.push(line.slice(Math.max(0, from - off), Math.min(line.length, to - off)))
+    off += end + 1
+  }
+  return result
 }
 
 function joinCompose(typeA: Type, typeB: Type) {

@@ -1,5 +1,6 @@
 import {EditorState} from "./state"
-import {Text, charType, ChangeDesc} from "@codemirror/next/text"
+import {ChangeDesc} from "./change"
+import {Text, charType} from "@codemirror/next/text"
 
 /// A single selection range. When
 /// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)

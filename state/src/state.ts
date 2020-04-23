@@ -1,4 +1,5 @@
-import {Text, ChangeSet, ChangeDesc, ChangeSpec as TextChangeSpec} from "@codemirror/next/text"
+import {Text} from "@codemirror/next/text"
+import {ChangeSet, ChangeDesc} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, scrollIntoView, TransactionSpec} from "./transaction"
@@ -150,7 +151,8 @@ export class EditorState {
 
   changes(spec: ChangeSpec | undefined) {
     if (spec instanceof ChangeSet) return spec
-    let changes: TextChangeSpec[] = [], set: ChangeSet | undefined
+    let changes: ({insert: readonly string[], at: number} | {delete: number, to: number})[] = []
+    let set: ChangeSet | undefined
     let len = this.doc.length
     let convert = (spec: any) => {
       if (!spec) {
