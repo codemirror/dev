@@ -1,6 +1,6 @@
 import {Text} from "@codemirror/next/text"
 
-export const DefaultSplit = /\r\n?|\n/ // FIXME dedup
+export const DefaultSplit = /\r\n?|\n/
 
 /// Distinguishes different ways in which positions can be mapped.
 export enum MapMode {
@@ -48,8 +48,6 @@ export class ChangeDesc {
   /// False when there are actual changes in this set.
   get empty() { return this.sections.length == 0 || this.sections.length == 2 && this.sections[1] < 0 }
 
-  // FIXME write these utilities on top of SectionIter?
-
   /// Iterate over the unchanged parts left by these changes.
   iterGaps(f: (posA: number, posB: number, length: number) => void) {
     for (let i = 0, posA = 0, posB = 0; i < this.sections.length;) {
@@ -62,6 +60,13 @@ export class ChangeDesc {
       }
       posA += len
     }
+  }
+
+  /// Iterate over the ranges changed by these changes. (See
+  /// [`ChangeSet.iterChanges`](#state.ChangeSet.iterChanges) for a
+  /// variant that also provides you with the inserted text.)
+  iterChangedRanges(f: (fromA: number, toA: number, fromB: number, toB: number) => void) {
+    iterChanges(this, f)
   }
 
   /// Get the inverted form of thes changes.
@@ -119,6 +124,14 @@ export class ChangeDesc {
     return posB
   }
 
+  /// Map a position in a way that reliably produces the same position
+  /// for a sequence of changes, regardless of the order in which they
+  /// were [mapped](#state.ChangeSet.map) and applied. This will map a
+  /// position to the start (or end) through _all_ adjacent changes
+  /// next to it, and often produces more surprising results than
+  /// [`mapPos`](#state.ChangeDesc.mapPos). But it can be useful in
+  /// cases where it is important that all clients in a collaborative
+  /// setting end up doing the precise same mapping.
   mapPosStable(pos: number, side = -1) {
     let posA = 0, posB = 0, lastB = 0
     for (let i = 0; i < this.sections.length;) {
@@ -156,16 +169,6 @@ export class ChangeDesc {
     }
     return result
   }
-
-  /// @internal
-  static make(sections: readonly (number | [number, number])[]) {
-    let values = []
-    for (let val of sections) {
-      if (Array.isArray(val)) values.push(val[0], val[1])
-      else values.push(val, -1)
-    }
-    return new ChangeDesc(values)
-  }
 }
 
 /// This type is used as argument to
@@ -197,22 +200,7 @@ export class ChangeSet extends ChangeDesc {
   /// document.
   apply(doc: Text) {
     if (this.length != doc.length) throw new RangeError("Applying change set to a document with the wrong length")
-    for (let pos = 0, i = 0; i < this.sections.length;) {
-      let len = this.sections[i++], ins = this.sections[i++]
-      if (ins < 0) {
-        pos += len
-      } else {
-        let start = pos, end = pos, text: readonly string[] = noText
-        for (;;) {
-          pos += ins
-          if (ins) text = appendText(text, this.inserted[(i - 2) >> 1])
-          end += len
-          if (i == this.sections.length || this.sections[i + 1] < 0) break
-          len = this.sections[i++]; ins = this.sections[i++]
-        }
-        doc = doc.replace(start, end, text)
-      }
-    }
+    this.iterChanges((fromA, toA, fromB, _toB, text) => doc = doc.replace(fromB, fromB + (toA - fromA), text))
     return doc
   }
 
@@ -254,18 +242,10 @@ export class ChangeSet extends ChangeDesc {
   // `other`, otherwise (the default) treat `other` as coming first.
   map(other: ChangeDesc, before = false): ChangeSet { return other.empty ? this : mapSet(this, other, before, true) }
 
-  /// Iterate over the changed sections, calling `f` for each. If this
-  /// is a `ChangeSet`, this will pass the inserted text as last
-  /// argument to the function when reporting an insertion.
-  iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: readonly string[] | null) => void) {
-    // FIXME group adjacent changes?
-    let posA = 0, posB = 0
-    for (let i = 0; i < this.sections.length;) {
-      let len = this.sections[i++], ins = this.sections[i++]
-      let endA = posA + len, endB = posB + (ins < 0 ? len : ins)
-      if (ins >= 0) f(posA, endA, posB, endB, ins ? this.inserted[(i - 2) >> 1] : noText)
-      posA = endA; posB = endB
-    }
+  /// Iterate over the changed ranges in the document, calling `f` for
+  /// each.
+  iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: readonly string[]) => void) {
+    iterChanges(this, f)
   }
 
   /// Get a [change description](#text.ChangeDesc) for this change
@@ -332,6 +312,27 @@ function addInsert(values: (readonly string[])[], sections: readonly number[], v
   } else {
     while (values.length < index) values.push(noText)
     values.push(value)
+  }
+}
+
+function iterChanges(desc: ChangeDesc,
+                     f: (fromA: number, toA: number, fromB: number, toB: number, text: readonly string[]) => void) {
+  let inserted = (desc as ChangeSet).inserted
+  for (let posA = 0, posB = 0, i = 0; i < desc.sections.length;) {
+    let len = desc.sections[i++], ins = desc.sections[i++]
+    if (ins < 0) {
+      posA += len; posB += len
+    } else {
+      let endA = posA, endB = posB, text = noText
+      for (;;) {
+        endA += len; endB += ins
+        if (ins && inserted) text = appendText(text, inserted[(i - 2) >> 1])
+        if (i == desc.sections.length || desc.sections[i + 1] < 0) break
+        len = desc.sections[i++]; ins = desc.sections[i++]
+      }
+      f(posA, endA, posB, endB, text)
+      posA = endA; posB = endB
+    }
   }
 }
 
