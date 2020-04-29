@@ -1,4 +1,4 @@
-import {ChangeSet, MapMode} from "@codemirror/next/text"
+import {ChangeSet, MapMode} from "@codemirror/next/state"
 
 /// Each range is associated with a value, which must inherit from
 /// this class.
@@ -309,7 +309,7 @@ export class RangeSet<T extends RangeValue> {
 
     let sideA = new SpanCursor(a, sharedChunks, minPoint)
     let sideB = new SpanCursor(b, sharedChunks, minPoint)
-    textDiff.gaps((fromA, fromB, length) => compare(sideA, fromA, sideB, fromB, length, comparator))
+    textDiff.iterGaps((fromA, fromB, length) => compare(sideA, fromA, sideB, fromB, length, comparator))
   }
 
   /// Iterate over a group of range sets at the same time, notifying

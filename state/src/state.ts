@@ -1,5 +1,5 @@
 import {Text} from "@codemirror/next/text"
-import {ChangeSet, ChangeDesc} from "./change"
+import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, scrollIntoView, TransactionSpec} from "./transaction"
@@ -26,20 +26,7 @@ export interface EditorStateConfig {
   extensions?: Extension
 }
 
-/// This type is used as argument to
-/// [`EditorState.changeSet`](#state.EditorState.changeSet) and in the
-/// [`changes` field](#state.TransactionSpec.changes) of transaction
-/// specs to succinctly describe document changes. Depending on its
-/// object shape, it represents an insertion, a deletion, or a
-/// replacement.
-export type ChangeSpec =
-  ChangeSet |
-  {insert: string, at: number} |
-  {delete: number, to: number} |
-  {replace: number, to: number, with: string} |
-  readonly ChangeSpec[]
-
-const DefaultIndentUnit = 2, DefaultTabsize = 4, DefaultSplit = /\r\n?|\n/
+const DefaultIndentUnit = 2, DefaultTabsize = 4
 
 /// The editor state class is a persistent (immutable) data structure.
 /// To update a state, you [create](#state.EditorState.t) and
@@ -119,7 +106,7 @@ export class EditorState {
   }
 
   replaceSelection(text: string): Transaction {
-    return this.changeByRange(range => ({changes: [{replace: range.from, to: range.to, with: text}],
+    return this.changeByRange(range => ({changes: [{at: range.from, to: range.to, insert: text}],
                                          range: new SelectionRange(range.from + text.length)}))
   }
 
@@ -134,14 +121,15 @@ export class EditorState {
       for (let r of sel.ranges) {
         let {changes, range} = f(r)
         let resolved = changes && this.changes(changes)
-        if (resolved) allChanges = allChanges ? allChanges.combine(resolved) : resolved
+        if (resolved) allChanges = allChanges ? allChanges.compose(resolved.map(allChanges)) : resolved
         newRanges.push(range)
         changeSets.push(resolved)
       }
+      // FIXME this cubic wrt change/range count
       for (let i = 0; i < newRanges.length; i++) {
         let others: ChangeDesc | undefined
         for (let j = 0; j < changeSets.length; j++) if (j != i && changeSets[j])
-          others = others ? others.combineDesc(changeSets[j]!.desc) : changeSets[j]!.desc
+          others = others ? others.composeDesc(changeSets[j]!.mapDesc(others)) : changeSets[j]!.desc
         if (others)
           newRanges[i] = newRanges[i].map(changeSets[i] ? others.mapDesc(changeSets[i]!) : others)
       }
@@ -149,32 +137,8 @@ export class EditorState {
     }
   }
 
-  changes(spec: ChangeSpec | undefined) {
-    if (spec instanceof ChangeSet) return spec
-    let changes: ({insert: readonly string[], at: number} | {delete: number, to: number})[] = []
-    let set: ChangeSet | undefined
-    let len = this.doc.length
-    let convert = (spec: any) => {
-      if (!spec) {
-      } else if (Array.isArray(spec)) {
-        for (let part of spec) convert(part)
-      } else if (spec instanceof ChangeSet) {
-        set = ChangeSet.of(len, changes).combine(spec)
-        changes = []
-      } else if (spec.insert != null) {
-        checkRange(spec.at, spec.at, len)
-        changes.push({insert: this.splitLines(spec.insert), at: spec.at})
-      } else if (spec.delete != null) {
-        checkRange(spec.delete, spec.to, len)
-        changes.push(spec)
-      } else {
-        checkRange(spec.replace, spec.to, len)
-        if (spec.with) changes.push({insert: this.splitLines(spec.with), at: spec.replace})
-        if (spec.to > spec.replace) changes.push({delete: spec.replace, to: spec.to})
-      }
-    }
-    convert(spec)
-    return set ? set.combine(ChangeSet.of(len, changes)) : ChangeSet.of(len, changes)
+  changes(spec: ChangeSpec = []) {
+    return ChangeSet.of(spec, this.doc.length, this.facet(EditorState.lineSeparator))
   }
 
   /// Join an array of lines using the state's [line
@@ -348,11 +312,6 @@ export class EditorState {
   /// updates its selection, such filters get a chance to replace the
   /// new selection with another one.
   static selectionFilter = selectionFilter
-}
-
-function checkRange(a: number, b: number, len: number) {
-  if (a > b || a < 0 || b > len)
-    throw new RangeError(`Invalid change range ${a} to ${b} (in doc of length ${len})`)
 }
 
 const none: readonly any[] = []

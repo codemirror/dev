@@ -70,7 +70,7 @@ export function handleBackspace(state: EditorState) {
       let before = prevChar(state.doc, range.head)
       for (let token of tokens) {
         if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
-          return {changes: {delete: range.head, to: range.head + token.length},
+          return {changes: {at: range.head, to: range.head + token.length},
                   range: new SelectionRange(range.head)}
       }
     }

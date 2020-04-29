@@ -10,7 +10,7 @@ describe("EditorState", () => {
 
   it("can apply changes", () => {
     let state = EditorState.create({doc: "hello"})
-    let transaction = state.tr({changes: [{replace: 2, to: 4, with: "w"}, {insert: "!", at: 5}]})
+    let transaction = state.tr({changes: [{at: 2, to: 4, insert: "w"}, {at: 5, insert: "!"}]})
     ist(transaction.apply().doc.toString(), "hewo!")
   })
 
@@ -32,9 +32,9 @@ describe("EditorState", () => {
 
   it("throws when a change's bounds are invalid", () => {
     let state = EditorState.create({doc: "1234"})
-    ist.throws(() => state.tr({changes: {delete: -1, to: 1}}))
-    ist.throws(() => state.tr({changes: {delete: 2, to: 1}}))
-//    ist.throws(() => state.tr({changes: {replace: 2, to: 10, with: "x"}}))
+    ist.throws(() => state.tr({changes: {at: -1, to: 1}}))
+    ist.throws(() => state.tr({changes: {at: 2, to: 1}}))
+    ist.throws(() => state.tr({changes: {at: 2, to: 10, insert: "x"}}))
   })
 
   it("stores and updates tab size", () => {
