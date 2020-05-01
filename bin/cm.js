@@ -20,7 +20,7 @@ for (let exp of Object.keys(packageJSON.exports)) {
   packageNames[pkg.name] = pkg
 }
   
-function external(id) { return id != "tslib" && !/^\.?\//.test(id) }
+function external(id) { return id != "tslib" && !/^(\.?\/|\w:)/.test(id) }
 
 function start() {
   let command = process.argv[2]
