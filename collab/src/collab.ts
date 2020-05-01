@@ -1,59 +1,20 @@
-import {Facet, Change, StateField, Annotation, EditorState, StateEffect, Transaction,
+import {Facet, ChangeSet, ChangeDesc, StateField, Annotation, EditorState, StateEffect, Transaction,
         combineConfig, Extension} from "@codemirror/next/state"
 
-/// An update can either be a [change](#state.Change) or an
-/// [effect](#state.StateEffect). In each update object, exactly one
-/// of these will be `undefined`. When you didn't configure your
-/// collab extension with a
-/// [`sharedEffects`](#collab.CollabOptions.sharedEffects) option, all
-/// updates produced by the extension will have the `change` property
-/// set.
-export type Update = {
-  change?: Change,
-  effect?: StateEffect<any>
+/// An update is a set of changes and effects. There'll only ever be
+/// effects in these When you configured your collab extension with a
+/// [`sharedEffects`](#collab.CollabOptions.sharedEffects) option.
+export interface Update {
+  changes: ChangeSet,
+  effects?: readonly StateEffect<any>[]
 }
 
 class LocalUpdate implements Update {
   constructor(
     readonly origin: Transaction,
-    readonly change?: Change,
-    readonly inverted?: Change,
-    readonly effect?: StateEffect<any>
+    readonly changes: ChangeSet,
+    readonly effects: readonly StateEffect<any>[]
   ) {}
-}
-
-// Undo a given set of updates, apply a set of other updates, and then
-// redo them.
-function rebaseUpdates(updates: readonly LocalUpdate[], over: readonly Update[], tr: Transaction) {
-  for (let i = updates.length - 1; i >= 0; i--) {
-    let update = updates[i]
-    if (update.change) tr.changeNoFilter(update.inverted!)
-  }
-  let mapFrom = tr.changes.length
-  for (let update of over) {
-    if (update.change) tr.changeNoFilter(update.change)
-    else tr.effect(update.effect!)
-  }
-
-  let result = []
-  for (let update of updates) {
-    let mapping = tr.changes.partialMapping(mapFrom)
-    if (update.change) {
-      let mapped = update.change.map(mapping)
-      mapFrom--
-      if (mapped) {
-        result.push(new LocalUpdate(update.origin, mapped, mapped.invert(tr.doc)))
-        tr.changeNoFilter(mapped, mapFrom)
-      }
-    } else {
-      let mapped = update.effect!.map(mapping)
-      if (mapped) {
-        tr.effect(mapped)
-        result.push(new LocalUpdate(update.origin, undefined, undefined, mapped))
-      }
-    }
-  }
-  return result
 }
 
 // This state field accumulates updates that have to be sent to the
@@ -110,11 +71,10 @@ const collabField = StateField.define({
   update(collab: CollabState, tr: Transaction) {
     let isSync = tr.annotation(collabReceive)
     if (isSync) return isSync
-    let updates = tr.changes.changes.map((ch, i) => new LocalUpdate(tr, ch, ch.invert(i ? tr.docs[i - 1] : tr.startState.doc)))
     let {sharedEffects} = tr.startState.facet(collabConfig)
-    if (sharedEffects) for (let effect of sharedEffects(tr))
-      updates.push(new LocalUpdate(tr, undefined, undefined, effect))
-    if (updates.length) return new CollabState(collab.version, collab.unconfirmed.concat(updates))
+    let update = new LocalUpdate(tr, tr.changes, sharedEffects ? sharedEffects(tr) : [])
+    if (update.effects.length || !update.changes.empty)
+      return new CollabState(collab.version, collab.unconfirmed.concat(update))
     return collab
   }
 })
@@ -129,9 +89,6 @@ export function collab(config: CollabConfig = {}): Extension {
                      generatedID: Math.floor(Math.random() * 0xFFFFFFFF).toString(16)})
   ]
 }
-
-// Snuck out for testing purposes here.
-;(collab as any).rebase = rebaseUpdates
 
 /// Create a transaction that represents a set of new updates received
 /// from the authority. Applying this transaction moves the state
@@ -150,13 +107,34 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
 
   // If all updates originated with us, we're done.
   if (!updates.length)
-    return state.t().annotate(collabReceive, new CollabState(version, unconfirmed))
+    return state.tr({annotations: [collabReceive.of(new CollabState(version, unconfirmed))]})
 
-  let nUnconfirmed = unconfirmed.length
-  let tr = state.t()
-  if (nUnconfirmed) {
+  let changes: ChangeSet | undefined = undefined, effects = []
+  if (unconfirmed.length) {
+    let changes = updates[0].changes
+    for (let i = 1; i < updates.length; i++) {
+      changes = changes.compose(updates[i].changes)
+    }
+    let mapping: ChangeDesc[] = [changes]
+    for (let update of unconfirmed)
+      mapping.push(mapping[mapping.length - 1].mapDesc(update.changes, true))
+    unconfirmed = unconfirmed.map((update, i) =>
+                                  new LocalUpdate(update.origin, update.changes.map(mapping[i]),
+                                                  update.effects.map(e => e.map(mapping[i + 1]))))
+    
+  }
+    for (let i = 0; i < mapping.lenA)
+      unconfirmed.push(
+    
+    for (let local of unconfirmed) {
+      let {changes, effects} = local
+      for (let remote of updates) {
+        changes = changes
+      }
+    }
+    unconfirmed = unconfirmed
     let interference = checkInterference(unconfirmed, updates)
-    unconfirmed = rebaseUpdates(unconfirmed, updates, tr)
+    
     // If the changes don't occur near each other, we can dispatch a
     // simplified transaction that just applies the mapped remote
     // changes, without rebasing.

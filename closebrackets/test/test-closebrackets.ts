@@ -1,7 +1,6 @@
 import ist from "ist"
 import {handleInsertion, handleBackspace} from "@codemirror/next/closebrackets"
 import {EditorState, Transaction, EditorSelection, languageData} from "@codemirror/next/state"
-import {Text} from "@codemirror/next/text"
 import {StreamSyntax} from "@codemirror/next/stream-syntax"
 
 function s(doc = "", anchor = 0, head = anchor) {
