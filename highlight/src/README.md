@@ -86,8 +86,10 @@ highlighters to style them differently if they want to.
 These flags can be added to every type:
 
  * **`invalid`** indicates that the node is an error of some kind.
- * **`meta`** Usually used for annotations, syntax-level attributes,
+ * **`meta`** is usually used for annotations, syntax-level attributes,
    or other metadata.
+ * **`standard`** indicates that a given element is part of the
+   language's standard environment.
  * **`link`**, **`strong`**, **`emphasis`**, **`monospace`** can be
    useful in markup languages to add styling information.
  * **`changed`**, **`inserted`**, and **`deleted`** would be

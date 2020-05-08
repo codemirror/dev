@@ -136,7 +136,7 @@ export class TagSystem {
 /// The set of highlighting tags used by regular language packages and
 /// themes.
 export const defaultTags = new TagSystem({
-  flags: ["invalid", "meta",
+  flags: ["invalid", "meta", "standard",
           "link", "strong", "emphasis", "monospace",
           "changed", "inserted", "deleted",
           "definition", "constant", "control"],
