@@ -271,11 +271,8 @@ describe("ChangeSet", () => {
 
   it("mapping before produces the same result as mapping the other after", () => {
     for (let i = 0, total = 100; i < total; i++) {
-      let a = [], b = [], size = r(20), count = Math.floor(i / (total / 10)) + 1
-      for (let j = 0; j < count; j++) {
-        a.push(rChange(size))
-        b.push(rChange(size))
-      }
+      let size = r(20), count = Math.floor(i / (total / 10)) + 1
+      let a = rChanges(size, count), b = rChanges(size, count)
       try {
         let setA = ChangeSet.of(a, size), setB = ChangeSet.of(b, size)
         let setA1 = setA.map(setB, true), setB1 = setB.map(setA, false)
@@ -286,6 +283,20 @@ describe("ChangeSet", () => {
         console.log(`a = ChangeSet.of(${JSON.stringify(a)}, ${size})\nb = ChangeSet.of(${JSON.stringify(b)}, ${size})`)
         throw e
       }
+    }
+  })
+
+  it("mapping still converges when mapping through multiple changes", () => {
+    for (let i = 0, total = 100; i < total; i++) {
+      let size = r(20), count = Math.floor(i / (total / 10)) + 1
+      let a = ChangeSet.of(rChanges(size, count), size)
+      let b = ChangeSet.of(rChanges(a.newLength, count), a.newLength)
+      let c = ChangeSet.of(rChanges(size, count), size)
+      let c$a = c.map(a), c$ab = c$a.map(b)
+      let a$c = a.map(c, true), b$ca = b.map(c$a, true)
+      let doc = Text.of([rStr(size)])
+      ist(a.compose(b).compose(c$ab).apply(doc).toString(),
+          c.compose(a$c).compose(b$ca).apply(doc).toString())
     }
   })
 
