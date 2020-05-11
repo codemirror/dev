@@ -1,7 +1,7 @@
 import ist from "ist"
 
 import {EditorState, EditorSelection, SelectionRange, Transaction,
-        StateEffect, StateEffectType, StateField} from "@codemirror/next/state"
+        StateEffect, StateEffectType, StateField, ChangeDesc} from "@codemirror/next/state"
 import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection, invertedEffects} from "@codemirror/next/history"
 
@@ -13,13 +13,15 @@ function mkState(config?: any, doc?: string) {
 }
 
 function type(state: EditorState, text: string, at = state.doc.length) {
-  return state.t().replace(at, at, text).apply()
+  return state.tr({changes: {from: at, insert: text}}).apply()
 }
 function timedType(state: EditorState, text: string, atTime: number) {
-  return state.t(atTime).replace(state.doc.length, state.doc.length, text).apply()
+  return state.tr({changes: {from: state.doc.length, insert: text},
+                   annotations: Transaction.time.of(atTime)}).apply()
 }
 function receive(state: EditorState, text: string, from: number, to = from) {
-  return state.t().replace(from, to, text).annotate(Transaction.addToHistory, false).apply()
+  return state.tr({changes: {from, to, insert: text},
+                   annotations: Transaction.addToHistory.of(false)}).apply()
 }
 function command(state: EditorState, cmd: any, success: boolean = true) {
   ist(cmd({state, dispatch(tr: Transaction) { state = tr.apply() }}), success)
@@ -60,21 +62,21 @@ describe("history", () => {
   })
 
   it("tracks multiple levels of history", () => {
-    let state = mkState()
+    let state = mkState([], "one")
     state = type(state, "new")
     state = type(state, "text")
     state = type(state, "some", 0)
-    ist(state.doc.toString(), "somenewtext")
+    ist(state.doc.toString(), "someonenewtext")
     state = command(state, undo)
-    ist(state.doc.toString(), "newtext")
+    ist(state.doc.toString(), "onenewtext")
     state = command(state, undo)
-    ist(state.doc.toString(), "")
+    ist(state.doc.toString(), "one")
     state = command(state, redo)
-    ist(state.doc.toString(), "newtext")
+    ist(state.doc.toString(), "onenewtext")
     state = command(state, redo)
-    ist(state.doc.toString(), "somenewtext")
+    ist(state.doc.toString(), "someonenewtext")
     state = command(state, undo)
-    ist(state.doc.toString(), "newtext")
+    ist(state.doc.toString(), "onenewtext")
   })
 
   it("starts a new event when newGroupDelay elapses", () => {
@@ -108,7 +110,9 @@ describe("history", () => {
 
   it("accurately maps changes through each other", () => {
     let state = mkState({}, "123")
-    state = state.t().replace(1, 2, "cd").replace(3, 4, "ef").replace(0, 1, "ab").apply()
+    state = state.tr({
+      changes: [{from: 0, to: 1, insert: "ab"}, {from: 1, to: 2, insert: "cd"}, {from: 2, to: 3, insert: "ef"}]
+    }).apply()
     state = receive(state, "!!!!!!!!", 2, 2)
     state = command(state, undo)
     state = command(state, redo)
@@ -118,12 +122,13 @@ describe("history", () => {
   it("can handle complex editing sequences", () => {
     let state = mkState()
     state = type(state, "hello")
-    state = state.t().annotate(isolateHistory, "before").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
     state = type(state, "!")
     state = receive(state, "....", 0)
     state = type(state, "\n\n", 2)
     ist(state.doc.toString(), "..\n\n..hello!")
     state = receive(state, "\n\n", 1)
+    console.log("first undo ----------")
     state = command(state, undo)
     state = command(state, undo)
     ist(state.doc.toString(), ".\n\n...hello")
@@ -134,8 +139,8 @@ describe("history", () => {
   it("supports overlapping edits", () => {
     let state = mkState()
     state = type(state, "hello")
-    state = state.t().annotate(isolateHistory, "before").apply()
-    state = state.t().replace(0, 5, "").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
+    state = state.tr({changes: {from: 0, to: 5}}).apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
     ist(state.doc.toString(), "hello")
@@ -147,8 +152,8 @@ describe("history", () => {
     let state = mkState()
     state = receive(state, "h", 0)
     state = type(state, "ello")
-    state = state.t().annotate(isolateHistory, "before").apply()
-    state = state.t().replace(0, 5, "").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
+    state = state.tr({changes: {from: 0, to: 5}}).apply()
     ist(state.doc.toString(), "")
     state = command(state, undo)
     ist(state.doc.toString(), "hello")
@@ -159,9 +164,9 @@ describe("history", () => {
   it("supports overlapping unsynced deletes", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().annotate(isolateHistory, "before").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
     state = type(state, "hello")
-    state = state.t().replace(0, 7, "").annotate(Transaction.addToHistory, false).apply()
+    state = state.tr({changes: {from: 0, to: 7}, annotations: Transaction.addToHistory.of(false)}).apply()
     ist(state.doc.toString(), "")
     state = command(state, undo, false)
     ist(state.doc.toString(), "")
@@ -171,10 +176,10 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "one")
     state = type(state, " two")
-    state = state.t().annotate(isolateHistory, "before").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
     state = type(state, " three")
     state = type(state, "zero ", 0)
-    state = state.t().annotate(isolateHistory, "before").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
     state = type(state, "\n\n", 0)
     state = type(state, "top", 0)
     for (let i = 0; i < 6; i++) {
@@ -197,11 +202,11 @@ describe("history", () => {
     let state = mkState()
     state = type(state, "one")
     state = type(state, " two")
-    state = state.t().annotate(isolateHistory, "before").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
     state = receive(state, "xxx", state.doc.length)
     state = type(state, " three")
     state = type(state, "zero ", 0)
-    state = state.t().annotate(isolateHistory, "before").apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
     state = type(state, "\n\n", 0)
     state = type(state, "top", 0)
     state = receive(state, "yyy", 0)
@@ -216,10 +221,10 @@ describe("history", () => {
   it("restores selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().annotate(isolateHistory, "before").apply()
-    state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
+    state = state.tr({selection: {anchor: 0, head: 2}}).apply()
     const selection = state.selection
-    state = state.t().replaceSelection("hello").apply()
+    state = state.replaceSelection("hello").apply()
     const selection2 = state.selection
     state = command(state, undo)
     ist(state.selection.eq(selection))
@@ -229,8 +234,8 @@ describe("history", () => {
 
   it("restores the selection before the first change in an item (#46)", () => {
     let state = mkState()
-    state = state.t().replace(0, 0, "a").setSelection(EditorSelection.single(1)).apply()
-    state = state.t().replace(1, 1, "b").setSelection(EditorSelection.single(2)).apply()
+    state = state.tr({changes: {from: 0, insert: "a"}, selection: {anchor: 1}}).apply()
+    state = state.tr({changes: {from: 1, insert: "b"}, selection: {anchor: 2}}).apply()
     state = command(state, undo)
     ist(state.doc.toString(), "")
     ist(state.selection.primary.anchor, 0)
@@ -239,16 +244,16 @@ describe("history", () => {
   it("doesn't merge document changes if there's a selection change in between", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
-    state = state.t().replaceSelection("hello").apply()
+    state = state.tr({selection: {anchor: 0, head: 2}}).apply()
+    state = state.replaceSelection("hello").apply()
     ist(undoDepth(state), 2)
   })
 
   it("rebases selection on undo", () => {
     let state = mkState()
     state = type(state, "hi")
-    state = state.t().annotate(isolateHistory, "before").apply()
-    state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
+    state = state.tr({annotations: isolateHistory.of("before")}).apply()
+    state = state.tr({selection: {anchor: 0, head: 2}}).apply()
     state = type(state, "hello", 0)
     state = receive(state, "---", 0)
     state = command(state, undo)
@@ -283,76 +288,37 @@ describe("history", () => {
     let state = mkState({minDepth: 10})
     for (let i = 0; i < 40; ++i) {
       state = type(state, "a")
-      state = state.t().annotate(isolateHistory, "before").apply()
+      state = state.tr({annotations: isolateHistory.of("before")}).apply()
     }
     ist(undoDepth(state) < 40)
-  })
-
-  it("supports transactions with multiple changes", () => {
-    let state = mkState()
-    state = state.t().replace(0, 0, "a").replace(1, 1, "b").apply()
-    state = type(state, "c", 0)
-    ist(state.doc.toString(), "cab")
-    state = command(state, undo)
-    ist(state.doc.toString(), "ab")
-    state = command(state, undo)
-    ist(state.doc.toString(), "")
-    state = command(state, redo)
-    ist(state.doc.toString(), "ab")
-    state = command(state, redo)
-    ist(state.doc.toString(), "cab")
-    state = command(state, undo)
-    ist(state.doc.toString(), "ab")
   })
 
   it("doesn't undo selection-only transactions", () => {
     let state = mkState(undefined, "abc")
     ist(state.selection.primary.head, 0)
-    state = state.t().setSelection(EditorSelection.single(2)).apply()
+    state = state.tr({selection: {anchor: 2}}).apply()
     state = command(state, undo, false)
     ist(state.selection.primary.head, 2)
   })
 
   it("isolates transactions when asked to", () => {
     let state = mkState()
-    state = state.t().replace(0, 0, "a").annotate(isolateHistory, "after").apply()
-    state = state.t().replace(1, 1, "b").apply()
-    state = state.t().replace(2, 2, "c").annotate(isolateHistory, "after").apply()
-    state = state.t().replace(3, 3, "d").apply()
-    state = state.t().replace(4, 4, "e").annotate(isolateHistory, "full").apply()
-    state = state.t().replace(5, 5, "f").apply()
+    state = state.tr({changes: {from: 0, insert: "a"}, annotations: isolateHistory.of("after")}).apply()
+    state = state.tr({changes: {from: 1, insert: "a"}}).apply()
+    state = state.tr({changes: {from: 2, insert: "c"}, annotations: isolateHistory.of("after")}).apply()
+    state = state.tr({changes: {from: 3, insert: "d"}}).apply()
+    state = state.tr({changes: {from: 4, insert: "e"}, annotations: isolateHistory.of("full")}).apply()
+    state = state.tr({changes: {from: 5, insert: "f"}}).apply()
     ist(undoDepth(state), 5)
   })
 
   it("can group events around a non-history transaction", () => {
     let state = mkState()
-    state = state.t().replace(0, 0, "a").apply()
-    state = state.t().replace(1, 1, "b").annotate(Transaction.addToHistory, false).apply()
-    state = state.t().replace(1, 1, "c").apply()
+    state = state.tr({changes: {from: 0, insert: "a"}}).apply()
+    state = state.tr({changes: {from: 1, insert: "b"}, annotations: Transaction.addToHistory.of(false)}).apply()
+    state = state.tr({changes: {from: 1, insert: "c"}}).apply()
     state = command(state, undo)
     ist(state.doc.toString(), "b")
-  })
-
-  it("survives compression", () => {
-    let state = mkState()
-    state = state.t().replace(0, 0, "a").apply()
-    state = state.t().replace(1, 1, "b").annotate(Transaction.addToHistory, false).apply()
-    state = state.t().replace(2, 2, "c").apply()
-    state = state.t().replace(3, 3, "d").apply()
-    state = state.t().replace(4, 4, "e").apply()
-    state = state.t().replace(0, 0, ">").apply()
-    for (let i = 0; i < 500; i++) state = state.t().replace(0, 0, "*").annotate(Transaction.addToHistory, false).apply()
-    state = state.t().replace(0, 500, "=").annotate(Transaction.addToHistory, false).apply()
-    ist(state.doc.toString(), "=>abcde")
-    state = command(state, undo)
-    state = command(state, undo)
-    ist(state.doc.toString(), "=ab")
-    state = command(state, undo)
-    ist(state.doc.toString(), "=b")
-    state = command(state, redo)
-    state = command(state, redo)
-    state = command(state, redo)
-    ist(state.doc.toString(), "=>abcde")
   })
 
   describe("undoSelection", () => {
@@ -366,7 +332,7 @@ describe("history", () => {
     it("allows to undo selection-only transactions", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.t().setSelection(EditorSelection.single(2)).apply()
+      state = state.tr({selection: {anchor: 2}}).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 0)
     })
@@ -374,9 +340,9 @@ describe("history", () => {
     it("merges selection-only transactions from keyboard", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.t().setSelection(EditorSelection.single(2)).annotate(Transaction.userEvent, "keyboard").apply()
-      state = state.t().setSelection(EditorSelection.single(3)).annotate(Transaction.userEvent, "keyboard").apply()
-      state = state.t().setSelection(EditorSelection.single(1)).annotate(Transaction.userEvent, "keyboard").apply()
+      state = state.tr({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboard")}).apply()
+      state = state.tr({selection: {anchor: 3}, annotations: Transaction.userEvent.of("keyboard")}).apply()
+      state = state.tr({selection: {anchor: 1}, annotations: Transaction.userEvent.of("keyboard")}).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 0)
     })
@@ -384,9 +350,9 @@ describe("history", () => {
     it("doesn't merge selection-only transactions from other sources", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.t().setSelection(EditorSelection.single(2)).apply()
-      state = state.t().setSelection(EditorSelection.single(3)).apply()
-      state = state.t().setSelection(EditorSelection.single(1)).apply()
+      state = state.tr({selection: {anchor: 2}}).apply()
+      state = state.tr({selection: {anchor: 3}}).apply()
+      state = state.tr({selection: {anchor: 1}}).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.head, 3)
       state = command(state, undoSelection)
@@ -398,10 +364,10 @@ describe("history", () => {
     it("doesn't merge selection-only transactions if they change the number of selections", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.t().setSelection(EditorSelection.single(2)).annotate(Transaction.userEvent, "keyboard").apply()
-      state = state.t().setSelection(EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)])).
-        annotate(Transaction.userEvent, "keyboard").apply()
-      state = state.t().setSelection(EditorSelection.single(1)).annotate(Transaction.userEvent, "keyboard").apply()
+      state = state.tr({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboard")}).apply()
+      state = state.tr({selection: EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)]),
+                        annotations: Transaction.userEvent.of("keyboard")}).apply()
+      state = state.tr({selection: {anchor: 1}, annotations: Transaction.userEvent.of("keyboard")}).apply()
       state = command(state, undoSelection)
       ist(state.selection.ranges.length, 2)
       state = command(state, undoSelection)
@@ -411,9 +377,9 @@ describe("history", () => {
     it("doesn't merge selection-only transactions if a selection changes empty state", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.t().setSelection(EditorSelection.single(2)).annotate(Transaction.userEvent, "keyboard").apply()
-      state = state.t().setSelection(EditorSelection.single(2, 3)).annotate(Transaction.userEvent, "keyboard").apply()
-      state = state.t().setSelection(EditorSelection.single(1)).annotate(Transaction.userEvent, "keyboard").apply()
+      state = state.tr({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboard")}).apply()
+      state = state.tr({selection: {anchor: 2, head: 3}, annotations: Transaction.userEvent.of("keyboard")}).apply()
+      state = state.tr({selection: {anchor: 1}, annotations: Transaction.userEvent.of("keyboard")}).apply()
       state = command(state, undoSelection)
       ist(state.selection.primary.anchor, 2)
       ist(state.selection.primary.head, 3)
@@ -432,7 +398,7 @@ describe("history", () => {
     it("allows to redo selection-only transactions", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
-      state = state.t().setSelection(EditorSelection.single(2)).apply()
+      state = state.tr({selection: {anchor: 2}}).apply()
       state = command(state, undoSelection)
       state = command(state, redoSelection)
       ist(state.selection.primary.head, 2)
@@ -441,16 +407,16 @@ describe("history", () => {
     it("only changes selection", () => {
       let state = mkState()
       state = type(state, "hi")
-      state = state.t().annotate(isolateHistory, "before").apply()
+      state = state.tr({annotations: isolateHistory.of("before")}).apply()
       const selection = state.selection
-      state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
+      state = state.tr({selection: {anchor: 0, head: 2}}).apply()
       const selection2 = state.selection
       state = command(state, undoSelection)
       ist(state.selection.eq(selection))
       ist(state.doc.toString(), "hi")
       state = command(state, redoSelection)
       ist(state.selection.eq(selection2))
-      state = state.t().replaceSelection("hello").apply()
+      state = state.replaceSelection("hello").apply()
       const selection3 = state.selection
       state = command(state, undoSelection)
       ist(state.selection.eq(selection2))
@@ -462,7 +428,7 @@ describe("history", () => {
       let state = mkState()
       state = type(state, "hello")
       const selection = state.selection
-      state = state.t().setSelection(EditorSelection.single(0, 2)).apply()
+      state = state.tr({selection: {anchor: 0, head: 2}}).apply()
       state = receive(state, "oops", 0)
       state = receive(state, "!", 9)
       ist(state.selection.eq(EditorSelection.single(0, 6)))
@@ -487,8 +453,8 @@ describe("history", () => {
         return []
       })
       let state = EditorState.create({extensions: [history(), field, invert]})
-      state = state.t().effect(set.of(10)).annotate(isolateHistory, "before").apply()
-      state = state.t().effect(set.of(20)).annotate(isolateHistory, "before").apply()
+      state = state.tr({effects: set.of(10), annotations: isolateHistory.of("before")}).apply()
+      state = state.tr({effects: set.of(20), annotations: isolateHistory.of("before")}).apply()
       ist(state.field(field), 20)
       state = command(state, undo)
       ist(state.field(field), 10)
@@ -547,12 +513,14 @@ describe("history", () => {
     it("can map effects", () => {
       let state = EditorState.create({extensions: [history(), comments, invertComments],
                                       doc: "one two foo"})
-      state = state.t().effect(addComment.of(new Comment(0, 3, "c1"))).annotate(isolateHistory, "full").apply()
+      state = state.tr({effects: addComment.of(new Comment(0, 3, "c1")),
+                        annotations: isolateHistory.of("full")}).apply()
       ist(commentStr(state), "c1@0")
-      state = state.t().replace(3, 4, "---").annotate(isolateHistory, "full").
-        effect(addComment.of(new Comment(6, 9, "c2"))).apply()
+      state = state.tr({changes: {from: 3, to: 4, insert: "---"},
+                        annotations: isolateHistory.of("full"),
+                        effects: addComment.of(new Comment(6, 9, "c2"))}).apply()
       ist(commentStr(state), "c1@0,c2@6")
-      state = state.t().replace(0, 0, "---").annotate(Transaction.addToHistory, false).apply()
+      state = state.tr({changes: {from: 0, insert: "---"}, annotations: Transaction.addToHistory.of(false)}).apply()
       ist(commentStr(state), "c1@3,c2@9")
       state = command(state, undo)
       ist(state.doc.toString(), "---one two foo")
@@ -564,8 +532,10 @@ describe("history", () => {
       state = command(state, redo)
       ist(commentStr(state), "c1@3,c2@9")
       ist(state.doc.toString(), "---one---two foo")
-      state = command(state, undo).t().replace(10, 11, "---").annotate(Transaction.addToHistory, false).apply()
-      state = state.t().effect(addComment.of(new Comment(13, 16, "c3"))).annotate(isolateHistory, "full").apply()
+      state = command(state, undo).tr({changes: {from: 10, to: 11, insert: "---"},
+                                       annotations: Transaction.addToHistory.of(false)}).apply()
+      state = state.tr({effects: addComment.of(new Comment(13, 16, "c3")),
+                        annotations: isolateHistory.of("full")}).apply()
       ist(commentStr(state), "c1@3,c3@13")
       state = command(state, undo)
       ist(state.doc.toString(), "---one two---foo")
@@ -577,75 +547,12 @@ describe("history", () => {
     it("can restore comments lost through deletion", () => {
       let state = EditorState.create({extensions: [history(), comments, invertComments],
                                       doc: "123456"})
-      state = state.t().effect(addComment.of(new Comment(3, 5, "c1"))).annotate(isolateHistory, "full").apply()
-      state = state.t().replace(2, 6, "").apply()
+      state = state.tr({effects: addComment.of(new Comment(3, 5, "c1")),
+                        annotations: isolateHistory.of("full")}).apply()
+      state = state.tr({changes: {from: 2, to: 6}}).apply()
       ist(commentStr(state), "")
       state = command(state, undo)
       ist(commentStr(state), "c1@3")
     })
-  })
-
-  it("behaves properly with rebasing changes", () => {
-    let state = EditorState.create({extensions: [history()], doc: "one three", selection: {anchor: 3}})
-    let changes: {forward: Change, backward: Change}[] = []
-    function dispatch(tr: Transaction) {
-      for (let inv = tr.invertedChanges(), i = 0, j = inv.length - 1; j >= 0; i++, j--)
-        changes.push({forward: tr.changes.changes[i], backward: inv.changes[j]})
-      state = tr.apply()
-    }
-    function receive(confirmedTo: number, f: (tr: Transaction) => void) {
-      let tr = state.t(), newChanges = changes.slice(0, confirmedTo)
-      for (let i = changes.length - 1; i >= confirmedTo; i--) tr.changeNoFilter(changes[i].backward)
-      f(tr)
-      for (let i = confirmedTo, refIndex = changes.length - confirmedTo; i < changes.length; i++) {
-        let mapped = changes[i].forward.map(tr.changes.partialMapping(refIndex))
-        refIndex--
-        if (mapped) {
-          newChanges.push({forward: mapped, backward: mapped.invert(tr.doc)})
-          tr.changeNoFilter(mapped, refIndex)
-        }          
-      }
-      state = tr.annotate(Transaction.rebasedChanges, changes.length - confirmedTo)
-        .annotate(Transaction.addToHistory, false).apply()
-      changes = newChanges
-    }
-
-    for (let ch of " two") dispatch(state.t().replaceSelection(ch))
-    dispatch(state.t().setSelection(13).replaceSelection("!"))
-    ist(changes.length, 5)
-    ist(state.doc.toString(), "one two three!")
-    // Say the last 3 changes (adding "wo" and "!") are unconfirmed,
-    // and remote changes come in replacing "three" -> "four"
-    receive(2, tr => tr.replace(6, 11, "four"))
-    ist(state.doc.toString(), "one two four!")
-    // Another remote change, adding " five" after "four"
-    receive(2, tr => tr.replace(10, 10, " five"))
-    dispatch(state.t().replace(18, 18, "?").annotate(isolateHistory, "full"))
-    ist(state.doc.toString(), "one two four five!?")
-
-    undo({state, dispatch})
-    ist(state.doc.toString(), "one two four five!")
-    undo({state, dispatch})
-    ist(state.doc.toString(), "one two four five")
-
-    // Run through the full undo/redo to verify that still works, but
-    // leave `state` at two undos
-    let undone3 = command(state, undo)
-    ist(undone3.doc.toString(), "one four five")
-    let redone = command(undone3, redo), redone2 = command(redone, redo), redone3 = command(redone2, redo)
-    ist(redone.doc.toString(), "one two four five")
-    ist(redone2.doc.toString(), "one two four five!")
-    ist(redone3.doc.toString(), "one two four five!?")
-
-    receive(3, tr => tr.replace(16, 16, " six"))
-    ist(state.doc.toString(), "one two four five six")
-    undo({state, dispatch})
-    ist(state.doc.toString(), "one four five six")
-    redo({state, dispatch})
-    ist(state.doc.toString(), "one two four five six")
-    redo({state, dispatch})
-    ist(state.doc.toString(), "one two four five six!")
-    redo({state, dispatch})
-    ist(state.doc.toString(), "one two four five six!?")
   })
 })
