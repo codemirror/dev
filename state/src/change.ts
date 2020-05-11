@@ -179,7 +179,7 @@ export class ChangeDesc {
 /// replacement, depending on which fields are present), a [change
 /// set](#state.ChangeSet), or an array of change specs.
 export type ChangeSpec =
-  {at: number, to?: number, insert?: string} |
+  {from: number, to?: number, insert?: string} |
   ChangeSet |
   readonly ChangeSpec[]
 
@@ -273,15 +273,15 @@ export class ChangeSet extends ChangeDesc {
         flush()
         total = total ? total.compose(spec.map(total)) : spec
       } else {
-        let {at, to = at, insert} = spec as {at: number, to?: number, insert?: string}
-        if (at > to || at < 0 || to > length)
-          throw new RangeError(`Invalid change range ${at} to ${to} (in doc of length ${length})`)
+        let {from, to = from, insert} = spec as {from: number, to?: number, insert?: string}
+        if (from > to || from < 0 || to > length)
+          throw new RangeError(`Invalid change range ${from} to ${to} (in doc of length ${length})`)
         let insText = insert ? insert.split(split || DefaultSplit) : noText
         let insLen = textLength(insText)
-        if (at == to && insLen == 0) return
-        if (at < pos) flush()
-        if (at > pos) addSection(sections, at - pos, -1)
-        addSection(sections, to - at, insLen)
+        if (from == to && insLen == 0) return
+        if (from < pos) flush()
+        if (from > pos) addSection(sections, from - pos, -1)
+        addSection(sections, to - from, insLen)
         addInsert(inserted, sections, insText)
         pos = to
       }

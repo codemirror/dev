@@ -88,7 +88,7 @@ export class EditorState {
 
   tr(spec: TransactionSpec): Transaction {
     let changes = this.changes(spec.changes)
-    let annotations = (spec.annotations || none).slice()
+    let annotations = Array.isArray(spec.annotations) ? spec.annotations.slice() : spec.annotations == null ? [] : [spec.annotations]
     if (!annotations.some(a => a.type == Transaction.time))
       annotations.push(Transaction.time.of(Date.now()))
     if (spec.scrollIntoView) annotations.push(scrollIntoView.of(true))
@@ -96,7 +96,8 @@ export class EditorState {
                                        : EditorSelection.single(spec.selection.anchor, spec.selection.head))
     let reconf = !(spec.reconfigure || spec.replaceExtensions) ? undefined
       : {base: spec.reconfigure || this.config.source, replace: spec.replaceExtensions || Object.create(null)}
-    return new Transaction(this, changes, selection, spec.effects || none, annotations, reconf)
+    let effects = Array.isArray(spec.effects) ? spec.effects : spec.effects == null ? none : [spec.effects]
+    return new Transaction(this, changes, selection, effects, annotations, reconf)
   }
 
   /// @internal

@@ -87,8 +87,8 @@ export class StateEffectType<Value> {
 export type TransactionSpec = {
   changes?: ChangeSpec
   selection?: EditorSelection | {anchor: number, head?: number},
-  effects?: readonly StateEffect<any>[],
-  annotations?: readonly Annotation<any>[],
+  effects?: StateEffect<any> | readonly StateEffect<any>[],
+  annotations?: Annotation<any> | readonly Annotation<any>[],
   scrollIntoView?: boolean,
   reconfigure?: Extension,
   // FIXME note symbol index type nonsense
@@ -179,16 +179,6 @@ export class Transaction {
   /// Annotation indicating whether a transaction should be added to
   /// the undo history or not.
   static addToHistory = Annotation.define<boolean>()
-
-  /// Annotation that should be used by transactions that reorder
-  /// changes (typically for collaborative editing), introducing new
-  /// changes before existing changes by first undoing a sequence of
-  /// changes (the count of which is the value of the annotation),
-  /// then applying other changes, and then re-doing (a mapped form
-  /// of) the old changes. The transaction's `changes.getMirror`
-  /// method can be used to figure out which forward change (if any)
-  /// corresponds to each inverted change.
-  static rebasedChanges = Annotation.define<number>()
 }
 
 function combineReconf(a: {base: Extension, replace: ExtensionMap} | undefined,
