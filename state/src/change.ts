@@ -291,6 +291,11 @@ export class ChangeSet extends ChangeDesc {
     flush(!total)
     return total!
   }
+
+  /// Create an empty changeset of the given length.
+  static empty(length: number) {
+    return new ChangeSet([length, -1], [])
+  }
 }
 
 const noText: readonly string[] = [""]
@@ -370,13 +375,10 @@ function mapSet(setA: ChangeDesc, setB: ChangeDesc, before: boolean, mkSet = fal
   let sections: number[] = [], insert: (readonly string[])[] | null = mkSet ? [] : null
   let a = new SectionIter(setA), b = new SectionIter(setB)
   for (let posA = 0, posB = 0;;) {
-    if (a.done && b.done) {
-      if (posA != posB) throw new Error("Mismatched change set lengths")
-      return insert ? new ChangeSet(sections, insert) : new ChangeDesc(sections)
-    } else if (a.ins == -1 && !a.done) {
+    if (a.ins == -1) {
       posA += a.len
       a.next()
-    } else if (b.ins == -1 && !b.done && posB < posA) {
+    } else if (b.ins == -1 && posB < posA) {
       let skip = Math.min(b.len, posA - posB)
       b.forward(skip)
       addSection(sections, skip, -1)
@@ -389,7 +391,7 @@ function mapSet(setA: ChangeDesc, setB: ChangeDesc, before: boolean, mkSet = fal
       }
       posB += b.len
       b.next()
-    } else {
+    } else if (a.ins >= 0) {
       let len = 0, end = posA + a.len
       for (;;) {
         if (b.ins >= 0 && posB > posA && posB + b.len < end) {
@@ -409,6 +411,10 @@ function mapSet(setA: ChangeDesc, setB: ChangeDesc, before: boolean, mkSet = fal
       if (insert) addInsert(insert, sections, a.text)
       posA = end
       a.next()
+    } else if (a.done && b.done) {
+      return insert ? new ChangeSet(sections, insert) : new ChangeDesc(sections)
+    } else {
+      throw new Error("Mismatched change set lengths")
     }
   }
 }
@@ -446,7 +452,7 @@ function composeSets(setA: ChangeDesc, setB: ChangeDesc, mkSet = false): ChangeD
         if (insert && !b.off) addInsert(insert, sections, b.text)
       }
       open = (a.ins > len || b.ins >= 0 && b.len > len) && (open || sections.length > sectionLen)
-      a.ins == -1 ? a.forward(len) : a.forwardIns(len)
+      a.forward2(len)
       b.forward(len)
     }
   }
@@ -493,8 +499,9 @@ class SectionIter {
     else { this.len -= len; this.off += len }
   }
 
-  forwardIns(len: number) {
-    if (len == this.ins) this.next()
+  forward2(len: number) {
+    if (this.ins == -1) this.forward(len)
+    else if (len == this.ins) this.next()
     else { this.ins -= len; this.off += len }
   }
 }
