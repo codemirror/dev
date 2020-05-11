@@ -52,8 +52,6 @@ let newState = transaction.apply()
 
 @Mapping
 
-@ChangedRange
-
 ### Extending Editor State
 
 The following are some types and mechanisms used when writing

@@ -144,7 +144,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
   dispatch(state.changeByRange(({from, to}) => {
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
-    return {changes: {from, to, insert: state.joinLines(["", space(indent)])},
+    return {changes: {from, to, insert: ["", space(indent)]},
             range: new SelectionRange(from + 1 + indent)}
   }).and({scrollIntoView: true}))
   return true

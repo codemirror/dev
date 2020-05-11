@@ -106,7 +106,7 @@ export class EditorState {
     return new EditorState(conf, tr.changes.apply(this.doc), tr.selection || this.selection.map(tr.changes), tr)
   }
 
-  replaceSelection(text: string): Transaction {
+  replaceSelection(text: string | readonly string[]): Transaction {
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
                                          range: new SelectionRange(range.from + text.length)}))
   }

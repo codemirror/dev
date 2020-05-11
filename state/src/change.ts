@@ -180,7 +180,7 @@ export class ChangeDesc {
 /// replacement, depending on which fields are present), a [change
 /// set](#state.ChangeSet), or an array of change specs.
 export type ChangeSpec =
-  {from: number, to?: number, insert?: string} |
+  {from: number, to?: number, insert?: string | readonly string[]} |
   ChangeSet |
   readonly ChangeSpec[]
 
@@ -274,10 +274,10 @@ export class ChangeSet extends ChangeDesc {
         flush()
         total = total ? total.compose(spec.map(total)) : spec
       } else {
-        let {from, to = from, insert} = spec as {from: number, to?: number, insert?: string}
+        let {from, to = from, insert} = spec as {from: number, to?: number, insert?: string | readonly string[]}
         if (from > to || from < 0 || to > length)
           throw new RangeError(`Invalid change range ${from} to ${to} (in doc of length ${length})`)
-        let insText = insert ? insert.split(split || DefaultSplit) : noText
+        let insText = !insert ? noText : Array.isArray(insert) ? insert : (insert as string).split(split || DefaultSplit)
         let insLen = textLength(insText)
         if (from == to && insLen == 0) return
         if (from < pos) flush()
