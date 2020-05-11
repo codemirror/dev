@@ -92,8 +92,7 @@ export type TransactionSpec = {
   scrollIntoView?: boolean,
   reconfigure?: Extension,
   // FIXME note symbol index type nonsense
-  replaceExtensions?: ExtensionMap,
-  filterChanges?: boolean
+  replaceExtensions?: ExtensionMap
 }
 
 /// Changes to the editor state are grouped into transactions.
@@ -179,6 +178,12 @@ export class Transaction {
   /// Annotation indicating whether a transaction should be added to
   /// the undo history or not.
   static addToHistory = Annotation.define<boolean>()
+
+  /// Annotation that can be used to turn off [change
+  /// filters](#state.EditorChange^changeFilter) for this transaction.
+  /// When this isn't explicitly set to `false`, change filtering is
+  /// enabled.
+  static filterChanges = Annotation.define<boolean>()
 }
 
 function combineReconf(a: {base: Extension, replace: ExtensionMap} | undefined,

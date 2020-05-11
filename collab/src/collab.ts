@@ -131,8 +131,8 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
     effects,
     annotations: [
       Transaction.addToHistory.of(false),
-      collabReceive.of(new CollabState(version, unconfirmed))
-      // FIXME disable change filtering
+      collabReceive.of(new CollabState(version, unconfirmed)),
+      Transaction.filterChanges.of(false)
     ]
   })
 }
