@@ -107,7 +107,7 @@ export class EditorState {
   }
 
   replaceSelection(text: string): Transaction {
-    return this.changeByRange(range => ({changes: [{at: range.from, to: range.to, insert: text}],
+    return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
                                          range: new SelectionRange(range.from + text.length)}))
   }
 

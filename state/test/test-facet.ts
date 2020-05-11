@@ -61,7 +61,7 @@ describe("EditorState facets", () => {
     let count = 0
     let st = mk(num.compute(["doc"], _ => count++))
     ist(st.facet(num).join(), "0")
-    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
+    st = st.tr({changes: {insert: "hello", from: 0}}).apply()
     ist(st.facet(num).join(), "1")
     st = st.tr({}).apply()
     ist(st.facet(num).join(), "1")
@@ -71,7 +71,7 @@ describe("EditorState facets", () => {
     let count = 0
     let st = mk(num.compute(["selection"], _ => count++))
     ist(st.facet(num).join(), "0")
-    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
+    st = st.tr({changes: {insert: "hello", from: 0}}).apply()
     ist(st.facet(num).join(), "1")
     st = st.tr({selection: {anchor: 2}}).apply()
     ist(st.facet(num).join(), "2")
@@ -82,7 +82,7 @@ describe("EditorState facets", () => {
   it("can provide multiple values at once", () => {
     let st = mk(num.computeN(["doc"], s => s.doc.length % 2 ? [100, 10] : []), num.of(1))
     ist(st.facet(num).join(), "1")
-    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
+    st = st.tr({changes: {insert: "hello", from: 0}}).apply()
     ist(st.facet(num).join(), "100,10,1")
   })
 
@@ -96,7 +96,7 @@ describe("EditorState facets", () => {
     let f = Facet.define<number, number>({combine: ns => ns.reduce((a, b) => a + b, 0)})
     let st = mk(f.of(1), f.compute(["doc"], s => s.doc.length), f.of(3))
     ist(st.facet(f), 4)
-    st = st.tr({changes: {insert: "hello", at: 0}}).apply()
+    st = st.tr({changes: {insert: "hello", from: 0}}).apply()
     ist(st.facet(f), 9)
   })
 

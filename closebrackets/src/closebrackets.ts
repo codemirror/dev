@@ -70,7 +70,7 @@ export function handleBackspace(state: EditorState) {
       let before = prevChar(state.doc, range.head)
       for (let token of tokens) {
         if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
-          return {changes: {at: range.head, to: range.head + token.length},
+          return {changes: {from: range.head, to: range.head + token.length},
                   range: new SelectionRange(range.head)}
       }
     }
@@ -108,11 +108,11 @@ function prevChar(doc: Text, pos: number) {
 function handleOpen(state: EditorState, open: string, close: string, closeBefore: string) {
   let dont = null, tr = state.changeByRange(range => {
     if (!range.empty)
-      return {changes: [{insert: open, at: range.from}, {insert: close, at: range.to}],
+      return {changes: [{insert: open, from: range.from}, {insert: close, from: range.to}],
               range: new SelectionRange(range.anchor + open.length, range.head + open.length)}
     let next = nextChar(state.doc, range.head)
     if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
-      return {changes: {insert: open + close, at: range.head},
+      return {changes: {insert: open + close, from: range.head},
               range: new SelectionRange(range.head + open.length)}
     return {range: dont = range}
   })
@@ -133,12 +133,12 @@ function handleClose(state: EditorState, _open: string, close: string) {
 function handleSame(state: EditorState, token: string, allowTriple: boolean) {
   let dont = null, tr = state.changeByRange(range => {
     if (!range.empty)
-      return {changes: [{insert: token, at: range.from}, {insert: token, at: range.to}],
+      return {changes: [{insert: token, from: range.from}, {insert: token, from: range.to}],
               range: new SelectionRange(range.anchor + token.length, range.head + token.length)}
     let pos = range.head, next = nextChar(state.doc, pos)
     if (next == token) {
       if (nodeStart(state, pos)) {
-        return {changes: {insert: token + token, at: pos},
+        return {changes: {insert: token + token, from: pos},
                 range: new SelectionRange(pos + token.length)}
       } else {
         let isTriple = allowTriple && state.doc.slice(pos, pos + token.length * 3) == token + token + token
@@ -146,12 +146,12 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
       }
     } else if (allowTriple && state.doc.slice(pos - 2 * token.length, pos) == token + token &&
                nodeStart(state, pos - 2 * token.length)) {
-      return {changes: {insert: token + token + token, at: pos},
+      return {changes: {insert: token + token + token, from: pos},
               range: new SelectionRange(pos + token.length)}
     } else if (!isWordChar(next)) {
       let prev = state.doc.slice(pos - 1, pos)
       if (!isWordChar(prev) && prev != token)
-        return {change: {insert: token + token, at: pos},
+        return {change: {insert: token + token, from: pos},
                 range: new SelectionRange(pos + token.length)}
     }
     return {range: dont = range}

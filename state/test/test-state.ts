@@ -10,7 +10,7 @@ describe("EditorState", () => {
 
   it("can apply changes", () => {
     let state = EditorState.create({doc: "hello"})
-    let transaction = state.tr({changes: [{at: 2, to: 4, insert: "w"}, {at: 5, insert: "!"}]})
+    let transaction = state.tr({changes: [{from: 2, to: 4, insert: "w"}, {from: 5, insert: "!"}]})
     ist(transaction.apply().doc.toString(), "hewo!")
   })
 
@@ -26,15 +26,15 @@ describe("EditorState", () => {
   const someAnnotation = Annotation.define<number>()
 
   it("can store annotations on transactions", () => {
-    let tr = EditorState.create({doc: "foo"}).tr({annotations: [someAnnotation.of(55)]})
+    let tr = EditorState.create({doc: "foo"}).tr({annotations: someAnnotation.of(55)})
     ist(tr.annotation(someAnnotation), 55)
   })
 
   it("throws when a change's bounds are invalid", () => {
     let state = EditorState.create({doc: "1234"})
-    ist.throws(() => state.tr({changes: {at: -1, to: 1}}))
-    ist.throws(() => state.tr({changes: {at: 2, to: 1}}))
-    ist.throws(() => state.tr({changes: {at: 2, to: 10, insert: "x"}}))
+    ist.throws(() => state.tr({changes: {from: -1, to: 1}}))
+    ist.throws(() => state.tr({changes: {from: 2, to: 1}}))
+    ist.throws(() => state.tr({changes: {from: 2, to: 10, insert: "x"}}))
   })
 
   it("stores and updates tab size", () => {
@@ -102,7 +102,7 @@ describe("EditorState", () => {
     ist(state.facet(facet).join(), "0,1")
     let state2 = state.tr({}).apply()
     ist(state2.facet(facet), state.facet(facet))
-    let state3 = state.tr({changes: {insert: "hi", at: 0}}).apply()
+    let state3 = state.tr({changes: {insert: "hi", from: 0}}).apply()
     ist(state3.facet(facet).join(), "2,1")
   })
 

@@ -18,12 +18,12 @@ function rStr(l: number) {
   for (let i = 0; i < l; i++) result += String.fromCharCode(97 + r(26))
   return result
 }
-function rChange(len: number): {at: number, to?: number, insert?: string} {
-  if (len == 0 || r(3) == 0) return {insert: rStr(r(5) + 1), at: r(len)}
-  let at = r(len - 1)
-  return {at, to: Math.min(at + r(5) + 1, len), insert: r(2) == 0 ? rStr(r(2) + 1) : undefined}
+function rChange(len: number): {from: number, to?: number, insert?: string} {
+  if (len == 0 || r(3) == 0) return {insert: rStr(r(5) + 1), from: r(len)}
+  let from = r(len - 1)
+  return {from, to: Math.min(from + r(5) + 1, len), insert: r(2) == 0 ? rStr(r(2) + 1) : undefined}
 }
-function rChanges(len: number, count: number): {at: number, to?: number, insert?: string}[] {
+function rChanges(len: number, count: number): {from: number, to?: number, insert?: string}[] {
   let result = []
   for (let i = 0; i < count; i++) result.push(rChange(len))
   return result
@@ -214,51 +214,51 @@ describe("ChangeDesc", () => {
 
 describe("ChangeSet", () => {
   it("can create change sets", () => {
-    ist(ChangeSet.of([{insert: "hi", at: 5}], 10).desc.toString(), "5 0:2 5")
-    ist(ChangeSet.of([{at: 5, to: 7}], 10).desc.toString(), "5 2:0 3")
+    ist(ChangeSet.of([{insert: "hi", from: 5}], 10).desc.toString(), "5 0:2 5")
+    ist(ChangeSet.of([{from: 5, to: 7}], 10).desc.toString(), "5 2:0 3")
     ist(ChangeSet.of([
-      {insert: "hi", at: 5}, {insert: "ok", at: 5},
-      {at: 0, to: 3}, {at: 4, to: 6},
-      {insert: "boo", at: 8}
+      {insert: "hi", from: 5}, {insert: "ok", from: 5},
+      {from: 0, to: 3}, {from: 4, to: 6},
+      {insert: "boo", from: 8}
     ], 10).desc.toString(), "3:0 1 2:0 2 0:3 2")
   })
 
   let doc10 = Text.of(["0123456789"])
 
   it("can apply change sets", () => {
-    ist(ChangeSet.of([{insert: "ok", at: 2}], 10).apply(doc10).toString(), "01ok23456789")
-    ist(ChangeSet.of([{at: 1, to: 9}], 10).apply(doc10).toString(), "09")
-    ist(ChangeSet.of([{at: 2, to: 8}, {insert: "hi", at: 1}], 10).apply(doc10).toString(), "0hi189")
+    ist(ChangeSet.of([{insert: "ok", from: 2}], 10).apply(doc10).toString(), "01ok23456789")
+    ist(ChangeSet.of([{from: 1, to: 9}], 10).apply(doc10).toString(), "09")
+    ist(ChangeSet.of([{from: 2, to: 8}, {insert: "hi", from: 1}], 10).apply(doc10).toString(), "0hi189")
   })
 
   it("can apply composed sets", () => {
-    ist(ChangeSet.of([{insert: "ABCD", at: 8}], 10)
-        .compose(ChangeSet.of([{at: 8, to: 11}], 14))
+    ist(ChangeSet.of([{insert: "ABCD", from: 8}], 10)
+        .compose(ChangeSet.of([{from: 8, to: 11}], 14))
         .apply(doc10).toString(), "01234567D89")
-    ist(ChangeSet.of([{insert: "hi", at: 2}, {insert: "ok", at: 8}], 10)
-        .compose(ChangeSet.of([{insert: "!", at: 4}, {at: 6, to: 8}, {insert: "?", at: 12}], 14))
+    ist(ChangeSet.of([{insert: "hi", from: 2}, {insert: "ok", from: 8}], 10)
+        .compose(ChangeSet.of([{insert: "!", from: 4}, {from: 6, to: 8}, {insert: "?", from: 12}], 14))
         .apply(doc10).toString(), "01hi!2367ok?89")
   })
 
   it("can clip inserted strings on compose", () => {
-    ist(ChangeSet.of([{insert: "abc", at: 2}, {insert: "def", at: 4}], 10)
-        .compose(ChangeSet.of([{at: 4, to: 8}], 16))
+    ist(ChangeSet.of([{insert: "abc", from: 2}, {insert: "def", from: 4}], 10)
+        .compose(ChangeSet.of([{from: 4, to: 8}], 16))
         .apply(doc10).toString(), "01abef456789")
   })
 
   it("can apply mapped sets", () => {
-    let set0 = ChangeSet.of([{insert: "hi", at: 5}, {at: 8, to: 10}], 10)
-    let set1 = ChangeSet.of([{insert: "ok", at: 10}, {at: 6, to: 7}], 10)
+    let set0 = ChangeSet.of([{insert: "hi", from: 5}, {from: 8, to: 10}], 10)
+    let set1 = ChangeSet.of([{insert: "ok", from: 10}, {from: 6, to: 7}], 10)
     ist(set0.compose(set1.map(set0)).apply(doc10).toString(), "01234hi57ok")
   })
 
   it("can apply inverted sets", () => {
-    let set0 = ChangeSet.of([{insert: "hi", at: 5}, {at: 8, to: 10}], 10)
+    let set0 = ChangeSet.of([{insert: "hi", from: 5}, {from: 8, to: 10}], 10)
     ist(set0.invert(doc10).apply(set0.apply(doc10)).toString(), doc10.toString())
   })
 
   it("can be iterated", () => {
-    let set = ChangeSet.of([{insert: "ok", at: 4}, {at: 6, to: 8}], 10)
+    let set = ChangeSet.of([{insert: "ok", from: 4}, {from: 6, to: 8}], 10)
     let result: any[] = []
     set.iterChanges((fromA, toA, fromB, toB, inserted) => result.push([fromA, toA, fromB, toB, inserted]))
     ist(JSON.stringify(result),
@@ -319,8 +319,8 @@ describe("ChangeSet", () => {
         for (let j = 0; j < 50; j++) {
           let set: ChangeSet, change = rChange(doc.length)
           log.push(`ChangeSet.of([${JSON.stringify(change)}], ${doc.length})`)
-          let {at, to = at, insert = ""} = change
-          txt = txt.slice(0, at) + insert + txt.slice(to)
+          let {from, to = from, insert = ""} = change
+          txt = txt.slice(0, from) + insert + txt.slice(to)
           set = ChangeSet.of([change], doc.length)
           all.push(set)
           inv.push(set.invert(doc))
