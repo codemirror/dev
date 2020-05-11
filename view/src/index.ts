@@ -7,5 +7,6 @@ export {themeClass} from "./theme"
 export {Range} from "@codemirror/next/rangeset"
 
 import {HeightMap, HeightOracle, MeasuredHeights, QueryType} from "./heightmap"
+import {ChangedRange} from "./extension"
 /// @internal
-export const __test = {HeightMap, HeightOracle, MeasuredHeights, QueryType}
+export const __test = {HeightMap, HeightOracle, MeasuredHeights, QueryType, ChangedRange}

@@ -38,10 +38,10 @@ function mkSet(ranges: Range<Value>[]) { return RangeSet.of<Value>(ranges) }
 function changeSet(changes: [number, number, number][]) {
   let collect: any[] = []
   for (let [from, to, len] of changes) {
-    if (len) collect.push({insert: ["x".repeat(len)], from})
+    if (len) collect.push({insert: ["x".repeat(len)], from, to})
     if (from < to) collect.push({from, to})
   }
-  return ChangeSet.of(collect, 5000)
+  return ChangeSet.of(collect, 5100)
 }
 
 let smallRanges: Range<Value>[] = []

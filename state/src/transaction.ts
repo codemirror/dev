@@ -146,11 +146,11 @@ export class Transaction {
   and(tr: Transaction | TransactionSpec) {
     if (!(tr instanceof Transaction)) tr = this.startState.tr(tr)
     if (tr.startState != this.startState) throw new Error("Trying to combine mismatched transaction (different start state)")
-    let trMap = this.effects.length || this.selection && !tr.selection ? tr.changes.mapDesc(this.changes) : null
-    let thisMap = tr.effects.length || tr.selection ? this.changes.mapDesc(tr.changes) : null
-    return new Transaction(this.startState, this.changes.compose(tr.changes.map(this.changes)),
-                           tr.selection ? tr.selection.map(thisMap!) : this.selection ? this.selection.map(trMap!) : undefined,
-                           mapEffects(this.effects, trMap!).concat(mapEffects(tr.effects, thisMap!)),
+    let trChanges = tr.changes.map(this.changes)
+    let thisMap = tr.effects.length || tr.selection ? this.changes.mapDesc(tr.changes, true) : null
+    return new Transaction(this.startState, this.changes.compose(trChanges),
+                           tr.selection ? tr.selection.map(thisMap!) : this.selection ? this.selection.map(trChanges) : undefined,
+                           mapEffects(this.effects, trChanges).concat(mapEffects(tr.effects, thisMap!)),
                            this.annotations.concat(tr.annotations),
                            combineReconf(this.reconfigure, tr.reconfigure))
   }

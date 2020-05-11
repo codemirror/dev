@@ -1,9 +1,8 @@
 import {Decoration, WidgetType, BlockType, BlockInfo, __test} from "@codemirror/next/view"
 import {Text} from "@codemirror/next/text"
-import {ChangedRange} from "@codemirror/next/state"
 import ist from "ist"
 
-const {HeightMap, HeightOracle, MeasuredHeights, QueryType} = __test
+const {HeightMap, HeightOracle, MeasuredHeights, QueryType, ChangedRange} = __test
 
 const byH = QueryType.ByHeight, byP = QueryType.ByPos
 

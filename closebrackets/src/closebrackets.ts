@@ -70,8 +70,8 @@ export function handleBackspace(state: EditorState) {
       let before = prevChar(state.doc, range.head)
       for (let token of tokens) {
         if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
-          return {changes: {from: range.head, to: range.head + token.length},
-                  range: new SelectionRange(range.head)}
+          return {changes: {from: range.head - token.length, to: range.head + token.length},
+                  range: new SelectionRange(range.head - token.length)}
       }
     }
     return {range: dont = range}
@@ -146,12 +146,12 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
       }
     } else if (allowTriple && state.doc.slice(pos - 2 * token.length, pos) == token + token &&
                nodeStart(state, pos - 2 * token.length)) {
-      return {changes: {insert: token + token + token, from: pos},
+      return {changes: {insert: token + token + token + token, from: pos},
               range: new SelectionRange(pos + token.length)}
     } else if (!isWordChar(next)) {
       let prev = state.doc.slice(pos - 1, pos)
       if (!isWordChar(prev) && prev != token)
-        return {change: {insert: token + token, from: pos},
+        return {changes: {insert: token + token, from: pos},
                 range: new SelectionRange(pos + token.length)}
     }
     return {range: dont = range}
