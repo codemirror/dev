@@ -214,27 +214,6 @@ describe("collab", () => {
     s.conv("A B")
   })
 
-  it("includes rebased changes when necessary", () => {
-    let counter = StateField.define<number>({
-      create() { return 0 },
-      update(val, tr) { return val + tr.changes.length }
-    })
-    let s = new DummyServer("___ ___", {extensions: [counter]})
-    s.delay(0, () => {
-      s.type(0, "a", 1)
-      s.type(1, "b", 5)
-    })
-    ist(s.states[0].field(counter), 2)
-    ist(s.states[1].field(counter), 2)
-    s.delay(0, () => {
-      s.type(0, "x", 3)
-      s.type(1, "y", 3)
-    })
-    ist(s.states[0].field(counter), 6)
-    ist(s.states[1].field(counter), 4)
-    s.conv("_a_yx_ _b__")
-  })
-
   it("allows you to set your client id", () => {
     ist(getClientID(EditorState.create({extensions: [collab({clientID: "my id"})]})), "my id")
   })

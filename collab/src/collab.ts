@@ -125,6 +125,8 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
       newUnconfirmed.push(new LocalUpdate(update.origin, updateChanges, mapEffects(update.effects, changes)))
     }
     unconfirmed = newUnconfirmed
+    if (effects.length) effects = mapEffects(effects, unconfirmed.reduce((ch, u) => ch.compose(u.changes),
+                                                                         ChangeSet.empty(unconfirmed[0].changes.length)))
   }
   return state.tr({
     changes,

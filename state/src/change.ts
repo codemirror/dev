@@ -70,11 +70,11 @@ export class ChangeDesc {
   }
 
   /// Get the inverted form of thes changes.
-  invertedDesc() {
+  get invertedDesc() {
     let sections = []
     for (let i = 0; i < this.sections.length;) {
       let len = this.sections[i++], ins = this.sections[i++]
-      if (len < 0) sections.push(len, ins)
+      if (ins < 0) sections.push(len, ins)
       else sections.push(ins, len)
     }
     return new ChangeDesc(sections)
@@ -121,6 +121,7 @@ export class ChangeDesc {
       }
       posA = endA
     }
+    if (pos > posA) throw new RangeError(`Position ${pos} is out of range for changeset of length ${posA}`)
     return posB
   }
 
