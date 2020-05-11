@@ -1,5 +1,5 @@
 import {Parser, InputStream, ParseContext} from "lezer"
-import {Tree, Subtree, NodeProp} from "lezer-tree"
+import {Tree, Subtree, NodeProp, ChangedRange} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
@@ -22,7 +22,7 @@ export class LezerSyntax implements Syntax {
     let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
       create(state) { return SyntaxState.advance(Tree.empty, parser, state.doc) },
-      update(value, tr) { return value.apply(tr, parser, setSyntax) }
+      update(value, tr, state) { return value.apply(tr, state, parser, setSyntax) }
     })
     this.extension = [
       EditorState.syntax.of(this),
@@ -149,11 +149,14 @@ class SyntaxState {
     return done ? new SyntaxState(done, doc.length) : new SyntaxState(takeTree(parse, tree), parse.pos)
   }
 
-  apply(tr: Transaction, parser: Parser, effect: StateEffectType<SyntaxState>) {
+  apply(tr: Transaction, newState: EditorState, parser: Parser, effect: StateEffectType<SyntaxState>) {
     for (let e of tr.effects) if (e.is(effect)) return e.value
-    return (!tr.docChanged && this) || SyntaxState.advance(
-      (this.parse ? takeTree(this.parse, this.updatedTree) : this.updatedTree).applyChanges(tr.changes.changedRanges()),
-      parser, tr.doc)
+    if (!tr.docChanged) return this
+    let ranges: ChangedRange[] = []
+    tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
+    return SyntaxState.advance(
+      (this.parse ? takeTree(this.parse, this.updatedTree) : this.updatedTree).applyChanges(ranges),
+      parser, newState.doc)
   }
 
   startParse(parser: Parser, doc: Text) {
@@ -210,8 +213,10 @@ class HighlightWorker {
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (done || field.parse!.badness > .8)
-      this.view.dispatch(state.t().effect(this.setSyntax.of(new SyntaxState(
-        field.stopParse(done, state.doc.length), state.doc.length))))
+      this.view.dispatch(state.tr({
+        effects: this.setSyntax.of(new SyntaxState(
+          field.stopParse(done, state.doc.length), state.doc.length))
+      }))
     else
       this.scheduleWork()
   }

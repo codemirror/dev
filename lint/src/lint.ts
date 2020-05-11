@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
         WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "@codemirror/next/view"
-import {StateEffect, EditorSelection, StateField, Extension} from "@codemirror/next/state"
+import {StateEffect, StateField, Extension} from "@codemirror/next/state"
 import {hoverTooltip} from "@codemirror/next/tooltip"
 import {panels, Panel, showPanel} from "@codemirror/next/panel"
 
@@ -155,7 +155,7 @@ export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
   if (!field.panel)
-    view.dispatch(view.state.t().effect(togglePanel.of(true)))
+    view.dispatch(view.state.tr({effects: togglePanel.of(true)}))
   if (view.state.field(lintState).panel)
     (view.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
@@ -165,7 +165,7 @@ export const openLintPanel: Command = (view: EditorView) => {
 export const closeLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field || !field.panel) return false
-  view.dispatch(view.state.t().effect(togglePanel.of(false)))
+  view.dispatch(view.state.tr({effects: togglePanel.of(false)}))
   return true
 }
 
@@ -195,7 +195,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
           annotations => {
             if (this.view.state.doc == state.doc &&
                 (annotations.length || this.view.state.field(lintState).diagnostics.size))
-              this.view.dispatch(this.view.state.t().effect(setDiagnostics.of(annotations)))
+              this.view.dispatch(this.view.state.tr({effects: setDiagnostics.of(annotations)}))
           },
           error => { logException(this.view.state, error) }
         )
@@ -380,10 +380,11 @@ class LintPanel implements Panel {
     let field = this.view.state.field(lintState)
     let selection = findDiagnostic(field.diagnostics, this.items[selectedIndex].diagnostic)
     if (!selection) return
-    this.view.dispatch(this.view.state.t()
-                       .setSelection(EditorSelection.single(selection.from, selection.to))
-                       .scrollIntoView()
-                       .effect(movePanelSelection.of(selection)))
+    this.view.dispatch(this.view.state.tr({
+      selection: {anchor: selection.from, head: selection.to},
+      scrollIntoView: true,
+      effects: movePanelSelection.of(selection)
+    }))
   }
 
   get style() { return "lint" }

@@ -1,16 +1,23 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "@codemirror/next/state"
 import {EditorView, Command} from "@codemirror/next/view"
 
+function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
+  return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
+}
+
 function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                        granularity: "character" | "word" | "line" | "lineboundary"): boolean {
-  let transaction = view.state.t().forEachRange(range => {
+  let selection = updateSel(view.state.selection, range => {
     if (!range.empty && granularity != "lineboundary")
       return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
     return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
-  if (transaction.selection.eq(view.state.selection)) return false
-  if (granularity == "line") transaction.annotate(Transaction.preserveGoalColumn, true)
-  view.dispatch(transaction.scrollIntoView())
+  if (selection.eq(view.state.selection)) return false
+  view.dispatch(view.state.tr({
+    selection,
+    annotations: granularity == "line" ? Transaction.preserveGoalColumn.of(true) : undefined,
+    scrollIntoView: true
+  }))
   return true
 }
 
@@ -37,12 +44,15 @@ export const moveLineEnd: Command = view => moveSelection(view, "forward", "line
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "word" | "line" | "lineboundary"): boolean {
-  let transaction = view.state.t().forEachRange(range => {
+  let selection = updateSel(view.state.selection, range => {
     return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
-  if (transaction.selection.eq(view.state.selection)) return false
-  if (granularity == "line") transaction.annotate(Transaction.preserveGoalColumn, true)
-  view.dispatch(transaction.scrollIntoView())
+  if (selection.eq(view.state.selection)) return false
+  view.dispatch(view.state.tr({
+    selection,
+    annotations: granularity == "line" ? Transaction.preserveGoalColumn.of(true) : undefined,
+    scrollIntoView: true
+  }))
   return true
 }
 
@@ -69,36 +79,35 @@ export const extendLineEnd: Command = view => extendSelection(view, "forward", "
 
 /// Move the selection to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {
-  dispatch(state.t().setSelection(EditorSelection.single(0)).scrollIntoView())
+  dispatch(state.tr({selection: {anchor: 0}, scrollIntoView: true}))
   return true
 }
 
 /// Move the selection to the end of the document.
 export const selectDocEnd: StateCommand = ({state, dispatch}) => {
-  dispatch(state.t().setSelection(EditorSelection.single(state.doc.length)).scrollIntoView())
+  dispatch(state.tr({selection: {anchor: state.doc.length}, scrollIntoView: true}))
   return true
 }
 
 /// Select the entire document.
 export const selectAll: StateCommand = ({state, dispatch}) => {
-  dispatch(state.t().setSelection(EditorSelection.single(0, state.doc.length)))
+  dispatch(state.tr({selection: {anchor: 0, head: state.doc.length}}))
   return true
 }
 
 function deleteText(view: EditorView, dir: "forward" | "backward") {
-  let transaction = view.state.t().forEachRange((range, transaction) => {
+  let transaction = view.state.changeByRange(range => {
     let {from, to} = range
     if (from == to) {
       let target = view.movePos(range.head, dir, "character", "move")
       from = Math.min(from, target); to = Math.max(to, target)
     }
-    if (from == to) return range
-    transaction.replace(from, to, "")
-    return new SelectionRange(from)
+    if (from == to) return {range}
+    return {changes: {from, to}, range: new SelectionRange(from)}
   })
   if (!transaction.docChanged) return false
 
-  view.dispatch(transaction.scrollIntoView())
+  view.dispatch(transaction.and({scrollIntoView: true}))
   return true
 }
 
@@ -132,20 +141,19 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let indent = getIndentation(new IndentContext(state), r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
   })
-  dispatch(state.t().forEachRange(({from, to}, tr) => {
-    let indent = indentation[i++], line = tr.doc.lineAt(to)
+  dispatch(state.changeByRange(({from, to}) => {
+    let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
-    let ref = tr.mapRef()
-    tr.replace(from, to, ["", space(indent)])
-    return new SelectionRange(ref.mapPos(from, 1))
-  }).scrollIntoView())
+    return {changes: {from, to, insert: state.joinLines(["", space(indent)])},
+            range: new SelectionRange(from + 1 + indent)}
+  }).and({scrollIntoView: true}))
   return true
 }
 
 /// Auto-indent the selected lines. This uses the [indentation
 /// behavor](#state.EditorState^indentation) as source.
 export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
-  let lastLine = -1, positions = []
+  let lastLine = -1, changes = []
   let updated: {[lineStart: number]: number} = Object.create(null)
   let context = new IndentContext(state, start => {
     let found = updated[start]
@@ -159,21 +167,14 @@ export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
         if (indent > -1 &&
             indent != (current = /^\s*/.exec(state.doc.slice(start, Math.min(end, start + 100)))![0].length)) {
           updated[start] = indent
-          positions.push({pos: start, current, indent})
+          changes.push({from: start, to: start + current, insert: space(indent)})
         }
       }
       if (end + 1 > range.to) break
       ;({start, end} = state.doc.lineAt(end + 1))
     }
   }
-  if (positions.length > 0) {
-    let tr = state.t()
-    for (let {pos, current, indent} of positions) {
-      let start = tr.changes.mapPos(pos)
-      tr.replace(start, start + current, space(indent))
-    }
-    dispatch(tr)
-  }
+  if (changes.length > 0) dispatch(state.tr({changes}))
   return true
 }
 

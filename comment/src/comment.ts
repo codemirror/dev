@@ -1,5 +1,5 @@
-import { Text, Line } from "@codemirror/next/text"
-import { EditorState, Transaction, SelectionRange, Change, StateCommand } from "@codemirror/next/state"
+import {Text, Line} from "@codemirror/next/text"
+import {EditorState, Transaction, SelectionRange, StateCommand} from "@codemirror/next/state"
 
 /// An object of this type can be provided as [language
 /// data](#state.EditorState.languageDataAt) under a `"commentTokens"`
@@ -87,29 +87,23 @@ class BlockCommenter {
     const selectionCommented = this.isSelectionCommented(state)
     if (selectionCommented !== null) {
       if (option !== CommentOption.OnlyComment) {
-        const tr = state.t()
-        const mapRef = tr.mapRef()
-        for (const {open, close} of selectionCommented) {
-          open.pos = mapRef.mapPos(open.pos)
-          tr.replace(open.pos - this.open.length, open.pos + open.margin, "")
-          close.pos = mapRef.mapPos(close.pos)
-          tr.replace(close.pos - close.margin, close.pos + this.close.length, "")
-        }
-
-        return tr
+        return state.tr({
+          changes: selectionCommented.map(({open, close}) => [
+            {from: open.pos - this.open.length, to: open.pos + open.margin},
+            {from: close.pos - close.margin, to: close.pos + this.close.length}
+          ])
+        })
       }
     } else {
       if (option !== CommentOption.OnlyUncomment) {
-        const tr = state.t()
-        tr.forEachRange((range: SelectionRange, tr: Transaction) => {
-          const copen = new Change(range.from, range.from, tr.startState.splitLines(this.open + this.margin))
-          const cclose = new Change(range.to, range.to, tr.startState.splitLines(this.margin + this.close))
-          tr.change([copen, cclose])
+        return state.changeByRange(range => {
           const shift = (this.open + this.margin).length
-          return new SelectionRange(range.anchor + shift, range.head + shift)
+          return {
+            changes: [{from: range.from, insert: this.open + this.margin},
+                      {from: range.to, insert: this.margin + this.close}],
+            range: new SelectionRange(range.anchor + shift, range.head + shift)
+          }
         })
-
-        return tr
       }
     }
 
@@ -181,33 +175,30 @@ class LineCommenter {
     const column = this.isRangeCommented(state, linesAcrossSelection)
     if (column.isRangeLineSkipped) {
       if (option != CommentOption.OnlyComment) {
-        const tr = state.t()
-        const mapRef = tr.mapRef()
+        let changes = []
         for (let i = 0; i < state.selection.ranges.length; i++) {
           const lines = linesAcrossRange[i]
           for (const line of lines) {
             if (lines.length > 1 && column.isLineSkipped[line.number]) continue
-            const pos = mapRef.mapPos(line.start + column.minCol)
+            const pos = line.start + column.minCol
             const posAfter = column.minCol + this.lineCommentToken.length
             const marginLen = line.slice(posAfter, posAfter + 1) == " " ? 1 : 0
-            tr.replace(pos, pos + this.lineCommentToken.length + marginLen, "")
+            changes.push({from: pos, to: pos + this.lineCommentToken.length + marginLen})
           }
         }
-        return tr
+        return state.tr({changes})
       }
     } else {
       if (option != CommentOption.OnlyUncomment) {
-        const tr = state.t()
-        const mapRef = tr.mapRef()
+        let changes = []
         for (let i = 0; i < state.selection.ranges.length; i++) {
           const lines = linesAcrossRange[i]
           for (const line of lines) {
-            if (lines.length > 1 && column.isLineSkipped[line.number]) continue
-            const pos = mapRef.mapPos(line.start + column.minCol)
-            tr.replace(pos, pos, this.lineCommentToken + this.margin)
+            if (lines.length <= 1 || !column.isLineSkipped[line.number])
+              changes.push({from: line.start + column.minCol, insert: this.lineCommentToken + this.margin})
           }
         }
-        return tr
+        return state.tr({changes})
       }
     }
 

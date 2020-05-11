@@ -5,8 +5,8 @@ const field = StateField.define<DecorationSet>({
   create(state) {
     return decorateSelections(state.selection)
   },
-  update(deco, tr) {
-    return tr.docChanged || tr.selectionSet ? decorateSelections(tr.selection) : deco
+  update(deco, tr, state) {
+    return tr.docChanged || tr.selection ? decorateSelections(state.selection) : deco
   },
   provide: [EditorView.decorations]
 })

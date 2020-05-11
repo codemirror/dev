@@ -1,11 +1,10 @@
 import ist from "ist"
-import { SelectionRange, EditorState, EditorSelection, Extension, StateCommand } from "@codemirror/next/state"
-import { Text } from "@codemirror/next/text"
-import { toggleLineComment, getLinesInRange, CommentTokens, toggleBlockComment } from "@codemirror/next/comment"
-import { html } from "@codemirror/next/lang-html"
+import {SelectionRange, EditorState, EditorSelection, Extension, StateCommand} from "@codemirror/next/state"
+import {Text} from "@codemirror/next/text"
+import {toggleLineComment, getLinesInRange, CommentTokens, toggleBlockComment} from "@codemirror/next/comment"
+import {html} from "@codemirror/next/lang-html"
 
 describe("comment", () => {
-
   it("get lines across range", () => {
     //                 0          1          2           3
     //                 0123456 7890123 4567890 1234567 8901234 5

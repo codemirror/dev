@@ -1,5 +1,5 @@
 import {Range, RangeSet, RangeValue, RangeComparator, SpanIterator} from "@codemirror/next/rangeset"
-import {ChangeSet} from "@codemirror/next/text"
+import {ChangeSet} from "@codemirror/next/state"
 import ist from "ist"
 
 class Value extends RangeValue {
@@ -38,10 +38,10 @@ function mkSet(ranges: Range<Value>[]) { return RangeSet.of<Value>(ranges) }
 function changeSet(changes: [number, number, number][]) {
   let collect: any[] = []
   for (let [from, to, len] of changes) {
-    if (len) collect.push({insert: ["x".repeat(len)], at: from})
-    if (from < to) collect.push({delete: from, to})
+    if (len) collect.push({insert: ["x".repeat(len)], from})
+    if (from < to) collect.push({from, to})
   }
-  return ChangeSet.of(5000, collect)
+  return ChangeSet.of(collect, 5000)
 }
 
 let smallRanges: Range<Value>[] = []

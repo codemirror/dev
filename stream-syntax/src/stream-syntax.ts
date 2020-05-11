@@ -93,7 +93,9 @@ export class StreamSyntax implements Syntax {
       update(value, tr, state) {
         for (let effect of tr.effects) if (effect.is(setSyntax)) return effect.value
         if (!tr.docChanged) return value
-        let {start, number} = tr.doc.lineAt(tr.changes.changedRanges()[0].fromA)
+        let changeStart = -1
+        tr.changes.iterChangedRanges(from => changeStart = changeStart < 0 ? from : changeStart)
+        let {start, number} = state.doc.lineAt(changeStart)
         let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, start)
         newValue.advanceFrontier(parserInst, state, Work.Apply)
         newValue.tree = newValue.updatedTree
@@ -264,7 +266,7 @@ class HighlightWorker implements PluginValue {
     let end = this.view.viewport.to
     field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice, end)
     if (field.frontierPos < end) this.scheduleWork()
-    else this.view.dispatch(state.t().effect(this.setSyntax.of(field.copy())))
+    else this.view.dispatch(state.tr({effects: this.setSyntax.of(field.copy())}))
   }
 
   destroy() {

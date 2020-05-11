@@ -1,5 +1,5 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException} from "@codemirror/next/view"
-import {combineConfig, EditorSelection, EditorState,
+import {combineConfig, EditorState,
         Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "@codemirror/next/state"
 import {keymap} from "@codemirror/next/keymap"
 import {Tooltip, tooltips, showTooltip} from "@codemirror/next/tooltip"
@@ -72,7 +72,7 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.t().effect(selectCompletion.of(selected)))
+    view.dispatch(view.state.tr({effects: selectCompletion.of(selected)}))
     return true
   }
 }
@@ -87,7 +87,7 @@ function acceptCompletion(view: EditorView) {
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active != null && active != "pending") return false
-  view.dispatch(view.state.t().effect(toggleCompletion.of(true)))
+  view.dispatch(view.state.tr({effects: toggleCompletion.of(true)}))
   return true
 }
 
@@ -96,8 +96,10 @@ function applyCompletion(view: EditorView, option: Completion) {
   // FIXME make sure option.start/end still point at the current
   // doc, or keep a mapping in an active completion
   if (typeof apply == "string") {
-    view.dispatch(view.state.t().replace(option.start, option.end, apply)
-                  .setSelection(EditorSelection.single(option.start + apply.length)))
+    view.dispatch(view.state.tr({
+      changes: {from: option.start, to: option.end, insert: apply},
+      selection: {anchor: option.start + apply.length}
+    }))
   } else {
     apply(view)
   }
@@ -106,7 +108,7 @@ function applyCompletion(view: EditorView, option: Completion) {
 function closeCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active == null) return false
-  view.dispatch(view.state.t().effect(toggleCompletion.of(false)))
+  view.dispatch(view.state.tr({effects: toggleCompletion.of(false)}))
   return true
 }
 
@@ -124,7 +126,7 @@ const activeCompletion = StateField.define<ActiveState>({
 
   update(value, tr) {
     if (tr.annotation(Transaction.userEvent) == "input") value = "pending"
-    else if (tr.docChanged || tr.selectionSet) value = null
+    else if (tr.docChanged || tr.selection) value = null
     for (let effect of tr.effects) {
       if (effect.is(openCompletion))
         value = new ActiveCompletion(effect.value, 0)
@@ -250,7 +252,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
       .then(result => {
         if (this.stateVersion != version || result.length == 0) return
-        this.view.dispatch(this.view.state.t().effect(openCompletion.of(result)))
+        this.view.dispatch(this.view.state.tr({effects: openCompletion.of(result)}))
       })
       .catch(e => logException(this.view.state, e))
   }

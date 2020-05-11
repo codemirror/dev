@@ -44,7 +44,7 @@ const matchingMark = Decoration.mark({class: themeClass("matchingBracket")}),
 const bracketMatchingState = StateField.define<DecorationSet>({
   create() { return Decoration.none },
   update(deco, tr, state) {
-    if (!tr.docChanged && !tr.selectionSet) return deco
+    if (!tr.docChanged && !tr.selection) return deco
     let decorations = []
     let config = state.facet(bracketMatchingConfig)
     for (let range of state.selection.ranges) {

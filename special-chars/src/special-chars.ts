@@ -1,5 +1,5 @@
 import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
-import {combineConfig, ChangedRange, Facet, Extension} from "@codemirror/next/state"
+import {combineConfig, Facet, Extension} from "@codemirror/next/state"
 import {countColumn} from "@codemirror/next/text"
 import {StyleModule} from "style-mod"
 
@@ -63,76 +63,25 @@ export function specialChars(config: SpecialCharConfig = {}): Extension {
   return [specialCharConfig.of(config), specialCharPlugin, styleExt]
 }
 
-const JoinGap = 10
-
 const specialCharPlugin = ViewPlugin.fromClass(class {
-  from = 0
-  to = 0
   decorations: DecorationSet = Decoration.none
   decorationCache: {[char: number]: Decoration} = Object.create(null)
 
   constructor(public view: EditorView) {
-    this.updateForViewport()
+    this.recompute()
   }
 
   update(update: ViewUpdate) {
-    if (update.prevState.facet(specialCharConfig) != update.state.facet(specialCharConfig)) {
-      this.decorationCache = Object.create(null)
-      this.from = this.to = 0
-      this.decorations = Decoration.none
-    }
-    if (update.changes.length) {
-      this.decorations = this.decorations.map(update.changes)
-      this.from = update.changes.mapPos(this.from, -1)
-      this.to = Math.max(this.from, update.changes.mapPos(this.to, 1))
-      this.closeHoles(update.changes.changedRanges())
-    }
-    this.updateForViewport()
+    let confChange = update.prevState.facet(specialCharConfig) != update.state.facet(specialCharConfig)
+    if (confChange) this.decorationCache = Object.create(null)
+    if (confChange || update.changes.length || update.viewportChanged) this.recompute()
   }
 
-  closeHoles(ranges: readonly ChangedRange[]) {
-    let decorations: Range<Decoration>[] = [], vp = this.view.viewport, replaced: number[] = []
-    let config = this.view.state.facet(specialCharConfig)
-    for (let i = 0; i < ranges.length; i++) {
-      let {fromB: from, toB: to} = ranges[i]
-      // Must redraw all tabs further on the line
-      if (config.replaceTabs) to = this.view.state.doc.lineAt(to).end
-      while (i < ranges.length - 1 && ranges[i + 1].fromB < to + JoinGap) to = Math.max(to, ranges[++i].toB)
-      // Clip to current viewport, to avoid doing work for invisible text
-      from = Math.max(vp.from, from); to = Math.min(vp.to, to)
-      if (from >= to) continue
-      this.getDecorationsFor(from, to, decorations)
-      replaced.push(from, to)
-    }
-    if (replaced.length) this.decorations = this.decorations.update({
-      add: decorations,
-      filter: pos => {
-        for (let i = 0; i < replaced.length; i += 2)
-          if (pos >= replaced[i] && pos < replaced[i + 1]) return false
-        return true
-      },
-      filterFrom: replaced[0],
-      filterTo: replaced[replaced.length - 1]
-    })
-  }
-
-  updateForViewport() {
-    let vp = this.view.viewport
-    // Viewports match, don't do anything
-    if (this.from == vp.from && this.to == vp.to) return
+  recompute() {
     let decorations: Range<Decoration>[] = []
-    if (this.from >= vp.to || this.to <= vp.from) {
-      this.getDecorationsFor(vp.from, vp.to, decorations)
-      this.decorations = Decoration.set(decorations)
-    } else {
-      if (vp.from < this.from) this.getDecorationsFor(vp.from, this.from, decorations)
-      if (this.to < vp.to) this.getDecorationsFor(this.to, vp.to, decorations)
-      this.decorations = this.decorations.update({
-        add: decorations,
-        filter: (from, to) => from >= vp.from && to <= vp.to
-      })
-    }
-    this.from = vp.from; this.to = vp.to
+    for (let {from, to} of this.view.visibleRanges)
+      this.getDecorationsFor(from, to, decorations)
+    this.decorations = Decoration.set(decorations)
   }
 
   getDecorationsFor(from: number, to: number, target: Range<Decoration>[]) {

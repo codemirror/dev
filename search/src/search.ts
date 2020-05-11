@@ -150,7 +150,7 @@ export const findNext: Command = view => {
   let {from, to} = view.state.selection.primary
   let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, state.query)
   if (!next || next.from == from && next.to == to) return false
-  view.dispatch(view.state.t().setSelection(EditorSelection.single(next.from, next.to)).scrollIntoView())
+  view.dispatch(view.state.tr({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
   maybeAnnounceMatch(view)
   return true
 }
@@ -180,7 +180,7 @@ export const findPrevious: Command = view => {
   let range = findPrevInRange(query, state.doc, 0, state.selection.primary.to - 1) ||
     findPrevInRange(query, state.doc, state.selection.primary.from + 1, state.doc.length)
   if (!range) return false
-  view.dispatch(state.t().setSelection(EditorSelection.single(range.from, range.to)).scrollIntoView())
+  view.dispatch(state.tr({selection: {anchor: range.from, head: range.to}, scrollIntoView: true}))
   maybeAnnounceMatch(view)
   return true
 }
@@ -192,7 +192,7 @@ export const selectMatches: Command = view => {
   let cursor = plugin.query.cursor(view.state.doc), ranges: SelectionRange[] = []
   while (!cursor.next().done) ranges.push(new SelectionRange(cursor.value.from, cursor.value.to))
   if (!ranges.length) return false
-  view.dispatch(view.state.t().setSelection(EditorSelection.create(ranges)))
+  view.dispatch(view.state.tr({selection: EditorSelection.create(ranges)}))
   return true
 }
 
@@ -201,15 +201,18 @@ export const replaceNext: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
 
-  let next = findNextMatch(view.state.doc, view.state.selection.primary.from, plugin.query)
+  let {state} = view, next = findNextMatch(state.doc, state.selection.primary.from, plugin.query)
   if (!next) return false
-  let {from, to} = view.state.selection.primary, tr = view.state.t()
+  let {from, to} = state.selection.primary, changes = [], selection: {anchor: number, head: number} | undefined
   if (next.from == from && next.to == to) {
-    tr.replace(next.from, next.to, plugin.query.replace)
-    next = findNextMatch(tr.doc, tr.changes.mapPos(next.to), plugin.query)
+    changes.push({from: next.from, to: next.to, insert: plugin.query.replace})
+    next = findNextMatch(state.doc, next.to, plugin.query)
   }
-  if (next) tr.setSelection(EditorSelection.single(next.from, next.to)).scrollIntoView()
-  view.dispatch(tr)
+  if (next) {
+    let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - plugin.query.replace.length
+    selection = {anchor: next.from - off, head: next.to - off}
+  }
+  view.dispatch(state.tr({changes, selection, scrollIntoView: !!selection}))
   if (next) maybeAnnounceMatch(view)
   return true
 }
@@ -219,13 +222,13 @@ export const replaceNext: Command = view => {
 export const replaceAll: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
-  let cursor = plugin.query.cursor(view.state.doc), tr = view.state.t()
+  let cursor = plugin.query.cursor(view.state.doc), changes = []
   while (!cursor.next().done) {
-    let {from, to} = cursor.value, newFrom = tr.changes.mapPos(from, 1)
-    tr.replace(newFrom, Math.max(newFrom, tr.changes.mapPos(to, -1)), plugin.query.replace)
+    let {from, to} = cursor.value
+    changes.push({from, to, insert: plugin.query.replace})
   }
-  if (!tr.docChanged) return false
-  view.dispatch(tr)
+  if (changes.length) return false
+  view.dispatch(view.state.tr({changes}))
   return true
 }
 
@@ -239,7 +242,7 @@ function createSearchPanel(view: EditorView) {
       updateQuery(q: Query) {
         if (!query.eq(q)) {
           query = q
-          view.dispatch(view.state.t().effect(setQuery.of(query)))
+          view.dispatch(view.state.tr({effects: setQuery.of(query)}))
         }
       }
     }),
@@ -256,7 +259,7 @@ export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState)!
   if (!state) return false
   if (!state.panel.length)
-    view.dispatch(view.state.t().effect(togglePanel.of(true)))
+    view.dispatch(view.state.tr({effects: togglePanel.of(true)}))
   return true
 }
 
@@ -279,7 +282,7 @@ export const closeSearchPanel: Command = view => {
   if (!state || !state.panel.length) return false
   let panel = view.dom.querySelector(".cm-panel-search")
   if (panel && panel.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.t().effect(togglePanel.of(false)))
+  view.dispatch(view.state.tr({effects: togglePanel.of(false)}))
   return true
 }
 

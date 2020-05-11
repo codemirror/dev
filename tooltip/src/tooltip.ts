@@ -182,7 +182,7 @@ class HoverPlugin {
     let open = pos < 0 ? null : this.source(this.view, (from, to) => {
       return from <= pos && to >= pos && (from == to || isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY))
     })
-    if (open) this.view.dispatch(this.view.state.t().effect(this.setHover.of(open)))
+    if (open) this.view.dispatch(this.view.state.tr({effects: this.setHover.of(open)}))
   }
 
   mousemove(event: MouseEvent) {
@@ -193,7 +193,7 @@ class HoverPlugin {
         (active.start == active.end
          ? this.view.posAtCoords({x: event.clientX, y: event.clientY}) != active.start
          : !isOverRange(this.view, active.start, active.end, event.clientX, event.clientY, HoverMaxDist)))
-      this.view.dispatch(this.view.state.t().effect(this.setHover.of(null)))
+      this.view.dispatch(this.view.state.tr({effects: this.setHover.of(null)}))
   }
 
   mouseenter() {
@@ -203,7 +203,7 @@ class HoverPlugin {
   mouseleave() {
     this.mouseInside = false
     if (this.active)
-      this.view.dispatch(this.view.state.t().effect(this.setHover.of(null)))
+      this.view.dispatch(this.view.state.tr({effects: this.setHover.of(null)}))
   }
 
   destroy() {
@@ -246,7 +246,7 @@ export function hoverTooltip(
     create() { return null },
 
     update(value, tr) {
-      if (value && options.hideOnChange && (tr.docChanged || tr.selectionSet)) return null
+      if (value && options.hideOnChange && (tr.docChanged || tr.selection)) return null
       for (let effect of tr.effects) if (effect.is(setHover)) return effect.value
       return value
     },
