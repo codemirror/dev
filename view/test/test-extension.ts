@@ -1,5 +1,5 @@
 import {tempEditor} from "./temp-editor"
-import {EditorSelection, Text} from "@codemirror/next/state"
+import {Text} from "@codemirror/next/state"
 import {EditorView, ViewPlugin, ViewUpdate} from "@codemirror/next/view"
 import ist from "ist"
 
@@ -44,9 +44,9 @@ describe("EditorView extension", () => {
     })
     let cm = tempEditor("xyz", [plugin])
     ist(updates, 0)
-    cm.dispatch(cm.state.t().replace(1, 2, "u"))
+    cm.dispatch(cm.state.tr({changes: {from: 1, to: 2, insert: "u"}}))
     ist(updates, 1)
-    cm.dispatch(cm.state.t().setSelection(EditorSelection.single(3)))
+    cm.dispatch(cm.state.tr({selection: {anchor: 3}}))
     ist(updates, 2)
   })
 

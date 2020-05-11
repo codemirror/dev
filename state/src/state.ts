@@ -1,5 +1,5 @@
 import {Text} from "@codemirror/next/text"
-import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit} from "./change"
+import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit, textLength} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, scrollIntoView, TransactionSpec} from "./transaction"
@@ -94,6 +94,7 @@ export class EditorState {
     if (spec.scrollIntoView) annotations.push(scrollIntoView.of(true))
     let selection = spec.selection && (spec.selection instanceof EditorSelection ? spec.selection
                                        : EditorSelection.single(spec.selection.anchor, spec.selection.head))
+    if (selection) checkSelection(selection, changes.newLength)
     let reconf = !(spec.reconfigure || spec.replaceExtensions) ? undefined
       : {base: spec.reconfigure || this.config.source, replace: spec.replaceExtensions || Object.create(null)}
     let effects = Array.isArray(spec.effects) ? spec.effects : spec.effects == null ? none : [spec.effects]
@@ -107,8 +108,10 @@ export class EditorState {
   }
 
   replaceSelection(text: string | readonly string[]): Transaction {
+    if (typeof text == "string") text = this.splitLines(text)
+    let length = textLength(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
-                                         range: new SelectionRange(range.from + text.length)}))
+                                         range: new SelectionRange(range.from + length)}))
   }
 
   changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}) {
@@ -188,7 +191,7 @@ export class EditorState {
     let selection = !config.selection ? EditorSelection.single(0)
       : config.selection instanceof EditorSelection ? config.selection
       : EditorSelection.single(config.selection.anchor, config.selection.head)
-    checkSelection(selection, doc)
+    checkSelection(selection, doc.length)
     if (!configuration.staticFacet(allowMultipleSelections)) selection = selection.asSingle()
     return new EditorState(configuration, doc, selection)
   }

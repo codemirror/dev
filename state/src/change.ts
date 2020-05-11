@@ -191,6 +191,7 @@ export class ChangeSet extends ChangeDesc {
   /// @internal
   constructor(
     sections: readonly number[],
+    // FIXME represent this as Text instances?
     /// @internal
     readonly inserted: readonly (readonly string[])[]
   ) {
@@ -351,7 +352,7 @@ function appendText(a: readonly string[], b: readonly string[]) {
   return result
 }
 
-function textLength(text: readonly string[]) {
+export function textLength(text: readonly string[]) {
   let length = -1
   for (let line of text) length += line.length + 1
   return length

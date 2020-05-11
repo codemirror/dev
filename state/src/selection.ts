@@ -1,6 +1,6 @@
 import {EditorState} from "./state"
 import {ChangeDesc} from "./change"
-import {Text, charType} from "@codemirror/next/text"
+import {charType} from "@codemirror/next/text"
 
 /// A single selection range. When
 /// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)
@@ -164,7 +164,7 @@ function normalized(ranges: SelectionRange[], primaryIndex: number = 0): EditorS
   return new EditorSelection(ranges, primaryIndex)
 }
 
-export function checkSelection(selection: EditorSelection, doc: Text) {
+export function checkSelection(selection: EditorSelection, docLength: number) {
   for (let range of selection.ranges)
-    if (range.to > doc.length) throw new RangeError("Selection points outside of document")
+    if (range.to > docLength) throw new RangeError("Selection points outside of document")
 }

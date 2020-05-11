@@ -309,7 +309,9 @@ export class RangeSet<T extends RangeValue> {
 
     let sideA = new SpanCursor(a, sharedChunks, minPoint)
     let sideB = new SpanCursor(b, sharedChunks, minPoint)
+
     textDiff.iterGaps((fromA, fromB, length) => compare(sideA, fromA, sideB, fromB, length, comparator))
+    if (textDiff.empty && textDiff.length == 0) compare(sideA, 0, sideB, 0, 0, comparator)
   }
 
   /// Iterate over a group of range sets at the same time, notifying

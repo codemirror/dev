@@ -1,5 +1,5 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection, StateField} from "@codemirror/next/state"
+import {StateField} from "@codemirror/next/state"
 import {EditorView, Decoration, DecorationSet, WidgetType} from "@codemirror/next/view"
 import ist from "ist"
 
@@ -90,7 +90,7 @@ describe("EditorView.movePos", () => {
     let last = cm.movePos(10, "forward", "line")
     ist(last, 19, "<")
     ist(last, 14, ">")
-    cm.dispatch(cm.state.t().setSelection(EditorSelection.single(1))) // Clear goal columns
+    cm.dispatch(cm.state.tr({selection: {anchor: 1}})) // Clear goal columns
     ist(cm.movePos(last, "backward", "line"), 10)
     ist(cm.movePos(12, "backward", "line"), 4)
     ist(cm.movePos(13, "backward", "line"), 5)

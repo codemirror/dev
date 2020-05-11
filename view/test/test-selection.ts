@@ -1,5 +1,4 @@
 import {tempEditor, requireFocus} from "./temp-editor"
-import {EditorSelection} from "@codemirror/next/state"
 import ist from "ist"
 
 function setDOMSel(node: Node, offset: number) {
@@ -38,7 +37,7 @@ describe("EditorView selection", () => {
   it("syncs the DOM selection with the editor selection", () => {
     let cm = requireFocus(tempEditor("abc\n\ndef"))
     function test(pos: number, node: Node, offset: number) {
-      cm.dispatch(cm.state.t().setSelection(EditorSelection.single(pos)))
+      cm.dispatch(cm.state.tr({selection: {anchor: pos}}))
       let sel = window.getSelection()!
       ist(isEquivalentPosition(node, offset, sel.focusNode, sel.focusOffset))
     }
