@@ -1,7 +1,7 @@
 import ist from "ist"
 
 import {EditorState, EditorSelection, SelectionRange, Transaction,
-        StateEffect, StateEffectType, StateField, Mapping, Change} from "@codemirror/next/state"
+        StateEffect, StateEffectType, StateField} from "@codemirror/next/state"
 import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection, invertedEffects} from "@codemirror/next/history"
 
@@ -511,7 +511,7 @@ describe("history", () => {
 
       eq(other: Comment) { return this.from == other.from && this.to == other.to && this.text == other.text }
     }
-    function mapComment(comment: Comment, mapping: Mapping) {
+    function mapComment(comment: Comment, mapping: ChangeDesc) {
       let from = mapping.mapPos(comment.from, 1), to = mapping.mapPos(comment.to, -1)
       return from >= to ? undefined : new Comment(from, to, comment.text)
     }
@@ -532,7 +532,7 @@ describe("history", () => {
       let effects = []
       for (let effect of tr.effects) {
         if (effect.is(addComment) || effect.is(rmComment)) {
-          let src = mapComment(effect.value, tr.invertedChanges())
+          let src = mapComment(effect.value, tr.changes.invertedDesc)
           if (src) effects.push((effect.is(addComment) ? rmComment : addComment).of(src))
         }
       }

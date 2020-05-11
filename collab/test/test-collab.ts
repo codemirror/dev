@@ -1,4 +1,4 @@
-import {EditorState, Transaction, StateField, StateEffect, Extension, Mapping} from "@codemirror/next/state"
+import {EditorState, Transaction, StateField, StateEffect, Extension, ChangeDesc} from "@codemirror/next/state"
 import {history, undo, redo, isolateHistory} from "@codemirror/next/history"
 import ist from "ist"
 import {collab, CollabConfig, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
@@ -48,7 +48,7 @@ class DummyServer {
   }
 
   type(n: number, text: string, pos: number = this.states[n].selection.primary.head) {
-    this.update(n, s => s.t().setSelection(pos).replaceSelection(text))
+    this.update(n, s => s.tr({changes: {from: pos, insert: text}, selection: {anchor: pos + text.length}}))
   }
 
   undo(n: number) {
@@ -143,16 +143,16 @@ describe("collab", () => {
 
   it("supports deep undo", () => {
     let s = new DummyServer("hello bye")
-    s.update(0, s => s.t().setSelection(5))
-    s.update(1, s => s.t().setSelection(9))
+    s.update(0, s => s.tr({selection: {anchor: 5}}))
+    s.update(1, s => s.tr({selection: {anchor: 9}}))
     s.type(0, "!")
     s.type(1, "!")
-    s.update(0, s => s.t().annotate(isolateHistory, "full"))
+    s.update(0, s => s.tr({annotations: isolateHistory.of("full")}))
     s.delay(0, () => {
       s.type(0, " ...")
       s.type(1, " ,,,")
     })
-    s.update(0, s => s.t().annotate(isolateHistory, "full"))
+    s.update(0, s => s.tr({annotations: isolateHistory.of("full")}))
     s.type(0, "*")
     s.type(1, "*")
     s.undo(0)
@@ -178,7 +178,7 @@ describe("collab", () => {
       s.type(0, "B", 3)
       s.type(0, "C", 4)
       s.type(0, "D", 0)
-      s.update(1, s => s.t().replace(1, 4, ""))
+      s.update(1, s => s.tr({changes: {from: 1, to: 4}}))
     })
     s.conv("Do!A")
     s.undo(0)
@@ -190,9 +190,9 @@ describe("collab", () => {
   it("handles conflicting steps", () => {
     let s = new DummyServer("abcde")
     s.delay(0, () => {
-      s.update(0, s => s.t().replace(2, 3, ""))
+      s.update(0, s => s.tr({changes: {from: 2, to: 3}}))
       s.type(0, "x")
-      s.update(1, s => s.t().replace(1, 4, ""))
+      s.update(1, s => s.tr({changes: {from: 1, to: 4}}))
     })
     s.undo(0)
     s.undo(0)
@@ -242,13 +242,13 @@ describe("collab", () => {
   it("client ids survive reconfiguration", () => {
     let ext = collab()
     let state = EditorState.create({extensions: [ext]})
-    let state2 = state.t().reconfigure([ext]).apply()
+    let state2 = state.tr({reconfigure: [ext]}).apply()
     ist(getClientID(state), getClientID(state2))
   })
 
   it("associates transaction info with local changes", () => {
     let state = EditorState.create({extensions: [collab()]})
-    let tr = state.t().replace(0, 0, "hi")
+    let tr = state.tr({changes: {from: 0, insert: "hi"}})
     ist(sendableUpdates(tr.apply())[0].origin, tr)
   })
 
@@ -258,7 +258,7 @@ describe("collab", () => {
                   readonly to: number,
                   readonly id: string) {}
 
-      map(mapping: Mapping) {
+      map(mapping: ChangeDesc) {
         let from = mapping.mapPos(this.from, 1), to = mapping.mapPos(this.to, -1)
         return from >= to ? undefined : new Mark(from, to, this.id)
       }
@@ -281,8 +281,8 @@ describe("collab", () => {
     })
     s.delay(0, () => {
       s.delay(1, () => {
-        s.update(0, s => s.t().effect(addMark.of(new Mark(1, 3, "a"))))
-        s.update(1, s => s.t().effect(addMark.of(new Mark(3, 5, "b"))))
+        s.update(0, s => s.tr({effects: addMark.of(new Mark(1, 3, "a"))}))
+        s.update(1, s => s.tr({effects: addMark.of(new Mark(3, 5, "b"))}))
         s.type(0, "A", 4)
         s.type(1, "B", 0)
         ist(s.states[0].field(marks).join(), "1-3=a")

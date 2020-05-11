@@ -109,87 +109,42 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
   if (!updates.length)
     return state.tr({annotations: [collabReceive.of(new CollabState(version, unconfirmed))]})
 
-  let changes: ChangeSet | undefined = undefined, effects = []
+  let changes = updates[0].changes, effects = updates[0].effects || []
+  for (let i = 1; i < updates.length; i++) {
+    let update = updates[i]
+    effects = mapEffects(effects, update.changes)
+    if (update.effects) effects = effects.concat(update.effects)
+    changes = changes.compose(update.changes)
+  }
+  
   if (unconfirmed.length) {
-    let changes = updates[0].changes
-    for (let i = 1; i < updates.length; i++) {
-      changes = changes.compose(updates[i].changes)
+    let newUnconfirmed = []
+    for (let update of unconfirmed) {
+      let updateChanges = update.changes.map(changes)
+      changes = changes.map(update.changes, true)
+      newUnconfirmed.push(new LocalUpdate(update.origin, updateChanges, mapEffects(update.effects, changes)))
     }
-    let mapping: ChangeDesc[] = [changes]
-    for (let update of unconfirmed)
-      mapping.push(mapping[mapping.length - 1].mapDesc(update.changes, true))
-    unconfirmed = unconfirmed.map((update, i) =>
-                                  new LocalUpdate(update.origin, update.changes.map(mapping[i]),
-                                                  update.effects.map(e => e.map(mapping[i + 1]))))
-    
+    unconfirmed = newUnconfirmed
   }
-    for (let i = 0; i < mapping.lenA)
-      unconfirmed.push(
-    
-    for (let local of unconfirmed) {
-      let {changes, effects} = local
-      for (let remote of updates) {
-        changes = changes
-      }
-    }
-    unconfirmed = unconfirmed
-    let interference = checkInterference(unconfirmed, updates)
-    
-    // If the changes don't occur near each other, we can dispatch a
-    // simplified transaction that just applies the mapped remote
-    // changes, without rebasing.
-    if (!interference) {
-      let newTr = state.t(), changeI = unconfirmed.reduce((n, u) => n + (u.change ? 1 : 0), 0)
-      for (let update of updates) {
-        if (update.change) {
-          newTr.changeNoFilter(update.change.map(tr.changes.partialMapping(changeI, 0))!)
-          changeI++
-        } else {
-          newTr.effect(update.effect!.map(tr.changes.partialMapping(changeI, 0))!)
-        }
-      }
-      tr = newTr
-    }
-  } else {
-    for (let update of updates) {
-      if (update.change) tr.changeNoFilter(update.change)
-      else tr.effect(update.effect!)
-    }
-    unconfirmed = []
-  }
-
-  return tr.annotate(Transaction.addToHistory, false)
-    .annotate(collabReceive, new CollabState(version, unconfirmed))
-    .annotate(Transaction.rebasedChanges, nUnconfirmed)
+  return state.tr({
+    changes,
+    effects,
+    annotations: [
+      Transaction.addToHistory.of(false),
+      collabReceive.of(new CollabState(version, unconfirmed))
+      // FIXME disable change filtering
+    ]
+  })
 }
 
-function checkInterference(unconfirmed: readonly LocalUpdate[], remote: readonly Update[]) {
-  // Map the extent of all changes back to the original document
-  // coordinate space, and check for overlap.
-  let localTouched: number[] = []
-  for (let i = 0; i < unconfirmed.length; i++) {
-    let {change} = unconfirmed[i]
-    if (!change) continue
-    let {from, to} = change
-    for (let j = i - 1; j >= 0; j--) {
-      let other = unconfirmed[j].inverted
-      if (other) { from = other.mapPos(from, -1); to = other.mapPos(to, 1) }
-    }
-    localTouched.push(from, to)
+function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
+  if (effects.length == 0) return effects
+  let result = []
+  for (let e of effects) {
+    let mapped = e.map(mapping)
+    if (mapped) result.push(mapped)
   }
-  for (let i = 0; i < remote.length; i++) {
-    let {change} = remote[i]
-    if (!change) continue
-    let {from, to} = change
-    for (let j = i - 1; j >= 0; j--) {
-      let inv = remote[j].change?.invertedDesc
-      if (inv) { from = inv.mapPos(from, -1); to = inv.mapPos(to, 1) }
-    }
-    for (let j = 0; j < localTouched.length; j += 2)
-      if (to >= localTouched[j] && from <= localTouched[j + 1])
-        return true
-  }
-  return false
+  return result
 }
 
 /// Returns the set of locally made updates that still have to be sent
