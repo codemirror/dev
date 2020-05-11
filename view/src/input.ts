@@ -1,4 +1,4 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet, Change} from "@codemirror/next/state"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet} from "@codemirror/next/state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,
@@ -169,9 +169,11 @@ class MouseSelection {
     let selection = this.update(this.view, this.startSelection, this.startPos, this.startBias,
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
-      this.view.dispatch(this.view.state.t().setSelection(selection)
-                         .annotate(Transaction.userEvent, "pointer")
-                         .scrollIntoView())
+      this.view.dispatch(this.view.state.tr({
+        selection,
+        annotations: Transaction.userEvent.of("pointer"),
+        scrollIntoView: true
+      }))
   }
 
   map(changes: ChangeSet) {
@@ -242,8 +244,10 @@ function capturePaste(view: EditorView) {
 }
 
 function doPaste(view: EditorView, text: string) {
-  view.dispatch(view.state.t().replaceSelection(text)
-                .annotate(Transaction.userEvent, "paste").scrollIntoView())
+  view.dispatch(view.state.replaceSelection(text).and({
+    annotations: Transaction.userEvent.of("paste"),
+    scrollIntoView: true
+  }))
 }
 
 function mustCapture(event: KeyboardEvent): boolean {
@@ -322,18 +326,18 @@ handlers.drop = (view, event: DragEvent) => {
 
   event.preventDefault()
 
-  let tr = view.state.t()
   let {mouseSelection} = view.inputState
-  if (mouseSelection && mouseSelection.dragging && mouseSelection.dragMove) {
-    tr.replace(mouseSelection.dragging.from, mouseSelection.dragging.to, "")
-    dropPos = tr.changes.mapPos(dropPos)
-  }
-  let ref = tr.mapRef(), change = new Change(dropPos, dropPos, view.state.splitLines(text))
-  tr.change(change)
-    .setSelection(EditorSelection.single(ref.mapPos(dropPos, -1), ref.mapPos(dropPos, 1)))
-    .annotate(Transaction.userEvent, "drop")
+  let del = mouseSelection && mouseSelection.dragging && mouseSelection.dragMove ?
+    {from: mouseSelection.dragging.from, to: mouseSelection.dragging.to} : null
+  let ins = {from: dropPos, insert: text}
+  let changes = view.state.changes(del ? [del, ins] : ins)
+
   view.focus()
-  view.dispatch(tr)
+  view.dispatch(view.state.tr({
+    changes,
+    selection: {anchor: changes.mapPos(dropPos, -1), head: changes.mapPos(dropPos, 1)},
+    annotations: Transaction.userEvent.of("drop")
+  }))
 }
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
@@ -377,9 +381,11 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
   } else {
     captureCopy(view, text)
   }
-  if (event.type == "cut") {
-    view.dispatch(view.state.t().replaceSelection([""]).scrollIntoView().annotate(Transaction.userEvent, "cut"))
-  }
+  if (event.type == "cut")
+    view.dispatch(view.state.replaceSelection([""]).and({
+      scrollIntoView: true,
+      annotations: Transaction.userEvent.of("cut")
+    }))
 }
 
 handlers.focus = handlers.blur = view => {

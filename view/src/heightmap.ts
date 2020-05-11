@@ -1,7 +1,8 @@
 import {Text} from "@codemirror/next/text"
-import {ChangedRange} from "@codemirror/next/state"
+import {ChangeSet} from "@codemirror/next/state"
 import {RangeSet, SpanIterator} from "@codemirror/next/rangeset"
 import {DecorationSet, PointDecoration, Decoration, BlockType, addRange} from "./decoration"
+import {ChangedRange} from "./extension"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
@@ -249,7 +250,7 @@ class HeightMapText extends HeightMapBlock {
 
   constructor(length: number, height: number) { super(length, height, BlockType.Text) }
 
-  replace(from: number, to: number, nodes: (HeightMap | null)[], doc: Text): HeightMap {
+  replace(from: number, _to: number, nodes: (HeightMap | null)[], doc: Text): HeightMap {
     if (nodes.length == 1 && Math.abs(this.length - nodes[0]!.length) < 10 &&
         (nodes[0] instanceof HeightMapText || nodes[0] instanceof HeightMapGap && doc.lineAt(from).length == nodes[0].length)) {
       let node = nodes[0]!
@@ -600,8 +601,7 @@ class NodeBuilder implements SpanIterator<Decoration> {
   get minPointSize() { return 0 }
 }
 
-export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[],
-                                          diff: readonly ChangedRange[]) {
+export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[], diff: ChangeSet) {
   let comp = new DecorationComparator()
   RangeSet.compare(a, b, diff, comp)
   return comp.changes

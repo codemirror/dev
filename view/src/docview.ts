@@ -2,14 +2,15 @@ import {ContentView, ChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
 import {ContentBuilder} from "./buildview"
-import {Viewport, extendWithRanges} from "./viewstate"
+import {Viewport} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType, addRange} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection, hasSelection} from "./dom"
-import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet, UpdateFlag, editable} from "./extension"
+import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet,
+        UpdateFlag, editable, ChangedRange} from "./extension"
 import {EditorView} from "./editorview"
 import {RangeSet} from "@codemirror/next/rangeset"
-import {ChangedRange, ChangeSet, Transaction} from "@codemirror/next/state"
+import {ChangeSet, Transaction} from "@codemirror/next/state"
 
 const none = [] as any
 
@@ -58,7 +59,7 @@ export class DocView extends ContentView {
   // position, if we know the editor is going to scroll that position
   // into view.
   update(update: ViewUpdate) {
-    let changedRanges = update.changes.changedRanges()
+    let changedRanges = update.changedRanges
     if (this.minWidth > 0 && changedRanges.length) {
       if (!changedRanges.every(({fromA, toA}) => toA < this.minWidthFrom || fromA > this.minWidthTo)) {
         this.minWidth = 0
@@ -74,14 +75,14 @@ export class DocView extends ContentView {
     // This forces a selection update when lines are joined to work
     // around that. Issue #54
     let forceSelection = browser.chrome && !this.compositionDeco.size && update &&
-      update.changes.changes.some(ch => ch.text.length > 1)
+      update.state.doc.lines != update.prevState.doc.lines
 
     if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, update.changes)
 
     let prevDeco = this.decorations, deco = this.updateDeco()
-    let decoDiff = findChangedDeco(prevDeco, deco, changedRanges)
-    changedRanges = extendWithRanges(changedRanges, decoDiff)
+    let decoDiff = findChangedDeco(prevDeco, deco, update.changes)
+    changedRanges = ChangedRange.extendWithRanges(changedRanges, decoDiff)
 
     let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointer")
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
@@ -474,7 +475,7 @@ class DecorationComparator {
   comparePoint(from: number, to: number) { addRange(from, to, this.changes) }
 }
 
-function findChangedDeco(a: readonly DecorationSet[], b: readonly DecorationSet[], diff: readonly ChangedRange[]) {
+function findChangedDeco(a: readonly DecorationSet[], b: readonly DecorationSet[], diff: ChangeSet) {
   let comp = new DecorationComparator
   RangeSet.compare(a, b, diff, comp)
   return comp.changes

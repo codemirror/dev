@@ -2,7 +2,7 @@ import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
-import {EditorSelection, Change, Transaction} from "@codemirror/next/state"
+import {EditorSelection, Transaction, Annotation} from "@codemirror/next/state"
 
 const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
@@ -24,8 +24,8 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     }
     let diff = findDiff(view.state.doc.slice(from, to, LineSep), reader.text,
                         preferredPos - from, preferredSide)
-    if (diff) change = new Change(from + diff.from, from + diff.toA,
-                                  reader.text.slice(diff.from, diff.toB).split(LineSep))
+    if (diff) change = {from: from + diff.from, to: from + diff.toA,
+                        insert: reader.text.slice(diff.from, diff.toB).split(LineSep)}
   } else if (view.hasFocus) {
     let domSel = getSelection(view.root)
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
@@ -42,7 +42,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
 
   // Heuristic to notice typing over a selected character
   if (!change && typeOver && !sel.empty && newSel && newSel.primary.empty)
-    change = new Change(sel.from, sel.to, view.state.doc.sliceLines(sel.from, sel.to))
+    change = {from: sel.from, to: sel.to, insert: view.state.doc.sliceLines(sel.from, sel.to)}
 
   if (change) {
     let startState = view.state
@@ -52,33 +52,35 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     // events.
     if (browser.android &&
         ((change.from == sel.from && change.to == sel.to &&
-          change.length == 1 && change.text.length == 2 &&
+          change.insert.length == 2 && !change.insert.some(x => x) &&
           dispatchKey(view, "Enter", 10)) ||
-         (change.from == sel.from - 1 && change.to == sel.to && change.length == 0 &&
+         (change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 1 && !change.insert[0] &&
           dispatchKey(view, "Backspace", 8)) ||
-         (change.from == sel.from && change.to == sel.to + 1 && change.length == 0 &&
+         (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 1 && !change.insert[0] &&
           dispatchKey(view, "Delete", 46))))
       return view.state != startState
 
-    let tr = startState.t()
+    let tr
     if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
       let before = sel.from < change.from ? startState.doc.slice(sel.from, change.from, LineSep) : ""
       let after = sel.to > change.to ? startState.doc.slice(change.to, sel.to, LineSep) : ""
-      tr.replaceSelection((before + change.text.join(LineSep) + after).split(LineSep))
+      tr = startState.replaceSelection((before + change.insert.join(LineSep) + after).split(LineSep))
     } else {
-      tr.change(change)
-      if (newSel && !tr.selection.primary.eq(newSel.primary) && newSel.primary.to <= tr.doc.length)
-        tr.setSelection(tr.selection.replaceRange(newSel.primary))
+      tr = startState.tr({
+        changes: change,
+        selection: newSel && !startState.selection.primary.eq(newSel.primary) && newSel.primary.to <= startState.doc.length
+          ? startState.selection.replaceRange(newSel.primary) : undefined
+      })
     }
-    view.dispatch(tr.scrollIntoView().annotate(Transaction.userEvent, "input"))
+    view.dispatch(tr.and({scrollIntoView: true, annotations: Transaction.userEvent.of("input")}))
     return true
   } else if (newSel && !newSel.primary.eq(sel)) {
-    let tr = view.state.t().setSelection(newSel)
+    let scrollIntoView = false, annotations: Annotation<any> | undefined
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
-      if (view.inputState.lastSelectionOrigin == "keyboard") tr.scrollIntoView()
-      else tr.annotate(Transaction.userEvent, view.inputState.lastSelectionOrigin!)
+      if (view.inputState.lastSelectionOrigin == "keyboard") scrollIntoView = true
+      else annotations = Transaction.userEvent.of(view.inputState.lastSelectionOrigin!)
     }
-    view.dispatch(tr)
+    view.dispatch(view.state.tr({selection: newSel, scrollIntoView, annotations}))
     return true
   }
   return false

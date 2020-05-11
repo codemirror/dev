@@ -199,6 +199,47 @@ export const styleModule = Facet.define<StyleModule>()
 
 export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, Oracle = 8, LineGaps = 16 }
 
+export class ChangedRange {
+  constructor(readonly fromA: number, readonly toA: number, readonly fromB: number, readonly toB: number) {}
+
+  join(other: ChangedRange): ChangedRange {
+    return new ChangedRange(Math.min(this.fromA, other.fromA), Math.max(this.toA, other.toA),
+                            Math.min(this.fromB, other.fromB), Math.max(this.toB, other.toB))
+  }
+
+  addToSet(set: ChangedRange[]): ChangedRange[] {
+    let i = set.length, me: ChangedRange = this
+    for (; i > 0; i--) {
+      let range = set[i - 1]
+      if (range.fromA > me.toA) continue
+      if (range.toA < me.fromA) break
+      me = me.join(range)
+      set.splice(i - 1, 1)
+    }
+    set.splice(i, 0, me)
+    return set
+  }
+
+  static extendWithRanges(diff: readonly ChangedRange[], ranges: number[]): readonly ChangedRange[] {
+    if (ranges.length == 0) return diff
+    let result: ChangedRange[] = []
+    for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
+      let next = dI == diff.length ? null : diff[dI], off = posA - posB
+      let end = next ? next.fromB : 1e9
+      while (rI < ranges.length && ranges[rI] < end) {
+        let from = ranges[rI], to = ranges[rI + 1]
+        let fromB = Math.max(posB, from), toB = Math.min(end, to)
+        if (fromB <= toB) new ChangedRange(fromB + off, toB + off, fromB, toB).addToSet(result)
+        if (to > end) break
+        else rI += 2
+      }
+      if (!next) return result
+      new ChangedRange(next.fromA, next.toA, next.fromB, next.toB).addToSet(result)
+      posA = next.toA; posB = next.toB
+    }
+  }
+}
+
 /// View [plugins](#view.ViewPlugin) are given instances of this
 /// class, which describe what happened, whenever the view is updated.
 export class ViewUpdate {
@@ -208,18 +249,24 @@ export class ViewUpdate {
   readonly prevState: EditorState
   /// @internal
   flags = 0
+  /// @internal
+  changedRanges: readonly ChangedRange[]
 
   /// @internal
   constructor(
     /// The editor view that the update is associated with.
     readonly view: EditorView,
-  /// The new editor state.
+    /// The new editor state.
     readonly state: EditorState,
     /// The transactions involved in the update. May be empty.
     readonly transactions: readonly Transaction[] = none
   ) {
-    this.changes = transactions.reduce((chs, tr) => chs.appendSet(tr.changes), ChangeSet.empty)
     this.prevState = view.state
+    this.changes = ChangeSet.empty(this.prevState.doc.length)
+    for (let tr of transactions) this.changes = this.changes.compose(tr.changes)
+    let changedRanges: ChangedRange[] = []
+    this.changes.iterChangedRanges((fromA, toA, fromB, toB) => changedRanges.push(new ChangedRange(fromA, toA, fromB, toB)))
+    this.changedRanges = changedRanges
     let focus = view.hasFocus
     if (focus != view.inputState.notifiedFocused) {
       view.inputState.notifiedFocused = focus
@@ -250,7 +297,7 @@ export class ViewUpdate {
 
   /// Whether the selection was explicitly set in this update.
   get selectionSet() {
-    return this.transactions.some(tr => tr.selectionSet)
+    return this.transactions.some(tr => tr.selection)
   }
 
   /// @internal

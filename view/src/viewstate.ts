@@ -1,9 +1,9 @@
 import {Text} from "@codemirror/next/text"
-import {EditorState, ChangedRange, ChangeSet, Mapping} from "@codemirror/next/state"
+import {EditorState, ChangeSet, ChangeDesc} from "@codemirror/next/state"
 import {RangeSet} from "@codemirror/next/rangeset"
 import {Rect} from "./dom"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRelevantDecoChanges} from "./heightmap"
-import {decorations, ViewUpdate, UpdateFlag} from "./extension"
+import {decorations, ViewUpdate, UpdateFlag, ChangedRange} from "./extension"
 import {WidgetType, Decoration, DecorationSet} from "./decoration"
 import {DocView} from "./docview"
 
@@ -112,10 +112,10 @@ export class ViewState {
     let prev = this.state
     this.state = update.state
     let newDeco = this.state.facet(decorations)
-    let contentChanges = update.changes.changedRanges()
+    let contentChanges = update.changedRanges
     
-    let heightChanges = extendWithRanges(contentChanges, heightRelevantDecoChanges(
-      update.prevState.facet(decorations), newDeco,update ? contentChanges : []))
+    let heightChanges = ChangedRange.extendWithRanges(contentChanges, heightRelevantDecoChanges(
+      update.prevState.facet(decorations), newDeco, update ? update.changes : ChangeSet.empty(this.state.doc.length)))
     let prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
@@ -211,7 +211,7 @@ export class ViewState {
     return viewport
   }
 
-  mapViewport(viewport: Viewport, changes: Mapping) {
+  mapViewport(viewport: Viewport, changes: ChangeDesc) {
     let from = changes.mapPos(viewport.from, -1), to = changes.mapPos(viewport.to, 1)
     if ((to - from) - (viewport.to - viewport.from) > 100) return null // Grew too much, recompute
     return new Viewport(this.heightMap.lineAt(from, QueryType.ByPos, this.state.doc, 0, 0).from,
@@ -227,7 +227,7 @@ export class ViewState {
   }
 
   mapLineGaps(gaps: readonly LineGap[], changes: ChangeSet) {
-    if (!gaps.length || !changes.changes.length) return gaps
+    if (!gaps.length || changes.empty) return gaps
     let mapped = []
     for (let gap of gaps) if (!changes.touchesRange(gap.from, gap.to))
       mapped.push(new LineGap(changes.mapPos(gap.from), changes.mapPos(gap.to), gap.size))
@@ -330,25 +330,6 @@ export class ViewState {
 export class Viewport {
   constructor(readonly from: number, readonly to: number) {}
   eq(b: Viewport) { return this.from == b.from && this.to == b.to }
-}
-
-export function extendWithRanges(diff: readonly ChangedRange[], ranges: number[]): readonly ChangedRange[] {
-  if (ranges.length == 0) return diff
-  let result: ChangedRange[] = []
-  for (let dI = 0, rI = 0, posA = 0, posB = 0;; dI++) {
-    let next = dI == diff.length ? null : diff[dI], off = posA - posB
-    let end = next ? next.fromB : 1e9
-    while (rI < ranges.length && ranges[rI] < end) {
-      let from = ranges[rI], to = ranges[rI + 1]
-      let fromB = Math.max(posB, from), toB = Math.min(end, to)
-      if (fromB <= toB) new ChangedRange(fromB + off, toB + off, fromB, toB).addToSet(result)
-      if (to > end) break
-      else rI += 2
-    }
-    if (!next) return result
-    new ChangedRange(next.fromA, next.toA, next.fromB, next.toB).addToSet(result)
-    posA = next.toA; posB = next.toB
-  }
 }
 
 function lineStructure(from: number, to: number, state: EditorState) {

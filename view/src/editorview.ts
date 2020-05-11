@@ -170,7 +170,7 @@ export class EditorView {
       state = tr.apply()
     }
     let update = new ViewUpdate(this, state, transactions)
-    if (state.doc != this.state.doc || transactions.some(tr => tr.selectionSet && !tr.annotation(Transaction.preserveGoalColumn)))
+    if (state.doc != this.state.doc || transactions.some(tr => tr.selection && !tr.annotation(Transaction.preserveGoalColumn)))
       this.inputState.goalColumns.length = 0
 
     let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1
