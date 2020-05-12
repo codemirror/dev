@@ -65,7 +65,7 @@ function keydown(event: KeyboardEvent, view: EditorView) {
 export function handleBackspace(state: EditorState) {
   let conf = config(state, state.selection.primary.head)
   let tokens = conf.brackets || defaults.brackets
-  let dont = null, tr = state.changeByRange(range => {
+  let dont = null, changes = state.changeByRange(range => {
     if (range.empty) {
       let before = prevChar(state.doc, range.head)
       for (let token of tokens) {
@@ -76,7 +76,7 @@ export function handleBackspace(state: EditorState) {
     }
     return {range: dont = range}
   })
-  return dont ? null : tr.and({scrollIntoView: true})
+  return dont ? null : state.tr(changes, {scrollIntoView: true})
 }
 
 /// Implements the extension's behavior on text insertion. Again,
@@ -106,7 +106,7 @@ function prevChar(doc: Text, pos: number) {
 }
 
 function handleOpen(state: EditorState, open: string, close: string, closeBefore: string) {
-  let dont = null, tr = state.changeByRange(range => {
+  let dont = null, changes = state.changeByRange(range => {
     if (!range.empty)
       return {changes: [{insert: open, from: range.from}, {insert: close, from: range.to}],
               range: new SelectionRange(range.anchor + open.length, range.head + open.length)}
@@ -116,7 +116,7 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
               range: new SelectionRange(range.head + open.length)}
     return {range: dont = range}
   })
-  return dont ? null : tr.and({scrollIntoView: true})
+  return dont ? null : state.tr(changes, {scrollIntoView: true})
 }
 
 function handleClose(state: EditorState, _open: string, close: string) {
@@ -131,7 +131,7 @@ function handleClose(state: EditorState, _open: string, close: string) {
 // Handles cases where the open and close token are the same, and
 // possibly triple quotes (as in `"""abc"""`-style quoting).
 function handleSame(state: EditorState, token: string, allowTriple: boolean) {
-  let dont = null, tr = state.changeByRange(range => {
+  let dont = null, changes = state.changeByRange(range => {
     if (!range.empty)
       return {changes: [{insert: token, from: range.from}, {insert: token, from: range.to}],
               range: new SelectionRange(range.anchor + token.length, range.head + token.length)}
@@ -156,7 +156,7 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
     }
     return {range: dont = range}
   })
-  return dont ? null : tr.and({scrollIntoView: true})
+  return dont ? null : state.tr(changes, {scrollIntoView: true})
 }
 
 function nodeStart(state: EditorState, pos: number) {

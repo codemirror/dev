@@ -26,14 +26,14 @@ describe("javascript syntax queries", () => {
   it("keeps the tree up to date through changes", () => {
     let state = s("if (2)\n  x")
     ist(tr(state).childAfter(0)!.name, "IfStatement")
-    state = state.tr({changes: {from: 0, to: 3, insert: "fac"}}).apply()
+    state = state.tr({changes: {from: 0, to: 3, insert: "fac"}}).state
     ist(tr(state).childAfter(0)!.name, "ExpressionStatement")
   })
 
   it("reuses nodes when parsing big documents", () => {
     let state = s("'hello';\n" + "blah;\n".repeat(3000))
     let buf = (tr(state).resolve(2) as any).buffer
-    state = state.tr({changes: {from: 2000, to: 2020, insert: "xyz"}}).apply()
+    state = state.tr({changes: {from: 2000, to: 2020, insert: "xyz"}}).state
     ist((tr(state).resolve(2) as any).buffer, buf)
   })
 })

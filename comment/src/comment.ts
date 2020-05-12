@@ -96,14 +96,14 @@ class BlockCommenter {
       }
     } else {
       if (option !== CommentOption.OnlyUncomment) {
-        return state.changeByRange(range => {
+        return state.tr(state.changeByRange(range => {
           const shift = (this.open + this.margin).length
           return {
             changes: [{from: range.from, insert: this.open + this.margin},
                       {from: range.to, insert: this.margin + this.close}],
             range: new SelectionRange(range.anchor + shift, range.head + shift)
           }
-        })
+        }))
       }
     }
 

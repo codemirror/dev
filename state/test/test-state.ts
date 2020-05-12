@@ -11,14 +11,14 @@ describe("EditorState", () => {
   it("can apply changes", () => {
     let state = EditorState.create({doc: "hello"})
     let transaction = state.tr({changes: [{from: 2, to: 4, insert: "w"}, {from: 5, insert: "!"}]})
-    ist(transaction.apply().doc.toString(), "hewo!")
+    ist(transaction.state.doc.toString(), "hewo!")
   })
 
   it("maps selection through changes", () => {
     let state = EditorState.create({doc: "abcdefgh",
                                     extensions: [EditorState.allowMultipleSelections.of(true)],
                                     selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
-    let newState = state.replaceSelection("Q").apply()
+    let newState = state.tr(state.replaceSelection("Q")).state
     ist(newState.doc.toString(), "QabcdQefghQ")
     ist(newState.selection.ranges.map(r => r.from).join("/"), "1/6/11")
   })
@@ -41,7 +41,7 @@ describe("EditorState", () => {
     let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize.of(2)]})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.tr({reconfigure: [EditorState.tabSize.of(8)]}).apply()
+    let updated = deflt.tr({reconfigure: [EditorState.tabSize.of(8)]}).state
     ist(updated.tabSize, 8)
   })
 
@@ -51,7 +51,7 @@ describe("EditorState", () => {
     ist(deflt.splitLines("foo\rbar").length, 2)
     ist(crlf.joinLines(["a", "b"]), "a\r\nb")
     ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
-    let updated = crlf.tr({reconfigure: [EditorState.lineSeparator.of("\n")]}).apply()
+    let updated = crlf.tr({reconfigure: [EditorState.lineSeparator.of("\n")]}).state
     ist(updated.joinLines(["a", "b"]), "a\nb")
     ist(updated.splitLines("foo\nbar").length, 2)
   })
@@ -62,26 +62,26 @@ describe("EditorState", () => {
     let state = EditorState.create({extensions: [field1, field2]})
     ist(state.field(field1), 0)
     ist(state.field(field2), 10)
-    let newState = state.tr({}).apply()
+    let newState = state.tr({}).state
     ist(newState.field(field1), 1)
     ist(newState.field(field2), 10)
   })
 
   it("can preserve fields across reconfiguration", () => {
     let field = StateField.define({create: () => 0, update: val => val + 1})
-    let start = EditorState.create({extensions: [field]}).tr({}).apply()
+    let start = EditorState.create({extensions: [field]}).tr({}).state
     ist(start.field(field), 1)
-    ist(start.tr({reconfigure: [field]}).apply().field(field), 2)
-    ist(start.tr({reconfigure: []}).apply().field(field, false), undefined)
+    ist(start.tr({reconfigure: [field]}).state.field(field), 2)
+    ist(start.tr({reconfigure: []}).state.field(field, false), undefined)
   })
 
   it("can replace extension groups", () => {
     let g = Symbol("A"), f = Facet.define<number>()
     let state = EditorState.create({extensions: [tagExtension(g, f.of(10)), f.of(20)]})
     ist(state.facet(f).join(), "10,20")
-    let state2 = state.tr({replaceExtensions: {[g]: [f.of(1), f.of(2)]}}).apply()
+    let state2 = state.tr({replaceExtensions: {[g]: [f.of(1), f.of(2)]}}).state
     ist(state2.facet(f).join(), "1,2,20")
-    let state3 = state2.tr({replaceExtensions: {[g]: f.of(3)}}).apply()
+    let state3 = state2.tr({replaceExtensions: {[g]: f.of(3)}}).state
     ist(state3.facet(f).join(), "3,20")
   })
 
@@ -100,45 +100,42 @@ describe("EditorState", () => {
       extensions: [field, facet.compute([field], state => state.field(field)[0]), facet.of(1)]
     })
     ist(state.facet(facet).join(), "0,1")
-    let state2 = state.tr({}).apply()
+    let state2 = state.tr({}).state
     ist(state2.facet(facet), state.facet(facet))
-    let state3 = state.tr({changes: {insert: "hi", from: 0}}).apply()
+    let state3 = state.tr({changes: {insert: "hi", from: 0}}).state
     ist(state3.facet(facet).join(), "2,1")
   })
 
-/* FIXME restore
   describe("changeFilter", () => {
     it("can cancel changes", () => {
-      // Cancels changes that start on an odd position
-      let state = EditorState.create({extensions: [EditorState.changeFilter.of(change => change.from % 2 ? [] : null)],
+      // Cancels all changes that add length
+      let state = EditorState.create({extensions: [EditorState.changeFilter.of(change => change.newLength <= change.length)],
                                       doc: "one two"})
-      state = state.t().replace(1, 5, "x").apply()
-      ist(state.doc.toString(), "one two")
-      state = state.t().replace(0, 1, "x").replace(1, 2, "x").replace(2, 3, "x").apply()
-      ist(state.doc.toString(), "xnx two")
+      let tr1 = state.tr({changes: {from: 3, insert: " three"}, selection: {anchor: 13}})
+      ist(tr1.state.doc.toString(), "one two")
+      ist(tr1.state.selection.primary.head, 7)
+      let tr2 = state.tr({changes: {from: 4, to: 7, insert: "2"}})
+      ist(tr2.state.doc.toString(), "one 2")
     })
 
     it("can split changes", () => {
-      let state = EditorState.create({
-        extensions: [EditorState.changeFilter.of(change => {
-          return [new Change(change.from, change.from + 1, change.text),
-                  new Change(change.to - 1, change.to, ["."])]
-        })],
-        doc: "one two"
-      })
-      ist(state.t().replace(0, 7, "--").doc.toString(), "--ne tw.")
+      // Only allows changes in the middle third of the document
+      let state = EditorState.create({extensions: [
+        EditorState.changeFilter.of((_ch, state) => [Math.floor(state.doc.length / 3), Math.floor(2 * state.doc.length / 3)])
+      ], doc: "onetwo"})
+      ist(state.tr({changes: {from: 0, to: 6}}).state.doc.toString(), "onwo")
     })
 
-    it("properly maps changes for multiple splits", () => {
-      let state = EditorState.create({
-        extensions: [EditorState.changeFilter.of(ch => [new Change(ch.from, ch.from, ["x"]), new Change(ch.from, ch.from, ch.text)]),
-                     EditorState.changeFilter.of(ch => [new Change(ch.from, ch.from, ["y"]), new Change(ch.from, ch.from, ch.text)])]
-      })
-      ist(state.t().replace(0, 0, "?").doc.toString(), "xyx?")
+    it("combines filter masks", () => {
+      let state = EditorState.create({extensions: [
+        EditorState.changeFilter.of(() => [0, 4]),
+        EditorState.changeFilter.of(() => [2, 6])
+      ], doc: "onetwo"})
+      ist(state.tr({changes: {from: 0, to: 6}}).state.doc.toString(), "onwo")
     })
   })
 
-  describe("selectionFilter", () => {
+/*  describe("selectionFilter", () => {
     it("can constrain the selection", () => {
       let state = EditorState.create({
         extensions: [EditorState.selectionFilter.of(sel => sel.primary.to < 4 ? sel : EditorSelection.single(4))],
@@ -149,7 +146,7 @@ describe("EditorState", () => {
       ist(tr.selection.primary.to, 3)
       tr.setSelection(EditorSelection.single(7))
       ist(tr.selection.primary.to, 4)
-      ist(tr.apply().selection.primary.to, 4)
+      ist(tr.state.selection.primary.to, 4)
     })
   })
 */

@@ -244,7 +244,7 @@ function capturePaste(view: EditorView) {
 }
 
 function doPaste(view: EditorView, text: string) {
-  view.dispatch(view.state.replaceSelection(text).and({
+  view.dispatch(view.state.tr(view.state.replaceSelection(text), {
     annotations: Transaction.userEvent.of("paste"),
     scrollIntoView: true
   }))
@@ -382,7 +382,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut")
-    view.dispatch(view.state.replaceSelection([""]).and({
+    view.dispatch(view.state.tr(view.state.replaceSelection([""]), {
       scrollIntoView: true,
       annotations: Transaction.userEvent.of("cut")
     }))

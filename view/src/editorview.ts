@@ -158,7 +158,7 @@ export class EditorView {
   /// update the visible document and selection to match the state
   /// produced by the transactions, and notify view plugins of the
   /// change.
-  update(transactions: Transaction[]) {
+  update(transactions: readonly Transaction[]) {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
     this.updateState = UpdateState.Updating
@@ -166,8 +166,8 @@ export class EditorView {
     let state = this.state
     for (let tr of transactions) {
       if (tr.startState != state)
-        throw new RangeError("Trying to update state with a transaction that doesn't start from the current state.")
-      state = tr.apply()
+        throw new RangeError("Trying to update state with a transaction that doesn't start from the previous state.")
+      state = tr.state
     }
     let update = new ViewUpdate(this, state, transactions)
     if (state.doc != this.state.doc || transactions.some(tr => tr.selection && !tr.annotation(Transaction.preserveGoalColumn)))

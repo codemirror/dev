@@ -255,27 +255,27 @@ export class ChangeSet extends ChangeDesc {
   get desc() { return new ChangeDesc(this.sections) }
 
   /// @internal
-  filter(ranges: readonly {from: number, to: number}[]) {
+  filter(ranges: readonly number[]) {
     let resultSections: number[] = [], resultInserted: (readonly string[])[] = [], filteredSections: number[] = []
     let iter = new SectionIter(this)
     done: for (let i = 0, pos = 0;;) {
-      let next = i == ranges.length ? 1e9 : ranges[i].from
+      let next = i == ranges.length ? 1e9 : ranges[i++]
       while (pos < next || pos == next && iter.len == 0) {
         if (iter.done) break done
         let len = Math.min(iter.len, next - pos)
+        addSection(resultSections, len, -1)
+        addSection(filteredSections, len, iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0)
+        iter.forward(len)
+        pos += len
+      }
+      let end = ranges[i++]
+      while (pos < end) {
+        if (iter.done) break done
+        let len = Math.min(iter.len, end - pos)
         addSection(filteredSections, len, -1)
         let ins = iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0
         addSection(resultSections, len, ins)
         if (ins > 0) addInsert(resultInserted, resultSections, iter.text)
-        iter.forward(len)
-        pos += len
-      }
-      let end = ranges[i++].to
-      while (pos < end) {
-        if (iter.done) break done
-        let len = Math.min(iter.len, end - pos)
-        addSection(resultSections, len, -1)
-        addSection(filteredSections, len, iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0)
         iter.forward(len)
         pos += len
       }
@@ -327,7 +327,7 @@ export class ChangeSet extends ChangeDesc {
 
   /// Create an empty changeset of the given length.
   static empty(length: number) {
-    return new ChangeSet([length, -1], [])
+    return new ChangeSet(length ? [length, -1] : [], [])
   }
 }
 

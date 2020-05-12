@@ -16,7 +16,7 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   static: true
 })
 
-export const changeFilter = Facet.define<(tr: Transaction) => boolean | readonly {from: number, to: number}[]>()
+export const changeFilter = Facet.define<(changes: ChangeSet, state: EditorState) => boolean | readonly number[]>()
 
 export const selectionFilter = Facet.define<(selection: EditorSelection,
                                              state: EditorState, changes: ChangeSet) => EditorSelection>()

@@ -96,7 +96,7 @@ export const selectAll: StateCommand = ({state, dispatch}) => {
 }
 
 function deleteText(view: EditorView, dir: "forward" | "backward") {
-  let transaction = view.state.changeByRange(range => {
+  let changes = view.state.changeByRange(range => {
     let {from, to} = range
     if (from == to) {
       let target = view.movePos(range.head, dir, "character", "move")
@@ -105,9 +105,9 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
     if (from == to) return {range}
     return {changes: {from, to}, range: new SelectionRange(from)}
   })
-  if (!transaction.docChanged) return false
+  if (!changes.changes) return false
 
-  view.dispatch(transaction.and({scrollIntoView: true}))
+  view.dispatch(view.state.tr(changes, {scrollIntoView: true}))
   return true
 }
 
@@ -141,12 +141,13 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let indent = getIndentation(new IndentContext(state), r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
   })
-  dispatch(state.changeByRange(({from, to}) => {
+  let changes = state.changeByRange(({from, to}) => {
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
     return {changes: {from, to, insert: ["", space(indent)]},
             range: new SelectionRange(from + 1 + indent)}
-  }).and({scrollIntoView: true}))
+  })
+  dispatch(state.tr(changes, {scrollIntoView: true}))
   return true
 }
 

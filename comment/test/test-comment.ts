@@ -68,7 +68,7 @@ describe("comment", () => {
   function checkToggleChain(toggle: StateCommand, config: CommentTokens, docs: string[]) {
     let state = s(docs[0], config)
     for (let i = 1; i <= docs.length; i++) {
-      toggle({state, dispatch(tr) { state = tr.apply() }})
+      toggle({state, dispatch(tr) { state = tr.state }})
       same(state, s(docs[i == docs.length ? docs.length - 2 : i], config))
     }
   }
@@ -184,7 +184,7 @@ describe("comment", () => {
 </script>
 <!-- HTML only provides block comments -->`, undefined, [html()])
 
-    toggleLineComment({state, dispatch(tr) { state = tr.apply() }})
+    toggleLineComment({state, dispatch(tr) { state = tr.state }})
     same(state, s(`<script>
   This is a |line comment
   console.log("Hello");

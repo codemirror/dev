@@ -67,13 +67,13 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       tr = startState.replaceSelection((before + change.insert.join(LineSep) + after).split(LineSep))
     } else {
       let changes = startState.changes(change)
-      tr = startState.tr({
+      tr = {
         changes,
         selection: newSel && !startState.selection.primary.eq(newSel.primary) && newSel.primary.to <= changes.newLength
           ? startState.selection.replaceRange(newSel.primary) : undefined
-      })
+      }
     }
-    view.dispatch(tr.and({scrollIntoView: true, annotations: Transaction.userEvent.of("input")}))
+    view.dispatch(startState.tr(tr, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")}))
     return true
   } else if (newSel && !newSel.primary.eq(sel)) {
     let scrollIntoView = false, annotations: Annotation<any> | undefined

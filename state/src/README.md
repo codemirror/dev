@@ -29,7 +29,7 @@ This is how you'd make a change to a document (replacing “world” with
 let state = EditorState.create({doc: "hello world"})
 let transaction = state.t().replace(6, 11, "editor")
 console.log(transaction.doc.toString()) // "hello editor"
-let newState = transaction.apply()
+let newState = transaction.state
 ```
 
 @ChangeDesc

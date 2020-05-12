@@ -23,7 +23,7 @@ class DummyServer {
         if (this.clientIDs[i] == getClientID(this.states[n])) count++
         else break
       }
-      this.states[n] = receiveUpdates(state, this.updates.slice(version), count).apply()
+      this.states[n] = receiveUpdates(state, this.updates.slice(version), count).state
     }
   }
 
@@ -43,7 +43,7 @@ class DummyServer {
   }
 
   update(n: number, f: (state: EditorState) => Transaction) {
-    this.states[n] = f(this.states[n]).apply()
+    this.states[n] = f(this.states[n]).state
     this.broadcast(n)
   }
 
@@ -221,14 +221,14 @@ describe("collab", () => {
   it("client ids survive reconfiguration", () => {
     let ext = collab()
     let state = EditorState.create({extensions: [ext]})
-    let state2 = state.tr({reconfigure: [ext]}).apply()
+    let state2 = state.tr({reconfigure: [ext]}).state
     ist(getClientID(state), getClientID(state2))
   })
 
   it("associates transaction info with local changes", () => {
     let state = EditorState.create({extensions: [collab()]})
     let tr = state.tr({changes: {from: 0, insert: "hi"}})
-    ist(sendableUpdates(tr.apply())[0].origin, tr)
+    ist(sendableUpdates(tr.state)[0].origin, tr)
   })
 
   it("supports shared effects", () => {

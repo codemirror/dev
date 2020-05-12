@@ -24,8 +24,6 @@ export class AnnotationType<T> {
   of(value: T): Annotation<T> { return new Annotation(this, value) }
 }
 
-export const scrollIntoView = Annotation.define<boolean>()
-
 /// Values passed to
 /// [`StateEffect.define`](#state.StateEffect^define).
 export interface StateEffectSpec<Value> {
@@ -96,12 +94,17 @@ export type TransactionSpec = {
   replaceExtensions?: ExtensionMap
 }
 
+export const enum TransactionFlag { reconfigured = 1, scrollIntoView = 2 }
+
 /// Changes to the editor state are grouped into transactions.
 /// Typically, a user action creates a single transaction, which may
 /// contain any number of document changes, may change the selection,
 /// or have other effects. Create a transaction by calling
 /// [`EditorState.tr`](#state.EditorState.tr).
 export class Transaction {
+  /// The new state created by the transaction.
+  readonly state!: EditorState
+
   /// @internal
   constructor(
     /// The state from which the transaction starts.
@@ -115,37 +118,8 @@ export class Transaction {
     readonly effects: readonly StateEffect<any>[],
     private annotations: readonly Annotation<any>[],
     /// @internal
-    readonly reconfigure: {base: Extension, replace: ExtensionMap} | undefined
+    readonly flags: number
   ) {}
-
-  /// Apply the transaction, producing a new editor state. Calling
-  /// this multiple times will not result in new states being
-  /// computed.
-  apply(): EditorState {
-    let tr: Transaction = this
-    if (this.annotation(Transaction.filterChanges) !== false) {
-      let result: boolean | readonly {from: number, to: number}[] = true
-      for (let filter of this.startState.facet(changeFilter)) {
-        let value = filter(this)
-        if (value === false) { result = false; break }
-        if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
-      }
-      if (result !== true) {
-        let changes, back
-        if (result === false) {
-          back = tr.changes.invertedDesc
-          changes = ChangeSet.empty(tr.startState.doc.length)
-        } else {
-          let filtered = tr.changes.filter(result)
-          changes = filtered.changes
-          back = filtered.filtered.invertedDesc
-        }
-        tr = new Transaction(tr.startState, changes, tr.selection && tr.selection.map(back),
-                             mapEffects(tr.effects, back), tr.annotations, tr.reconfigure)
-      }
-    }
-    return tr.startState.applyTransaction(tr)
-  }
 
   /// Get the value of the given annotation type, if any.
   annotation<T>(type: AnnotationType<T>): T | undefined {
@@ -158,22 +132,10 @@ export class Transaction {
 
   /// Query whether the selection should be scrolled into view after
   /// applying this transaction.
-  get scrolledIntoView(): boolean { return this.annotation(scrollIntoView) != null }
+  get scrolledIntoView(): boolean { return (this.flags & TransactionFlag.scrollIntoView) > 0 }
 
   /// Indicates whether the transaction reconfigures the state.
-  get reconfigured(): boolean { return !!this.reconfigure }
-
-  and(tr: Transaction | TransactionSpec) {
-    if (!(tr instanceof Transaction)) tr = this.startState.tr(tr)
-    if (tr.startState != this.startState) throw new Error("Trying to combine mismatched transaction (different start state)")
-    let trChanges = tr.changes.map(this.changes)
-    let thisMap = tr.effects.length || tr.selection ? this.changes.mapDesc(tr.changes, true) : null
-    return new Transaction(this.startState, this.changes.compose(trChanges),
-                           tr.selection ? tr.selection.map(thisMap!) : this.selection ? this.selection.map(trChanges) : undefined,
-                           mapEffects(this.effects, trChanges).concat(mapEffects(tr.effects, thisMap!)),
-                           this.annotations.concat(tr.annotations),
-                           combineReconf(this.reconfigure, tr.reconfigure))
-  }
+  get reconfigured(): boolean { return (this.flags & TransactionFlag.reconfigured) > 0 }
 
   /// Annotation used to store transaction timestamps.
   static time = Annotation.define<number>()
@@ -206,27 +168,80 @@ export class Transaction {
   static filterChanges = Annotation.define<boolean>()
 }
 
-function joinRanges(a: readonly {from: number, to: number}[], b: readonly {from: number, to: number}[]) {
+function intersectRanges(a: readonly number[], b: readonly number[]) {
   let result = []
-  for (let iA = 0, iB = 0, last = null;;) {
-    let next
-    if (iA < a.length && (iB == b.length || b[iB].from >= a[iA].from)) next = a[iA++]
-    else if (iB < b.length) next = b[iB++]
-    else break
-    if (!last || last.to < next.from) result.push(last = next)
-    else if (last.to < next.to) last = result[result.length - 1] = {from: last.from, to: next.to}
+  for (let iA = 0, iB = 0; iA < a.length;) {
+    let fromA = a[iA++], toA = a[iA++]
+    while (iB < b.length) {
+      let fromB = b[iB], toB = b[iB + 1]
+      if (fromB < toA && toB > fromA) result.push(Math.max(fromA, fromB), Math.min(toA, toB))
+      if (toB >= toA) break
+      iB += 2
+    }
   }
   return result
 }
 
-function combineReconf(a: {base: Extension, replace: ExtensionMap} | undefined,
-                       b: {base: Extension, replace: ExtensionMap} | undefined) {
-  if (!b) return a
-  if (!a || a.base != b.base) return b
-  let replace = Object.create(null)
-  for (let tag in a.replace) replace[tag] = a.replace[tag]
-  for (let tag in b.replace) replace[tag] = b.replace[tag]
-  return {base: b.base, replace}
+export class ResolvedTransactionSpec {
+  constructor(readonly changes: ChangeSet,
+              readonly selection: EditorSelection | undefined,
+              readonly effects: readonly StateEffect<any>[],
+              readonly annotations: readonly Annotation<any>[],
+              readonly scrollIntoView: boolean,
+              readonly reconfigure: Extension | undefined,
+              readonly replaceExtensions: ExtensionMap | undefined) {}
+
+  static create(state: EditorState, spec: TransactionSpec) {
+    let sel = spec.selection
+    return new ResolvedTransactionSpec(
+      spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
+      sel && (sel instanceof EditorSelection ? sel : EditorSelection.single(sel.anchor, sel.head)),
+      !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
+      !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
+      !!spec.scrollIntoView,
+      spec.reconfigure,
+      spec.replaceExtensions)
+  }
+
+  combine(b: ResolvedTransactionSpec) {
+    let a: ResolvedTransactionSpec = this
+    let changesA = a.changes.mapDesc(b.changes, true), changesB = b.changes.map(a.changes)
+    return new ResolvedTransactionSpec(
+      a.changes.compose(changesB),
+      b.selection ? b.selection.map(changesA) : a.selection ? a.selection.map(changesB) : undefined,
+      mapEffects(a.effects, changesB).concat(mapEffects(b.effects, changesA)),
+      a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
+      a.scrollIntoView || b.scrollIntoView,
+      b.reconfigure || a.reconfigure,
+      b.replaceExtensions || (b.reconfigure ? undefined : a.replaceExtensions))
+  }
+
+  filterChanges(state: EditorState) {
+    let result: boolean | readonly number[] = true
+    for (let filter of state.facet(changeFilter)) {
+      let value = filter(this.changes, state)
+      if (value === false) { result = false; break }
+      if (Array.isArray(value)) result = result === true ? value : intersectRanges(result, value)
+    }
+    if (result === true) return this
+    let changes, back
+    if (result === false) {
+      back = this.changes.invertedDesc
+      changes = ChangeSet.empty(state.doc.length)
+    } else {
+      let filtered = this.changes.filter(result)
+      changes = filtered.changes
+      back = filtered.filtered.invertedDesc
+    }
+    return new ResolvedTransactionSpec(
+      changes,
+      this.selection && this.selection.map(back),
+      mapEffects(this.effects, back),
+      this.annotations,
+      this.scrollIntoView,
+      this.reconfigure,
+      this.replaceExtensions)
+  }
 }
 
 function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
@@ -238,3 +253,5 @@ function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
   }
   return result
 }
+
+const none: readonly any[] = []

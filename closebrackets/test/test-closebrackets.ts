@@ -9,7 +9,7 @@ function s(doc = "", anchor = 0, head = anchor) {
 
 function same(s0: null | Transaction, s1: EditorState) {
   ist(s0)
-  ist(s0!.apply().doc.toString(), s1.doc.toString())
+  ist(s0!.state.doc.toString(), s1.doc.toString())
   ist(JSON.stringify(s0!.selection), JSON.stringify(s1.selection))
 }
 
