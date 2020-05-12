@@ -91,7 +91,6 @@ export class EditorState {
     let spec = (specs.length ? specs : [{}]).map(s => ResolvedTransactionSpec.create(this, s)).reduce((a, b) => a.combine(b))
     if (!spec.annotations.some(a => a.type == Transaction.filterChanges && a.value === false))
       spec = spec.filterChanges(this)
-    // FIXME selection filtering
     let annotations = spec.annotations
     if (!annotations.some(a => a.type == Transaction.time))
       annotations = annotations.concat(Transaction.time.of(Date.now()))
@@ -99,8 +98,10 @@ export class EditorState {
     let reconf = spec.reconfigure || spec.replaceExtensions, conf = !reconf ? this.config
       : Configuration.resolve(spec.reconfigure || this.config.source, spec.replaceExtensions, this)
     let flags = (reconf ? TransactionFlag.reconfigured : 0) | (spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0)
-    let tr = new Transaction(this, spec.changes, spec.selection, spec.effects, annotations, flags)
-    new EditorState(conf, spec.changes.apply(this.doc), spec.selection || this.selection.map(spec.changes), tr)
+    let selection = spec.selection
+    if (selection) for (let filter of this.facet(selectionFilter)) selection = filter(selection, this, spec.changes)
+    let tr = new Transaction(this, spec.changes, selection, spec.effects, annotations, flags)
+    new EditorState(conf, spec.changes.apply(this.doc), selection || this.selection.map(spec.changes), tr)
     return tr
   }
 

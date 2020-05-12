@@ -217,6 +217,7 @@ export class ResolvedTransactionSpec {
   }
 
   filterChanges(state: EditorState) {
+    // FIXME appending changes
     let result: boolean | readonly number[] = true
     for (let filter of state.facet(changeFilter)) {
       let value = filter(this.changes, state)
