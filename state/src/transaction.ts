@@ -2,6 +2,7 @@ import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
 import {EditorSelection} from "./selection"
 import {Extension, ExtensionMap} from "./facet"
+import {changeFilter} from "./extension"
 
 /// Annotations are tagged values that are used to add metadata to
 /// transactions in an extensible way. They should be used to model
@@ -101,9 +102,6 @@ export type TransactionSpec = {
 /// or have other effects. Create a transaction by calling
 /// [`EditorState.tr`](#state.EditorState.tr).
 export class Transaction {
-  // Cached result of `apply`.
-  private newState: EditorState | null = null
-
   /// @internal
   constructor(
     /// The state from which the transaction starts.
@@ -124,7 +122,29 @@ export class Transaction {
   /// this multiple times will not result in new states being
   /// computed.
   apply(): EditorState {
-    return this.newState || (this.newState = this.startState.applyTransaction(this))
+    let tr: Transaction = this
+    if (this.annotation(Transaction.filterChanges) !== false) {
+      let result: boolean | readonly {from: number, to: number}[] = true
+      for (let filter of this.startState.facet(changeFilter)) {
+        let value = filter(this)
+        if (value === false) { result = false; break }
+        if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
+      }
+      if (result !== true) {
+        let changes, back
+        if (result === false) {
+          back = tr.changes.invertedDesc
+          changes = ChangeSet.empty(tr.startState.doc.length)
+        } else {
+          let filtered = tr.changes.filter(result)
+          changes = filtered.changes
+          back = filtered.filtered.invertedDesc
+        }
+        tr = new Transaction(tr.startState, changes, tr.selection && tr.selection.map(back),
+                             mapEffects(tr.effects, back), tr.annotations, tr.reconfigure)
+      }
+    }
+    return tr.startState.applyTransaction(tr)
   }
 
   /// Get the value of the given annotation type, if any.
@@ -184,6 +204,19 @@ export class Transaction {
   /// When this isn't explicitly set to `false`, change filtering is
   /// enabled.
   static filterChanges = Annotation.define<boolean>()
+}
+
+function joinRanges(a: readonly {from: number, to: number}[], b: readonly {from: number, to: number}[]) {
+  let result = []
+  for (let iA = 0, iB = 0, last = null;;) {
+    let next
+    if (iA < a.length && (iB == b.length || b[iB].from >= a[iA].from)) next = a[iA++]
+    else if (iB < b.length) next = b[iB++]
+    else break
+    if (!last || last.to < next.from) result.push(last = next)
+    else if (last.to < next.to) last = result[result.length - 1] = {from: last.from, to: next.to}
+  }
+  return result
 }
 
 function combineReconf(a: {base: Extension, replace: ExtensionMap} | undefined,

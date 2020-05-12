@@ -65,8 +65,8 @@ export class ChangeDesc {
   /// Iterate over the ranges changed by these changes. (See
   /// [`ChangeSet.iterChanges`](#state.ChangeSet.iterChanges) for a
   /// variant that also provides you with the inserted text.)
-  iterChangedRanges(f: (fromA: number, toA: number, fromB: number, toB: number) => void) {
-    iterChanges(this, f)
+  iterChangedRanges(f: (fromA: number, toA: number, fromB: number, toB: number) => void, individual = false) {
+    iterChanges(this, f, individual)
   }
 
   /// Get the inverted form of thes changes.
@@ -202,7 +202,7 @@ export class ChangeSet extends ChangeDesc {
   /// document.
   apply(doc: Text) {
     if (this.length != doc.length) throw new RangeError("Applying change set to a document with the wrong length")
-    this.iterChanges((fromA, toA, fromB, _toB, text) => doc = doc.replace(fromB, fromB + (toA - fromA), text))
+    iterChanges(this, (fromA, toA, fromB, _toB, text) => doc = doc.replace(fromB, fromB + (toA - fromA), text), false)
     return doc
   }
 
@@ -246,8 +246,8 @@ export class ChangeSet extends ChangeDesc {
 
   /// Iterate over the changed ranges in the document, calling `f` for
   /// each.
-  iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: readonly string[]) => void) {
-    iterChanges(this, f)
+  iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: readonly string[]) => void, individual = false) {
+    iterChanges(this, f, individual)
   }
 
   /// Get a [change description](#text.ChangeDesc) for this change
@@ -255,6 +255,37 @@ export class ChangeSet extends ChangeDesc {
   get desc() { return new ChangeDesc(this.sections) }
 
   /// @internal
+  filter(ranges: readonly {from: number, to: number}[]) {
+    let resultSections: number[] = [], resultInserted: (readonly string[])[] = [], filteredSections: number[] = []
+    let iter = new SectionIter(this)
+    done: for (let i = 0, pos = 0;;) {
+      let next = i == ranges.length ? 1e9 : ranges[i].from
+      while (pos < next || pos == next && iter.len == 0) {
+        if (iter.done) break done
+        let len = Math.min(iter.len, next - pos)
+        addSection(filteredSections, len, -1)
+        let ins = iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0
+        addSection(resultSections, len, ins)
+        if (ins > 0) addInsert(resultInserted, resultSections, iter.text)
+        iter.forward(len)
+        pos += len
+      }
+      let end = ranges[i++].to
+      while (pos < end) {
+        if (iter.done) break done
+        let len = Math.min(iter.len, end - pos)
+        addSection(resultSections, len, -1)
+        addSection(filteredSections, len, iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0)
+        iter.forward(len)
+        pos += len
+      }
+    }
+    return {changes: new ChangeSet(resultSections, resultInserted),
+            filtered: new ChangeDesc(filteredSections)}
+  }
+
+  /// @internal
+  // FIXME make public?
   static of(changes: ChangeSpec, length: number, split?: string): ChangeSet {
     let sections: number[] = [], inserted: (readonly string[])[] = [], pos = 0
     let total: ChangeSet | null = null
@@ -323,7 +354,8 @@ function addInsert(values: (readonly string[])[], sections: readonly number[], v
 }
 
 function iterChanges(desc: ChangeDesc,
-                     f: (fromA: number, toA: number, fromB: number, toB: number, text: readonly string[]) => void) {
+                     f: (fromA: number, toA: number, fromB: number, toB: number, text: readonly string[]) => void,
+                     individual: boolean) {
   let inserted = (desc as ChangeSet).inserted
   for (let posA = 0, posB = 0, i = 0; i < desc.sections.length;) {
     let len = desc.sections[i++], ins = desc.sections[i++]
@@ -334,7 +366,7 @@ function iterChanges(desc: ChangeDesc,
       for (;;) {
         endA += len; endB += ins
         if (ins && inserted) text = appendText(text, inserted[(i - 2) >> 1])
-        if (i == desc.sections.length || desc.sections[i + 1] < 0) break
+        if (individual || i == desc.sections.length || desc.sections[i + 1] < 0) break
         len = desc.sections[i++]; ins = desc.sections[i++]
       }
       f(posA, endA, posB, endB, text)
