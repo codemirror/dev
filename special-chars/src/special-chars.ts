@@ -95,7 +95,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
           if (code == null) continue
           if (code == 9) {
             let line = doc.lineAt(pos + m.index)
-            let size = this.view.state.tabSize, col = countColumn(doc.slice(line.start, pos + m.index), 0, size)
+            let size = this.view.state.tabSize, col = countColumn(doc.sliceString(line.start, pos + m.index), 0, size)
             deco = Decoration.replace({widget: new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth)})
           } else {
             deco = this.decorationCache[code] ||

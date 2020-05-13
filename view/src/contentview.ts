@@ -1,3 +1,4 @@
+import {Text} from "@codemirror/next/text"
 import {Rect, maxOffset, domIndex} from "./dom"
 import {EditorView} from "./editorview"
 
@@ -25,7 +26,7 @@ export abstract class ContentView {
     return this.parent.editorView
   }
 
-  get overrideDOMText(): readonly string[] | null { return null }
+  get overrideDOMText(): Text | null { return null }
 
   get posAtStart(): number {
     return this.parent ? this.parent.posBefore(this) : 0
@@ -48,7 +49,7 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length
   }
 
-  coordsAt(pos: number): Rect | null { return null }
+  coordsAt(_pos: number): Rect | null { return null }
 
   sync() {
     if (this.dirty & Dirty.Node) {
@@ -73,7 +74,7 @@ export abstract class ContentView {
     }
   }
 
-  reuseDOM(dom: Node) { return false }
+  reuseDOM(_dom: Node) { return false }
 
   abstract domAtPos(pos: number): DOMPos
 
@@ -163,8 +164,8 @@ export abstract class ContentView {
     for (let i = 0; i < children.length; i++) children[i].setParent(this)
   }
 
-  ignoreMutation(rec: MutationRecord): boolean { return false }
-  ignoreEvent(event: Event): boolean { return false }
+  ignoreMutation(_rec: MutationRecord): boolean { return false }
+  ignoreEvent(_event: Event): boolean { return false }
 
   childCursor(pos: number = this.length) {
     return new ChildCursor(this.children, pos, this.children.length)

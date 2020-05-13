@@ -432,12 +432,12 @@ export function computeCompositionDeco(view: EditorView, changes: ChangeSet): De
   }
 
   let newFrom = changes.mapPos(from, 1), newTo = Math.max(newFrom, changes.mapPos(to, -1))
-  let text = textNode.nodeValue!, doc = view.state.doc
+  let text = textNode.nodeValue!, {state} = view
   if (newTo - newFrom < text.length) {
-    if (doc.slice(newFrom, Math.min(doc.length, newFrom + text.length)) == text) newTo = newFrom + text.length
-    else if (doc.slice(Math.max(0, newTo - text.length), newTo) == text) newFrom = newTo - text.length
+    if (state.sliceDoc(newFrom, Math.min(state.doc.length, newFrom + text.length)) == text) newTo = newFrom + text.length
+    else if (state.sliceDoc(Math.max(0, newTo - text.length), newTo) == text) newFrom = newTo - text.length
     else return Decoration.none
-  } else if (doc.slice(newFrom, newTo) != text) {
+  } else if (state.sliceDoc(newFrom, newTo) != text) {
     return Decoration.none
   }
 

@@ -48,13 +48,12 @@ describe("EditorState", () => {
 
   it("stores and updates the line separator", () => {
     let deflt = EditorState.create({}), crlf = EditorState.create({extensions: [EditorState.lineSeparator.of("\r\n")]})
-    ist(deflt.joinLines(["a", "b"]), "a\nb")
-    ist(deflt.splitLines("foo\rbar").length, 2)
-    ist(crlf.joinLines(["a", "b"]), "a\r\nb")
-    ist(crlf.splitLines("foo\nbar\r\nbaz").length, 2)
+    ist(deflt.facet(EditorState.lineSeparator), null)
+    ist(deflt.toText("a\nb").lines, 2)
+    ist(crlf.facet(EditorState.lineSeparator), "\r\n")
+    ist(crlf.toText("a\nb").lines, 1)
     let updated = crlf.update({reconfigure: [EditorState.lineSeparator.of("\n")]}).state
-    ist(updated.joinLines(["a", "b"]), "a\nb")
-    ist(updated.splitLines("foo\nbar").length, 2)
+    ist(updated.facet(EditorState.lineSeparator), "\n")
   })
 
   it("stores and updates fields", () => {

@@ -307,12 +307,12 @@ function updateMouseSelection(type: number): MouseSelectionUpdate {
 }
 
 handlers.dragstart = (view, event: DragEvent) => {
-  let {doc, selection: {primary}} = view.state
+  let {selection: {primary}} = view.state
   let {mouseSelection} = view.inputState
   if (mouseSelection) mouseSelection.dragging = primary
 
   if (event.dataTransfer) {
-    event.dataTransfer.setData("Text", doc.slice(primary.from, primary.to))
+    event.dataTransfer.setData("Text", view.state.sliceDoc(primary.from, primary.to))
     event.dataTransfer.effectAllowed = "copyMove"
   }
 }
@@ -373,7 +373,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
   if (range.empty) return
 
   let data = brokenClipboardAPI ? null : event.clipboardData
-  let text = view.state.joinLines(view.state.doc.sliceLines(range.from, range.to))
+  let text = view.state.sliceDoc(range.from, range.to)
   if (data) {
     event.preventDefault()
     data.clearData()
@@ -382,7 +382,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut")
-    view.dispatch(view.state.update(view.state.replaceSelection([""]), {
+    view.dispatch(view.state.update(view.state.replaceSelection(""), {
       scrollIntoView: true,
       annotations: Transaction.userEvent.of("cut")
     }))

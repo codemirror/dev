@@ -6,6 +6,7 @@ import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
 import {Open} from "./buildview"
 import {themeClass} from "./theme"
+import {Text} from "@codemirror/next/state"
 
 export interface BlockView extends ContentView {
   merge(from: number, to: number, source: ContentView | null, takeDeco: boolean): boolean
@@ -202,7 +203,7 @@ export class LineView extends ContentView implements BlockView {
     return (this.dom!.lastChild as HTMLElement).getBoundingClientRect()
   }
 
-  match(other: ContentView) { return false }
+  match(_other: ContentView) { return false }
 
   get type() { return BlockType.Text }
 }
@@ -256,7 +257,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
   }
 
   get overrideDOMText() {
-    return this.parent ? this.parent!.view.state.doc.sliceLines(this.posAtStart, this.posAtEnd) : [""]
+    return this.parent ? this.parent!.view.state.doc.slice(this.posAtStart, this.posAtEnd) : Text.empty
   }
 
   domBoundsAround() { return null }

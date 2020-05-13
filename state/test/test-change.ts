@@ -260,9 +260,9 @@ describe("ChangeSet", () => {
   it("can be iterated", () => {
     let set = ChangeSet.of([{insert: "ok", from: 4}, {from: 6, to: 8}], 10)
     let result: any[] = []
-    set.iterChanges((fromA, toA, fromB, toB, inserted) => result.push([fromA, toA, fromB, toB, inserted]))
+    set.iterChanges((fromA, toA, fromB, toB, inserted) => result.push([fromA, toA, fromB, toB, inserted.toString()]))
     ist(JSON.stringify(result),
-        JSON.stringify([[4, 4, 4, 6, ["ok"]], [6, 8, 8, 8, [""]]]))
+        JSON.stringify([[4, 4, 4, 6, "ok"], [6, 8, 8, 8, ""]]))
     result = []
     set.iterGaps((fromA, toA, len) => result.push([fromA, toA, len]))
     ist(JSON.stringify(result),

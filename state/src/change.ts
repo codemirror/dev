@@ -180,7 +180,7 @@ export class ChangeDesc {
 /// replacement, depending on which fields are present), a [change
 /// set](#state.ChangeSet), or an array of change specs.
 export type ChangeSpec =
-  {from: number, to?: number, insert?: string | readonly string[]} |
+  {from: number, to?: number, insert?: string | Text} |
   ChangeSet |
   readonly ChangeSpec[]
 
@@ -193,7 +193,7 @@ export class ChangeSet extends ChangeDesc {
     sections: readonly number[],
     // FIXME represent this as Text instances?
     /// @internal
-    readonly inserted: readonly (readonly string[])[]
+    readonly inserted: readonly Text[]
   ) {
     super(sections)
   }
@@ -223,8 +223,8 @@ export class ChangeSet extends ChangeDesc {
       if (ins >= 0) {
         sections[i] = ins; sections[i + 1] = len
         let index = i >> 1
-        while (inserted.length < index) inserted.push(noText)
-        inserted.push(len ? doc.sliceLines(pos, pos + len) : noText)
+        while (inserted.length < index) inserted.push(Text.empty)
+        inserted.push(len ? doc.slice(pos, pos + len) : Text.empty)
       }
       pos += len
     }
@@ -246,7 +246,7 @@ export class ChangeSet extends ChangeDesc {
 
   /// Iterate over the changed ranges in the document, calling `f` for
   /// each.
-  iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: readonly string[]) => void, individual = false) {
+  iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: Text) => void, individual = false) {
     iterChanges(this, f, individual)
   }
 
@@ -256,7 +256,7 @@ export class ChangeSet extends ChangeDesc {
 
   /// @internal
   filter(ranges: readonly number[]) {
-    let resultSections: number[] = [], resultInserted: (readonly string[])[] = [], filteredSections: number[] = []
+    let resultSections: number[] = [], resultInserted: Text[] = [], filteredSections: number[] = []
     let iter = new SectionIter(this)
     done: for (let i = 0, pos = 0;;) {
       let next = i == ranges.length ? 1e9 : ranges[i++]
@@ -287,7 +287,7 @@ export class ChangeSet extends ChangeDesc {
   /// Create a change set for the given changes, for a document of the
   /// given length, using `lineSep` as line separator.
   static of(changes: ChangeSpec, length: number, lineSep?: string): ChangeSet {
-    let sections: number[] = [], inserted: (readonly string[])[] = [], pos = 0
+    let sections: number[] = [], inserted: Text[] = [], pos = 0
     let total: ChangeSet | null = null
 
     function flush(force = false) {
@@ -306,11 +306,11 @@ export class ChangeSet extends ChangeDesc {
         flush()
         total = total ? total.compose(spec.map(total)) : spec
       } else {
-        let {from, to = from, insert} = spec as {from: number, to?: number, insert?: string | readonly string[]}
+        let {from, to = from, insert} = spec as {from: number, to?: number, insert?: string | Text}
         if (from > to || from < 0 || to > length)
           throw new RangeError(`Invalid change range ${from} to ${to} (in doc of length ${length})`)
-        let insText = !insert ? noText : Array.isArray(insert) ? insert : (insert as string).split(lineSep || DefaultSplit)
-        let insLen = textLength(insText)
+        let insText = !insert ? Text.empty : typeof insert == "string" ? Text.of(insert.split(lineSep || DefaultSplit)) : insert
+        let insLen = insText.length
         if (from == to && insLen == 0) return
         if (from < pos) flush()
         if (from > pos) addSection(sections, from - pos, -1)
@@ -331,8 +331,6 @@ export class ChangeSet extends ChangeDesc {
   }
 }
 
-const noText: readonly string[] = [""]
-
 function addSection(sections: number[], len: number, ins: number, forceJoin = false) {
   if (len == 0 && ins <= 0) return
   let last = sections.length - 2
@@ -342,19 +340,19 @@ function addSection(sections: number[], len: number, ins: number, forceJoin = fa
   else sections.push(len, ins)
 }
 
-function addInsert(values: (readonly string[])[], sections: readonly number[], value: readonly string[]) {
-  if (value.length == 1 && !value[0]) return
+function addInsert(values: Text[], sections: readonly number[], value: Text) {
+  if (value.length == 0) return
   let index = (sections.length - 2) >> 1
   if (index < values.length) {
-    values[values.length - 1] = appendText(values[values.length - 1], value)
+    values[values.length - 1] = values[values.length - 1].append(value)
   } else {
-    while (values.length < index) values.push(noText)
+    while (values.length < index) values.push(Text.empty)
     values.push(value)
   }
 }
 
 function iterChanges(desc: ChangeDesc,
-                     f: (fromA: number, toA: number, fromB: number, toB: number, text: readonly string[]) => void,
+                     f: (fromA: number, toA: number, fromB: number, toB: number, text: Text) => void,
                      individual: boolean) {
   let inserted = (desc as ChangeSet).inserted
   for (let posA = 0, posB = 0, i = 0; i < desc.sections.length;) {
@@ -362,10 +360,10 @@ function iterChanges(desc: ChangeDesc,
     if (ins < 0) {
       posA += len; posB += len
     } else {
-      let endA = posA, endB = posB, text = noText
+      let endA = posA, endB = posB, text = Text.empty
       for (;;) {
         endA += len; endB += ins
-        if (ins && inserted) text = appendText(text, inserted[(i - 2) >> 1])
+        if (ins && inserted) text = text.append(inserted[(i - 2) >> 1])
         if (individual || i == desc.sections.length || desc.sections[i + 1] < 0) break
         len = desc.sections[i++]; ins = desc.sections[i++]
       }
@@ -375,38 +373,10 @@ function iterChanges(desc: ChangeDesc,
   }
 }
 
-function appendText(a: readonly string[], b: readonly string[]) {
-  if (a == noText) return b
-  if (b == noText) return a
-  let result = a.slice()
-  result[result.length - 1] += b[0]
-  for (let i = 1; i < b.length; i++) result.push(b[i])
-  return result
-}
-
-export function textLength(text: readonly string[]) {
-  let length = -1
-  for (let line of text) length += line.length + 1
-  return length
-}
-
-function sliceText(text: readonly string[], from: number, to?: number): readonly string[] {
-  if (from == to) return noText
-  if (!from && (to == null || to == textLength(text))) return text
-  if (to == null) to = 1e9
-  let result = []
-  for (let off = 0, i = 0; i < text.length && off <= to; i++) {
-    let line = text[i], end = off + line.length
-    if (end >= from) result.push(line.slice(Math.max(0, from - off), Math.min(line.length, to - off)))
-    off += end + 1
-  }
-  return result
-}
-
 function mapSet(setA: ChangeSet, setB: ChangeDesc, before: boolean, mkSet: true): ChangeSet
 function mapSet(setA: ChangeDesc, setB: ChangeDesc, before: boolean): ChangeDesc
 function mapSet(setA: ChangeDesc, setB: ChangeDesc, before: boolean, mkSet = false): ChangeSet | ChangeDesc {
-  let sections: number[] = [], insert: (readonly string[])[] | null = mkSet ? [] : null
+  let sections: number[] = [], insert: Text[] | null = mkSet ? [] : null
   let a = new SectionIter(setA), b = new SectionIter(setB)
   for (let posA = 0, posB = 0;;) {
     if (a.ins == -1) {
@@ -457,7 +427,7 @@ function composeSets(setA: ChangeSet, setB: ChangeSet, mkSet: true): ChangeSet
 function composeSets(setA: ChangeDesc, setB: ChangeDesc): ChangeDesc
 function composeSets(setA: ChangeDesc, setB: ChangeDesc, mkSet = false): ChangeDesc {
   let sections: number[] = []
-  let insert: (readonly string[])[] | null = mkSet ? [] : null
+  let insert: Text[] | null = mkSet ? [] : null
   let a = new SectionIter(setA), b = new SectionIter(setB)
   for (let open = false;;) {
     if (a.done && b.done) {
@@ -519,13 +489,13 @@ class SectionIter {
 
   get text() {
     let {inserted} = this.set as ChangeSet, index = (this.i - 2) >> 1
-    return index >= inserted.length ? noText : inserted[index]
+    return index >= inserted.length ? Text.empty : inserted[index]
   }
 
   textBit(len?: number) {
     let {inserted} = this.set as ChangeSet, index = (this.i - 2) >> 1
-    return index >= inserted.length && !len ? noText
-      : sliceText(inserted[index], this.off, len == null ? undefined : this.off + len)
+    return index >= inserted.length && !len ? Text.empty
+      : inserted[index].slice(this.off, len == null ? undefined : this.off + len)
   }
 
   forward(len: number) {

@@ -366,10 +366,10 @@ const AnnounceMargin = 30
 
 // FIXME this is a kludge
 function maybeAnnounceMatch(view: EditorView) {
-  let {doc} = view.state, {from, to} = view.state.selection.primary
-  let lineStart = doc.lineAt(from).start, lineEnd = doc.lineAt(to).end
+  let {from, to} = view.state.selection.primary
+  let lineStart = view.state.doc.lineAt(from).start, lineEnd = view.state.doc.lineAt(to).end
   let start = Math.max(lineStart, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin)
-  let text = doc.slice(start, end)
+  let text = view.state.sliceDoc(start, end)
   if (start != lineStart) {
     for (let i = 0; i < AnnounceMargin; i++) if (isWordChar(text[i + 1]) && !isWordChar(text[i])) {
       text = text.slice(i)

@@ -364,7 +364,7 @@ function elementName(doc: Text, tree: Subtree) {
   let tag = tree.firstChild
   if (!tag || tag.name != "OpenTag") return ""
   let name = tag.iterate({enter: (type, from, to) => {
-    return type.name == "TagName" ? doc.slice(from, to) : undefined
+    return type.name == "TagName" ? doc.sliceString(from, to) : undefined
   }})
   return name || ""
 }
@@ -393,7 +393,7 @@ function openTags(doc: Text, tree: Subtree) {
 }
 
 function completeTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let text = state.doc.slice(from, to).toLowerCase()
+  let text = state.doc.sliceString(from, to).toLowerCase()
   let result = []
   for (let tagName of allowedChildren(state.doc, tree))
     if (context.filter(tagName, text))
@@ -402,8 +402,8 @@ function completeTag(state: EditorState, tree: Subtree, from: number, to: number
 }
 
 function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let result = [], text = state.doc.slice(from, to).toLowerCase()
-  let end = /\s*>/.test(state.doc.slice(to, to + 5)) ? "" : ">"
+  let result = [], text = state.sliceDoc(from, to).toLowerCase()
+  let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   for (let open of openTags(state.doc, tree))
     if (context.filter(open, text))
       result.push({label: open, start: from, end: to, apply: open + end})
@@ -422,7 +422,7 @@ function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
 function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
   let result = []
   let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
-  let base = state.doc.slice(from, to).toLowerCase()
+  let base = state.sliceDoc(from, to).toLowerCase()
   for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
     if (context.filter(attrName, base))
       result.push({label: attrName, start: from, end: to})
@@ -433,7 +433,7 @@ function completeAttrName(state: EditorState, tree: Subtree, from: number, to: n
 function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
   let attrName = tree.parent?.iterate({
     enter(type, from, to) {
-      return type.name == "AttributeName" ? state.doc.slice(from, to) : undefined
+      return type.name == "AttributeName" ? state.sliceDoc(from, to) : undefined
     },
     from: tree.start,
     to: tree.parent.start
@@ -446,10 +446,10 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
       options = info?.attrs && info.attrs[attrName]
     }
     if (options) {
-      let base = state.doc.slice(from, to).toLowerCase(), quoteStart = '"', quoteEnd = '"'
+      let base = state.sliceDoc(from, to).toLowerCase(), quoteStart = '"', quoteEnd = '"'
       if (/^['"]/.test(base)) {
         quoteStart = ""
-        quoteEnd = state.doc.slice(to, to + 1) == base[0] ? "" : base[0]
+        quoteEnd = state.sliceDoc(to, to + 1) == base[0] ? "" : base[0]
         base = base.slice(1)
         from++
       }

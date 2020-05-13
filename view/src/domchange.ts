@@ -2,8 +2,9 @@ import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
-import {EditorSelection, Transaction, Annotation} from "@codemirror/next/state"
+import {EditorSelection, Transaction, Annotation, Text} from "@codemirror/next/state"
 
+// FIXME reconsider this kludge (does it break reading dom text with newlines?)
 const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
 export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean): boolean {
@@ -22,10 +23,10 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       preferredPos = sel.to
       preferredSide = "end"
     }
-    let diff = findDiff(view.state.doc.slice(from, to, LineSep), reader.text,
+    let diff = findDiff(view.state.doc.sliceString(from, to, LineSep), reader.text,
                         preferredPos - from, preferredSide)
     if (diff) change = {from: from + diff.from, to: from + diff.toA,
-                        insert: reader.text.slice(diff.from, diff.toB).split(LineSep)}
+                        insert: Text.of(reader.text.slice(diff.from, diff.toB).split(LineSep))}
   } else if (view.hasFocus) {
     let domSel = getSelection(view.root)
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
@@ -42,7 +43,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
 
   // Heuristic to notice typing over a selected character
   if (!change && typeOver && !sel.empty && newSel && newSel.primary.empty)
-    change = {from: sel.from, to: sel.to, insert: view.state.doc.sliceLines(sel.from, sel.to)}
+    change = {from: sel.from, to: sel.to, insert: view.state.doc.slice(sel.from, sel.to)}
 
   if (change) {
     let startState = view.state
@@ -52,19 +53,19 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
     // events.
     if (browser.android &&
         ((change.from == sel.from && change.to == sel.to &&
-          change.insert.length == 2 && !change.insert.some(x => x) &&
+          change.insert.length == 1 && change.insert.lines == 2 &&
           dispatchKey(view, "Enter", 10)) ||
-         (change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 1 && !change.insert[0] &&
+         (change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 0 &&
           dispatchKey(view, "Backspace", 8)) ||
-         (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 1 && !change.insert[0] &&
+         (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 0 &&
           dispatchKey(view, "Delete", 46))))
       return view.state != startState
 
     let tr
     if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
-      let before = sel.from < change.from ? startState.doc.slice(sel.from, change.from, LineSep) : ""
-      let after = sel.to > change.to ? startState.doc.slice(change.to, sel.to, LineSep) : ""
-      tr = startState.replaceSelection((before + change.insert.join(LineSep) + after).split(LineSep))
+      let before = sel.from < change.from ? startState.doc.sliceString(sel.from, change.from, LineSep) : ""
+      let after = sel.to > change.to ? startState.doc.sliceString(change.to, sel.to, LineSep) : ""
+      tr = startState.replaceSelection(Text.of((before + change.insert.sliceString(0, undefined, LineSep) + after).split(LineSep)))
     } else {
       let changes = startState.changes(change)
       tr = {
@@ -140,7 +141,7 @@ class DOMReader {
     let view = ContentView.get(node)
     let fromView = view && view.overrideDOMText
     let text: string | undefined
-    if (fromView != null) text = fromView.join(LineSep)
+    if (fromView != null) text = fromView.sliceString(0, undefined, LineSep)
     else if (node.nodeType == 3) text = node.nodeValue!
     else if (node.nodeName == "BR") text = node.nextSibling ? LineSep : ""
     else if (node.nodeType == 1) this.readRange(node.firstChild, null)

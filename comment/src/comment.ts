@@ -123,9 +123,12 @@ class BlockCommenter {
 
   /// Determines if the `range` is block-commented in the given `state`.
   /// The `range` must be a valid range in `state`.
-  isRangeCommented(state: EditorState, range: SelectionRange): { open: { pos: number, margin: number }, close: { pos: number, margin: number } } | null {
-    let textBefore = state.doc.slice(range.from - SearchMargin, range.from)
-    let textAfter = state.doc.slice(range.to, range.to + SearchMargin)
+  isRangeCommented(state: EditorState, range: SelectionRange): {
+    open: {pos: number, margin: number},
+    close: {pos: number, margin: number}
+  } | null {
+    let textBefore = state.sliceDoc(range.from - SearchMargin, range.from)
+    let textAfter = state.sliceDoc(range.to, range.to + SearchMargin)
     let spaceBefore = /\s*$/.exec(textBefore)![0].length, spaceAfter = /^\s*/.exec(textAfter)![0].length
     let beforeOff = textBefore.length - spaceBefore
     if (textBefore.slice(beforeOff - this.open.length, beforeOff) == this.open &&
@@ -136,10 +139,10 @@ class BlockCommenter {
 
     let startText: string, endText: string
     if (range.to - range.from <= 2 * SearchMargin) {
-      startText = endText = state.doc.slice(range.from, range.to)
+      startText = endText = state.sliceDoc(range.from, range.to)
     } else {
-      startText = state.doc.slice(range.from, range.from + SearchMargin)
-      endText = state.doc.slice(range.to - SearchMargin, range.to)
+      startText = state.sliceDoc(range.from, range.from + SearchMargin)
+      endText = state.sliceDoc(range.to - SearchMargin, range.to)
     }
     let startSpace = /^\s*/.exec(startText)![0].length, endSpace = /\s*$/.exec(endText)![0].length
     let endOff = endText.length - endSpace - this.close.length

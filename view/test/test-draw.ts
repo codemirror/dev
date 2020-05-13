@@ -25,7 +25,7 @@ describe("EditorView drawing", () => {
     ist(domText(cm), "one\ntwo")
     cm.dispatch(cm.state.update({changes: {from: 1, to: 2, insert: "x"}}))
     ist(domText(cm), "oxe\ntwo")
-    cm.dispatch(cm.state.update({changes: {from: 2, to: 5, insert: ["1", "2", "3"]}}))
+    cm.dispatch(cm.state.update({changes: {from: 2, to: 5, insert: "1\n2\n3"}}))
     ist(domText(cm), "ox1\n2\n3wo")
     cm.dispatch(cm.state.update({changes: {from: 1, to: 8}}))
     ist(domText(cm), "oo")

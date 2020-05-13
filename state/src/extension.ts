@@ -83,7 +83,7 @@ export class IndentContext {
   /// Get the text directly after `pos`, either the entire line
   /// or the next 100 characters, whichever is shorter.
   textAfterPos(pos: number) {
-    return this.state.doc.slice(pos, Math.min(pos + 100, this.state.doc.lineAt(pos).end)).match(/^\s*(.*)/)![1]
+    return this.state.sliceDoc(pos, Math.min(pos + 100, this.state.doc.lineAt(pos).end)).match(/^\s*(.*)/)![1]
   }
 
   /// find the column position (taking tabs into account) of the given

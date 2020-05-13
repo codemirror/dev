@@ -137,7 +137,7 @@ function matchMarkedBrackets(_state: EditorState, _pos: number, dir: -1 | 1, tok
 
 function matchPlainBrackets(state: EditorState, pos: number, dir: number, tree: Tree,
                             tokenType: NodeType, maxScanDistance: number, brackets: string) {
-  let startCh = dir < 0 ? state.doc.slice(pos - 1, pos) : state.doc.slice(pos, pos + 1)
+  let startCh = dir < 0 ? state.sliceDoc(pos - 1, pos) : state.sliceDoc(pos, pos + 1)
   let bracket = brackets.indexOf(startCh)
   if (bracket < 0 || (bracket % 2 == 0) != (dir > 0)) return null
 

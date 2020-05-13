@@ -65,7 +65,7 @@ describe("HeightMap", () => {
   it("updates the length of replaced decorations for changes", () => {
     let text = doc(20)
     let map = mk(text, [Decoration.replace({}).range(5, 15)])
-    map = map.applyChanges([Decoration.set(Decoration.replace({}).range(5, 10))], text, o(text.replace(7, 12, [""])),
+    map = map.applyChanges([Decoration.set(Decoration.replace({}).range(5, 10))], text, o(text.replace(7, 12, Text.empty)),
                            [new ChangedRange(7, 12, 7, 7)])
     ist(map.toString(), "line(15-5)")
   })
@@ -105,7 +105,7 @@ describe("HeightMap", () => {
                         Decoration.replace({widget: new MyWidget(20), block: true}).range(2, 2),
                         Decoration.widget({widget: new MyWidget(30), side: 1, block: true}).range(3)])
     ist(map.toString(), "gap(0) block(0)-line(0) block(0) line(0)-block(0) gap(0)")
-    map = map.applyChanges([], text, o(text.replace(1, 3, ["y"])), [new ChangedRange(1, 3, 1, 2)])
+    map = map.applyChanges([], text, o(text.replace(1, 3, Text.of(["y"]))), [new ChangedRange(1, 3, 1, 2)])
     ist(map.toString(), "gap(3)")
   })
 
@@ -113,7 +113,7 @@ describe("HeightMap", () => {
     let text = doc(10, 10, 10, 10)
     let map = mk(text, [Decoration.replace({}).range(16, 27)])
     ist(map.toString(), "gap(10) line(21-11) gap(10)")
-    map = map.applyChanges([], text, o(text.replace(5, 38, ["yyy"])), [new ChangedRange(5, 38, 5, 8)])
+    map = map.applyChanges([], text, o(text.replace(5, 38, Text.of(["yyy"]))), [new ChangedRange(5, 38, 5, 8)])
     ist(map.toString(), "gap(13)")
   })
 
@@ -125,7 +125,7 @@ describe("HeightMap", () => {
     map = map.applyChanges([
       Decoration.set([Decoration.replace({}).range(2, 5),
                       Decoration.widget({widget: new MyWidget(20)}).range(12)])
-    ], text, o(text.replace(10, 22, [""])), [new ChangedRange(10, 22, 10, 10)])
+    ], text, o(text.replace(10, 22, Text.empty)), [new ChangedRange(10, 22, 10, 10)])
     ist(map.toString(), "line(20-3:20)")
   })
 
@@ -158,12 +158,12 @@ describe("HeightMap", () => {
     ist(map.height, 1500)
     ist(map.size, 100)
     ist(depth(map), 9, "<")
-    let text2 = text.replace(0, 31 * 80, [""])
+    let text2 = text.replace(0, 31 * 80, Text.empty)
     map = map.applyChanges([], text, o(text2), [new ChangedRange(0, 31 * 80, 0, 0)])
     ist(map.size, 20)
     ist(depth(map), 7, "<")
     let len = text2.length
-    let text3 = text2.replace(len, len, "\nfoo".repeat(200).split("\n"))
+    let text3 = text2.replace(len, len, Text.of("\nfoo".repeat(200).split("\n")))
     map = map.applyChanges([], text2, o(text3), [new ChangedRange(len, len, len, len + 800)])
     map = map.updateHeight(oracle.setDoc(text3), 0, false, new MeasuredHeights(len + 1, new Array(200).fill(10)))
     ist(map.size, 220)
@@ -174,7 +174,7 @@ describe("HeightMap", () => {
     let text = doc(3, 3, 3), oracle = o(text)
     let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10]))
     ist(map.size, 3)
-    let text2 = text.replace(3, 3, ["", ""])
+    let text2 = text.replace(3, 3, Text.of(["", ""]))
     map = map.applyChanges([], text, oracle.setDoc(text2), [new ChangedRange(3, 3, 3, 4)])
       .updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10, 10]))
     ist(map.size, 4)
@@ -184,7 +184,7 @@ describe("HeightMap", () => {
   it("can handle insertion in the middle of a line", () => {
     let text = doc(3, 3, 3), oracle = o(text)
     let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, [10, 10, 10]))
-    let text2 = text.replace(5, 5, ["foo", "bar", "baz", "bug"])
+    let text2 = text.replace(5, 5, Text.of(["foo", "bar", "baz", "bug"]))
     map = map.applyChanges([], text, o(text2), [new ChangedRange(5, 5, 5, 20)])
       .updateHeight(o(text2), 0, false, new MeasuredHeights(0, [10, 10, 10, 10, 10, 10]))
     ist(map.size, 6)

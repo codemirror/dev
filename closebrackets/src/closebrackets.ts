@@ -96,12 +96,12 @@ export function handleInsertion(state: EditorState, ch: string): Transaction | n
 }
 
 function nextChar(doc: Text, pos: number) {
-  let next = doc.slice(pos, pos + 2)
+  let next = doc.sliceString(pos, pos + 2)
   return next.length == 2 && codePointAt(next, 0) < minPairCodePoint ? next.slice(0, 1) : next
 }
 
 function prevChar(doc: Text, pos: number) {
-  let prev = doc.slice(pos - 2, pos)
+  let prev = doc.sliceString(pos - 2, pos)
   return prev.length == 2 && codePointAt(prev, 0) < minPairCodePoint ? prev.slice(1) : prev
 }
 
@@ -141,15 +141,15 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
         return {changes: {insert: token + token, from: pos},
                 range: new SelectionRange(pos + token.length)}
       } else {
-        let isTriple = allowTriple && state.doc.slice(pos, pos + token.length * 3) == token + token + token
+        let isTriple = allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token
         return {range: new SelectionRange(pos + token.length * (isTriple ? 3 : 1))}
       }
-    } else if (allowTriple && state.doc.slice(pos - 2 * token.length, pos) == token + token &&
+    } else if (allowTriple && state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
                nodeStart(state, pos - 2 * token.length)) {
       return {changes: {insert: token + token + token + token, from: pos},
               range: new SelectionRange(pos + token.length)}
     } else if (!isWordChar(next)) {
-      let prev = state.doc.slice(pos - 1, pos)
+      let prev = state.sliceDoc(pos - 1, pos)
       if (!isWordChar(prev) && prev != token)
         return {changes: {insert: token + token, from: pos},
                 range: new SelectionRange(pos + token.length)}

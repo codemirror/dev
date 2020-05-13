@@ -1,4 +1,4 @@
-import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "@codemirror/next/state"
+import {Text, EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "@codemirror/next/state"
 import {EditorView, Command} from "@codemirror/next/view"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -144,7 +144,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
   let changes = state.changeByRange(({from, to}) => {
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
-    return {changes: {from, to, insert: ["", space(indent)]},
+    return {changes: {from, to, insert: Text.of(["", space(indent)])},
             range: new SelectionRange(from + 1 + indent)}
   })
   dispatch(state.update(changes, {scrollIntoView: true}))
@@ -166,7 +166,7 @@ export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
         lastLine = start
         let indent = getIndentation(context, start), current
         if (indent > -1 &&
-            indent != (current = /^\s*/.exec(state.doc.slice(start, Math.min(end, start + 100)))![0].length)) {
+            indent != (current = /^\s*/.exec(state.sliceDoc(start, Math.min(end, start + 100)))![0].length)) {
           updated[start] = indent
           changes.push({from: start, to: start + current, insert: space(indent)})
         }

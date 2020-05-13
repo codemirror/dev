@@ -95,7 +95,7 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
   if (context == null) {
     for (let pos = start;; pos += dir) {
       if (dir < 0 && pos == 0 || dir > 0 && pos == doc.length) return pos
-      if (!isExtendingChar((dir < 0 ? doc.slice(pos - 1, pos) : doc.slice(pos, pos + 1)).charCodeAt(0))) {
+      if (!isExtendingChar((dir < 0 ? doc.sliceString(pos - 1, pos) : doc.sliceString(pos, pos + 1)).charCodeAt(0))) {
         if (dir < 0) return pos - 1
         else if (pos != start) return pos
       }
@@ -126,7 +126,7 @@ function moveWord(view: EditorView, start: number, direction: "forward" | "backw
   for (let pos = start, i = 0;; i++) {
     let next = movePos(view, pos, direction, "character", "move")
     if (next == pos) return pos // End of document
-    if (doc.sliceLines(Math.min(next, pos), Math.max(next, pos)).length > 1) return next // Crossed a line boundary
+    if (doc.lineAt(Math.min(next, pos)).end < Math.max(next, pos)) return next // Crossed a line boundary
     let group = SelectionRange.groupAt(view.state, next, next > pos ? -1 : 1)
     let away = pos < group.from && pos > group.to
     // If the group is away from its start position, we jumped over a
@@ -134,7 +134,7 @@ function moveWord(view: EditorView, start: number, direction: "forward" | "backw
     // coordinates) to the start position
     let start = away ? pos < group.head : group.from == pos ? false : group.to == pos ? true : next < pos
     pos = start ? group.from : group.to
-    if (i > 0 || /\S/.test(doc.slice(group.from, group.to))) return pos
+    if (i > 0 || /\S/.test(doc.sliceString(group.from, group.to))) return pos
     next = Math.max(0, Math.min(doc.length, pos + (start ? -1 : 1)))
   }
 }
@@ -171,7 +171,7 @@ export class LineContext {
 
   // FIXME limit the amount of work in character motion in non-bidi
   // context? or not worth it?
-  prepareForQuery(view: EditorView, pos: number) {
+  prepareForQuery(_view: EditorView, pos: number) {
     let linesToSync: LineView[] = [], atWidget = false
     function maybeHide(view: InlineView) {
       if (!(view instanceof TextView)) atWidget = true
@@ -205,7 +205,7 @@ export class LineContext {
     return {lines: linesToSync, atWidget}
   }
 
-  undoQueryPreparation(view: EditorView, toSync: {lines: LineView[]}) {
+  undoQueryPreparation(_view: EditorView, toSync: {lines: LineView[]}) {
     for (let line of toSync.lines) { line.dirty = Dirty.Node; line.sync(); line.dirty = Dirty.Not }
   }
 }

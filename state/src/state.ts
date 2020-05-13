@@ -1,5 +1,5 @@
 import {Text} from "@codemirror/next/text"
-import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit, textLength} from "./change"
+import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionFlag,
@@ -99,11 +99,10 @@ export class EditorState {
     return tr
   }
 
-  replaceSelection(text: string | readonly string[]): StrictTransactionSpec {
-    if (typeof text == "string") text = this.splitLines(text)
-    let length = textLength(text)
+  replaceSelection(text: string | Text): StrictTransactionSpec {
+    if (typeof text == "string") text = this.toText(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
-                                         range: new SelectionRange(range.from + length)}))
+                                         range: new SelectionRange(range.from + text.length)}))
   }
 
   changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): StrictTransactionSpec {
@@ -140,13 +139,16 @@ export class EditorState {
     return ChangeSet.of(spec, this.doc.length, this.facet(EditorState.lineSeparator))
   }
 
-  /// Join an array of lines using the state's [line
-  /// separator](#state.EditorState^lineSeparator).
-  joinLines(text: readonly string[]): string { return text.join(this.facet(EditorState.lineSeparator) || "\n") }
-
   /// Split a string into lines using the state's [line
   /// separator](#state.EditorState^lineSeparator).
-  splitLines(text: string): string[] { return text.split(this.facet(EditorState.lineSeparator) || DefaultSplit) }
+  toText(string: string): Text {
+    return Text.of(string.split(this.facet(EditorState.lineSeparator) || DefaultSplit))
+  }
+
+  /// Return the given range of the document as a string.
+  sliceDoc(from = 0, to = this.doc.length) {
+    return this.doc.sliceString(from, to, this.facet(EditorState.lineSeparator) || "\n")
+  }
 
   /// Get the value of a state [facet](#state.Facet).
   facet<Output>(facet: Facet<any, Output>): Output {
@@ -160,7 +162,7 @@ export class EditorState {
   toJSON(): any {
     // FIXME plugin state serialization
     return {
-      doc: this.joinLines(this.doc.sliceLines(0, this.doc.length)),
+      doc: this.sliceDoc(),
       selection: this.selection.toJSON()
     }
   }

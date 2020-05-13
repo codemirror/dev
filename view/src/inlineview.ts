@@ -1,7 +1,7 @@
+import {Text} from "@codemirror/next/text"
 import {ContentView, DOMPos} from "./contentview"
 import {WidgetType} from "./decoration"
 import {attrsEq} from "./attributes"
-import {Text} from "@codemirror/next/text"
 import {Rect} from "./dom"
 import browser from "./browser"
 import {Open} from "./buildview"
@@ -10,7 +10,7 @@ const none: any[] = []
 
 export abstract class InlineView extends ContentView {
   abstract merge(from: number, to?: number, source?: InlineView | null): boolean
-  match(other: InlineView) { return false }
+  match(_other: InlineView) { return false }
   get children() { return none }
   abstract slice(from: number, to?: number): InlineView
   getSide() { return 0 }
@@ -85,7 +85,7 @@ export class TextView extends InlineView {
 
   domAtPos(pos: number) { return new DOMPos(this.textDOM!, pos) }
 
-  domBoundsAround(from: number, to: number, offset: number) {
+  domBoundsAround(_from: number, _to: number, offset: number) {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
   }
 
@@ -161,12 +161,12 @@ export class WidgetView extends InlineView {
   ignoreMutation(): boolean { return true }
   ignoreEvent(event: Event): boolean { return this.widget.ignoreEvent(event) }
 
-  get overrideDOMText(): readonly string[] | null {
-    if (this.length == 0) return [""]
+  get overrideDOMText(): Text | null {
+    if (this.length == 0) return Text.empty
     let top: ContentView = this
     while (top.parent) top = top.parent
     let view = (top as any).editorView, text: Text | undefined = view && view.state.doc, start = this.posAtStart
-    return text ? text.sliceLines(start, start + this.length) : [""]
+    return text ? text.slice(start, start + this.length) : Text.empty
   }
 
   domAtPos(pos: number) {

@@ -97,7 +97,7 @@ class DocStream implements InputStream {
   read(from: number, to: number) {
     let stringStart = this.cursorPos - this.string.length
     if (from < stringStart || to >= this.cursorPos)
-      return this.doc.slice(from, to)
+      return this.doc.sliceString(from, to)
     else
       return this.string.slice(from - stringStart, to - stringStart)
   }
