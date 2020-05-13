@@ -145,17 +145,17 @@ describe("EditorState", () => {
     })
 
     it("can split changes", () => {
-      // Only allows changes in the middle third of the document
+      // Disallows changes in the middle third of the document
       let state = EditorState.create({extensions: [
         EditorState.changeFilter.of((_tr, state) => [Math.floor(state.doc.length / 3), Math.floor(2 * state.doc.length / 3)])
       ], doc: "onetwo"})
-      ist(state.update({changes: {from: 0, to: 6}}).state.doc.toString(), "onwo")
+      ist(state.update({changes: {from: 0, to: 6}}).state.doc.toString(), "et")
     })
 
     it("combines filter masks", () => {
       let state = EditorState.create({extensions: [
-        EditorState.changeFilter.of(() => [0, 4]),
-        EditorState.changeFilter.of(() => [2, 6])
+        EditorState.changeFilter.of(() => [0, 2]),
+        EditorState.changeFilter.of(() => [4, 6])
       ], doc: "onetwo"})
       ist(state.update({changes: {from: 0, to: 6}}).state.doc.toString(), "onwo")
     })

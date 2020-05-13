@@ -315,14 +315,17 @@ export class EditorState {
   static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 
   /// Facet used to register change filters, which are called for each
-  /// change applied in a transaction, and can modify those changes.
-  /// Such a function should return null to indicate that it doesn't
-  /// want to do anything about the given change, or an array of
-  /// replacement changes.
+  /// transaction (unless explicitly
+  /// [disabled](#state.TransactionSpec.filter)), and can suppress
+  /// part of the transaction's changes.
   ///
-  /// Change filters are called from lower to higher precedence. When
-  /// a change is replaced by a given filter, only filters with higher
-  /// precedence are called on the newly produced changes.
+  /// Such a function can return `true` to indicate that it doesn't
+  /// want to do anything, `false` to completely stop the changes in
+  /// the transaction, or a set of ranges in which changes should be
+  /// suppressed. Such ranges are represented as an array of numbers,
+  /// with each pair of two number indicating the start and end of a
+  /// range. So for example `[10, 20, 100, 110]` suppresses changes
+  /// between 10 and 20, and between 100 and 110.
   static changeFilter = changeFilter
 
   /// Facet used to register a hook that gets a chance to update or

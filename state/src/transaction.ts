@@ -199,20 +199,6 @@ export class Transaction {
   static addToHistory = Annotation.define<boolean>()
 }
 
-function intersectRanges(a: readonly number[], b: readonly number[]) {
-  let result = []
-  for (let iA = 0, iB = 0; iA < a.length;) {
-    let fromA = a[iA++], toA = a[iA++]
-    while (iB < b.length) {
-      let fromB = b[iB], toB = b[iB + 1]
-      if (fromB < toA && toB > fromA) result.push(Math.max(fromA, fromB), Math.min(toA, toB))
-      if (toB >= toA) break
-      iB += 2
-    }
-  }
-  return result
-}
-
 export class ResolvedTransactionSpec implements StrictTransactionSpec {
   constructor(readonly changes: ChangeSet,
               readonly selection: EditorSelection | undefined,
@@ -261,12 +247,11 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
 
   filterChanges(state: EditorState) {
     if (!this.filter) return this
-    // FIXME appending changes
     let result: boolean | readonly number[] = true
     for (let filter of state.facet(changeFilter)) {
       let value = filter(this, state)
       if (value === false) { result = false; break }
-      if (Array.isArray(value)) result = result === true ? value : intersectRanges(result, value)
+      if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
     }
     if (result === true) return this
     let changes, back
@@ -308,6 +293,18 @@ function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
     if (mapped) result.push(effect)
   }
   return result
+}
+
+function joinRanges(a: readonly number[], b: readonly number[]) {
+  let result = []
+  for (let iA = 0, iB = 0;;) {
+    let from, to
+    if (iA < a.length && (iB == b.length || b[iB] >= a[iA])) { from = a[iA++]; to = a[iA++] }
+    else if (iB < b.length) { from = b[iB++]; to = b[iB++] }
+    else return result
+    if (!result.length || result[result.length - 1] < from) result.push(from, to)
+    else if (result[result.length - 1] < to) result[result.length - 1] = to
+  }
 }
 
 const none: readonly any[] = []

@@ -191,7 +191,6 @@ export class ChangeSet extends ChangeDesc {
   /// @internal
   constructor(
     sections: readonly number[],
-    // FIXME represent this as Text instances?
     /// @internal
     readonly inserted: readonly Text[]
   ) {
@@ -263,8 +262,10 @@ export class ChangeSet extends ChangeDesc {
       while (pos < next || pos == next && iter.len == 0) {
         if (iter.done) break done
         let len = Math.min(iter.len, next - pos)
-        addSection(resultSections, len, -1)
-        addSection(filteredSections, len, iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0)
+        addSection(filteredSections, len, -1)
+        let ins = iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0
+        addSection(resultSections, len, ins)
+        if (ins > 0) addInsert(resultInserted, resultSections, iter.text)
         iter.forward(len)
         pos += len
       }
@@ -272,10 +273,8 @@ export class ChangeSet extends ChangeDesc {
       while (pos < end) {
         if (iter.done) break done
         let len = Math.min(iter.len, end - pos)
-        addSection(filteredSections, len, -1)
-        let ins = iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0
-        addSection(resultSections, len, ins)
-        if (ins > 0) addInsert(resultInserted, resultSections, iter.text)
+        addSection(resultSections, len, -1)
+        addSection(filteredSections, len, iter.ins == -1 ? -1 : iter.off == 0 ? iter.ins : 0)
         iter.forward(len)
         pos += len
       }
