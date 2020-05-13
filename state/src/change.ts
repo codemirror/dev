@@ -65,11 +65,15 @@ export class ChangeDesc {
   /// Iterate over the ranges changed by these changes. (See
   /// [`ChangeSet.iterChanges`](#state.ChangeSet.iterChanges) for a
   /// variant that also provides you with the inserted text.)
+  ///
+  /// When `individual` is true, adjacent changes (which are kept
+  /// separate for [position mapping](#state.ChangeDesc.mapPos)) are
+  /// reported separately.
   iterChangedRanges(f: (fromA: number, toA: number, fromB: number, toB: number) => void, individual = false) {
     iterChanges(this, f, individual)
   }
 
-  /// Get the inverted form of thes changes.
+  /// Get a description of the inverted form of these changes.
   get invertedDesc() {
     let sections = []
     for (let i = 0; i < this.sections.length;) {
@@ -241,6 +245,12 @@ export class ChangeSet extends ChangeDesc {
   /// applied to the document produced by applying `other`. When
   /// `before` is `true`, order changes as if `this` comes before
   /// `other`, otherwise (the default) treat `other` as coming first.
+  ///
+  /// Given two changes `A` and `B`, `A.compose(B.map(A))` and
+  /// `B.compose(A.map(B, true))` will produce the same document. This
+  /// provides a basic form of [operational
+  /// transformation](https://en.wikipedia.org/wiki/Operational_transformation),
+  /// and can be used for collaborative editing.
   map(other: ChangeDesc, before = false): ChangeSet { return other.empty ? this : mapSet(this, other, before, true) }
 
   /// Iterate over the changed ranges in the document, calling `f` for

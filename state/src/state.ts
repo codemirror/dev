@@ -332,9 +332,9 @@ export class EditorState {
   /// replace transaction specs before they are applied. This will
   /// only be applied for transactions that don't have
   /// [`filter`](#state.TransactionSpec.filter) set to `false`. You
-  /// can either return a single new spec, or an array of specs (which
-  /// will be combined in the same way as the arguments to
-  /// [`EditorState.update`](#state.EditorState.update)).
+  /// can either return a single spec (possibly the input spec), or an
+  /// array of specs (which will be combined in the same way as the
+  /// arguments to [`EditorState.update`](#state.EditorState.update)).
   ///
   /// (This functionality should be used with care. Indiscriminately
   /// modifying transaction is likely to break something or degrade
