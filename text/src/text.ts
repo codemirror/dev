@@ -62,7 +62,6 @@ export abstract class Text {
   /// Replace a range of the text with the given lines. `text` should
   /// have a length of at least one.
   replace(from: number, to: number, text: Text): Text {
-    // FIXME optimize small-change-in-deep-doc case
     let parts: Text[] = []
     this.decompose(0, from, parts)
     parts.push(text)
@@ -174,6 +173,12 @@ class TextLeaf extends Text {
 
   firstLineLength(): number { return this.text[0].length }
 
+  replace(from: number, to: number, text: Text): Text {
+    let newLen = this.length + text.length - (to - from)
+    if (newLen >= Tree.MaxLeaf || !(text instanceof TextLeaf)) return super.replace(from, to, text)
+    return new TextLeaf(appendText(this.text, appendText(text.text, sliceText(this.text, 0, from)), to), newLen)
+  }
+
   sliceString(from: number, to = this.length, lineSep = "\n") {
     return sliceText(this.text, from, to).join(lineSep)
   }
@@ -273,6 +278,28 @@ class TextNode extends Text {
   }
 
   firstLineLength(): number { return this.lineLengthFrom(0) }
+
+  replace(from: number, to: number, text: Text): Text {
+    // Looks like a small change, try to optimize
+    if (text.length < Tree.BaseLeaf && to - from < Tree.BaseLeaf) {
+      let lengthDiff = text.length - (to - from)
+      for (let i = 0, pos = 0; i < this.children.length; i++) {
+        let child = this.children[i], end = pos + child.length
+        // Fast path: if the change only affects one child and the
+        // child's size remains in the acceptable range, only update
+        // that child
+        if (from >= pos && to <= end &&
+            child.length + lengthDiff < (this.length + lengthDiff) >> (Tree.BranchShift - 1) &&
+            child.length + lengthDiff > 0) {
+          let copy = this.children.slice()
+          copy[i] = child.replace(from - pos, to - pos, text)
+          return new TextNode(copy, this.length + lengthDiff)
+        }
+        pos = end
+      }
+    }
+    return super.replace(from, to, text)
+  }
 
   sliceString(from: number, to = this.length, lineSep = "\n") {
     let result = ""
