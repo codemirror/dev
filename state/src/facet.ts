@@ -31,7 +31,7 @@ export type FacetConfig<Input, Output> = {
 /// Examples of facets are the theme styles associated with an editor
 /// (which are all stored) or the tab size (which is reduced to a
 /// single value, using the input with the hightest precedence).
-export class Facet<Input, Output> {
+export class Facet<Input, Output = readonly Input[]> {
   /// @internal
   readonly id = nextID++
   /// @internal
