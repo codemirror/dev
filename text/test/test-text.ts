@@ -10,6 +10,15 @@ const lines = new Array(200).fill(line), text0 = lines.join("\n")
 const doc0 = Text.of(lines)
 
 describe("doc", () => {
+  it("handles basic replacement", () => {
+    let doc = Text.of(["one", "two", "three"])
+    ist(doc.replace(2, 5, Text.of(["foo", "bar"])).toString(), "onfoo\nbarwo\nthree")
+  })
+
+  it("can append documents", () => {
+    ist(Text.of(["one", "two", "three"]).append(Text.of(["!", "ok"])).toString(), "one\ntwo\nthree!\nok")
+  })
+
   it("creates a balanced tree when loading a document", () => {
     let doc = Text.of(new Array(2000).fill(line)), d = depth(doc)
     ist(d, 3, "<=")
@@ -19,36 +28,36 @@ describe("doc", () => {
   it("rebalances on insert", () => {
     let doc = doc0
     let insert = "abc".repeat(200), at = Math.floor(doc.length / 2)
-    for (let i = 0; i < 10; i++) doc = doc.replace(at, at, [insert])
+    for (let i = 0; i < 10; i++) doc = doc.replace(at, at, Text.of([insert]))
     ist(depth(doc), 3, "<=")
     ist(doc.toString(), text0.slice(0, at) + "abc".repeat(2000) + text0.slice(at))
   })
 
   it("collapses on delete", () => {
-    let doc = doc0.replace(10, text0.length - 10, [""])
+    let doc = doc0.replace(10, text0.length - 10, Text.empty)
     ist(depth(doc), 0)
     ist(doc.length, 20)
     ist(doc.toString(), line.slice(0, 20))
   })
 
   it("handles deleting at start", () => {
-    ist(Text.of(lines.slice(0, -1).concat([line + "!"])).replace(0, 9500, [""]).toString(), text0.slice(9500) + "!")
+    ist(Text.of(lines.slice(0, -1).concat([line + "!"])).replace(0, 9500, Text.empty).toString(), text0.slice(9500) + "!")
   })
 
   it("handles deleting at end", () => {
-    ist(Text.of(["?" + line].concat(lines.slice(1))).replace(9500, text0.length + 1, [""]).toString(), "?" + text0.slice(0, 9499))
+    ist(Text.of(["?" + line].concat(lines.slice(1))).replace(9500, text0.length + 1, Text.empty).toString(), "?" + text0.slice(0, 9499))
   })
 
   it("can insert on node boundaries", () => {
     let doc = doc0, pos = doc.children![0].length
-    ist(doc.replace(pos, pos, ["abc"]).slice(pos, pos + 3), "abc")
+    ist(doc.replace(pos, pos, Text.of(["abc"])).slice(pos, pos + 3).toString(), "abc")
   })
 
   it("can build up a doc by repeated appending", () => {
     let doc = Text.of([""]), text = ""
     for (let i = 1; i < 1000; ++i) {
       let add = "newtext" + i + " "
-      doc = doc.replace(doc.length, doc.length, [add])
+      doc = doc.replace(doc.length, doc.length, Text.of([add]))
       text += add
     }
     ist(doc.toString(), text)
@@ -60,11 +69,11 @@ describe("doc", () => {
       let insPos = Math.floor(Math.random() * doc.length)
       let insChar = String.fromCharCode("A".charCodeAt(0) + Math.floor(Math.random() * 26))
       str = str.slice(0, insPos) + insChar + str.slice(insPos)
-      doc = doc.replace(insPos, insPos, [insChar])
+      doc = doc.replace(insPos, insPos, Text.of([insChar]))
       let delFrom = Math.floor(Math.random() * doc.length)
       let delTo = Math.min(doc.length, delFrom + Math.floor(Math.random() * 20))
       str = str.slice(0, delFrom) + str.slice(delTo)
-      doc = doc.replace(delFrom, delTo, [""])
+      doc = doc.replace(delFrom, delTo, Text.empty)
     }
     ist(doc.toString(), str)
   })
@@ -77,7 +86,7 @@ describe("doc", () => {
     for (let i = 0; i < 400; i++) {
       let start = i == 0 ? 0 : Math.floor(Math.random() * doc.length)
       let end = i == 399 ? doc.length : start + Math.floor(Math.random() * (doc.length - start))
-      ist(doc.slice(start, end, "\n"), str.slice(start, end))
+      ist(doc.slice(start, end).toString(), str.slice(start, end))
     }
   })
 
@@ -86,12 +95,12 @@ describe("doc", () => {
     ist(doc.eq(doc))
     ist(doc.eq(doc2))
     ist(doc2.eq(doc))
-    ist(!doc.eq(doc2.replace(5000, 5000, ["y"])))
-    ist(!doc.eq(doc2.replace(5000, 5001, ["y"])))
+    ist(!doc.eq(doc2.replace(5000, 5000, Text.of(["y"]))))
+    ist(!doc.eq(doc2.replace(5000, 5001, Text.of(["y"]))))
   })
 
   it("can be compared despite different tree shape", () => {
-    ist(doc0.replace(100, 201, ["abc"]).eq(Text.of([line + "abc"].concat(lines.slice(2)))))
+    ist(doc0.replace(100, 201, Text.of(["abc"])).eq(Text.of([line + "abc"].concat(lines.slice(2)))))
   })
 
   it("can compare small documents", () => {
@@ -124,13 +133,13 @@ describe("doc", () => {
   it("is partially iterable", () => {
     let found = ""
     for (let iter = doc0.iterRange(500, doc0.length - 500); !iter.next().done;) found += iter.value
-    ist(JSON.stringify(found), JSON.stringify(text0.slice(500, text0.length - 500)))
+    ist(JSON.stringify(found), JSON.stringify(text0.slice(500, text0.length - 500).toString()))
   })
 
   it("is partially iterable in reverse", () => {
     let found = ""
     for (let iter = doc0.iterRange(doc0.length - 500, 500); !iter.next().done;) found = iter.value + found
-    ist(found, text0.slice(500, text0.length - 500))
+    ist(found, text0.slice(500, text0.length - 500).toString())
   })
 
   it("can partially iter over subsections at the start and end", () => {
@@ -192,6 +201,6 @@ describe("doc", () => {
   })
 
   it("can delete a range at the start of a child node", () => {
-    ist(doc0.replace(0, 100, ["x"]).toString(), "x" + text0.slice(100))
+    ist(doc0.replace(0, 100, Text.of(["x"])).toString(), "x" + text0.slice(100))
   })
 })

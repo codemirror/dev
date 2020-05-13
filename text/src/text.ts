@@ -61,27 +61,32 @@ export abstract class Text {
 
   /// Replace a range of the text with the given lines. `text` should
   /// have a length of at least one.
-  replace(from: number, to: number, text: readonly string[]): Text {
-    if (text.length == 0) throw new RangeError("An inserted range must have at least one line")
-    return this.replaceInner(from, to, text, textLength(text))
+  replace(from: number, to: number, text: Text): Text {
+    // FIXME optimize small-change-in-deep-doc case
+    let parts: Text[] = []
+    this.decompose(0, from, parts)
+    parts.push(text)
+    this.decompose(to, this.length, parts)
+    return TextNode.from(parts, this.length - (to - from) + text.length)
   }
 
-  /// @internal
-  abstract replaceInner(from: number, to: number, text: readonly string[], length: number): Text
+  /// Append another document to this one.
+  append(text: Text): Text {
+    return this.length == 0 ? text : text.length == 0 ? this : TextNode.from([this, text], this.length + text.length)
+  }
 
   /// Retrieve the lines between the given points.
-  sliceLines(from: number, to: number = this.length): readonly string[] {
-    return this.sliceTo(from, to, [""])
+  slice(from: number, to: number = this.length): Text {
+    let parts: Text[] = []
+    this.decompose(from, to, parts)
+    return TextNode.from(parts, to - from)
   }
+
+  /// Retrive a part of the document as a string
+  abstract sliceString(from: number, to?: number, lineSep?: string): string
 
   /// @internal
-  abstract sliceTo(from: number, to: number, target: string[]): string[]
-
-  /// Retrieve the text between the given points.
-  slice(from: number, to?: number, lineSeparator: string = "\n"): string {
-    if (from == to) return ""
-    return this.sliceLines(from, to).join(lineSeparator)
-  }
+  abstract flatten(target: string[]): void
 
   /// Test whether this text is equal to another instance.
   eq(other: Text): boolean { return this == other || eqContent(this, other) }
@@ -105,17 +110,14 @@ export abstract class Text {
   iterLines(from: number = 0): TextIterator { return new LineCursor(this, from) }
 
   /// @internal
-  abstract decomposeStart(to: number, target: Text[]): void
-  /// @internal
-  abstract decomposeEnd(from: number, target: Text[]): void
+  abstract decompose(from: number, to: number, target: Text[]): void
   /// @internal
   abstract lastLineLength(): number
   /// @internal
   abstract firstLineLength(): number
 
-  /// Flattens the document into a single string, using `"\n"` as line
-  /// separator.
-  toString() { return this.slice(0, this.length) }
+  /// @internal
+  toString() { return this.sliceString(0) }
 
   /// @internal
   protected constructor() {}
@@ -141,10 +143,10 @@ function cacheLine(text: Text, line: Line): Line {
 }
 
 // Leaves store an array of strings. There are always line breaks
-// between these strings (though not between adjacent leaves). These
-// are limited in length, so that bigger documents are constructed as
-// a tree structure. Long lines will be broken into a number of
-// single-line leaves.
+// between these strings (though not between adjacent Text nodes).
+// These are limited in length, so that bigger documents are
+// constructed as a tree structure. Long lines will be broken into a
+// number of single-line leaves.
 class TextLeaf extends Text {
   constructor(readonly text: readonly string[], readonly length: number = textLength(text)) {
     super()
@@ -153,14 +155,6 @@ class TextLeaf extends Text {
   get lines(): number { return this.text.length }
 
   get children() { return null }
-
-  replaceInner(from: number, to: number, text: readonly string[]): Text {
-    return Text.of(appendText(this.text, appendText(text, sliceText(this.text, 0, from)), to))
-  }
-
-  sliceTo(from: number, to: number = this.length, target: string[]): string[] {
-    return appendText(this.text, target, from, to)
-  }
 
   lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
     for (let i = 0;; i++) {
@@ -172,17 +166,22 @@ class TextLeaf extends Text {
     }
   }
 
-  decomposeStart(to: number, target: Text[]) {
-    target.push(new TextLeaf(sliceText(this.text, 0, to), to))
-  }
-
-  decomposeEnd(from: number, target: Text[]) {
-    target.push(new TextLeaf(sliceText(this.text, from), this.length - from))
+  decompose(from: number, to: number, target: Text[]) {
+    target.push(new TextLeaf(sliceText(this.text, from, to), Math.min(to, this.length) - Math.max(0, from)))
   }
 
   lastLineLength(): number { return this.text[this.text.length - 1].length }
 
   firstLineLength(): number { return this.text[0].length }
+
+  sliceString(from: number, to = this.length, lineSep = "\n") {
+    return sliceText(this.text, from, to).join(lineSep)
+  }
+
+  flatten(target: string[]) {
+    target[target.length - 1] += this.text[0]
+    for (let i = 1; i < this.text.length; i++) target.push(this.text[i])
+  }
 
   static split(text: readonly string[], target: Text[]): Text[] {
     let part = [], length = -1
@@ -220,51 +219,6 @@ class TextNode extends Text {
     for (let child of children) this.lines += child.lines - 1
   }
 
-  replaceInner(from: number, to: number, text: readonly string[], length: number): Text {
-    let lengthDiff = length - (to - from), newLength = this.length + lengthDiff
-    if (newLength <= Tree.BaseLeaf)
-      return new TextLeaf(appendText(this.sliceLines(to), appendText(text, this.sliceTo(0, from, [""]))), newLength)
-
-    let children
-    for (let i = 0, pos = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = pos + child.length
-      if (from >= pos && to <= end &&
-          (lengthDiff > 0
-           ? child.length + lengthDiff < Math.max(newLength >> (Tree.BranchShift - 1), Tree.MaxLeaf)
-           : child.length + lengthDiff > newLength >> (Tree.BranchShift + 1))) {
-        // Fast path: if the change only affects one child and the
-        // child's size remains in the acceptable range, only update
-        // that child
-        children = this.children.slice()
-        children[i] = child.replace(from - pos, to - pos, text)
-        return new TextNode(children, newLength)
-      } else if (end >= from) {
-        // Otherwise, we must build up a new array of children
-        if (children == null) children = this.children.slice(0, i)
-        if (pos < from) {
-          if (end == from) children.push(child)
-          else child.decomposeStart(from - pos, children)
-        }
-        if (pos <= from && end >= from) TextLeaf.split(text, children)
-        if (pos >= to) children.push(child)
-        else if (end > to) child.decomposeEnd(to - pos, children)
-      }
-      pos = end
-    }
-    return children ? TextNode.from(children, newLength) : this
-  }
-
-  sliceTo(from: number, to: number, target: string[]): string[] {
-    let pos = 0
-    for (let child of this.children) {
-      let end = pos + child.length
-      if (to > pos && from < end)
-        child.sliceTo(Math.max(0, from - pos), Math.min(child.length, to - pos), target)
-      pos = end
-    }
-    return target
-  }
-
   lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
     for (let i = 0;; i++) {
       let child = this.children[i], end = offset + child.length, endLine = line + child.lines - 1
@@ -285,25 +239,13 @@ class TextNode extends Text {
     }
   }
 
-  decomposeStart(to: number, target: Text[]) {
-    for (let i = 0, pos = 0;; i++) {
+  decompose(from: number, to: number, target: Text[]) {
+    for (let i = 0, pos = 0; pos < to && i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
-      if (end <= to) {
-        target.push(child)
-      } else {
-        if (pos < to) child.decomposeStart(to - pos, target)
-        break
+      if (from < end && to > pos) {
+        if (pos >= from && end <= to) target.push(child)
+        else child.decompose(from - pos, to - pos, target)
       }
-      pos = end
-    }
-  }
-
-  decomposeEnd(from: number, target: Text[]) {
-    let pos = 0
-    for (let child of this.children) {
-      let end = pos + child.length
-      if (pos >= from) target.push(child)
-      else if (end > from && pos < from) child.decomposeEnd(from - pos, target)
       pos = end
     }
   }
@@ -332,10 +274,25 @@ class TextNode extends Text {
 
   firstLineLength(): number { return this.lineLengthFrom(0) }
 
+  sliceString(from: number, to = this.length, lineSep = "\n") {
+    let result = ""
+    for (let i = 0, pos = 0; pos < to && i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length
+      if (from < end && to > pos) result += child.sliceString(from - pos, to - pos, lineSep)
+      pos = end
+    }
+    return result
+  }
+
+  flatten(target: string[]) {
+    for (let child of this.children) child.flatten(target)
+  }
+
   static from(children: Text[], length: number): Text {
+    if (!children.every(ch => ch instanceof Text)) throw new Error("NOP")
     if (length < Tree.MaxLeaf) {
       let text = [""]
-      for (let child of children) child.sliceTo(0, child.length, text)
+      for (let child of children) child.flatten(text)
       return new TextLeaf(text, length)
     }
 
@@ -343,6 +300,7 @@ class TextNode extends Text {
     let chunked: Text[] = [], currentLength = 0, currentChunk: Text[] = []
     function add(child: Text) {
       let childLength = child.length, last
+      if (!childLength) return
       if (childLength > maxLength && child instanceof TextNode) {
         for (let node of child.children) add(node)
       } else if (childLength > minLength && (currentLength > minLength || currentLength == 0)) {
