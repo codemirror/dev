@@ -1,9 +1,8 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Line} from "@codemirror/next/text"
 import {EditorState} from "./state"
-import {Transaction, StrictTransactionSpec} from "./transaction"
+import {Transaction, TransactionSpec, StrictTransactionSpec} from "./transaction"
 import {Facet} from "./facet"
-import {EditorSelection} from "./selection"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that
@@ -17,8 +16,8 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
 
 export const changeFilter = Facet.define<(tr: StrictTransactionSpec, state: EditorState) => boolean | readonly number[]>()
 
-export const selectionFilter = Facet.define<
-  (selection: EditorSelection, tr: StrictTransactionSpec, state: EditorState) => EditorSelection
+export const transactionFilter = Facet.define<
+  (tr: StrictTransactionSpec, state: EditorState) => TransactionSpec | readonly TransactionSpec[]
 >()
 
 /// A node prop that can be stored on a grammar's top node to

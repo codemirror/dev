@@ -2,7 +2,7 @@ import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
 import {EditorSelection} from "./selection"
 import {Extension, ExtensionMap} from "./facet"
-import {changeFilter} from "./extension"
+import {changeFilter, transactionFilter} from "./extension"
 
 /// Annotations are tagged values that are used to add metadata to
 /// transactions in an extensible way. They should be used to model
@@ -135,7 +135,10 @@ export class Transaction {
     private annotations: readonly Annotation<any>[],
     /// @internal
     readonly flags: number
-  ) {}
+  ) {
+    if (!this.annotations.some((a: Annotation<any>) => a.type == Transaction.time))
+      this.annotations = this.annotations.concat(Transaction.time.of(Date.now()))
+  }
 
   /// Get the value of the given annotation type, if any.
   annotation<T>(type: AnnotationType<T>): T | undefined {
@@ -202,8 +205,16 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
               readonly reconfigure: Extension | undefined,
               readonly replaceExtensions: ExtensionMap | undefined) {}
 
-  static create(state: EditorState, spec: TransactionSpec) {
-    if (spec instanceof ResolvedTransactionSpec) return spec
+  static create(state: EditorState, specs: TransactionSpec | readonly TransactionSpec[]): ResolvedTransactionSpec {
+    let spec: TransactionSpec
+    if (Array.isArray(specs)) {
+      if (specs.length) return specs.map(s => ResolvedTransactionSpec.create(state, s)).reduce((a, b) => a.combine(b))
+      spec = {}
+    } else if (specs instanceof ResolvedTransactionSpec) {
+      return specs
+    } else {
+      spec = specs as TransactionSpec
+    }
     let sel = spec.selection
     return new ResolvedTransactionSpec(
       spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
@@ -259,6 +270,15 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
       this.filter,
       this.reconfigure,
       this.replaceExtensions)
+  }
+
+  filterTransaction(state: EditorState) {
+    if (!this.filter) return this
+    let result: ResolvedTransactionSpec = this
+    let filters = state.facet(transactionFilter)
+    for (let i = filters.length - 1; i >= 0; i--)
+      result = ResolvedTransactionSpec.create(state, filters[i](result, state))
+    return result
   }
 }
 

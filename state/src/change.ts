@@ -284,9 +284,9 @@ export class ChangeSet extends ChangeDesc {
             filtered: new ChangeDesc(filteredSections)}
   }
 
-  /// @internal
-  // FIXME make public?
-  static of(changes: ChangeSpec, length: number, split?: string): ChangeSet {
+  /// Create a change set for the given changes, for a document of the
+  /// given length, using `lineSep` as line separator.
+  static of(changes: ChangeSpec, length: number, lineSep?: string): ChangeSet {
     let sections: number[] = [], inserted: (readonly string[])[] = [], pos = 0
     let total: ChangeSet | null = null
 
@@ -309,7 +309,7 @@ export class ChangeSet extends ChangeDesc {
         let {from, to = from, insert} = spec as {from: number, to?: number, insert?: string | readonly string[]}
         if (from > to || from < 0 || to > length)
           throw new RangeError(`Invalid change range ${from} to ${to} (in doc of length ${length})`)
-        let insText = !insert ? noText : Array.isArray(insert) ? insert : (insert as string).split(split || DefaultSplit)
+        let insText = !insert ? noText : Array.isArray(insert) ? insert : (insert as string).split(lineSep || DefaultSplit)
         let insLen = textLength(insText)
         if (from == to && insLen == 0) return
         if (from < pos) flush()

@@ -1,5 +1,6 @@
 import ist from "ist"
-import {EditorState, StateField, Facet, tagExtension, EditorSelection, SelectionRange, Annotation} from "@codemirror/next/state"
+import {EditorState, StateField, Facet, tagExtension,
+        EditorSelection, SelectionRange, Annotation, ChangeSet} from "@codemirror/next/state"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -142,14 +143,28 @@ describe("EditorState", () => {
     })
   })
 
-  describe("selectionFilter", () => {
+  describe("transactionFilter", () => {
     it("can constrain the selection", () => {
       let state = EditorState.create({
-        extensions: [EditorState.selectionFilter.of(sel => sel.primary.to < 4 ? sel : EditorSelection.single(4))],
+        extensions: EditorState.transactionFilter.of(tr => {
+          if (tr.selection && tr.selection.primary.to > 4) return [tr, {selection: {anchor: 4}}]
+          else return tr
+        }),
         doc: "one two"
       })
       ist(state.tr({selection: {anchor: 3}}).selection!.primary.to, 3)
       ist(state.tr({selection: {anchor: 7}}).selection!.primary.to, 4)
+    }),
+
+    it("can append changes", () => {
+      let state = EditorState.create({
+        extensions: EditorState.transactionFilter.of(tr => {
+          let len = tr.changes.newLength
+          return {...tr, changes: tr.changes.compose(ChangeSet.of({from: len, insert: "!"}, len))}
+        }),
+        doc: "one two"
+      })
+      ist(state.tr({changes: {from: 3, insert: ","}}).state.doc.toString(), "one, two!")
     })
   })
 })
