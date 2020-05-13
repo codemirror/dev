@@ -83,6 +83,7 @@ export class EditorSelection {
   /// Map a selection through a mapping. Mostly used to adjust the
   /// selection position for changes.
   map(mapping: ChangeDesc): EditorSelection {
+    if (mapping.empty) return this
     return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)
   }
 

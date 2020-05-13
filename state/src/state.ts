@@ -1,5 +1,5 @@
 import {Text} from "@codemirror/next/text"
-import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit} from "./change"
+import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionFlag,
@@ -146,13 +146,17 @@ export class EditorState {
     })
   }
 
+  /// Create a [change set](#state.ChangeSet) from the given change
+  /// description, taking the state's document length and line
+  /// separator into account.
   changes(spec: ChangeSpec = []) {
     if (spec instanceof ChangeSet) return spec
     return ChangeSet.of(spec, this.doc.length, this.facet(EditorState.lineSeparator))
   }
 
-  /// Split a string into lines using the state's [line
-  /// separator](#state.EditorState^lineSeparator).
+  /// Using the state's [line
+  /// separator](#state.EditorState^lineSeparator), create a
+  /// [`Text`](#text.Text) instance from the given string.
   toText(string: string): Text {
     return Text.of(string.split(this.facet(EditorState.lineSeparator) || DefaultSplit))
   }

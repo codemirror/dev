@@ -83,15 +83,34 @@ export class StateEffectType<Value> {
   of(value: Value): StateEffect<Value> { return new StateEffect(this, value) }
 }
 
+/// Describes a [transaction](#state.Transaction) when calling the
+/// [`EditorState.update`](#state.EditorState.update) method.
 export type TransactionSpec = {
+  /// The changes to the document made by this transaction.
   changes?: ChangeSpec
+  /// When set, this transaction explicitly updates the selection.
+  /// Offsets in this selection should refer to the document as it is
+  /// _after_ the transaction.
   selection?: EditorSelection | {anchor: number, head?: number},
+  /// Attach [state effects](#state.StateEffect) to this transaction.
   effects?: StateEffect<any> | readonly StateEffect<any>[],
+  /// Set [annotations](#state.Annotation) for this transaction.
   annotations?: Annotation<any> | readonly Annotation<any>[],
+  /// When set to `true`, the transaction is marked as needing to
+  /// scroll the current selection into view.
   scrollIntoView?: boolean,
+  /// By default, transactions can be modified by [change
+  /// filters](#state.EditorState.changeFilter) and [transaction
+  /// filters](#state.EditorState.transactionFilter). You can set this
+  /// to `false` to disable that.
   filter?: boolean,
+  /// When given, the state will be reconfigured to use a new set of
+  /// extensions instead of its old configuration.
   reconfigure?: Extension,
-  // FIXME note symbol index type nonsense
+  /// [Tagged extensions](#state.tagExtension) can be used to
+  /// partially configure a state by replacing specific parts of its
+  /// configuration. (Note that the keys in this object may also be
+  /// symbols, even though the TypeScript type can't express that.)
   replaceExtensions?: ExtensionMap
 }
 
@@ -127,14 +146,13 @@ export class Transaction {
     readonly startState: EditorState,
     /// The document changes made by this transaction.
     readonly changes: ChangeSet,
-    /// The selection set by this transaction, or null if it doesn't
-    /// explicitly set a selection.
+    /// The selection set by this transaction, or undefined if it
+    /// doesn't explicitly set a selection.
     readonly selection: EditorSelection | undefined,
     /// The effects added to the transaction.
     readonly effects: readonly StateEffect<any>[],
     private annotations: readonly Annotation<any>[],
-    /// @internal
-    readonly flags: number
+    private flags: number
   ) {
     if (!this.annotations.some((a: Annotation<any>) => a.type == Transaction.time))
       this.annotations = this.annotations.concat(Transaction.time.of(Date.now()))
