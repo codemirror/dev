@@ -124,6 +124,7 @@ export abstract class Text {
   /// Create a `Text` instance for the given array of lines.
   static of(text: readonly string[]): Text {
     if (text.length == 0) throw new RangeError("A document must have at least one line")
+    if (text.length == 1 && !text[0]) return Text.empty
     let length = textLength(text)
     return length < Tree.MaxLeaf ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
   }

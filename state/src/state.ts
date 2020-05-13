@@ -88,6 +88,19 @@ export class EditorState {
     return getAddr(this, addr)
   }
 
+  /// Create a [transaction](#state.Transaction) that updates this
+  /// state. Any number of [transaction specs](#state.TransactionSpec)
+  /// can be passed. The [changes](#state.TransactionSpec.changes) (if
+  /// any) of each spec are assumed to start in the _current_ document
+  /// (not the document produced by previous specs), and its
+  /// [selection](#state.TransactionSpec.selection) and
+  /// [effects](#state.TransactionSpec.effects) are assumed to refer
+  /// to the document created by its _own_ changes. The resulting
+  /// transaction contains the combined effect of all the different
+  /// specs. For things like
+  /// [selection](#state.TransactionSpec.selection) or
+  /// [reconfiguration](#state.TransactionSpec.reconfigure), later
+  /// specs take precedence over earlier ones.
   update(...specs: readonly TransactionSpec[]): Transaction {
     let spec = ResolvedTransactionSpec.create(this, specs).filterChanges(this).filterTransaction(this)
     if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
@@ -99,39 +112,38 @@ export class EditorState {
     return tr
   }
 
+  /// Create a [transaction spec](#state.StrictTransactionSpec) that
+  /// replaces every selection range with the given content.
   replaceSelection(text: string | Text): StrictTransactionSpec {
     if (typeof text == "string") text = this.toText(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
                                          range: new SelectionRange(range.from + text.length)}))
   }
 
+  /// Create a set of changes and a new selection by running the given
+  /// function for each range in the active selection. The function
+  /// can return an optional set of changes (in the coordinate space
+  /// of the start document), plus an updated range (in the coordinate
+  /// space of the document produced by the call's own changes). This
+  /// method will merge all the changes and ranges into a single
+  /// changeset and selection, and return it as a [transaction
+  /// spec](#state.StrictTransactionSpec), which can be passed to
+  /// [`update`](#state.EditorState.update).
   changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): StrictTransactionSpec {
     let sel = this.selection
-    if (sel.ranges.length == 1) {
-      let {changes, range} = f(sel.primary)
-      return ResolvedTransactionSpec.create(this, {changes, selection: EditorSelection.create([range])})
-    } else {
-      let allChanges: ChangeSet | undefined, changeSets = [], newRanges = []
-      for (let r of sel.ranges) {
-        let {changes, range} = f(r)
-        let resolved = changes && this.changes(changes)
-        if (resolved) allChanges = allChanges ? allChanges.compose(resolved.map(allChanges)) : resolved
-        newRanges.push(range)
-        changeSets.push(resolved)
-      }
-      // FIXME this cubic wrt change/range count
-      for (let i = 0; i < newRanges.length; i++) {
-        let others: ChangeDesc | undefined
-        for (let j = 0; j < changeSets.length; j++) if (j != i && changeSets[j])
-          others = others ? others.composeDesc(changeSets[j]!.mapDesc(others)) : changeSets[j]!.desc
-        if (others)
-          newRanges[i] = newRanges[i].map(changeSets[i] ? others.mapDesc(changeSets[i]!) : others)
-      }
-      return ResolvedTransactionSpec.create(this, {
-        changes: allChanges,
-        selection: EditorSelection.create(newRanges, sel.primaryIndex)
-      })
+    let result1 = f(sel.ranges[0])
+    let changes = this.changes(result1.changes), ranges = [result1.range]
+    for (let i = 1; i < sel.ranges.length; i++) {
+      let result = f(sel.ranges[i])
+      let newChanges = this.changes(result.changes), newMapped = newChanges.map(changes)
+      for (let j = 0; j < i; j++) ranges[j] = ranges[j].map(newMapped)
+      ranges.push(result.range.map(changes.mapDesc(newChanges, true)))
+      changes = changes.compose(newMapped)
     }
+    return ResolvedTransactionSpec.create(this, {
+      changes,
+      selection: EditorSelection.create(ranges, sel.primaryIndex)
+    })
   }
 
   changes(spec: ChangeSpec = []) {

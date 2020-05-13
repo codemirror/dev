@@ -106,6 +106,31 @@ describe("EditorState", () => {
     ist(state3.facet(facet).join(), "2,1")
   })
 
+  describe("changeByRange", () => {
+    it("can make simple changes", () => {
+      let state = EditorState.create({doc: "hi"})
+      state = state.update(state.changeByRange(r => ({changes: {from: r.from, to: r.from + 1, insert: "q"},
+                                                      range: new SelectionRange(r.from + 1)}))).state
+      ist(state.doc.toString(), "qi")
+      ist(state.selection.primary.from, 1)
+    })
+
+    it("does the right thing when there are multiple selections", () => {
+      let state = EditorState.create({
+        doc: "1 2 3 4",
+        selection: EditorSelection.create([new SelectionRange(0, 1),
+                                           new SelectionRange(2, 3),
+                                           new SelectionRange(4, 5),
+                                           new SelectionRange(6, 7)]),
+        extensions: EditorState.allowMultipleSelections.of(true)
+      })
+      state = state.update(state.changeByRange(r => ({changes: {from: r.from, to: r.to, insert: "-".repeat((r.from >> 1) + 1)},
+                                                      range: new SelectionRange(r.from, r.from + 1 + (r.from >> 1))}))).state
+      ist(state.doc.toString(), "- -- --- ----")
+      ist(state.selection.ranges.map(r => r.from + "-" + r.to).join(" "), "0-1 2-4 5-8 9-13")
+    })
+  })
+
   describe("changeFilter", () => {
     it("can cancel changes", () => {
       // Cancels all changes that add length
