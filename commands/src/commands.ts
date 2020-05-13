@@ -105,7 +105,7 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
     if (from == to) return {range}
     return {changes: {from, to}, range: new SelectionRange(from)}
   })
-  if (!changes.changes) return false
+  if (changes.changes.empty) return false
 
   view.dispatch(view.state.tr(changes, {scrollIntoView: true}))
   return true

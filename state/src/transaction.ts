@@ -89,9 +89,25 @@ export type TransactionSpec = {
   effects?: StateEffect<any> | readonly StateEffect<any>[],
   annotations?: Annotation<any> | readonly Annotation<any>[],
   scrollIntoView?: boolean,
+  filter?: boolean,
   reconfigure?: Extension,
   // FIXME note symbol index type nonsense
   replaceExtensions?: ExtensionMap
+}
+
+/// A [transactions spec](#state.TransactionSpec) with most of its
+/// fields narrowed down to more predictable types. This type is used
+/// to pass something more usable than a raw transaction spec to, for
+/// example, [change filters](#state.EditorState^changeFilter).
+export type StrictTransactionSpec = {
+  changes: ChangeSet,
+  selection: EditorSelection | undefined,
+  effects: readonly StateEffect<any>[],
+  annotations: readonly Annotation<any>[],
+  scrollIntoView: boolean,
+  filter: boolean,
+  reconfigure: Extension | undefined,
+  replaceExtensions: ExtensionMap | undefined
 }
 
 export const enum TransactionFlag { reconfigured = 1, scrollIntoView = 2 }
@@ -160,12 +176,6 @@ export class Transaction {
   /// Annotation indicating whether a transaction should be added to
   /// the undo history or not.
   static addToHistory = Annotation.define<boolean>()
-
-  /// Annotation that can be used to turn off [change
-  /// filters](#state.EditorChange^changeFilter) for this transaction.
-  /// When this isn't explicitly set to `false`, change filtering is
-  /// enabled.
-  static filterChanges = Annotation.define<boolean>()
 }
 
 function intersectRanges(a: readonly number[], b: readonly number[]) {
@@ -182,16 +192,18 @@ function intersectRanges(a: readonly number[], b: readonly number[]) {
   return result
 }
 
-export class ResolvedTransactionSpec {
+export class ResolvedTransactionSpec implements StrictTransactionSpec {
   constructor(readonly changes: ChangeSet,
               readonly selection: EditorSelection | undefined,
               readonly effects: readonly StateEffect<any>[],
               readonly annotations: readonly Annotation<any>[],
               readonly scrollIntoView: boolean,
+              readonly filter: boolean,
               readonly reconfigure: Extension | undefined,
               readonly replaceExtensions: ExtensionMap | undefined) {}
 
   static create(state: EditorState, spec: TransactionSpec) {
+    if (spec instanceof ResolvedTransactionSpec) return spec
     let sel = spec.selection
     return new ResolvedTransactionSpec(
       spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
@@ -199,6 +211,7 @@ export class ResolvedTransactionSpec {
       !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
       !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
       !!spec.scrollIntoView,
+      spec.filter !== false,
       spec.reconfigure,
       spec.replaceExtensions)
   }
@@ -212,15 +225,17 @@ export class ResolvedTransactionSpec {
       mapEffects(a.effects, changesB).concat(mapEffects(b.effects, changesA)),
       a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
       a.scrollIntoView || b.scrollIntoView,
+      a.filter && b.filter,
       b.reconfigure || a.reconfigure,
       b.replaceExtensions || (b.reconfigure ? undefined : a.replaceExtensions))
   }
 
   filterChanges(state: EditorState) {
+    if (!this.filter) return this
     // FIXME appending changes
     let result: boolean | readonly number[] = true
     for (let filter of state.facet(changeFilter)) {
-      let value = filter(this.changes, state)
+      let value = filter(this, state)
       if (value === false) { result = false; break }
       if (Array.isArray(value)) result = result === true ? value : intersectRanges(result, value)
     }
@@ -234,12 +249,14 @@ export class ResolvedTransactionSpec {
       changes = filtered.changes
       back = filtered.filtered.invertedDesc
     }
+
     return new ResolvedTransactionSpec(
       changes,
       this.selection && this.selection.map(back),
       mapEffects(this.effects, back),
       this.annotations,
       this.scrollIntoView,
+      this.filter,
       this.reconfigure,
       this.replaceExtensions)
   }

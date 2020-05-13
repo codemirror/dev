@@ -38,6 +38,10 @@ let newState = transaction.state
 
 @ChangeSet
 
+@TransactionSpec
+
+@StrictTransactionSpec
+
 @Transaction
 
 @Annotation

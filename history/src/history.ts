@@ -314,8 +314,8 @@ class HistoryState {
         changes: event.changes,
         selection: event.startSelection,
         effects: event.effects,
-        annotations: [fromHistory.of({side, rest}),
-                      Transaction.filterChanges.of(false)]
+        annotations: fromHistory.of({side, rest}),
+        filter: false
       })
     }
   }

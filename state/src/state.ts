@@ -2,7 +2,8 @@ import {Text} from "@codemirror/next/text"
 import {ChangeSet, ChangeDesc, ChangeSpec, DefaultSplit, textLength} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
-import {Transaction, TransactionFlag, TransactionSpec, ResolvedTransactionSpec} from "./transaction"
+import {Transaction, Annotation, TransactionFlag,
+        TransactionSpec, StrictTransactionSpec, ResolvedTransactionSpec} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData,
         changeFilter, selectionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
@@ -88,36 +89,37 @@ export class EditorState {
   }
 
   tr(...specs: readonly TransactionSpec[]): Transaction {
-    let spec = (specs.length ? specs : [{}]).map(s => ResolvedTransactionSpec.create(this, s)).reduce((a, b) => a.combine(b))
-    if (!spec.annotations.some(a => a.type == Transaction.filterChanges && a.value === false))
-      spec = spec.filterChanges(this)
+    let spec = (specs.length ? specs : [{}])
+      .map(s => ResolvedTransactionSpec.create(this, s))
+      .reduce((a, b) => a.combine(b))
+      .filterChanges(this)
     let annotations = spec.annotations
-    if (!annotations.some(a => a.type == Transaction.time))
+    if (!annotations.some((a: Annotation<any>) => a.type == Transaction.time))
       annotations = annotations.concat(Transaction.time.of(Date.now()))
     if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
     let reconf = spec.reconfigure || spec.replaceExtensions, conf = !reconf ? this.config
       : Configuration.resolve(spec.reconfigure || this.config.source, spec.replaceExtensions, this)
     let flags = (reconf ? TransactionFlag.reconfigured : 0) | (spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0)
     let selection = spec.selection
-    if (selection) for (let filter of this.facet(selectionFilter)) selection = filter(selection, this, spec.changes)
+    if (selection && spec.filter) for (let filter of this.facet(selectionFilter))
+      selection = filter(selection, spec, this)
     let tr = new Transaction(this, spec.changes, selection, spec.effects, annotations, flags)
     new EditorState(conf, spec.changes.apply(this.doc), selection || this.selection.map(spec.changes), tr)
     return tr
   }
 
-  replaceSelection(text: string | readonly string[]): TransactionSpec {
+  replaceSelection(text: string | readonly string[]): StrictTransactionSpec {
     if (typeof text == "string") text = this.splitLines(text)
     let length = textLength(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
                                          range: new SelectionRange(range.from + length)}))
   }
 
-  changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): TransactionSpec {
-    // FIXME this is not quite obvious and practical yet, revisit
+  changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): StrictTransactionSpec {
     let sel = this.selection
     if (sel.ranges.length == 1) {
       let {changes, range} = f(sel.primary)
-      return {changes, selection: EditorSelection.create([range])}
+      return ResolvedTransactionSpec.create(this, {changes, selection: EditorSelection.create([range])})
     } else {
       let allChanges: ChangeSet | undefined, changeSets = [], newRanges = []
       for (let r of sel.ranges) {
@@ -135,7 +137,10 @@ export class EditorState {
         if (others)
           newRanges[i] = newRanges[i].map(changeSets[i] ? others.mapDesc(changeSets[i]!) : others)
       }
-      return {changes: allChanges, selection: EditorSelection.create(newRanges, sel.primaryIndex)}
+      return ResolvedTransactionSpec.create(this, {
+        changes: allChanges,
+        selection: EditorSelection.create(newRanges, sel.primaryIndex)
+      })
     }
   }
 

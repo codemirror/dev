@@ -1,8 +1,7 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
 import {Line} from "@codemirror/next/text"
-import {ChangeSet} from "./change"
 import {EditorState} from "./state"
-import {Transaction} from "./transaction"
+import {Transaction, StrictTransactionSpec} from "./transaction"
 import {Facet} from "./facet"
 import {EditorSelection} from "./selection"
 
@@ -16,10 +15,11 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   static: true
 })
 
-export const changeFilter = Facet.define<(changes: ChangeSet, state: EditorState) => boolean | readonly number[]>()
+export const changeFilter = Facet.define<(tr: StrictTransactionSpec, state: EditorState) => boolean | readonly number[]>()
 
-export const selectionFilter = Facet.define<(selection: EditorSelection,
-                                             state: EditorState, changes: ChangeSet) => EditorSelection>()
+export const selectionFilter = Facet.define<
+  (selection: EditorSelection, tr: StrictTransactionSpec, state: EditorState) => EditorSelection
+>()
 
 /// A node prop that can be stored on a grammar's top node to
 /// associate information with the language. Different extension might

@@ -133,9 +133,9 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
     effects,
     annotations: [
       Transaction.addToHistory.of(false),
-      collabReceive.of(new CollabState(version, unconfirmed)),
-      Transaction.filterChanges.of(false)
-    ]
+      collabReceive.of(new CollabState(version, unconfirmed))
+    ],
+    filter: false
   })
 }
 

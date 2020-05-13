@@ -109,8 +109,9 @@ describe("EditorState", () => {
   describe("changeFilter", () => {
     it("can cancel changes", () => {
       // Cancels all changes that add length
-      let state = EditorState.create({extensions: [EditorState.changeFilter.of(change => change.newLength <= change.length)],
-                                      doc: "one two"})
+      let state = EditorState.create({extensions: [
+        EditorState.changeFilter.of(({changes}) => changes.newLength <= changes.length)
+      ], doc: "one two"})
       let tr1 = state.tr({changes: {from: 3, insert: " three"}, selection: {anchor: 13}})
       ist(tr1.state.doc.toString(), "one two")
       ist(tr1.state.selection.primary.head, 7)
@@ -121,7 +122,7 @@ describe("EditorState", () => {
     it("can split changes", () => {
       // Only allows changes in the middle third of the document
       let state = EditorState.create({extensions: [
-        EditorState.changeFilter.of((_ch, state) => [Math.floor(state.doc.length / 3), Math.floor(2 * state.doc.length / 3)])
+        EditorState.changeFilter.of((_tr, state) => [Math.floor(state.doc.length / 3), Math.floor(2 * state.doc.length / 3)])
       ], doc: "onetwo"})
       ist(state.tr({changes: {from: 0, to: 6}}).state.doc.toString(), "onwo")
     })
@@ -132,6 +133,12 @@ describe("EditorState", () => {
         EditorState.changeFilter.of(() => [2, 6])
       ], doc: "onetwo"})
       ist(state.tr({changes: {from: 0, to: 6}}).state.doc.toString(), "onwo")
+    })
+
+    it("can be turned off", () => {
+      let state = EditorState.create({extensions: [EditorState.changeFilter.of(() => false)]})
+      ist(state.tr({changes: {from: 0, insert: "hi"}}).state.doc.length, 0)
+      ist(state.tr({changes: {from: 0, insert: "hi"}, filter: false}).state.doc.length, 2)
     })
   })
 
