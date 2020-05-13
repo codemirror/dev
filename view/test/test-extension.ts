@@ -44,9 +44,9 @@ describe("EditorView extension", () => {
     })
     let cm = tempEditor("xyz", [plugin])
     ist(updates, 0)
-    cm.dispatch(cm.state.tr({changes: {from: 1, to: 2, insert: "u"}}))
+    cm.dispatch(cm.state.update({changes: {from: 1, to: 2, insert: "u"}}))
     ist(updates, 1)
-    cm.dispatch(cm.state.tr({selection: {anchor: 3}}))
+    cm.dispatch(cm.state.update({selection: {anchor: 3}}))
     ist(updates, 2)
   })
 

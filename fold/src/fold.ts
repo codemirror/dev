@@ -55,7 +55,7 @@ export const foldCode: Command = view => {
     let range = view.state.facet(EditorState.foldable)
       .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
     if (range) {
-      view.dispatch(view.state.tr({effects: foldEffect.of(range)}))
+      view.dispatch(view.state.update({effects: foldEffect.of(range)}))
       return true
     }
   }
@@ -69,7 +69,7 @@ export const unfoldCode: Command = view => {
     let folded = foldInside(view.state, line.from, line.to)
     if (folded) effects.push(unfoldEffect.of(folded))
   }
-  if (effects.length) view.dispatch(view.state.tr({effects}))
+  if (effects.length) view.dispatch(view.state.update({effects}))
   return effects.length > 0
 }
 
@@ -111,7 +111,7 @@ class FoldWidget extends WidgetType<null> {
     element.onclick = event => {
       let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
       let folded = foldInside(view.state, line.from, line.to)
-      if (folded) view.dispatch(view.state.tr({effects: unfoldEffect.of(folded)}))
+      if (folded) view.dispatch(view.state.update({effects: unfoldEffect.of(folded)}))
       event.preventDefault()
     }
     return element
@@ -165,13 +165,13 @@ export function foldGutter(config: FoldGutterConfig = {}) {
         click: (view, line) => {
           let folded = foldInside(view.state, line.from, line.to)
           if (folded) {
-            view.dispatch(view.state.tr({effects: unfoldEffect.of(folded)}))
+            view.dispatch(view.state.update({effects: unfoldEffect.of(folded)}))
             return true
           }
           let range = view.state.facet(EditorState.foldable)
             .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
           if (range) {
-            view.dispatch(view.state.tr({effects: foldEffect.of(range)}))
+            view.dispatch(view.state.update({effects: foldEffect.of(range)}))
             return true
           }
           return false

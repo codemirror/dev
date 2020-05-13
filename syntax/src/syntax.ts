@@ -213,7 +213,7 @@ class HighlightWorker {
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (done || field.parse!.badness > .8)
-      this.view.dispatch(state.tr({
+      this.view.dispatch(state.update({
         effects: this.setSyntax.of(new SyntaxState(
           field.stopParse(done, state.doc.length), state.doc.length))
       }))

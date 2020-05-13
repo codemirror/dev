@@ -87,7 +87,7 @@ class BlockCommenter {
     const selectionCommented = this.isSelectionCommented(state)
     if (selectionCommented !== null) {
       if (option !== CommentOption.OnlyComment) {
-        return state.tr({
+        return state.update({
           changes: selectionCommented.map(({open, close}) => [
             {from: open.pos - this.open.length, to: open.pos + open.margin},
             {from: close.pos - close.margin, to: close.pos + this.close.length}
@@ -96,7 +96,7 @@ class BlockCommenter {
       }
     } else {
       if (option !== CommentOption.OnlyUncomment) {
-        return state.tr(state.changeByRange(range => {
+        return state.update(state.changeByRange(range => {
           const shift = (this.open + this.margin).length
           return {
             changes: [{from: range.from, insert: this.open + this.margin},
@@ -186,7 +186,7 @@ class LineCommenter {
             changes.push({from: pos, to: pos + this.lineCommentToken.length + marginLen})
           }
         }
-        return state.tr({changes})
+        return state.update({changes})
       }
     } else {
       if (option != CommentOption.OnlyUncomment) {
@@ -198,7 +198,7 @@ class LineCommenter {
               changes.push({from: line.start + column.minCol, insert: this.lineCommentToken + this.margin})
           }
         }
-        return state.tr({changes})
+        return state.update({changes})
       }
     }
 

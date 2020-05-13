@@ -23,33 +23,33 @@ describe("EditorView drawing", () => {
   it("follows updates to the document", () => {
     let cm = tempEditor("one\ntwo")
     ist(domText(cm), "one\ntwo")
-    cm.dispatch(cm.state.tr({changes: {from: 1, to: 2, insert: "x"}}))
+    cm.dispatch(cm.state.update({changes: {from: 1, to: 2, insert: "x"}}))
     ist(domText(cm), "oxe\ntwo")
-    cm.dispatch(cm.state.tr({changes: {from: 2, to: 5, insert: ["1", "2", "3"]}}))
+    cm.dispatch(cm.state.update({changes: {from: 2, to: 5, insert: ["1", "2", "3"]}}))
     ist(domText(cm), "ox1\n2\n3wo")
-    cm.dispatch(cm.state.tr({changes: {from: 1, to: 8}}))
+    cm.dispatch(cm.state.update({changes: {from: 1, to: 8}}))
     ist(domText(cm), "oo")
   })
 
   it("works in multiple lines", () => {
     let doc = "abcdefghijklmnopqrstuvwxyz\n".repeat(10)
     let cm = tempEditor("")
-    cm.dispatch(cm.state.tr({changes: {from: 0, insert: doc}}))
+    cm.dispatch(cm.state.update({changes: {from: 0, insert: doc}}))
     ist(domText(cm), doc)
-    cm.dispatch(cm.state.tr({changes: {from: 0, insert: "/"}}))
+    cm.dispatch(cm.state.update({changes: {from: 0, insert: "/"}}))
     doc = "/" + doc
     ist(domText(cm), doc)
-    cm.dispatch(cm.state.tr({changes: {from: 100, to: 104, insert: "$"}}))
+    cm.dispatch(cm.state.update({changes: {from: 100, to: 104, insert: "$"}}))
     doc = doc.slice(0, 100) + "$" + doc.slice(104)
     ist(domText(cm), doc)
-    cm.dispatch(cm.state.tr({changes: {from: 200, to: 268}}))
+    cm.dispatch(cm.state.update({changes: {from: 200, to: 268}}))
     doc = doc.slice(0, 200)
     ist(domText(cm), doc)
   })
 
   it("can split a line", () => {
     let cm = tempEditor("abc\ndef\nghi")
-    cm.dispatch(cm.state.tr({changes: {from: 4, insert: "xyz\nk"}}))
+    cm.dispatch(cm.state.update({changes: {from: 4, insert: "xyz\nk"}}))
     ist(domText(cm), "abc\nxyz\nkdef\nghi")
   })
 
@@ -57,7 +57,7 @@ describe("EditorView drawing", () => {
     let cm = tempEditor("one\ntwo\nthree")
     let line0 = cm.domAtPos(0).node, line1 = line0.nextSibling!, line2 = line1.nextSibling!
     let text0 = line0.firstChild!, text2 = line2.firstChild!
-    cm.dispatch(cm.state.tr({changes: {from: 5, insert: "x"}}))
+    cm.dispatch(cm.state.update({changes: {from: 5, insert: "x"}}))
     ist(text0.parentElement, line0)
     ist(cm.contentDOM.contains(line0))
     ist(cm.contentDOM.contains(line1))
@@ -67,7 +67,7 @@ describe("EditorView drawing", () => {
 
   it("notices the doc needs to be redrawn when only inserting empty lines", () => {
     let cm = tempEditor("")
-    cm.dispatch(cm.state.tr({changes: {from: 0, insert: "\n\n\n"}}))
+    cm.dispatch(cm.state.update({changes: {from: 0, insert: "\n\n\n"}}))
     ist(domText(cm), "\n\n\n")
   })
 
@@ -76,7 +76,7 @@ describe("EditorView drawing", () => {
     let emptyLine = cm.domAtPos(4).node
     ist(emptyLine.childNodes.length, 1)
     ist(emptyLine.firstChild!.nodeName, "BR")
-    cm.dispatch(cm.state.tr({changes: {from: 4, insert: "x"}}))
+    cm.dispatch(cm.state.update({changes: {from: 4, insert: "x"}}))
     ist(!Array.from(cm.domAtPos(4).node.childNodes).some(n => (n as any).nodeName == "BR"))
   })
 
@@ -88,7 +88,7 @@ describe("EditorView drawing", () => {
     ist(cm.contentDOM.scrollHeight, 10000, ">")
     ist(!cm.contentDOM.textContent!.match(/b/))
     let gap = cm.contentDOM.lastChild
-    cm.dispatch(cm.state.tr({changes: {from: 2000, insert: "\n\n"}}))
+    cm.dispatch(cm.state.update({changes: {from: 2000, insert: "\n\n"}}))
     ist(cm.contentDOM.lastChild, gap) // Make sure gap nodes are reused when resized
     cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2
     cm.measure()
@@ -97,7 +97,7 @@ describe("EditorView drawing", () => {
 
   it("keeps a drawn area around selection ends", () => {
     let cm = tempEditor("\nsecond\n" + "x\n".repeat(500) + "last", [], {scroll: 300})
-    cm.dispatch(cm.state.tr({selection: EditorSelection.single(1, cm.state.doc.length)}))
+    cm.dispatch(cm.state.update({selection: EditorSelection.single(1, cm.state.doc.length)}))
     cm.focus()
     let text = cm.contentDOM.textContent!
     ist(text.length, 500, "<")
@@ -113,26 +113,26 @@ describe("EditorView drawing", () => {
       let from = Math.floor(Math.random() * (cm.state.doc.length - 10)), to = from + Math.floor(Math.random() * 10)
       changes.push({from, to, insert: "XYZ"})
     }
-    cm.dispatch(cm.state.tr({changes}))
+    cm.dispatch(cm.state.update({changes}))
     ist(domText(cm), cm.state.doc.slice(cm.viewport.from, cm.viewport.to))
   })
 
   it("can handle deleting a line's content", () => {
     let cm = tempEditor("foo\nbaz")
-    cm.dispatch(cm.state.tr({changes: {from: 4, to: 7}}))
+    cm.dispatch(cm.state.update({changes: {from: 4, to: 7}}))
     ist(domText(cm), "foo\n")
   })
 
   it("can insert blank lines at the end of the document", () => {
     let cm = tempEditor("foo")
-    cm.dispatch(cm.state.tr({changes: {from: 3, insert: "\n\nx"}}))
+    cm.dispatch(cm.state.update({changes: {from: 3, insert: "\n\nx"}}))
     ist(domText(cm), "foo\n\nx")
   })
 
   it("can handle deleting the end of a line", () => {
     let cm = tempEditor("a\nbc\n")
-    cm.dispatch(cm.state.tr({changes: {from: 3, to: 4}}))
-    cm.dispatch(cm.state.tr({changes: {from: 3, insert: "d"}}))
+    cm.dispatch(cm.state.update({changes: {from: 3, to: 4}}))
+    cm.dispatch(cm.state.update({changes: {from: 3, insert: "d"}}))
     ist(domText(cm), "a\nbd\n")
   })
 
@@ -155,7 +155,7 @@ describe("EditorView drawing", () => {
           changes.push({from: pos, insert: text})
         }
       }
-      cm.dispatch(cm.state.tr({changes}))
+      cm.dispatch(cm.state.update({changes}))
       doc = cm.state.doc.toString()
       ist(domText(cm), doc.slice(cm.viewport.from, cm.viewport.to))
     }

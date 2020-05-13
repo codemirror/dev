@@ -76,7 +76,7 @@ export function handleBackspace(state: EditorState) {
     }
     return {range: dont = range}
   })
-  return dont ? null : state.tr(changes, {scrollIntoView: true})
+  return dont ? null : state.update(changes, {scrollIntoView: true})
 }
 
 /// Implements the extension's behavior on text insertion. Again,
@@ -116,7 +116,7 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
               range: new SelectionRange(range.head + open.length)}
     return {range: dont = range}
   })
-  return dont ? null : state.tr(changes, {scrollIntoView: true})
+  return dont ? null : state.update(changes, {scrollIntoView: true})
 }
 
 function handleClose(state: EditorState, _open: string, close: string) {
@@ -124,7 +124,7 @@ function handleClose(state: EditorState, _open: string, close: string) {
     if (range.empty && nextChar(state.doc, range.head) == close) return new SelectionRange(range.head + close.length)
     return dont = range
   })
-  return dont ? null : state.tr({selection: EditorSelection.create(moved, state.selection.primaryIndex),
+  return dont ? null : state.update({selection: EditorSelection.create(moved, state.selection.primaryIndex),
                                  scrollIntoView: true})
 }
 
@@ -156,7 +156,7 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
     }
     return {range: dont = range}
   })
-  return dont ? null : state.tr(changes, {scrollIntoView: true})
+  return dont ? null : state.update(changes, {scrollIntoView: true})
 }
 
 function nodeStart(state: EditorState, pos: number) {

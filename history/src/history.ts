@@ -301,7 +301,7 @@ class HistoryState {
     if (branch.length == 0) return null
     let event = branch[branch.length - 1]
     if (selection && event.selectionsAfter.length) {
-      return state.tr({
+      return state.update({
         selection: event.selectionsAfter[event.selectionsAfter.length - 1],
         annotations: fromHistory.of({side, rest: popSelection(branch)})
       })
@@ -310,7 +310,7 @@ class HistoryState {
     } else {
       let rest = branch.length == 1 ? none : branch.slice(0, branch.length - 1)
       if (event.mapped) rest = addMappingToBranch(rest, event.mapped!)
-      return state.tr({
+      return state.update({
         changes: event.changes,
         selection: event.startSelection,
         effects: event.effects,

@@ -13,7 +13,7 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
     return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
   })
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.tr({
+  view.dispatch(view.state.update({
     selection,
     annotations: granularity == "line" ? Transaction.preserveGoalColumn.of(true) : undefined,
     scrollIntoView: true
@@ -48,7 +48,7 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
     return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.tr({
+  view.dispatch(view.state.update({
     selection,
     annotations: granularity == "line" ? Transaction.preserveGoalColumn.of(true) : undefined,
     scrollIntoView: true
@@ -79,19 +79,19 @@ export const extendLineEnd: Command = view => extendSelection(view, "forward", "
 
 /// Move the selection to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {
-  dispatch(state.tr({selection: {anchor: 0}, scrollIntoView: true}))
+  dispatch(state.update({selection: {anchor: 0}, scrollIntoView: true}))
   return true
 }
 
 /// Move the selection to the end of the document.
 export const selectDocEnd: StateCommand = ({state, dispatch}) => {
-  dispatch(state.tr({selection: {anchor: state.doc.length}, scrollIntoView: true}))
+  dispatch(state.update({selection: {anchor: state.doc.length}, scrollIntoView: true}))
   return true
 }
 
 /// Select the entire document.
 export const selectAll: StateCommand = ({state, dispatch}) => {
-  dispatch(state.tr({selection: {anchor: 0, head: state.doc.length}}))
+  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}}))
   return true
 }
 
@@ -107,7 +107,7 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
   })
   if (changes.changes.empty) return false
 
-  view.dispatch(view.state.tr(changes, {scrollIntoView: true}))
+  view.dispatch(view.state.update(changes, {scrollIntoView: true}))
   return true
 }
 
@@ -147,7 +147,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     return {changes: {from, to, insert: ["", space(indent)]},
             range: new SelectionRange(from + 1 + indent)}
   })
-  dispatch(state.tr(changes, {scrollIntoView: true}))
+  dispatch(state.update(changes, {scrollIntoView: true}))
   return true
 }
 
@@ -175,7 +175,7 @@ export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
       ;({start, end} = state.doc.lineAt(end + 1))
     }
   }
-  if (changes.length > 0) dispatch(state.tr({changes}))
+  if (changes.length > 0) dispatch(state.update({changes}))
   return true
 }
 

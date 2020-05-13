@@ -71,7 +71,7 @@ function translateDiagnostic(input: any, doc: Text, offset: {line: number, col: 
     result.actions = [{
       name: "fix",
       apply(view: EditorView, start: number) {
-        view.dispatch(view.state.tr({changes: {from: start + from, to: start + to, insert: text}, scrollIntoView: true}))
+        view.dispatch(view.state.update({changes: {from: start + from, to: start + to, insert: text}, scrollIntoView: true}))
       }
     }]
   }

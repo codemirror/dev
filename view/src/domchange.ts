@@ -73,7 +73,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
           ? startState.selection.replaceRange(newSel.primary) : undefined
       }
     }
-    view.dispatch(startState.tr(tr, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")}))
+    view.dispatch(startState.update(tr, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")}))
     return true
   } else if (newSel && !newSel.primary.eq(sel)) {
     let scrollIntoView = false, annotations: Annotation<any> | undefined
@@ -81,7 +81,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       if (view.inputState.lastSelectionOrigin == "keyboard") scrollIntoView = true
       else annotations = Transaction.userEvent.of(view.inputState.lastSelectionOrigin!)
     }
-    view.dispatch(view.state.tr({selection: newSel, scrollIntoView, annotations}))
+    view.dispatch(view.state.update({selection: newSel, scrollIntoView, annotations}))
     return true
   }
   return false

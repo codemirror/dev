@@ -88,7 +88,7 @@ export class EditorState {
     return getAddr(this, addr)
   }
 
-  tr(...specs: readonly TransactionSpec[]): Transaction {
+  update(...specs: readonly TransactionSpec[]): Transaction {
     let spec = ResolvedTransactionSpec.create(this, specs).filterChanges(this).filterTransaction(this)
     if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
     let reconf = spec.reconfigure || spec.replaceExtensions, conf = !reconf ? this.config

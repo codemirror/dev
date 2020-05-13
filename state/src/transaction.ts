@@ -116,7 +116,7 @@ export const enum TransactionFlag { reconfigured = 1, scrollIntoView = 2 }
 /// Typically, a user action creates a single transaction, which may
 /// contain any number of document changes, may change the selection,
 /// or have other effects. Create a transaction by calling
-/// [`EditorState.tr`](#state.EditorState.tr).
+/// [`EditorState.update`](#state.EditorState.update).
 export class Transaction {
   /// The new state created by the transaction.
   readonly state!: EditorState

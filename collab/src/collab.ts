@@ -107,7 +107,7 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
 
   // If all updates originated with us, we're done.
   if (!updates.length)
-    return state.tr({annotations: [collabReceive.of(new CollabState(version, unconfirmed))]})
+    return state.update({annotations: [collabReceive.of(new CollabState(version, unconfirmed))]})
 
   let changes = updates[0].changes, effects = updates[0].effects || []
   for (let i = 1; i < updates.length; i++) {
@@ -128,7 +128,7 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
     if (effects.length) effects = mapEffects(effects, unconfirmed.reduce((ch, u) => ch.compose(u.changes),
                                                                          ChangeSet.empty(unconfirmed[0].changes.length)))
   }
-  return state.tr({
+  return state.update({
     changes,
     effects,
     annotations: [

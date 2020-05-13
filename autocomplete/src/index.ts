@@ -72,7 +72,7 @@ function moveCompletion(dir: string) {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
     let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
-    view.dispatch(view.state.tr({effects: selectCompletion.of(selected)}))
+    view.dispatch(view.state.update({effects: selectCompletion.of(selected)}))
     return true
   }
 }
@@ -87,7 +87,7 @@ function acceptCompletion(view: EditorView) {
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active != null && active != "pending") return false
-  view.dispatch(view.state.tr({effects: toggleCompletion.of(true)}))
+  view.dispatch(view.state.update({effects: toggleCompletion.of(true)}))
   return true
 }
 
@@ -96,7 +96,7 @@ function applyCompletion(view: EditorView, option: Completion) {
   // FIXME make sure option.start/end still point at the current
   // doc, or keep a mapping in an active completion
   if (typeof apply == "string") {
-    view.dispatch(view.state.tr({
+    view.dispatch(view.state.update({
       changes: {from: option.start, to: option.end, insert: apply},
       selection: {anchor: option.start + apply.length}
     }))
@@ -108,7 +108,7 @@ function applyCompletion(view: EditorView, option: Completion) {
 function closeCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active == null) return false
-  view.dispatch(view.state.tr({effects: toggleCompletion.of(false)}))
+  view.dispatch(view.state.update({effects: toggleCompletion.of(false)}))
   return true
 }
 
@@ -252,7 +252,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
       .then(result => {
         if (this.stateVersion != version || result.length == 0) return
-        this.view.dispatch(this.view.state.tr({effects: openCompletion.of(result)}))
+        this.view.dispatch(this.view.state.update({effects: openCompletion.of(result)}))
       })
       .catch(e => logException(this.view.state, e))
   }

@@ -169,7 +169,7 @@ class MouseSelection {
     let selection = this.update(this.view, this.startSelection, this.startPos, this.startBias,
                                 this.curPos, this.curBias, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
-      this.view.dispatch(this.view.state.tr({
+      this.view.dispatch(this.view.state.update({
         selection,
         annotations: Transaction.userEvent.of("pointer"),
         scrollIntoView: true
@@ -244,7 +244,7 @@ function capturePaste(view: EditorView) {
 }
 
 function doPaste(view: EditorView, text: string) {
-  view.dispatch(view.state.tr(view.state.replaceSelection(text), {
+  view.dispatch(view.state.update(view.state.replaceSelection(text), {
     annotations: Transaction.userEvent.of("paste"),
     scrollIntoView: true
   }))
@@ -333,7 +333,7 @@ handlers.drop = (view, event: DragEvent) => {
   let changes = view.state.changes(del ? [del, ins] : ins)
 
   view.focus()
-  view.dispatch(view.state.tr({
+  view.dispatch(view.state.update({
     changes,
     selection: {anchor: changes.mapPos(dropPos, -1), head: changes.mapPos(dropPos, 1)},
     annotations: Transaction.userEvent.of("drop")
@@ -382,7 +382,7 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut")
-    view.dispatch(view.state.tr(view.state.replaceSelection([""]), {
+    view.dispatch(view.state.update(view.state.replaceSelection([""]), {
       scrollIntoView: true,
       annotations: Transaction.userEvent.of("cut")
     }))
