@@ -1,11 +1,13 @@
 import {Facet, ChangeSet, ChangeDesc, StateField, Annotation, EditorState, StateEffect, Transaction,
         combineConfig, Extension} from "@codemirror/next/state"
 
-/// An update is a set of changes and effects. There'll only ever be
-/// effects in these When you configured your collab extension with a
-/// [`sharedEffects`](#collab.CollabOptions.sharedEffects) option.
+/// An update is a set of changes and effects.
 export interface Update {
+  /// The changes made by this update.
   changes: ChangeSet,
+  /// The effects in this update. There'll only ever be effects here
+  /// when you configured your collab extension with a
+  /// [`sharedEffects`](#collab.CollabOptions.sharedEffects) option.
   effects?: readonly StateEffect<any>[]
 }
 

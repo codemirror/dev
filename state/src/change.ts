@@ -230,17 +230,17 @@ export class ChangeSet extends ChangeDesc {
     return new ChangeSet(sections, inserted)
   }
 
-  // Combine two subsequent change sets into a single set. `other`
-  // must start in the document produced by `this`. If `this` goes
-  // `docA` → `docB` and `other` represents `docB` → `docC`, the
-  // returned value will represent the change `docA` → `docC`.
+  /// Combine two subsequent change sets into a single set. `other`
+  /// must start in the document produced by `this`. If `this` goes
+  /// `docA` → `docB` and `other` represents `docB` → `docC`, the
+  /// returned value will represent the change `docA` → `docC`.
   compose(other: ChangeSet) { return this.empty ? other : other.empty ? this : composeSets(this, other, true) }
 
-  // Given another change set starting in the same document, maps this
-  // change set over the other, producing a new change set that can be
-  // applied to the document produced by applying `other`. When
-  // `before` is `true`, order changes as if `this` comes before
-  // `other`, otherwise (the default) treat `other` as coming first.
+  /// Given another change set starting in the same document, maps this
+  /// change set over the other, producing a new change set that can be
+  /// applied to the document produced by applying `other`. When
+  /// `before` is `true`, order changes as if `this` comes before
+  /// `other`, otherwise (the default) treat `other` as coming first.
   map(other: ChangeDesc, before = false): ChangeSet { return other.empty ? this : mapSet(this, other, before, true) }
 
   /// Iterate over the changed ranges in the document, calling `f` for

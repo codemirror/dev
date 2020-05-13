@@ -27,14 +27,13 @@ This is how you'd make a change to a document (replacing “world” with
 
 ```javascript
 let state = EditorState.create({doc: "hello world"})
-let transaction = state.t().replace(6, 11, "editor")
-console.log(transaction.doc.toString()) // "hello editor"
-let newState = transaction.state
+let transaction = state.update({changes: {from: 6, to: 11, insert: "editor"}})
+console.log(transaction.state.doc.toString()) // "hello editor"
 ```
 
-@ChangeDesc
+@ChangeSpec
 
-@Change
+@ChangeDesc
 
 @ChangeSet
 
@@ -53,8 +52,6 @@ let newState = transaction.state
 @StateEffectType
 
 @MapMode
-
-@Mapping
 
 ### Extending Editor State
 
@@ -75,7 +72,7 @@ extensions for the editor state.
 
 @Precedence
 
-@ExtensionGroup
+@tagExtension
 
 @Syntax
 

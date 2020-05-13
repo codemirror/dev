@@ -1,5 +1,5 @@
 import {combineConfig, fillConfig, EditorState, StateEffect, ChangeDesc, Facet,
-        StateField} from "@codemirror/next/state"
+        StateField, Extension} from "@codemirror/next/state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "@codemirror/next/view"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
 
@@ -49,6 +49,7 @@ function foldInside(state: EditorState, from: number, to: number) {
   return found
 }
 
+/// Fold the lines that are selected, if possible.
 export const foldCode: Command = view => {
   if (!view.state.field(foldState, false)) return false
   for (let line of selectedLines(view)) {
@@ -62,6 +63,7 @@ export const foldCode: Command = view => {
   return false
 }
 
+/// Unfold folded ranges on selected lines.
 export const unfoldCode: Command = view => {
   if (!view.state.field(foldState, false)) return false
   let effects = []
@@ -73,8 +75,14 @@ export const unfoldCode: Command = view => {
   return effects.length > 0
 }
 
+/// Used to configure the code folding extending.
 export interface FoldConfig {
+  /// A function that creates the DOM element used to indicate the
+  /// position of folded code. When not given, the `placeholderText`
+  /// option will be used instead.
   placeholderDOM?: (() => HTMLElement) | null,
+  /// Text to use as placeholder for folded text. Defaults to `"…"`.
+  /// Will be styled with the `foldPlaceholder` theme selector.
   placeholderText?: string
 }
 
@@ -87,7 +95,8 @@ const foldConfig = Facet.define<FoldConfig, Required<FoldConfig>>({
   combine(values) { return combineConfig(values, defaultConfig) }
 })
 
-export function codeFolding(config: FoldConfig = {}) {
+/// Create an extension that enables code folding.
+export function codeFolding(config: FoldConfig = {}): Extension {
   return [
     foldConfig.of(config),
     foldState,
@@ -120,8 +129,14 @@ class FoldWidget extends WidgetType<null> {
   static decoration = Decoration.replace({widget: new FoldWidget(null)})
 }
 
+/// Configuration used when defining a [fold
+/// gutter](#fold.foldGutter).
 export interface FoldGutterConfig {
+  /// Text used to indicate that a given line can be folded. Defaults
+  /// to `"⌄"`.
   openText?: string
+  /// Text used to indicate that a given line is folded. Defaults to
+  /// `"›"`.
   closedText?: string
 }
 
@@ -144,7 +159,10 @@ class FoldMarker extends GutterMarker {
   }
 }
 
-export function foldGutter(config: FoldGutterConfig = {}) {
+/// Create an extension that registers a fold gutter, which shows a
+/// fold status indicator before lines which can be clicked to fold or
+/// unfold the line.
+export function foldGutter(config: FoldGutterConfig = {}): Extension {
   let fullConfig = fillConfig(config, foldGutterDefaults)
   return [
     gutter({

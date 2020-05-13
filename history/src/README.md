@@ -14,10 +14,6 @@
 
 @redoDepth
 
-@redoSelectionDepth
-
-@undoSelectionDepth
-
 @isolateHistory
 
 @invertedEffects
