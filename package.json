@@ -1,6 +1,6 @@
 {
   "name": "@codemirror/next",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Text/code editor component",
   "scripts": {
     "test": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js keymap/test/test-*.js view/test/test-heightmap.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js",

@@ -1,3 +1,31 @@
+## 0.6.0 (2020-05-13)
+
+### New features
+
+There is now a `comment` package with commenting/uncommenting commands.
+
+The new `collab` package implements a framework for collaborative editing.
+
+When creating or updating a state, the selection may now be specified as an `{anchor, head?}` object literal.
+
+There are new methods `toText` and `sliceDoc` on the editor state for working with strings.
+
+Some methods that used to be part of `Transaction` now have an equivalent on the state object. `replaceSelection` moved there. `changeByRange` replaces `Transaction.forEachRange`. And `changes` can be used to build up a changeset.
+
+### Breaking changes
+
+The `Text` class interface changed to make better use of its own abstraction. `replace` takes a `Text` instance instead of an array of strings, `slice` now returns a `Text`, and there's a new `append` method.
+
+The representation of changes and change sets has been redone. Instead of storing a sequence of change objects, change sets are now a flat map of the locations in the document that changed.
+
+The way transactions work has changed. They are now immutable objects created with `EditorState.update`.
+
+Transaction filtering works differently now. See the `changeFilter` and `transactionFilter` facets.
+
+What used to be extension groups is now called tagged extensions (using the `tagExtension` function).
+
+`mapPos` now returns -1 to indicate deletion (when the map mode asks for this).
+
 ## 0.5.2 (2020-04-09)
 
 ### Bug fixes
