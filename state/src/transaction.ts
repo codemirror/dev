@@ -63,6 +63,17 @@ export class StateEffect<Value> {
   static define<Value = null>(spec: StateEffectSpec<Value> = {}): StateEffectType<Value> {
     return new StateEffectType(spec.map || (v => v))
   }
+
+  /// Map an array of effects through a change set.
+  static mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
+    if (!effects.length) return effects
+    let result = []
+    for (let effect of effects) {
+      let mapped = effect.map(mapping)
+      if (mapped) result.push(mapped)
+    }
+    return result
+  }
 }
 
 /// Representation of a type of state effect. Defined with
@@ -237,7 +248,7 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
     return new ResolvedTransactionSpec(
       a.changes.compose(changesB),
       b.selection ? b.selection.map(changesA) : a.selection ? a.selection.map(changesB) : undefined,
-      mapEffects(a.effects, changesB).concat(mapEffects(b.effects, changesA)),
+      StateEffect.mapEffects(a.effects, changesB).concat(StateEffect.mapEffects(b.effects, changesA)),
       a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
       a.scrollIntoView || b.scrollIntoView,
       a.filter && b.filter,
@@ -267,7 +278,7 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
     return new ResolvedTransactionSpec(
       changes,
       this.selection && this.selection.map(back),
-      mapEffects(this.effects, back),
+      StateEffect.mapEffects(this.effects, back),
       this.annotations,
       this.scrollIntoView,
       this.filter,
@@ -283,16 +294,6 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
       result = ResolvedTransactionSpec.create(state, filters[i](result, state))
     return result
   }
-}
-
-function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
-  if (!effects.length) return effects
-  let result = []
-  for (let effect of effects) {
-    let mapped = effect.map(mapping)
-    if (mapped) result.push(effect)
-  }
-  return result
 }
 
 function joinRanges(a: readonly number[], b: readonly number[]) {

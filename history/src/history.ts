@@ -244,14 +244,9 @@ function mapEvent(event: HistEvent, mapping: ChangeDesc,
   if (!event.changes) return HistEvent.selection(selections)
 
   let mappedChanges = event.changes.map(mapping), before = mapping.mapDesc(event.changes, true)
-  let effects: StateEffect<any>[] = event.effects.length ? [] : none as StateEffect<any>[]
-  for (let effect of event.effects) {
-    let mapped = effect.map(mapping)
-    if (mapped) effects.push(mapped)
-  }
-
   let fullMapping = event.mapped ? event.mapped.composeDesc(before) : before
-  return new HistEvent(mappedChanges, effects, fullMapping, event.startSelection!.map(mapping), selections)
+  return new HistEvent(mappedChanges, StateEffect.mapEffects(event.effects, mapping),
+                       fullMapping, event.startSelection!.map(mapping), selections)
 }
 
 class HistoryState {

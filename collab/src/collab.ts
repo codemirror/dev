@@ -1,4 +1,4 @@
-import {Facet, ChangeSet, ChangeDesc, StateField, Annotation, EditorState, StateEffect, Transaction,
+import {Facet, ChangeSet, StateField, Annotation, EditorState, StateEffect, Transaction,
         combineConfig, Extension} from "@codemirror/next/state"
 
 /// An update is a set of changes and effects.
@@ -114,7 +114,7 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
   let changes = updates[0].changes, effects = updates[0].effects || []
   for (let i = 1; i < updates.length; i++) {
     let update = updates[i]
-    effects = mapEffects(effects, update.changes)
+    effects = StateEffect.mapEffects(effects, update.changes)
     if (update.effects) effects = effects.concat(update.effects)
     changes = changes.compose(update.changes)
   }
@@ -124,11 +124,11 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
     for (let update of unconfirmed) {
       let updateChanges = update.changes.map(changes)
       changes = changes.map(update.changes, true)
-      newUnconfirmed.push(new LocalUpdate(update.origin, updateChanges, mapEffects(update.effects, changes)))
+      newUnconfirmed.push(new LocalUpdate(update.origin, updateChanges, StateEffect.mapEffects(update.effects, changes)))
     }
     unconfirmed = newUnconfirmed
-    if (effects.length) effects = mapEffects(effects, unconfirmed.reduce((ch, u) => ch.compose(u.changes),
-                                                                         ChangeSet.empty(unconfirmed[0].changes.length)))
+    effects = StateEffect.mapEffects(effects, unconfirmed.reduce((ch, u) => ch.compose(u.changes),
+                                                                 ChangeSet.empty(unconfirmed[0].changes.length)))
   }
   return state.update({
     changes,
@@ -139,16 +139,6 @@ export function receiveUpdates(state: EditorState, updates: readonly Update[], o
     ],
     filter: false
   })
-}
-
-function mapEffects(effects: readonly StateEffect<any>[], mapping: ChangeDesc) {
-  if (effects.length == 0) return effects
-  let result = []
-  for (let e of effects) {
-    let mapped = e.map(mapping)
-    if (mapped) result.push(mapped)
-  }
-  return result
 }
 
 /// Returns the set of locally made updates that still have to be sent
