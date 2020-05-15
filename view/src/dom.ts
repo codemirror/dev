@@ -166,7 +166,7 @@ export function focusPreventScroll(dom: HTMLElement) {
 
   let stack = []
   for (let cur: Node | null = dom; cur; cur = cur.parentNode) {
-    stack.push(cur, dom.scrollTop, dom.scrollLeft)
+    stack.push(cur, (cur as any).scrollTop, (cur as any).scrollLeft)
     if (cur == cur.ownerDocument) break
   }
   dom.focus(preventScrollSupported == null ? {
