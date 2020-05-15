@@ -442,21 +442,20 @@ function composeSets(setA: ChangeDesc, setB: ChangeDesc, mkSet = false): ChangeD
     if (a.done && b.done) {
       return insert ? new ChangeSet(sections, insert) : new ChangeDesc(sections)
     } else if (a.ins == 0) { // Deletion in A
-      addSection(sections, a.len, 0)
+      addSection(sections, a.len, 0, open)
       a.next()
     } else if (b.len == 0 && !b.done) { // Insertion in B
-      addSection(sections, 0, b.ins)
+      addSection(sections, 0, b.ins, open)
       if (insert) addInsert(insert, sections, b.text)
       b.next()
     } else if (a.done || b.done) {
       throw new Error("Mismatched change set lengths")
     } else {
       let len = Math.min(a.len2, b.len), sectionLen = sections.length
-      if (a.ins == -1 && b.ins == -1) {
-        addSection(sections, len, -1)
-      } else if (a.ins == -1) {
-        addSection(sections, len, b.off ? 0 : b.ins, open)
-        if (insert && !b.off) addInsert(insert, sections, b.text)
+      if (a.ins == -1) {
+        let insB = b.ins == -1 ? -1 : b.off ? 0 : b.ins
+        addSection(sections, len, insB, open)
+        if (insert && insB) addInsert(insert, sections, b.text)
       } else if (b.ins == -1) {
         addSection(sections, a.off ? 0 : a.len, len, open)
         if (insert) addInsert(insert, sections, a.textBit(len))
