@@ -494,7 +494,7 @@ class SectionIter {
 
   get done() { return this.ins == -2 }
 
-  get len2() { return this.ins == -1 ? this.len : this.ins }
+  get len2() { return this.ins < 0 ? this.len : this.ins }
 
   get text() {
     let {inserted} = this.set as ChangeSet, index = (this.i - 2) >> 1

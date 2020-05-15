@@ -300,6 +300,15 @@ describe("ChangeSet", () => {
     }
   })
 
+  it("compose produces the same result as individual changes", () => {
+    for (let i = 0; i < 100; i++) {
+      let size = r(20), doc = Text.of([rStr(size)])
+      let a = ChangeSet.of(rChanges(size, r(5) + 1), size)
+      let b = ChangeSet.of(rChanges(a.newLength, r(6)), a.newLength)
+      ist(b.apply(a.apply(doc)).toString(), a.compose(b).apply(doc).toString())
+    }
+  })
+
   it("composing is associative", () => {
     for (let i = 0; i < 100; i++) {
       let size = r(20), doc = Text.of([rStr(size)])
