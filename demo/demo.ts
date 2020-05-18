@@ -12,6 +12,7 @@ import {multipleSelections} from "@codemirror/next/multiple-selections"
 import {search, defaultSearchKeymap} from "@codemirror/next/search"
 import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
 import {toggleLineComment, lineComment, lineUncomment, toggleBlockComment} from "@codemirror/next/comment"
+import {rectangularSelection} from "@codemirror/next/rectangular-selection"
 
 import {html} from "@codemirror/next/lang-html"
 import {defaultHighlighter} from "@codemirror/next/highlight"
@@ -45,6 +46,7 @@ let state = EditorState.create({doc: `<script>
   bracketMatching(),
   closeBrackets,
   autocomplete(),
+  rectangularSelection(),
   keymap({
     "Mod-z": undo,
     "Mod-Shift-z": redo,
