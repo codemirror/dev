@@ -1,21 +1,13 @@
-import {Text, TextIterator} from "@codemirror/next/text"
+import {Text, TextIterator, countColumn} from "@codemirror/next/text"
 
 // Counts the column offset in a string, taking tabs into account.
 // Used mostly to find indentation.
-// FIXME more or less duplicated in indent/src/indent.ts
-function countColumn(string: string, end: number | null, tabSize: number, startIndex?: number, startValue?: number): number {
+function countCol(string: string, end: number | null, tabSize: number, startIndex = 0, startValue = 0): number {
   if (end == null) {
     end = string.search(/[^\s\u00a0]/)
     if (end == -1) end = string.length
   }
-  for (let i = startIndex || 0, n = startValue || 0;;) {
-    let nextTab = string.indexOf("\t", i)
-    if (nextTab < 0 || nextTab >= end)
-      return n + (end - i)
-    n += nextTab - i
-    n += tabSize - (n % tabSize)
-    i = nextTab + 1
-  }
+  return countColumn(string.slice(startIndex, end), startValue, tabSize)
 }
 
 // STRING STREAM
@@ -88,15 +80,15 @@ export class StringStream {
   /// Get the column position at `this.pos`.
   column() {
     if (this.lastColumnPos < this.start) {
-      this.lastColumnValue = countColumn(this.string, this.start, this.tabSize, this.lastColumnPos, this.lastColumnValue)
+      this.lastColumnValue = countCol(this.string, this.start, this.tabSize, this.lastColumnPos, this.lastColumnValue)
       this.lastColumnPos = this.start
     }
-    return this.lastColumnValue - (this.lineStart ? countColumn(this.string, this.lineStart, this.tabSize) : 0)
+    return this.lastColumnValue - (this.lineStart ? countCol(this.string, this.lineStart, this.tabSize) : 0)
   }
   /// Get the indentation column of the current line.
   indentation() {
-    return countColumn(this.string, null, this.tabSize) -
-      (this.lineStart ? countColumn(this.string, this.lineStart, this.tabSize) : 0)
+    return countCol(this.string, null, this.tabSize) -
+      (this.lineStart ? countCol(this.string, this.lineStart, this.tabSize) : 0)
   }
   /// Match the input against the given string or regular expression
   /// (which should start with a `^`). Return true or the regexp match

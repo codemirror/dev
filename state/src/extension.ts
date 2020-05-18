@@ -1,5 +1,5 @@
 import {Tree, NodeType, NodeProp} from "lezer-tree"
-import {Line} from "@codemirror/next/text"
+import {Line, countColumn} from "@codemirror/next/text"
 import {EditorState} from "./state"
 import {Transaction, TransactionSpec, StrictTransactionSpec} from "./transaction"
 import {Facet} from "./facet"
@@ -89,16 +89,7 @@ export class IndentContext {
   /// find the column position (taking tabs into account) of the given
   /// position in the given string.
   countColumn(line: string, pos: number) {
-    // FIXME use extending character information
-    if (pos < 0) pos = line.length
-    let tab = this.state.tabSize
-    for (var i = 0, n = 0;;) {
-      let nextTab = line.indexOf("\t", i);
-      if (nextTab < 0 || nextTab >= pos) return n + (pos - i)
-      n += nextTab - i
-      n += tab - (n % tab)
-      i = nextTab + 1
-    }
+    return countColumn(pos < 0 ? line : line.slice(0, pos), 0, this.state.tabSize)
   }
 
   /// Find the indentation column of the given document line.
