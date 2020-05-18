@@ -173,18 +173,15 @@ export class ViewState {
       this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights))
 
     let result = this.heightOracle.heightChanged ? UpdateFlag.Height : 0
-    let scrollTo = this.scrollTo
-    this.scrollTo = -1
     if (!this.viewportIsCovering(this.viewport, bias) ||
-        scrollTo > -1 && (scrollTo < this.viewport.from || scrollTo > this.viewport.to)) {
-      this.viewport = this.getViewport(bias, scrollTo)
+        this.scrollTo > -1 && (this.scrollTo < this.viewport.from || this.scrollTo > this.viewport.to)) {
+      this.viewport = this.getViewport(bias, this.scrollTo)
       result |= UpdateFlag.Viewport
     }
     if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
       result |= this.updateLineGaps(this.ensureLineGaps(refresh ? [] : this.lineGaps))
     this.computeVisibleRanges()
 
-    if (scrollTo > -1) docView.scrollPosIntoView(scrollTo) // FIXME return instead?
     return result
   }
 

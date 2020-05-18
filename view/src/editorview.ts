@@ -216,7 +216,7 @@ export class EditorView {
       this.updateState = UpdateState.Measuring
       let changed = this.viewState.measure(this.docView, i > 0)
       let measuring = this.measureRequests
-      if (!changed && !measuring.length) break
+      if (!changed && !measuring.length && this.viewState.scrollTo < 0) break
       this.measureRequests = []
       if (i > 5) {
         console.warn("Viewport failed to stabilize")
@@ -234,6 +234,10 @@ export class EditorView {
       for (let i = 0; i < measuring.length; i++) if (measured[i] != BadMeasure) {
         try { measuring[i].write(measured[i], this) }
         catch(e) { logException(this.state, e) }
+      }
+      if (this.viewState.scrollTo > -1) {
+        this.docView.scrollPosIntoView(this.viewState.scrollTo)
+        this.viewState.scrollTo = -1
       }
       if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
     }
@@ -369,6 +373,12 @@ export class EditorView {
           granularity: "character" | "word" | "line" | "lineboundary" = "character",
           action: "move" | "extend" = "move"): number {
     return movePos(this, start, direction, granularity, action)
+  }
+
+  /// Scroll the given document position into view.
+  scrollPosIntoView(pos: number) {
+    this.viewState.scrollTo = pos
+    this.requestMeasure()
   }
 
   /// Get the document position at the given screen coordinates.
