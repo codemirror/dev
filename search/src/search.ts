@@ -227,7 +227,7 @@ export const replaceAll: Command = view => {
     let {from, to} = cursor.value
     changes.push({from, to, insert: plugin.query.replace})
   }
-  if (changes.length) return false
+  if (!changes.length) return false
   view.dispatch(view.state.update({changes}))
   return true
 }
