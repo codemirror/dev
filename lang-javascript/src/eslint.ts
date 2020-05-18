@@ -30,7 +30,7 @@ export function esLint(eslint: any, config?: any) {
 
   function range(state: EditorState, from: number = 0, to: number = state.doc.length) {
     let fromLine = state.doc.lineAt(from), offset = {line: fromLine.number - 1, col: from - fromLine.start, pos: from}
-    return eslint.verify(state.doc.slice(from, to), config)
+    return eslint.verify(state.sliceDoc(from, to), config)
       .map((val: any) => translateDiagnostic(val, state.doc, offset))
   }
 
