@@ -1,11 +1,11 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSet} from "@codemirror/next/state"
+import {EditorSelection, EditorState, SelectionRange, Transaction} from "@codemirror/next/state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,
-        logException} from "./extension"
+        logException, mouseSelectionStyle} from "./extension"
 import browser from "./browser"
 import {LineContext} from "./cursor"
-import {getSelection} from "./dom"
+import {getSelection, focusPreventScroll} from "./dom"
 
 // This will also be where dragging info and such goes
 export class InputState {
@@ -80,13 +80,13 @@ export class InputState {
     return false
   }
 
-  startMouseSelection(view: EditorView, event: MouseEvent, update: MouseSelectionUpdate) {
+  startMouseSelection(view: EditorView, event: MouseEvent, style: MouseSelectionStyle) {
     if (this.mouseSelection) this.mouseSelection.destroy()
-    this.mouseSelection = new MouseSelection(this, view, event, update)
+    this.mouseSelection = new MouseSelection(this, view, event, style)
   }
 
   update(update: ViewUpdate) {
-    if (this.mouseSelection) this.mouseSelection.map(update.changes)
+    if (this.mouseSelection) this.mouseSelection.update(update)
     this.lastKeyCode = this.lastSelectionTime = 0
   }
 
@@ -95,66 +95,62 @@ export class InputState {
   }
 }
 
-export type MouseSelectionUpdate = (view: EditorView, startSelection: EditorSelection,
-                                    startPos: number, startBias: -1 | 1,
-                                    curPos: number, curBias: -1 | 1,
-                                    extend: boolean, multiple: boolean) => EditorSelection
+/// Interface that objects registered with
+/// [`EditorView.mouseSelectionStyle`](#view.EditorView^mouseSelectionStyle)
+/// must conform to.
+export interface MouseSelectionStyle {
+  /// Return a new selection for the mouse gesture that starts with
+  /// the event that was originally given to the constructor, and ends
+  /// with the event passed here. In case of a plain click, those may
+  /// both be the `mousedown` event, in case of a drag gesture, the
+  /// latest `mousemove` event will be passed.
+  ///
+  /// When `extend` is true, that means the new selection should, if
+  /// possible, extend the start selection. If `multiple` is true, the
+  /// new selection should be added to the original selection.
+  get: (curEvent: MouseEvent, extend: boolean, multiple: boolean) => EditorSelection
+  /// Called when the view is updated while the gesture is in
+  /// progress. When the document changed, it may be necessary to map
+  /// some data (like the original selection or start position)
+  /// through the changes.
+  update: (update: ViewUpdate) => void
+}
+
+export type MakeSelectionStyle = (view: EditorView, event: MouseEvent) => MouseSelectionStyle | null
 
 class MouseSelection {
   dragging: null | false | SelectionRange
-  startSelection: EditorSelection
-  startPos: number
-  startBias: -1 | 1
-  curPos: number
-  curBias: -1 | 1
+  dragMove: boolean
   extend: boolean
   multiple: boolean
-  dragMove: boolean
 
-  constructor(private inputState: InputState, private view: EditorView, event: MouseEvent,
-              private update: MouseSelectionUpdate) {
+  constructor(private inputState: InputState, private view: EditorView,
+              private startEvent: MouseEvent,
+              private style: MouseSelectionStyle) {
     let doc = view.contentDOM.ownerDocument!
     doc.addEventListener("mousemove", this.move = this.move.bind(this))
     doc.addEventListener("mouseup", this.up = this.up.bind(this))
 
-    this.extend = event.shiftKey
-    this.multiple = view.state.facet(EditorState.allowMultipleSelections) && addsSelectionRange(view, event)
-    this.dragMove = dragMovesSelection(view, event)
-
-    this.startSelection = view.state.selection
-    let {pos, bias} = this.queryPos(event)
-    this.startPos = this.curPos = pos
-    this.startBias = this.curBias = bias
-    this.dragging = isInPrimarySelection(view, this.startPos, event) ? null : false
+    this.extend = startEvent.shiftKey
+    this.multiple = view.state.facet(EditorState.allowMultipleSelections) && addsSelectionRange(view, startEvent)
+    this.dragMove = dragMovesSelection(view, startEvent)
+    this.dragging = isInPrimarySelection(view, startEvent) ? null : false
     // When clicking outside of the selection, immediately apply the
     // effect of starting the selection
     if (this.dragging === false) {
-      event.preventDefault()
-      this.select()
+      startEvent.preventDefault()
+      this.select(startEvent)
     }
-  }
-
-  queryPos(event: MouseEvent): {pos: number, bias: 1 | -1} {
-    let pos = this.view.posAtCoords({x: event.clientX, y: event.clientY})
-    let coords = pos < 0 ? null : this.view.coordsAtPos(pos)
-    let bias: 1 | -1 = !coords ? 1 :
-      coords.top > event.clientY ? -1 :
-      coords.bottom < event.clientY ? 1 :
-      coords.left > event.clientX ? -1 : 1
-    return {pos, bias}
   }
 
   move(event: MouseEvent) {
     if (event.buttons == 0) return this.destroy()
     if (this.dragging !== false) return
-    let {pos, bias} = this.queryPos(event)
-    if (pos == this.curPos && bias == this.curBias) return
-    this.curPos = pos; this.curBias = bias
-    this.select()
+    this.select(event)
   }
 
   up() {
-    if (this.dragging == null) this.select()
+    if (this.dragging == null) this.select(this.startEvent)
     this.destroy()
   }
 
@@ -165,9 +161,8 @@ class MouseSelection {
     this.inputState.mouseSelection = null
   }
 
-  select() {
-    let selection = this.update(this.view, this.startSelection, this.startPos, this.startBias,
-                                this.curPos, this.curBias, this.extend, this.multiple)
+  select(event: MouseEvent) {
+    let selection = this.style.get(event, this.extend, this.multiple)
     if (!selection.eq(this.view.state.selection))
       this.view.dispatch(this.view.state.update({
         selection,
@@ -176,13 +171,9 @@ class MouseSelection {
       }))
   }
 
-  map(changes: ChangeSet) {
-    if (changes.length) {
-      this.startSelection = this.startSelection.map(changes)
-      this.startPos = changes.mapPos(this.startPos)
-      this.curPos = changes.mapPos(this.curPos)
-    }
-    if (this.dragging) this.dragging = this.dragging.map(changes)
+  update(update: ViewUpdate) {
+    if (update.docChanged && this.dragging) this.dragging = this.dragging.map(update.changes)
+    this.style.update(update)
   }
 }
 
@@ -196,11 +187,9 @@ function dragMovesSelection(view: EditorView, event: MouseEvent) {
   return facet.length ? facet[0](event) : browser.mac ? !event.altKey : !event.ctrlKey
 }
 
-function isInPrimarySelection(view: EditorView, pos: number, event: MouseEvent) {
+function isInPrimarySelection(view: EditorView, event: MouseEvent) {
   let {primary} = view.state.selection
   if (primary.empty) return false
-  if (pos < primary.from || pos > primary.to) return false
-  if (pos > primary.from && pos < primary.to) return true
   // On boundary clicks, check whether the coordinates are inside the
   // selection's client rectangles
   let sel = getSelection(view.root)
@@ -272,8 +261,16 @@ handlers.touchdown = handlers.touchmove = view => {
 }
 
 handlers.mousedown = (view, event: MouseEvent) => {
-  if (event.button == 0)
-    view.startMouseSelection(event, updateMouseSelection(event.detail))
+  let style: MouseSelectionStyle | null = null
+  for (let makeStyle of view.state.facet(mouseSelectionStyle)) {
+    style = makeStyle(view, event)
+    if (style) break
+  }
+  if (!style && event.button == 0) style = basicMouseSelection(view, event)
+  if (style) {
+    focusPreventScroll(view.contentDOM)
+    view.inputState.startMouseSelection(view, event, style)
+  }
 }
 
 function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number): SelectionRange {
@@ -289,21 +286,42 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
   }
 }
 
-function updateMouseSelection(type: number): MouseSelectionUpdate {
-  return (view, startSelection, startPos, startBias, curPos, curBias, extend, multiple) => {
-    let range = rangeForClick(view, curPos, curBias, type)
-    if (startPos != curPos && !extend) {
-      let startRange = rangeForClick(view, startPos, startBias, type)
-      let from = Math.min(startRange.from, range.from), to = Math.max(startRange.to, range.to)
-      range = from < range.from ? new SelectionRange(from, to) : new SelectionRange(to, from)
+function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | -1} {
+  let pos = view.posAtCoords({x: event.clientX, y: event.clientY})
+  let coords = pos < 0 ? null : view.coordsAtPos(pos)
+  let bias: 1 | -1 = !coords ? 1 :
+    coords.top > event.clientY ? -1 :
+    coords.bottom < event.clientY ? 1 :
+    coords.left > event.clientX ? -1 : 1
+  return {pos, bias}
+}
+
+function basicMouseSelection(view: EditorView, event: MouseEvent) {
+  let start = queryPos(view, event), type = event.detail
+  let startSel = view.state.selection
+  return {
+    update(update) {
+      if (update.changes) {
+        start.pos = update.changes.mapPos(start.pos)
+        startSel = startSel.map(update.changes)
+      }
+    },
+    get(event, extend, multiple) {
+      let cur = queryPos(view, event)
+      let range = rangeForClick(view, cur.pos, cur.bias, type)
+      if (start.pos != cur.pos && !extend) {
+        let startRange = rangeForClick(view, start.pos, start.bias, type)
+        let from = Math.min(startRange.from, range.from), to = Math.max(startRange.to, range.to)
+        range = from < range.from ? new SelectionRange(from, to) : new SelectionRange(to, from)
+      }
+      if (extend)
+        return startSel.replaceRange(startSel.primary.extend(range.from, range.to))
+      else if (multiple)
+        return startSel.addRange(range)
+      else
+        return EditorSelection.create([range])
     }
-    if (extend)
-      return startSelection.replaceRange(startSelection.primary.extend(range.from, range.to))
-    else if (multiple)
-      return startSelection.addRange(range)
-    else
-      return EditorSelection.create([range])
-  }
+  } as MouseSelectionStyle
 }
 
 handlers.dragstart = (view, event: DragEvent) => {

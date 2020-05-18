@@ -4,6 +4,7 @@ import {DecorationSet} from "./decoration"
 import {EditorView} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 import {Rect} from "./dom"
+import {MakeSelectionStyle} from "./input"
 
 /// Command functions are used in key bindings and other types of user
 /// actions. Given an editor view, they check whether their effect can
@@ -16,6 +17,8 @@ const none: readonly any[] = []
 export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boolean>()
 
 export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>()
+
+export const mouseSelectionStyle = Facet.define<MakeSelectionStyle>()
 
 export const exceptionSink = Facet.define<(exception: any) => void>()
 

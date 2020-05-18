@@ -3,13 +3,13 @@ import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
 import {ContentView} from "./contentview"
-import {InputState, MouseSelectionUpdate} from "./input"
+import {InputState} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
 import {movePos, posAtCoords} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
-        contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection,
+        contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection, mouseSelectionStyle,
         exceptionSink, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
         decorations, MeasureRequest, UpdateFlag, editable} from "./extension"
 import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
@@ -402,12 +402,6 @@ export class EditorView {
   /// The text direction (`direction` CSS property) of the editor.
   get textDirection() { return this.viewState.heightOracle.direction }
 
-  /// Start a custom mouse selection event.
-  startMouseSelection(event: MouseEvent, update: MouseSelectionUpdate) {
-    focusPreventScroll(this.contentDOM)
-    this.inputState.startMouseSelection(this, event, update)
-  }
-
   /// Check whether the editor has focus.
   get hasFocus(): boolean {
     return this.root.activeElement == this.contentDOM
@@ -472,6 +466,12 @@ export class EditorView {
   /// Facet used to configure whether a given selecting click adds
   /// a new range to the existing selection or replaces it entirely.
   static clickAddsSelectionRange = clickAddsSelectionRange
+
+  /// Allows you to influence the way mouse selection happens. The
+  /// functions in this facet will be called for a `mousedown` event
+  /// on the editor, and can return an object that overrides the way a
+  /// selection is computed from that mouse click or drag.
+  static mouseSelectionStyle = mouseSelectionStyle
 
   /// A facet that determines which [decorations](#view.Decoration)
   /// are shown in the view. See also [view
