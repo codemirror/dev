@@ -1,8 +1,9 @@
-import {EditorState, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
-import {indentMore, indentLess} from "@codemirror/next/commands"
+import {EditorState, EditorSelection, SelectionRange, StateCommand, Extension} from "@codemirror/next/state"
+import {indentMore, indentLess, indentSelection, insertNewlineAndIndent} from "@codemirror/next/commands"
+import {javascript} from "@codemirror/next/lang-javascript"
 import ist from "ist"
 
-function mkState(doc: string) {
+function mkState(doc: string, extensions: Extension = []) {
   let range = /\||<([^]*?)>/g, m
   let ranges = []
   while (m = range.exec(doc)) {
@@ -19,7 +20,7 @@ function mkState(doc: string) {
   return EditorState.create({
     doc,
     selection: ranges.length ? EditorSelection.create(ranges) : undefined,
-    extensions: EditorState.allowMultipleSelections.of(true)
+    extensions: [extensions, EditorState.allowMultipleSelections.of(true)]
   })
 }
 
@@ -71,5 +72,41 @@ describe("commands", () => {
 
     it("can split tabs", () =>
        test("\tone|", "  one|"))
+  })
+
+  describe("indentSelection", () => {
+    function test(from: string, to: string) {
+      ist(stateStr(cmd(mkState(from, javascript()), indentSelection)), to)
+    }
+
+    it("auto-indents the current line", () =>
+       test("if (0)\nfoo()|", "if (0)\n  foo()|"))
+
+    it("moves the cursor ahead of the indentation", () =>
+       test("if (0)\n | foo()", "if (0)\n  |foo()"))
+
+    it("indents blocks of lines", () =>
+       test("if (0) {\n<one\ntwo\nthree>\n}", "if (0) {\n  <one\n  two\n  three>\n}"))
+
+    it("includes previous indentation changes in relative indentation", () =>
+       test("<{\n{\n{\n{}\n}\n}\n}>", "<{\n  {\n    {\n      {}\n    }\n  }\n}>"))
+  })
+
+  describe("insertNewlineAndIndent", () => {
+    function test(from: string, to: string) {
+      ist(stateStr(cmd(mkState(from, javascript()), insertNewlineAndIndent)), to)
+    }
+
+    it("indents the new line", () =>
+       test("{|", "{\n  |"))
+
+    it("can handle multiple selections", () =>
+       test("{|\n  foo()|", "{\n  |\n  foo()\n  |"))
+
+    it("isn't confused by text after the cursor", () =>
+       test("{|two", "{\n  |two"))
+
+    it("deletes selected text", () =>
+       test("{<one>two", "{\n  |two"))
   })
 })

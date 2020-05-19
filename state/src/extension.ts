@@ -62,28 +62,39 @@ export interface Syntax {
 /// selectively override the indentation reported for some
 /// lines.
 export class IndentContext {
-  /// Create an indent context. The optional second argument can be
-  /// used to override line indentations provided to the indentation
-  /// helper function, which is useful when implementing region
-  /// indentation, where indentation for later lines needs to refer to
-  /// previous lines, which may have been reindented compared to the
-  /// original start state.
+  /// Create an indent context.
+  ///
+  /// The optional second argument can be used to override line
+  /// indentations provided to the indentation helper function, which
+  /// is useful when implementing region indentation, where
+  /// indentation for later lines needs to refer to previous lines,
+  /// which may have been reindented compared to the original start
+  /// state. If given, this function should return -1 for lines (given
+  /// by start position) that didn't change, and an updated
+  /// indentation otherwise.
+  ///
+  /// The third argument can be used to make it look, to the indent
+  /// logic, like a line break was added at the given position (which
+  /// is mostly just useful for implementing
+  /// [`insertNewlineAndIndent`](#commands.insewrtNewlineAndIndent).
   constructor(
     /// The editor state.
     readonly state: EditorState,
-    /// A function from a line start to an indentation, or `-1` if the
-    /// original indentation in `this.state` should be used. Affects
-    /// the output of `this.lineIndent`.
-    readonly overrideIndentation?: (pos: number) => number
+    /// @internal
+    readonly overrideIndentation?: (pos: number) => number,
+    /// @internal
+    readonly simulateBreak?: number
   ) {}
 
-  /// The indent unit (number of spaces per indentation level).
+  /// The indent unit (number of columns per indentation level).
   get unit() { return this.state.indentUnit }
 
   /// Get the text directly after `pos`, either the entire line
   /// or the next 100 characters, whichever is shorter.
   textAfterPos(pos: number) {
-    return this.state.sliceDoc(pos, Math.min(pos + 100, this.state.doc.lineAt(pos).end)).match(/^\s*(.*)/)![1]
+    return this.state.sliceDoc(pos, Math.min(pos + 100,
+                                             this.simulateBreak != null && this.simulateBreak >= pos ? this.simulateBreak : 1e9,
+                                             this.state.doc.lineAt(pos).end))
   }
 
   /// find the column position (taking tabs into account) of the given

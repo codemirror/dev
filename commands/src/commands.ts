@@ -1,6 +1,6 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction,
         IndentContext, ChangeSpec} from "@codemirror/next/state"
-import {Text, Line, countColumn, findColumn} from "@codemirror/next/text"
+import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command} from "@codemirror/next/view"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -142,7 +142,7 @@ function getIndentation(cx: IndentContext, pos: number): number {
 /// line(s).
 export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean => {
   let i = 0, indentation = state.selection.ranges.map(r => {
-    let indent = getIndentation(new IndentContext(state), r.from)
+    let indent = getIndentation(new IndentContext(state, undefined, r.from), r.from)
     return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
   })
   let changes = state.changeByRange(({from, to}) => {
@@ -155,41 +155,13 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
   return true
 }
 
-/// Auto-indent the selected lines. This uses the [indentation
-/// behavor](#state.EditorState^indentation) as source.
-export const indentSelection: StateCommand = ({state, dispatch}) => {
-  let lastLine = -1, changes = []
-  let updated: {[lineStart: number]: number} = Object.create(null)
-  let context = new IndentContext(state, start => {
-    let found = updated[start]
-    return found == null ? -1 : found
-  })
-  for (let range of state.selection.ranges) {
-    for (let {start, end} = state.doc.lineAt(range.from);;) {
-      if (start != lastLine) {
-        lastLine = start
-        let indent = getIndentation(context, start), current
-        if (indent > -1 &&
-            indent != (current = /^\s*/.exec(state.sliceDoc(start, Math.min(end, start + 100)))![0].length)) {
-          updated[start] = indent
-          changes.push({from: start, to: start + current, insert: indentString(state, indent)})
-        }
-      }
-      if (end + 1 > range.to) break
-      ;({start, end} = state.doc.lineAt(end + 1))
-    }
-  }
-  if (changes.length > 0) dispatch(state.update({changes}))
-  return true
-}
-
-function changeBySelectedLine(state: EditorState, f: (line: Line, changes: ChangeSpec[]) => void) {
+function changeBySelectedLine(state: EditorState, f: (line: Line, changes: ChangeSpec[], range: SelectionRange) => void) {
   let atLine = -1
   return state.changeByRange(range => {
     let changes: ChangeSpec[] = []
     for (let line = state.doc.lineAt(range.from);;) {
       if (line.number > atLine) {
-        f(line, changes)
+        f(line, changes, range)
         atLine = line.number
       }
       if (range.to <= line.end) break
@@ -199,6 +171,29 @@ function changeBySelectedLine(state: EditorState, f: (line: Line, changes: Chang
     return {changes,
             range: new SelectionRange(changeSet.mapPos(range.anchor, 1), changeSet.mapPos(range.head, 1))}
   })
+}
+
+/// Auto-indent the selected lines. This uses the [indentation
+/// facet](#state.EditorState^indentation) as source for auto-indent
+/// information.
+export const indentSelection: StateCommand = ({state, dispatch}) => {
+  let updated: {[lineStart: number]: number} = Object.create(null)
+  let context = new IndentContext(state, start => {
+    let found = updated[start]
+    return found == null ? -1 : found
+  })
+  let changes = changeBySelectedLine(state, (line, changes, range) => {
+    let indent = getIndentation(context, line.start)
+    if (indent < 0) return
+    let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, 200)))![0]
+    let norm = indentString(state, indent)
+    if (cur != norm || range.from < line.start + cur.length) {
+      updated[line.start] = indent
+      changes.push({from: line.start, to: line.start + cur.length, insert: norm})
+    }
+  })
+  if (!changes.changes!.empty) dispatch(state.update(changes))
+  return true
 }
 
 /// Add a [unit](#state.EditorState^indentUnit) of indentation to all

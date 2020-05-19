@@ -62,11 +62,11 @@ export class TreeIndentContext extends IndentContext {
     /// The syntax tree node for which the indentation strategy is
     /// registered.
     readonly node: Subtree) {
-    super(base.state, base.overrideIndentation)
+    super(base.state, base.overrideIndentation, base.simulateBreak)
   }
 
   /// Get the text directly after `this.pos`, either the entire line
-  /// or the next 50 characters, whichever is shorter.
+  /// or the next 100 characters, whichever is shorter.
   get textAfter() {
     return this.textAfterPos(this.pos)
   }
@@ -100,7 +100,7 @@ function isParent(parent: Subtree, of: Subtree) {
 function bracketedAligned(context: TreeIndentContext) {
   let tree = context.node
   let openToken = tree.childAfter(tree.start), last = tree.lastChild
-  if (!openToken) return null
+  if (!openToken || context.simulateBreak == openToken.end) return null
   let openLine = context.state.doc.lineAt(openToken.start)
   for (let pos = openToken.end;;) {
     let next = tree.childAfter(pos)
@@ -122,7 +122,8 @@ function bracketedAligned(context: TreeIndentContext) {
 ///         baz)
 export function delimitedIndent({closing, align = true, units = 1}: {closing: string, align?: boolean, units?: number}) {
   return (context: TreeIndentContext) => {
-    let closed = context.textAfter.slice(0, closing.length) == closing
+    let after = context.textAfter.match(/^\s*(.*)/)![1]
+    let closed = after.slice(0, closing.length) == closing
     let aligned = align ? bracketedAligned(context) : null
     if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
     return context.baseIndent + (closed ? 0 : context.unit * units)
