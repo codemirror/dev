@@ -98,11 +98,22 @@ export const selectAll: StateCommand = ({state, dispatch}) => {
 }
 
 function deleteText(view: EditorView, dir: "forward" | "backward") {
-  let changes = view.state.changeByRange(range => {
+  let {state} = view, changes = state.changeByRange(range => {
     let {from, to} = range
     if (from == to) {
-      let target = view.movePos(range.head, dir, "character", "move")
-      from = Math.min(from, target); to = Math.max(to, target)
+      let line = state.doc.lineAt(from), before
+      if (dir == "backward" && from > line.start && from < line.start + 200 &&
+          !/[^ \t]/.test(before = line.slice(0, from - line.start))) {
+        if (before[before.length - 1] == "\t") {
+          from--
+        } else {
+          let col = countColumn(before, 0, state.tabSize), drop = col % state.indentUnit || state.indentUnit
+          for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) from--
+        }
+      } else {
+        let target = view.movePos(range.head, dir, "character", "move")
+        from = Math.min(from, target); to = Math.max(to, target)
+      }
     }
     if (from == to) return {range}
     return {changes: {from, to}, range: new SelectionRange(from)}
