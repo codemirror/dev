@@ -1,4 +1,6 @@
-import {Text, EditorState, StateCommand, EditorSelection, SelectionRange, Transaction, IndentContext} from "@codemirror/next/state"
+import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction,
+        IndentContext, ChangeSpec} from "@codemirror/next/state"
+import {Text, Line, countColumn, findColumn} from "@codemirror/next/text"
 import {EditorView, Command} from "@codemirror/next/view"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -118,10 +120,12 @@ export const deleteCharBackward: Command = view => deleteText(view, "backward")
 /// Delete the character after the cursor.
 export const deleteCharForward: Command = view => deleteText(view, "forward")
 
-// FIXME support indenting by tab
-
-function space(n: number) {
+function indentString(state: EditorState, n: number) {
   let result = ""
+  if (state.indentWithTabs) while (n >= state.tabSize) {
+    result += "\t"
+    n -= state.tabSize
+  }
   for (let i = 0; i < n; i++) result += " "
   return result
 }
@@ -144,7 +148,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
   let changes = state.changeByRange(({from, to}) => {
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
-    return {changes: {from, to, insert: Text.of(["", space(indent)])},
+    return {changes: {from, to, insert: Text.of(["", indentString(state, indent)])},
             range: new SelectionRange(from + 1 + indent)}
   })
   dispatch(state.update(changes, {scrollIntoView: true}))
@@ -153,7 +157,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
 
 /// Auto-indent the selected lines. This uses the [indentation
 /// behavor](#state.EditorState^indentation) as source.
-export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
+export const indentSelection: StateCommand = ({state, dispatch}) => {
   let lastLine = -1, changes = []
   let updated: {[lineStart: number]: number} = Object.create(null)
   let context = new IndentContext(state, start => {
@@ -168,7 +172,7 @@ export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
         if (indent > -1 &&
             indent != (current = /^\s*/.exec(state.sliceDoc(start, Math.min(end, start + 100)))![0].length)) {
           updated[start] = indent
-          changes.push({from: start, to: start + current, insert: space(indent)})
+          changes.push({from: start, to: start + current, insert: indentString(state, indent)})
         }
       }
       if (end + 1 > range.to) break
@@ -176,6 +180,47 @@ export const indentSelection: StateCommand = ({state, dispatch}): boolean => {
     }
   }
   if (changes.length > 0) dispatch(state.update({changes}))
+  return true
+}
+
+function changeBySelectedLine(state: EditorState, f: (line: Line, changes: ChangeSpec[]) => void) {
+  let atLine = -1
+  return state.changeByRange(range => {
+    let changes: ChangeSpec[] = []
+    for (let line = state.doc.lineAt(range.from);;) {
+      if (line.number > atLine) {
+        f(line, changes)
+        atLine = line.number
+      }
+      if (range.to <= line.end) break
+      line = state.doc.lineAt(line.end + 1)
+    }
+    let changeSet = state.changes(changes)
+    return {changes,
+            range: new SelectionRange(changeSet.mapPos(range.anchor, 1), changeSet.mapPos(range.head, 1))}
+  })
+}
+
+/// Add a [unit](#state.EditorState^indentUnit) of indentation to all
+/// selected lines.
+export const indentMore: StateCommand = ({state, dispatch}) => {
+  dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
+    changes.push({from: line.start, insert: state.facet(EditorState.indentUnit)})
+  })))
+  return true
+}
+
+/// Remove a [unit](#state.EditorState^indentUnit) of indentation from
+/// all selected lines.
+export const indentLess: StateCommand = ({state, dispatch}) => {
+  dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
+    let lineStart = line.slice(0, Math.min(line.length, 200))
+    let space = /^\s*/.exec(lineStart)![0]
+    if (!space) return
+    let col = countColumn(space, 0, state.tabSize), insert = indentString(state, Math.max(0, col - state.indentUnit)), keep = 0
+    while (keep < space.length && keep < insert.length && space.charCodeAt(keep) == insert.charCodeAt(keep)) keep++
+    changes.push({from: line.start + keep, to: line.start + space.length, insert: insert.slice(keep)})
+  })))
   return true
 }
 
@@ -227,6 +272,8 @@ export const macBaseKeymap: {[key: string]: Command} = {
   "Shift-Control-e": extendLineEnd,
   "Cmd-ArrowUp": selectDocStart,
   "Cmd-ArrowDown": selectDocEnd,
+  "Cmd-ArrowLeft": moveLineStart,
+  "Cmd-ArrowRight": moveLineEnd,
   "Control-d": deleteCharForward,
   "Control-h": deleteCharBackward
 }

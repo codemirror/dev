@@ -57,3 +57,7 @@
 @insertNewlineAndIndent
 
 @indentSelection
+
+@indentMore
+
+@indentLess
