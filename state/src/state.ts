@@ -27,8 +27,6 @@ export interface EditorStateConfig {
   extensions?: Extension
 }
 
-const DefaultIndentUnit = 2, DefaultTabsize = 4
-
 /// The editor state class is a persistent (immutable) data structure.
 /// To update a state, you [create](#state.EditorState.t) and
 /// [apply](#state.Transaction.apply) a
@@ -221,9 +219,10 @@ export class EditorState {
   static indentation = Facet.define<(context: IndentContext, pos: number) => number>()
 
   /// Configures the tab size to use in this state. The first
-  /// (highest-precedence) value of the facet is used.
+  /// (highest-precedence) value of the facet is used. If no value is
+  /// given, this defaults to 4.
   static tabSize = Facet.define<number, number>({
-    combine: values => values.length ? values[0] : DefaultTabsize
+    combine: values => values.length ? values[0] : 4
   })
 
   /// The size (in columns) of a tab in the document, determined by
@@ -242,15 +241,29 @@ export class EditorState {
     static: true
   })
 
-  /// Facet for overriding the unit (in columns) by which
-  /// indentation happens. When not set, this defaults to 2.
-  static indentUnit = Facet.define<number, number>({
-    combine: values => values.length ? values[0] : DefaultIndentUnit
+  /// Facet for overriding the unit by which indentation happens.
+  /// Should be a string consisting either entirely of spaces or
+  /// entirely of tabs. When not set, this defaults to 2 spaces.
+  static indentUnit = Facet.define<string, string>({
+    combine: values => {
+      if (!values.length) return "  "
+      if (!/^(?: +|\t+)$/.test(values[0])) throw new Error("Invalid indent unit: " + JSON.stringify(values[0]))
+      return values[0]
+    }
   })
 
-  /// The size of an indent unit in the document. Determined by the
-  /// [`indentUnit`](#state.EditorState^indentUnit) facet.
-  get indentUnit() { return this.facet(EditorState.indentUnit) }
+  /// The _column width_ of an indent unit in the document. Determined
+  /// by the [`indentUnit`](#state.EditorState^indentUnit) facet, and
+  /// [`tabSize`](#state.EditorState^tabSize) when that contains tabs.
+  get indentUnit() {
+    let unit = this.facet(EditorState.indentUnit)
+    return unit.charCodeAt(0) == 9 ? this.tabSize * unit.length : unit.length
+  }
+
+  /// Whether indentation should use tabs. Will be true when the
+  /// [`indentUnit`](#state.EditorState^indentUnit) facet contains
+  /// tabs.
+  get indentWithTabs() { return this.facet(EditorState.indentUnit).charCodeAt(0) == 9 }
 
   /// Registers translation phrases. The
   /// [`phrase`](#state.EditorState.phrase) method will look through
