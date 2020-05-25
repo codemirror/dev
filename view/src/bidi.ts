@@ -47,51 +47,38 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
   if (!line || direction == "ltr" && !BidiRE.test(line)) return [new BidiSpan(0, line.length, 0)]
 
   let len = line.length, types: T[] = []
-  for (let i = 0; i < len; i++) types.push(charType(line.charCodeAt(i)))
 
   // W1. Examine each non-spacing mark (NSM) in the level run, and
   // change the type of the NSM to the type of the previous
   // character. If the NSM is at the start of the level run, it will
   // get the type of sor.
-  for (let i = 0, prev = outerType; i < len; i++) {
-    let type = types[i]
-    if (type == T.NSM) types[i] = prev
-    else prev = type
-  }
-
   // W2. Search backwards from each instance of a European number
   // until the first strong type (R, L, AL, or sor) is found. If an
   // AL is found, change the type of the European number to Arabic
   // number.
   // W3. Change all ALs to R.
   // (Left after this: L, R, EN, AN, ES, ET, CS, NI)
-  for (let i = 0, cur = outerType; i < len; i++) {
-    let type = types[i]
-    if (type == T.EN && cur == T.AL) {
-      types[i] = T.AN
-    } else if (type & T.Strong) {
-      cur = type
-      if (type == T.AL) types[i] = T.R
-    }
+  for (let i = 0, prev = outerType, prevStrong = outerType; i < len; i++) {
+    let type = charType(line.charCodeAt(i))
+    if (type == T.NSM) type = prev
+    else if (type == T.EN && prevStrong == T.AL) type = T.AN
+    types.push(type == T.AL ? T.R : type)
+    if (type & T.Strong) prevStrong = type
+    prev = type
   }
 
   // W4. A single European separator between two European numbers
   // changes to a European number. A single common separator between
   // two numbers of the same type changes to that type.
-  for (let i = 1, prev = types[0]; i < len - 1; i++) {
-    let type = types[i]
-    if (type == T.CS && prev == types[i + 1] && (prev & T.Num)) types[i] = prev
-    prev = type
-  }
-
   // W5. A sequence of European terminators adjacent to European
   // numbers changes to all European numbers.
   // W6. Otherwise, separators and terminators change to Other
   // Neutral.
   // (Left after this: L, R, EN, AN, NI)
-  for (let i = 0; i < len; i++) {
+  for (let i = 1, prev = types[0]; i < len - 1; i++) {
     let type = types[i]
-    if (type == T.CS) types[i] = T.NI
+    if (type == T.CS && prev == types[i + 1] && (prev & T.Num)) type = types[i] = prev
+    else if (type == T.CS) types[i] = T.NI
     else if (type == T.ET) {
       let end = i + 1
       while (end < len && types[end] == T.ET) end++
@@ -99,6 +86,7 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
       for (let j = i; j < end; j++) types[j] = replace
       i = end - 1
     }
+    prev = type
   }
 
   // W7. Search backwards from each instance of a European number
@@ -129,7 +117,6 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
       i = end - 1
     }
   }
-  //console.log("types are now", types.map(i => i == T.L ? "L" : i == T.R ? "R" : "N").join(""))
 
   // Here we depart from the documented algorithm, in order to avoid
   // building up an actual levels array. Since there are only three

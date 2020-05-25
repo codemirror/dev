@@ -42,7 +42,7 @@ const cases = [
   "م1234%bc",
   "ر12:34ر",
   "xyאהxyאהxyאהxyאהxyאהxyאהxyאה",
-  "ab مرآة10 cde 20مرآة!"
+  "ab مرآة10 cde 20مرآة!",
 ]
 
 let queried: {ltr: (readonly number[])[], rtl: (readonly number[])[]} | null = null
