@@ -16,7 +16,7 @@ const enum T {
 // Decode a string with each type encoded as log2(type)
 function dec(str: string): readonly T[] {
   let result = []
-  for (let i = 0; i < str.length; i++) result.push(1 << (str.charCodeAt(i) - 48))
+  for (let i = 0; i < str.length; i++) result.push(1 << +str[i])
   return result
 }
 
@@ -37,16 +37,18 @@ function charType(ch: number) {
 
 const BidiRE = /[\u0590-\u05f4\u0600-\u06ff\u0700-\u08ac]/
 
-class BidiSpan {
+export class BidiSpan {
   constructor(readonly from: number, readonly to: number, readonly level: number) {}
+  get inverted() { return this.level % 2 > 0 }
 }
 
+// Reused array of character types
+const types: T[] = []
+
 export function computeOrder(line: string, direction: "ltr" | "rtl") {
-  let outerType = direction == "ltr" ? T.L : T.R
+  let len = line.length, outerType = direction == "ltr" ? T.L : T.R 
 
-  if (!line || direction == "ltr" && !BidiRE.test(line)) return [new BidiSpan(0, line.length, 0)]
-
-  let len = line.length, types: T[] = []
+  if (!line || direction == "ltr" && !BidiRE.test(line)) return trivialOrder(len)
 
   // W1. Examine each non-spacing mark (NSM) in the level run, and
   // change the type of the NSM to the type of the previous
@@ -57,19 +59,16 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
   // AL is found, change the type of the European number to Arabic
   // number.
   // W3. Change all ALs to R.
-  // (Left after this: L, R, EN, AN, ES, ET, CS, NI)
+  // (Left after this: L, R, EN, AN, ET, CS, NI)
   for (let i = 0, prev = outerType, prevStrong = outerType; i < len; i++) {
     let type = charType(line.charCodeAt(i))
     if (type == T.NSM) type = prev
     else if (type == T.EN && prevStrong == T.AL) type = T.AN
-    types.push(type == T.AL ? T.R : type)
+    types[i] = type == T.AL ? T.R : type
     if (type & T.Strong) prevStrong = type
     prev = type
   }
 
-  // W4. A single European separator between two European numbers
-  // changes to a European number. A single common separator between
-  // two numbers of the same type changes to that type.
   // W5. A sequence of European terminators adjacent to European
   // numbers changes to all European numbers.
   // W6. Otherwise, separators and terminators change to Other
@@ -146,4 +145,8 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
     }
   }
   return order
+}
+
+export function trivialOrder(length: number) {
+  return [new BidiSpan(0, length, 0)]
 }

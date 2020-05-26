@@ -1,4 +1,5 @@
-import {EditorState, Transaction, Extension, Precedence} from "@codemirror/next/state"
+import {EditorState, Transaction, Extension, Precedence, ChangeDesc} from "@codemirror/next/state"
+import {Line} from "@codemirror/next/text"
 import {StyleModule, Style} from "style-mod"
 
 import {DocView} from "./docview"
@@ -17,6 +18,7 @@ import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import browser from "./browser"
 import {applyDOMChange} from "./domchange"
+import {computeOrder, trivialOrder, BidiSpan} from "./bidi"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
@@ -111,6 +113,7 @@ export class EditorView {
   private editorAttrs: Attrs = {}
   private contentAttrs: Attrs = {}
   private styleModules!: readonly StyleModule[]
+  private bidiCache: CachedOrder[] = []
 
   /// @internal
   updateState: UpdateState = UpdateState.Updating
@@ -175,6 +178,7 @@ export class EditorView {
 
     let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1
     this.viewState.update(update, scrollTo)
+    this.bidiCache = CachedOrder.update(this.bidiCache, update.changes)
     if (!update.empty) this.updatePlugins(update)
     let redrawn = this.docView.update(update)
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
@@ -402,6 +406,19 @@ export class EditorView {
   /// The text direction (`direction` CSS property) of the editor.
   get textDirection() { return this.viewState.heightOracle.direction }
 
+  /// Returns the bidirectional text structure of the given line
+  /// (which should be in the current document) as an array of span
+  /// objects.
+  // FIXME properly document output format 
+  bidiSpans(line: Line) {
+    if (line.length > MaxBidiLine) return trivialOrder(line.length)
+    let dir = this.textDirection
+    for (let entry of this.bidiCache) if (entry.from == line.start && entry.dir == dir) return entry.order
+    let order = computeOrder(line.slice(), this.textDirection)
+    this.bidiCache.push(new CachedOrder(line.start, line.end, dir, order))
+    return order
+  }
+
   /// Check whether the editor has focus.
   get hasFocus(): boolean {
     return this.root.activeElement == this.contentDOM
@@ -503,6 +520,9 @@ export class EditorView {
   static editorAttributes = editorAttributes
 }
 
+// Maximum line length for which we compute accurate bidi info
+const MaxBidiLine = 4096
+
 function ensureTop(given: number | undefined, dom: HTMLElement) {
   return given == null ? dom.getBoundingClientRect().top : given
 }
@@ -526,3 +546,23 @@ function handleResize() {
 }
 
 const BadMeasure = {}
+
+class CachedOrder {
+  constructor(
+    readonly from: number,
+    readonly to: number,
+    readonly dir: "ltr" | "rtl",
+    readonly order: readonly BidiSpan[]
+  ) {}
+
+  static update(cache: CachedOrder[], changes: ChangeDesc) {
+    if (changes.empty) return cache
+    let result = [], lastDir = cache.length ? cache[cache.length - 1].dir : "ltr"
+    for (let i = Math.max(0, cache.length - 10); i < cache.length; i++) {
+      let entry = cache[i]
+      if (entry.dir == lastDir && !changes.touchesRange(entry.from, entry.to))
+        result.push(new CachedOrder(changes.mapPos(entry.from, 1), changes.mapPos(entry.to, -1), entry.dir, entry.order))
+    }
+    return result
+  }
+}
