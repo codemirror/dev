@@ -48,7 +48,7 @@ const types: T[] = []
 export function computeOrder(line: string, direction: "ltr" | "rtl") {
   let len = line.length, outerType = direction == "ltr" ? T.L : T.R 
 
-  if (!line || direction == "ltr" && !BidiRE.test(line)) return trivialOrder(len)
+  if (!line || outerType == T.L && !BidiRE.test(line)) return trivialOrder(len)
 
   // W1. Examine each non-spacing mark (NSM) in the level run, and
   // change the type of the NSM to the type of the previous
@@ -73,29 +73,27 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
   // numbers changes to all European numbers.
   // W6. Otherwise, separators and terminators change to Other
   // Neutral.
-  // (Left after this: L, R, EN, AN, NI)
-  for (let i = 1, prev = types[0]; i < len - 1; i++) {
-    let type = types[i]
-    if (type == T.CS && prev == types[i + 1] && (prev & T.Num)) type = types[i] = prev
-    else if (type == T.CS) types[i] = T.NI
-    else if (type == T.ET) {
-      let end = i + 1
-      while (end < len && types[end] == T.ET) end++
-      let replace = (i && types[i - 1] == T.EN) || (end < len && types[end] == T.EN) ? T.EN : T.NI
-      for (let j = i; j < end; j++) types[j] = replace
-      i = end - 1
-    }
-    prev = type
-  }
-
   // W7. Search backwards from each instance of a European number
   // until the first strong type (R, L, or sor) is found. If an L is
   // found, then change the type of the European number to L.
   // (Left after this: L, R, EN+AN, NI)
-  for (let i = 0, cur = outerType; i < len; i++) {
+  for (let i = 1, prev = types[0], prevStrong = outerType; i < len - 1; i++) {
     let type = types[i]
-    if (cur == T.L && type == T.EN) types[i] = T.L
-    else if (type & T.Strong) cur = type
+    if (type == T.CS && prev == types[i + 1] && (prev & T.Num)) {
+      type = types[i] = prev
+    } else if (type == T.CS) {
+      types[i] = T.NI
+    } else if (type == T.ET) {
+      let end = i + 1
+      while (end < len && types[end] == T.ET) end++
+      let replace = (i && prev == T.EN) || (end < len && types[end] == T.EN) ? (prevStrong == T.L ? T.L : T.EN) : T.NI
+      for (let j = i; j < end; j++) types[j] = replace
+      i = end - 1
+    } else if (type == T.EN && prevStrong == T.L) {
+      types[i] = T.L
+    }
+    prev = type
+    if (type & T.Strong) prevStrong = type
   }
 
   // N1. A sequence of neutrals takes the direction of the
@@ -123,25 +121,25 @@ export function computeOrder(line: string, direction: "ltr" | "rtl") {
   // explicit embedding into account, we can build up the order on
   // the fly, without following the level-based algorithm.
   let order = []
-  for (let i = 0; i < len;) {
-    let start = i, rtl
-    if (outerType == T.R) {
-      // Treat the whole line as an RTL-context span when the outer dir is rtl
-      rtl = true
-      i = len
-    } else {
-      // Otherwise, split the line into pure-L and other sections
-      rtl = types[i++] != T.L
+  if (outerType == T.L) {
+    for (let i = 0; i < len;) {
+      let start = i, rtl = types[i++] != T.L
       while (i < len && rtl == (types[i] != T.L)) i++
-    }
-    if (rtl) {
-      for (let j = i; j > start;) {
-        let end = j, l = types[--j] != T.R
-        while (j > start && l == (types[j - 1] != T.R)) j--
-        order.push(new BidiSpan(j, end, l ? 2 : 1))
+      if (rtl) {
+        for (let j = i; j > start;) {
+          let end = j, l = types[--j] != T.R
+          while (j > start && l == (types[j - 1] != T.R)) j--
+          order.push(new BidiSpan(j, end, l ? 2 : 1))
+        }
+      } else {
+        order.push(new BidiSpan(start, i, 0))
       }
-    } else {
-      order.push(new BidiSpan(start, i, 0))
+    }
+  } else {
+    for (let i = 0; i < len;) {
+      let start = i, rtl = types[i++] == T.R
+      while (i < len && rtl == (types[i] == T.R)) i++
+      order.push(new BidiSpan(start, i, rtl ? 1 : 2))
     }
   }
   return order

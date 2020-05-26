@@ -54,7 +54,7 @@ function getOrder(i: number, dir: "ltr" | "rtl") {
 function ourOrder(i: number, dir: "ltr" | "rtl") {
   let order = __test.computeOrder(cases[i], dir)
   let result = []
-  for (let span of order) {
+  for (let span of dir == "ltr" ? order : order.slice().reverse()) {
     if (span.level % 2) for (let i = span.to - 1; i >= span.from; i--) result.push(i)
     else for (let i = span.from; i < span.to; i++) result.push(i)
   }
