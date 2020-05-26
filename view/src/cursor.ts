@@ -3,7 +3,7 @@ import {LineView} from "./blockview"
 import {BlockType} from "./decoration"
 import {Dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
-import {Text as Doc, findColumn, countColumn, isExtendingChar} from "@codemirror/next/text"
+import {Text as Doc, findColumn, countColumn} from "@codemirror/next/text"
 import {SelectionRange} from "@codemirror/next/state"
 import {isEquivalentPosition, clientRectsFor, getSelection} from "./dom"
 import browser from "./browser"
@@ -92,14 +92,9 @@ function moveLineByColumn(doc: Doc, tabSize: number, pos: number, dir: -1 | 1): 
 }
 
 function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | null, doc: Doc): number {
-  if (context == null) {
-    for (let pos = start;; pos += dir) {
-      if (dir < 0 && pos == 0 || dir > 0 && pos == doc.length) return pos
-      if (!isExtendingChar((dir < 0 ? doc.sliceString(pos - 1, pos) : doc.sliceString(pos, pos + 1)).charCodeAt(0))) {
-        if (dir < 0) return pos - 1
-        else if (pos != start) return pos
-      }
-    }
+  if (context == null) { // FIXME cluster breaks
+    if (dir < 0 && start == 0 || dir > 0 && start == doc.length) return start
+    return start + dir
   }
   for (let {i, off} = context.line.childPos(start - context.start), {children} = context.line, pos = start;;) {
     if (off == (dir < 0 || i == children.length ? 0 : children[i].length)) {
@@ -110,10 +105,8 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
     }
     let inline = children[i]
     if (inline instanceof TextView) {
-      if (!isExtendingChar(inline.text.charCodeAt(off - (dir < 0 ? 1 : 0)))) {
-        if (dir < 0) return pos - 1
-        else if (pos != start) return pos
-      }
+      if (dir < 0) return pos - 1
+      if (pos != start) return pos
       off += dir; pos += dir
     } else if (inline.length > 0) {
       return pos - off + (dir < 0 ? 0 : inline.length)

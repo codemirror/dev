@@ -1,4 +1,4 @@
-import {Text, TextIterator, isExtendingChar} from "@codemirror/next/text"
+import {Text, TextIterator} from "@codemirror/next/text"
 
 const basicNormalize: (string: string) => string = String.prototype.normalize ? x => x.normalize("NFKD") : x => x
 
@@ -65,7 +65,7 @@ export class SearchCursor implements Iterator<{from: number, to: number}>{
       this.bufferPos++
       for (;;) {
         let peek = this.peek()
-        if (peek < 0 || !isExtendingChar(peek)) break
+        if (peek < 0xDC00 || peek >= 0xE000) break
         this.bufferPos++
         str += String.fromCharCode(peek)
       }
