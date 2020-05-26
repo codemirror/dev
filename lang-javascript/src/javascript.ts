@@ -17,11 +17,11 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     }
   }),
   indentNodeProp.add(type => {
-    if (type.name == "IfStatement") return continuedIndent({except: /^({|else\b)/})
-    if (type.name == "TryStatement") return continuedIndent({except: /^({|catch|finally)\b/})
+    if (type.name == "IfStatement") return continuedIndent({except: /^\s*({|else\b)/})
+    if (type.name == "TryStatement") return continuedIndent({except: /^\s*({|catch|finally)\b/})
     if (type.name == "LabeledStatement") return flatIndent
     if (type.name == "SwitchBody") return context => {
-      let after = context.textAfter, closed = after[0] == "}", isCase = /^(case|default)\b/.test(after)
+      let after = context.textAfter, closed = /^\s*\}/.test(after), isCase = /^\s*(case|default)\b/.test(after)
       return context.baseIndent + (closed ? 0 : isCase ? 1 : 2) * context.unit
     }
     if (type.name == "TemplateString" || type.name == "BlockComment") return () => -1

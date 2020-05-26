@@ -76,7 +76,7 @@ export class IndentContext {
   /// The third argument can be used to make it look, to the indent
   /// logic, like a line break was added at the given position (which
   /// is mostly just useful for implementing
-  /// [`insertNewlineAndIndent`](#commands.insewrtNewlineAndIndent).
+  /// [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent).
   constructor(
     /// The editor state.
     readonly state: EditorState,
