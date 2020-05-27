@@ -1,5 +1,6 @@
 import ist from "ist"
-import {__test} from "@codemirror/next/view"
+import {__test, BidiSpan} from "@codemirror/next/view"
+import {Text} from "@codemirror/next/text"
 
 function queryBrowserOrder(strings: readonly string[]) {
   let scratch = document.body.appendChild(document.createElement("div"))
@@ -32,7 +33,6 @@ const cases = [
   "codeمرآة",
   "الشفرةmirror",
   "codeمرآةabc",
-  "الشفرةmirror",
   "كود1234المرآة",
   "كودabcالمرآة",
   "code123مرآة157abc",
@@ -51,8 +51,7 @@ function getOrder(i: number, dir: "ltr" | "rtl") {
   return queried[dir][i]
 }
 
-function ourOrder(i: number, dir: "ltr" | "rtl") {
-  let order = __test.computeOrder(cases[i], dir)
+function ourOrder(order: readonly BidiSpan[], dir: "ltr" | "rtl") {
   let result = []
   for (let span of dir == "ltr" ? order : order.slice().reverse()) {
     if (span.level % 2) for (let i = span.to - 1; i >= span.from; i--) result.push(i)
@@ -64,7 +63,40 @@ function ourOrder(i: number, dir: "ltr" | "rtl") {
 function tests(dir: "ltr" | "rtl") {
   describe(dir + " context", () => {
     for (let i = 0; i < cases.length; i++) it(cases[i], () => {
-      ist(ourOrder(i, dir).join("-"), getOrder(i, dir).join("-"))
+      ist(ourOrder(__test.computeOrder(cases[i], dir), dir).join("-"), getOrder(i, dir).join("-"))
+    })
+  })
+
+  describe(dir + " motion", () => {
+    for (let i = 0; i < cases.length; i++) {
+      for (let forward = true;; forward = false) {
+        it(cases[i] + (forward ? " forward" : " backward"), () => {
+          let order = __test.computeOrder(cases[i], dir)
+          let line = Text.of([cases[i]]).line(1)
+          let seen = []
+          for (let p = __test.lineSide(line, order, dir, !forward);;) {
+            ist(!seen[p.index])
+            seen[p.index] = true
+            let next = __test.moveVisually(line, order, dir, p.index, p.level, forward)
+            if (!next) break
+            p = next
+          }
+          ist(seen.length, cases[i].length + 1)
+          for (let i = 0; i < seen.length; i++) ist(seen[i])
+        })
+        if (!forward) break
+      }
+    }
+
+    it("handles extending characters", () => {
+      let str = "aé̠őx 😎🙉 👨‍🎤💪🏽👩‍👩‍👧‍👦 🇩🇪🇫🇷"
+      let points = [0, 1, 4, 6, 7, 8, 10, 12, 13, 18, 22, 33, 34, 38, 42]
+      let line = Text.of([str]).line(1)
+      let order = __test.computeOrder(str, "ltr")
+      for (let i = 1; i < points.length; i++) {
+        ist(__test.moveVisually(line, order, "ltr", points[i - 1], 0, true)!.index, points[i])
+        ist(__test.moveVisually(line, order, "ltr", points[i], 0, false)!.index, points[i - 1])
+      }
     })
   })
 }
