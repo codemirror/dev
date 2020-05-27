@@ -40,9 +40,9 @@ export const moveCharLeft: Command = view => moveHoriz(view, view.textDirection 
 export const moveCharRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "character")
 
 /// Move the selection one word to the left.
-export const moveWordLeft: Command = view => moveHoriz(view, view.textDirection != Direction.LTR, "group")
+export const moveGroupLeft: Command = view => moveHoriz(view, view.textDirection != Direction.LTR, "group")
 /// Move the selection one word to the right.
-export const moveWordRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "group")
+export const moveGroupRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "group")
 
 /// Move the selection one line up.
 export const moveLineUp: Command = view => moveSelection(view, "backward", "line")
@@ -68,16 +68,26 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
   return true
 }
 
+function extendHoriz(view: EditorView, forward: boolean, unit: "character" | "group"): boolean {
+  let selection = updateSel(view.state.selection, range => {
+    let pos = view.moveHorizontally(range, forward, unit)
+    return EditorSelection.range(range.anchor, pos.from)
+  })
+  if (selection.eq(view.state.selection)) return false
+  view.dispatch(view.state.update({selection, scrollIntoView: true}))
+  return true
+}
+
 /// Move the selection head one character to the left, while leaving
 /// the anchor in place.
-export const extendCharLeft: Command = view => extendSelection(view, "left", "character")
+export const extendCharLeft: Command = view => extendHoriz(view, view.textDirection != Direction.LTR, "character")
 /// Move the selection head one character to the right.
-export const extendCharRight: Command = view => extendSelection(view, "right", "character")
+export const extendCharRight: Command = view => extendHoriz(view, view.textDirection == Direction.LTR, "character")
 
 /// Move the selection head one word to the left.
-export const extendWordLeft: Command = view => extendSelection(view, "left", "word")
+export const extendGroupLeft: Command = view => extendHoriz(view, view.textDirection != Direction.LTR, "group")
 /// Move the selection head one word to the right.
-export const extendWordRight: Command = view => extendSelection(view, "right", "word")
+export const extendGroupRight: Command = view => extendHoriz(view, view.textDirection == Direction.LTR, "group")
 
 /// Move the selection head one line up.
 export const extendLineUp: Command = view => extendSelection(view, "backward", "line")
@@ -250,10 +260,10 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "ArrowRight": moveCharRight,
   "Shift-ArrowLeft": extendCharLeft,
   "Shift-ArrowRight": extendCharRight,
-  "Mod-ArrowLeft": moveWordLeft,
-  "Mod-ArrowRight": moveWordRight,
-  "Shift-Mod-ArrowLeft": extendWordLeft,
-  "Shift-Mod-ArrowRight": extendWordRight,
+  "Mod-ArrowLeft": moveGroupLeft,
+  "Mod-ArrowRight": moveGroupRight,
+  "Shift-Mod-ArrowLeft": extendGroupLeft,
+  "Shift-Mod-ArrowRight": extendGroupRight,
   "ArrowUp": moveLineUp,
   "ArrowDown": moveLineDown,
   "Shift-ArrowUp": extendLineUp,
