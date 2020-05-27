@@ -40,9 +40,9 @@ export const moveCharLeft: Command = view => moveHoriz(view, view.textDirection 
 export const moveCharRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "character")
 
 /// Move the selection one word to the left.
-export const moveWordLeft: Command = view => moveSelection(view, "left", "word")
+export const moveWordLeft: Command = view => moveHoriz(view, view.textDirection != Direction.LTR, "group")
 /// Move the selection one word to the right.
-export const moveWordRight: Command = view => moveSelection(view, "right", "word")
+export const moveWordRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "group")
 
 /// Move the selection one line up.
 export const moveLineUp: Command = view => moveSelection(view, "backward", "line")

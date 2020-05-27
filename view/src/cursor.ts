@@ -1,4 +1,4 @@
-import {EditorState, EditorSelection} from "@codemirror/next/state"
+import {EditorState, EditorSelection, SelectionRange, CharCategory} from "@codemirror/next/state"
 import {nextClusterBreak, prevClusterBreak} from "@codemirror/next/text"
 import {EditorView} from "./editorview"
 import {LineView} from "./blockview"
@@ -7,6 +7,7 @@ import {Dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn} from "@codemirror/next/text"
 import {isEquivalentPosition, clientRectsFor, getSelection} from "./dom"
+import {moveVisually, lineSide} from "./bidi"
 import browser from "./browser"
 
 declare global {
@@ -361,4 +362,25 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
     ;({node, offset} = domPosAtCoords(line.dom!, x, y))
   }
   return view.docView.posFromDOM(node, offset)
+}
+
+export function moveHorizontally(view: EditorView, start: SelectionRange, forward: boolean,
+                                 unit: "character" | "group" = "character") {
+  let line = view.state.doc.lineAt(start.head)
+  let result = moveVisually(line, view.bidiSpans(line), view.textDirection, start, forward,
+                            unit == "character" ? undefined : ch => moveByWord(view, start.head, ch))
+  if (result) return result
+  if (line.number == (forward ? view.state.doc.lines : 1)) return start
+  let nextLine = view.state.doc.line(line.number + (forward ? 1 : -1))
+  return lineSide(nextLine, view.bidiSpans(nextLine), view.textDirection, !forward)
+}
+
+function moveByWord(view: EditorView, pos: number, start: string) {
+  let categorize = view.state.charCategorizer(pos)
+  let cat = categorize(start)
+  return (next: string) => {
+    let nextCat = categorize(next)
+    if (cat == CharCategory.Space) cat = nextCat
+    return cat == nextCat
+  }
 }

@@ -6,7 +6,7 @@ import {DocView} from "./docview"
 import {ContentView} from "./contentview"
 import {InputState} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
-import {movePos, posAtCoords} from "./cursor"
+import {movePos, posAtCoords, moveHorizontally} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
@@ -18,7 +18,7 @@ import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import browser from "./browser"
 import {applyDOMChange} from "./domchange"
-import {computeOrder, trivialOrder, BidiSpan, Direction, moveVisually, lineSide} from "./bidi"
+import {computeOrder, trivialOrder, BidiSpan, Direction} from "./bidi"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
@@ -379,13 +379,14 @@ export class EditorView {
     return movePos(this, start, direction, granularity, action)
   }
 
-  moveHorizontally(start: SelectionRange, forward: boolean, _unit: "character" | "group" = "character") {
-    let line = this.state.doc.lineAt(start.head)
-    let result = moveVisually(line, this.bidiSpans(line), this.textDirection, start, forward)
-    if (result) return result
-    if (line.number == (forward ? this.state.doc.lines : 1)) return start
-    let nextLine = this.state.doc.line(line.number + (forward ? 1 : -1))
-    return lineSide(nextLine, this.bidiSpans(nextLine), this.textDirection, !forward)
+  /// Move a cursor position by one character or group (sequence of
+  /// word or non-word characters). Moves (visually) away from the
+  /// start of the line when `forward` is true, towards it otherwise.
+  /// Will skip to the next line when reaching the line boundary, and
+  /// return the original position when hitting the start or end of
+  /// the document.
+  moveHorizontally(start: SelectionRange, forward: boolean, unit: "character" | "group" = "character") {
+    return moveHorizontally(this, start, forward, unit)
   }
 
   /// Scroll the given document position into view.
