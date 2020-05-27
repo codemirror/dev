@@ -379,13 +379,13 @@ export class EditorView {
     return movePos(this, start, direction, granularity, action)
   }
 
-  /// Move a cursor position by one character or group (sequence of
-  /// word or non-word characters). Moves (visually) away from the
-  /// start of the line when `forward` is true, towards it otherwise.
-  /// Will skip to the next line when reaching the line boundary, and
-  /// return the original position when hitting the start or end of
-  /// the document.
-  moveHorizontally(start: SelectionRange, forward: boolean, unit: "character" | "group" = "character") {
+  /// Move a cursor position by one character, group (sequence of word
+  /// or non-word characters), or line boundary. Moves (visually) away
+  /// from the start of the line when `forward` is true, towards it
+  /// otherwise. Will skip to the next line when reaching the end or
+  /// start of line, unless unit is `"lineboundary"`, and return the
+  /// original position when hitting the start or end of the document.
+  moveHorizontally(start: SelectionRange, forward: boolean, unit: "character" | "group" | "lineboundary" | "lineend" = "character") {
     return moveHorizontally(this, start, forward, unit)
   }
 

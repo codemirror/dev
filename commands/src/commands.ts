@@ -23,10 +23,12 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
   return true
 }
 
-function moveHoriz(view: EditorView, forward: boolean, unit: "character" | "group"): boolean {
+function moveHoriz(view: EditorView, forward: boolean, unit: "character" | "group" | "lineboundary"): boolean {
   let selection = updateSel(view.state.selection, range => {
-    if (!range.empty) return EditorSelection.cursor(forward ? range.to : range.from)
-    return view.moveHorizontally(range, forward, unit)
+    if (!range.empty && unit != "lineboundary") return EditorSelection.cursor(forward ? range.to : range.from)
+    let moved = view.moveHorizontally(range, forward, unit)
+    if (unit == "lineboundary" && moved.head == range.head) moved = view.moveHorizontally(range, forward, "lineend")
+    return moved
   })
   if (selection.eq(view.state.selection)) return false
   view.dispatch(view.state.update({selection, scrollIntoView: true}))
@@ -50,9 +52,9 @@ export const moveLineUp: Command = view => moveSelection(view, "backward", "line
 export const moveLineDown: Command = view => moveSelection(view, "forward", "line")
 
 /// Move the selection to the start of the line.
-export const moveLineStart: Command = view => moveSelection(view, "backward", "lineboundary")
+export const moveLineStart: Command = view => moveHoriz(view, false, "lineboundary")
 /// Move the selection to the end of the line.
-export const moveLineEnd: Command = view => moveSelection(view, "forward", "lineboundary")
+export const moveLineEnd: Command = view => moveHoriz(view, true, "lineboundary")
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "word" | "line" | "lineboundary"): boolean {
@@ -68,9 +70,10 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
   return true
 }
 
-function extendHoriz(view: EditorView, forward: boolean, unit: "character" | "group"): boolean {
+function extendHoriz(view: EditorView, forward: boolean, unit: "character" | "group" | "lineboundary"): boolean {
   let selection = updateSel(view.state.selection, range => {
     let pos = view.moveHorizontally(range, forward, unit)
+    if (unit == "lineboundary" && pos.head == range.head) pos = view.moveHorizontally(range, forward, "lineend")
     return EditorSelection.range(range.anchor, pos.from)
   })
   if (selection.eq(view.state.selection)) return false
@@ -95,9 +98,9 @@ export const extendLineUp: Command = view => extendSelection(view, "backward", "
 export const extendLineDown: Command = view => extendSelection(view, "forward", "line")
 
 /// Move the selection head to the start of the line.
-export const extendLineStart: Command = view => extendSelection(view, "backward", "lineboundary")
+export const extendLineStart: Command = view => extendHoriz(view, false, "lineboundary")
 /// Move the selection head to the end of the line.
-export const extendLineEnd: Command = view => extendSelection(view, "forward", "lineboundary")
+export const extendLineEnd: Command = view => extendHoriz(view, true, "lineboundary")
 
 /// Move the selection to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {

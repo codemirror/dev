@@ -7,7 +7,7 @@ import {Dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn} from "@codemirror/next/text"
 import {isEquivalentPosition, clientRectsFor, getSelection} from "./dom"
-import {moveVisually, lineSide} from "./bidi"
+import {moveVisually, lineSide, Direction} from "./bidi"
 import browser from "./browser"
 
 declare global {
@@ -365,8 +365,18 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
 }
 
 export function moveHorizontally(view: EditorView, start: SelectionRange, forward: boolean,
-                                 unit: "character" | "group" = "character") {
+                                 unit: "character" | "group" | "lineboundary" | "lineend" = "character") {
   let line = view.state.doc.lineAt(start.head)
+  if (unit == "lineboundary" || unit == "lineend") {
+    let coords = unit == "lineend" || !view.viewState.heightOracle.lineWrapping ? null
+      : view.coordsAtPos(start.assoc < 0 && start.head > line.start ? start.head - 1 : start.head)
+    if (!coords) return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
+    let editorRect = view.dom.getBoundingClientRect()
+    let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
+                                y: (coords.top + coords.bottom) / 2})
+    return EditorSelection.cursor(pos, forward ? -1 : 1)
+  }
+
   let result = moveVisually(line, view.bidiSpans(line), view.textDirection, start, forward,
                             unit == "character" ? undefined : ch => moveByWord(view, start.head, ch))
   if (result) return result
