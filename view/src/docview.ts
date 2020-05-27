@@ -211,7 +211,10 @@ export class DocView extends ContentView {
         // browsers support it yet.
         if (primary.empty || domSel.extend) {
           domSel.collapse(anchor.node, anchor.offset)
-          if (!primary.empty) domSel.extend(head.node, head.offset)
+          if (!primary.empty)
+            domSel.extend(head.node, head.offset)
+          else if (primary.bidiLevel != null && (domSel as any).cursorBidiLevel != null)
+            (domSel as any).cursorBidiLevel = primary.bidiLevel
         } else {
           let range = document.createRange()
           if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
