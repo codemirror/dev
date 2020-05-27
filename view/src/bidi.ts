@@ -90,12 +90,11 @@ export function computeOrder(line: string, direction: Direction) {
   // until the first strong type (R, L, or sor) is found. If an L is
   // found, then change the type of the European number to L.
   // (Left after this: L, R, EN+AN, NI)
-  for (let i = 1, prev = types[0], prevStrong = outerType; i < len - 1; i++) {
+  for (let i = 0, prev = outerType, prevStrong = outerType; i < len; i++) {
     let type = types[i]
-    if (type == T.CS && prev == types[i + 1] && (prev & T.Num)) {
-      type = types[i] = prev
-    } else if (type == T.CS) {
-      types[i] = T.NI
+    if (type == T.CS) {
+      if (i < len - 1 && prev == types[i + 1] && (prev & T.Num)) type = types[i] = prev
+      else types[i] = T.NI
     } else if (type == T.ET) {
       let end = i + 1
       while (end < len && types[end] == T.ET) end++

@@ -35,6 +35,7 @@ const cases = [
   "codeمرآةabc",
   "كود1234المرآة",
   "كودabcالمرآة",
+  "كو,",
   "code123مرآة157abc",
   "  foo  ",
   "  مرآة  ",
@@ -61,13 +62,13 @@ function ourOrder(order: readonly BidiSpan[], dir: Direction) {
 }
 
 function tests(dir: Direction) {
-  describe(dir + " context", () => {
+  describe(Direction[dir] + " context", () => {
     for (let i = 0; i < cases.length; i++) it(cases[i], () => {
       ist(ourOrder(__test.computeOrder(cases[i], dir), dir).join("-"), getOrder(i, dir).join("-"))
     })
   })
 
-  describe(dir + " motion", () => {
+  describe(Direction[dir] + " motion", () => {
     for (let i = 0; i < cases.length; i++) {
       for (let forward = true;; forward = false) {
         it(cases[i] + (forward ? " forward" : " backward"), () => {
