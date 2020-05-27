@@ -115,7 +115,7 @@ export class EditorState {
   replaceSelection(text: string | Text): StrictTransactionSpec {
     if (typeof text == "string") text = this.toText(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
-                                         range: new SelectionRange(range.from + text.length)}))
+                                         range: EditorSelection.cursor(range.from + text.length)}))
   }
 
   /// Create a set of changes and a new selection by running the given

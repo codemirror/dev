@@ -1,5 +1,5 @@
 import {Text, Line} from "@codemirror/next/text"
-import {EditorState, Transaction, SelectionRange, StateCommand} from "@codemirror/next/state"
+import {EditorState, Transaction, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
 
 /// An object of this type can be provided as [language
 /// data](#state.EditorState.languageDataAt) under a `"commentTokens"`
@@ -101,7 +101,7 @@ class BlockCommenter {
           return {
             changes: [{from: range.from, insert: this.open + this.margin},
                       {from: range.to, insert: this.margin + this.close}],
-            range: new SelectionRange(range.anchor + shift, range.head + shift)
+            range: EditorSelection.range(range.anchor + shift, range.head + shift)
           }
         }))
       }

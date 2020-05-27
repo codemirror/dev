@@ -174,14 +174,31 @@ function findSpan(order: readonly BidiSpan[], index: number, level: number) {
   return maybe
 }
 
-function moveIndex(line: Line, span: BidiSpan, dir: Direction, start: number, forward: boolean) {
-  let contextStart = Math.max(span.from, start - 256)
-  let context = line.slice(contextStart, Math.min(span.to, contextStart + 512))
-  return ((span.dir == dir) == forward ? nextClusterBreak : prevClusterBreak)(context, start - contextStart) + contextStart
+function slice(str: string, a: number, b: number) {
+  return str.slice(Math.min(a, b), Math.max(a, b))
+}
+
+function moveIndex(line: Line, span: BidiSpan, dir: Direction, start: number, forward: boolean,
+                   repeat?: (cur: string) => (next: string) => boolean) {
+  let contextStart = Math.max(span.from, start - 512), contextEnd = Math.min(span.to, contextStart + 1024)
+  let context = line.slice(contextStart, contextEnd)
+  let func = (span.dir == dir) == forward ? nextClusterBreak : prevClusterBreak
+  let result = func(context, start - contextStart) + contextStart
+  if (repeat) {
+    let end = Math.max(contextStart, Math.min(contextEnd, span.side(forward, dir)))
+    let test = repeat(slice(context, start - contextStart, result - contextStart))
+    while (result != end) {
+      let next = func(context, result - contextStart) + contextStart
+      if (!test(slice(context, result - contextStart, next - contextStart))) break
+      result = next
+    }
+  }
+  return result
 }
 
 export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direction,
-                             startIndex: number, startLevel: number, forward: boolean) {
+                             startIndex: number, startLevel: number, forward: boolean,
+                             repeat?: (cur: string) => (next: string) => boolean) {
   if (startIndex == 0) {
     if (!forward || !line.length) return null
     if (order[0].level != dir) {
@@ -202,7 +219,7 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
     span = order[spanI += forward ? 1 : -1]
     startIndex = span.side(!forward, dir)
   }
-  let nextIndex = moveIndex(line, span, dir, startIndex, forward)
+  let nextIndex = moveIndex(line, span, dir, startIndex, forward, repeat)
   if (nextIndex != span.side(forward, dir)) return {index: nextIndex, level: span.level}
   let nextSpan = spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)]
   if (!nextSpan && span.level != dir) return {index: forward ? line.length : 0, level: dir}

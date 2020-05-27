@@ -10,7 +10,7 @@ describe("comment", () => {
     //                 0123456 7890123 4567890 1234567 8901234 5
     let doc = Text.of("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n\n".split("\n"))
     const t = (from: number, to: number, expectedLinesNo: number[]) => {
-      let lines = getLinesInRange(doc, new SelectionRange(from, to))
+      let lines = getLinesInRange(doc, EditorSelection.range(from, to))
       ist(lines.map(l => l.start).join(","), expectedLinesNo.join(","))
     }
 
@@ -43,13 +43,13 @@ describe("comment", () => {
 
     const ranges: SelectionRange[] = []
     if (markers.length == 1) {
-      ranges.push(new SelectionRange(markers[0]))
+      ranges.push(EditorSelection.cursor(markers[0]))
     } else if (markers.length % 2 != 0) {
       throw "Markers for multiple selections need to be even.";
     } else {
       for (let i = 0; i < markers.length; i += 2)
-        ranges.push(new SelectionRange(markers[i], markers[i + 1]))
-      if (ranges.length == 0) ranges.push(new SelectionRange(0))
+        ranges.push(EditorSelection.range(markers[i], markers[i + 1]))
+      if (ranges.length == 0) ranges.push(EditorSelection.cursor(0))
     }
 
     return EditorState.create({

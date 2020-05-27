@@ -1,6 +1,6 @@
 import ist from "ist"
 
-import {EditorState, EditorSelection, SelectionRange, Transaction,
+import {EditorState, EditorSelection, Transaction,
         StateEffect, StateEffectType, StateField, ChangeDesc} from "@codemirror/next/state"
 import {isolateHistory, history, redo, redoDepth, redoSelection, undo, undoDepth,
         undoSelection, invertedEffects} from "@codemirror/next/history"
@@ -365,7 +365,7 @@ describe("history", () => {
       let state = mkState(undefined, "abc")
       ist(state.selection.primary.head, 0)
       state = state.update({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboard")}).state
-      state = state.update({selection: EditorSelection.create([new SelectionRange(1, 1), new SelectionRange(3, 3)]),
+      state = state.update({selection: EditorSelection.create([EditorSelection.cursor(1), EditorSelection.cursor(3)]),
                         annotations: Transaction.userEvent.of("keyboard")}).state
       state = state.update({selection: {anchor: 1}, annotations: Transaction.userEvent.of("keyboard")}).state
       state = command(state, undoSelection)

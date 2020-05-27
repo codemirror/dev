@@ -11,8 +11,8 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
                        granularity: "character" | "word" | "line" | "lineboundary"): boolean {
   let selection = updateSel(view.state.selection, range => {
     if (!range.empty && granularity != "lineboundary")
-      return new SelectionRange(dir == "left" || dir == "backward" ? range.from : range.to)
-    return new SelectionRange(view.movePos(range.head, dir, granularity, "move"))
+      return EditorSelection.cursor(dir == "left" || dir == "backward" ? range.from : range.to)
+    return EditorSelection.cursor(view.movePos(range.head, dir, granularity, "move"))
   })
   if (selection.eq(view.state.selection)) return false
   view.dispatch(view.state.update({
@@ -47,7 +47,7 @@ export const moveLineEnd: Command = view => moveSelection(view, "forward", "line
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "word" | "line" | "lineboundary"): boolean {
   let selection = updateSel(view.state.selection, range => {
-    return new SelectionRange(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
+    return EditorSelection.range(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
   })
   if (selection.eq(view.state.selection)) return false
   view.dispatch(view.state.update({
@@ -116,7 +116,7 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
       }
     }
     if (from == to) return {range}
-    return {changes: {from, to}, range: new SelectionRange(from)}
+    return {changes: {from, to}, range: EditorSelection.cursor(from)}
   })
   if (changes.changes.empty) return false
 
@@ -160,7 +160,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
     return {changes: {from, to, insert: Text.of(["", indentString(state, indent)])},
-            range: new SelectionRange(from + 1 + indent)}
+            range: EditorSelection.cursor(from + 1 + indent)}
   })
   dispatch(state.update(changes, {scrollIntoView: true}))
   return true
@@ -180,7 +180,7 @@ function changeBySelectedLine(state: EditorState, f: (line: Line, changes: Chang
     }
     let changeSet = state.changes(changes)
     return {changes,
-            range: new SelectionRange(changeSet.mapPos(range.anchor, 1), changeSet.mapPos(range.head, 1))}
+            range: EditorSelection.range(changeSet.mapPos(range.anchor, 1), changeSet.mapPos(range.head, 1))}
   })
 }
 

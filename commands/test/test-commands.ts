@@ -1,4 +1,4 @@
-import {EditorState, EditorSelection, SelectionRange, StateCommand, Extension} from "@codemirror/next/state"
+import {EditorState, EditorSelection, StateCommand, Extension} from "@codemirror/next/state"
 import {indentMore, indentLess, indentSelection, insertNewlineAndIndent} from "@codemirror/next/commands"
 import {javascript} from "@codemirror/next/lang-javascript"
 import ist from "ist"
@@ -8,11 +8,11 @@ function mkState(doc: string, extensions: Extension = []) {
   let ranges = []
   while (m = range.exec(doc)) {
     if (m[1]) {
-      ranges.push(new SelectionRange(m.index, m.index + m[1].length))
+      ranges.push(EditorSelection.range(m.index, m.index + m[1].length))
       doc = doc.slice(0, m.index) + doc.slice(m.index + 1, m.index + 1 + m[1].length) + doc.slice(m.index + m[0].length)
       range.lastIndex -= 2
     } else {
-      ranges.push(new SelectionRange(m.index))
+      ranges.push(EditorSelection.cursor(m.index))
       doc = doc.slice(0, m.index) + doc.slice(m.index + 1)
       range.lastIndex--
     }

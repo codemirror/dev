@@ -275,14 +275,14 @@ handlers.mousedown = (view, event: MouseEvent) => {
 
 function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number): SelectionRange {
   if (type == 1) { // Single click
-    return new SelectionRange(pos)
+    return EditorSelection.cursor(pos)
   } else if (type == 2) { // Double click
     return SelectionRange.groupAt(view.state, pos, bias)
   } else { // Triple click
     let context = LineContext.get(view, pos)
-    if (context) return new SelectionRange(context.start + context.line.length, context.start)
+    if (context) return EditorSelection.range(context.start + context.line.length, context.start)
     let {start, end} = view.state.doc.lineAt(pos)
-    return new SelectionRange(start, end)
+    return EditorSelection.range(start, end)
   }
 }
 
@@ -312,7 +312,7 @@ function basicMouseSelection(view: EditorView, event: MouseEvent) {
       if (start.pos != cur.pos && !extend) {
         let startRange = rangeForClick(view, start.pos, start.bias, type)
         let from = Math.min(startRange.from, range.from), to = Math.max(startRange.to, range.to)
-        range = from < range.from ? new SelectionRange(from, to) : new SelectionRange(to, from)
+        range = from < range.from ? EditorSelection.range(from, to) : EditorSelection.range(to, from)
       }
       if (extend)
         return startSel.replaceRange(startSel.primary.extend(range.from, range.to))

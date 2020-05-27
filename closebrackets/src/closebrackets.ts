@@ -1,5 +1,5 @@
 import {EditorView} from "@codemirror/next/view"
-import {EditorState, EditorSelection, SelectionRange, Transaction} from "@codemirror/next/state"
+import {EditorState, EditorSelection, Transaction} from "@codemirror/next/state"
 import {Text, isWordChar} from "@codemirror/next/text"
 import {codePointAt, fromCodePoint, minPairCodePoint} from "@codemirror/next/text"
 import {keyName} from "w3c-keyname"
@@ -71,7 +71,7 @@ export function handleBackspace(state: EditorState) {
       for (let token of tokens) {
         if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
           return {changes: {from: range.head - token.length, to: range.head + token.length},
-                  range: new SelectionRange(range.head - token.length)}
+                  range: EditorSelection.cursor(range.head - token.length)}
       }
     }
     return {range: dont = range}
@@ -109,11 +109,11 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
   let dont = null, changes = state.changeByRange(range => {
     if (!range.empty)
       return {changes: [{insert: open, from: range.from}, {insert: close, from: range.to}],
-              range: new SelectionRange(range.anchor + open.length, range.head + open.length)}
+              range: EditorSelection.range(range.anchor + open.length, range.head + open.length)}
     let next = nextChar(state.doc, range.head)
     if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
       return {changes: {insert: open + close, from: range.head},
-              range: new SelectionRange(range.head + open.length)}
+              range: EditorSelection.cursor(range.head + open.length)}
     return {range: dont = range}
   })
   return dont ? null : state.update(changes, {scrollIntoView: true})
@@ -121,7 +121,7 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
 
 function handleClose(state: EditorState, _open: string, close: string) {
   let dont = null, moved = state.selection.ranges.map(range => {
-    if (range.empty && nextChar(state.doc, range.head) == close) return new SelectionRange(range.head + close.length)
+    if (range.empty && nextChar(state.doc, range.head) == close) return EditorSelection.cursor(range.head + close.length)
     return dont = range
   })
   return dont ? null : state.update({selection: EditorSelection.create(moved, state.selection.primaryIndex),
@@ -134,25 +134,25 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
   let dont = null, changes = state.changeByRange(range => {
     if (!range.empty)
       return {changes: [{insert: token, from: range.from}, {insert: token, from: range.to}],
-              range: new SelectionRange(range.anchor + token.length, range.head + token.length)}
+              range: EditorSelection.range(range.anchor + token.length, range.head + token.length)}
     let pos = range.head, next = nextChar(state.doc, pos)
     if (next == token) {
       if (nodeStart(state, pos)) {
         return {changes: {insert: token + token, from: pos},
-                range: new SelectionRange(pos + token.length)}
+                range: EditorSelection.cursor(pos + token.length)}
       } else {
         let isTriple = allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token
-        return {range: new SelectionRange(pos + token.length * (isTriple ? 3 : 1))}
+        return {range: EditorSelection.cursor(pos + token.length * (isTriple ? 3 : 1))}
       }
     } else if (allowTriple && state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
                nodeStart(state, pos - 2 * token.length)) {
       return {changes: {insert: token + token + token + token, from: pos},
-              range: new SelectionRange(pos + token.length)}
+              range: EditorSelection.cursor(pos + token.length)}
     } else if (!isWordChar(next)) {
       let prev = state.sliceDoc(pos - 1, pos)
       if (!isWordChar(prev) && prev != token)
         return {changes: {insert: token + token, from: pos},
-                range: new SelectionRange(pos + token.length)}
+                range: EditorSelection.cursor(pos + token.length)}
     }
     return {range: dont = range}
   })

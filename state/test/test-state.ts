@@ -1,6 +1,6 @@
 import ist from "ist"
 import {EditorState, StateField, Facet, tagExtension,
-        EditorSelection, SelectionRange, Annotation, ChangeSet} from "@codemirror/next/state"
+        EditorSelection, Annotation, ChangeSet} from "@codemirror/next/state"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -18,7 +18,7 @@ describe("EditorState", () => {
   it("maps selection through changes", () => {
     let state = EditorState.create({doc: "abcdefgh",
                                     extensions: [EditorState.allowMultipleSelections.of(true)],
-                                    selection: EditorSelection.create([0, 4, 8].map(n => new SelectionRange(n)))})
+                                    selection: EditorSelection.create([0, 4, 8].map(n => EditorSelection.cursor(n)))})
     let newState = state.update(state.replaceSelection("Q")).state
     ist(newState.doc.toString(), "QabcdQefghQ")
     ist(newState.selection.ranges.map(r => r.from).join("/"), "1/6/11")
@@ -122,7 +122,7 @@ describe("EditorState", () => {
     it("can make simple changes", () => {
       let state = EditorState.create({doc: "hi"})
       state = state.update(state.changeByRange(r => ({changes: {from: r.from, to: r.from + 1, insert: "q"},
-                                                      range: new SelectionRange(r.from + 1)}))).state
+                                                      range: EditorSelection.cursor(r.from + 1)}))).state
       ist(state.doc.toString(), "qi")
       ist(state.selection.primary.from, 1)
     })
@@ -130,14 +130,14 @@ describe("EditorState", () => {
     it("does the right thing when there are multiple selections", () => {
       let state = EditorState.create({
         doc: "1 2 3 4",
-        selection: EditorSelection.create([new SelectionRange(0, 1),
-                                           new SelectionRange(2, 3),
-                                           new SelectionRange(4, 5),
-                                           new SelectionRange(6, 7)]),
+        selection: EditorSelection.create([EditorSelection.range(0, 1),
+                                           EditorSelection.range(2, 3),
+                                           EditorSelection.range(4, 5),
+                                           EditorSelection.range(6, 7)]),
         extensions: EditorState.allowMultipleSelections.of(true)
       })
       state = state.update(state.changeByRange(r => ({changes: {from: r.from, to: r.to, insert: "-".repeat((r.from >> 1) + 1)},
-                                                      range: new SelectionRange(r.from, r.from + 1 + (r.from >> 1))}))).state
+                                                      range: EditorSelection.range(r.from, r.from + 1 + (r.from >> 1))}))).state
       ist(state.doc.toString(), "- -- --- ----")
       ist(state.selection.ranges.map(r => r.from + "-" + r.to).join(" "), "0-1 2-4 5-8 9-13")
     })

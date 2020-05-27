@@ -190,7 +190,7 @@ export const selectMatches: Command = view => {
   let plugin = beforeCommand(view)
   if (typeof plugin == "boolean") return plugin
   let cursor = plugin.query.cursor(view.state.doc), ranges: SelectionRange[] = []
-  while (!cursor.next().done) ranges.push(new SelectionRange(cursor.value.from, cursor.value.to))
+  while (!cursor.next().done) ranges.push(EditorSelection.range(cursor.value.from, cursor.value.to))
   if (!ranges.length) return false
   view.dispatch(view.state.update({selection: EditorSelection.create(ranges)}))
   return true

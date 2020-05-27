@@ -1,4 +1,4 @@
-import {Extension, EditorSelection, SelectionRange, EditorState} from "@codemirror/next/state"
+import {Extension, EditorSelection, EditorState} from "@codemirror/next/state"
 import {EditorView, MouseSelectionStyle} from "@codemirror/next/view"
 import {countColumn, findColumn} from "@codemirror/next/text"
 
@@ -16,7 +16,7 @@ function rectangleFor(state: EditorState, a: Pos, b: Pos) {
     for (let i = startLine; i <= endLine; i++) {
       let line = state.doc.line(i)
       if (line.length <= endOff)
-        ranges.push(new SelectionRange(line.start + startOff, line.end + endOff))
+        ranges.push(EditorSelection.range(line.start + startOff, line.end + endOff))
     }
   } else {
     let startCol = Math.min(a.col, b.col), endCol = Math.max(a.col, b.col)
@@ -24,7 +24,7 @@ function rectangleFor(state: EditorState, a: Pos, b: Pos) {
       let line = state.doc.line(i), str = line.length > MaxOff ? line.slice(0, 2 * endCol) : line.slice()
       let start = findColumn(str, 0, startCol, state.tabSize), end = findColumn(str, 0, endCol, state.tabSize)
       if (!start.leftOver)
-        ranges.push(new SelectionRange(line.start + start.offset, line.start + end.offset))
+        ranges.push(EditorSelection.range(line.start + start.offset, line.start + end.offset))
     }
   }
   return ranges
