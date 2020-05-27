@@ -1,4 +1,4 @@
-import {EditorState, Transaction, Extension, Precedence, ChangeDesc} from "@codemirror/next/state"
+import {EditorState, Transaction, Extension, Precedence, ChangeDesc, SelectionRange} from "@codemirror/next/state"
 import {Line} from "@codemirror/next/text"
 import {StyleModule, Style} from "style-mod"
 
@@ -18,7 +18,7 @@ import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import browser from "./browser"
 import {applyDOMChange} from "./domchange"
-import {computeOrder, trivialOrder, BidiSpan, Direction} from "./bidi"
+import {computeOrder, trivialOrder, BidiSpan, Direction, moveVisually, lineSide} from "./bidi"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
@@ -377,6 +377,15 @@ export class EditorView {
           granularity: "character" | "word" | "line" | "lineboundary" = "character",
           action: "move" | "extend" = "move"): number {
     return movePos(this, start, direction, granularity, action)
+  }
+
+  moveHorizontally(start: SelectionRange, forward: boolean, _unit: "character" | "group" = "character") {
+    let line = this.state.doc.lineAt(start.head)
+    let result = moveVisually(line, this.bidiSpans(line), this.textDirection, start, forward) // FIXME by-group
+    if (result) return result
+    if (line.number == (forward ? this.state.doc.lines : 1)) return start
+    let nextLine = this.state.doc.line(line.number + (forward ? 1 : -1))
+    return lineSide(nextLine, this.bidiSpans(nextLine), this.textDirection, !forward)
   }
 
   /// Scroll the given document position into view.

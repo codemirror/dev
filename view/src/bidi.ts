@@ -228,17 +228,17 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
   }
   let nextIndex = moveIndex(line, span, dir, startIndex, forward, repeat)
   if (nextIndex != span.side(forward, dir))
-    return EditorSelection.cursor(nextIndex, forward == (span.dir == dir) ? -1 : 1, span.level)
+    return EditorSelection.cursor(nextIndex + line.start, forward == (span.dir == dir) ? -1 : 1, span.level)
   let nextSpan = spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)]
   if (!nextSpan && span.level != dir)
-    return EditorSelection.cursor(forward ? line.length : 0, forward ? -1 : 1, dir)
+    return EditorSelection.cursor(forward ? line.end : line.start, forward ? -1 : 1, dir)
   if (nextSpan && nextSpan.level < span.level)
-    return EditorSelection.cursor(nextSpan.side(!forward, dir), 0, nextSpan.level)
-  return EditorSelection.cursor(nextIndex, 0, span.level)
+    return EditorSelection.cursor(nextSpan.side(!forward, dir) + line.start, 0, nextSpan.level)
+  return EditorSelection.cursor(nextIndex + line.start, 0, span.level)
 }
 
 export function lineSide(line: Line, order: readonly BidiSpan[], dir: Direction, end: boolean) {
   let span = order[end ? order.length - 1 : 0]
-  if (span.level == dir) return EditorSelection.cursor(span.side(end, dir), end ? -1 : 1, span.level)
-  return EditorSelection.cursor(end ? line.length : 0, 0, dir)
+  if (span.level == dir) return EditorSelection.cursor(span.side(end, dir) + line.start, end ? -1 : 1, span.level)
+  return EditorSelection.cursor(end ? line.end : line.start, 0, dir)
 }

@@ -1,7 +1,7 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction,
         IndentContext, ChangeSpec} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
-import {EditorView, Command} from "@codemirror/next/view"
+import {EditorView, Command, Direction} from "@codemirror/next/view"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
@@ -23,11 +23,21 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
   return true
 }
 
+function moveHoriz(view: EditorView, forward: boolean, unit: "character" | "group"): boolean {
+  let selection = updateSel(view.state.selection, range => {
+    if (!range.empty) return EditorSelection.cursor(forward ? range.to : range.from)
+    return view.moveHorizontally(range, forward, unit)
+  })
+  if (selection.eq(view.state.selection)) return false
+  view.dispatch(view.state.update({selection, scrollIntoView: true}))
+  return true
+}
+
 /// Move the selection one character to the left (which is backward in
 /// left-to-right text, forward in right-to-left text).
-export const moveCharLeft: Command = view => moveSelection(view, "left", "character")
+export const moveCharLeft: Command = view => moveHoriz(view, view.textDirection != Direction.LTR, "character")
 /// Move the selection one character to the right.
-export const moveCharRight: Command = view => moveSelection(view, "right", "character")
+export const moveCharRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "character")
 
 /// Move the selection one word to the left.
 export const moveWordLeft: Command = view => moveSelection(view, "left", "word")
