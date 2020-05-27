@@ -1,4 +1,4 @@
-import {EditorView, ViewPlugin, ViewUpdate, themeClass} from "@codemirror/next/view"
+import {EditorView, ViewPlugin, ViewUpdate, themeClass, Direction} from "@codemirror/next/view"
 import {StateEffect, StateEffectType, Facet, StateField, Extension} from "@codemirror/next/state"
 
 const HoverTime = 750, HoverMaxDist = 10
@@ -82,7 +82,8 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
         continue
       }
       let width = size.right - size.left, height = size.bottom - size.top
-      let left = this.view.textDirection == "ltr" ? Math.min(pos.left, measured.innerWidth - width) : Math.max(0, pos.left - width)
+      let left = this.view.textDirection == Direction.LTR ? Math.min(pos.left, measured.innerWidth - width)
+        : Math.max(0, pos.left - width)
       let above = !!tooltip.above
       if (!tooltip.strictSide &&
           (above ? pos.top - (size.bottom - size.top) < 0 : pos.bottom + (size.bottom - size.top) > measured.innerHeight))

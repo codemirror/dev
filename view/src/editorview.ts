@@ -18,7 +18,7 @@ import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import browser from "./browser"
 import {applyDOMChange} from "./domchange"
-import {computeOrder, trivialOrder, BidiSpan} from "./bidi"
+import {computeOrder, trivialOrder, BidiSpan, Direction} from "./bidi"
 
 /// Configuration parameters passed when creating an editor view.
 export interface EditorConfig {
@@ -404,12 +404,14 @@ export class EditorView {
   /// The default height of a line in the editor.
   get defaultLineHeight() { return this.viewState.heightOracle.lineHeight }
   /// The text direction (`direction` CSS property) of the editor.
-  get textDirection() { return this.viewState.heightOracle.direction }
+  get textDirection(): Direction { return this.viewState.heightOracle.direction }
 
   /// Returns the bidirectional text structure of the given line
   /// (which should be in the current document) as an array of span
-  /// objects.
-  // FIXME properly document output format 
+  /// objects. The order of these spans matches the [text
+  /// direction](#view.EditorView.textDirection)—if that is
+  /// left-to-right, the leftmost spans come first, otherwise the
+  /// rightmost spans come first.
   bidiSpans(line: Line) {
     if (line.length > MaxBidiLine) return trivialOrder(line.length)
     let dir = this.textDirection
@@ -551,13 +553,13 @@ class CachedOrder {
   constructor(
     readonly from: number,
     readonly to: number,
-    readonly dir: "ltr" | "rtl",
+    readonly dir: Direction,
     readonly order: readonly BidiSpan[]
   ) {}
 
   static update(cache: CachedOrder[], changes: ChangeDesc) {
     if (changes.empty) return cache
-    let result = [], lastDir = cache.length ? cache[cache.length - 1].dir : "ltr"
+    let result = [], lastDir = cache.length ? cache[cache.length - 1].dir : Direction.LTR
     for (let i = Math.max(0, cache.length - 10); i < cache.length; i++) {
       let entry = cache[i]
       if (entry.dir == lastDir && !changes.touchesRange(entry.from, entry.to))

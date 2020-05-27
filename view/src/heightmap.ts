@@ -3,13 +3,14 @@ import {ChangeSet} from "@codemirror/next/state"
 import {RangeSet, SpanIterator} from "@codemirror/next/rangeset"
 import {DecorationSet, PointDecoration, Decoration, BlockType, addRange} from "./decoration"
 import {ChangedRange} from "./extension"
+import {Direction} from "./bidi"
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line"]
 
 export class HeightOracle {
   doc: Text = Text.empty
   lineWrapping: boolean = false
-  direction: "ltr" | "rtl" = "ltr"
+  direction: Direction = Direction.LTR
   heightSamples: {[key: number]: boolean} = {}
   lineHeight: number = 14
   charWidth: number = 7
@@ -32,7 +33,7 @@ export class HeightOracle {
 
   setDoc(doc: Text): this { this.doc = doc; return this }
 
-  mustRefresh(lineHeights: number[], whiteSpace: string, direction: string): boolean {
+  mustRefresh(lineHeights: number[], whiteSpace: string, direction: Direction): boolean {
     let newHeight = false
     for (let i = 0; i < lineHeights.length; i++) {
       let h = lineHeights[i]
@@ -46,7 +47,7 @@ export class HeightOracle {
     return newHeight || (wrappingWhiteSpace.indexOf(whiteSpace) > -1) != this.lineWrapping || this.direction != direction
   }
 
-  refresh(whiteSpace: string, direction: "ltr" | "rtl", lineHeight: number, charWidth: number,
+  refresh(whiteSpace: string, direction: Direction, lineHeight: number, charWidth: number,
           lineLength: number, knownHeights: number[]): boolean {
     let lineWrapping = wrappingWhiteSpace.indexOf(whiteSpace) > -1
     let changed = Math.round(lineHeight) != Math.round(this.lineHeight) ||

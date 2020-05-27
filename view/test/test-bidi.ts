@@ -1,5 +1,5 @@
 import ist from "ist"
-import {__test, BidiSpan} from "@codemirror/next/view"
+import {__test, BidiSpan, Direction} from "@codemirror/next/view"
 import {Text} from "@codemirror/next/text"
 
 function queryBrowserOrder(strings: readonly string[]) {
@@ -46,21 +46,21 @@ const cases = [
 ]
 
 let queried: {ltr: (readonly number[])[], rtl: (readonly number[])[]} | null = null
-function getOrder(i: number, dir: "ltr" | "rtl") {
+function getOrder(i: number, dir: Direction) {
   if (!queried) queried = queryBrowserOrder(cases)
-  return queried[dir][i]
+  return queried[dir == Direction.LTR ? "ltr" : "rtl"][i]
 }
 
-function ourOrder(order: readonly BidiSpan[], dir: "ltr" | "rtl") {
+function ourOrder(order: readonly BidiSpan[], dir: Direction) {
   let result = []
-  for (let span of dir == "ltr" ? order : order.slice().reverse()) {
+  for (let span of dir == Direction.LTR ? order : order.slice().reverse()) {
     if (span.level % 2) for (let i = span.to - 1; i >= span.from; i--) result.push(i)
     else for (let i = span.from; i < span.to; i++) result.push(i)
   }
   return result
 }
 
-function tests(dir: "ltr" | "rtl") {
+function tests(dir: Direction) {
   describe(dir + " context", () => {
     for (let i = 0; i < cases.length; i++) it(cases[i], () => {
       ist(ourOrder(__test.computeOrder(cases[i], dir), dir).join("-"), getOrder(i, dir).join("-"))
@@ -92,16 +92,16 @@ function tests(dir: "ltr" | "rtl") {
       let str = "aé̠őx 😎🙉 👨‍🎤💪🏽👩‍👩‍👧‍👦 🇩🇪🇫🇷"
       let points = [0, 1, 4, 6, 7, 8, 10, 12, 13, 18, 22, 33, 34, 38, 42]
       let line = Text.of([str]).line(1)
-      let order = __test.computeOrder(str, "ltr")
+      let order = __test.computeOrder(str, Direction.LTR)
       for (let i = 1; i < points.length; i++) {
-        ist(__test.moveVisually(line, order, "ltr", points[i - 1], 0, true)!.index, points[i])
-        ist(__test.moveVisually(line, order, "ltr", points[i], 0, false)!.index, points[i - 1])
+        ist(__test.moveVisually(line, order, Direction.LTR, points[i - 1], 0, true)!.index, points[i])
+        ist(__test.moveVisually(line, order, Direction.LTR, points[i], 0, false)!.index, points[i - 1])
       }
     })
   })
 }
 
 describe("bidi", () => {
-  tests("ltr")
-  tests("rtl")
+  tests(Direction.LTR)
+  tests(Direction.RTL)
 })

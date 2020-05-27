@@ -5,7 +5,7 @@ export {Decoration, DecorationSet, WidgetType,
 export {BlockInfo} from "./heightmap"
 export {themeClass} from "./theme"
 export {MouseSelectionStyle} from "./input"
-export {BidiSpan} from "./bidi"
+export {BidiSpan, Direction} from "./bidi"
 export {Range} from "@codemirror/next/rangeset"
 
 import {HeightMap, HeightOracle, MeasuredHeights, QueryType} from "./heightmap"

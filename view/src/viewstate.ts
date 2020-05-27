@@ -6,6 +6,7 @@ import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRe
 import {decorations, ViewUpdate, UpdateFlag, ChangedRange} from "./extension"
 import {WidgetType, Decoration, DecorationSet} from "./decoration"
 import {DocView} from "./docview"
+import {Direction} from "./bidi"
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
   let rect = dom.getBoundingClientRect()
@@ -136,12 +137,12 @@ export class ViewState {
   }
 
   measure(docView: DocView, repeated: boolean) {
-    let dom = docView.dom, whiteSpace = "", direction: "ltr" | "rtl" = "ltr"
+    let dom = docView.dom, whiteSpace = "", direction: Direction = Direction.LTR
 
     if (!repeated) {
       // Vertical padding
       let style = window.getComputedStyle(dom)
-      whiteSpace = style.whiteSpace!, direction = (style.direction || "ltr") as any
+      whiteSpace = style.whiteSpace!, direction = (style.direction == "rtl" ? Direction.RTL : Direction.LTR) as any
       this.paddingTop = parseInt(style.paddingTop!) || 0
       this.paddingBottom = parseInt(style.paddingBottom!) || 0
     }
@@ -241,7 +242,7 @@ export class ViewState {
   ensureLineGaps(current: readonly LineGap[]) {
     let gaps: LineGap[] = []
     // This won't work at all in predominantly right-to-left text.
-    if (this.heightOracle.direction != "ltr") return gaps
+    if (this.heightOracle.direction != Direction.LTR) return gaps
     this.heightMap.forEachLine(this.viewport.from, this.viewport.to, this.state.doc, 0, 0, line => {
       if (line.length < LG.Margin) return
       let structure = lineStructure(line.from, line.to, this.state)

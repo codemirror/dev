@@ -1,5 +1,14 @@
 import {Line, nextClusterBreak, prevClusterBreak} from "@codemirror/next/text"
 
+/// Used to indicate [text direction](#view.EditorView.textDirection).
+export enum Direction {
+  // (These are chosen to match the base levels, in bidi algorithm
+  // terms, of spans in that direction.)
+  LTR = 0, RTL = 1
+}
+
+const LTR = Direction.LTR, RTL = Direction.RTL
+
 // Codes used for character types:
 const enum T {
   L = 1, // Left-to-Right
@@ -41,15 +50,15 @@ const BidiRE = /[\u0590-\u05f4\u0600-\u06ff\u0700-\u08ac]/
 
 export class BidiSpan {
   constructor(readonly from: number, readonly to: number, readonly level: number) {}
-  get dir() { return this.level % 2 ? "rtl" : "ltr" }
-  side(end: boolean, dir: "rtl" | "ltr") { return (this.dir == dir) == end ? this.to : this.from }
+  get dir() { return this.level % 2 ? RTL : LTR }
+  side(end: boolean, dir: Direction) { return (this.dir == dir) == end ? this.to : this.from }
 }
 
 // Reused array of character types
 const types: T[] = []
 
-export function computeOrder(line: string, direction: "ltr" | "rtl") {
-  let len = line.length, outerType = direction == "ltr" ? T.L : T.R 
+export function computeOrder(line: string, direction: Direction) {
+  let len = line.length, outerType = direction == LTR ? T.L : T.R 
 
   if (!line || outerType == T.L && !BidiRE.test(line)) return trivialOrder(len)
 
@@ -165,28 +174,24 @@ function findSpan(order: readonly BidiSpan[], index: number, level: number) {
   return maybe
 }
 
-function moveIndex(line: Line, span: BidiSpan, dir: "ltr" | "rtl", start: number, forward: boolean) {
+function moveIndex(line: Line, span: BidiSpan, dir: Direction, start: number, forward: boolean) {
   let contextStart = Math.max(span.from, start - 256)
   let context = line.slice(contextStart, Math.min(span.to, contextStart + 512))
   return ((span.dir == dir) == forward ? nextClusterBreak : prevClusterBreak)(context, start - contextStart) + contextStart
 }
 
-function baseLevel(dir: "ltr" | "rtl") {
-  return dir == "ltr" ? 0 : 1
-}
-
-export function moveVisually(line: Line, order: readonly BidiSpan[], dir: "ltr" | "rtl",
+export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direction,
                              startIndex: number, startLevel: number, forward: boolean) {
   if (startIndex == 0) {
     if (!forward || !line.length) return null
-    if (order[0].level != baseLevel(dir)) {
+    if (order[0].level != dir) {
       startIndex = order[0].side(false, dir)
       startLevel = order[0].level
     }
   } else if (startIndex == line.length) {
     if (forward) return null
     let last = order[order.length - 1]
-    if (last.level != baseLevel(dir)) {
+    if (last.level != dir) {
       startIndex = last.side(true, dir)
       startLevel = last.level
     }
@@ -200,13 +205,13 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: "ltr" 
   let nextIndex = moveIndex(line, span, dir, startIndex, forward)
   if (nextIndex != span.side(forward, dir)) return {index: nextIndex, level: span.level}
   let nextSpan = spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)]
-  if (!nextSpan && span.level != baseLevel(dir)) return {index: forward ? line.length : 0, level: baseLevel(dir)}
+  if (!nextSpan && span.level != dir) return {index: forward ? line.length : 0, level: dir}
   if (nextSpan && nextSpan.level < span.level) return {index: nextSpan.side(!forward, dir), level: nextSpan.level}
   return {index: nextIndex, level: span.level}
 }
 
-export function lineSide(line: Line, order: readonly BidiSpan[], dir: "ltr" | "rtl", end: boolean) {
+export function lineSide(line: Line, order: readonly BidiSpan[], dir: Direction, end: boolean) {
   let span = order[end ? order.length - 1 : 0]
-  if (span.level == baseLevel(dir)) return {index: span.side(end, dir), level: span.level}
-  return {index: end ? line.length : 0, level: dir == "ltr" ? 0 : 1}
+  if (span.level == dir) return {index: span.side(end, dir), level: span.level}
+  return {index: end ? line.length : 0, level: dir == LTR ? 0 : 1}
 }
