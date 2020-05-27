@@ -1,6 +1,6 @@
 import ist from "ist"
 import {__test, BidiSpan, Direction} from "@codemirror/next/view"
-import {Text} from "@codemirror/next/text"
+import {Text, EditorSelection} from "@codemirror/next/state"
 
 function queryBrowserOrder(strings: readonly string[]) {
   let scratch = document.body.appendChild(document.createElement("div"))
@@ -75,9 +75,9 @@ function tests(dir: Direction) {
           let line = Text.of([cases[i]]).line(1)
           let seen = []
           for (let p = __test.lineSide(line, order, dir, !forward);;) {
-            ist(!seen[p.index])
-            seen[p.index] = true
-            let next = __test.moveVisually(line, order, dir, p.index, p.level, forward)
+            ist(!seen[p.from])
+            seen[p.from] = true
+            let next = __test.moveVisually(line, order, dir, p, forward)
             if (!next) break
             p = next
           }
@@ -94,8 +94,8 @@ function tests(dir: Direction) {
       let line = Text.of([str]).line(1)
       let order = __test.computeOrder(str, Direction.LTR)
       for (let i = 1; i < points.length; i++) {
-        ist(__test.moveVisually(line, order, Direction.LTR, points[i - 1], 0, true)!.index, points[i])
-        ist(__test.moveVisually(line, order, Direction.LTR, points[i], 0, false)!.index, points[i - 1])
+        ist(__test.moveVisually(line, order, Direction.LTR, EditorSelection.cursor(points[i - 1], 0, 0), true)!.from, points[i])
+        ist(__test.moveVisually(line, order, Direction.LTR, EditorSelection.cursor(points[i], 0, 0), false)!.from, points[i - 1])
       }
     })
   })

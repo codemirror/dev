@@ -1,4 +1,5 @@
 import {Line, nextClusterBreak, prevClusterBreak} from "@codemirror/next/text"
+import {EditorSelection, SelectionRange} from "@codemirror/next/state"
 
 /// Used to indicate [text direction](#view.EditorView.textDirection).
 export enum Direction {
@@ -161,13 +162,17 @@ export function trivialOrder(length: number) {
   return [new BidiSpan(0, length, 0)]
 }
 
-function findSpan(order: readonly BidiSpan[], index: number, level: number) {
+function findSpan(order: readonly BidiSpan[], index: number, level: number, assoc: number) {
   let maybe = -1
   for (let i = 0; i < order.length; i++) {
     let span = order[i]
     if (span.from <= index && span.to >= index) {
       if (span.level == level) return i
-      if (maybe < 0 || order[maybe].level > span.level) maybe = i
+      // When multiple spans match, if assoc != 0, take the one that
+      // covers that side, otherwise take the one with the minimum
+      // level.
+      if (maybe < 0 || (assoc != 0 ? (assoc < 0 ? span.from < index : span.to > index) : order[maybe].level > span.level))
+        maybe = i
     }
   }
   if (maybe < 0) throw new RangeError("Index out of range")
@@ -197,38 +202,43 @@ function moveIndex(line: Line, span: BidiSpan, dir: Direction, start: number, fo
 }
 
 export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direction,
-                             startIndex: number, startLevel: number, forward: boolean,
+                             start: SelectionRange, forward: boolean,
                              repeat?: (cur: string) => (next: string) => boolean) {
+  let startIndex = start.head - line.start, spanI = -1
   if (startIndex == 0) {
     if (!forward || !line.length) return null
     if (order[0].level != dir) {
       startIndex = order[0].side(false, dir)
-      startLevel = order[0].level
+      spanI = 0
     }
   } else if (startIndex == line.length) {
     if (forward) return null
     let last = order[order.length - 1]
     if (last.level != dir) {
       startIndex = last.side(true, dir)
-      startLevel = last.level
+      spanI = order.length - 1
     }
   }
-  let spanI = findSpan(order, startIndex, startLevel), span = order[spanI]
+  if (spanI < 0) spanI = findSpan(order, startIndex, start.bidiLevel ?? -1, start.assoc)
+  let span = order[spanI]
   // End of span. (But not end of line--that was check for above.)
   if (startIndex == span.side(forward, dir)) {
     span = order[spanI += forward ? 1 : -1]
     startIndex = span.side(!forward, dir)
   }
   let nextIndex = moveIndex(line, span, dir, startIndex, forward, repeat)
-  if (nextIndex != span.side(forward, dir)) return {index: nextIndex, level: span.level}
+  if (nextIndex != span.side(forward, dir))
+    return EditorSelection.cursor(nextIndex, forward == (span.dir == dir) ? -1 : 1, span.level)
   let nextSpan = spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)]
-  if (!nextSpan && span.level != dir) return {index: forward ? line.length : 0, level: dir}
-  if (nextSpan && nextSpan.level < span.level) return {index: nextSpan.side(!forward, dir), level: nextSpan.level}
-  return {index: nextIndex, level: span.level}
+  if (!nextSpan && span.level != dir)
+    return EditorSelection.cursor(forward ? line.length : 0, forward ? -1 : 1, dir)
+  if (nextSpan && nextSpan.level < span.level)
+    return EditorSelection.cursor(nextSpan.side(!forward, dir), 0, nextSpan.level)
+  return EditorSelection.cursor(nextIndex, 0, span.level)
 }
 
 export function lineSide(line: Line, order: readonly BidiSpan[], dir: Direction, end: boolean) {
   let span = order[end ? order.length - 1 : 0]
-  if (span.level == dir) return {index: span.side(end, dir), level: span.level}
-  return {index: end ? line.length : 0, level: dir == LTR ? 0 : 1}
+  if (span.level == dir) return EditorSelection.cursor(span.side(end, dir), end ? -1 : 1, span.level)
+  return EditorSelection.cursor(end ? line.length : 0, 0, dir)
 }
