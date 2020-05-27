@@ -66,12 +66,9 @@ export class SelectionRange {
     return EditorSelection.range(this.anchor, head)
   }
 
-  /// Compare this range to another range. Will only compare
-  /// [association](#state.SelectionRange.assoc) side and [bidi
-  /// level](#state.SelectionRange.bidiLevel) when `precise` is true.
-  eq(other: SelectionRange, precise = false): boolean {
-    let mask = precise ? 0xff : RangeFlag.Inverted
-    return this.from == other.from && this.to == other.to && (this.flags & mask) == (other.flags & mask)
+  /// Compare this range to another range.
+  eq(other: SelectionRange): boolean {
+    return this.anchor == other.anchor && this.head == other.head
   }
 
   /// Return a JSON-serializable object representing the range.

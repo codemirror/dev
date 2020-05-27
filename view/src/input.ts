@@ -163,7 +163,7 @@ class MouseSelection {
 
   select(event: MouseEvent) {
     let selection = this.style.get(event, this.extend, this.multiple)
-    if (!selection.eq(this.view.state.selection))
+    if (!selection.eq(this.view.state.selection) || selection.primary.assoc != this.view.state.selection.primary.assoc)
       this.view.dispatch(this.view.state.update({
         selection,
         annotations: Transaction.userEvent.of("pointer"),
@@ -296,6 +296,7 @@ function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | 
   return {pos, bias}
 }
 
+// FIXME set cursor assoc when appropriate
 function basicMouseSelection(view: EditorView, event: MouseEvent) {
   let start = queryPos(view, event), type = event.detail
   let startSel = view.state.selection
