@@ -1,6 +1,4 @@
-import {EditorState} from "./state"
 import {ChangeDesc} from "./change"
-import {charType} from "@codemirror/next/text"
 
 // A range's flags field is used like this:
 // - 2 bits for bidi level (3 means unset) (only meaningful for
@@ -80,20 +78,6 @@ export class SelectionRange {
     if (!json || typeof json.anchor != "number" || typeof json.head != "number")
       throw new RangeError("Invalid JSON representation for SelectionRange")
     return EditorSelection.range(json.anchor, json.head)
-  }
-
-  /// @internal FIXME export?
-  static groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
-    // FIXME at some point, take language-specific identifier characters into account
-    let line = state.doc.lineAt(pos), linePos = pos - line.start
-    if (line.length == 0) return EditorSelection.cursor(pos)
-    if (linePos == 0) bias = 1
-    else if (linePos == line.length) bias = -1
-    let read = linePos + (bias < 0 ? -1 : 0), type = charType(line.slice(read, read + 1))
-    let from = pos, to = pos
-    for (let lineFrom = linePos; lineFrom > 0 && charType(line.slice(lineFrom - 1, lineFrom)) == type; lineFrom--) from--
-    for (let lineTo = linePos; lineTo < line.length && charType(line.slice(lineTo, lineTo + 1)) == type; lineTo++) to++
-    return EditorSelection.range(to, from)
   }
 }
 

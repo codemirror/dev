@@ -7,3 +7,4 @@ export {Transaction, TransactionSpec, StrictTransactionSpec,
 export {Text} from "@codemirror/next/text"
 export {combineConfig, fillConfig} from "./config"
 export {ChangeSpec, ChangeSet, ChangeDesc, MapMode} from "./change"
+export {CharCategory} from "./charcategory"

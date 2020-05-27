@@ -28,11 +28,11 @@ export function nextClusterBreak(str: string, pos: number) {
   // If pos is in the middle of a surrogate pair, move to its start
   if (pos && surrogateLow(str.charCodeAt(pos)) && surrogateHigh(str.charCodeAt(pos - 1))) pos--
   let prev = codePointAt(str, pos)
-  pos += prev < minPairCodePoint ? 1 : 2
+  pos += codePointSize(prev)
   while (pos < str.length) {
     let next = codePointAt(str, pos)
     if (prev == ZWJ || next == ZWJ || isExtendingChar(next)) {
-      pos += next < minPairCodePoint ? 1 : 2
+      pos += codePointSize(next)
       prev = next
     } else if (isRegionalIndicator(next)) {
       let countBefore = 0, i = pos - 2
@@ -54,37 +54,6 @@ export function prevClusterBreak(str: string, pos: number) {
     pos--
   }
   return 0
-}
-
-const nonASCIISingleCaseWordChar = /[\u00df\u0587\u0590-\u05f4\u0600-\u06ff\u3040-\u309f\u30a0-\u30ff\u3400-\u4db5\u4e00-\u9fcc\uac00-\ud7af]/
-
-let wordChar: RegExp | null
-try { wordChar = new RegExp("[\\p{Alphabetic}_]", "u") } catch (_) {}
-
-// FIXME this doesn't work for astral chars yet (need different calling convention)
-
-function isWordCharBasic(ch: string): boolean {
-  if (wordChar) return wordChar.test(ch)
-  return /\w/.test(ch) || ch > "\x80" &&
-    (ch.toUpperCase() != ch.toLowerCase() || nonASCIISingleCaseWordChar.test(ch))
-}
-
-/// Test whether the given character is a word character.
-export function isWordChar(ch: string, wordChars?: RegExp): boolean {
-  if (!wordChars) return isWordCharBasic(ch)
-  if (wordChars.source.indexOf("\\w") > -1 && isWordCharBasic(ch)) return true
-  return wordChars.test(ch)
-}
-
-/// This is used to group characters into three categories—word
-/// characters, whitespace, and anything else. It is used, by default,
-/// to do things like selecting by word.
-export enum CharType { Word, Space, Other }
-
-/// Determine the character type for a given character.
-export function charType(ch: string, wordChars?: RegExp): CharType {
-  // FIXME make this configurable in a better way
-  return /\s/.test(ch) ? CharType.Space : isWordChar(ch, wordChars) ? CharType.Word : CharType.Other
 }
 
 function surrogateLow(ch: number) { return ch >= 0xDC00 && ch < 0xE000 }
@@ -114,4 +83,4 @@ export function fromCodePoint(code: number) {
 /// string. It is often useful to compare with this after calling
 /// `codePointAt`, to figure out whether your character takes up 1 or
 /// 2 index positions.
-export const minPairCodePoint = 0x10000
+export function codePointSize(code: number) { return code < 0x10000 ? 1 : 2 }

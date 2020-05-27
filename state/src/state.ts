@@ -7,6 +7,7 @@ import {Transaction, TransactionFlag,
 import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData,
         changeFilter, transactionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
+import {CharCategory, makeCategorizer} from "./charcategory"
 
 /// Options passed when [creating](#state.EditorState^create) an
 /// editor state.
@@ -282,6 +283,19 @@ export class EditorState {
 
   /// Facet that registers a parsing service for the state.
   static syntax = Facet.define<Syntax>()
+
+  /// Return a function that can categorize strings (expected to
+  /// represent a single [grapheme cluster](#text.nextClusterBreak))
+  /// into one of:
+  ///
+  ///  - Word (contains an alphanumeric character or a character
+  ///    explicitly listed in the local language's `"wordChars"`
+  ///    language data, which should be a string)
+  ///  - Space (contains only whitespace)
+  ///  - Other (anything else)
+  charCategorizer(at: number): (char: string) => CharCategory {
+    return makeCategorizer(this.languageDataAt<string>("wordChars", at).join(""))
+  }
 
   /// Get the syntax tree for this state, which is the current
   /// (possibly incomplete) parse tree of the [syntax](#state.Syntax)

@@ -1,10 +1,11 @@
+import {EditorState, EditorSelection} from "@codemirror/next/state"
+import {nextClusterBreak, prevClusterBreak} from "@codemirror/next/text"
 import {EditorView} from "./editorview"
 import {LineView} from "./blockview"
 import {BlockType} from "./decoration"
 import {Dirty} from "./contentview"
 import {InlineView, TextView, WidgetView} from "./inlineview"
 import {Text as Doc, findColumn, countColumn} from "@codemirror/next/text"
-import {SelectionRange} from "@codemirror/next/state"
 import {isEquivalentPosition, clientRectsFor, getSelection} from "./dom"
 import browser from "./browser"
 
@@ -114,13 +115,38 @@ function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | 
   }
 }
 
+export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
+  let categorize = state.charCategorizer(pos)
+  let line = state.doc.lineAt(pos), linePos = pos - line.start
+  if (line.length == 0) return EditorSelection.cursor(pos)
+  if (linePos == 0) bias = 1
+  else if (linePos == line.length) bias = -1
+  let contextStart = Math.max(line.start, pos - 256), contextEnd = Math.min(line.end, contextStart + 512)
+  let context = line.slice(contextStart - line.start, contextEnd - line.start)
+  let from = pos, to = pos
+  if (bias < 0) from = prevClusterBreak(context, pos - contextStart)
+  else to = nextClusterBreak(context, pos - contextStart)
+  let cat = categorize(context.slice(from - contextStart, to - contextStart))
+  while (from > contextStart) {
+    let prev = prevClusterBreak(context, from - contextStart)
+    if (categorize(context.slice(prev, from - contextStart)) != cat) break
+    from = prev + contextStart
+  }
+  while (to < contextEnd) {
+    let next = nextClusterBreak(context, to - contextStart)
+    if (categorize(context.slice(to - contextStart, next)) != cat) break
+    to = next + contextStart
+  }
+  return EditorSelection.range(from, to)
+}
+
 function moveWord(view: EditorView, start: number, direction: "forward" | "backward" | "left" | "right") {
   let {doc} = view.state
   for (let pos = start, i = 0;; i++) {
     let next = movePos(view, pos, direction, "character", "move")
     if (next == pos) return pos // End of document
     if (doc.lineAt(Math.min(next, pos)).end < Math.max(next, pos)) return next // Crossed a line boundary
-    let group = SelectionRange.groupAt(view.state, next, next > pos ? -1 : 1)
+    let group = groupAt(view.state, next, next > pos ? -1 : 1)
     let away = pos < group.from && pos > group.to
     // If the group is away from its start position, we jumped over a
     // bidi boundary, and should take the side closest (in index

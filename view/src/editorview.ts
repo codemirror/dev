@@ -381,7 +381,7 @@ export class EditorView {
 
   moveHorizontally(start: SelectionRange, forward: boolean, _unit: "character" | "group" = "character") {
     let line = this.state.doc.lineAt(start.head)
-    let result = moveVisually(line, this.bidiSpans(line), this.textDirection, start, forward) // FIXME by-group
+    let result = moveVisually(line, this.bidiSpans(line), this.textDirection, start, forward)
     if (result) return result
     if (line.number == (forward ? this.state.doc.lines : 1)) return start
     let nextLine = this.state.doc.line(line.number + (forward ? 1 : -1))

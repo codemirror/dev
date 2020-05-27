@@ -4,7 +4,7 @@ import {ContentView} from "./contentview"
 import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,
         logException, mouseSelectionStyle} from "./extension"
 import browser from "./browser"
-import {LineContext} from "./cursor"
+import {LineContext, groupAt} from "./cursor"
 import {getSelection, focusPreventScroll} from "./dom"
 
 // This will also be where dragging info and such goes
@@ -277,7 +277,7 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
   if (type == 1) { // Single click
     return EditorSelection.cursor(pos)
   } else if (type == 2) { // Double click
-    return SelectionRange.groupAt(view.state, pos, bias)
+    return groupAt(view.state, pos, bias)
   } else { // Triple click
     let context = LineContext.get(view, pos)
     if (context) return EditorSelection.range(context.start + context.line.length, context.start)

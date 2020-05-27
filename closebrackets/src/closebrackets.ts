@@ -1,7 +1,7 @@
 import {EditorView} from "@codemirror/next/view"
-import {EditorState, EditorSelection, Transaction} from "@codemirror/next/state"
-import {Text, isWordChar} from "@codemirror/next/text"
-import {codePointAt, fromCodePoint, minPairCodePoint} from "@codemirror/next/text"
+import {EditorState, EditorSelection, Transaction, CharCategory} from "@codemirror/next/state"
+import {Text} from "@codemirror/next/text"
+import {codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
 import {keyName} from "w3c-keyname"
 
 /// Configures bracket closing behavior for a syntax (via
@@ -53,7 +53,7 @@ function keydown(event: KeyboardEvent, view: EditorView) {
   }
 
   let key = keyName(event)
-  if (key.length > 2 || key.length == 2 && codePointAt(key, 0) < minPairCodePoint) return false
+  if (key.length > 2 || key.length == 2 && codePointSize(codePointAt(key, 0)) == 1) return false
   let tr = handleInsertion(view.state, key)
   if (!tr) return false
   view.dispatch(tr)
@@ -97,12 +97,12 @@ export function handleInsertion(state: EditorState, ch: string): Transaction | n
 
 function nextChar(doc: Text, pos: number) {
   let next = doc.sliceString(pos, pos + 2)
-  return next.length == 2 && codePointAt(next, 0) < minPairCodePoint ? next.slice(0, 1) : next
+  return next.slice(0, codePointSize(codePointAt(next, 0)))
 }
 
 function prevChar(doc: Text, pos: number) {
   let prev = doc.sliceString(pos - 2, pos)
-  return prev.length == 2 && codePointAt(prev, 0) < minPairCodePoint ? prev.slice(1) : prev
+  return codePointSize(codePointAt(prev, 0)) == prev.length ? prev : prev.slice(1)
 }
 
 function handleOpen(state: EditorState, open: string, close: string, closeBefore: string) {
@@ -148,9 +148,9 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
                nodeStart(state, pos - 2 * token.length)) {
       return {changes: {insert: token + token + token + token, from: pos},
               range: EditorSelection.cursor(pos + token.length)}
-    } else if (!isWordChar(next)) {
+    } else if (state.charCategorizer(pos)(next) != CharCategory.Word) {
       let prev = state.sliceDoc(pos - 1, pos)
-      if (!isWordChar(prev) && prev != token)
+      if (prev != token && state.charCategorizer(pos)(prev) != CharCategory.Word)
         return {changes: {insert: token + token, from: pos},
                 range: EditorSelection.cursor(pos + token.length)}
     }

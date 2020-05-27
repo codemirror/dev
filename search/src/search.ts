@@ -2,7 +2,7 @@ import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, 
 import {StateField, Facet, StateEffect, EditorSelection, SelectionRange, Extension} from "@codemirror/next/state"
 import {panels, Panel, showPanel} from "@codemirror/next/panel"
 import {Keymap, NormalizedKeymap, keymap} from "@codemirror/next/keymap"
-import {Text, isWordChar} from "@codemirror/next/text"
+import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 import {SearchCursor} from "./cursor"
 export {SearchCursor}
@@ -364,6 +364,8 @@ function buildPanel(conf: {
 
 const AnnounceMargin = 30
 
+const Break = /[\s\.,:;?!]/
+
 // FIXME this is a kludge
 function maybeAnnounceMatch(view: EditorView) {
   let {from, to} = view.state.selection.primary
@@ -371,13 +373,13 @@ function maybeAnnounceMatch(view: EditorView) {
   let start = Math.max(lineStart, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin)
   let text = view.state.sliceDoc(start, end)
   if (start != lineStart) {
-    for (let i = 0; i < AnnounceMargin; i++) if (isWordChar(text[i + 1]) && !isWordChar(text[i])) {
+    for (let i = 0; i < AnnounceMargin; i++) if (!Break.test(text[i + 1]) && Break.test(text[i])) {
       text = text.slice(i)
       break
     }
   }
   if (end != lineEnd) {
-    for (let i = text.length - 1; i > text.length - AnnounceMargin; i--) if (isWordChar(text[i - 1]) && !isWordChar(text[i])) {
+    for (let i = text.length - 1; i > text.length - AnnounceMargin; i--) if (!Break.test(text[i - 1]) && Break.test(text[i])) {
       text = text.slice(0, i)
       break
     }
