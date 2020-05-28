@@ -23,12 +23,12 @@ export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   if (bias < 0) from = line.findClusterBreak(linePos, false)
   else to = line.findClusterBreak(linePos, true)
   let cat = categorize(line.slice(from, to))
-  while (from > line.start) {
+  while (from > 0) {
     let prev = line.findClusterBreak(from, false)
     if (categorize(line.slice(prev, from)) != cat) break
     from = prev
   }
-  while (to < line.end) {
+  while (to < line.length) {
     let next = line.findClusterBreak(to, true)
     if (categorize(line.slice(to, next)) != cat) break
     to = next
