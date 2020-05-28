@@ -139,8 +139,8 @@ function deleteText(view: EditorView, forward: boolean) {
           for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) from--
         }
       } else {
-        let target = line.findClusterBreak(from - line.start, forward)
-        if (forward) from = target; else to = target
+        let target = line.findClusterBreak(from - line.start, forward) + line.start
+        if (forward) to = target; else from = target
       }
     }
     if (from == to) return {range}
