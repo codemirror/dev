@@ -1,10 +1,11 @@
 import {EditorSelection, EditorState, SelectionRange, Transaction} from "@codemirror/next/state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
+import {LineView} from "./blockview"
 import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,
         logException, mouseSelectionStyle} from "./extension"
 import browser from "./browser"
-import {LineContext, groupAt} from "./cursor"
+import {groupAt} from "./cursor"
 import {getSelection, focusPreventScroll} from "./dom"
 
 // This will also be where dragging info and such goes
@@ -279,8 +280,8 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
   } else if (type == 2) { // Double click
     return groupAt(view.state, pos, bias)
   } else { // Triple click
-    let context = LineContext.get(view, pos)
-    if (context) return EditorSelection.range(context.start + context.line.length, context.start)
+    let line = LineView.find(view.docView, pos)
+    if (line) return EditorSelection.range(line.posAtStart, line.posAtEnd)
     let {start, end} = view.state.doc.lineAt(pos)
     return EditorSelection.range(start, end)
   }

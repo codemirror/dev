@@ -20,7 +20,6 @@ export class DocView extends ContentView {
 
   compositionDeco = Decoration.none
   decorations: readonly DecorationSet[] = []
-  selectionDirty: any = null
 
   // Track a minimum width for the editor. When measuring sizes in
   // checkLayout, this is updated to point at the width of a given
@@ -192,7 +191,6 @@ export class DocView extends ContentView {
 
   // Sync the DOM selection to this.state.selection
   updateSelection(force = false, fromPointer = false) {
-    this.clearSelectionDirty()
     if (!(fromPointer || this.mayControlSelection())) return
 
     let primary = this.view.state.selection.primary
@@ -306,19 +304,6 @@ export class DocView extends ContentView {
       dummy.remove()
     })
     return {lineHeight, charWidth}
-  }
-
-  clearSelectionDirty() {
-    if (this.selectionDirty != null) {
-      cancelAnimationFrame(this.selectionDirty)
-      this.selectionDirty = null
-    }
-  }
-
-  setSelectionDirty() {
-    this.view.observer.clearSelection()
-    if (this.selectionDirty == null)
-      this.selectionDirty = requestAnimationFrame(() => this.updateSelection())
   }
 
   childCursor(pos: number = this.length): ChildCursor {

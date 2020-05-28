@@ -6,7 +6,7 @@ import {DocView} from "./docview"
 import {ContentView} from "./contentview"
 import {InputState} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
-import {movePos, posAtCoords, moveByChar, moveToLineBoundary, byGroup, moveVertically} from "./cursor"
+import {posAtCoords, moveByChar, moveToLineBoundary, byGroup, moveVertically} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
@@ -365,18 +365,6 @@ export class EditorView {
   /// The editor's total content height.
   get contentHeight() {
     return this.viewState.heightMap.height + this.viewState.paddingTop + this.viewState.paddingBottom
-  }
-
-  /// Compute cursor motion from the given position, in the given
-  /// direction, by the given unit. Since this might involve
-  /// temporarily mutating the DOM selection, you can pass the action
-  /// type this will be used for to, in case the editor selection is
-  /// set to the new position right away, avoid an extra DOM selection
-  /// change.
-  movePos(start: number, direction: "forward" | "backward" | "left" | "right",
-          granularity: "character" | "word" | "line" | "lineboundary" = "character",
-          action: "move" | "extend" = "move"): number {
-    return movePos(this, start, direction, granularity, action)
   }
 
   /// Move a cursor position by [grapheme

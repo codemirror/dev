@@ -1,99 +1,16 @@
 import {EditorState, EditorSelection, SelectionRange, CharCategory} from "@codemirror/next/state"
 import {EditorView} from "./editorview"
-import {LineView} from "./blockview"
 import {BlockType} from "./decoration"
-import {Dirty} from "./contentview"
-import {InlineView, TextView, WidgetView} from "./inlineview"
-import {Text as Doc, findColumn, countColumn} from "@codemirror/next/text"
-import {isEquivalentPosition, clientRectsFor, getSelection} from "./dom"
+import {WidgetView} from "./inlineview"
+import {LineView} from "./blockview"
+import {findColumn, countColumn} from "@codemirror/next/text"
+import {clientRectsFor} from "./dom"
 import {moveVisually, lineSide, Direction} from "./bidi"
 import browser from "./browser"
 
 declare global {
   interface Selection { modify(action: string, direction: string, granularity: string): void }
   interface Document { caretPositionFromPoint(x: number, y: number): {offsetNode: Node, offset: number} }
-}
-
-// FIXME rename "word" to something more descriptive of what it actually does?
-export function movePos(view: EditorView, start: number,
-                        direction: "forward" | "backward" | "left" | "right",
-                        granularity: "character" | "word" | "line" | "lineboundary" = "character",
-                        action: "move" | "extend"): number {
-  let sel = getSelection(view.root)
-  let context = LineContext.get(view, start)
-  let dir: 1 | -1 = direction == "forward" || direction == "right" ? 1 : -1
-  // Can only query native behavior when Selection.modify is
-  // supported, the cursor is well inside the rendered viewport, and
-  // we're not doing by-line motion on Gecko (which will mess up goal
-  // column motion)
-  if (sel.modify && context && !context.nearViewportEnd(view) && view.hasFocus &&
-      granularity != "word" &&
-      !(granularity == "line" && (browser.gecko || view.state.selection.ranges.length > 1))) {
-    return view.observer.ignore(() => {
-      let prepared = context!.prepareForQuery(view, start)
-      let startDOM = view.docView.domAtPos(start)
-      let equiv = (!browser.chrome || prepared.lines.length == 0) &&
-        isEquivalentPosition(startDOM.node, startDOM.offset, sel.focusNode, sel.focusOffset) && false
-      // Firefox skips an extra character ahead when extending across
-      // an uneditable element (but not when moving)
-      if (prepared.atWidget && browser.gecko && action == "extend") action = "move"
-      if (action == "move" && !(equiv && sel.isCollapsed)) sel.collapse(startDOM.node, startDOM.offset)
-      else if (action == "extend" && !equiv) sel.extend(startDOM.node, startDOM.offset)
-      sel.modify(action, direction, granularity)
-      view.docView.setSelectionDirty()
-      let result = view.docView.posFromDOM(sel.focusNode!, sel.focusOffset)
-      context!.undoQueryPreparation(view, prepared)
-      return result
-    })
-  } else if (granularity == "character") {
-    return moveCharacterSimple(start, dir, context, view.state.doc)
-  } else if (granularity == "lineboundary") {
-    if (context) return context.start + (dir < 0 ? 0 : context.line.length)
-    let line = view.state.doc.lineAt(start)
-    return dir < 0 ? line.start : line.end
-  } else if (granularity == "line") {
-    if (context && !context.nearViewportEnd(view, dir)) {
-      let startCoords = view.coordsAtPos(start)!
-      let goal = getGoalColumn(view, start, startCoords.left)
-      for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, dist = 5; dist < 50; dist += 10) {
-        let pos = posAtCoords(view, {x: goal.column, y: startY + dist * dir}, dir)
-        if (pos < 0) break
-        if (pos != start) {
-          goal.pos = pos
-          return pos
-        }
-      }
-    }
-    // Can't do a precise one based on DOM positions, fall back to per-column
-    return 0
-  } else if (granularity == "word") {
-    return moveWord(view, start, direction)
-  } else {
-    throw new RangeError("Invalid move granularity: " + granularity)
-  }
-}
-
-function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | null, doc: Doc): number {
-  if (context == null) { // FIXME cluster breaks
-    if (dir < 0 && start == 0 || dir > 0 && start == doc.length) return start
-    return start + dir
-  }
-  for (let {i, off} = context.line.childPos(start - context.start), {children} = context.line, pos = start;;) {
-    if (off == (dir < 0 || i == children.length ? 0 : children[i].length)) {
-      i += dir
-      if (i < 0 || i >= children.length) // End/start of line
-        return Math.max(0, Math.min(doc.length, pos + (start == pos ? dir : 0)))
-      off = dir < 0 ? children[i].length : 0
-    }
-    let inline = children[i]
-    if (inline instanceof TextView) {
-      if (dir < 0) return pos - 1
-      if (pos != start) return pos
-      off += dir; pos += dir
-    } else if (inline.length > 0) {
-      return pos - off + (dir < 0 ? 0 : inline.length)
-    }
-  }
 }
 
 export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
@@ -118,88 +35,6 @@ export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   }
   return EditorSelection.range(from + line.start, to + line.start)
 }
-
-function moveWord(view: EditorView, start: number, direction: "forward" | "backward" | "left" | "right") {
-  let {doc} = view.state
-  for (let pos = start, i = 0;; i++) {
-    let next = movePos(view, pos, direction, "character", "move")
-    if (next == pos) return pos // End of document
-    if (doc.lineAt(Math.min(next, pos)).end < Math.max(next, pos)) return next // Crossed a line boundary
-    let group = groupAt(view.state, next, next > pos ? -1 : 1)
-    let away = pos < group.from && pos > group.to
-    // If the group is away from its start position, we jumped over a
-    // bidi boundary, and should take the side closest (in index
-    // coordinates) to the start position
-    let start = away ? pos < group.head : group.from == pos ? false : group.to == pos ? true : next < pos
-    pos = start ? group.from : group.to
-    if (i > 0 || /\S/.test(doc.sliceString(group.from, group.to))) return pos
-    next = Math.max(0, Math.min(doc.length, pos + (start ? -1 : 1)))
-  }
-}
-
-export class LineContext {
-  constructor(public line: LineView, public start: number, public index: number) {}
-
-  static get(view: EditorView, pos: number): LineContext | null {
-    for (let i = 0, off = 0;; i++) {
-      let line = view.docView.children[i], end = off + line.length
-      if (end >= pos) {
-        if (line instanceof LineView) return new LineContext(line, off, i)
-        if (line.length) return null
-      }
-      off = end + 1
-    }
-  }
-
-  nearViewportEnd(view: EditorView, side: number = 0): boolean {
-    for (let {from, to} of view.docView.viewports)
-      if (from > 0 && from == this.start && side <= 0 ||
-          to < view.state.doc.length && to == this.start + this.line.length && side >= 0)
-        return true
-    return false
-  }
-
-  // FIXME limit the amount of work in character motion in non-bidi
-  // context? or not worth it?
-  prepareForQuery(_view: EditorView, pos: number) {
-    let linesToSync: LineView[] = [], atWidget = false
-    function maybeHide(view: InlineView) {
-      if (!(view instanceof TextView)) atWidget = true
-      if (view.length > 0) return false
-      ;(view.dom as any).remove()
-      if (linesToSync.indexOf(view.parent as LineView) < 0) linesToSync.push(view.parent as LineView)
-      return true
-    }
-    let {i, off} = this.line.childPos(pos - this.start)
-    if (off == 0) {
-      for (let j = i; j < this.line.children.length; j++) if (!maybeHide(this.line.children[j])) break
-      for (let j = i; j > 0; j--) if (!maybeHide(this.line.children[j - 1])) break
-    }
-    function addForLine(line: LineView, omit: number = -1) {
-      if (line.children.length == 0) return
-      for (let i = 0, off = 0; i <= line.children.length; i++) {
-        let next = i == line.children.length ? null : line.children[i]
-        if ((!next || !(next instanceof TextView)) && off != omit &&
-            (i == 0 || !(line.children[i - 1] instanceof TextView))) {
-          line.dom!.insertBefore(document.createTextNode("\u200b"), next ? next.dom : null)
-          if (linesToSync.indexOf(line) < 0) linesToSync.push(line)
-        }
-        if (next) off += next.length
-      }
-    }
-    if (this.index > 0)
-      addForLine(this.line.parent!.children[this.index - 1] as LineView)
-    addForLine(this.line, pos - this.start)
-    if (this.index < this.line.parent!.children.length - 1)
-      addForLine(this.line.parent!.children[this.index + 1] as LineView)
-    return {lines: linesToSync, atWidget}
-  }
-
-  undoQueryPreparation(_view: EditorView, toSync: {lines: LineView[]}) {
-    for (let line of toSync.lines) { line.dirty = Dirty.Node; line.sync(); line.dirty = Dirty.Not }
-  }
-}
-
 
 // Search the DOM for the {node, offset} position closest to the given
 // coordinates. Very inefficient and crude, but can usually be avoided
@@ -328,7 +163,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
 
   // No luck, do our own (potentially expensive) search
   if (!node) {
-    let {line} = LineContext.get(view, lineStart)!
+    let line = LineView.find(view.docView, lineStart)!
     ;({node, offset} = domPosAtCoords(line.dom!, x, y))
   }
   return view.docView.posFromDOM(node, offset)

@@ -206,6 +206,17 @@ export class LineView extends ContentView implements BlockView {
   match(_other: ContentView) { return false }
 
   get type() { return BlockType.Text }
+
+  static find(docView: DocView, pos: number): LineView | null {
+    for (let i = 0, off = 0;; i++) {
+      let block = docView.children[i], end = off + block.length
+      if (end >= pos) {
+        if (block instanceof LineView) return block
+        if (block.length) return null
+      }
+      off = end + block.breakAfter
+    }
+  }
 }
 
 const none = [] as any
