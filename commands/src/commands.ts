@@ -1,4 +1,5 @@
-import {EditorState, StateCommand, EditorSelection, SelectionRange, IndentContext, ChangeSpec} from "@codemirror/next/state"
+import {EditorState, StateCommand, EditorSelection, SelectionRange,
+        IndentContext, ChangeSpec, CharCategory} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
 
@@ -43,7 +44,14 @@ export const moveLineUp: Command = view => moveByLine(view, false)
 /// Move the selection one line down.
 export const moveLineDown: Command = view => moveByLine(view, true)
 
-// FIXME movePageUp/Down
+function moveByPage(view: EditorView, forward: boolean) {
+  return moveSel(view, range => view.moveVertically(range, forward, view.dom.clientHeight))
+}
+
+/// Move the selection one page up.
+export const movePageUp: Command = view => moveByPage(view, false)
+/// Move the selection one page down.
+export const movePageDown: Command = view => moveByPage(view, true)
 
 function moveLineBoundary(view: EditorView, forward: boolean) {
   return moveSel(view, range => {
@@ -93,7 +101,16 @@ function extendByLine(view: EditorView, forward: boolean) {
 /// Move the selection head one line up.
 export const extendLineUp: Command = view => extendByLine(view, false)
 /// Move the selection head one line down.
-export const extendLineDown: Command = view => extendByLine(view, false)
+export const extendLineDown: Command = view => extendByLine(view, true)
+
+function extendByPage(view: EditorView, forward: boolean) {
+  return extendSel(view, range => view.moveVertically(range, forward, view.dom.clientHeight))
+}
+
+/// Move the selection head one page up.
+export const extendPageUp: Command = view => extendByPage(view, false)
+/// Move the selection head one page down.
+export const extendPageDown: Command = view => extendByPage(view, true)
 
 function extendByLineBoundary(view: EditorView, forward: boolean) {
   return extendSel(view, range => {
@@ -125,12 +142,32 @@ export const selectAll: StateCommand = ({state, dispatch}) => {
   return true
 }
 
-function deleteText(view: EditorView, forward: boolean) {
+function deleteText(view: EditorView, forward: boolean, group: boolean) {
   let {state} = view, changes = state.changeByRange(range => {
     let {from, to} = range
     if (from == to) {
       let line = state.doc.lineAt(from), before
-      if (!forward && from > line.start && from < line.start + 200 &&
+      if (group) {
+        let categorize = view.state.charCategorizer(from)
+        let head = from
+        for (let cat: CharCategory | null = null;;) {
+          let next, nextChar
+          if (head == (forward ? line.end : line.start)) {
+            if (line.number == (forward ? state.doc.lines : 1)) break
+            line = state.doc.line(line.number + (forward ? 1 : -1))
+            next = forward ? line.start : line.end
+            nextChar = "\n"
+          } else {
+            next = line.findClusterBreak(head - line.start, forward) + line.start
+            nextChar = line.slice(Math.min(head, next) - line.start, Math.max(head, next) - line.start)
+          }
+          let nextCat = categorize(nextChar)
+          if (cat != null && nextCat != cat) break
+          if (nextCat != CharCategory.Space) cat = nextCat
+          head = next
+        }
+        if (forward) to = head; else from = head
+      } else if (!forward && from > line.start && from < line.start + 200 &&
           !/[^ \t]/.test(before = line.slice(0, from - line.start))) {
         if (before[before.length - 1] == "\t") {
           from--
@@ -140,6 +177,8 @@ function deleteText(view: EditorView, forward: boolean) {
         }
       } else {
         let target = line.findClusterBreak(from - line.start, forward) + line.start
+        if (target == from && line.number != (forward ? state.doc.lines : 0))
+          target += forward ? 1 : -1
         if (forward) to = target; else from = target
       }
     }
@@ -152,12 +191,17 @@ function deleteText(view: EditorView, forward: boolean) {
   return true
 }
 
-/// Delete the character before the cursor (which is the one to left
-/// in left-to-right text, but the one to the right in right-to-left
-/// text).
-export const deleteCharBackward: Command = view => deleteText(view, false)
-/// Delete the character after the cursor.
-export const deleteCharForward: Command = view => deleteText(view, true)
+/// Delete the selection, or, for cursor selections, the character
+/// before the cursor.
+export const deleteCharBackward: Command = view => deleteText(view, false, false)
+/// Delete the selection or the character after the cursor.
+export const deleteCharForward: Command = view => deleteText(view, true, false)
+
+/// Delete the selection or backward until the end of the next
+/// [group](#view.EditorView.moveByGroup).
+export const deleteGroupBackward: Command = view => deleteText(view, false, true)
+/// Delete the selection or forward until the end of the next group.
+export const deleteGroupForward: Command = view => deleteText(view, true, true)
 
 function indentString(state: EditorState, n: number) {
   let result = ""
@@ -260,7 +304,7 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
 
 /// The default keymap for Linux/Windows/non-Mac platforms. Binds the
 /// arrows for cursor motion, shift-arrow for selection extension,
-/// ctrl-arrows for by-word motion, home/end for line start/end,
+/// ctrl-arrows for by-group motion, home/end for line start/end,
 /// ctrl-home/end for document start/end, ctrl-a to select all,
 /// backspace/delete for deletion, and enter for newline-and-indent.
 export const pcBaseKeymap: {[key: string]: Command} = {
@@ -276,6 +320,10 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "ArrowDown": moveLineDown,
   "Shift-ArrowUp": extendLineUp,
   "Shift-ArrowDown": extendLineDown,
+  "PageUp": movePageUp,
+  "PageDown": movePageDown,
+  "Shift-PageUp": extendPageUp,
+  "Shift-PageDown": extendPageDown,
   "Home": moveLineStart,
   "End": moveLineEnd,
   "Shift-Home": extendLineStart,
@@ -285,6 +333,8 @@ export const pcBaseKeymap: {[key: string]: Command} = {
   "Mod-a": selectAll,
   "Backspace": deleteCharBackward,
   "Delete": deleteCharForward,
+  "Mod-Backspace": deleteGroupBackward,
+  "Mod-Delete": deleteGroupForward,
   "Enter": insertNewlineAndIndent
 }
 

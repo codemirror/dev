@@ -10,13 +10,17 @@
 
 @moveCharRight
 
-@moveWordLeft
+@moveGroupLeft
 
-@moveWordRight
+@moveGroupRight
 
 @moveLineUp
 
 @moveLineDown
+
+@movePageUp
+
+@movePageDown
 
 @moveLineStart
 
@@ -34,13 +38,17 @@
 
 @extendCharRight
 
-@extendWordLeft
+@extendGroupLeft
 
-@extendWordRight
+@extendGroupRight
 
 @extendLineUp
 
 @extendLineDown
+
+@extendPageUp
+
+@extendPageDown
 
 @extendLineStart
 
@@ -51,6 +59,10 @@
 @deleteCharBackward
 
 @deleteCharForward
+
+@deleteGroupBackward
+
+@deleteGroupForward
 
 ### Indentation
 
