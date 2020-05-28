@@ -218,9 +218,3 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
     return EditorSelection.cursor(nextSpan.side(!forward, dir) + line.start, 0, nextSpan.level)
   return EditorSelection.cursor(nextIndex + line.start, 0, span.level)
 }
-
-export function lineSide(line: Line, order: readonly BidiSpan[], dir: Direction, end: boolean) {
-  let span = order[end ? order.length - 1 : 0]
-  if (span.level == dir) return EditorSelection.cursor(span.side(end, dir) + line.start, end ? -1 : 1, span.level)
-  return EditorSelection.cursor(end ? line.end : line.start, 0, dir)
-}

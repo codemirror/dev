@@ -5,7 +5,7 @@ import {WidgetView} from "./inlineview"
 import {LineView} from "./blockview"
 import {findColumn, countColumn} from "@codemirror/next/text"
 import {clientRectsFor} from "./dom"
-import {moveVisually, movedOver, lineSide, Direction} from "./bidi"
+import {moveVisually, movedOver, Direction} from "./bidi"
 import browser from "./browser"
 
 declare global {
@@ -179,20 +179,20 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
                                 y: (coords.top + coords.bottom) / 2})
     if (pos > -1) return EditorSelection.cursor(pos, forward ? -1 : 1)
   }
-  return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
+  return EditorSelection.cursor(forward ? line.end : line.start, forward ? -1 : 1)
 }
 
 export function moveByChar(view: EditorView, start: SelectionRange, forward: boolean,
                            by?: (initial: string) => (next: string) => boolean) {
   let line = view.state.doc.lineAt(start.head), spans = view.bidiSpans(line)
   for (let cur = start, check: null | ((next: string) => boolean) = null;;) {
-    let next = moveVisually(line, view.bidiSpans(line), view.textDirection, cur, forward), char = movedOver
+    let next = moveVisually(line, spans, view.textDirection, cur, forward), char = movedOver
     if (!next) {
       if (line.number == (forward ? view.state.doc.lines : 1)) return cur
       char = "\n"
       line = view.state.doc.line(line.number + (forward ? 1 : -1))
       spans = view.bidiSpans(line)
-      next = lineSide(line, spans, view.textDirection, !forward)
+      next = EditorSelection.cursor(forward ? line.start : line.end)
     }
     if (!check) {
       if (!by) return next

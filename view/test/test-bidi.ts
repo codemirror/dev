@@ -75,7 +75,7 @@ function tests(dir: Direction) {
           let order = __test.computeOrder(cases[i], dir)
           let line = Text.of([cases[i]]).line(1)
           let seen = []
-          for (let p = __test.lineSide(line, order, dir, !forward);;) {
+          for (let p = EditorSelection.cursor(forward ? 0 : line.length);;) {
             ist(!seen[p.from])
             seen[p.from] = true
             let next = __test.moveVisually(line, order, dir, p, forward)

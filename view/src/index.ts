@@ -10,6 +10,6 @@ export {Range} from "@codemirror/next/rangeset"
 
 import {HeightMap, HeightOracle, MeasuredHeights, QueryType} from "./heightmap"
 import {ChangedRange} from "./extension"
-import {computeOrder, moveVisually, lineSide} from "./bidi"
+import {computeOrder, moveVisually} from "./bidi"
 /// @internal
-export const __test = {HeightMap, HeightOracle, MeasuredHeights, QueryType, ChangedRange, computeOrder, moveVisually, lineSide}
+export const __test = {HeightMap, HeightOracle, MeasuredHeights, QueryType, ChangedRange, computeOrder, moveVisually}
