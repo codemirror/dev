@@ -178,29 +178,10 @@ function findSpan(order: readonly BidiSpan[], index: number, level: number, asso
   return maybe
 }
 
-function slice(line: Line, a: number, b: number) {
-  return line.slice(Math.min(a, b), Math.max(a, b))
-}
-
-function moveIndex(line: Line, span: BidiSpan, dir: Direction, start: number, forward: boolean,
-                   repeat?: (cur: string) => (next: string) => boolean) {
-  let textForward = forward == (span.dir == dir)
-  let result = line.findClusterBreak(start, textForward)
-  if (repeat) {
-    let end = span.side(forward, dir)
-    let test = repeat(slice(line, start, result))
-    while (result != end) {
-      let next = line.findClusterBreak(result, textForward)
-      if (!test(slice(line, result, next))) break
-      result = next
-    }
-  }
-  return result
-}
+export let movedOver = ""
 
 export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direction,
-                             start: SelectionRange, forward: boolean,
-                             repeat?: (cur: string) => (next: string) => boolean) {
+                             start: SelectionRange, forward: boolean) {
   let startIndex = start.head - line.start, spanI = -1
   if (startIndex == 0) {
     if (!forward || !line.length) return null
@@ -216,16 +197,20 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
       spanI = order.length - 1
     }
   }
+
   if (spanI < 0) spanI = findSpan(order, startIndex, start.bidiLevel ?? -1, start.assoc)
   let span = order[spanI]
-  // End of span. (But not end of line--that was check for above.)
+  // End of span. (But not end of line--that was checked for above.)
   if (startIndex == span.side(forward, dir)) {
     span = order[spanI += forward ? 1 : -1]
     startIndex = span.side(!forward, dir)
   }
-  let nextIndex = moveIndex(line, span, dir, startIndex, forward, repeat)
+  let indexForward = forward == (span.dir == dir)
+  let nextIndex = line.findClusterBreak(startIndex, indexForward)
+  movedOver = line.slice(Math.min(startIndex, nextIndex), Math.max(startIndex, nextIndex))
+
   if (nextIndex != span.side(forward, dir))
-    return EditorSelection.cursor(nextIndex + line.start, forward == (span.dir == dir) ? -1 : 1, span.level)
+    return EditorSelection.cursor(nextIndex + line.start, indexForward ? -1 : 1, span.level)
   let nextSpan = spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)]
   if (!nextSpan && span.level != dir)
     return EditorSelection.cursor(forward ? line.end : line.start, forward ? -1 : 1, dir)

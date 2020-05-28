@@ -5,7 +5,7 @@ import {WidgetView} from "./inlineview"
 import {LineView} from "./blockview"
 import {findColumn, countColumn} from "@codemirror/next/text"
 import {clientRectsFor} from "./dom"
-import {moveVisually, lineSide, Direction} from "./bidi"
+import {moveVisually, movedOver, lineSide, Direction} from "./bidi"
 import browser from "./browser"
 
 declare global {
@@ -182,16 +182,26 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
   return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
 }
 
-// FIXME allow `by` to control behavior across line breaks
-
 export function moveByChar(view: EditorView, start: SelectionRange, forward: boolean,
                            by?: (initial: string) => (next: string) => boolean) {
-  let line = view.state.doc.lineAt(start.head)
-  let result = moveVisually(line, view.bidiSpans(line), view.textDirection, start, forward, by)
-  if (result) return result
-  if (line.number == (forward ? view.state.doc.lines : 1)) return start
-  let nextLine = view.state.doc.line(line.number + (forward ? 1 : -1))
-  return lineSide(nextLine, view.bidiSpans(nextLine), view.textDirection, !forward)
+  let line = view.state.doc.lineAt(start.head), spans = view.bidiSpans(line)
+  for (let cur = start, check: null | ((next: string) => boolean) = null;;) {
+    let next = moveVisually(line, view.bidiSpans(line), view.textDirection, cur, forward), char = movedOver
+    if (!next) {
+      if (line.number == (forward ? view.state.doc.lines : 1)) return cur
+      char = "\n"
+      line = view.state.doc.line(line.number + (forward ? 1 : -1))
+      spans = view.bidiSpans(line)
+      next = lineSide(line, spans, view.textDirection, !forward)
+    }
+    if (!check) {
+      if (!by) return next
+      check = by(char)
+    } else if (!check(char)) {
+      return cur
+    }
+    cur = next
+  }
 }
 
 export function byGroup(view: EditorView, pos: number, start: string) {

@@ -67,12 +67,12 @@ describe("EditorView.moveByChar", () => {
 
 describe("EditorView.moveByGroup", () => {
   it("can move by group", () => {
-    let cm = tempEditor("foo bar 国的狗 ...y\nx\n")
+    let cm = tempEditor("foo bar 国的狗 ...y\nx\n foo")
     for (let [from, to] of [[0, 3], [2, 3], [3, 7], [7, 11], [10, 11], [11, 15],
-                            [15, 16], [16, 17], [18, 19], [19, 19]])
+                            [15, 16], [16, 18], [18, 23], [23, 23]])
       ist(cm.moveByGroup(cur(from), true).head, to)
-    for (let [from, to] of [[0, 0], [2, 0], [4, 0], [5, 4], [11, 8], [15, 12], [16, 15],
-                            [17, 16], [18, 17], [18, 17], [19, 18]])
+    for (let [from, to] of [[0, 0], [2, 0], [4, 0], [5, 4], [11, 8], [15, 12],
+                            [17, 15], [20, 17], [23, 20]])
       ist(cm.moveByGroup(cur(from), false).head, to)
   })
 
