@@ -127,12 +127,12 @@ export const selectAll: StateCommand = ({state, dispatch}) => {
   return true
 }
 
-function deleteText(view: EditorView, dir: "forward" | "backward") {
+function deleteText(view: EditorView, forward: boolean) {
   let {state} = view, changes = state.changeByRange(range => {
     let {from, to} = range
     if (from == to) {
       let line = state.doc.lineAt(from), before
-      if (dir == "backward" && from > line.start && from < line.start + 200 &&
+      if (!forward && from > line.start && from < line.start + 200 &&
           !/[^ \t]/.test(before = line.slice(0, from - line.start))) {
         if (before[before.length - 1] == "\t") {
           from--
@@ -141,8 +141,8 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
           for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) from--
         }
       } else {
-        let target = view.movePos(range.head, dir, "character", "move")
-        from = Math.min(from, target); to = Math.max(to, target)
+        let target = line.findClusterBreak(from - line.start, forward)
+        if (forward) from = target; else to = target
       }
     }
     if (from == to) return {range}
@@ -157,9 +157,9 @@ function deleteText(view: EditorView, dir: "forward" | "backward") {
 /// Delete the character before the cursor (which is the one to left
 /// in left-to-right text, but the one to the right in right-to-left
 /// text).
-export const deleteCharBackward: Command = view => deleteText(view, "backward")
+export const deleteCharBackward: Command = view => deleteText(view, false)
 /// Delete the character after the cursor.
-export const deleteCharForward: Command = view => deleteText(view, "forward")
+export const deleteCharForward: Command = view => deleteText(view, true)
 
 function indentString(state: EditorState, n: number) {
   let result = ""

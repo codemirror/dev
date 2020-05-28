@@ -1,5 +1,4 @@
 import {EditorState, EditorSelection, SelectionRange, CharCategory} from "@codemirror/next/state"
-import {nextClusterBreak, prevClusterBreak} from "@codemirror/next/text"
 import {EditorView} from "./editorview"
 import {LineView} from "./blockview"
 import {BlockType} from "./decoration"
@@ -103,23 +102,21 @@ export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   if (line.length == 0) return EditorSelection.cursor(pos)
   if (linePos == 0) bias = 1
   else if (linePos == line.length) bias = -1
-  let contextStart = Math.max(line.start, pos - 256), contextEnd = Math.min(line.end, contextStart + 512)
-  let context = line.slice(contextStart - line.start, contextEnd - line.start)
-  let from = pos, to = pos
-  if (bias < 0) from = prevClusterBreak(context, pos - contextStart)
-  else to = nextClusterBreak(context, pos - contextStart)
-  let cat = categorize(context.slice(from - contextStart, to - contextStart))
-  while (from > contextStart) {
-    let prev = prevClusterBreak(context, from - contextStart)
-    if (categorize(context.slice(prev, from - contextStart)) != cat) break
-    from = prev + contextStart
+  let from = linePos, to = linePos
+  if (bias < 0) from = line.findClusterBreak(linePos, false)
+  else to = line.findClusterBreak(linePos, true)
+  let cat = categorize(line.slice(from, to))
+  while (from > line.start) {
+    let prev = line.findClusterBreak(from, false)
+    if (categorize(line.slice(prev, from)) != cat) break
+    from = prev
   }
-  while (to < contextEnd) {
-    let next = nextClusterBreak(context, to - contextStart)
-    if (categorize(context.slice(to - contextStart, next)) != cat) break
-    to = next + contextStart
+  while (to < line.end) {
+    let next = line.findClusterBreak(to, true)
+    if (categorize(line.slice(to, next)) != cat) break
+    to = next
   }
-  return EditorSelection.range(from, to)
+  return EditorSelection.range(from + line.start, to + line.start)
 }
 
 function moveWord(view: EditorView, start: number, direction: "forward" | "backward" | "left" | "right") {

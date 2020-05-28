@@ -1,3 +1,5 @@
+import {nextClusterBreak, prevClusterBreak} from "./char"
+
 const enum Tree {
   // The base size of a leaf node
   BaseLeaf = 512,
@@ -584,6 +586,24 @@ export class Line {
   finish(text: Text): this {
     if (this.content == null) this.content = new LineContent(text, this.start)
     return this
+  }
+
+  /// Find the next (or previous if `forward` is false) grapheme
+  /// cluster break from the given start position (as an offset inside
+  /// the line, not the document). Will return a position greater than
+  /// (or less than if `forward` is false) `start` unless there is no
+  /// such index in the string.
+  findClusterBreak(start: number, forward: boolean) {
+    if (start < 0 || start > this.length) throw new RangeError("Invalid position given to Line.findClusterBreak")
+    let contextStart, context
+    if (this.content == "string") {
+      contextStart = this.start
+      context = this.content
+    } else {
+      contextStart = Math.max(0, start - 256)
+      context = this.slice(contextStart, Math.min(this.length, contextStart + 512))
+    }
+    return (forward ? nextClusterBreak : prevClusterBreak)(context, start - contextStart) + contextStart
   }
 }
 

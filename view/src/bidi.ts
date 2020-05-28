@@ -1,4 +1,4 @@
-import {Line, nextClusterBreak, prevClusterBreak} from "@codemirror/next/text"
+import {Line} from "@codemirror/next/text"
 import {EditorSelection, SelectionRange} from "@codemirror/next/state"
 
 /// Used to indicate [text direction](#view.EditorView.textDirection).
@@ -178,22 +178,20 @@ function findSpan(order: readonly BidiSpan[], index: number, level: number, asso
   return maybe
 }
 
-function slice(str: string, a: number, b: number) {
-  return str.slice(Math.min(a, b), Math.max(a, b))
+function slice(line: Line, a: number, b: number) {
+  return line.slice(Math.min(a, b), Math.max(a, b))
 }
 
 function moveIndex(line: Line, span: BidiSpan, dir: Direction, start: number, forward: boolean,
                    repeat?: (cur: string) => (next: string) => boolean) {
-  let contextStart = Math.max(span.from, start - 512), contextEnd = Math.min(span.to, contextStart + 1024)
-  let context = line.slice(contextStart, contextEnd)
-  let func = (span.dir == dir) == forward ? nextClusterBreak : prevClusterBreak
-  let result = func(context, start - contextStart) + contextStart
+  let textForward = forward == (span.dir == dir)
+  let result = line.findClusterBreak(start, textForward)
   if (repeat) {
-    let end = Math.max(contextStart, Math.min(contextEnd, span.side(forward, dir)))
-    let test = repeat(slice(context, start - contextStart, result - contextStart))
+    let end = span.side(forward, dir)
+    let test = repeat(slice(line, start, result))
     while (result != end) {
-      let next = func(context, result - contextStart) + contextStart
-      if (!test(slice(context, result - contextStart, next - contextStart))) break
+      let next = line.findClusterBreak(result, textForward)
+      if (!test(slice(line, result, next))) break
       result = next
     }
   }
