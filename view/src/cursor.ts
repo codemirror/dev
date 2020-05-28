@@ -179,7 +179,9 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
                                 y: (coords.top + coords.bottom) / 2})
     if (pos > -1) return EditorSelection.cursor(pos, forward ? -1 : 1)
   }
-  return EditorSelection.cursor(forward ? line.end : line.start, forward ? -1 : 1)
+  let lineView = LineView.find(view.docView, start.head)
+  let end = lineView ? (forward ? lineView.posAtEnd : lineView.posAtStart) : (forward ? line.end : line.start)
+  return EditorSelection.cursor(end, forward ? -1 : 1)
 }
 
 export function moveByChar(view: EditorView, start: SelectionRange, forward: boolean,
