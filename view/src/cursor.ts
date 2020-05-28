@@ -204,44 +204,40 @@ export function byGroup(view: EditorView, pos: number, start: string) {
   }
 }
 
-function getGoalColumn(view: EditorView, pos: number, column: number): {pos: number, column: number} {
-  for (let goal of view.inputState.goalColumns)
-    if (goal.pos == pos) return goal
-  let goal = {pos: 0, column}
-  view.inputState.goalColumns.push(goal)
-  return goal
-}
-
 export function moveVertically(view: EditorView, start: SelectionRange, forward: boolean, distance?: number) {
   let startPos = start.head, dir: -1 | 1 = forward ? 1 : -1
   let startCoords = view.coordsAtPos(startPos)
   if (startCoords) {
-    let goal = getGoalColumn(view, startPos, startCoords.left), dist = distance ?? 5
+    let rect = view.dom.getBoundingClientRect()
+    let goal = start.goalColumn ?? startCoords.left - rect.left
+    let resolvedGoal = rect.left + goal
+    let dist = distance ?? 5
     for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, extra = 0; extra < 50; extra += 10) {
-      let pos = posAtCoords(view, {x: goal.column, y: startY + (dist + extra) * dir}, dir)
+      let pos = posAtCoords(view, {x: resolvedGoal, y: startY + (dist + extra) * dir}, dir)
       if (pos < 0) break
-      if (pos != startPos) {
-        goal.pos = pos
-        return EditorSelection.cursor(pos)
-      }
+      if (pos != startPos) return EditorSelection.cursor(pos, undefined, undefined, goal)
     }
   }
 
   // Outside of the drawn viewport, use a crude column-based approach
   let {doc} = view.state, line = doc.lineAt(startPos), tabSize = view.state.tabSize
-  // FIXME also needs goal column
-  let col = 0
-  for (const iter = doc.iterRange(line.start, startPos); !iter.next().done;)
-    col = countColumn(iter.value, col, tabSize)
-  if (dir < 0 && line.start == 0) return EditorSelection.cursor(0)
-  else if (dir > 0 && line.end == doc.length) return EditorSelection.cursor(line.end)
+  let goal = start.goalColumn, goalCol = 0
+  if (goal == null) {
+    for (const iter = doc.iterRange(line.start, startPos); !iter.next().done;)
+      goalCol = countColumn(iter.value, goalCol, tabSize)
+    goal = goalCol * view.defaultCharacterWidth
+  } else {
+    goalCol = Math.round(goal / view.defaultCharacterWidth)
+  }
+  if (dir < 0 && line.start == 0) return EditorSelection.cursor(0, undefined, undefined, goal)
+  else if (dir > 0 && line.end == doc.length) return EditorSelection.cursor(line.end, undefined, undefined, goal)
   let otherLine = doc.line(line.number + dir)
   let result = otherLine.start
   let seen = 0
-  for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= col && !iter.next().done;) {
-    const {offset, leftOver} = findColumn(iter.value, seen, col, tabSize)
-    seen = col - leftOver
+  for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= goalCol && !iter.next().done;) {
+    const {offset, leftOver} = findColumn(iter.value, seen, goalCol, tabSize)
+    seen = goalCol - leftOver
     result += offset
   }
-  return EditorSelection.cursor(result)
+  return EditorSelection.cursor(result, undefined, undefined, goal)
 }

@@ -188,13 +188,6 @@ export class Transaction {
   /// Annotation used to store transaction timestamps.
   static time = Annotation.define<number>()
 
-  /// Annotation used to indicate that this transaction shouldn't
-  /// clear the goal column, which is used during vertical cursor
-  /// motion (so that moving over short lines doesn't reset the
-  /// horizontal position to the end of the shortest line). Should
-  /// generally only be set by commands that perform vertical motion.
-  static preserveGoalColumn = Annotation.define<boolean>()
-
   /// Annotation used to associate a transaction with a user interface
   /// event. The view will set this to...
   ///

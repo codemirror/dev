@@ -173,9 +173,6 @@ export class EditorView {
       state = tr.state
     }
     let update = new ViewUpdate(this, state, transactions)
-    if (state.doc != this.state.doc || transactions.some(tr => tr.selection && !tr.annotation(Transaction.preserveGoalColumn)))
-      this.inputState.goalColumns.length = 0
-
     let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1
     this.viewState.update(update, scrollTo)
     this.bidiCache = CachedOrder.update(this.bidiCache, update.changes)
@@ -399,7 +396,13 @@ export class EditorView {
   /// it defaults to moving to the next line (including wrapped
   /// lines). Otherwise, `distance` should provide a positive distance
   /// in pixels.
-  // FIXME clean up / document goal column
+  ///
+  /// When `start` has a
+  /// [`goalColumn`](#state.SelectionRange.goalColumn), the vertical
+  /// motion will use that as a target horizontal position. Otherwise,
+  /// the cursor's own horizontal position is used. The returned
+  /// cursor will have its goal column set to whichever column was
+  /// used.
   moveVertically(start: SelectionRange, forward: boolean, distance?: number) {
     return moveVertically(this, start, forward, distance)
   }

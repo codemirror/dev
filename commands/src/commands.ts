@@ -1,5 +1,4 @@
-import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction,
-        IndentContext, ChangeSpec, Annotation} from "@codemirror/next/state"
+import {EditorState, StateCommand, EditorSelection, SelectionRange, IndentContext, ChangeSpec} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
 
@@ -7,10 +6,10 @@ function updateSel(sel: EditorSelection, by: (range: SelectionRange) => Selectio
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
 }
 
-function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange, annotation?: Annotation<any>): boolean {
+function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, how)
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true, annotations: annotation}))
+  view.dispatch(view.state.update({selection, scrollIntoView: true}))
   return true
 }
 
@@ -36,7 +35,7 @@ export const moveGroupLeft: Command = view => moveByGroup(view, view.textDirecti
 export const moveGroupRight: Command = view => moveByGroup(view, view.textDirection == Direction.LTR)
 
 function moveByLine(view: EditorView, forward: boolean) {
-  return moveSel(view, range => view.moveVertically(range, forward), Transaction.preserveGoalColumn.of(true))
+  return moveSel(view, range => view.moveVertically(range, forward))
 }
 
 /// Move the selection one line up.
@@ -58,14 +57,13 @@ export const moveLineStart: Command = view => moveLineBoundary(view, false)
 /// Move the selection to the end of the line.
 export const moveLineEnd: Command = view => moveLineBoundary(view, true)
 
-function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange,
-                   annotation?: Annotation<any>): boolean {
+function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, range => {
     let head = how(range)
     return EditorSelection.range(range.anchor, head.head)
   })
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, annotations: annotation, scrollIntoView: true}))
+  view.dispatch(view.state.update({selection, scrollIntoView: true}))
   return true
 }
 
@@ -89,7 +87,7 @@ export const extendGroupLeft: Command = view => extendByGroup(view, view.textDir
 export const extendGroupRight: Command = view => extendByGroup(view, view.textDirection == Direction.LTR)
 
 function extendByLine(view: EditorView, forward: boolean) {
-  return extendSel(view, range => view.moveVertically(range, forward), Transaction.preserveGoalColumn.of(true))
+  return extendSel(view, range => view.moveVertically(range, forward))
 }
 
 /// Move the selection head one line up.

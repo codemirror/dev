@@ -23,8 +23,6 @@ export class InputState {
 
   composing = false
 
-  goalColumns: {pos: number, column: number}[] = []
-
   mouseSelection: MouseSelection | null = null
 
   notifiedFocused: boolean
