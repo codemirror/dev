@@ -4,7 +4,7 @@ import "./test-selection"
 import "./test-coords"
 import "./test-draw-decoration"
 import "./test-extension"
-import "./test-movepos"
+import "./test-motion"
 import "./test-composition"
 import "./test-bidi"
 

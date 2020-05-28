@@ -347,6 +347,8 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
   return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
 }
 
+// FIXME allow `by` to control behavior across line breaks
+
 export function moveByChar(view: EditorView, start: SelectionRange, forward: boolean,
                            by?: (initial: string) => (next: string) => boolean) {
   let line = view.state.doc.lineAt(start.head)
