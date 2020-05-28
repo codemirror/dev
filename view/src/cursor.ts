@@ -364,28 +364,28 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   return view.docView.posFromDOM(node, offset)
 }
 
-export function moveHorizontally(view: EditorView, start: SelectionRange, forward: boolean,
-                                 unit: "character" | "group" | "lineboundary" | "lineend" = "character") {
+export function moveToLineBoundary(view: EditorView, start: SelectionRange, forward: boolean, includeWrap: boolean) {
   let line = view.state.doc.lineAt(start.head)
-  if (unit == "lineboundary" || unit == "lineend") {
-    let coords = unit == "lineend" || !view.viewState.heightOracle.lineWrapping ? null
-      : view.coordsAtPos(start.assoc < 0 && start.head > line.start ? start.head - 1 : start.head)
-    if (!coords) return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
-    let editorRect = view.dom.getBoundingClientRect()
-    let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
-                                y: (coords.top + coords.bottom) / 2})
-    return EditorSelection.cursor(pos, forward ? -1 : 1)
-  }
+  let coords = !includeWrap || !view.viewState.heightOracle.lineWrapping ? null
+    : view.coordsAtPos(start.assoc < 0 && start.head > line.start ? start.head - 1 : start.head)
+  if (!coords) return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
+  let editorRect = view.dom.getBoundingClientRect()
+  let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
+                              y: (coords.top + coords.bottom) / 2})
+  return EditorSelection.cursor(pos, forward ? -1 : 1)
+}
 
-  let result = moveVisually(line, view.bidiSpans(line), view.textDirection, start, forward,
-                            unit == "character" ? undefined : ch => moveByWord(view, start.head, ch))
+export function moveByChar(view: EditorView, start: SelectionRange, forward: boolean,
+                           by?: (initial: string) => (next: string) => boolean) {
+  let line = view.state.doc.lineAt(start.head)
+  let result = moveVisually(line, view.bidiSpans(line), view.textDirection, start, forward, by)
   if (result) return result
   if (line.number == (forward ? view.state.doc.lines : 1)) return start
   let nextLine = view.state.doc.line(line.number + (forward ? 1 : -1))
   return lineSide(nextLine, view.bidiSpans(nextLine), view.textDirection, !forward)
 }
 
-function moveByWord(view: EditorView, pos: number, start: string) {
+export function byGroup(view: EditorView, pos: number, start: string) {
   let categorize = view.state.charCategorizer(pos)
   let cat = categorize(start)
   return (next: string) => {

@@ -6,7 +6,7 @@ import {DocView} from "./docview"
 import {ContentView} from "./contentview"
 import {InputState} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
-import {movePos, posAtCoords, moveHorizontally} from "./cursor"
+import {movePos, posAtCoords, moveByChar, moveToLineBoundary, byGroup} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
@@ -379,14 +379,32 @@ export class EditorView {
     return movePos(this, start, direction, granularity, action)
   }
 
-  /// Move a cursor position by one character, group (sequence of word
-  /// or non-word characters), or line boundary. Moves (visually) away
-  /// from the start of the line when `forward` is true, towards it
-  /// otherwise. Will skip to the next line when reaching the end or
-  /// start of line, unless unit is `"lineboundary"`, and return the
-  /// original position when hitting the start or end of the document.
-  moveHorizontally(start: SelectionRange, forward: boolean, unit: "character" | "group" | "lineboundary" | "lineend" = "character") {
-    return moveHorizontally(this, start, forward, unit)
+  /// Move a cursor position by [grapheme
+  /// cluster](#text.nextClusterBoundary). `forward` determines
+  /// whether the motion is away from the line start, or towards it.
+  /// Motion in bidirectional text is in visual order, in the editor's
+  /// [text direction](#view.EditorView.textDirection). When the start
+  /// position was the last one on the line, the returned position
+  /// will be across the line break. If there is no further line, the
+  /// original position is returned.
+  moveByChar(start: SelectionRange, forward: boolean, by?: (initial: string) => (next: string) => boolean) {
+    return moveByChar(this, start, forward, by)
+  }
+
+  /// Move a cursor position across the next group of either
+  /// [letters](#state.EditorState.charCategorizer) or non-letter
+  /// non-whitespace characters.
+  moveByGroup(start: SelectionRange, forward: boolean) {
+    return moveByChar(this, start, forward, initial => byGroup(this, start.head, initial))
+  }
+
+  /// Move to the next line boundary in the given direction. If
+  /// `includeWrap` is true, line wrapping is on, and there is a
+  /// further wrap point on the current line, the wrap point will be
+  /// returned. Otherwise this function will return the start or end
+  /// of the line.
+  moveToLineBoundary(start: SelectionRange, forward: boolean, includeWrap = true) {
+    return moveToLineBoundary(this, start, forward, includeWrap)
   }
 
   /// Scroll the given document position into view.

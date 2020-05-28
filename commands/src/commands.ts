@@ -23,38 +23,50 @@ function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "ba
   return true
 }
 
-function moveHoriz(view: EditorView, forward: boolean, unit: "character" | "group" | "lineboundary"): boolean {
-  let selection = updateSel(view.state.selection, range => {
-    if (!range.empty && unit != "lineboundary") return EditorSelection.cursor(forward ? range.to : range.from)
-    let moved = view.moveHorizontally(range, forward, unit)
-    if (unit == "lineboundary" && moved.head == range.head) moved = view.moveHorizontally(range, forward, "lineend")
-    return moved
-  })
+function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
+  let selection = updateSel(view.state.selection, how)
   if (selection.eq(view.state.selection)) return false
   view.dispatch(view.state.update({selection, scrollIntoView: true}))
   return true
 }
 
+function moveByChar(view: EditorView, forward: boolean) {
+  return moveSel(view, range =>
+                 range.empty ? view.moveByChar(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
+}
+
 /// Move the selection one character to the left (which is backward in
 /// left-to-right text, forward in right-to-left text).
-export const moveCharLeft: Command = view => moveHoriz(view, view.textDirection != Direction.LTR, "character")
+export const moveCharLeft: Command = view => moveByChar(view, view.textDirection != Direction.LTR)
 /// Move the selection one character to the right.
-export const moveCharRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "character")
+export const moveCharRight: Command = view => moveByChar(view, view.textDirection == Direction.LTR)
+
+function moveByGroup(view: EditorView, forward: boolean) {
+  return moveSel(view, range =>
+                 range.empty ? view.moveByGroup(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
+}
 
 /// Move the selection one word to the left.
-export const moveGroupLeft: Command = view => moveHoriz(view, view.textDirection != Direction.LTR, "group")
+export const moveGroupLeft: Command = view => moveByGroup(view, view.textDirection != Direction.LTR)
 /// Move the selection one word to the right.
-export const moveGroupRight: Command = view => moveHoriz(view, view.textDirection == Direction.LTR, "group")
+export const moveGroupRight: Command = view => moveByGroup(view, view.textDirection == Direction.LTR)
 
 /// Move the selection one line up.
 export const moveLineUp: Command = view => moveSelection(view, "backward", "line")
 /// Move the selection one line down.
 export const moveLineDown: Command = view => moveSelection(view, "forward", "line")
 
+function moveLineBoundary(view: EditorView, forward: boolean) {
+  return moveSel(view, range => {
+    let moved = view.moveToLineBoundary(range, forward)
+    return moved.head == range.head ? view.moveToLineBoundary(range, forward, false) : moved
+  })
+}
+
 /// Move the selection to the start of the line.
-export const moveLineStart: Command = view => moveHoriz(view, false, "lineboundary")
+export const moveLineStart: Command = view => moveLineBoundary(view, false)
 /// Move the selection to the end of the line.
-export const moveLineEnd: Command = view => moveHoriz(view, true, "lineboundary")
+export const moveLineEnd: Command = view => moveLineBoundary(view, true)
 
 function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
                          granularity: "character" | "word" | "line" | "lineboundary"): boolean {
@@ -70,37 +82,51 @@ function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "
   return true
 }
 
-function extendHoriz(view: EditorView, forward: boolean, unit: "character" | "group" | "lineboundary"): boolean {
+function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, range => {
-    let pos = view.moveHorizontally(range, forward, unit)
-    if (unit == "lineboundary" && pos.head == range.head) pos = view.moveHorizontally(range, forward, "lineend")
-    return EditorSelection.range(range.anchor, pos.from)
+    let head = how(range)
+    return EditorSelection.range(range.anchor, head.head)
   })
   if (selection.eq(view.state.selection)) return false
   view.dispatch(view.state.update({selection, scrollIntoView: true}))
   return true
 }
 
+function extendByChar(view: EditorView, forward: boolean) {
+  return extendSel(view, range => view.moveByChar(range, forward))
+}
+
 /// Move the selection head one character to the left, while leaving
 /// the anchor in place.
-export const extendCharLeft: Command = view => extendHoriz(view, view.textDirection != Direction.LTR, "character")
+export const extendCharLeft: Command = view => extendByChar(view, view.textDirection != Direction.LTR)
 /// Move the selection head one character to the right.
-export const extendCharRight: Command = view => extendHoriz(view, view.textDirection == Direction.LTR, "character")
+export const extendCharRight: Command = view => extendByChar(view, view.textDirection == Direction.LTR)
+
+function extendByGroup(view: EditorView, forward: boolean) {
+  return extendSel(view, range => view.moveByGroup(range, forward))
+}
 
 /// Move the selection head one word to the left.
-export const extendGroupLeft: Command = view => extendHoriz(view, view.textDirection != Direction.LTR, "group")
+export const extendGroupLeft: Command = view => extendByGroup(view, view.textDirection != Direction.LTR)
 /// Move the selection head one word to the right.
-export const extendGroupRight: Command = view => extendHoriz(view, view.textDirection == Direction.LTR, "group")
+export const extendGroupRight: Command = view => extendByGroup(view, view.textDirection == Direction.LTR)
 
 /// Move the selection head one line up.
 export const extendLineUp: Command = view => extendSelection(view, "backward", "line")
 /// Move the selection head one line down.
 export const extendLineDown: Command = view => extendSelection(view, "forward", "line")
 
+function extendByLineBoundary(view: EditorView, forward: boolean) {
+  return extendSel(view, range => {
+    let head = view.moveToLineBoundary(range, forward)
+    return head.head == range.head ? view.moveToLineBoundary(range, forward, false) : head
+  })
+}
+
 /// Move the selection head to the start of the line.
-export const extendLineStart: Command = view => extendHoriz(view, false, "lineboundary")
+export const extendLineStart: Command = view => extendByLineBoundary(view, false)
 /// Move the selection head to the end of the line.
-export const extendLineEnd: Command = view => extendHoriz(view, true, "lineboundary")
+export const extendLineEnd: Command = view => extendByLineBoundary(view, true)
 
 /// Move the selection to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {
