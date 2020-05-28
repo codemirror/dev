@@ -66,31 +66,12 @@ export function movePos(view: EditorView, start: number,
       }
     }
     // Can't do a precise one based on DOM positions, fall back to per-column
-    return moveLineByColumn(view.state.doc, view.state.tabSize, start, dir)
+    return 0
   } else if (granularity == "word") {
     return moveWord(view, start, direction)
   } else {
     throw new RangeError("Invalid move granularity: " + granularity)
   }
-}
-
-function moveLineByColumn(doc: Doc, tabSize: number, pos: number, dir: -1 | 1): number {
-  let line = doc.lineAt(pos)
-  // FIXME also needs goal column?
-  let col = 0
-  for (const iter = doc.iterRange(line.start, pos); !iter.next().done;)
-    col = countColumn(iter.value, col, tabSize)
-  if (dir < 0 && line.start == 0) return 0
-  else if (dir > 0 && line.end == doc.length) return line.end
-  let otherLine = doc.line(line.number + dir)
-  let result = otherLine.start
-  let seen = 0
-  for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= col && !iter.next().done;) {
-    const {offset, leftOver} = findColumn(iter.value, seen, col, tabSize)
-    seen = col - leftOver
-    result += offset
-  }
-  return result
 }
 
 function moveCharacterSimple(start: number, dir: 1 | -1, context: LineContext | null, doc: Doc): number {
@@ -157,14 +138,6 @@ function moveWord(view: EditorView, start: number, direction: "forward" | "backw
     if (i > 0 || /\S/.test(doc.sliceString(group.from, group.to))) return pos
     next = Math.max(0, Math.min(doc.length, pos + (start ? -1 : 1)))
   }
-}
-
-function getGoalColumn(view: EditorView, pos: number, column: number): {pos: number, column: number} {
-  for (let goal of view.inputState.goalColumns)
-    if (goal.pos == pos) return goal
-  let goal = {pos: 0, column}
-  view.inputState.goalColumns.push(goal)
-  return goal
 }
 
 export class LineContext {
@@ -368,11 +341,13 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
   let line = view.state.doc.lineAt(start.head)
   let coords = !includeWrap || !view.viewState.heightOracle.lineWrapping ? null
     : view.coordsAtPos(start.assoc < 0 && start.head > line.start ? start.head - 1 : start.head)
-  if (!coords) return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
-  let editorRect = view.dom.getBoundingClientRect()
-  let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
-                              y: (coords.top + coords.bottom) / 2})
-  return EditorSelection.cursor(pos, forward ? -1 : 1)
+  if (coords) {
+    let editorRect = view.dom.getBoundingClientRect()
+    let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
+                                y: (coords.top + coords.bottom) / 2})
+    if (pos > -1) return EditorSelection.cursor(pos, forward ? -1 : 1)
+  }
+  return lineSide(line, view.bidiSpans(line), view.textDirection, forward)
 }
 
 export function moveByChar(view: EditorView, start: SelectionRange, forward: boolean,
@@ -393,4 +368,46 @@ export function byGroup(view: EditorView, pos: number, start: string) {
     if (cat == CharCategory.Space) cat = nextCat
     return cat == nextCat
   }
+}
+
+function getGoalColumn(view: EditorView, pos: number, column: number): {pos: number, column: number} {
+  for (let goal of view.inputState.goalColumns)
+    if (goal.pos == pos) return goal
+  let goal = {pos: 0, column}
+  view.inputState.goalColumns.push(goal)
+  return goal
+}
+
+export function moveVertically(view: EditorView, start: SelectionRange, forward: boolean, distance?: number) {
+  let startPos = start.head, dir: -1 | 1 = forward ? 1 : -1
+  let startCoords = view.coordsAtPos(startPos)
+  if (startCoords) {
+    let goal = getGoalColumn(view, startPos, startCoords.left), dist = distance ?? 5
+    for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, extra = 0; extra < 50; extra += 10) {
+      let pos = posAtCoords(view, {x: goal.column, y: startY + (dist + extra) * dir}, dir)
+      if (pos < 0) break
+      if (pos != startPos) {
+        goal.pos = pos
+        return EditorSelection.cursor(pos)
+      }
+    }
+  }
+
+  // Outside of the drawn viewport, use a crude column-based approach
+  let {doc} = view.state, line = doc.lineAt(startPos), tabSize = view.state.tabSize
+  // FIXME also needs goal column
+  let col = 0
+  for (const iter = doc.iterRange(line.start, startPos); !iter.next().done;)
+    col = countColumn(iter.value, col, tabSize)
+  if (dir < 0 && line.start == 0) return EditorSelection.cursor(0)
+  else if (dir > 0 && line.end == doc.length) return EditorSelection.cursor(line.end)
+  let otherLine = doc.line(line.number + dir)
+  let result = otherLine.start
+  let seen = 0
+  for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= col && !iter.next().done;) {
+    const {offset, leftOver} = findColumn(iter.value, seen, col, tabSize)
+    seen = col - leftOver
+    result += offset
+  }
+  return EditorSelection.cursor(result)
 }

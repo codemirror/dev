@@ -6,7 +6,7 @@ import {DocView} from "./docview"
 import {ContentView} from "./contentview"
 import {InputState} from "./input"
 import {Rect, focusPreventScroll} from "./dom"
-import {movePos, posAtCoords, moveByChar, moveToLineBoundary, byGroup} from "./cursor"
+import {movePos, posAtCoords, moveByChar, moveToLineBoundary, byGroup, moveVertically} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
@@ -405,6 +405,15 @@ export class EditorView {
   /// of the line.
   moveToLineBoundary(start: SelectionRange, forward: boolean, includeWrap = true) {
     return moveToLineBoundary(this, start, forward, includeWrap)
+  }
+
+  /// Move a cursor position vertically. When `distance` isn't given,
+  /// it defaults to moving to the next line (including wrapped
+  /// lines). Otherwise, `distance` should provide a positive distance
+  /// in pixels.
+  // FIXME clean up / document goal column
+  moveVertically(start: SelectionRange, forward: boolean, distance?: number) {
+    return moveVertically(this, start, forward, distance)
   }
 
   /// Scroll the given document position into view.

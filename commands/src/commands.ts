@@ -1,5 +1,5 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange, Transaction,
-        IndentContext, ChangeSpec} from "@codemirror/next/state"
+        IndentContext, ChangeSpec, Annotation} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
 
@@ -7,26 +7,10 @@ function updateSel(sel: EditorSelection, by: (range: SelectionRange) => Selectio
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
 }
 
-function moveSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
-                       granularity: "character" | "word" | "line" | "lineboundary"): boolean {
-  let selection = updateSel(view.state.selection, range => {
-    if (!range.empty && granularity != "lineboundary")
-      return EditorSelection.cursor(dir == "left" || dir == "backward" ? range.from : range.to)
-    return EditorSelection.cursor(view.movePos(range.head, dir, granularity, "move"))
-  })
-  if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({
-    selection,
-    annotations: granularity == "line" ? Transaction.preserveGoalColumn.of(true) : undefined,
-    scrollIntoView: true
-  }))
-  return true
-}
-
-function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
+function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange, annotation?: Annotation<any>): boolean {
   let selection = updateSel(view.state.selection, how)
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true}))
+  view.dispatch(view.state.update({selection, scrollIntoView: true, annotations: annotation}))
   return true
 }
 
@@ -51,10 +35,16 @@ export const moveGroupLeft: Command = view => moveByGroup(view, view.textDirecti
 /// Move the selection one word to the right.
 export const moveGroupRight: Command = view => moveByGroup(view, view.textDirection == Direction.LTR)
 
+function moveByLine(view: EditorView, forward: boolean) {
+  return moveSel(view, range => view.moveVertically(range, forward), Transaction.preserveGoalColumn.of(true))
+}
+
 /// Move the selection one line up.
-export const moveLineUp: Command = view => moveSelection(view, "backward", "line")
+export const moveLineUp: Command = view => moveByLine(view, false)
 /// Move the selection one line down.
-export const moveLineDown: Command = view => moveSelection(view, "forward", "line")
+export const moveLineDown: Command = view => moveByLine(view, true)
+
+// FIXME movePageUp/Down
 
 function moveLineBoundary(view: EditorView, forward: boolean) {
   return moveSel(view, range => {
@@ -68,27 +58,14 @@ export const moveLineStart: Command = view => moveLineBoundary(view, false)
 /// Move the selection to the end of the line.
 export const moveLineEnd: Command = view => moveLineBoundary(view, true)
 
-function extendSelection(view: EditorView, dir: "left" | "right" | "forward" | "backward",
-                         granularity: "character" | "word" | "line" | "lineboundary"): boolean {
-  let selection = updateSel(view.state.selection, range => {
-    return EditorSelection.range(range.anchor, view.movePos(range.head, dir, granularity, "extend"))
-  })
-  if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({
-    selection,
-    annotations: granularity == "line" ? Transaction.preserveGoalColumn.of(true) : undefined,
-    scrollIntoView: true
-  }))
-  return true
-}
-
-function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
+function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange,
+                   annotation?: Annotation<any>): boolean {
   let selection = updateSel(view.state.selection, range => {
     let head = how(range)
     return EditorSelection.range(range.anchor, head.head)
   })
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true}))
+  view.dispatch(view.state.update({selection, annotations: annotation, scrollIntoView: true}))
   return true
 }
 
@@ -111,10 +88,14 @@ export const extendGroupLeft: Command = view => extendByGroup(view, view.textDir
 /// Move the selection head one word to the right.
 export const extendGroupRight: Command = view => extendByGroup(view, view.textDirection == Direction.LTR)
 
+function extendByLine(view: EditorView, forward: boolean) {
+  return extendSel(view, range => view.moveVertically(range, forward), Transaction.preserveGoalColumn.of(true))
+}
+
 /// Move the selection head one line up.
-export const extendLineUp: Command = view => extendSelection(view, "backward", "line")
+export const extendLineUp: Command = view => extendByLine(view, false)
 /// Move the selection head one line down.
-export const extendLineDown: Command = view => extendSelection(view, "forward", "line")
+export const extendLineDown: Command = view => extendByLine(view, false)
 
 function extendByLineBoundary(view: EditorView, forward: boolean) {
   return extendSel(view, range => {
