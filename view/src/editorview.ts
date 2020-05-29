@@ -181,7 +181,7 @@ export class EditorView {
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
-    if (redrawn || scrollTo) this.requestMeasure()
+    if (redrawn || scrollTo || this.viewState.mustEnforceCursorAssoc) this.requestMeasure()
   }
 
   updatePlugins(update: ViewUpdate) {

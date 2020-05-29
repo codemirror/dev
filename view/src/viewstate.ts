@@ -100,6 +100,16 @@ export class ViewState {
   lineGaps: readonly LineGap[]
   lineGapDeco: DecorationSet
 
+  // Cursor 'assoc' is only significant when the cursor is on a line
+  // wrap point, where it must stick to the character that it is
+  // associated with. Since browsers don't provide a reasonable
+  // interface to set or query this, when a selection is set that
+  // might cause this to be signficant, this flag is set. The next
+  // measure phase will check whether the cursor is on a line-wrapping
+  // boundary and, if so, reset it to make sure it is positioned in
+  // the right place.
+  mustEnforceCursorAssoc = false
+
   constructor(public state: EditorState) {
     this.heightMap = this.heightMap.applyChanges(state.facet(decorations), Text.empty, this.heightOracle.setDoc(state.doc),
                                                  [new ChangedRange(0, 0, 0, state.doc.length)])
@@ -134,6 +144,10 @@ export class ViewState {
     this.computeVisibleRanges()
 
     if (scrollTo) this.scrollTo = scrollTo
+
+    if (!this.mustEnforceCursorAssoc && update.selectionSet && update.view.lineWrapping &&
+        update.state.selection.primary.empty && update.state.selection.primary.assoc)
+      this.mustEnforceCursorAssoc = true
   }
 
   measure(docView: DocView, repeated: boolean) {
@@ -182,6 +196,15 @@ export class ViewState {
     if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
       result |= this.updateLineGaps(this.ensureLineGaps(refresh ? [] : this.lineGaps))
     this.computeVisibleRanges()
+
+    if (this.mustEnforceCursorAssoc) {
+      this.mustEnforceCursorAssoc = false
+      // This is done in the read stage, because moving the selection
+      // to a line end is going to trigger a layout anyway, so it
+      // can't be a pure write. It should be rare that it does any
+      // writing.
+      docView.enforceCursorAssoc()
+    }
 
     return result
   }

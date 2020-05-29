@@ -228,6 +228,21 @@ export class DocView extends ContentView {
     this.impreciseHead = head.precise ? null: new DOMPos(domSel.focusNode!, domSel.focusOffset)
   }
 
+  enforceCursorAssoc() {
+    let cursor = this.view.state.selection.primary
+    let sel = getSelection(this.root)
+    if (!cursor.empty || !cursor.assoc || !sel.modify) return
+    let line = LineView.find(this, cursor.head) // FIXME provide view-line-range finding helper
+    if (!line) return
+    let lineStart = line.posAtStart
+    if (cursor.head == lineStart || cursor.head == lineStart + line.length) return
+    let before = this.coordsAt(cursor.head, -1), after = this.coordsAt(cursor.head, 1)
+    if (!before || !after || before.bottom > after.top) return
+    let dom = this.domAtPos(cursor.head + cursor.assoc)
+    sel.collapse(dom.node, dom.offset)
+    sel.modify("move", cursor.assoc < 0 ? "forward" : "backward", "lineboundary")
+  }
+
   mayControlSelection() {
     return this.view.state.facet(editable) ? this.root.activeElement == this.dom : hasSelection(this.dom, getSelection(this.root))
   }
