@@ -438,6 +438,9 @@ export class EditorView {
   get defaultLineHeight() { return this.viewState.heightOracle.lineHeight }
   /// The text direction (`direction` CSS property) of the editor.
   get textDirection(): Direction { return this.viewState.heightOracle.direction }
+  /// Whether this editor wraps lines (as determined by the
+  /// `white-space` CSS property of its content element).
+  get lineWrapping(): boolean { return this.viewState.heightOracle.lineWrapping }
 
   /// Returns the bidirectional text structure of the given line
   /// (which should be in the current document) as an array of span

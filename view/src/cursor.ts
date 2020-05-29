@@ -171,7 +171,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
 
 export function moveToLineBoundary(view: EditorView, start: SelectionRange, forward: boolean, includeWrap: boolean) {
   let line = view.state.doc.lineAt(start.head)
-  let coords = !includeWrap || !view.viewState.heightOracle.lineWrapping ? null
+  let coords = !includeWrap || !view.lineWrapping ? null
     : view.coordsAtPos(start.assoc < 0 && start.head > line.start ? start.head - 1 : start.head)
   if (coords) {
     let editorRect = view.dom.getBoundingClientRect()
