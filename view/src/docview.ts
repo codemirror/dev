@@ -200,20 +200,31 @@ export class DocView extends ContentView {
 
     let domSel = getSelection(this.root)
     // If the selection is already here, or in an equivalent position, don't touch it
-    if (force ||
+    if (force || !domSel.focusNode ||
+        (browser.gecko && primary.empty && nextToUneditable(domSel.focusNode, domSel.focusOffset)) ||
         !isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) ||
         !isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {
       this.view.observer.ignore(() => {
-        // Selection.extend can be used to create an 'inverted' selection
-        // (one where the focus is before the anchor), but not all
-        // browsers support it yet.
-        if (primary.empty || domSel.extend) {
+        if (primary.empty) {
+          // Work around https://bugzilla.mozilla.org/show_bug.cgi?id=1612076
+          if (browser.gecko) {
+            let nextTo = nextToUneditable(anchor.node, anchor.offset)
+            if (nextTo && nextTo != (NextTo.Before | NextTo.After)) {
+              let text = nearbyTextNode(anchor.node, anchor.offset, nextTo == NextTo.Before ? 1 : -1)
+              if (text) anchor = new DOMPos(text, nextTo == NextTo.Before ? 0 : text.nodeValue!.length)
+            }
+          }
           domSel.collapse(anchor.node, anchor.offset)
-          if (!primary.empty)
-            domSel.extend(head.node, head.offset)
-          else if (primary.bidiLevel != null && (domSel as any).cursorBidiLevel != null)
+          if (primary.bidiLevel != null && (domSel as any).cursorBidiLevel != null)
             (domSel as any).cursorBidiLevel = primary.bidiLevel
+        } else if (domSel.extend) {
+          // Selection.extend can be used to create an 'inverted' selection
+          // (one where the focus is before the anchor), but not all
+          // browsers support it yet.
+          domSel.collapse(anchor.node, anchor.offset)
+          domSel.extend(head.node, head.offset)
         } else {
+          // Primitive (IE) way
           let range = document.createRange()
           if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
           range.setEnd(head.node, head.offset)
@@ -417,7 +428,7 @@ class BlockGapWidget extends WidgetType<number> {
 
 export function computeCompositionDeco(view: EditorView, changes: ChangeSet): DecorationSet {
   let sel = getSelection(view.root)
-  let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset)
+  let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset, 0)
   if (!textNode) return Decoration.none
   let cView = view.docView.nearest(textNode)
   let from: number, to: number, topNode = textNode
@@ -457,19 +468,27 @@ class CompositionWidget extends WidgetType<{top: Node, text: Node}> {
   get customView() { return CompositionView }
 }
 
-function nearbyTextNode(node: Node, offset: number): Node | null {
+function nearbyTextNode(node: Node, offset: number, side: number): Node | null {
   for (;;) {
     if (node.nodeType == 3) return node
-    if (node.nodeType == 1 && offset > 0) {
+    if (node.nodeType == 1 && offset > 0 && side <= 0) {
       node = node.childNodes[offset - 1]
       offset = maxOffset(node)
-    } else if (node.nodeType == 1 && offset < node.childNodes.length) {
+    } else if (node.nodeType == 1 && offset < node.childNodes.length && side >= 0) {
       node = node.childNodes[offset]
       offset = 0
     } else {
       return null
     }
   }
+}
+
+const enum NextTo { Before = 1, After = 2 }
+
+function nextToUneditable(node: Node, offset: number) {
+  if (node.nodeType != 1) return 0
+  return (offset && (node.childNodes[offset - 1] as any).contentEditable == "false" ? NextTo.Before : 0) |
+    (offset < node.childNodes.length && (node.childNodes[offset] as any).contentEditable == "false" ? NextTo.After : 0)
 }
 
 class DecorationComparator {
