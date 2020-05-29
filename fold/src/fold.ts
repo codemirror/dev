@@ -36,6 +36,16 @@ const foldState = StateField.define<DecorationSet>({
                                 filterFrom: e.value.from, filterTo: e.value.to})
       }
     }
+    // Clear folded ranges that cover the selection head
+    if (tr.selection) {
+      let onSelection = false, {head} = tr.selection.primary
+      folded.between(head, head, (a, b) => { if (a < head && b > head) onSelection = true })
+      if (onSelection) folded = folded.update({
+        filterFrom: head,
+        filterTo: head,
+        filter: (a, b) => b <= head || a >= head
+      })
+    }
     return folded
   },
   provide: [EditorView.decorations]
