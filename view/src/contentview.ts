@@ -49,7 +49,7 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length
   }
 
-  coordsAt(_pos: number): Rect | null { return null }
+  coordsAt(_pos: number, _side: number): Rect | null { return null }
 
   sync() {
     if (this.dirty & Dirty.Node) {

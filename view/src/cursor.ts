@@ -92,7 +92,7 @@ function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node,
   let clipX = Math.max(closestRect!.left, Math.min(closestRect!.right, x))
   if (closest.nodeType == 3) return domPosInText(closest as Text, clipX, y)
   if (!closestX && (closest as HTMLElement).contentEditable == "true")
-    domPosAtCoords(closest as HTMLElement, clipX, y)
+    return domPosAtCoords(closest as HTMLElement, clipX, y)
   let offset = Array.prototype.indexOf.call(parent.childNodes, closest) +
     (x >= (closestRect!.left + closestRect!.right) / 2 ? 1 : 0)
   return {node: parent, offset}
@@ -110,7 +110,7 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
       if (rect.left - 1 <= x && rect.right + 1 >= x &&
           rect.top - 1 <= y && rect.bottom + 1 >= y) {
         let right = x >= (rect.left + rect.right) / 2, after = right
-        if (browser.chrome || browser.gecko) {
+        if (browser.webkit || browser.gecko) {
           // Check for RTL on browsers that support getting client
           // rects for empty ranges.
           range.setEnd(node, i)

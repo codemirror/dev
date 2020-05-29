@@ -53,6 +53,23 @@ export class BidiSpan {
   constructor(readonly from: number, readonly to: number, readonly level: number) {}
   get dir() { return this.level % 2 ? RTL : LTR }
   side(end: boolean, dir: Direction) { return (this.dir == dir) == end ? this.to : this.from }
+
+  static find(order: readonly BidiSpan[], index: number, level: number, assoc: number) {
+    let maybe = -1
+    for (let i = 0; i < order.length; i++) {
+      let span = order[i]
+      if (span.from <= index && span.to >= index) {
+        if (span.level == level) return i
+        // When multiple spans match, if assoc != 0, take the one that
+        // covers that side, otherwise take the one with the minimum
+        // level.
+        if (maybe < 0 || (assoc != 0 ? (assoc < 0 ? span.from < index : span.to > index) : order[maybe].level > span.level))
+          maybe = i
+      }
+    }
+    if (maybe < 0) throw new RangeError("Index out of range")
+    return maybe
+  }
 }
 
 // Reused array of character types
@@ -161,23 +178,6 @@ export function trivialOrder(length: number) {
   return [new BidiSpan(0, length, 0)]
 }
 
-function findSpan(order: readonly BidiSpan[], index: number, level: number, assoc: number) {
-  let maybe = -1
-  for (let i = 0; i < order.length; i++) {
-    let span = order[i]
-    if (span.from <= index && span.to >= index) {
-      if (span.level == level) return i
-      // When multiple spans match, if assoc != 0, take the one that
-      // covers that side, otherwise take the one with the minimum
-      // level.
-      if (maybe < 0 || (assoc != 0 ? (assoc < 0 ? span.from < index : span.to > index) : order[maybe].level > span.level))
-        maybe = i
-    }
-  }
-  if (maybe < 0) throw new RangeError("Index out of range")
-  return maybe
-}
-
 export let movedOver = ""
 
 export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direction,
@@ -198,7 +198,7 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
     }
   }
 
-  if (spanI < 0) spanI = findSpan(order, startIndex, start.bidiLevel ?? -1, start.assoc)
+  if (spanI < 0) spanI = BidiSpan.find(order, startIndex, start.bidiLevel ?? -1, start.assoc)
   let span = order[spanI]
   // End of span. (But not end of line--that was checked for above.)
   if (startIndex == span.side(forward, dir)) {

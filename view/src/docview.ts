@@ -1,3 +1,5 @@
+import {RangeSet} from "@codemirror/next/rangeset"
+import {ChangeSet, Transaction} from "@codemirror/next/state"
 import {ContentView, ChildCursor, Dirty, DOMPos} from "./contentview"
 import {BlockView, LineView} from "./blockview"
 import {InlineView, CompositionView} from "./inlineview"
@@ -9,8 +11,6 @@ import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoVie
 import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet,
         UpdateFlag, editable, ChangedRange} from "./extension"
 import {EditorView} from "./editorview"
-import {RangeSet} from "@codemirror/next/rangeset"
-import {ChangeSet, Transaction} from "@codemirror/next/state"
 
 const none = [] as any
 
@@ -257,10 +257,10 @@ export class DocView extends ContentView {
     return this.children[i].domAtPos(off)
   }
 
-  coordsAt(pos: number): Rect | null {
+  coordsAt(pos: number, side: number): Rect | null {
     for (let off = this.length, i = this.children.length - 1;; i--) {
       let child = this.children[i], start = off - child.breakAfter - child.length
-      if (pos >= start && child.type != BlockType.WidgetAfter) return child.coordsAt(pos - start)
+      if (pos >= start && child.type != BlockType.WidgetAfter) return child.coordsAt(pos - start, side)
       off = start
     }
   }
@@ -352,8 +352,8 @@ export class DocView extends ContentView {
     ]
   }
 
-  scrollPosIntoView(pos: number) {
-    let rect = this.coordsAt(pos)
+  scrollPosIntoView(pos: number, side: number) {
+    let rect = this.coordsAt(pos, side)
     if (!rect) return
     let mLeft = 0, mRight = 0, mTop = 0, mBottom = 0
     for (let margins of this.view.pluginField(PluginField.scrollMargins)) if (margins) {

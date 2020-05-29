@@ -1,4 +1,4 @@
-import {EditorState, Transaction, Extension, Precedence, ChangeDesc, SelectionRange} from "@codemirror/next/state"
+import {EditorState, Transaction, Extension, Precedence, ChangeDesc, EditorSelection, SelectionRange} from "@codemirror/next/state"
 import {Line} from "@codemirror/next/text"
 import {StyleModule, Style} from "style-mod"
 
@@ -173,7 +173,7 @@ export class EditorView {
       state = tr.state
     }
     let update = new ViewUpdate(this, state, transactions)
-    let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary.head : -1
+    let scrollTo = transactions.some(tr => tr.scrolledIntoView) ? state.selection.primary : null
     this.viewState.update(update, scrollTo)
     this.bidiCache = CachedOrder.update(this.bidiCache, update.changes)
     if (!update.empty) this.updatePlugins(update)
@@ -181,7 +181,7 @@ export class EditorView {
     if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
     this.updateAttrs()
     this.updateState = UpdateState.Idle
-    if (redrawn || scrollTo > -1) this.requestMeasure()
+    if (redrawn || scrollTo) this.requestMeasure()
   }
 
   updatePlugins(update: ViewUpdate) {
@@ -217,7 +217,7 @@ export class EditorView {
       this.updateState = UpdateState.Measuring
       let changed = this.viewState.measure(this.docView, i > 0)
       let measuring = this.measureRequests
-      if (!changed && !measuring.length && this.viewState.scrollTo < 0) break
+      if (!changed && !measuring.length && this.viewState.scrollTo == null) break
       this.measureRequests = []
       if (i > 5) {
         console.warn("Viewport failed to stabilize")
@@ -236,9 +236,9 @@ export class EditorView {
         try { measuring[i].write(measured[i], this) }
         catch(e) { logException(this.state, e) }
       }
-      if (this.viewState.scrollTo > -1) {
-        this.docView.scrollPosIntoView(this.viewState.scrollTo)
-        this.viewState.scrollTo = -1
+      if (this.viewState.scrollTo) {
+        this.docView.scrollPosIntoView(this.viewState.scrollTo.head, this.viewState.scrollTo.assoc)
+        this.viewState.scrollTo = null
       }
       if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
     }
@@ -409,7 +409,7 @@ export class EditorView {
 
   /// Scroll the given document position into view.
   scrollPosIntoView(pos: number) {
-    this.viewState.scrollTo = pos
+    this.viewState.scrollTo = EditorSelection.cursor(pos)
     this.requestMeasure()
   }
 
@@ -421,9 +421,14 @@ export class EditorView {
   }
 
   /// Get the screen coordinates at the given document position.
-  coordsAtPos(pos: number): Rect | null {
+  coordsAtPos(pos: number, side: -1 | 1 = 1): Rect | null {
     this.readMeasured()
-    return this.docView.coordsAt(pos)
+    let rect = this.docView.coordsAt(pos, side)
+    if (!rect || rect.left == rect.right) return rect
+    let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line)
+    let span = order[BidiSpan.find(order, pos - line.start, -1, side)]
+    let x = (span.dir == Direction.LTR) == (side < 0) ? rect.right : rect.left
+    return {left: x, right: x, top: rect.top, bottom: rect.bottom}
   }
 
   /// The default width of a character in the editor. May not

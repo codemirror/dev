@@ -1,5 +1,5 @@
 import {Text} from "@codemirror/next/text"
-import {EditorState, ChangeSet, ChangeDesc} from "@codemirror/next/state"
+import {EditorState, ChangeSet, ChangeDesc, SelectionRange} from "@codemirror/next/state"
 import {RangeSet} from "@codemirror/next/rangeset"
 import {Rect} from "./dom"
 import {HeightMap, HeightOracle, BlockInfo, MeasuredHeights, QueryType, heightRelevantDecoChanges} from "./heightmap"
@@ -91,7 +91,7 @@ export class ViewState {
   heightOracle: HeightOracle = new HeightOracle
   heightMap: HeightMap = HeightMap.empty()
 
-  scrollTo = -1
+  scrollTo: SelectionRange | null = null
   // Briefly set to true when printing, to disable viewport limiting
   printing = false
 
@@ -103,13 +103,13 @@ export class ViewState {
   constructor(public state: EditorState) {
     this.heightMap = this.heightMap.applyChanges(state.facet(decorations), Text.empty, this.heightOracle.setDoc(state.doc),
                                                  [new ChangedRange(0, 0, 0, state.doc.length)])
-    this.viewport = this.getViewport(0, -1)
+    this.viewport = this.getViewport(0, null)
     this.lineGaps = this.ensureLineGaps([])
     this.lineGapDeco = Decoration.set(this.lineGaps.map(gap => gap.draw(false)))
     this.computeVisibleRanges()
   }
 
-  update(update: ViewUpdate, scrollTo = -1) {
+  update(update: ViewUpdate, scrollTo: SelectionRange | null = null) {
     let prev = this.state
     this.state = update.state
     let newDeco = this.state.facet(decorations)
@@ -122,7 +122,7 @@ export class ViewState {
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
 
     let viewport = heightChanges.length ? this.mapViewport(this.viewport, update.changes) : this.viewport
-    if (!viewport || scrollTo > -1 && (scrollTo < viewport.from || scrollTo > viewport.to) ||
+    if (!viewport || scrollTo && (scrollTo.head < viewport.from || scrollTo.head > viewport.to) ||
         !this.viewportIsCovering(viewport))
       viewport = this.getViewport(0, scrollTo)
     if (!viewport.eq(this.viewport)) {
@@ -133,7 +133,7 @@ export class ViewState {
       update.flags |= this.updateLineGaps(this.ensureLineGaps(this.mapLineGaps(this.lineGaps, update.changes)))
     this.computeVisibleRanges()
 
-    if (scrollTo > -1) this.scrollTo = scrollTo
+    if (scrollTo) this.scrollTo = scrollTo
   }
 
   measure(docView: DocView, repeated: boolean) {
@@ -175,7 +175,7 @@ export class ViewState {
 
     let result = this.heightOracle.heightChanged ? UpdateFlag.Height : 0
     if (!this.viewportIsCovering(this.viewport, bias) ||
-        this.scrollTo > -1 && (this.scrollTo < this.viewport.from || this.scrollTo > this.viewport.to)) {
+        this.scrollTo && (this.scrollTo.head < this.viewport.from || this.scrollTo.head > this.viewport.to)) {
       this.viewport = this.getViewport(bias, this.scrollTo)
       result |= UpdateFlag.Viewport
     }
@@ -186,7 +186,7 @@ export class ViewState {
     return result
   }
 
-  getViewport(bias: number, scrollTo: number): Viewport {
+  getViewport(bias: number, scrollTo: SelectionRange | null): Viewport {
     // This will divide VP.Margin between the top and the
     // bottom, depending on the bias (the change in viewport position
     // since the last update). It'll hold a number between 0 and 1
@@ -194,14 +194,14 @@ export class ViewState {
     let map = this.heightMap, doc = this.state.doc, {top, bottom} = this.pixelViewport
     let viewport = new Viewport(map.lineAt(top - marginTop * VP.Margin, QueryType.ByHeight, doc, 0, 0).from,
                                 map.lineAt(bottom + (1 - marginTop) * VP.Margin, QueryType.ByHeight, doc, 0, 0).to)
-    // If scrollTo is > -1, make sure the viewport includes that position
-    if (scrollTo > -1) {
-      if (scrollTo < viewport.from) {
-        let {top: newTop} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
+    // If scrollTo is given, make sure the viewport includes that position
+    if (scrollTo) {
+      if (scrollTo.head < viewport.from) {
+        let {top: newTop} = map.lineAt(scrollTo.head, QueryType.ByPos, doc, 0, 0)
         viewport = new Viewport(map.lineAt(newTop - VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).from,
                                 map.lineAt(newTop + (bottom - top) + VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).to)
-      } else if (scrollTo > viewport.to) {
-        let {bottom: newBottom} = map.lineAt(scrollTo, QueryType.ByPos, doc, 0, 0)
+      } else if (scrollTo.head > viewport.to) {
+        let {bottom: newBottom} = map.lineAt(scrollTo.head, QueryType.ByPos, doc, 0, 0)
         viewport = new Viewport(map.lineAt(newBottom - (bottom - top) - VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).from,
                                 map.lineAt(newBottom + VP.Margin / 2, QueryType.ByHeight, doc, 0, 0).to)
       }

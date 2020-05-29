@@ -6,7 +6,7 @@ import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, drag
         logException, mouseSelectionStyle} from "./extension"
 import browser from "./browser"
 import {groupAt} from "./cursor"
-import {getSelection, focusPreventScroll} from "./dom"
+import {getSelection, focusPreventScroll, Rect} from "./dom"
 
 // This will also be where dragging info and such goes
 export class InputState {
@@ -274,7 +274,7 @@ handlers.mousedown = (view, event: MouseEvent) => {
 
 function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number): SelectionRange {
   if (type == 1) { // Single click
-    return EditorSelection.cursor(pos)
+    return EditorSelection.cursor(pos, bias)
   } else if (type == 2) { // Double click
     return groupAt(view.state, pos, bias)
   } else { // Triple click
@@ -285,29 +285,49 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
   }
 }
 
-function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | -1} {
-  let pos = view.posAtCoords({x: event.clientX, y: event.clientY})
-  let coords = pos < 0 ? null : view.coordsAtPos(pos)
-  let bias: 1 | -1 = !coords ? 1 :
-    coords.top > event.clientY ? -1 :
-    coords.bottom < event.clientY ? 1 :
-    coords.left > event.clientX ? -1 : 1
-  return {pos, bias}
+let insideY = (y: number, rect: Rect) => y >= rect.top && y <= rect.bottom
+let inside = (x: number, y: number, rect: Rect) => insideY(y, rect) && x >= rect.left && x <= rect.right
+
+// Try to determine, for the given coordinates, associated with the
+// given position, whether they are related to the element before or
+// the element after the position.
+function findPositionSide(view: EditorView, pos: number, x: number, y: number) {
+  let line = LineView.find(view.docView, pos)
+  if (!line) return 1
+  let off = pos - line.posAtStart
+  // Line boundaries point into the line
+  if (off == 0) return 1
+  if (off == line.length) return -1
+
+  // Positions on top of an element point at that element
+  let before = line.coordsAt(off, -1)
+  if (before && inside(x, y, before)) return -1
+  let after = line.coordsAt(off, 1)
+  if (after && inside(x, y, after)) return 1
+  // This is probably a line wrap point. Pick before if the point is
+  // beside it.
+  return before && insideY(y, before) ? -1 : 1
 }
 
-// FIXME set cursor assoc when appropriate
+function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | -1} | null {
+  let pos = view.posAtCoords({x: event.clientX, y: event.clientY})
+  if (pos < 0) return null
+  return {pos, bias: findPositionSide(view, pos, event.clientX, event.clientY)}
+}
+
 function basicMouseSelection(view: EditorView, event: MouseEvent) {
   let start = queryPos(view, event), type = event.detail
   let startSel = view.state.selection
   return {
     update(update) {
       if (update.changes) {
-        start.pos = update.changes.mapPos(start.pos)
+        if (start) start.pos = update.changes.mapPos(start.pos)
         startSel = startSel.map(update.changes)
       }
     },
     get(event, extend, multiple) {
       let cur = queryPos(view, event)
+      if (!cur || !start) return startSel
       let range = rangeForClick(view, cur.pos, cur.bias, type)
       if (start.pos != cur.pos && !extend) {
         let startRange = rangeForClick(view, start.pos, start.bias, type)

@@ -89,27 +89,24 @@ export class TextView extends InlineView {
     return {from: offset, to: offset + this.length, startDOM: this.dom, endDOM: this.dom!.nextSibling}
   }
 
-  coordsAt(pos: number): Rect {
-    return textCoords(this.textDOM!, pos)
+  coordsAt(pos: number, side: number): Rect {
+    return textCoords(this.textDOM!, pos, side, this.length)
   }
 }
 
-function textCoords(text: Node, pos: number): Rect {
-  let range = document.createRange()
-  if (browser.chrome || browser.gecko) {
-    // These browsers reliably return valid rectangles for empty ranges
-    range.setEnd(text, pos)
-    range.setStart(text, pos)
-    return range.getBoundingClientRect()
+function textCoords(text: Node, pos: number, side: number, length: number): Rect {
+  let from = pos, to = pos
+  if (pos == 0 && side < 0 || pos == length && side >= 0) {
+    if (!(browser.webkit || browser.gecko)) { // These browsers reliably return valid rectangles for empty ranges
+      if (pos) from--; else to++
+    }
   } else {
-    // Otherwise, get the rectangle around a character and take one side
-    let extend = pos == 0 ? 1 : -1
-    range.setEnd(text, pos + (extend > 0 ? 1 : 0))
-    range.setStart(text, pos - (extend < 0 ? 1 : 0))
-    let rect = range.getBoundingClientRect()
-    let x = extend < 0 ? rect.right : rect.left
-    return {left: x, right: x, top: rect.top, bottom: rect.bottom}
+    if (side < 0) from--; else to++
   }
+  let range = document.createRange()
+  range.setEnd(text, to)
+  range.setStart(text, from)
+  return range.getBoundingClientRect()
 }
 
 // Also used for collapsed ranges that don't have a placeholder widget!
@@ -175,13 +172,13 @@ export class WidgetView extends InlineView {
 
   domBoundsAround() { return null }
 
-  coordsAt(pos: number): Rect | null {
-    let rects = this.dom!.getClientRects()
+  coordsAt(pos: number, _side: number): Rect | null {
+    let rects = this.dom!.getClientRects(), rect: Rect | null = null
     for (let i = pos > 0 ? rects.length - 1 : 0;; i += (pos > 0 ? -1 : 1)) {
-      let rect = rects[i]
-      if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) return rects[i]
+      rect = rects[i]
+      if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) break
     }
-    return null
+    return rect
   }
 }
 
@@ -194,5 +191,5 @@ export class CompositionView extends WidgetView {
 
   get overrideDOMText() { return null }
 
-  coordsAt(pos: number) { return textCoords(this.widget.value.text, pos) }
+  coordsAt(pos: number, side: number) { return textCoords(this.widget.value.text, pos, side, this.length) }
 }
