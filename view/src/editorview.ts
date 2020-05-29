@@ -438,8 +438,9 @@ export class EditorView {
   get defaultLineHeight() { return this.viewState.heightOracle.lineHeight }
   /// The text direction (`direction` CSS property) of the editor.
   get textDirection(): Direction { return this.viewState.heightOracle.direction }
-  /// Whether this editor wraps lines (as determined by the
-  /// `white-space` CSS property of its content element).
+  /// Whether this editor [wraps lines](#view.EditorView.lineWrapping)
+  /// (as determined by the `white-space` CSS property of its content
+  /// element).
   get lineWrapping(): boolean { return this.viewState.heightOracle.lineWrapping }
 
   /// Returns the bidirectional text structure of the given line
@@ -548,6 +549,9 @@ export class EditorView {
   static baseTheme(spec: {[name: string]: Style}): Extension {
     return Precedence.Fallback.set(styleModule.of(buildTheme(baseThemeID, spec)))
   }
+
+  /// An extension that enables line wrapping in the editor.
+  static lineWrapping = EditorView.theme({content: {whiteSpace: "pre-wrap"}})
 
   /// Facet that provides attributes for the editor's editable DOM
   /// element.
