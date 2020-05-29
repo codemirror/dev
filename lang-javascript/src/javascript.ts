@@ -29,8 +29,10 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     return undefined
   }),
   foldNodeProp.add({
-    Block(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} },
-    BlockComment(tree: Subtree) { return {from: tree.start + 2, to: tree.end - 2} }
+    Block(tree) { return {from: tree.start + 1, to: tree.end - 1} },
+    ObjectExpression(tree) { return {from: tree.start + 1, to: tree.end - 1} },
+    ArrayExpression(tree) { return {from: tree.start + 1, to: tree.end - 1} },
+    BlockComment(tree) { return {from: tree.start + 2, to: tree.end - 2} }
   }),
   styleTags({
     "get set async static": "modifier",
