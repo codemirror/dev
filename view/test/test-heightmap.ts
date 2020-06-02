@@ -191,6 +191,15 @@ describe("HeightMap", () => {
     ist(map.height, 60)
   })
 
+  it("properly shrinks gaps when partially replaced", () => {
+    let text = doc(9, 9, 9, 9, 9, 9, 9)
+    let map = mk(text).updateHeight(o(text), 0, false, new MeasuredHeights(20, [10, 10, 10]))
+    ist(map.toString(), "gap(19) line(9) line(9) line(9) gap(19)")
+    map = map.applyChanges([Decoration.set(Decoration.replace({}).range(15, 55))], text, o(text),
+                           [new ChangedRange(15, 55, 15, 55)])
+    ist(map.toString(), "gap(9) line(49-40) gap(9)")
+  })
+
   describe("blockAt", () => {
     it("finds blocks in a gap", () => {
       let text = doc(3, 3, 3, 3, 3), map = mk(text)

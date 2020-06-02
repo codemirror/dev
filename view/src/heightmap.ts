@@ -328,11 +328,11 @@ class HeightMapGap extends HeightMap {
   }
 
   decomposeLeft(to: number, result: (HeightMap | null)[]) {
-    result.push(to == this.length ? this : new HeightMapGap(to))
+    result.push(new HeightMapGap(to - 1), null)
   }
 
   decomposeRight(from: number, result: (HeightMap | null)[]) {
-    result.push(from == 0 ? this : new HeightMapGap(this.length - from))
+    result.push(null, new HeightMapGap(this.length - from - 1))
   }
 
   updateHeight(oracle: HeightOracle, offset: number = 0, force: boolean = false, measured?: MeasuredHeights): HeightMap {
