@@ -355,7 +355,7 @@ export class Viewport {
 }
 
 function lineStructure(from: number, to: number, state: EditorState) {
-  let ranges = [], pos = 0, total = 0
+  let ranges = [], pos = from, total = 0
   RangeSet.spans(state.facet(decorations), from, to, {
     span() {},
     point(from, to) {
