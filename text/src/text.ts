@@ -27,13 +27,15 @@ export interface TextIterator extends Iterator<string> {
 }
 
 /// The document tree type.
-export abstract class Text {
+export abstract class Text implements Iterable<string> {
   /// The length of the string.
   abstract readonly length: number
   /// The number of lines in the string (always >= 1).
   abstract readonly lines: number
   /// @internal
   abstract readonly children: readonly Text[] | null
+
+  [Symbol.iterator]!: () => Iterator<string>
 
   /// Get the line description around the given position.
   lineAt(pos: number): Line {
@@ -134,6 +136,10 @@ export abstract class Text {
   /// The empty text.
   static empty: Text
 }
+
+if (typeof Symbol != "undefined")
+  // @ts-ignore
+  Text.prototype[Symbol.iterator] = function() { return this.iter() }
 
 let lineCache: any[] = [], lineCachePos = -2, lineCacheSize = 12
 
