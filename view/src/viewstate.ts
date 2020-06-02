@@ -359,7 +359,7 @@ function lineStructure(from: number, to: number, state: EditorState) {
   RangeSet.spans(state.facet(decorations), from, to, {
     span() {},
     point(from, to) {
-      if (from > pos) { ranges.push({from: pos, to: from}); total += to - pos }
+      if (from > pos) { ranges.push({from: pos, to: from}); total += from - pos }
       pos = to
     },
     minPointSize: 20 // We're only interested in collapsed ranges of a significant size
