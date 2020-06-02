@@ -17,11 +17,6 @@ import {rectangularSelection} from "@codemirror/next/rectangular-selection"
 import {html} from "@codemirror/next/lang-html"
 import {defaultHighlighter} from "@codemirror/next/highlight"
 
-import {esLint} from "@codemirror/next/lang-javascript"
-// @ts-ignore
-import Linter from "eslint4b-prebuilt"
-import {linter, openLintPanel} from "@codemirror/next/lint"
-
 //import {StreamSyntax} from "@codemirror/next/stream-syntax"
 //import legacyJS from "@codemirror/next/legacy-modes/src/javascript"
 
@@ -40,7 +35,6 @@ let state = EditorState.create({doc: `<script>
   multipleSelections(),
 //  new StreamSyntax(legacyJS()).extension,
   html(),
-  linter(esLint(new Linter)),
   search({keymap: defaultSearchKeymap}),
   defaultHighlighter,
   bracketMatching(),
@@ -57,7 +51,6 @@ let state = EditorState.create({doc: `<script>
     "Mod-Alt-[": foldCode,
     "Mod-Alt-]": unfoldCode,
     "Mod-Space": startCompletion,
-    "Shift-Mod-m": openLintPanel,
     "Mod-/": toggleLineComment,
     "Mod-Alt-/": lineComment,
     "Mod-Alt-Shift-/": lineUncomment,
