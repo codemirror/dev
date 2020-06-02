@@ -133,8 +133,7 @@ export class ViewState {
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height
 
     let viewport = heightChanges.length ? this.mapViewport(this.viewport, update.changes) : this.viewport
-    if (!viewport || scrollTo && (scrollTo.head < viewport.from || scrollTo.head > viewport.to) ||
-        !this.viewportIsCovering(viewport))
+    if (scrollTo && (scrollTo.head < viewport.from || scrollTo.head > viewport.to) || !this.viewportIsAppropriate(viewport))
       viewport = this.getViewport(0, scrollTo)
     if (!viewport.eq(this.viewport)) {
       this.viewport = viewport
@@ -189,7 +188,7 @@ export class ViewState {
       this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights))
 
     let result = this.heightOracle.heightChanged ? UpdateFlag.Height : 0
-    if (!this.viewportIsCovering(this.viewport, bias) ||
+    if (!this.viewportIsAppropriate(this.viewport, bias) ||
         this.scrollTo && (this.scrollTo.head < this.viewport.from || this.scrollTo.head > this.viewport.to)) {
       this.viewport = this.getViewport(bias, this.scrollTo)
       result |= UpdateFlag.Viewport
@@ -235,17 +234,19 @@ export class ViewState {
 
   mapViewport(viewport: Viewport, changes: ChangeDesc) {
     let from = changes.mapPos(viewport.from, -1), to = changes.mapPos(viewport.to, 1)
-    if ((to - from) - (viewport.to - viewport.from) > 100) return null // Grew too much, recompute
     return new Viewport(this.heightMap.lineAt(from, QueryType.ByPos, this.state.doc, 0, 0).from,
                         this.heightMap.lineAt(to, QueryType.ByPos, this.state.doc, 0, 0).to)
   }
 
-  viewportIsCovering({from, to}: Viewport, bias = 0) {
+  // Checks if a given viewport covers the visible part of the
+  // document and not too much beyond that.
+  viewportIsAppropriate({from, to}: Viewport, bias = 0) {
     let {top} = this.heightMap.lineAt(from, QueryType.ByPos, this.state.doc, 0, 0)
     let {bottom} = this.heightMap.lineAt(to, QueryType.ByPos, this.state.doc, 0, 0)
     return (from == 0 || top <= this.pixelViewport.top - Math.max(VP.MinCoverMargin, Math.min(-bias, VP.MaxCoverMargin))) &&
       (to == this.state.doc.length ||
-       bottom >= this.pixelViewport.bottom + Math.max(VP.MinCoverMargin, Math.min(bias, VP.MaxCoverMargin)))
+       bottom >= this.pixelViewport.bottom + Math.max(VP.MinCoverMargin, Math.min(bias, VP.MaxCoverMargin))) &&
+      (top > this.pixelViewport.top - 2 * VP.Margin && bottom < this.pixelViewport.bottom + 2 * VP.Margin)
   }
 
   mapLineGaps(gaps: readonly LineGap[], changes: ChangeSet) {
