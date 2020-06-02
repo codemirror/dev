@@ -14,7 +14,8 @@ function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
   let top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom)
   for (let parent = dom.parentNode as any; parent;) { // (Cast to any because TypeScript is useless with Node types)
     if (parent.nodeType == 1) {
-      if (parent.scrollHeight > parent.clientHeight || parent.scrollWidth > parent.clientWidth) {
+      if ((parent.scrollHeight > parent.clientHeight || parent.scrollWidth > parent.clientWidth) &&
+          window.getComputedStyle(parent).overflow != "visible") {
         let parentRect = parent.getBoundingClientRect()
         left = Math.max(left, parentRect.left)
         right = Math.min(right, parentRect.right)
