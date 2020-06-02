@@ -131,22 +131,41 @@ function work(parse: ParseContext, time: number, upto: number = Work.MaxPos) {
 
 function takeTree(parse: ParseContext, base: Tree) {
   let parsed = parse.forceFinish()
-  let after = base.applyChanges([{fromA: 0, toA: parse.pos, fromB: 0, toB: parse.pos}])
-  return parsed.append(after)
+  let cache = parsed.applyChanges([{fromA: parse.pos, toA: parsed.length, fromB: parse.pos, toB: parsed.length}])
+    .append(base.applyChanges([{fromA: 0, toA: parse.pos, fromB: 0, toB: parse.pos}]))
+  return {parsed, cache}
 }
 
 class SyntaxState {
+  // The furthest version of the syntax tree. Starts in sync with
+  // this.tree, may be updated by the parsing process.
   public updatedTree: Tree
+  // In-progress parse, if any
   public parse: ParseContext | null = null
 
-  constructor(public tree: Tree, public upto: number) {
+  constructor(
+    // The current tree. Immutable, because directly accessible from
+    // the editor state.
+    readonly tree: Tree,
+    // The point upto which the document has been parsed.
+    public upto: number,
+    // The tree that can be used as cache for further incremental
+    // parsing. May differ from tree/updatedTree if a parse is broken
+    // off halfway—in that case, this one will have nodes that touch
+    // the break-off point dropped/decomposed so that they don't get
+    // incorrectly reused. The other properties will have those nodes,
+    // since they may be useful for code consuming the tree.
+    public cache: Tree
+  ) {
     this.updatedTree = tree
   }
 
-  static advance(tree: Tree, parser: Parser, doc: Text) {
-    let parse = parser.startParse(new DocStream(doc), {cache: tree})
+  static advance(cache: Tree, parser: Parser, doc: Text) {
+    let parse = parser.startParse(new DocStream(doc), {cache})
     let done = work(parse, Work.Apply)
-    return done ? new SyntaxState(done, doc.length) : new SyntaxState(takeTree(parse, tree), parse.pos)
+    if (done) return new SyntaxState(done, doc.length, done)
+    let result = takeTree(parse, cache)
+    return new SyntaxState(result.parsed, parse.pos, result.cache)
   }
 
   apply(tr: Transaction, newState: EditorState, parser: Parser, effect: StateEffectType<SyntaxState>) {
@@ -155,16 +174,17 @@ class SyntaxState {
     let ranges: ChangedRange[] = []
     tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
     return SyntaxState.advance(
-      (this.parse ? takeTree(this.parse, this.updatedTree) : this.updatedTree).applyChanges(ranges),
+      (this.parse ? takeTree(this.parse, this.updatedTree).cache : this.cache).applyChanges(ranges),
       parser, newState.doc)
   }
 
   startParse(parser: Parser, doc: Text) {
-    this.parse = parser.startParse(new DocStream(doc), {cache: this.updatedTree})
+    this.parse = parser.startParse(new DocStream(doc), {cache: this.cache})
   }
 
   stopParse(tree?: Tree | null, upto?: number) {
-    if (!tree) tree = takeTree(this.parse!, this.updatedTree)
+    if (!tree) ({parsed: tree, cache: this.cache} = takeTree(this.parse!, this.updatedTree))
+    else this.cache = tree
     this.updatedTree = tree
     this.upto = upto ?? this.parse!.pos
     this.parse = null
@@ -212,13 +232,14 @@ class HighlightWorker {
     if (field.upto >= state.doc.length) return
     if (!field.parse) field.startParse(this.syntax.parser, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    if (done || field.parse!.badness > .8)
+    if (done || field.parse!.badness > .8) {
+      let tree = field.stopParse(done, state.doc.length)
       this.view.dispatch(state.update({
-        effects: this.setSyntax.of(new SyntaxState(
-          field.stopParse(done, state.doc.length), state.doc.length))
+        effects: this.setSyntax.of(new SyntaxState(tree, state.doc.length, field.cache))
       }))
-    else
+    } else {
       this.scheduleWork()
+    }
   }
 
   destroy() {
