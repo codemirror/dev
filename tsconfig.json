@@ -2,7 +2,8 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["es6", "dom"],
-    "types": ["mocha"]
+    "types": ["mocha"],
+    "stripInternal": true
   },
   "include": ["*/src/*.ts", "*/test/*.ts", "demo/demo.ts"]
 }
