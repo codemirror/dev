@@ -220,13 +220,14 @@ const brokenClipboardAPI = (browser.ie && browser.ie_version < 15) ||
   (browser.ios && browser.webkit_version < 604)
 
 function capturePaste(view: EditorView) {
-  let doc = view.dom.ownerDocument!
-  let target = doc.body.appendChild(doc.createElement("textarea"))
+  let parent = view.dom.parentNode
+  if (!parent) return
+  let target = parent.appendChild(document.createElement("textarea"))
   target.style.cssText = "position: fixed; left: -10000px; top: 10px"
   target.focus()
   setTimeout(() => {
     view.focus()
-    doc.body.removeChild(target)
+    target.remove()
     doPaste(view, target.value)
   }, 50)
 }
@@ -393,15 +394,16 @@ handlers.paste = (view: EditorView, event: ClipboardEvent) => {
 function captureCopy(view: EditorView, text: string) {
   // The extra wrapper is somehow necessary on IE/Edge to prevent the
   // content from being mangled when it is put onto the clipboard
-  let doc = view.dom.ownerDocument!
-  let target = doc.body.appendChild(doc.createElement("textarea"))
+  let parent = view.dom.parentNode
+  if (!parent) return
+  let target = parent.appendChild(document.createElement("textarea"))
   target.style.cssText = "position: fixed; left: -10000px; top: 10px"
   target.value = text
   target.focus()
   target.selectionEnd = text.length
   target.selectionStart = 0
   setTimeout(() => {
-    doc.body.removeChild(target)
+    target.remove()
     view.focus()
   }, 50)
 }
