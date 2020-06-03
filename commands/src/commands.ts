@@ -18,57 +18,57 @@ function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRang
   return true
 }
 
-function moveByChar(view: EditorView, forward: boolean) {
+function cursorByChar(view: EditorView, forward: boolean) {
   return moveSel(view, range =>
                  range.empty ? view.moveByChar(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
 }
 
 /// Move the selection one character to the left (which is backward in
 /// left-to-right text, forward in right-to-left text).
-export const moveCharLeft: Command = view => moveByChar(view, view.textDirection != Direction.LTR)
+export const cursorCharLeft: Command = view => cursorByChar(view, view.textDirection != Direction.LTR)
 /// Move the selection one character to the right.
-export const moveCharRight: Command = view => moveByChar(view, view.textDirection == Direction.LTR)
+export const cursorCharRight: Command = view => cursorByChar(view, view.textDirection == Direction.LTR)
 
 /// Move the selection one character forward.
-export const moveCharForward: Command = view => moveByChar(view, true)
+export const cursorCharForward: Command = view => cursorByChar(view, true)
 /// Move the selection one character backward.
-export const moveCharBackward: Command = view => moveByChar(view, false)
+export const cursorCharBackward: Command = view => cursorByChar(view, false)
 
-function moveByGroup(view: EditorView, forward: boolean) {
+function cursorByGroup(view: EditorView, forward: boolean) {
   return moveSel(view, range =>
                  range.empty ? view.moveByGroup(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
 }
 
 /// Move the selection across one group of word or non-word (but also
 /// non-space) characters.
-export const moveGroupLeft: Command = view => moveByGroup(view, view.textDirection != Direction.LTR)
+export const cursorGroupLeft: Command = view => cursorByGroup(view, view.textDirection != Direction.LTR)
 /// Move the selection one group to the right.
-export const moveGroupRight: Command = view => moveByGroup(view, view.textDirection == Direction.LTR)
+export const cursorGroupRight: Command = view => cursorByGroup(view, view.textDirection == Direction.LTR)
 
 /// Move the selection one group forward.
-export const moveGroupForward: Command = view => moveByGroup(view, true)
+export const cursorGroupForward: Command = view => cursorByGroup(view, true)
 /// Move the selection one group backward.
-export const moveGroupBackward: Command = view => moveByGroup(view, false)
+export const cursorGroupBackward: Command = view => cursorByGroup(view, false)
 
-function moveByLine(view: EditorView, forward: boolean) {
+function cursorByLine(view: EditorView, forward: boolean) {
   return moveSel(view, range => view.moveVertically(range, forward))
 }
 
 /// Move the selection one line up.
-export const moveLineUp: Command = view => moveByLine(view, false)
+export const cursorLineUp: Command = view => cursorByLine(view, false)
 /// Move the selection one line down.
-export const moveLineDown: Command = view => moveByLine(view, true)
+export const cursorLineDown: Command = view => cursorByLine(view, true)
 
-function moveByPage(view: EditorView, forward: boolean) {
+function cursorByPage(view: EditorView, forward: boolean) {
   return moveSel(view, range => view.moveVertically(range, forward, view.dom.clientHeight))
 }
 
 /// Move the selection one page up.
-export const movePageUp: Command = view => moveByPage(view, false)
+export const cursorPageUp: Command = view => cursorByPage(view, false)
 /// Move the selection one page down.
-export const movePageDown: Command = view => moveByPage(view, true)
+export const cursorPageDown: Command = view => cursorByPage(view, true)
 
-function moveLineBoundary(view: EditorView, forward: boolean) {
+function cursorLineBoundary(view: EditorView, forward: boolean) {
   return moveSel(view, range => {
     let moved = view.moveToLineBoundary(range, forward)
     return moved.head == range.head ? view.moveToLineBoundary(range, forward, false) : moved
@@ -77,15 +77,15 @@ function moveLineBoundary(view: EditorView, forward: boolean) {
 
 /// Move the selection to the next line wrap point, or to the end of
 /// the line if there isn't one left on this line.
-export const moveLineBoundaryForward: Command = view => moveLineBoundary(view, false)
+export const cursorLineBoundaryForward: Command = view => cursorLineBoundary(view, false)
 /// Move the selection to previous line wrap point, or failing that to
 /// the start of the line.
-export const moveLineBoundaryBackward: Command = view => moveLineBoundary(view, true)
+export const cursorLineBoundaryBackward: Command = view => cursorLineBoundary(view, true)
 
 /// Move the selection to the start of the line.
-export const moveLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from, 1))
+export const cursorLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from, 1))
 /// Move the selection to the end of the line.
-export const moveLineEnd: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to, -1))
+export const cursorLineEnd: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to, -1))
 
 function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, range => {
@@ -97,55 +97,55 @@ function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRa
   return true
 }
 
-function extendByChar(view: EditorView, forward: boolean) {
+function selectByChar(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveByChar(range, forward))
 }
 
 /// Move the selection head one character to the left, while leaving
 /// the anchor in place.
-export const extendCharLeft: Command = view => extendByChar(view, view.textDirection != Direction.LTR)
+export const selectCharLeft: Command = view => selectByChar(view, view.textDirection != Direction.LTR)
 /// Move the selection head one character to the right.
-export const extendCharRight: Command = view => extendByChar(view, view.textDirection == Direction.LTR)
+export const selectCharRight: Command = view => selectByChar(view, view.textDirection == Direction.LTR)
 
 /// Move the selection head one character forward.
-export const extendCharForward: Command = view => extendByChar(view, true)
+export const selectCharForward: Command = view => selectByChar(view, true)
 /// Move the selection head one character backward.
-export const extendCharBackward: Command = view => extendByChar(view, false)
+export const selectCharBackward: Command = view => selectByChar(view, false)
 
-function extendByGroup(view: EditorView, forward: boolean) {
+function selectByGroup(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveByGroup(range, forward))
 }
 
 /// Move the selection head one [group](#commands.moveGroupLeft) to
 /// the left.
-export const extendGroupLeft: Command = view => extendByGroup(view, view.textDirection != Direction.LTR)
+export const selectGroupLeft: Command = view => selectByGroup(view, view.textDirection != Direction.LTR)
 /// Move the selection head one group to the right.
-export const extendGroupRight: Command = view => extendByGroup(view, view.textDirection == Direction.LTR)
+export const selectGroupRight: Command = view => selectByGroup(view, view.textDirection == Direction.LTR)
 
 /// Move the selection head one group forward.
-export const extendGroupForward: Command = view => extendByGroup(view, true)
+export const selectGroupForward: Command = view => selectByGroup(view, true)
 /// Move the selection head one group backward.
-export const extendGroupBackward: Command = view => extendByGroup(view, false)
+export const selectGroupBackward: Command = view => selectByGroup(view, false)
 
-function extendByLine(view: EditorView, forward: boolean) {
+function selectByLine(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveVertically(range, forward))
 }
 
 /// Move the selection head one line up.
-export const extendLineUp: Command = view => extendByLine(view, false)
+export const selectLineUp: Command = view => selectByLine(view, false)
 /// Move the selection head one line down.
-export const extendLineDown: Command = view => extendByLine(view, true)
+export const selectLineDown: Command = view => selectByLine(view, true)
 
-function extendByPage(view: EditorView, forward: boolean) {
+function selectByPage(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveVertically(range, forward, view.dom.clientHeight))
 }
 
 /// Move the selection head one page up.
-export const extendPageUp: Command = view => extendByPage(view, false)
+export const selectPageUp: Command = view => selectByPage(view, false)
 /// Move the selection head one page down.
-export const extendPageDown: Command = view => extendByPage(view, true)
+export const selectPageDown: Command = view => selectByPage(view, true)
 
-function extendByLineBoundary(view: EditorView, forward: boolean) {
+function selectByLineBoundary(view: EditorView, forward: boolean) {
   return extendSel(view, range => {
     let head = view.moveToLineBoundary(range, forward)
     return head.head == range.head ? view.moveToLineBoundary(range, forward, false) : head
@@ -153,35 +153,35 @@ function extendByLineBoundary(view: EditorView, forward: boolean) {
 }
 
 /// Move the selection head to the next line boundary.
-export const extendLineBoundaryForward: Command = view => extendByLineBoundary(view, false)
+export const selectLineBoundaryForward: Command = view => selectByLineBoundary(view, false)
 /// Move the selection head to the previous line boundary.
-export const extendLineBoundaryBackward: Command = view => extendByLineBoundary(view, true)
+export const selectLineBoundaryBackward: Command = view => selectByLineBoundary(view, true)
 
 /// Move the selection head to the start of the line.
-export const extendLineStart: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from))
+export const selectLineStart: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from))
 /// Move the selection head to the end of the line.
-export const extendLineEnd: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to))
+export const selectLineEnd: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to))
 
 /// Move the selection to the start of the document.
-export const selectDocStart: StateCommand = ({state, dispatch}) => {
+export const cursorDocStart: StateCommand = ({state, dispatch}) => {
   dispatch(setSel(state, {anchor: 0}))
   return true
 }
 
 /// Move the selection to the end of the document.
-export const selectDocEnd: StateCommand = ({state, dispatch}) => {
+export const cursorDocEnd: StateCommand = ({state, dispatch}) => {
   dispatch(setSel(state, {anchor: state.doc.length}))
   return true
 }
 
 /// Move the selection head to the start of the document.
-export const extendDocStart: StateCommand = ({state, dispatch}) => {
+export const selectDocStart: StateCommand = ({state, dispatch}) => {
   dispatch(setSel(state, {anchor: state.selection.primary.anchor, head: 0}))
   return true
 }
 
 /// Move the selection head to the end of the document.
-export const extendDocEnd: StateCommand = ({state, dispatch}) => {
+export const selectDocEnd: StateCommand = ({state, dispatch}) => {
   dispatch(setSel(state, {anchor: state.selection.primary.anchor, head: state.doc.length}))
   return true
 }
@@ -390,30 +390,31 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
 }
 
 const sharedBaseKeymap: {[key: string]: Command} = {
-  "ArrowLeft": moveCharLeft,
-  "Shift-ArrowLeft": extendCharLeft,
-  "ArrowRight": moveCharRight,
-  "Shift-ArrowRight": extendCharRight,
+  "ArrowLeft": cursorCharLeft,
+  "Shift-ArrowLeft": selectCharLeft,
+  "ArrowRight": cursorCharRight,
+  "Shift-ArrowRight": selectCharRight,
 
-  "ArrowUp": moveLineUp,
-  "Shift-ArrowUp": extendLineUp,
-  "ArrowDown": moveLineDown,
-  "Shift-ArrowDown": extendLineDown,
+  "ArrowUp": cursorLineUp,
+  "Shift-ArrowUp": selectLineUp,
 
-  "PageUp": movePageUp,
-  "Shift-PageUp": extendPageUp,
-  "PageDown": movePageDown,
-  "Shift-PageDown": extendPageDown,
+  "ArrowDown": cursorLineDown,
+  "Shift-ArrowDown": selectLineDown,
 
-  "Home": moveLineBoundaryBackward,
-  "Shift-Home": extendLineBoundaryBackward,
-  "Mod-Home": selectDocStart,
-  "Shift-Mod-Home": extendDocStart,
+  "PageUp": cursorPageUp,
+  "Shift-PageUp": selectPageUp,
+  "PageDown": cursorPageDown,
+  "Shift-PageDown": selectPageDown,
 
-  "End": moveLineBoundaryForward,
-  "Shift-End": extendLineBoundaryForward,
-  "Mod-End": selectDocEnd,
-  "Shift-Mod-End": extendDocEnd,
+  "Home": cursorLineBoundaryBackward,
+  "Shift-Home": selectLineBoundaryBackward,
+  "Mod-Home": cursorDocStart,
+  "Shift-Mod-Home": selectDocStart,
+
+  "End": cursorLineBoundaryForward,
+  "Shift-End": selectLineBoundaryForward,
+  "Mod-End": cursorDocEnd,
+  "Shift-Mod-End": selectDocEnd,
 
   "Mod-a": selectAll,
 
@@ -429,10 +430,10 @@ const sharedBaseKeymap: {[key: string]: Command} = {
 /// ctrl-home/end for document start/end, ctrl-a to select all,
 /// backspace/delete for deletion, and enter for newline-and-indent.
 export const pcBaseKeymap: {[key: string]: Command} = {
-  "Mod-ArrowLeft": moveGroupLeft,
-  "Shift-Mod-ArrowLeft": extendGroupLeft,
-  "Mod-ArrowRight": moveGroupRight,
-  "Shift-Mod-ArrowRight": extendGroupRight,
+  "Mod-ArrowLeft": cursorGroupLeft,
+  "Shift-Mod-ArrowLeft": selectGroupLeft,
+  "Mod-ArrowRight": cursorGroupRight,
+  "Shift-Mod-ArrowRight": selectGroupRight,
 
   "Mod-Backspace": deleteGroupBackward,
   "Mod-Delete": deleteGroupForward,
@@ -441,20 +442,20 @@ export const pcBaseKeymap: {[key: string]: Command} = {
 /// Keymap containing the Emacs-style part of the [macOS base
 /// keymap](#commands.macBaseKeymap).
 export const emacsStyleBaseKeymap: {[key: string]: Command} = {
-  "Ctrl-b": moveCharLeft,
-  "Shift-Ctrl-b": extendCharLeft,
-  "Ctrl-f": moveCharRight,
-  "Shift-Ctrl-f": extendCharRight,
+  "Ctrl-b": cursorCharLeft,
+  "Shift-Ctrl-b": selectCharLeft,
+  "Ctrl-f": cursorCharRight,
+  "Shift-Ctrl-f": selectCharRight,
 
-  "Ctrl-p": moveLineUp,
-  "Shift-Ctrl-p": extendLineUp,
-  "Ctrl-n": moveLineDown,
-  "Shift-Ctrl-n": extendLineDown,
+  "Ctrl-p": cursorLineUp,
+  "Shift-Ctrl-p": selectLineUp,
+  "Ctrl-n": cursorLineDown,
+  "Shift-Ctrl-n": selectLineDown,
 
-  "Ctrl-a": moveLineStart,
-  "Shift-Ctrl-a": extendLineStart,
-  "Ctrl-e": moveLineEnd,
-  "Shift-Ctrl-e": extendLineEnd,
+  "Ctrl-a": cursorLineStart,
+  "Shift-Ctrl-a": selectLineStart,
+  "Ctrl-e": cursorLineEnd,
+  "Shift-Ctrl-e": selectLineEnd,
 
   "Ctrl-d": deleteCharForward,
   "Ctrl-h": deleteCharBackward,
@@ -463,47 +464,43 @@ export const emacsStyleBaseKeymap: {[key: string]: Command} = {
   "Ctrl-o": splitLine,
   "Ctrl-t": transposeChars,
 
-  "Alt-f": moveGroupForward,
-  "Alt-b": moveGroupBackward,
+  "Alt-f": cursorGroupForward,
+  "Alt-b": cursorGroupBackward,
 
-  "Alt-<": selectDocStart,
-  "Alt->": selectDocEnd,
+  "Alt-<": cursorDocStart,
+  "Alt->": cursorDocEnd,
 
-  "Ctrl-v": movePageDown,
-  "Alt-v": movePageUp,
+  "Ctrl-v": cursorPageDown,
+  "Alt-v": cursorPageUp,
   "Alt-d": deleteGroupForward,
   "Ctrl-Alt-h": deleteGroupBackward,
 }
 
 /// The default keymap for Mac platforms.
 export const macBaseKeymap: {[key: string]: Command} = {
-  "Cmd-ArrowUp": selectDocStart,
-  "Shift-Cmd-ArrowUp": extendDocStart,
-  "Ctrl-ArrowUp": movePageUp,
-  "Shift-Ctrl-ArrowUp": extendPageUp,
-  "Alt-ArrowUp": moveLineBoundaryBackward,
-  "Shift-Alt-ArrowUp": extendLineBoundaryBackward,
+  "Cmd-ArrowUp": cursorDocStart,
+  "Shift-Cmd-ArrowUp": selectDocStart,
+  "Ctrl-ArrowUp": cursorPageUp,
+  "Shift-Ctrl-ArrowUp": selectPageUp,
 
-  "Cmd-ArrowDown": selectDocEnd,
-  "Shift-Cmd-ArrowDown": extendDocEnd,
-  "Ctrl-ArrowDown": movePageDown,
-  "Shift-Ctrl-ArrowDown": extendPageDown,
-  "Alt-ArrowDown": movePageDown,
-  "Shift-Alt-ArrowDown": extendPageDown,
+  "Cmd-ArrowDown": cursorDocEnd,
+  "Shift-Cmd-ArrowDown": selectDocEnd,
+  "Ctrl-ArrowDown": cursorPageDown,
+  "Shift-Ctrl-ArrowDown": selectPageDown,
 
-  "Cmd-ArrowLeft": moveLineStart,
-  "Shift-Cmd-ArrowLeft": extendLineStart,
-  "Ctrl-ArrowLeft": moveLineStart,
-  "Shift-Ctrl-ArrowLeft": extendLineStart,
-  "Alt-ArrowLeft": moveGroupLeft,
-  "Shift-Alt-ArrowLeft": extendGroupLeft,
+  "Cmd-ArrowLeft": cursorLineStart,
+  "Shift-Cmd-ArrowLeft": selectLineStart,
+  "Ctrl-ArrowLeft": cursorLineStart,
+  "Shift-Ctrl-ArrowLeft": selectLineStart,
+  "Alt-ArrowLeft": cursorGroupLeft,
+  "Shift-Alt-ArrowLeft": selectGroupLeft,
 
-  "Cmd-ArrowRight": moveLineEnd,
-  "Shift-Cmd-ArrowRight": extendLineEnd,
-  "Ctrl-ArrowRight": moveLineEnd,
-  "Shift-Ctrl-ArrowRight": extendLineEnd,
-  "Alt-ArrowRight": moveGroupRight,
-  "Shift-Alt-ArrowRight": extendGroupRight,
+  "Cmd-ArrowRight": cursorLineEnd,
+  "Shift-Cmd-ArrowRight": selectLineEnd,
+  "Ctrl-ArrowRight": cursorLineEnd,
+  "Shift-Ctrl-ArrowRight": selectLineEnd,
+  "Alt-ArrowRight": cursorGroupRight,
+  "Shift-Alt-ArrowRight": selectGroupRight,
 
   "Alt-Backspace": deleteGroupBackward,
   "Ctrl-Alt-Backspace": deleteGroupBackward,
