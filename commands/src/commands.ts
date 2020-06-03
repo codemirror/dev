@@ -340,6 +340,18 @@ export const copyLineUp: StateCommand = ({state, dispatch}) => copyLine(state, d
 /// Create a copy of the selected lines. Keep the selection in the bottom copy.
 export const copyLineDown: StateCommand = ({state, dispatch}) => copyLine(state, dispatch, true)
 
+/// Delete selected lines.
+export const deleteLine: Command = view => {
+  let {state} = view, changes = state.changes(selectedLineBlocks(state).map(({from, to}) => {
+    if (from > 0) from--
+    else if (to < state.doc.length) to++
+    return {from, to}
+  }))
+  let selection = updateSel(state.selection, range => view.moveVertically(range, true)).map(changes)
+  view.dispatch(state.update({changes, selection, scrollIntoView: true}))
+  return true
+}
+
 function indentString(state: EditorState, n: number) {
   let result = ""
   if (state.indentWithTabs) while (n >= state.tabSize) {
@@ -471,6 +483,8 @@ const sharedBaseKeymap: {[key: string]: Command} = {
   "Shift-Mod-End": selectDocEnd,
 
   "Mod-a": selectAll,
+
+  "Shift-Mod-k": deleteLine,
 
   "Backspace": deleteCharBackward,
   "Delete": deleteCharForward,
