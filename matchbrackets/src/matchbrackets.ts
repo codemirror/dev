@@ -94,7 +94,7 @@ export interface MatchResult {
   /// The extent of the bracket token found.
   start: {from: number, to: number},
   /// The extent of the matched token, if any was found.
-  end?: {from: number, to: number},
+  end?: {from: number, to: number}, // FIXME rename
   /// Whether the tokens match. This can be false even when `end` has
   /// a value, if that token doesn't match the opening token.
   matched: boolean
