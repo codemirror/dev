@@ -283,7 +283,7 @@ export const transposeChars: StateCommand = ({state, dispatch}) => {
     let from = pos == line.start ? pos - 1 : line.findClusterBreak(pos - line.start, false) + line.start
     let to = pos == line.end ? pos + 1 : line.findClusterBreak(pos - line.start, true) + line.start
     return {changes: {from, to, insert: state.doc.slice(pos, to).append(state.doc.slice(from, pos))},
-            range: EditorSelection.cursor(from + (to - pos))}
+            range: EditorSelection.cursor(to)}
   })
   if (changes.changes.empty) return false
   dispatch(state.update(changes, {scrollIntoView: true}))
