@@ -7,10 +7,12 @@ function updateSel(sel: EditorSelection, by: (range: SelectionRange) => Selectio
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
 }
 
+const kbSelection = Transaction.userEvent.of("keyboardselection")
+
 function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, how)
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true}))
+  view.dispatch(view.state.update({selection, scrollIntoView: true, annotations: kbSelection}))
   return true
 }
 
@@ -71,7 +73,7 @@ function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRa
     return EditorSelection.range(range.anchor, head.head)
   })
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true}))
+  view.dispatch(view.state.update({selection, scrollIntoView: true, annotations: kbSelection}))
   return true
 }
 
@@ -126,19 +128,19 @@ export const extendLineEnd: Command = view => extendByLineBoundary(view, true)
 
 /// Move the selection to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: 0}, scrollIntoView: true}))
+  dispatch(state.update({selection: {anchor: 0}, scrollIntoView: true, annotations: kbSelection}))
   return true
 }
 
 /// Move the selection to the end of the document.
 export const selectDocEnd: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: state.doc.length}, scrollIntoView: true}))
+  dispatch(state.update({selection: {anchor: state.doc.length}, scrollIntoView: true, annotations: kbSelection}))
   return true
 }
 
 /// Select the entire document.
 export const selectAll: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}}))
+  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}, annotations: kbSelection}))
   return true
 }
 
