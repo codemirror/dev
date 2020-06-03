@@ -7,12 +7,14 @@ function updateSel(sel: EditorSelection, by: (range: SelectionRange) => Selectio
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
 }
 
-const kbSelection = Transaction.userEvent.of("keyboardselection")
+function setSel(state: EditorState, selection: EditorSelection | {anchor: number, head?: number}) {
+  return state.update({selection, scrollIntoView: true, annotations: Transaction.userEvent.of("keyboardselection")})
+}
 
 function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, how)
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true, annotations: kbSelection}))
+  view.dispatch(setSel(view.state, selection))
   return true
 }
 
@@ -27,15 +29,26 @@ export const moveCharLeft: Command = view => moveByChar(view, view.textDirection
 /// Move the selection one character to the right.
 export const moveCharRight: Command = view => moveByChar(view, view.textDirection == Direction.LTR)
 
+/// Move the selection one character forward.
+export const moveCharForward: Command = view => moveByChar(view, true)
+/// Move the selection one character backward.
+export const moveCharBackward: Command = view => moveByChar(view, false)
+
 function moveByGroup(view: EditorView, forward: boolean) {
   return moveSel(view, range =>
                  range.empty ? view.moveByGroup(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
 }
 
-/// Move the selection one word to the left.
+/// Move the selection across one group of word or non-word (but also
+/// non-space) characters.
 export const moveGroupLeft: Command = view => moveByGroup(view, view.textDirection != Direction.LTR)
-/// Move the selection one word to the right.
+/// Move the selection one group to the right.
 export const moveGroupRight: Command = view => moveByGroup(view, view.textDirection == Direction.LTR)
+
+/// Move the selection one group forward.
+export const moveGroupForward: Command = view => moveByGroup(view, true)
+/// Move the selection one group backward.
+export const moveGroupBackward: Command = view => moveByGroup(view, false)
 
 function moveByLine(view: EditorView, forward: boolean) {
   return moveSel(view, range => view.moveVertically(range, forward))
@@ -62,10 +75,17 @@ function moveLineBoundary(view: EditorView, forward: boolean) {
   })
 }
 
+/// Move the selection to the next line wrap point, or to the end of
+/// the line if there isn't one left on this line.
+export const moveLineBoundaryForward: Command = view => moveLineBoundary(view, false)
+/// Move the selection to previous line wrap point, or failing that to
+/// the start of the line.
+export const moveLineBoundaryBackward: Command = view => moveLineBoundary(view, true)
+
 /// Move the selection to the start of the line.
-export const moveLineStart: Command = view => moveLineBoundary(view, false)
+export const moveLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from, 1))
 /// Move the selection to the end of the line.
-export const moveLineEnd: Command = view => moveLineBoundary(view, true)
+export const moveLineEnd: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to, -1))
 
 function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, range => {
@@ -73,7 +93,7 @@ function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRa
     return EditorSelection.range(range.anchor, head.head)
   })
   if (selection.eq(view.state.selection)) return false
-  view.dispatch(view.state.update({selection, scrollIntoView: true, annotations: kbSelection}))
+  view.dispatch(setSel(view.state, selection))
   return true
 }
 
@@ -87,14 +107,25 @@ export const extendCharLeft: Command = view => extendByChar(view, view.textDirec
 /// Move the selection head one character to the right.
 export const extendCharRight: Command = view => extendByChar(view, view.textDirection == Direction.LTR)
 
+/// Move the selection head one character forward.
+export const extendCharForward: Command = view => extendByChar(view, true)
+/// Move the selection head one character backward.
+export const extendCharBackward: Command = view => extendByChar(view, false)
+
 function extendByGroup(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveByGroup(range, forward))
 }
 
-/// Move the selection head one word to the left.
+/// Move the selection head one [group](#commands.moveGroupLeft) to
+/// the left.
 export const extendGroupLeft: Command = view => extendByGroup(view, view.textDirection != Direction.LTR)
-/// Move the selection head one word to the right.
+/// Move the selection head one group to the right.
 export const extendGroupRight: Command = view => extendByGroup(view, view.textDirection == Direction.LTR)
+
+/// Move the selection head one group forward.
+export const extendGroupForward: Command = view => extendByGroup(view, true)
+/// Move the selection head one group backward.
+export const extendGroupBackward: Command = view => extendByGroup(view, false)
 
 function extendByLine(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveVertically(range, forward))
@@ -121,89 +152,143 @@ function extendByLineBoundary(view: EditorView, forward: boolean) {
   })
 }
 
+/// Move the selection head to the next line boundary.
+export const extendLineBoundaryForward: Command = view => extendByLineBoundary(view, false)
+/// Move the selection head to the previous line boundary.
+export const extendLineBoundaryBackward: Command = view => extendByLineBoundary(view, true)
+
 /// Move the selection head to the start of the line.
-export const extendLineStart: Command = view => extendByLineBoundary(view, false)
+export const extendLineStart: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from))
 /// Move the selection head to the end of the line.
-export const extendLineEnd: Command = view => extendByLineBoundary(view, true)
+export const extendLineEnd: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to))
 
 /// Move the selection to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: 0}, scrollIntoView: true, annotations: kbSelection}))
+  dispatch(setSel(state, {anchor: 0}))
   return true
 }
 
 /// Move the selection to the end of the document.
 export const selectDocEnd: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: state.doc.length}, scrollIntoView: true, annotations: kbSelection}))
+  dispatch(setSel(state, {anchor: state.doc.length}))
+  return true
+}
+
+/// Move the selection head to the start of the document.
+export const extendDocStart: StateCommand = ({state, dispatch}) => {
+  dispatch(setSel(state, {anchor: state.selection.primary.anchor, head: 0}))
+  return true
+}
+
+/// Move the selection head to the end of the document.
+export const extendDocEnd: StateCommand = ({state, dispatch}) => {
+  dispatch(setSel(state, {anchor: state.selection.primary.anchor, head: state.doc.length}))
   return true
 }
 
 /// Select the entire document.
 export const selectAll: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}, annotations: kbSelection}))
+  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}, annotations: Transaction.userEvent.of("keyboarselection")}))
   return true
 }
 
-function deleteText(view: EditorView, forward: boolean, group: boolean) {
+function deleteBy(view: EditorView, by: (start: number) => number) {
   let {state} = view, changes = state.changeByRange(range => {
     let {from, to} = range
     if (from == to) {
-      let line = state.doc.lineAt(from), before
-      if (group) {
-        let categorize = view.state.charCategorizer(from)
-        let head = from
-        for (let cat: CharCategory | null = null;;) {
-          let next, nextChar
-          if (head == (forward ? line.end : line.start)) {
-            if (line.number == (forward ? state.doc.lines : 1)) break
-            line = state.doc.line(line.number + (forward ? 1 : -1))
-            next = forward ? line.start : line.end
-            nextChar = "\n"
-          } else {
-            next = line.findClusterBreak(head - line.start, forward) + line.start
-            nextChar = line.slice(Math.min(head, next) - line.start, Math.max(head, next) - line.start)
-          }
-          let nextCat = categorize(nextChar)
-          if (cat != null && nextCat != cat) break
-          if (nextCat != CharCategory.Space) cat = nextCat
-          head = next
-        }
-        if (forward) to = head; else from = head
-      } else if (!forward && from > line.start && from < line.start + 200 &&
-          !/[^ \t]/.test(before = line.slice(0, from - line.start))) {
-        if (before[before.length - 1] == "\t") {
-          from--
-        } else {
-          let col = countColumn(before, 0, state.tabSize), drop = col % state.indentUnit || state.indentUnit
-          for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) from--
-        }
-      } else {
-        let target = line.findClusterBreak(from - line.start, forward) + line.start
-        if (target == from && line.number != (forward ? state.doc.lines : 0))
-          target += forward ? 1 : -1
-        if (forward) to = target; else from = target
-      }
+      let towards = by(from)
+      from = Math.min(from, towards)
+      to = Math.max(to, towards)
     }
-    if (from == to) return {range}
-    return {changes: {from, to}, range: EditorSelection.cursor(from)}
+    return from == to ? {range} : {changes: {from, to}, range: EditorSelection.cursor(from)}
   })
   if (changes.changes.empty) return false
-
   view.dispatch(view.state.update(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("delete")}))
   return true
 }
 
+const deleteByChar = (view: EditorView, forward: boolean) => deleteBy(view, pos => {
+  let {state} = view, line = state.doc.lineAt(pos), before
+  if (!forward && pos > line.start && pos < line.start + 200 &&
+      !/[^ \t]/.test(before = line.slice(0, pos - line.start))) {
+    if (before[before.length - 1] == "\t") return pos - 1
+    let col = countColumn(before, 0, state.tabSize), drop = col % state.indentUnit || state.indentUnit
+    for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) pos--
+    return pos
+  }
+  let target = line.findClusterBreak(pos - line.start, forward) + line.start
+  if (target == pos && line.number != (forward ? state.doc.lines : 0))
+    target += forward ? 1 : -1
+  return target
+})
+
 /// Delete the selection, or, for cursor selections, the character
 /// before the cursor.
-export const deleteCharBackward: Command = view => deleteText(view, false, false)
+export const deleteCharBackward: Command = view => deleteByChar(view, false)
 /// Delete the selection or the character after the cursor.
-export const deleteCharForward: Command = view => deleteText(view, true, false)
+export const deleteCharForward: Command = view => deleteByChar(view, true)
+
+const deleteByGroup = (view: EditorView, forward: boolean) => deleteBy(view, pos => {
+  let {state} = view, line = state.doc.lineAt(pos), categorize = state.charCategorizer(pos)
+  for (let cat: CharCategory | null = null;;) {
+    let next, nextChar
+    if (pos == (forward ? line.end : line.start)) {
+      if (line.number == (forward ? state.doc.lines : 1)) break
+      line = state.doc.line(line.number + (forward ? 1 : -1))
+      next = forward ? line.start : line.end
+      nextChar = "\n"
+    } else {
+      next = line.findClusterBreak(pos - line.start, forward) + line.start
+      nextChar = line.slice(Math.min(pos, next) - line.start, Math.max(pos, next) - line.start)
+    }
+    let nextCat = categorize(nextChar)
+    if (cat != null && nextCat != cat) break
+    if (nextCat != CharCategory.Space) cat = nextCat
+    pos = next
+  }
+  return pos
+})
 
 /// Delete the selection or backward until the end of the next
 /// [group](#view.EditorView.moveByGroup).
-export const deleteGroupBackward: Command = view => deleteText(view, false, true)
+export const deleteGroupBackward: Command = view => deleteByGroup(view, false)
 /// Delete the selection or forward until the end of the next group.
-export const deleteGroupForward: Command = view => deleteText(view, true, true)
+export const deleteGroupForward: Command = view => deleteByGroup(view, true)
+
+/// Delete the selection, or, if it is a cursor selection, delete to
+/// the end of the line. If the cursor is directly at the end of the
+/// line, delete the line break after it.
+export const deleteToLineEnd: Command = view => deleteBy(view, pos => {
+  let lineEnd = view.lineAt(pos).to
+  if (pos < lineEnd) return lineEnd
+  return Math.max(view.state.doc.length, pos + 1)
+})
+
+/// Replace each selection range with a line break, leaving the cursor
+/// on the line before the break.
+export const splitLine: StateCommand = ({state, dispatch}) => {
+  let changes = state.changeByRange(range => {
+    return {changes: {from: range.from, to: range.to, insert: Text.of(["", ""])},
+            range: EditorSelection.cursor(range.from)}
+  })
+  dispatch(state.update(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")}))
+  return true
+}
+
+/// Flip the characters before and after the cursor(s).
+export const transposeChars: StateCommand = ({state, dispatch}) => {
+  let changes = state.changeByRange(range => {
+    if (!range.empty || range.from == 0 || range.from == state.doc.length) return {range}
+    let pos = range.from, line = state.doc.lineAt(pos)
+    let from = pos == line.start ? pos - 1 : line.findClusterBreak(pos - line.start, false) + line.start
+    let to = pos == line.end ? pos + 1 : line.findClusterBreak(pos - line.start, true) + line.start
+    return {changes: {from, to, insert: state.doc.slice(pos, to).append(state.doc.slice(from, pos))},
+            range: EditorSelection.cursor(from + (to - pos))}
+  })
+  if (changes.changes.empty) return false
+  dispatch(state.update(changes, {scrollIntoView: true}))
+  return true
+}
 
 function indentString(state: EditorState, n: number) {
   let result = ""
@@ -304,66 +389,129 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
   return true
 }
 
+const sharedBaseKeymap: {[key: string]: Command} = {
+  "ArrowLeft": moveCharLeft,
+  "Shift-ArrowLeft": extendCharLeft,
+  "ArrowRight": moveCharRight,
+  "Shift-ArrowRight": extendCharRight,
+
+  "ArrowUp": moveLineUp,
+  "Shift-ArrowUp": extendLineUp,
+  "ArrowDown": moveLineDown,
+  "Shift-ArrowDown": extendLineDown,
+
+  "PageUp": movePageUp,
+  "Shift-PageUp": extendPageUp,
+  "PageDown": movePageDown,
+  "Shift-PageDown": extendPageDown,
+
+  "Home": moveLineBoundaryBackward,
+  "Shift-Home": extendLineBoundaryBackward,
+  "Mod-Home": selectDocStart,
+  "Shift-Mod-Home": extendDocStart,
+
+  "End": moveLineBoundaryForward,
+  "Shift-End": extendLineBoundaryForward,
+  "Mod-End": selectDocEnd,
+  "Shift-Mod-End": extendDocEnd,
+
+  "Mod-a": selectAll,
+
+  "Backspace": deleteCharBackward,
+  "Delete": deleteCharForward,
+
+  "Enter": insertNewlineAndIndent,
+}
+
 /// The default keymap for Linux/Windows/non-Mac platforms. Binds the
 /// arrows for cursor motion, shift-arrow for selection extension,
 /// ctrl-arrows for by-group motion, home/end for line start/end,
 /// ctrl-home/end for document start/end, ctrl-a to select all,
 /// backspace/delete for deletion, and enter for newline-and-indent.
 export const pcBaseKeymap: {[key: string]: Command} = {
-  "ArrowLeft": moveCharLeft,
-  "ArrowRight": moveCharRight,
-  "Shift-ArrowLeft": extendCharLeft,
-  "Shift-ArrowRight": extendCharRight,
   "Mod-ArrowLeft": moveGroupLeft,
-  "Mod-ArrowRight": moveGroupRight,
   "Shift-Mod-ArrowLeft": extendGroupLeft,
+  "Mod-ArrowRight": moveGroupRight,
   "Shift-Mod-ArrowRight": extendGroupRight,
-  "ArrowUp": moveLineUp,
-  "ArrowDown": moveLineDown,
-  "Shift-ArrowUp": extendLineUp,
-  "Shift-ArrowDown": extendLineDown,
-  "PageUp": movePageUp,
-  "PageDown": movePageDown,
-  "Shift-PageUp": extendPageUp,
-  "Shift-PageDown": extendPageDown,
-  "Home": moveLineStart,
-  "End": moveLineEnd,
-  "Shift-Home": extendLineStart,
-  "Shift-End": extendLineEnd,
-  "Mod-Home": selectDocStart,
-  "Mod-End": selectDocEnd,
-  "Mod-a": selectAll,
-  "Backspace": deleteCharBackward,
-  "Delete": deleteCharForward,
+
   "Mod-Backspace": deleteGroupBackward,
   "Mod-Delete": deleteGroupForward,
-  "Enter": insertNewlineAndIndent
 }
 
-/// The default keymap for Mac platforms. Includes the bindings from
-/// the [PC keymap](#commands.pcBaseKeymap) (using Cmd instead of
-/// Ctrl), and adds Mac-specific default bindings.
-export const macBaseKeymap: {[key: string]: Command} = {
-  "Control-b": moveCharLeft,
-  "Control-f": moveCharRight,
-  "Shift-Control-b": extendCharLeft,
-  "Shift-Control-f": extendCharRight,
-  "Control-p": moveLineUp,
-  "Control-n": moveLineDown,
-  "Shift-Control-p": extendLineUp,
-  "Shift-Control-n": extendLineDown,
-  "Control-a": moveLineStart,
-  "Control-e": moveLineEnd,
-  "Shift-Control-a": extendLineStart,
-  "Shift-Control-e": extendLineEnd,
-  "Cmd-ArrowUp": selectDocStart,
-  "Cmd-ArrowDown": selectDocEnd,
-  "Cmd-ArrowLeft": moveLineStart,
-  "Cmd-ArrowRight": moveLineEnd,
-  "Control-d": deleteCharForward,
-  "Control-h": deleteCharBackward
+/// Keymap containing the Emacs-style part of the [macOS base
+/// keymap](#commands.macBaseKeymap).
+export const emacsStyleBaseKeymap: {[key: string]: Command} = {
+  "Ctrl-b": moveCharLeft,
+  "Shift-Ctrl-b": extendCharLeft,
+  "Ctrl-f": moveCharRight,
+  "Shift-Ctrl-f": extendCharRight,
+
+  "Ctrl-p": moveLineUp,
+  "Shift-Ctrl-p": extendLineUp,
+  "Ctrl-n": moveLineDown,
+  "Shift-Ctrl-n": extendLineDown,
+
+  "Ctrl-a": moveLineStart,
+  "Shift-Ctrl-a": extendLineStart,
+  "Ctrl-e": moveLineEnd,
+  "Shift-Ctrl-e": extendLineEnd,
+
+  "Ctrl-d": deleteCharForward,
+  "Ctrl-h": deleteCharBackward,
+  "Ctrl-k": deleteToLineEnd,
+
+  "Ctrl-o": splitLine,
+  "Ctrl-t": transposeChars,
+
+  "Alt-f": moveGroupForward,
+  "Alt-b": moveGroupBackward,
+
+  "Alt-<": selectDocStart,
+  "Alt->": selectDocEnd,
+
+  "Ctrl-v": movePageDown,
+  "Alt-v": movePageUp,
+  "Alt-d": deleteGroupForward,
+  "Ctrl-Alt-h": deleteGroupBackward,
 }
-for (let key in pcBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key]
+
+/// The default keymap for Mac platforms.
+export const macBaseKeymap: {[key: string]: Command} = {
+  "Cmd-ArrowUp": selectDocStart,
+  "Shift-Cmd-ArrowUp": extendDocStart,
+  "Ctrl-ArrowUp": movePageUp,
+  "Shift-Ctrl-ArrowUp": extendPageUp,
+  "Alt-ArrowUp": moveLineBoundaryBackward,
+  "Shift-Alt-ArrowUp": extendLineBoundaryBackward,
+
+  "Cmd-ArrowDown": selectDocEnd,
+  "Shift-Cmd-ArrowDown": extendDocEnd,
+  "Ctrl-ArrowDown": movePageDown,
+  "Shift-Ctrl-ArrowDown": extendPageDown,
+  "Alt-ArrowDown": movePageDown,
+  "Shift-Alt-ArrowDown": extendPageDown,
+
+  "Cmd-ArrowLeft": moveLineStart,
+  "Shift-Cmd-ArrowLeft": extendLineStart,
+  "Ctrl-ArrowLeft": moveLineStart,
+  "Shift-Ctrl-ArrowLeft": extendLineStart,
+  "Alt-ArrowLeft": moveGroupLeft,
+  "Shift-Alt-ArrowLeft": extendGroupLeft,
+
+  "Cmd-ArrowRight": moveLineEnd,
+  "Shift-Cmd-ArrowRight": extendLineEnd,
+  "Ctrl-ArrowRight": moveLineEnd,
+  "Shift-Ctrl-ArrowRight": extendLineEnd,
+  "Alt-ArrowRight": moveGroupRight,
+  "Shift-Alt-ArrowRight": extendGroupRight,
+
+  "Alt-Backspace": deleteGroupBackward,
+  "Ctrl-Alt-Backspace": deleteGroupBackward,
+  "Alt-Delete": deleteGroupForward,
+}
+
+for (let key in emacsStyleBaseKeymap) macBaseKeymap[key] = emacsStyleBaseKeymap[key]
+for (let key in sharedBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key] = sharedBaseKeymap[key]
 
 declare const os: any
 const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform)
