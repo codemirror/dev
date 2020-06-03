@@ -79,7 +79,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   } else if (newSel && !newSel.primary.eq(sel)) {
     let scrollIntoView = false, annotations: Annotation<any> | undefined
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
-      if (view.inputState.lastSelectionOrigin == "keyboard") scrollIntoView = true
+      if (view.inputState.lastSelectionOrigin == "keyboardselection") scrollIntoView = true
       else annotations = Transaction.userEvent.of(view.inputState.lastSelectionOrigin!)
     }
     view.dispatch(view.state.update({selection: newSel, scrollIntoView, annotations}))

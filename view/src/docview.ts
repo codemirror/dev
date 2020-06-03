@@ -83,7 +83,7 @@ export class DocView extends ContentView {
     let decoDiff = findChangedDeco(prevDeco, deco, update.changes)
     changedRanges = ChangedRange.extendWithRanges(changedRanges, decoDiff)
 
-    let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointer")
+    let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointerselection")
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
         !(update.flags & (UpdateFlag.Viewport | UpdateFlag.LineGaps)) &&
         update.state.selection.primary.from >= this.view.viewport.from &&

@@ -279,7 +279,7 @@ class HistoryState {
     let last = this.done.length ? this.done[this.done.length - 1].selectionsAfter : none
     if (last.length > 0 &&
         time - this.prevTime < newGroupDelay &&
-        userEvent == "keyboard" && this.prevUserEvent == "keyboard" &&
+        userEvent == "keyboardselection" && this.prevUserEvent == userEvent &&
         eqSelectionShape(last[last.length - 1], selection))
       return this
     return new HistoryState(addSelection(this.done, selection), this.undone, time, userEvent)

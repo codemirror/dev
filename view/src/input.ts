@@ -165,7 +165,7 @@ class MouseSelection {
     if (!selection.eq(this.view.state.selection) || selection.primary.assoc != this.view.state.selection.primary.assoc)
       this.view.dispatch(this.view.state.update({
         selection,
-        annotations: Transaction.userEvent.of("pointer"),
+        annotations: Transaction.userEvent.of("pointerselection"),
         scrollIntoView: true
       }))
   }
@@ -252,11 +252,11 @@ function mustCapture(event: KeyboardEvent): boolean {
 
 handlers.keydown = (view, event: KeyboardEvent) => {
   if (mustCapture(event)) event.preventDefault()
-  view.inputState.setSelectionOrigin("keyboard")
+  view.inputState.setSelectionOrigin("keyboardselection")
 }
 
 handlers.touchdown = handlers.touchmove = view => {
-  view.inputState.setSelectionOrigin("pointer")
+  view.inputState.setSelectionOrigin("pointerselection")
 }
 
 handlers.mousedown = (view, event: MouseEvent) => {

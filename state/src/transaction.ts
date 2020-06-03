@@ -191,11 +191,13 @@ export class Transaction {
   /// Annotation used to associate a transaction with a user interface
   /// event. The view will set this to...
   ///
+  ///  - `"input"` when the user types text
+  ///  - `"delete"` when the user deletes the selection or text near the selection
+  ///  - `"keyboardselection"` when moving the selection via the keyboard
+  ///  - `"pointerselection"` when moving the selection through the pointing device
   ///  - `"paste"` when pasting content
   ///  - `"cut"` when cutting
   ///  - `"drop"` when content is inserted via drag-and-drop
-  ///  - `"keyboard"` when moving the selection via the keyboard
-  ///  - `"pointer"` when moving the selection through the pointing device
   static userEvent = Annotation.define<string>()
 
   /// Annotation indicating whether a transaction should be added to
