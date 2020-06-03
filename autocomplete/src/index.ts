@@ -125,7 +125,8 @@ const activeCompletion = StateField.define<ActiveState>({
   create() { return null },
 
   update(value, tr) {
-    if (tr.annotation(Transaction.userEvent) == "input") value = "pending"
+    let event = tr.annotation(Transaction.userEvent)
+    if (event == "input" || event == "delete" && value) value = "pending"
     else if (tr.docChanged || tr.selection) value = null
     for (let effect of tr.effects) {
       if (effect.is(openCompletion))

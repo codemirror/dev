@@ -1,5 +1,5 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange,
-        IndentContext, ChangeSpec, CharCategory} from "@codemirror/next/state"
+        IndentContext, ChangeSpec, CharCategory, Transaction} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
 
@@ -187,7 +187,7 @@ function deleteText(view: EditorView, forward: boolean, group: boolean) {
   })
   if (changes.changes.empty) return false
 
-  view.dispatch(view.state.update(changes, {scrollIntoView: true}))
+  view.dispatch(view.state.update(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("delete")}))
   return true
 }
 
