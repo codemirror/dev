@@ -232,8 +232,15 @@ function capturePaste(view: EditorView) {
   }, 50)
 }
 
-function doPaste(view: EditorView, text: string) {
-  view.dispatch(view.state.update(view.state.replaceSelection(text), {
+function doPaste(view: EditorView, input: string) {
+  let text = view.state.toText(input), i = 1
+  let changes = text.lines == view.state.selection.ranges.length ?
+    view.state.changeByRange(range => {
+      let line = text.line(i++)
+      return {changes: {from: range.from, to: range.to, insert: line.slice()},
+              range: EditorSelection.cursor(range.from + line.length)}
+    }) : view.state.replaceSelection(text)
+  view.dispatch(view.state.update(changes, {
     annotations: Transaction.userEvent.of("paste"),
     scrollIntoView: true
   }))
