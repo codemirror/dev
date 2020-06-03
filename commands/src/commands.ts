@@ -290,6 +290,56 @@ export const transposeChars: StateCommand = ({state, dispatch}) => {
   return true
 }
 
+function selectedLineBlocks(state: EditorState) {
+  let blocks = [], upto = -1
+  for (let range of state.selection.ranges) {
+    let startLine = state.doc.lineAt(range.from), endLine = state.doc.lineAt(range.to)
+    if (upto == startLine.number) blocks[blocks.length - 1].to = endLine.end
+    else blocks.push({from: startLine.start, to: endLine.end})
+    upto = endLine.number
+  }
+  return blocks
+}
+
+function moveLine(state: EditorState, dispatch: (tr: Transaction) => void, forward: boolean): boolean {
+  let changes = []
+  for (let block of selectedLineBlocks(state)) {
+    if (forward ? block.to == state.doc.length : block.from == 0) continue
+    let nextLine = state.doc.lineAt(forward ? block.to + 1 : block.from - 1)
+    if (forward)
+      changes.push({from: block.to, to: nextLine.end},
+                   {from: block.from, insert: nextLine.slice() + state.lineBreak})
+    else
+      changes.push({from: nextLine.start, to: block.from},
+                   {from: block.to, insert: state.lineBreak + nextLine.slice()})
+  }
+  if (!changes.length) return false
+  dispatch(state.update({changes, scrollIntoView: true}))
+  return true
+}
+
+/// Move the selected lines up one line.
+export const moveLineUp: StateCommand = ({state, dispatch}) => moveLine(state, dispatch, false)
+/// Move the selected lines down one line.
+export const moveLineDown: StateCommand = ({state, dispatch}) => moveLine(state, dispatch, true)
+
+function copyLine(state: EditorState, dispatch: (tr: Transaction) => void, forward: boolean): boolean {
+  let changes = []
+  for (let block of selectedLineBlocks(state)) {
+    if (forward)
+      changes.push({from: block.from, insert: state.doc.slice(block.from, block.to) + state.lineBreak})
+    else
+      changes.push({from: block.to, insert: state.lineBreak + state.doc.slice(block.from, block.to)})
+  }
+  dispatch(state.update({changes, scrollIntoView: true}))
+  return true
+}
+
+/// Create a copy of the selected lines. Keep the selection in the top copy.
+export const copyLineUp: StateCommand = ({state, dispatch}) => copyLine(state, dispatch, false)
+/// Create a copy of the selected lines. Keep the selection in the bottom copy.
+export const copyLineDown: StateCommand = ({state, dispatch}) => copyLine(state, dispatch, true)
+
 function indentString(state: EditorState, n: number) {
   let result = ""
   if (state.indentWithTabs) while (n >= state.tabSize) {
@@ -397,9 +447,13 @@ const sharedBaseKeymap: {[key: string]: Command} = {
 
   "ArrowUp": cursorLineUp,
   "Shift-ArrowUp": selectLineUp,
+  "Alt-ArrowUp": moveLineUp,
+  "Shift-Alt-ArrowUp": copyLineUp,
 
   "ArrowDown": cursorLineDown,
   "Shift-ArrowDown": selectLineDown,
+  "Alt-ArrowDown": moveLineDown,
+  "Shift-Alt-ArrowDown": copyLineDown,
 
   "PageUp": cursorPageUp,
   "Shift-PageUp": selectPageUp,
