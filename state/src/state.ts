@@ -162,7 +162,7 @@ export class EditorState {
 
   /// Return the given range of the document as a string.
   sliceDoc(from = 0, to = this.doc.length) {
-    return this.doc.sliceString(from, to, this.facet(EditorState.lineSeparator) || "\n")
+    return this.doc.sliceString(from, to, this.lineBreak)
   }
 
   /// Get the value of a state [facet](#state.Facet).
@@ -241,6 +241,10 @@ export class EditorState {
     combine: values => values.length ? values[0] : undefined,
     static: true
   })
+
+  /// Get the proper [line-break](#state.EditorState^lineSeparator)
+  /// string for this state.
+  get lineBreak() { return this.facet(EditorState.lineSeparator) || "\n" }
 
   /// Facet for overriding the unit by which indentation happens.
   /// Should be a string consisting either entirely of spaces or

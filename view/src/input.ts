@@ -434,7 +434,7 @@ function copiedRange(state: EditorState) {
     }
   }
 
-  return {text: content.join(state.facet(EditorState.lineSeparator) || "\n"), ranges}
+  return {text: content.join(state.lineBreak), ranges}
 }
 
 handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
