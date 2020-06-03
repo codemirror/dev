@@ -408,12 +408,33 @@ function captureCopy(view: EditorView, text: string) {
   }, 50)
 }
 
+function copiedRange(state: EditorState) {
+  let content = [], ranges: {from: number, to: number}[] = []
+  for (let range of state.selection.ranges) if (!range.empty) {
+    content.push(state.sliceDoc(range.from, range.to))
+    ranges.push(range)
+  }
+  if (!content.length) {
+    // Nothing selected, do a line-wise copy
+    let upto = -1
+    for (let {from} of state.selection.ranges) {
+      let line = state.doc.lineAt(from)
+      if (line.number > upto) {
+        content.push(line.slice())
+        ranges.push({from: line.start, to: Math.min(state.doc.length, line.end + 1)})
+      }
+      upto = line.number
+    }
+  }
+
+  return {text: content.join(state.facet(EditorState.lineSeparator) || "\n"), ranges}
+}
+
 handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
-  let range = view.state.selection.primary
-  if (range.empty) return
+  let {text, ranges} = copiedRange(view.state)
+  if (!text) return
 
   let data = brokenClipboardAPI ? null : event.clipboardData
-  let text = view.state.sliceDoc(range.from, range.to)
   if (data) {
     event.preventDefault()
     data.clearData()
@@ -422,7 +443,8 @@ handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
     captureCopy(view, text)
   }
   if (event.type == "cut")
-    view.dispatch(view.state.update(view.state.replaceSelection(""), {
+    view.dispatch(view.state.update({
+      changes: ranges,
       scrollIntoView: true,
       annotations: Transaction.userEvent.of("cut")
     }))
