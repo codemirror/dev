@@ -1,5 +1,6 @@
 import {combineConfig, EditorState, Transaction, StateField, StateCommand, StateEffect,
         Facet, Annotation, Extension, ChangeSet, ChangeDesc, EditorSelection} from "@codemirror/next/state"
+import {KeyBinding} from "@codemirror/next/keymap"
 
 const enum BranchName { Done, Undone }
 
@@ -75,6 +76,7 @@ const historyField = StateField.define({
 
 /// Create a history extension with the given configuration.
 export function history(config: HistoryConfig = {}): Extension {
+  // FIXME register beforeinput handler
   return [
     historyField,
     historyConfig.of(config)
@@ -317,3 +319,16 @@ class HistoryState {
 
   static empty: HistoryState = new HistoryState(none, none)
 }
+
+/// Default key bindings for the undo history.
+///
+/// - Mod-z: [`undo`](#history.undo).
+/// - Mod-y (Mod-Shift-z on macOS): [`redo`](#history.redo).
+/// - Mod-u: [`undoSelection`](#history.undoSelection).
+/// - Alt-u (Mod-Shift-u on macOS): [`redoSelection`](#history.redoSelection).
+export const historyKeymap: readonly KeyBinding[] = [
+  {key: "Mod-z", run: undo},
+  {key: "Mod-y", mac: "Mod-Shift-z", run: redo},
+  {key: "Mod-u", run: view => undoSelection(view) || true},
+  {key: "Alt-u", mac: "Mod-Shift-u", run: redoSelection}
+]

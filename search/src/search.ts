@@ -1,7 +1,7 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "@codemirror/next/view"
-import {StateField, Facet, StateEffect, EditorSelection, SelectionRange, Extension} from "@codemirror/next/state"
+import {StateField, StateEffect, EditorSelection, SelectionRange, Extension} from "@codemirror/next/state"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
-import {Keymap, NormalizedKeymap, keymap} from "@codemirror/next/keymap"
+import {runScopeHandlers, KeyBinding} from "@codemirror/next/keymap"
 import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 import {SearchCursor} from "./cursor"
@@ -76,45 +76,12 @@ const searchHighlighter = ViewPlugin.fromClass(class {
   }
 }).decorations()
 
-/// The configuration options passed to [`search`](#search.search).
-export interface SearchConfig {
-  /// A keymap with search-related bindings that should be enabled in
-  /// the editor. You can pass
-  /// [`defaultSearchKeymap`](#search.defaultSearchKeymap) here.
-  ///
-  /// Configuring bindings like this differs from just passing the
-  /// keymap as a separate extension in that the bindings in this
-  /// keymap are also available when the search panel is focused.
-  keymap?: Keymap
-
-  /// Additional key bindings to enable only in the search panel.
-  panelKeymap?: Keymap
-}
-
-const panelKeymap = Facet.define<Keymap, NormalizedKeymap<Command>>({
-  combine(keymaps) {
-    let result = Object.create(null)
-    for (let map of keymaps) for (let prop of Object.keys(map)) result[prop] = map[prop]
-    return new NormalizedKeymap(result)
-  }
-})
-
 /// Create an extension that enables search/replace functionality.
 /// This needs to be enabled for any of the search-related commands to
 /// work.
-export const search = function(config: SearchConfig): Extension {
-  // FIXME make multiple instances of this combine, somehow
-  let keys = Object.create(null), panelKeys = Object.create(null)
-  if (config.keymap) for (let key of Object.keys(config.keymap)) {
-    panelKeys[key] = keys[key] = config.keymap[key]
-  }
-  if (config.panelKeymap) for (let key of Object.keys(config.panelKeymap)) {
-    panelKeys[key] = config.panelKeymap[key]
-  }
+export const search = function(): Extension {
   return [
     searchState,
-    keymap(keys),
-    panelKeymap.of(panelKeys),
     searchHighlighter,
     panels(),
     baseTheme
@@ -237,7 +204,6 @@ function createSearchPanel(view: EditorView) {
   return {
     dom: buildPanel({
       view,
-      keymap: view.state.facet(panelKeymap),
       query,
       updateQuery(q: Query) {
         if (!query.eq(q)) {
@@ -263,18 +229,16 @@ export const openSearchPanel: Command = view => {
   return true
 }
 
-/// Default search-related bindings.
+/// Default search-related key bindings.
 ///
 ///  * Mod-f: [`openSearchPanel`](#search.openSearchPanel)
 ///  * F3, Mod-g: [`findNext`](#search.findNext)
 ///  * Shift-F3, Shift-Mod-g: [`findPrevious`](#search.findPrevious)
-export const defaultSearchKeymap = {
-  "Mod-f": openSearchPanel,
-  "F3": findNext,
-  "Mod-g": findNext,
-  "Shift-F3": findPrevious,
-  "Shift-Mod-g": findPrevious
-}
+export const searchKeymap: readonly KeyBinding[] = [
+  {key: "Mod-f", run: openSearchPanel, scope: "editor search-panel"},
+  {key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel"},
+  {key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel"}
+]
 
 /// Close the search panel.
 export const closeSearchPanel: Command = view => {
@@ -300,7 +264,6 @@ function elt(name: string, props: null | {[prop: string]: any} = null, children:
 
 // FIXME sync when search state changes independently
 function buildPanel(conf: {
-  keymap: NormalizedKeymap<Command>,
   view: EditorView,
   query: Query,
   updateQuery: (query: Query) => void
@@ -332,8 +295,7 @@ function buildPanel(conf: {
     conf.updateQuery(new Query(searchField.value, replaceField.value, !caseField.checked))
   }
   function keydown(e: KeyboardEvent) {
-    let mapped = conf.keymap.get(e)
-    if (mapped && mapped(conf.view)) {
+    if (runScopeHandlers(conf.view, e, "search-panel")) {
       e.preventDefault()
     } else if (e.keyCode == 27) {
       e.preventDefault()

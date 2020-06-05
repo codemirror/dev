@@ -2,6 +2,7 @@ import {EditorState, StateCommand, EditorSelection, SelectionRange,
         IndentContext, ChangeSpec, CharCategory, Transaction} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
+import {KeyBinding} from "@codemirror/next/keymap"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -472,141 +473,86 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
   return true
 }
 
-const sharedBaseKeymap: {[key: string]: Command} = {
-  "ArrowLeft": cursorCharLeft,
-  "Shift-ArrowLeft": selectCharLeft,
-  "ArrowRight": cursorCharRight,
-  "Shift-ArrowRight": selectCharRight,
+/// Key bindings containing the Emacs-style bindings that are
+/// available on macOS by default. (These are included in
+/// [`baseKeymap`](#commands.baseKeymap), with their `key` property
+/// changed to `mac`.)
+export const emacsStyleBaseKeymap: readonly KeyBinding[] = [
+  {key:"Ctrl-b", run: cursorCharLeft, shift: selectCharLeft},
+  {key: "Ctrl-f", run: cursorCharRight, shift: selectCharRight},
 
-  "ArrowUp": cursorLineUp,
-  "Shift-ArrowUp": selectLineUp,
-  "Alt-ArrowUp": moveLineUp,
-  "Shift-Alt-ArrowUp": copyLineUp,
+  {key: "Ctrl-p", run: cursorLineUp, shift: selectLineUp},
+  {key: "Ctrl-n", run: cursorLineDown, shift: selectLineDown},
 
-  "ArrowDown": cursorLineDown,
-  "Shift-ArrowDown": selectLineDown,
-  "Alt-ArrowDown": moveLineDown,
-  "Shift-Alt-ArrowDown": copyLineDown,
+  {key: "Ctrl-a", run: cursorLineStart, shift: selectLineStart},
+  {key: "Ctrl-e", run: cursorLineEnd, shift: selectLineEnd},
 
-  "PageUp": cursorPageUp,
-  "Shift-PageUp": selectPageUp,
-  "PageDown": cursorPageDown,
-  "Shift-PageDown": selectPageDown,
+  {key: "Ctrl-d", run: deleteCharForward},
+  {key: "Ctrl-h", run: deleteCharBackward},
+  {key: "Ctrl-k", run: deleteToLineEnd},
 
-  "Home": cursorLineBoundaryBackward,
-  "Shift-Home": selectLineBoundaryBackward,
-  "Mod-Home": cursorDocStart,
-  "Shift-Mod-Home": selectDocStart,
+  {key: "Ctrl-o", run: splitLine},
+  {key: "Ctrl-t", run: transposeChars},
 
-  "End": cursorLineBoundaryForward,
-  "Shift-End": selectLineBoundaryForward,
-  "Mod-End": cursorDocEnd,
-  "Shift-Mod-End": selectDocEnd,
+  {key: "Alt-f", run: cursorGroupForward},
+  {key: "Alt-b", run: cursorGroupBackward},
 
-  "Enter": insertNewlineAndIndent,
+  {key: "Alt-<", run: cursorDocStart},
+  {key: "Alt->", run: cursorDocEnd},
 
-  "Mod-a": selectAll,
+  {key: "Ctrl-v", run: cursorPageDown},
+  {key: "Alt-v", run: cursorPageUp},
+  {key: "Alt-d", run: deleteGroupForward},
+  {key: "Ctrl-Alt-h", run: deleteGroupBackward},
+]
 
-  "Mod-[": indentLess,
-  "Mod-]": indentMore,
+export const baseKeymap: readonly KeyBinding[] = ([
+  {key: "ArrowLeft", run: cursorCharLeft, shift: selectCharLeft},
+  {key: "Mod-ArrowLeft", mac: "Alt-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft},
+  {mac: "Cmd-ArrowLeft", run: cursorLineStart, shift: selectLineStart},
+  {mac: "Ctrl-ArrowLeft", run: cursorLineStart, shift: selectLineStart},
 
-  "Shift-Mod-k": deleteLine,
+  {key: "ArrowRight", run: cursorCharRight, shift: selectCharRight},
+  {key: "Mod-ArrowRight", mac: "Alt-ArrowRight", run: cursorGroupRight, shift: selectGroupRight},
+  {mac: "Cmd-ArrowRight", run: cursorLineEnd, shift: selectLineEnd},
+  {mac: "Ctrl-ArrowRight", run: cursorLineEnd, shift: selectLineEnd},
 
-  "Mod-Shift-\\": cursorMatchingBracket,
+  {key: "ArrowUp", run: cursorLineUp, shift: selectLineUp},
+  {key: "Alt-ArrowUp", run: moveLineUp},
+  {key: "Shift-Alt-ArrowUp", run: copyLineUp},
+  {mac: "Cmd-ArrowUp", run: cursorDocStart, shift: selectDocStart},
+  {mac: "Ctrl-ArrowUp", run: cursorPageUp, shift: selectPageUp},
 
-  "Backspace": deleteCharBackward,
-  "Delete": deleteCharForward,
-}
+  {key: "ArrowDown", run: cursorLineDown, shift: selectLineDown},
+  {key: "Alt-ArrowDown", run: moveLineDown},
+  {key: "Shift-Alt-ArrowDown", run: copyLineDown},
+  {mac: "Cmd-ArrowDown", run: cursorDocEnd, shift: selectDocEnd},
+  {mac: "Ctrl-ArrowDown", run: cursorPageDown, shift: selectPageDown},
 
-/// The default keymap for Linux/Windows/non-Mac platforms. Binds the
-/// arrows for cursor motion, shift-arrow for selection extension,
-/// ctrl-arrows for by-group motion, home/end for line start/end,
-/// ctrl-home/end for document start/end, ctrl-a to select all,
-/// backspace/delete for deletion, and enter for newline-and-indent.
-export const pcBaseKeymap: {[key: string]: Command} = {
-  "Mod-ArrowLeft": cursorGroupLeft,
-  "Shift-Mod-ArrowLeft": selectGroupLeft,
-  "Mod-ArrowRight": cursorGroupRight,
-  "Shift-Mod-ArrowRight": selectGroupRight,
+  {key: "PageUp", run: cursorPageUp, shift: selectPageUp},
+  {key: "PageDown", run: cursorPageDown, shift: selectPageDown},
 
-  "Mod-Backspace": deleteGroupBackward,
-  "Mod-Delete": deleteGroupForward,
-}
+  {key: "Home", run: cursorLineBoundaryBackward, shift: selectLineBoundaryBackward},
+  {key: "Mod-Home", run: cursorDocStart, shift: selectDocStart},
 
-/// Keymap containing the Emacs-style part of the [macOS base
-/// keymap](#commands.macBaseKeymap).
-export const emacsStyleBaseKeymap: {[key: string]: Command} = {
-  "Ctrl-b": cursorCharLeft,
-  "Shift-Ctrl-b": selectCharLeft,
-  "Ctrl-f": cursorCharRight,
-  "Shift-Ctrl-f": selectCharRight,
+  {key: "End", run: cursorLineBoundaryForward, shift: selectLineBoundaryForward},
+  {key: "Mod-End", run: cursorDocEnd, shift: selectDocEnd},
 
-  "Ctrl-p": cursorLineUp,
-  "Shift-Ctrl-p": selectLineUp,
-  "Ctrl-n": cursorLineDown,
-  "Shift-Ctrl-n": selectLineDown,
+  {key: "Enter", run: insertNewlineAndIndent},
 
-  "Ctrl-a": cursorLineStart,
-  "Shift-Ctrl-a": selectLineStart,
-  "Ctrl-e": cursorLineEnd,
-  "Shift-Ctrl-e": selectLineEnd,
+  {key: "Mod-a", run: selectAll},
 
-  "Ctrl-d": deleteCharForward,
-  "Ctrl-h": deleteCharBackward,
-  "Ctrl-k": deleteToLineEnd,
+  {key: "Mod-[", run: indentLess},
+  {key: "Mod-]", run: indentMore},
 
-  "Ctrl-o": splitLine,
-  "Ctrl-t": transposeChars,
+  {key: "Shift-Mod-k", run: deleteLine},
 
-  "Alt-f": cursorGroupForward,
-  "Alt-b": cursorGroupBackward,
+  {key: "Mod-Shift-\\", run: cursorMatchingBracket},
 
-  "Alt-<": cursorDocStart,
-  "Alt->": cursorDocEnd,
+  {key: "Backspace", run: deleteCharBackward},
+  {key: "Delete", run: deleteCharForward},
+  {key: "Mod-Backspace", mac: "Ctrl-Alt-Backspace", run: deleteGroupBackward},
+  {key: "Mod-Delete", mac: "Alt-Backspace", run: deleteGroupForward},
 
-  "Ctrl-v": cursorPageDown,
-  "Alt-v": cursorPageUp,
-  "Alt-d": deleteGroupForward,
-  "Ctrl-Alt-h": deleteGroupBackward,
-}
-
-/// The default keymap for Mac platforms.
-export const macBaseKeymap: {[key: string]: Command} = {
-  "Cmd-ArrowUp": cursorDocStart,
-  "Shift-Cmd-ArrowUp": selectDocStart,
-  "Ctrl-ArrowUp": cursorPageUp,
-  "Shift-Ctrl-ArrowUp": selectPageUp,
-
-  "Cmd-ArrowDown": cursorDocEnd,
-  "Shift-Cmd-ArrowDown": selectDocEnd,
-  "Ctrl-ArrowDown": cursorPageDown,
-  "Shift-Ctrl-ArrowDown": selectPageDown,
-
-  "Cmd-ArrowLeft": cursorLineStart,
-  "Shift-Cmd-ArrowLeft": selectLineStart,
-  "Ctrl-ArrowLeft": cursorLineStart,
-  "Shift-Ctrl-ArrowLeft": selectLineStart,
-  "Alt-ArrowLeft": cursorGroupLeft,
-  "Shift-Alt-ArrowLeft": selectGroupLeft,
-
-  "Cmd-ArrowRight": cursorLineEnd,
-  "Shift-Cmd-ArrowRight": selectLineEnd,
-  "Ctrl-ArrowRight": cursorLineEnd,
-  "Shift-Ctrl-ArrowRight": selectLineEnd,
-  "Alt-ArrowRight": cursorGroupRight,
-  "Shift-Alt-ArrowRight": selectGroupRight,
-
-  "Alt-Backspace": deleteGroupBackward,
-  "Ctrl-Alt-Backspace": deleteGroupBackward,
-  "Alt-Delete": deleteGroupForward,
-}
-
-for (let key in emacsStyleBaseKeymap) macBaseKeymap[key] = emacsStyleBaseKeymap[key]
-for (let key in sharedBaseKeymap) macBaseKeymap[key] = pcBaseKeymap[key] = sharedBaseKeymap[key]
-
-declare const os: any
-const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform)
-          : typeof os != "undefined" ? os.platform() == "darwin" : false
-
-/// The default keymap for the current platform.
-export const baseKeymap = mac ? macBaseKeymap : pcBaseKeymap
+  {mac: "Alt-Delete", run: deleteGroupForward},
+] as KeyBinding[]).concat(emacsStyleBaseKeymap.map(b => ({mac: b.key, run: b.run, shift: b.shift})))

@@ -58,12 +58,12 @@ export function autocomplete(config: Partial<AutocompleteConfig> = {}): Extensio
     autocompletePlugin,
     style,
     tooltips(),
-    Precedence.Override.set(keymap({
-      ArrowDown: moveCompletion("down"),
-      ArrowUp: moveCompletion("up"),
-      Enter: acceptCompletion,
-      Escape: closeCompletion
-    }))
+    Precedence.Override.set(keymap([
+      {key: "ArrowDown", run: moveCompletion("down")},
+      {key: "ArrowUp", run: moveCompletion("up")},
+      {key: "Enter", run: acceptCompletion},
+      {key: "Escape", run: closeCompletion}
+    ]))
   ]
 }
 
