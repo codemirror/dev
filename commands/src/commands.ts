@@ -510,6 +510,9 @@ const sharedBaseKeymap: {[key: string]: Command} = {
 
   "Mod-a": selectAll,
 
+  "Mod-[": indentLess,
+  "Mod-]": indentMore,
+
   "Shift-Mod-k": deleteLine,
 
   "Mod-Shift-\\": cursorMatchingBracket,
