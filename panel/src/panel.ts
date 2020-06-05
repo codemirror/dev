@@ -1,8 +1,33 @@
 import {EditorView, ViewPlugin, PluginField, ViewUpdate, themeClass} from "@codemirror/next/view"
 import {Facet, Extension} from "@codemirror/next/state"
 
+/// Configuration options passed to [`panels`](#panel.panels).
+export type PanelConfig = {
+  /// By default, panels will be placed inside the editor's DOM
+  /// structure. You can use this option to override where panels with
+  /// `top: true` are placed.
+  topContainer?: HTMLElement
+  /// Override where panels with `top: false` are placed.
+  bottomContainer?: HTMLElement
+}
+
+const panelConfig = Facet.define<PanelConfig, PanelConfig>({
+  combine(configs: readonly PanelConfig[]) {
+    let topContainer, bottomContainer
+    for (let c of configs) {
+      topContainer = topContainer || c.topContainer
+      bottomContainer = bottomContainer || c.bottomContainer
+    }
+    return {topContainer, bottomContainer}
+  }
+})
+
 /// Enables the panel-managing extension.
-export function panels(): Extension { return [panelPlugin, baseTheme] }
+export function panels(config?: PanelConfig): Extension {
+  let ext = [panelPlugin, baseTheme]
+  if (config) ext.push(panelConfig.of(config))
+  return ext
+}
 
 /// Object that describes an active panel.
 export interface Panel {
@@ -29,6 +54,15 @@ export interface Panel {
 /// panel through this facet.
 export const showPanel = Facet.define<(view: EditorView) => Panel>()
 
+/// Get the active panel created by the given constructor, if any.
+/// This can be useful when you need access to your panels' DOM
+/// structure.
+export function getPanel(view: EditorView, panel: (view: EditorView) => Panel) {
+  let plugin = view.plugin(panelPlugin)
+  let index = view.state.facet(showPanel).indexOf(panel)
+  return plugin && index > -1 ? plugin.panels[index] : null
+}
+
 const panelPlugin = ViewPlugin.fromClass(class {
   specs: readonly ((view: EditorView) => Panel)[]
   panels: Panel[]
@@ -38,8 +72,11 @@ const panelPlugin = ViewPlugin.fromClass(class {
   constructor(view: EditorView) {
     this.specs = view.state.facet(showPanel)
     this.panels = this.specs.map(spec => spec(view))
-    this.top = new PanelGroup(view, true, this.panels.filter(p => p.top)) 
-    this.bottom = new PanelGroup(view, false, this.panels.filter(p => !p.top))
+    let conf = view.state.facet(panelConfig)
+    this.top = new PanelGroup(view, true, conf.topContainer)
+    this.bottom = new PanelGroup(view, false, conf.bottomContainer)
+    this.top.sync(this.panels.filter(p => !p.top))
+    this.bottom.sync(this.panels.filter(p => p.top))
     for (let p of this.panels) {
       p.dom.className += " " + panelClass(p)
       if (p.mount) p.mount()
@@ -47,6 +84,15 @@ const panelPlugin = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
+    let conf = update.state.facet(panelConfig)
+    if (this.top.customDOM != conf.topContainer) {
+      this.top.sync([])
+      this.top = new PanelGroup(update.view, true, conf.topContainer)
+    }
+    if (this.bottom.customDOM != conf.bottomContainer) {
+      this.bottom.sync([])
+      this.bottom = new PanelGroup(update.view, false, conf.bottomContainer)
+    }
     let specs = update.state.facet(showPanel)
     if (specs != this.specs) {
       let panels = [], top: Panel[] = [], bottom: Panel[] = [], mount = []
@@ -74,6 +120,11 @@ const panelPlugin = ViewPlugin.fromClass(class {
       for (let p of this.panels) if (p.update) p.update(update)
     }
   }
+
+  destroy() {
+    this.top.sync([])
+    this.bottom.sync([])
+  }
 }).provide(PluginField.scrollMargins, value => ({top: value.top.scrollMargin(), bottom: value.bottom.scrollMargin()}))
 
 function panelClass(panel: Panel) {
@@ -81,10 +132,11 @@ function panelClass(panel: Panel) {
 }
 
 class PanelGroup {
-  dom: HTMLElement | null = null
+  dom: HTMLElement | undefined = undefined
+  panels: Panel[] = []
 
-  constructor(readonly view: EditorView, readonly top: boolean, public panels: Panel[]) {
-    this.syncDOM()
+  constructor(readonly view: EditorView, readonly top: boolean, readonly customDOM: HTMLElement | undefined) {
+    this.dom = this.customDOM
   }
 
   sync(panels: Panel[]) {
@@ -94,9 +146,11 @@ class PanelGroup {
 
   syncDOM() {
     if (this.panels.length == 0) {
-      if (this.dom) {
+      if (this.customDOM) {
+        for (let ch = this.customDOM.firstChild; ch; ch = rm(ch)) {}
+      } else if (this.dom) {
         this.dom.remove()
-        this.dom = null
+        this.dom = undefined
       }
       return
     }
@@ -121,9 +175,9 @@ class PanelGroup {
   }
 
   scrollMargin() {
-    return !this.dom ? 0 : Math.max(0, this.top
-                                    ? this.dom.getBoundingClientRect().bottom - this.view.scrollDOM.getBoundingClientRect().top
-                                    : this.view.scrollDOM.getBoundingClientRect().bottom - this.dom.getBoundingClientRect().top)
+    return !this.dom || this.customDOM ? 0
+      : Math.max(0, this.top ? this.dom.getBoundingClientRect().bottom - this.view.scrollDOM.getBoundingClientRect().top
+                 : this.view.scrollDOM.getBoundingClientRect().bottom - this.dom.getBoundingClientRect().top)
   }
 }
 

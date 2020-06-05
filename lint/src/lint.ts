@@ -2,7 +2,7 @@ import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
         WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "@codemirror/next/view"
 import {StateEffect, StateField, Extension} from "@codemirror/next/state"
 import {hoverTooltip} from "@codemirror/next/tooltip"
-import {panels, Panel, showPanel} from "@codemirror/next/panel"
+import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 
 /// Describes a problem or hint for a piece of code.
 export interface Diagnostic {
@@ -156,8 +156,8 @@ export const openLintPanel: Command = (view: EditorView) => {
   if (!field) return false
   if (!field.panel)
     view.dispatch(view.state.update({effects: togglePanel.of(true)}))
-  if (view.state.field(lintState).panel)
-    (view.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
+  let panel = getPanel(view, LintPanel.open)
+  if (panel) (panel.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
 }
 

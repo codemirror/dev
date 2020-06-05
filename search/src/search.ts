@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "@codemirror/next/view"
 import {StateField, Facet, StateEffect, EditorSelection, SelectionRange, Extension} from "@codemirror/next/state"
-import {panels, Panel, showPanel} from "@codemirror/next/panel"
+import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 import {Keymap, NormalizedKeymap, keymap} from "@codemirror/next/keymap"
 import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
@@ -280,8 +280,8 @@ export const defaultSearchKeymap = {
 export const closeSearchPanel: Command = view => {
   let state = view.state.field(searchState)
   if (!state || !state.panel.length) return false
-  let panel = view.dom.querySelector(".cm-panel-search")
-  if (panel && panel.contains(view.root.activeElement)) view.focus()
+  let panel = getPanel(view, createSearchPanel)
+  if (panel && panel.dom.contains(view.root.activeElement)) view.focus()
   view.dispatch(view.state.update({effects: togglePanel.of(false)}))
   return true
 }
@@ -385,10 +385,9 @@ function maybeAnnounceMatch(view: EditorView) {
     }
   }
 
-  let state = view.state.field(searchState)
-  let panel = state.panel.length && view.dom.querySelector(".cm-panel-search")
-  if (!panel || !panel.contains(view.root.activeElement)) return
-  let live = panel.querySelector("div[aria-live]")!
+  let panel = getPanel(view, createSearchPanel)
+  if (!panel || !panel.dom.contains(view.root.activeElement)) return
+  let live = panel.dom.querySelector("div[aria-live]")!
   live.textContent = view.state.phrase("current match") + ". " + text
 }
 
