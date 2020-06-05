@@ -174,7 +174,10 @@ export const nextLintDiagnostic: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
   let next = field.diagnostics.iter(view.state.selection.primary.from + 1)
-  if (!next.value) return false
+  if (!next.value) {
+    next = field.diagnostics.iter(0)
+    if (!next.value) return false
+  }
   view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
   return true
 }
