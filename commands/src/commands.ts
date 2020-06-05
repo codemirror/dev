@@ -69,19 +69,23 @@ export const cursorPageUp: Command = view => cursorByPage(view, false)
 /// Move the selection one page down.
 export const cursorPageDown: Command = view => cursorByPage(view, true)
 
-function cursorLineBoundary(view: EditorView, forward: boolean) {
-  return moveSel(view, range => {
-    let moved = view.moveToLineBoundary(range, forward)
-    return moved.head == range.head ? view.moveToLineBoundary(range, forward, false) : moved
-  })
+function moveByLineBoundary(view: EditorView, start: SelectionRange, forward: boolean) {
+  let line = view.lineAt(start.head), moved = view.moveToLineBoundary(start, forward)
+  if (moved.head == start.head && moved.head != (forward ? line.to : line.from))
+    moved = view.moveToLineBoundary(start, forward, false)
+  if (!forward && moved.head == line.from && line.length) {
+    let space = /^\s*/.exec(view.state.sliceDoc(line.from, Math.min(line.from + 100, line.to)))![0].length
+    if (space && start.head > line.from + space) moved = EditorSelection.cursor(line.from + space)
+  }
+  return moved
 }
 
 /// Move the selection to the next line wrap point, or to the end of
 /// the line if there isn't one left on this line.
-export const cursorLineBoundaryForward: Command = view => cursorLineBoundary(view, false)
+export const cursorLineBoundaryForward: Command = view => moveSel(view, range => moveByLineBoundary(view, range, true))
 /// Move the selection to previous line wrap point, or failing that to
 /// the start of the line.
-export const cursorLineBoundaryBackward: Command = view => cursorLineBoundary(view, true)
+export const cursorLineBoundaryBackward: Command = view => moveSel(view, range => moveByLineBoundary(view, range, false))
 
 /// Move the selection to the start of the line.
 export const cursorLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from, 1))
@@ -169,17 +173,10 @@ export const selectPageUp: Command = view => selectByPage(view, false)
 /// Move the selection head one page down.
 export const selectPageDown: Command = view => selectByPage(view, true)
 
-function selectByLineBoundary(view: EditorView, forward: boolean) {
-  return extendSel(view, range => {
-    let head = view.moveToLineBoundary(range, forward)
-    return head.head == range.head ? view.moveToLineBoundary(range, forward, false) : head
-  })
-}
-
 /// Move the selection head to the next line boundary.
-export const selectLineBoundaryForward: Command = view => selectByLineBoundary(view, false)
+export const selectLineBoundaryForward: Command = view => extendSel(view, range => moveByLineBoundary(view, range, true))
 /// Move the selection head to the previous line boundary.
-export const selectLineBoundaryBackward: Command = view => selectByLineBoundary(view, true)
+export const selectLineBoundaryBackward: Command = view => extendSel(view, range => moveByLineBoundary(view, range, false))
 
 /// Move the selection head to the start of the line.
 export const selectLineStart: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from))
