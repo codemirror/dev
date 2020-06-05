@@ -169,6 +169,16 @@ export const closeLintPanel: Command = (view: EditorView) => {
   return true
 }
 
+/// Move the selection to the next diagnostic.
+export const nextLintDiagnostic: Command = (view: EditorView) => {
+  let field = view.state.field(lintState, false)
+  if (!field) return false
+  let next = field.diagnostics.iter(view.state.selection.primary.from + 1)
+  if (!next.value) return false
+  view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
+  return true
+}
+
 const LintDelay = 500
 
 /// Given a diagnostic source, this function returns an extension that
