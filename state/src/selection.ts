@@ -7,7 +7,7 @@ import {ChangeDesc} from "./change"
 //   for cursors)
 // - 1 bit to indicate whether the range is inverted (head before
 //   anchor) (only meaningful for non-empty ranges)
-// - Any further bits hold the goal column (only for cursors
+// - Any further bits hold the goal column (only for ranges
 //   produced by vertical motion)
 const enum RangeFlag {
   BidiLevelMask = 3,
@@ -57,7 +57,7 @@ export class SelectionRange {
 
   get goalColumn() {
     let value = this.flags >> RangeFlag.GoalColumnOffset
-    return value == RangeFlag.NoGoalColumn ? null : value
+    return value == RangeFlag.NoGoalColumn ? undefined : value
   }
 
   /// Map this range through a mapping.
@@ -182,9 +182,9 @@ export class EditorSelection {
   }
 
   /// Create a selection range.
-  static range(anchor: number, head: number) {
-    let noGoal = RangeFlag.NoGoalColumn << RangeFlag.GoalColumnOffset
-    return head < anchor ? new SelectionRange(head, anchor, RangeFlag.Inverted | noGoal) : new SelectionRange(anchor, head, noGoal)
+  static range(anchor: number, head: number, goalColumn?: number) {
+    let goal = (goalColumn ?? RangeFlag.NoGoalColumn) << RangeFlag.GoalColumnOffset
+    return head < anchor ? new SelectionRange(head, anchor, RangeFlag.Inverted | goal) : new SelectionRange(anchor, head, goal)
   }
 }
 

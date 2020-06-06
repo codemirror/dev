@@ -12,10 +12,11 @@ function setSel(state: EditorState, selection: EditorSelection | {anchor: number
   return state.update({selection, scrollIntoView: true, annotations: Transaction.userEvent.of("keyboardselection")})
 }
 
-function moveSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
-  let selection = updateSel(view.state.selection, how)
-  if (selection.eq(view.state.selection)) return false
-  view.dispatch(setSel(view.state, selection))
+function moveSel({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void},
+                 how: (range: SelectionRange) => SelectionRange): boolean {
+  let selection = updateSel(state.selection, how)
+  if (selection.eq(state.selection)) return false
+  dispatch(setSel(state, selection))
   return true
 }
 
@@ -95,7 +96,7 @@ export const cursorLineEnd: Command = view => moveSel(view, range => EditorSelec
 function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, range => {
     let head = how(range)
-    return EditorSelection.range(range.anchor, head.head)
+    return EditorSelection.range(range.anchor, head.head, head.goalColumn)
   })
   if (selection.eq(view.state.selection)) return false
   view.dispatch(setSel(view.state, selection))
