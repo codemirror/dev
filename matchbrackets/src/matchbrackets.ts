@@ -1,4 +1,5 @@
-import {combineConfig, EditorState, Facet, StateField, Extension} from "@codemirror/next/state"
+import {combineConfig, EditorState, EditorSelection, Facet, StateField, Extension,
+        StateCommand, Transaction} from "@codemirror/next/state"
 import {EditorView, themeClass} from "@codemirror/next/view"
 import {Decoration, DecorationSet} from "@codemirror/next/view"
 import {Tree, Subtree, NodeType} from "lezer-tree"
@@ -88,7 +89,6 @@ function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string): null | re
   return null
 }
 
-
 /// The result returned from `matchBrackets`.
 export interface MatchResult {
   /// The extent of the bracket token found.
@@ -162,3 +162,26 @@ function matchPlainBrackets(state: EditorState, pos: number, dir: number, tree: 
   }
   return iter.done ? {start: startToken, matched: false} : null
 }
+
+function toMatchingBracket(state: EditorState, dispatch: (tr: Transaction) => void, extend: boolean) {
+  let found = false, selection = EditorSelection.create(state.selection.ranges.map(range => {
+    let matching = matchBrackets(state, range.head, -1)
+      || matchBrackets(state, range.head, 1)
+      || (range.head > 0 && matchBrackets(state, range.head - 1, 1))
+      || (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1))
+    if (!matching || !matching.end) return range
+    found = true
+    let head = matching.start.from == range.head ? matching.end.to : matching.end.from
+    return extend ? EditorSelection.range(range.anchor, head) : EditorSelection.cursor(head)
+  }), state.selection.primaryIndex)
+  if (!found) return false
+  dispatch(state.update({selection, scrollIntoView: true, annotations: Transaction.userEvent.of("keyboardselection")}))
+  return true
+}
+
+/// Move the selection to the bracket matching the one it is currently
+/// on, if any.
+export const cursorMatchingBracket: StateCommand = ({state, dispatch}) => toMatchingBracket(state, dispatch, false)
+/// Extend the selection to the bracket matching the one the selection
+/// head is currently on, if any.
+export const selectMatchingBracket: StateCommand = ({state, dispatch}) => toMatchingBracket(state, dispatch, true)
