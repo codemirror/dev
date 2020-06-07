@@ -4,6 +4,7 @@ import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
 import {KeyBinding} from "@codemirror/next/keymap"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
+import {Subtree, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
@@ -52,6 +53,38 @@ export const cursorGroupRight: Command = view => cursorByGroup(view, view.textDi
 export const cursorGroupForward: Command = view => cursorByGroup(view, true)
 /// Move the selection one group backward.
 export const cursorGroupBackward: Command = view => cursorByGroup(view, false)
+
+function interestingNode(state: EditorState, node: Subtree, bracketProp: NodeProp<unknown>) {
+  if (node.type.prop(bracketProp)) return true
+  let len = node.end - node.start
+  return len && (len > 2 || /[^\s,.;:]/.test(state.sliceDoc(node.start, node.end))) || node.firstChild
+}
+
+function moveBySyntax(state: EditorState, start: SelectionRange, forward: boolean) {
+  let pos = state.tree.resolve(start.head)
+  let bracketProp = forward ? NodeProp.closedBy : NodeProp.openedBy
+  // Scan forward through child nodes to see if there's an interesting
+  // node ahead.
+  for (let at = start.head;;) {
+    let next = forward ? pos.childAfter(at) : pos.childBefore(at)
+    if (!next) break
+    if (interestingNode(state, next, bracketProp)) pos = next
+    else at = forward ? next.end : next.start
+  }
+  let bracket = pos.type.prop(bracketProp), match, newPos
+  if (bracket && (match = forward ? matchBrackets(state, pos.start, 1) : matchBrackets(state, pos.end, -1)) && match.matched)
+    newPos = forward ? match.end!.to : match.end!.from
+  else
+    newPos = forward ? pos.end : pos.start
+  return EditorSelection.cursor(newPos, forward ? -1 : 1)
+}
+
+/// Move the cursor over the next syntactic element to the left.
+export const cursorSyntaxLeft: Command =
+  view => moveSel(view, range => moveBySyntax(view.state, range, view.textDirection != Direction.LTR))
+/// Move the cursor over the next syntactic element to the right.
+export const cursorSyntaxRight: Command =
+  view => moveSel(view, range => moveBySyntax(view.state, range, view.textDirection == Direction.LTR))
 
 function cursorByLine(view: EditorView, forward: boolean) {
   return moveSel(view, range => view.moveVertically(range, forward))
@@ -156,6 +189,13 @@ export const selectGroupRight: Command = view => selectByGroup(view, view.textDi
 export const selectGroupForward: Command = view => selectByGroup(view, true)
 /// Move the selection head one group backward.
 export const selectGroupBackward: Command = view => selectByGroup(view, false)
+
+/// Move the selection head over the next syntactic element to the left.
+export const selectSyntaxLeft: Command =
+  view => extendSel(view, range => moveBySyntax(view.state, range, view.textDirection != Direction.LTR))
+/// Move the selection head over the next syntactic element to the right.
+export const selectSyntaxRight: Command =
+  view => extendSel(view, range => moveBySyntax(view.state, range, view.textDirection == Direction.LTR))
 
 function selectByLine(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveVertically(range, forward))
@@ -527,13 +567,13 @@ export const emacsStyleBaseKeymap: readonly KeyBinding[] = [
 export const baseKeymap: readonly KeyBinding[] = ([
   {key: "ArrowLeft", run: cursorCharLeft, shift: selectCharLeft},
   {key: "Mod-ArrowLeft", mac: "Alt-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft},
+  {key: "Alt-ArrowLeft", mac: "Ctrl-ArrowLeft", run: cursorSyntaxLeft, shift: selectSyntaxLeft},
   {mac: "Cmd-ArrowLeft", run: cursorLineStart, shift: selectLineStart},
-  {mac: "Ctrl-ArrowLeft", run: cursorLineStart, shift: selectLineStart},
 
   {key: "ArrowRight", run: cursorCharRight, shift: selectCharRight},
   {key: "Mod-ArrowRight", mac: "Alt-ArrowRight", run: cursorGroupRight, shift: selectGroupRight},
+  {key: "Alt-ArrowRight", mac: "Ctrl-ArrowRight", run: cursorSyntaxRight, shift: selectSyntaxRight},
   {mac: "Cmd-ArrowRight", run: cursorLineEnd, shift: selectLineEnd},
-  {mac: "Ctrl-ArrowRight", run: cursorLineEnd, shift: selectLineEnd},
 
   {key: "ArrowUp", run: cursorLineUp, shift: selectLineUp},
   {key: "Alt-ArrowUp", run: moveLineUp},
