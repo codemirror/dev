@@ -120,8 +120,12 @@ export type TransactionSpec = {
   reconfigure?: Extension,
   /// [Tagged extensions](#state.tagExtension) can be used to
   /// partially configure a state by replacing specific parts of its
-  /// configuration. (Note that the keys in this object may also be
-  /// symbols, even though the TypeScript type can't express that.)
+  /// configuration. When replacing a tag that doesn't exist in the
+  /// original configuration, the given extension will be added to the
+  /// end of the configuration.
+  ///
+  /// Note that the keys in this object may also be symbols, even
+  /// though the TypeScript type can't currently express that.
   replaceExtensions?: ExtensionMap
 }
 
