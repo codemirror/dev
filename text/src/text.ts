@@ -138,7 +138,6 @@ export abstract class Text implements Iterable<string> {
 }
 
 if (typeof Symbol != "undefined")
-  // @ts-ignore
   Text.prototype[Symbol.iterator] = function() { return this.iter() }
 
 let lineCache: any[] = [], lineCachePos = -2, lineCacheSize = 12
