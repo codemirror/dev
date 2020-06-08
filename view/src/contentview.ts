@@ -53,19 +53,19 @@ export abstract class ContentView {
 
   sync() {
     if (this.dirty & Dirty.Node) {
-      let parent = this.dom as HTMLElement, pos: Node | null = parent.firstChild
+      let parent = this.dom as HTMLElement, pos: Node | null = null
       for (let child of this.children) {
         if (child.dirty) {
-          if (pos && !child.dom && !ContentView.get(pos)) {
-            let prev = pos.previousSibling
-            if (child.reuseDOM(pos)) pos = prev ? prev.nextSibling : parent.firstChild
-          }
+          let next = pos ? pos.nextSibling : parent.firstChild
+          if (next && !child.dom && !ContentView.get(next)) child.reuseDOM(next)
           child.sync()
           child.dirty = Dirty.Not
         }
-        pos = syncNodeInto(parent, pos, child.dom!)
+        syncNodeInto(parent, pos, child.dom!)
+        pos = child.dom!
       }
-      while (pos) pos = rm(pos)
+      let next: Node | null = pos ? pos.nextSibling : parent.firstChild
+      while (next) next = rm(next)
     } else if (this.dirty & Dirty.Child) {
       for (let child of this.children) if (child.dirty) {
         child.sync()
@@ -194,14 +194,10 @@ function rm(dom: Node): Node {
   return next!
 }
 
-function syncNodeInto(parent: HTMLElement, pos: Node | null, dom: Node): Node | null {
-  if (dom.parentNode == parent) {
-    while (pos != dom) pos = rm(pos!)
-    pos = dom.nextSibling
-  } else {
-    parent.insertBefore(dom, pos)
-  }
-  return pos
+function syncNodeInto(parent: HTMLElement, after: Node | null, dom: Node) {
+  let next: Node | null = after ? after.nextSibling : parent.firstChild
+  if (dom.parentNode == parent) while (next != dom) next = rm(next!)
+  else parent.insertBefore(dom, next)
 }
 
 export class ChildCursor {
