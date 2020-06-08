@@ -57,12 +57,12 @@
   },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "lezer": "^0.8.3",
-    "lezer-css": "^0.8.3",
-    "lezer-html": "^0.8.4",
-    "lezer-javascript": "^0.8.3",
-    "lezer-python": "^0.8.0",
-    "lezer-tree": "^0.8.4",
+    "lezer": "^0.9.0",
+    "lezer-css": "^0.9.0",
+    "lezer-html": "^0.9.0",
+    "lezer-javascript": "^0.9.0",
+    "lezer-python": "^0.9.0",
+    "lezer-tree": "^0.9.0",
     "style-mod": "^2.2.2",
     "w3c-keyname": "^2.2.4"
   },
