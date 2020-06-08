@@ -191,6 +191,23 @@ export const selectAll: StateCommand = ({state, dispatch}) => {
   return true
 }
 
+/// Select the next syntactic construct that is larger than the
+/// selection. Note that this will only work insofar as the language
+/// [syntaxes](#state.EditorState^syntax) you use builds up a full
+/// syntax tree.
+export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
+  let selection = updateSel(state.selection, range => {
+    let context = state.tree.resolve(range.head, 1)
+    while (!((context.start < range.from && context.end >= range.to) ||
+             (context.end > range.to && context.start <= range.from) ||
+             !context.parent?.parent))
+      context = context.parent
+    return EditorSelection.range(context.end, context.start)
+  })
+  dispatch(setSel(state, selection))
+  return true
+}
+
 function deleteBy(view: EditorView, by: (start: number) => number) {
   let {state} = view, changes = state.changeByRange(range => {
     let {from, to} = range
@@ -518,6 +535,7 @@ export const baseKeymap: readonly KeyBinding[] = ([
   {key: "Enter", run: insertNewlineAndIndent},
 
   {key: "Mod-a", run: selectAll},
+  {key: "Mod-i", run: selectParentSyntax},
 
   {key: "Mod-[", run: indentLess},
   {key: "Mod-]", run: indentMore},
