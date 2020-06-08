@@ -2,8 +2,7 @@ import {combineConfig, EditorState, EditorSelection, Facet, StateField, Extensio
         StateCommand, Transaction} from "@codemirror/next/state"
 import {EditorView, themeClass} from "@codemirror/next/view"
 import {Decoration, DecorationSet} from "@codemirror/next/view"
-import {Tree, Subtree, NodeType} from "lezer-tree"
-import {openNodeProp, closeNodeProp} from "@codemirror/next/syntax"
+import {Tree, Subtree, NodeType, NodeProp} from "lezer-tree"
 
 /// Configuration options
 export interface Config {
@@ -79,7 +78,7 @@ export function bracketMatching(config: Config = {}): Extension {
 }
 
 function matchingNodes(node: NodeType, dir: -1 | 1, brackets: string): null | readonly string[] {
-  let byProp = node.prop(dir < 0 ? closeNodeProp : openNodeProp)
+  let byProp = node.prop(dir < 0 ? NodeProp.openedBy : NodeProp.closedBy)
   if (byProp) return byProp
   if (node.name.length == 1) {
     let index = brackets.indexOf(node.name)

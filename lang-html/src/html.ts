@@ -2,7 +2,7 @@ import {configureHTML} from "lezer-html"
 import {Subtree} from "lezer-tree"
 import {cssSyntax} from "@codemirror/next/lang-css"
 import {javascriptSyntax} from "@codemirror/next/lang-javascript"
-import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp, openNodeProp, closeNodeProp} from "@codemirror/next/syntax"
+import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
 import {languageData} from "@codemirror/next/state"
 import {styleTags} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
@@ -40,12 +40,6 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
       if (!first || first.name != "OpenTag") return null
       return {from: first.end, to: last.name == "CloseTag" ? last.start : subtree.end}
     }
-  }),
-  openNodeProp.add({
-    "StartTag StartCloseTag": ["EndTag", "SelfCloseEndTag"]
-  }),
-  closeNodeProp.add({
-    "EndTag SelfCloseEndTag": ["StartTag", "StartCloseTag"]
   }),
   styleTags({
     AttributeValue: "string",

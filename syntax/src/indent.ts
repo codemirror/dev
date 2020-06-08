@@ -1,4 +1,4 @@
-import {NodeType, NodeProp, Subtree, Tree} from "lezer-tree"
+import {NodeProp, Subtree, Tree} from "lezer-tree"
 import {EditorState, Syntax, IndentContext} from "@codemirror/next/state"
 
 /// A syntax tree node prop used to associate indentation strategies
@@ -34,19 +34,21 @@ function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
   }
 
   for (; tree; tree = tree.parent) {
-    let strategy = indentStrategy(tree.type) || (tree.parent == null ? topIndent : null)
+    let strategy = indentStrategy(tree)
     if (strategy) return strategy(new TreeIndentContext(cx, pos, tree))
   }
   return -1
 }
 
-function indentStrategy(type: NodeType) {
-  let strategy = type.prop(indentNodeProp)
-  if (!strategy) {
-    let delim = type.prop(NodeProp.delim)
-    if (delim) return delimitedIndent({closing: delim.split(" ")[1]})
+function indentStrategy(tree: Subtree): ((context: TreeIndentContext) => number) | null {
+  let strategy = tree.type.prop(indentNodeProp)
+  if (strategy) return strategy
+  let first = tree.firstChild, close: readonly string[] | undefined
+  if (first && (close = first.type.prop(NodeProp.closedBy))) {
+    let last = tree.lastChild, closed = last && close.indexOf(last.name) > -1
+    return cx => delimitedStrategy(cx, true, 1, undefined, closed ? last!.start : undefined)
   }
-  return strategy
+  return tree.parent == null ? topIndent : null
 }
 
 function topIndent() { return 0 }
@@ -121,13 +123,15 @@ function bracketedAligned(context: TreeIndentContext) {
 ///     foo(bar,
 ///         baz)
 export function delimitedIndent({closing, align = true, units = 1}: {closing: string, align?: boolean, units?: number}) {
-  return (context: TreeIndentContext) => {
-    let after = context.textAfter.match(/^\s*(.*)/)![1]
-    let closed = after.slice(0, closing.length) == closing
-    let aligned = align ? bracketedAligned(context) : null
-    if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
-    return context.baseIndent + (closed ? 0 : context.unit * units)
-  }
+  return (context: TreeIndentContext) => delimitedStrategy(context, align, units, closing)
+}
+
+function delimitedStrategy(context: TreeIndentContext, align: boolean, units: number, closing?: string, closedAt?: number) {
+  let after = context.textAfter, space = after.match(/^\s*/)![0].length
+  let closed = closing && after.slice(space, space + closing.length) == closing || closedAt == context.pos + space
+  let aligned = align ? bracketedAligned(context) : null
+  if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
+  return context.baseIndent + (closed ? 0 : context.unit * units)
 }
 
 /// An indentation strategy that aligns a node content to its base

@@ -1,9 +1,5 @@
 @LezerSyntax
 
-@openNodeProp
-
-@closeNodeProp
-
 @foldNodeProp
 
 ### Indentation
