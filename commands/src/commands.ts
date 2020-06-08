@@ -3,6 +3,7 @@ import {EditorState, StateCommand, EditorSelection, SelectionRange,
 import {Text, Line, countColumn} from "@codemirror/next/text"
 import {EditorView, Command, Direction} from "@codemirror/next/view"
 import {KeyBinding} from "@codemirror/next/keymap"
+import {matchBrackets} from "@codemirror/next/matchbrackets"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
@@ -92,6 +93,29 @@ export const cursorLineBoundaryBackward: Command = view => moveSel(view, range =
 export const cursorLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from, 1))
 /// Move the selection to the end of the line.
 export const cursorLineEnd: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to, -1))
+
+function toMatchingBracket(state: EditorState, dispatch: (tr: Transaction) => void, extend: boolean) {
+  let found = false, selection = updateSel(state.selection, range => {
+    let matching = matchBrackets(state, range.head, -1)
+      || matchBrackets(state, range.head, 1)
+      || (range.head > 0 && matchBrackets(state, range.head - 1, 1))
+      || (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1))
+    if (!matching || !matching.end) return range
+    found = true
+    let head = matching.start.from == range.head ? matching.end.to : matching.end.from
+    return extend ? EditorSelection.range(range.anchor, head) : EditorSelection.cursor(head)
+  })
+  if (!found) return false
+  dispatch(setSel(state, selection))
+  return true
+}
+
+/// Move the selection to the bracket matching the one it is currently
+/// on, if any.
+export const cursorMatchingBracket: StateCommand = ({state, dispatch}) => toMatchingBracket(state, dispatch, false)
+/// Extend the selection to the bracket matching the one the selection
+/// head is currently on, if any.
+export const selectMatchingBracket: StateCommand = ({state, dispatch}) => toMatchingBracket(state, dispatch, true)
 
 function extendSel(view: EditorView, how: (range: SelectionRange) => SelectionRange): boolean {
   let selection = updateSel(view.state.selection, range => {
@@ -541,6 +565,8 @@ export const baseKeymap: readonly KeyBinding[] = ([
   {key: "Mod-]", run: indentMore},
 
   {key: "Shift-Mod-k", run: deleteLine},
+
+  {key: "Mod-Shift-\\", run: cursorMatchingBracket},
 
   {key: "Backspace", run: deleteCharBackward},
   {key: "Delete", run: deleteCharForward},
