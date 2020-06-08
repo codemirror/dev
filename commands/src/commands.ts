@@ -255,6 +255,13 @@ export const selectAll: StateCommand = ({state, dispatch}) => {
   return true
 }
 
+/// Expand the selection to cover entire lines.
+export const selectLine: StateCommand = ({state, dispatch}) => {
+  let ranges = selectedLineBlocks(state).map(({from, to}) => EditorSelection.range(from, Math.min(to + 1, state.doc.length)))
+  dispatch(state.update({selection: new EditorSelection(ranges), annotations: Transaction.userEvent.of("keyboardselection")}))
+  return true
+}
+
 /// Select the next syntactic construct that is larger than the
 /// selection. Note that this will only work insofar as the language
 /// [syntaxes](#state.EditorState^syntax) you use builds up a full
@@ -601,6 +608,7 @@ export const baseKeymap: readonly KeyBinding[] = ([
   {key: "Enter", run: insertNewlineAndIndent},
 
   {key: "Mod-a", run: selectAll},
+  {key: "Mod-l", run: selectLine},
   {key: "Mod-i", run: selectParentSyntax},
 
   {key: "Mod-[", run: indentLess},
