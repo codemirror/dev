@@ -2,6 +2,7 @@ import {combineConfig, fillConfig, EditorState, StateEffect, ChangeDesc, Facet,
         StateField, Extension} from "@codemirror/next/state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "@codemirror/next/view"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
+import {KeyBinding} from "@codemirror/next/keymap"
 
 type Range = {from: number, to: number}
 
@@ -29,7 +30,7 @@ const foldState = StateField.define<DecorationSet>({
   update(folded, tr) {
     folded = folded.map(tr.changes)
     for (let e of tr.effects) {
-      if (e.is(foldEffect))
+      if (e.is(foldEffect) && !foldExists(folded, e.value.from, e.value.to))
         folded = folded.update({add: [FoldWidget.decoration.range(e.value.from, e.value.to)]})
       else if (e.is(unfoldEffect)) {
         folded = folded.update({filter: (from, to) => e.value.from != from || e.value.to != to,
@@ -59,12 +60,21 @@ function foldInside(state: EditorState, from: number, to: number) {
   return found
 }
 
+function foldExists(folded: DecorationSet, from: number, to: number) {
+  let found = false
+  folded.between(from, from, (a, b) => { if (a == from && b == to) found = true })
+  return found
+}
+
+function getFoldable(state: EditorState, from: number, to: number) {
+  return state.facet(EditorState.foldable).reduce<Range | null>((value, f) => value || f(state, from, to), null)
+}
+
 /// Fold the lines that are selected, if possible.
 export const foldCode: Command = view => {
   if (!view.state.field(foldState, false)) return false
   for (let line of selectedLines(view)) {
-    let range = view.state.facet(EditorState.foldable)
-      .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
+    let range = getFoldable(view.state, line.from, line.to)
     if (range) {
       view.dispatch(view.state.update({effects: foldEffect.of(range)}))
       return true
@@ -84,6 +94,41 @@ export const unfoldCode: Command = view => {
   if (effects.length) view.dispatch(view.state.update({effects}))
   return effects.length > 0
 }
+
+/// Fold all top-level foldable ranges.
+export const foldAll: Command = view => {
+  let {state} = view, effects = []
+  for (let pos = 0; pos < state.doc.length;) {
+    let line = view.lineAt(pos, 0), range = getFoldable(state, line.from, line.to)
+    if (range) effects.push(foldEffect.of(range))
+    pos = (range ? view.lineAt(range.to) : line).to + 1
+  }
+  if (effects.length) view.dispatch(view.state.update({effects}))
+  return !!effects.length
+}
+
+/// Unfold all folded code.
+export const unfoldAll: Command = view => {
+  let field = view.state.field(foldState, false)
+  if (!field || !field.size) return false
+  let effects: StateEffect<any>[] = []
+  field.between(0, view.state.doc.length, (from, to) => { effects.push(unfoldEffect.of({from, to})) })
+  view.dispatch(view.state.update({effects}))
+  return true
+}
+
+/// Default fold-related key bindings.
+///
+///  - Ctrl-Shift-[ (Cmd-Alt-[ on macOS): [`foldCode`](#fold.foldCode).
+///  - Ctrl-Shift-] (Cmd-Alt-] on macOS): [`unfoldCode`](#fold.unfoldCode).
+///  - Ctrl-Alt-[: [`foldAll`](#fold.foldAll).
+///  - Ctrl-Alt-]: [`unfoldAll`](#fold.unfoldAll).
+export const foldKeymap: readonly KeyBinding[] = [
+  {key: "Ctrl-Shift-[", mac: "Cmd-Alt-[", run: foldCode},
+  {key: "Ctrl-Shift-]", mac: "Cmd-Alt-]", run: unfoldCode},
+  {key: "Ctrl-Alt-[", run: foldAll},
+  {key: "Ctrl-Alt-]", run: unfoldAll}
+]
 
 /// Used to configure the code folding extending.
 export interface FoldConfig {
@@ -182,8 +227,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
         // don't change anything relevant
         let folded = foldInside(view.state, line.from, line.to)
         if (folded) return new FoldMarker(fullConfig, false)
-        if (view.state.facet(EditorState.foldable).some(f => f(view.state, line.from, line.to)))
-          return new FoldMarker(fullConfig, true)
+        if (getFoldable(view.state, line.from, line.to)) return new FoldMarker(fullConfig, true)
         return null
       },
       initialSpacer() {
@@ -196,8 +240,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
             view.dispatch(view.state.update({effects: unfoldEffect.of(folded)}))
             return true
           }
-          let range = view.state.facet(EditorState.foldable)
-            .reduce<Range | null>((value, f) => value || f(view.state, line.from, line.to), null)
+          let range = getFoldable(view.state, line.from, line.to)
           if (range) {
             view.dispatch(view.state.update({effects: foldEffect.of(range)}))
             return true

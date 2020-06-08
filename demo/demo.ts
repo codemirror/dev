@@ -2,7 +2,7 @@ import {EditorState} from "@codemirror/next/state"
 import {EditorView} from "@codemirror/next/view"
 import {keymap} from "@codemirror/next/keymap"
 import {history, historyKeymap} from "@codemirror/next/history"
-import {foldCode, unfoldCode, foldGutter} from "@codemirror/next/fold"
+import {foldGutter, foldKeymap} from "@codemirror/next/fold"
 import {lineNumbers} from "@codemirror/next/gutter"
 import {baseKeymap, indentSelection} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"
@@ -40,17 +40,19 @@ let state = EditorState.create({doc: `<script>
   closeBrackets,
   autocomplete(),
   rectangularSelection(),
-  keymap(baseKeymap.concat(searchKeymap).concat(historyKeymap).concat([
+  keymap([
+    ...baseKeymap,
+    ...searchKeymap,
+    ...historyKeymap,
+    ...foldKeymap,
     // FIXME move into exported keymaps
     {key: "Shift-Tab", run: indentSelection},
-    {key: "Mod-Alt-[", run: foldCode},
-    {key: "Mod-Alt-]", run: unfoldCode},
     {key: "Mod-Space", run: startCompletion},
     {key: "Mod-/", run: toggleLineComment},
     {key: "Mod-Alt-/", run: lineComment},
     {key: "Mod-Alt-Shift-/", run: lineUncomment},
     {key: "Mod-*", run: toggleBlockComment}
-  ]))
+  ])
 ]})
 
 let view = (window as any).view = new EditorView({state})

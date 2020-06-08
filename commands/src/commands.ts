@@ -564,6 +564,8 @@ export const emacsStyleBaseKeymap: readonly KeyBinding[] = [
   {key: "Ctrl-Alt-h", run: deleteGroupBackward},
 ]
 
+/// The default base keymap.
+// FIXME document the precise bindings.
 export const baseKeymap: readonly KeyBinding[] = ([
   {key: "ArrowLeft", run: cursorCharLeft, shift: selectCharLeft},
   {key: "Mod-ArrowLeft", mac: "Alt-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft},
