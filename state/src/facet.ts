@@ -385,11 +385,15 @@ export class Configuration {
   }
 }
 
+function allKeys(obj: ExtensionMap) {
+  return ((Object.getOwnPropertySymbols ? Object.getOwnPropertySymbols(obj) : []) as (string | symbol)[]).concat(Object.keys(obj))
+}
+
 function flatten(extension: Extension, replacements: ExtensionMap) {
   let result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], []]
   let seen = new Set<Extension>()
   let tagsSeen = Object.create(null)
-  ;(function inner(ext, prec: number) {
+  function inner(ext: Extension, prec: number) {
     if (seen.has(ext)) return
     seen.add(ext)
     if (Array.isArray(ext)) {
@@ -407,7 +411,12 @@ function flatten(extension: Extension, replacements: ExtensionMap) {
       result[prec].push(ext as any)
       if (ext instanceof StateField) inner(ext.facets, prec)
     }
-  })(extension, Precedence.Default.val)
+  }
+  inner(extension, Precedence.Default.val)
+  for (let key of allKeys(replacements)) if (!(key in tagsSeen)) {
+    tagsSeen[key] = true
+    inner(replacements[key as any], Precedence.Default.val)
+  }
   return result.reduce((a, b) => a.concat(b))
 }
 

@@ -1,18 +1,6 @@
 import {panels, Panel, getPanel, showPanel} from "@codemirror/next/panel"
-import {StateField, StateEffect, EditorSelection} from "@codemirror/next/state"
+import {EditorSelection} from "@codemirror/next/state"
 import {EditorView, Command} from "@codemirror/next/view"
-
-const setPanel = StateEffect.define<boolean>()
-
-const panelStatus = StateField.define<readonly ((view: EditorView) => Panel)[]>({
-  create() { return [] },
-  update(status, tr) {
-    for (let effect of tr.effects) if (effect.is(setPanel))
-      status = effect.value ? [createLineDialog] : []
-    return status
-  },
-  provide: [showPanel.nFrom(x => x)]
-})
 
 function createLineDialog(view: EditorView): Panel {
   let dom = document.createElement("form")
@@ -23,7 +11,7 @@ function createLineDialog(view: EditorView): Panel {
   function go() {
     let n = parseInt(input.value, 10)
     view.dispatch(view.state.update({
-      effects: setPanel.of(false),
+      replaceExtensions: {[tag]: [baseTheme]},
       selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).start) : undefined
     }))
     view.focus()
@@ -31,7 +19,7 @@ function createLineDialog(view: EditorView): Panel {
   dom.addEventListener("keydown", event => {
     if (event.keyCode == 27) { // Escape
       event.preventDefault()
-      view.dispatch(view.state.update({effects: setPanel.of(false)}))
+      view.dispatch(view.state.update({replaceExtensions: {[tag]: [baseTheme]}}))
       view.focus()
     } else if (event.keyCode == 13) { // Enter
       event.preventDefault()
@@ -43,16 +31,7 @@ function createLineDialog(view: EditorView): Panel {
   return {dom, style: "goto-line", pos: -10}
 }
 
-export const openLineDialog: Command = view => {
-  let field = view.state.field(panelStatus, false)
-  if (!field) return false
-  if (!field.length) view.dispatch(view.state.update({effects: setPanel.of(true)}))
-  let dialog = getPanel(view, createLineDialog)
-  if (dialog) dialog.dom.querySelector("input")!.focus()
-  return true
-}
-
-export function gotoLine() { return [panels(), panelStatus, baseTheme] }
+const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
 
 const baseTheme = EditorView.baseTheme({
   "panel.goto-line": {
@@ -61,3 +40,20 @@ const baseTheme = EditorView.baseTheme({
     "& input, & button": { verticalAlign: "middle" },
   }
 })
+
+const extension = [panels(), baseTheme, showPanel.of(createLineDialog)]
+
+/// Command that shows a dialog asking the user for a line number, and
+/// when a valid number is provided, moves the cursor to that line.
+///
+/// The dialog can be styled with the `panel.goto-line` theme
+/// selector.
+export const gotoLine: Command = view => {
+  let panel = getPanel(view, createLineDialog)
+  if (!panel) {
+    view.dispatch(view.state.update({replaceExtensions: {[tag]: extension}}))
+    panel = getPanel(view, createLineDialog)
+  }
+  if (panel) panel.dom.querySelector("input")!.focus()
+  return true
+}
