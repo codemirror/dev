@@ -1,28 +1,9 @@
 import ist from "ist"
 import {SelectionRange, EditorState, EditorSelection, Extension, StateCommand} from "@codemirror/next/state"
-import {Text} from "@codemirror/next/text"
-import {toggleLineComment, getLinesInRange, CommentTokens, toggleBlockComment} from "@codemirror/next/comment"
+import {toggleLineComment, CommentTokens, toggleBlockComment} from "@codemirror/next/comment"
 import {html} from "@codemirror/next/lang-html"
 
 describe("comment", () => {
-  it("get lines across range", () => {
-    //                 0          1          2           3
-    //                 0123456 7890123 4567890 1234567 8901234 5
-    let doc = Text.of("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n\n".split("\n"))
-    const t = (from: number, to: number, expectedLinesNo: number[]) => {
-      let lines = getLinesInRange(doc, EditorSelection.range(from, to))
-      ist(lines.map(l => l.start).join(","), expectedLinesNo.join(","))
-    }
-
-    t(0, 0, [0])
-    t(7, 7, [7])
-    t(16, 16, [14])
-    t(0, 35, [0, 7, 14, 21, 28, 35])
-    t(0, 6, [0])
-    t(4, 8, [0, 7])
-    t(3, 17, [0, 7, 14])
-  })
-
   const defaultConfig: CommentTokens = {line: "//", block: {open: "/*", close: "*/"}}
 
   /// Creates a new `EditorState` using `doc` as the document text.

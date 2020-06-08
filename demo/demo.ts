@@ -11,7 +11,7 @@ import {specialChars} from "@codemirror/next/special-chars"
 import {multipleSelections} from "@codemirror/next/multiple-selections"
 import {search, searchKeymap} from "@codemirror/next/search"
 import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
-import {toggleLineComment, lineComment, lineUncomment, toggleBlockComment} from "@codemirror/next/comment"
+import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
 
 import {html} from "@codemirror/next/lang-html"
@@ -45,13 +45,10 @@ let state = EditorState.create({doc: `<script>
     ...searchKeymap,
     ...historyKeymap,
     ...foldKeymap,
+    ...commentKeymap,
     // FIXME move into exported keymaps
     {key: "Shift-Tab", run: indentSelection},
-    {key: "Mod-Space", run: startCompletion},
-    {key: "Mod-/", run: toggleLineComment},
-    {key: "Mod-Alt-/", run: lineComment},
-    {key: "Mod-Alt-Shift-/", run: lineUncomment},
-    {key: "Mod-*", run: toggleBlockComment}
+    {key: "Mod-Space", run: startCompletion}
   ])
 ]})
 

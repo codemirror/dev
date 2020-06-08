@@ -1,5 +1,6 @@
 import {Text, Line} from "@codemirror/next/text"
 import {EditorState, Transaction, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
+import {KeyBinding} from "@codemirror/next/keymap"
 
 /// An object of this type can be provided as [language
 /// data](#state.EditorState.languageDataAt) under a `"commentTokens"`
@@ -47,6 +48,15 @@ export const blockComment: StateCommand = target => {
 export const blockUncomment: StateCommand = target => {
   return dispatch(toggleBlockCommentWithOption(CommentOption.OnlyUncomment), target)
 }
+
+/// Default key bindings for this package.
+///
+///  - Ctrl-/ (Cmd-/ on macOS): [\`toggleLineComment\`](#comment.toggleLineComment).
+///  - Shift-Alt-a: [\`toggleBlockComment\`](#comment.toggleBlockComment).
+export const commentKeymap: readonly KeyBinding[] = [
+  {key: "Mod-/", run: toggleLineComment},
+  {key: "Alt-A", run: toggleBlockComment}
+]
 
 function dispatch(cmd: (st: EditorState) => Transaction | null,
                   target: { state: EditorState, dispatch: (transaction: Transaction) => void }): boolean {
@@ -231,7 +241,7 @@ class LineCommenter {
 
 // Computes the lines spanned by `range`.
 /// @internal
-export function getLinesInRange(doc: Text, range: SelectionRange): Line[] {
+function getLinesInRange(doc: Text, range: SelectionRange): Line[] {
   let line: Line = doc.lineAt(range.from)
   const lines = []
   while (line.start + line.length < range.to ||
