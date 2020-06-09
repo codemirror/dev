@@ -548,14 +548,14 @@ export class EditorView {
   /// declarations](https://github.com/marijnh/style-mod#documentation)
   /// providing the CSS styling for the selector.
   ///
-  /// When `isDark` is set to true, the theme will be marked as dark,
+  /// When `dark` is set to true, the theme will be marked as dark,
   /// which causes the [base theme](#view.EditorView^baseThemes) rules
   /// marked with `@dark` to apply instead of those marked with
   /// `@light`.
-  static theme(spec: {[selector: string]: Style}, isDark = false): Extension {
+  static theme(spec: {[selector: string]: Style}, options?: {dark: boolean}): Extension {
     let prefix = StyleModule.newName()
     let result = [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
-    if (isDark) result.push(darkTheme.of(true))
+    if (options && options.dark) result.push(darkTheme.of(true))
     return result
   }
 
