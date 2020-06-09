@@ -75,8 +75,8 @@ const panelPlugin = ViewPlugin.fromClass(class {
     let conf = view.state.facet(panelConfig)
     this.top = new PanelGroup(view, true, conf.topContainer)
     this.bottom = new PanelGroup(view, false, conf.bottomContainer)
-    this.top.sync(this.panels.filter(p => !p.top))
-    this.bottom.sync(this.panels.filter(p => p.top))
+    this.top.sync(this.panels.filter(p => p.top))
+    this.bottom.sync(this.panels.filter(p => !p.top))
     for (let p of this.panels) {
       p.dom.className += " " + panelClass(p)
       if (p.mount) p.mount()
