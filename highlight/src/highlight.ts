@@ -328,17 +328,21 @@ class Highlighter implements PluginValue {
 
 /// A default highlighter (works well with light themes).
 export const defaultHighlighter = highlighter({
+  deleted: {textDecoration: "line-through"},
+  inserted: {textDecoration: "underline"},
+  link: {textDecoration: "underline"},
+  strong: {fontWeight: "bold"},
+  emphasis: {fontStyle: "italic"},
   invalid: {color: "#f00"},
   keyword: {color: "#708"},
   atom: {color: "#219"},
   number: {color: "#164"},
   string: {color: "#a11"},
-  character: {color: "#a11"},
-  regexp: {color: "#e40"},
-  escape: {color: "#e40"},
+  "regexp, escape": {color: "#e40"},
   "variableName definition": {color: "#00f"},
   typeName: {color: "#085"},
+  className: {color: "#167"},
   "propertyName definition": {color: "#00c"},
   comment: {color: "#940"},
-  meta: {color: "#555"}
+  meta: {color: "#555"},
 })
