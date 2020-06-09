@@ -259,7 +259,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   }
 })
 
-const style = Precedence.Fallback.set(EditorView.theme({
+const style = EditorView.baseTheme({
   "tooltip.autocomplete": {
     fontFamily: "monospace",
     overflowY: "auto",
@@ -281,4 +281,4 @@ const style = Precedence.Fallback.set(EditorView.theme({
       color: "HighlightText"
     }
   }
-}))
+})

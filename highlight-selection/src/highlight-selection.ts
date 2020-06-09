@@ -2,13 +2,13 @@ import {EditorView, ViewPlugin, Decoration, DecorationSet, ViewUpdate, themeClas
 import {Facet, combineConfig, Text, CharCategory, Extension} from "@codemirror/next/state"
 import {SearchCursor} from "@codemirror/next/search"
 
-/// Mark lines that have a cursor on them with the \`activeline\`
+/// Mark lines that have a cursor on them with the \`activeLine\`
 /// theme selector.
 export function highlightActiveLine(): Extension {
   return [defaultTheme, activeLineHighlighter]
 }
 
-const lineDeco = Decoration.line({attributes: {class: themeClass("activeline")}})
+const lineDeco = Decoration.line({attributes: {class: themeClass("activeLine")}})
 
 const activeLineHighlighter = ViewPlugin.fromClass(class {
   decorations: DecorationSet
@@ -64,9 +64,9 @@ const highlightConfig = Facet.define<HighlightOptions, Required<HighlightOptions
 })
 
 /// This extension highlights text that matches the selection. It uses
-/// the `selection-match` theme selector for the highlighting. When
+/// the `selectionMatch` theme selector for the highlighting. When
 /// `highlightWordAroundCursor` is enabled, the word at the cursor
-/// itself will be highlighted with `selection-match.main`.
+/// itself will be highlighted with `selectionMatch.main`.
 export function highlightSelectionMatches(options?: HighlightOptions): Extension {
   let ext = [defaultTheme, matchHighlighter]
   if (options) ext.push(highlightConfig.of(options))
@@ -89,8 +89,8 @@ function wordAt(doc: Text, pos: number, check: (ch: string) => CharCategory) {
   return from == to ? null : line.slice(from, to)
 }
 
-const matchDeco = Decoration.mark({class: themeClass("selection-match")})
-const mainMatchDeco = Decoration.mark({class: themeClass("selection-match.main")})
+const matchDeco = Decoration.mark({class: themeClass("selectionMatch")})
+const mainMatchDeco = Decoration.mark({class: themeClass("selectionMatch.main")})
 
 const matchHighlighter = ViewPlugin.fromClass(class {
   decorations: DecorationSet
@@ -139,7 +139,7 @@ const matchHighlighter = ViewPlugin.fromClass(class {
 }).decorations()
 
 const defaultTheme = EditorView.baseTheme({
-  "activeline@light": { background: "#e8f2ff" },
-  "activeline@dark": { background: "#223039" },
-  "selection-match": { background: "#cfb" }
+  "activeLine@light": { background: "#e8f2ff" },
+  "activeLine@dark": { background: "#223039" },
+  "selectionMatch": { background: "#cfb" }
 })

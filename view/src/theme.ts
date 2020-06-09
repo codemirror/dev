@@ -12,13 +12,16 @@ export const baseDarkThemeID = StyleModule.newName()
 export function buildTheme(mainID: string, spec: {[name: string]: Style}) {
   let styles = Object.create(null)
   for (let prop in spec) {
-    let id = mainID, main = prop, narrow
-    if (id == baseThemeID && (narrow = /^(.*?)@(light|dark)$/.exec(prop))) {
-      id = narrow[2] == "dark" ? baseDarkThemeID : baseLightThemeID
-      main = narrow[1]
-    }
-    let parts = main.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " ")
-    for (let i = 1; i <= parts.length; i++) selector += ".cm-" + parts.slice(0, i).join("-")
+    let selector = prop.split(/\s*,\s*/).map(piece => {
+      let id = mainID, narrow
+      if (id == baseThemeID && (narrow = /^(.*?)@(light|dark)$/.exec(piece))) {
+        id = narrow[2] == "dark" ? baseDarkThemeID : baseLightThemeID
+        piece = narrow[1]
+      }
+      let parts = piece.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " ")
+      for (let i = 1; i <= parts.length; i++) selector += ".cm-" + parts.slice(0, i).join("-")
+      return selector
+    }).join(", ")
     styles[selector] = spec[prop]
   }
   return new StyleModule(styles, {generateClasses: false})

@@ -28,7 +28,7 @@ function createLineDialog(view: EditorView): Panel {
   })
   dom.addEventListener("submit", go)
 
-  return {dom, style: "goto-line", pos: -10}
+  return {dom, style: "gotoLine", pos: -10}
 }
 
 const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
@@ -36,7 +36,7 @@ const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
 /// Command that shows a dialog asking the user for a line number, and
 /// when a valid number is provided, moves the cursor to that line.
 ///
-/// The dialog can be styled with the `panel.goto-line` theme
+/// The dialog can be styled with the `panel.gotoLine` theme
 /// selector.
 export const gotoLine: Command = view => {
   let panel = getPanel(view, createLineDialog)
