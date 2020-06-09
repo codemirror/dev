@@ -137,14 +137,15 @@ export class TagSystem {
 /// themes.
 export const defaultTags = new TagSystem({
   flags: ["invalid", "meta", "standard",
+          "definition", "constant", "local", "control",
           "link", "strong", "emphasis", "monospace",
-          "changed", "inserted", "deleted",
-          "definition", "constant", "control"],
+          "changed", "inserted", "deleted"],
   subtypes: 7,
   types: [
     "comment",
     "lineComment=comment",
     "blockComment=comment",
+    "docComment=comment",
     "name",
     "variableName=name",
     "typeName=name",
@@ -154,6 +155,7 @@ export const defaultTags = new TagSystem({
     "namespace=name",
     "literal",
     "string=literal",
+    "docString=string",
     "character=string",
     "number=literal",
     "integer=number",

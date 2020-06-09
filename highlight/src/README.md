@@ -24,6 +24,7 @@ other types.
  * **`comment`**
    * **`lineComment`**
    * **`blockComment`**
+   * **`docComment`**
  * **`name`** represents any kind of identifier.
    * **`variableName`**
    * **`typeName`**
@@ -34,6 +35,7 @@ other types.
  * **`literal`**
    * **`string`**
      * **`character`**
+     * **`docString`**
    * **`number`**
      * **`integer`**
      * **`float`**
@@ -98,6 +100,7 @@ These flags can be added to every type:
    with `name` types to indicate that a name is being defined, or with
    `keyword` or `operator` types to indicate definition syntax.
  * **`constant`** can be used to indicate constant variable names.
+ * **`local`** can be used to mark local constructs.
  * **`control`** is usually combined with `keyword` or `operator` to
    tag control structures.
 
