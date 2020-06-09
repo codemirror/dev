@@ -57,9 +57,11 @@ const styles = EditorView.baseTheme({
   secondaryCursor: {
     display: "inline-block",
     verticalAlign: "text-top",
-    borderLeft: "1.4px solid #555",
     width: 0,
     height: "1.15em",
     margin: "0 -0.7px -.7em"
-  }
+  },
+
+  "secondaryCursor@light": { borderLeft: "1.4px solid #555" },
+  "secondaryCursor@dark": { borderLeft: "1.4px solid #ddd" }
 })

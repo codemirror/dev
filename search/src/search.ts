@@ -331,7 +331,6 @@ function maybeAnnounceMatch(view: EditorView) {
 
 const baseTheme = EditorView.baseTheme({
   "panel.search": {
-    padding: "2px 6px 4px",
     position: "relative",
     "& [name=close]": {
       position: "absolute",
@@ -344,21 +343,18 @@ const baseTheme = EditorView.baseTheme({
       margin: 0
     },
     "& input, & button": {
-      verticalAlign: "middle",
-      marginRight: ".5em"
+      margin: ".2em .5em .2em 0"
     },
     "& label": {
       fontSize: "80%"
     }
   },
 
-  searchMatch: {
-    background: "#ffa"
-  },
+  "searchMatch@light": { background: "#ffa" },
+  "searchMatch@dark": { background: "#088" },
 
-  "searchMatch.selected": {
-    background: "#fca"
-  }
+  "searchMatch.selected@light": { background: "#fca" },
+  "searchMatch.selected@dark": { background: "#808" }
 })
 
 const searchExtensions = [

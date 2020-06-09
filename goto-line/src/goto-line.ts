@@ -4,14 +4,14 @@ import {EditorView, Command} from "@codemirror/next/view"
 
 function createLineDialog(view: EditorView): Panel {
   let dom = document.createElement("form")
-  dom.innerHTML = `<label>${view.state.phrase("Go to line:")} <input name=line type=number></label>
+  dom.innerHTML = `<label>${view.state.phrase("Go to line:")} <input name=line></label>
 <button type=submit>${view.state.phrase("go")}</button>`
   let input = dom.querySelector("input") as HTMLInputElement
 
   function go() {
     let n = parseInt(input.value, 10)
     view.dispatch(view.state.update({
-      replaceExtensions: {[tag]: [baseTheme]},
+      replaceExtensions: {[tag]: []},
       selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).start) : undefined
     }))
     view.focus()
@@ -19,7 +19,7 @@ function createLineDialog(view: EditorView): Panel {
   dom.addEventListener("keydown", event => {
     if (event.keyCode == 27) { // Escape
       event.preventDefault()
-      view.dispatch(view.state.update({replaceExtensions: {[tag]: [baseTheme]}}))
+      view.dispatch(view.state.update({replaceExtensions: {[tag]: []}}))
       view.focus()
     } else if (event.keyCode == 13) { // Enter
       event.preventDefault()
@@ -33,16 +33,6 @@ function createLineDialog(view: EditorView): Panel {
 
 const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
 
-const baseTheme = EditorView.baseTheme({
-  "panel.goto-line": {
-    padding: "2px 6px 4px",
-    position: "relative",
-    "& input, & button": { verticalAlign: "middle" },
-  }
-})
-
-const extension = [panels(), baseTheme, showPanel.of(createLineDialog)]
-
 /// Command that shows a dialog asking the user for a line number, and
 /// when a valid number is provided, moves the cursor to that line.
 ///
@@ -51,7 +41,7 @@ const extension = [panels(), baseTheme, showPanel.of(createLineDialog)]
 export const gotoLine: Command = view => {
   let panel = getPanel(view, createLineDialog)
   if (!panel) {
-    view.dispatch(view.state.update({replaceExtensions: {[tag]: extension}}))
+    view.dispatch(view.state.update({replaceExtensions: {[tag]: [panels(), showPanel.of(createLineDialog)]}}))
     panel = getPanel(view, createLineDialog)
   }
   if (panel) panel.dom.querySelector("input")!.focus()

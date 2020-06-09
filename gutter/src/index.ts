@@ -72,13 +72,21 @@ export function gutter(config: GutterConfig): Extension {
 
 const baseTheme = EditorView.baseTheme({
   gutters: {
-    background: "#f5f5f5",
-    borderRight: "1px solid silver",
-    color: "#999",
     display: "flex",
     height: "100%",
     boxSizing: "border-box",
     left: 0
+  },
+
+  "gutters@light": {
+    background: "#f5f5f5",
+    color: "#999",
+    borderRight: "1px solid silver"
+  },
+
+  "gutters@dark": {
+    background: "#333338",
+    color: "#ccc"
   },
 
   gutter: {

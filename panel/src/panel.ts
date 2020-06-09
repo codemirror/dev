@@ -189,16 +189,57 @@ function rm(node: ChildNode) {
 
 const baseTheme = EditorView.baseTheme({
   panels: {
-    background: "#f5f5f5",
     boxSizing: "border-box",
     position: "sticky",
     left: 0,
-    right: 0
+    right: 0,
+    "& input, & button": {
+      verticalAlign: "middle",
+      color: "inherit",
+      background: "inherit",
+      fontSize: "70%"
+    },
+    "& button": {
+      padding: ".2em 1em",
+      borderRadius: "3px"
+    },
+    "& input": {
+      border: "1px solid silver",
+      padding: ".2em .5em"
+    }
   },
-  "panels.top": {
+  panel: {
+    padding: "2px 6px 4px"
+  },
+  "panels@light": {
+    background: "#f5f5f5",
+    color: "black",
+    "& button": {
+      backgroundImage: "linear-gradient(#eff1f5, #d9d9df)",
+      border: "1px solid #888",
+      "&:active": {
+        backgroundImage: "linear-gradient(#b4b4b4, #d0d3d6)"
+      }
+    }
+  },
+  "panels.top@light": {
     borderBottom: "1px solid silver"
   },
-  "panels.bottom": {
+  "panels.bottom@light": {
     borderTop: "1px solid silver"
+  },
+  "panels@dark": {
+    background: "#333338",
+    color: "white",
+    "& button": {
+      backgroundImage: "linear-gradient(#555, #111)",
+      border: "1px solid #888",
+      "&:active": {
+        backgroundImage: "linear-gradient(#111, #333)"
+      }
+    },
+    "& input": {
+      border: "1px solid #555"
+    }
   }
 })

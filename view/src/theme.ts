@@ -3,12 +3,21 @@ import {StyleModule, Style} from "style-mod"
 
 export const theme = Facet.define<string>()
 
-export const baseThemeID = StyleModule.newName()
+export const darkTheme = Facet.define<boolean, boolean>({combine: values => values.indexOf(true) > -1})
 
-export function buildTheme(id: string, spec: {[name: string]: Style}) {
+export const baseThemeID = StyleModule.newName()
+export const baseLightThemeID = StyleModule.newName()
+export const baseDarkThemeID = StyleModule.newName()
+
+export function buildTheme(mainID: string, spec: {[name: string]: Style}) {
   let styles = Object.create(null)
   for (let prop in spec) {
-    let parts = prop.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " ")
+    let id = mainID, main = prop, narrow
+    if (id == baseThemeID && (narrow = /^(.*?)@(light|dark)$/.exec(prop))) {
+      id = narrow[2] == "dark" ? baseDarkThemeID : baseLightThemeID
+      main = narrow[1]
+    }
+    let parts = main.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " ")
     for (let i = 1; i <= parts.length; i++) selector += ".cm-" + parts.slice(0, i).join("-")
     styles[selector] = spec[prop]
   }
@@ -64,9 +73,11 @@ export const baseTheme = buildTheme(baseThemeID, {
     boxSizing: "border-box",
 
     padding: "4px 0",
-    outline: "none",
-    caretColor: "black",
+    outline: "none"
   },
+
+  "content@light": { caretColor: "black" },
+  "content@dark": { caretColor: "white" },
 
   line: {
     display: "block",

@@ -13,7 +13,7 @@ import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection, mouseSelectionStyle,
         exceptionSink, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
         decorations, MeasureRequest, UpdateFlag, editable} from "./extension"
-import {themeClass, theme, buildTheme, baseThemeID, baseTheme} from "./theme"
+import {themeClass, theme, darkTheme, buildTheme, baseThemeID, baseDarkThemeID, baseLightThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import browser from "./browser"
@@ -250,7 +250,9 @@ export class EditorView {
   private updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
       class: themeClass("wrap") + (this.hasFocus ? " cm-focused " : " ") +
-        baseThemeID + " " + this.state.facet(theme).join(" ")
+        baseThemeID + " " +
+        (this.state.facet(darkTheme) ? baseDarkThemeID : baseLightThemeID) + " " +
+        this.state.facet(theme).join(" ")
     })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
     this.editorAttrs = editorAttrs
@@ -541,13 +543,25 @@ export class EditorView {
   /// nested) [style
   /// declarations](https://github.com/marijnh/style-mod#documentation)
   /// providing the CSS styling for the selector.
-  static theme(spec: {[name: string]: Style}): Extension {
+  ///
+  /// When `isDark` is set to true, the theme will be marked as dark,
+  /// which causes the [base theme](#view.EditorView^baseThemes) rules
+  /// marked with `@dark` to apply instead of those marked with
+  /// `@light`.
+  static theme(spec: {[selector: string]: Style}, isDark = false): Extension {
     let prefix = StyleModule.newName()
-    return [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
+    let result = [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
+    if (isDark) result.push(darkTheme.of(true))
+    return result
   }
 
-  /// Create an extension that adds styles to the base theme.
-  static baseTheme(spec: {[name: string]: Style}): Extension {
+  /// Create an extension that adds styles to the base theme. The
+  /// given object works much like the one passed to
+  /// [`theme`](#view.EditorView^theme), but allows selectors to be
+  /// marked by adding `@dark` to their end to only apply when there
+  /// is a dark theme active, or by `@light` to only apply when there
+  /// is _no_ dark theme active.
+  static baseTheme(spec: {[selector: string]: Style}): Extension {
     return Precedence.Fallback.set(styleModule.of(buildTheme(baseThemeID, spec)))
   }
 
