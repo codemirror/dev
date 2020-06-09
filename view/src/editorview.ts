@@ -348,7 +348,8 @@ export class EditorView {
 
   /// Find the height information for the given line.
   lineAt(pos: number, editorTop?: number): BlockInfo {
-    this.readMeasured()
+    // FIXME separate line (extent, bidi, widgets) info from height queries
+    if (editorTop == null) this.readMeasured()
     return this.viewState.lineAt(pos, ensureTop(editorTop, this.contentDOM))
   }
 

@@ -14,6 +14,7 @@ import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
 import {gotoLine} from "@codemirror/next/goto-line"
+import {highlightActiveLine} from "@codemirror/next/highlight-selection"
 
 import {html} from "@codemirror/next/lang-html"
 import {defaultHighlighter} from "@codemirror/next/highlight"
@@ -40,6 +41,7 @@ let state = EditorState.create({doc: `<script>
   closeBrackets,
   autocomplete(),
   rectangularSelection(),
+  highlightActiveLine(),
   keymap([
     ...baseKeymap,
     ...searchKeymap,

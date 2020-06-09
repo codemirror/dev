@@ -51,6 +51,7 @@
     "./autocomplete": "./autocomplete/dist/index.js",
     "./comment": "./comment/dist/index.js",
     "./rectangular-selection": "./rectangular-selection/dist/index.js",
+    "./highlight-selection": "./highlight-selection/dist/index.js",
     "./lang-javascript": "./lang-javascript/dist/index.js",
     "./lang-python": "./lang-python/dist/index.js",
     "./lang-css": "./lang-css/dist/index.js",
