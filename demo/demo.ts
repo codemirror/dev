@@ -9,7 +9,7 @@ import {bracketMatching} from "@codemirror/next/matchbrackets"
 import {closeBrackets} from "@codemirror/next/closebrackets"
 import {specialChars} from "@codemirror/next/special-chars"
 import {multipleSelections} from "@codemirror/next/multiple-selections"
-import {search, searchKeymap} from "@codemirror/next/search"
+import {searchKeymap} from "@codemirror/next/search"
 import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
@@ -35,7 +35,6 @@ let state = EditorState.create({doc: `<script>
   multipleSelections(),
 //  new StreamSyntax(legacyJS()).extension,
   html(),
-  search(),
   defaultHighlighter,
   bracketMatching(),
   closeBrackets,

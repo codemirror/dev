@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "@codemirror/next/view"
-import {StateField, StateEffect, EditorSelection, SelectionRange, Extension} from "@codemirror/next/state"
+import {StateField, StateEffect, EditorSelection, SelectionRange} from "@codemirror/next/state"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 import {runScopeHandlers, KeyBinding} from "@codemirror/next/keymap"
 import {Text} from "@codemirror/next/text"
@@ -76,26 +76,11 @@ const searchHighlighter = ViewPlugin.fromClass(class {
   }
 }).decorations()
 
-/// Create an extension that enables search/replace functionality.
-/// This needs to be enabled for any of the search-related commands to
-/// work.
-export const search = function(): Extension {
-  return [
-    searchState,
-    searchHighlighter,
-    panels(),
-    baseTheme
-  ]
-}
-
-function beforeCommand(view: EditorView): boolean | SearchState {
-  let state = view.state.field(searchState)
-  if (!state) return false
-  if (!state.query.valid) {
-    openSearchPanel(view)
-    return true
+function searchCommand(f: (view: EditorView, state: SearchState) => boolean): Command {
+  return view => {
+    let state = view.state.field(searchState, false)
+    return state && state.query.valid ? f(view, state) : openSearchPanel(view)
   }
-  return state
 }
 
 function findNextMatch(doc: Text, from: number, query: Query) {
@@ -111,16 +96,14 @@ function findNextMatch(doc: Text, from: number, query: Query) {
 /// selection to the first match after the current primary selection.
 /// Will wrap around to the start of the document when it reaches the
 /// end.
-export const findNext: Command = view => {
-  let state = beforeCommand(view)
-  if (typeof state == "boolean") return state
+export const findNext = searchCommand((view, state) => {
   let {from, to} = view.state.selection.primary
   let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, state.query)
   if (!next || next.from == from && next.to == to) return false
   view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
   maybeAnnounceMatch(view)
   return true
-}
+})
 
 const FindPrevChunkSize = 10000
 
@@ -140,64 +123,55 @@ function findPrevInRange(query: Query, doc: Text, from: number, to: number) {
 /// Move the selection to the previous instance of the search query,
 /// before the current primary selection. Will wrap past the start
 /// of the document to start searching at the end again.
-export const findPrevious: Command = view => {
-  let plugin = beforeCommand(view)
-  if (typeof plugin == "boolean") return plugin
-  let {state} = view, {query} = plugin
+export const findPrevious = searchCommand((view, {query}) => {
+  let {state} = view
   let range = findPrevInRange(query, state.doc, 0, state.selection.primary.to - 1) ||
     findPrevInRange(query, state.doc, state.selection.primary.from + 1, state.doc.length)
   if (!range) return false
   view.dispatch(state.update({selection: {anchor: range.from, head: range.to}, scrollIntoView: true}))
   maybeAnnounceMatch(view)
   return true
-}
+})
 
 /// Select all instances of the search query.
-export const selectMatches: Command = view => {
-  let plugin = beforeCommand(view)
-  if (typeof plugin == "boolean") return plugin
-  let cursor = plugin.query.cursor(view.state.doc), ranges: SelectionRange[] = []
+export const selectMatches = searchCommand((view, {query}) => {
+  let cursor = query.cursor(view.state.doc), ranges: SelectionRange[] = []
   while (!cursor.next().done) ranges.push(EditorSelection.range(cursor.value.from, cursor.value.to))
   if (!ranges.length) return false
   view.dispatch(view.state.update({selection: EditorSelection.create(ranges)}))
   return true
-}
+})
 
 /// Replace the current match of the search query.
-export const replaceNext: Command = view => {
-  let plugin = beforeCommand(view)
-  if (typeof plugin == "boolean") return plugin
-
-  let {state} = view, next = findNextMatch(state.doc, state.selection.primary.from, plugin.query)
+export const replaceNext = searchCommand((view, {query}) => {
+  let {state} = view, next = findNextMatch(state.doc, state.selection.primary.from, query)
   if (!next) return false
   let {from, to} = state.selection.primary, changes = [], selection: {anchor: number, head: number} | undefined
   if (next.from == from && next.to == to) {
-    changes.push({from: next.from, to: next.to, insert: plugin.query.replace})
-    next = findNextMatch(state.doc, next.to, plugin.query)
+    changes.push({from: next.from, to: next.to, insert: query.replace})
+    next = findNextMatch(state.doc, next.to, query)
   }
   if (next) {
-    let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - plugin.query.replace.length
+    let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - query.replace.length
     selection = {anchor: next.from - off, head: next.to - off}
   }
   view.dispatch(state.update({changes, selection, scrollIntoView: !!selection}))
   if (next) maybeAnnounceMatch(view)
   return true
-}
+})
 
 /// Replace all instances of the search query with the given
 /// replacement.
-export const replaceAll: Command = view => {
-  let plugin = beforeCommand(view)
-  if (typeof plugin == "boolean") return plugin
-  let cursor = plugin.query.cursor(view.state.doc), changes = []
+export const replaceAll = searchCommand((view, {query}) => {
+  let cursor = query.cursor(view.state.doc), changes = []
   while (!cursor.next().done) {
     let {from, to} = cursor.value
-    changes.push({from, to, insert: plugin.query.replace})
+    changes.push({from, to, insert: query.replace})
   }
   if (!changes.length) return false
   view.dispatch(view.state.update({changes}))
   return true
-}
+})
 
 function createSearchPanel(view: EditorView) {
   let {query} = view.state.field(searchState)
@@ -220,12 +194,14 @@ function createSearchPanel(view: EditorView) {
   }
 }
 
+const tag = typeof Symbol == "function" ? Symbol("search") : "__search-tag"
+
 /// Make sure the search panel is open and focused.
 export const openSearchPanel: Command = view => {
-  let state = view.state.field(searchState)!
-  if (!state) return false
-  if (!state.panel.length)
-    view.dispatch(view.state.update({effects: togglePanel.of(true)}))
+  let state = view.state.field(searchState, false)
+  if (state && state.panel.length) return false
+  view.dispatch(view.state.update({effects: togglePanel.of(true),
+                                   replaceExtensions: state ? undefined : {[tag]: searchExtensions}}))
   return true
 }
 
@@ -242,7 +218,7 @@ export const searchKeymap: readonly KeyBinding[] = [
 
 /// Close the search panel.
 export const closeSearchPanel: Command = view => {
-  let state = view.state.field(searchState)
+  let state = view.state.field(searchState, false)
   if (!state || !state.panel.length) return false
   let panel = getPanel(view, createSearchPanel)
   if (panel && panel.dom.contains(view.root.activeElement)) view.focus()
@@ -384,3 +360,10 @@ const baseTheme = EditorView.baseTheme({
     background: "#fca"
   }
 })
+
+const searchExtensions = [
+  searchState,
+  searchHighlighter,
+  panels(),
+  baseTheme
+]
