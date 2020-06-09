@@ -247,12 +247,16 @@ export class EditorView {
     this.measureScheduled = -1
   }
 
+  /// Get the CSS classes for the currently active editor themes.
+  get themeClasses() {
+    return baseThemeID + " " +
+      (this.state.facet(darkTheme) ? baseDarkThemeID : baseLightThemeID) + " " +
+      this.state.facet(theme).join(" ")
+  }
+
   private updateAttrs() {
     let editorAttrs = combineAttrs(this.state.facet(editorAttributes), {
-      class: themeClass("wrap") + (this.hasFocus ? " cm-focused " : " ") +
-        baseThemeID + " " +
-        (this.state.facet(darkTheme) ? baseDarkThemeID : baseLightThemeID) + " " +
-        this.state.facet(theme).join(" ")
+      class: themeClass("wrap") + (this.hasFocus ? " cm-focused " : " ") + this.themeClasses
     })
     updateAttrs(this.dom, this.editorAttrs, editorAttrs)
     this.editorAttrs = editorAttrs

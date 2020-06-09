@@ -85,14 +85,16 @@ const panelPlugin = ViewPlugin.fromClass(class {
 
   update(update: ViewUpdate) {
     let conf = update.state.facet(panelConfig)
-    if (this.top.customDOM != conf.topContainer) {
+    if (this.top.container != conf.topContainer) {
       this.top.sync([])
       this.top = new PanelGroup(update.view, true, conf.topContainer)
     }
-    if (this.bottom.customDOM != conf.bottomContainer) {
+    if (this.bottom.container != conf.bottomContainer) {
       this.bottom.sync([])
       this.bottom = new PanelGroup(update.view, false, conf.bottomContainer)
     }
+    this.top.syncClasses()
+    this.bottom.syncClasses()
     let specs = update.state.facet(showPanel)
     if (specs != this.specs) {
       let panels = [], top: Panel[] = [], bottom: Panel[] = [], mount = []
@@ -133,10 +135,11 @@ function panelClass(panel: Panel) {
 
 class PanelGroup {
   dom: HTMLElement | undefined = undefined
+  classes = ""
   panels: Panel[] = []
 
-  constructor(readonly view: EditorView, readonly top: boolean, readonly customDOM: HTMLElement | undefined) {
-    this.dom = this.customDOM
+  constructor(readonly view: EditorView, readonly top: boolean, readonly container: HTMLElement | undefined) {
+    this.syncClasses()
   }
 
   sync(panels: Panel[]) {
@@ -146,9 +149,7 @@ class PanelGroup {
 
   syncDOM() {
     if (this.panels.length == 0) {
-      if (this.customDOM) {
-        for (let ch = this.customDOM.firstChild; ch; ch = rm(ch)) {}
-      } else if (this.dom) {
+      if (this.dom) {
         this.dom.remove()
         this.dom = undefined
       }
@@ -159,7 +160,8 @@ class PanelGroup {
       this.dom = document.createElement("div")
       this.dom.className = themeClass(this.top ? "panels.top" : "panels.bottom")
       this.dom.style[this.top ? "top" : "bottom"] = "0"
-      this.view.dom.insertBefore(this.dom, this.top ? this.view.dom.firstChild : null)
+      let parent = this.container || this.view.dom
+      parent.insertBefore(this.dom, this.top ? parent.firstChild : null)
     }
 
     let curDOM = this.dom.firstChild
@@ -175,9 +177,15 @@ class PanelGroup {
   }
 
   scrollMargin() {
-    return !this.dom || this.customDOM ? 0
+    return !this.dom || this.container ? 0
       : Math.max(0, this.top ? this.dom.getBoundingClientRect().bottom - this.view.scrollDOM.getBoundingClientRect().top
                  : this.view.scrollDOM.getBoundingClientRect().bottom - this.dom.getBoundingClientRect().top)
+  }
+
+  syncClasses() {
+    if (!this.container || this.classes == this.view.themeClasses) return
+    for (let cls of this.classes.split(" ")) if (cls) this.container.classList.remove(cls)
+    for (let cls of (this.classes = this.view.themeClasses).split(" ")) if (cls) this.container.classList.add(cls)
   }
 }
 

@@ -36,7 +36,7 @@ export function logException(state: EditorState, exception: any, context?: strin
   let handler = state.facet(exceptionSink)
   if (handler.length) handler[0](exception)
   else if (window.onerror) window.onerror(String(exception), context, undefined, undefined, exception)
-  else if (context) console.error(context + ":" , exception)
+  else if (context) console.error(context + ":", exception)
   else console.error(exception)
 }
 
