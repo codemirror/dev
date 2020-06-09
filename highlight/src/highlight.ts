@@ -51,7 +51,7 @@ export class TagSystem {
     this.flags = options.flags
     this.types = options.types
     this.flagMask = Math.pow(2, this.flags.length) - 1
-    this.typeShift = this.flags.length + 1
+    this.typeShift = this.flags.length
     let subtypes = options.subtypes || 0
     let parentNames: (string | undefined)[] = [undefined]
     this.typeIDs[""] = 0
@@ -88,7 +88,7 @@ export class TagSystem {
     for (let part of (value ? name.slice(1) : name).split(" ")) if (part) {
       let flag = this.flags.indexOf(part)
       if (flag > -1) {
-        value += 1 << (flag + 1)
+        value += 1 << flag
       } else {
         let typeID = this.typeIDs[part]
         if (typeID == null) throw new RangeError(`Unknown tag type '${part}'`)
@@ -201,7 +201,9 @@ export const defaultTags = new TagSystem({
 export const styleTags = (tags: {[selector: string]: string}) => defaultTags.add(tags)
 
 /// Create a highlighter theme that adds the given styles to the given
-/// tags. The spec's property names must be tag names, and the values
+/// tags. The spec's property names must be [tag
+/// names](#highlight.defaultTags) or comma-separated lists of tag
+/// names. The values should be
 /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
 /// style objects that define the CSS for that tag.
 export const highlighter = (spec: {[tag: string]: Style}) => defaultTags.highlighter(spec)
@@ -220,10 +222,12 @@ class Styling {
     let nextCls = 0
     let rules: StyleRule[] = []
     for (let prop in spec) {
-      let tag = tags.get(prop)
       let cls = "c" + nextCls++
       modSpec[cls] = spec[prop]
-      rules.push(new StyleRule(tag >> tags.typeShift, tag & tags.flagMask, tags.specificity(tag), cls))
+      for (let part of prop.split(/\s*,\s*/)) {
+        let tag = tags.get(part)
+        rules.push(new StyleRule(tag >> tags.typeShift, tag & tags.flagMask, tags.specificity(tag), cls))
+      }
     }
     this.rules = rules.sort((a, b) => b.specificity - a.specificity)
     this.module = new StyleModule(modSpec)
