@@ -208,6 +208,11 @@ export type StateFieldSpec<Value> = {
   provide?: readonly (Facet<Value, any> | ((field: StateField<Value>) => Extension))[]
 }
 
+function maybeIndex(state: EditorState, id: number) {
+  let found = state.config.address[id]
+  return found == null ? null : found >> 1
+}
+
 /// Fields can store additional information in an editor state, and
 /// keep it in sync with the rest of the state.
 export class StateField<Value> {
@@ -236,16 +241,22 @@ export class StateField<Value> {
   slot(addresses: {[id: number]: number}) {
     let idx = addresses[this.id] >> 1
     return (state: EditorState, tr: Transaction | null) => {
-      let oldIdx = !tr ? null : tr.reconfigured ? tr.startState.config.address[this.id] >> 1 : idx
-      if (oldIdx == null) {
+      if (!tr) {
         state.values[idx] = this.createF(state)
         return SlotStatus.Changed
-      } else {
-        let oldVal = tr!.startState.values[oldIdx], value = this.updateF(oldVal, tr!, state)
-        if (this.compareF(oldVal, value)) return 0
-        state.values[idx] = value
-        return SlotStatus.Changed
       }
+      let oldVal, changed = 0
+      if (tr.reconfigured) {
+        let oldIdx = maybeIndex(tr.startState, this.id)
+        oldVal = oldIdx == null ? this.createF(tr.startState) : tr.startState.values[oldIdx]
+        changed = SlotStatus.Changed
+      } else {
+        oldVal = tr.startState.values[idx]
+      }
+      let value = this.updateF(oldVal, tr!, state)
+      if (!changed && !this.compareF(oldVal, value)) changed = SlotStatus.Changed
+      if (changed) state.values[idx] = value
+      return changed
     }
   }
 

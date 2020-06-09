@@ -1,5 +1,5 @@
 import ist from "ist"
-import {EditorState, Facet, Extension, Precedence} from "@codemirror/next/state"
+import {EditorState, Facet, Extension, Precedence, StateField} from "@codemirror/next/state"
 
 function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
@@ -111,6 +111,24 @@ describe("EditorState facets", () => {
     let st = mk(num.of(1), num.of(2), str.of("3"))
     let st2 = st.update({reconfigure: [num.of(1), num.of(2)]}).state
     ist(st.facet(num), st2.facet(num))
+  })
+
+  it("creates newly added fields when reconfiguring", () => {
+    let st = mk(num.of(2))
+    let events: string[] = []
+    let field = StateField.define({
+      create() {
+        events.push("create")
+        return 0
+      },
+      update(val: number) {
+        events.push("update " + val)
+        return val + 1
+      }
+    })
+    st = st.update({replaceExtensions: {x: field}}).state
+    ist(events.join(", "), "create, update 0")
+    ist(st.field(field), 1)
   })
 
   it("errors on cyclic dependencies", () => {
