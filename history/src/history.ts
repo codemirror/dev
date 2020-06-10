@@ -327,8 +327,8 @@ class HistoryState {
 /// - Mod-u: [`undoSelection`](#history.undoSelection).
 /// - Alt-u (Mod-Shift-u on macOS): [`redoSelection`](#history.redoSelection).
 export const historyKeymap: readonly KeyBinding[] = [
-  {key: "Mod-z", run: undo},
-  {key: "Mod-y", mac: "Mod-Shift-z", run: redo},
-  {key: "Mod-u", run: view => undoSelection(view) || true},
-  {key: "Alt-u", mac: "Mod-Shift-u", run: redoSelection}
+  {key: "Mod-z", run: undo, preventDefault: true},
+  {key: "Mod-y", mac: "Mod-Shift-z", run: redo, preventDefault: true},
+  {key: "Mod-u", run: undoSelection, preventDefault: true},
+  {key: "Alt-u", mac: "Mod-Shift-u", run: redoSelection, preventDefault: true}
 ]

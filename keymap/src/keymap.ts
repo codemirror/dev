@@ -53,6 +53,14 @@ export type KeyBinding = {
   /// a custom scope name. You may also set multiple scope names,
   /// separated by spaces.
   scope?: string
+  /// When set to true (the default is false), this will always
+  /// prevent the further handling for the bound key, even if the
+  /// command(s) return false. This can be useful for cases where the
+  /// native behavior of the key is annoying or irrelevant but the
+  /// command doesn't always apply (such as, Mod-u for undo selection,
+  /// which would cause the browser to view source instead when no
+  /// selection can be undone).
+  preventDefault?: boolean
 }
 
 type PlatformName = "mac" | "win" | "linux" | "key"
@@ -92,7 +100,9 @@ function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
   return name
 }
 
-type Keymap = {[scope: string]: {[key: string]: Command[]}}
+type Binding = {preventDefault: boolean, commands: Command[]}
+
+type Keymap = {[scope: string]: {[key: string]: Binding}}
 
 const keymaps = Facet.define<Keymap>()
 
@@ -139,29 +149,34 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
       throw new Error("Key binding " + name + " is used both as a regular binding and as a multi-stroke prefix")
   }
 
-  let add = (scope: string, key: string, command: Command) => {
+  let add = (scope: string, key: string, command: Command, preventDefault?: boolean) => {
     let scopeObj = bound[scope] || (bound[scope] = Object.create(null))
     let parts = key.split(/ (?!$)/).map(k => normalizeKeyName(k, platform))
     for (let i = 1; i < parts.length; i++) {
       let prefix = parts.slice(0, i).join(" ")
       checkPrefix(prefix, true)
-      if (!scopeObj[prefix]) scopeObj[prefix] = [(view: EditorView) => {
-        let ourObj = storedPrefix = {view, prefix, scope}
-        setTimeout(() => { if (storedPrefix == ourObj) storedPrefix = null }, PrefixTimeout)
-        return true
-      }]
+      if (!scopeObj[prefix]) scopeObj[prefix] = {
+        preventDefault: true,
+        commands: [(view: EditorView) => {
+          let ourObj = storedPrefix = {view, prefix, scope}
+          setTimeout(() => { if (storedPrefix == ourObj) storedPrefix = null }, PrefixTimeout)
+          return true
+        }]
+      }
     }
     let full = parts.join(" ")
     checkPrefix(full, false)
-    ;(scopeObj[full] || (scopeObj[full] = [])).push(command)
+    let binding = scopeObj[full] || (scopeObj[full] = {preventDefault: false, commands: []})
+    binding.commands.push(command)
+    if (preventDefault) binding.preventDefault = true
   }
 
   for (let b of bindings) {
     let name = b[platform] || b.key
     if (!name) continue
     for (let scope of b.scope ? b.scope.split(" ") : ["editor"]) {
-      add(scope, name, b.run)
-      if (b.shift) add(scope, "Shift-" + name, b.shift)
+      add(scope, name, b.run, b.preventDefault)
+      if (b.shift) add(scope, "Shift-" + name, b.shift, b.preventDefault)
     }
   }
   return bound
@@ -174,26 +189,26 @@ function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: Editor
     prefix = storedPrefix.prefix + " "
     storedPrefix = null
   }
+  let fallthrough = !!prefix
+
+  let runFor = (binding: Binding | undefined) => {
+    if (binding) {
+      for (let cmd of binding.commands) if (cmd(view)) return true
+      if (binding.preventDefault) fallthrough = true
+    }
+    return false
+  }
 
   for (let map of maps) {
-    let scopeObj = map[scope]
+    let scopeObj = map[scope], baseName
     if (!scopeObj) continue
-    let direct = scopeObj[prefix + modifiers(name, event, !isChar)]
-    if (direct && runFor(direct, view)) return true
-    let baseName
+    if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)])) return true
     if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
         (baseName = base[event.keyCode]) && baseName != name) {
-      let fromCode = scopeObj[prefix + modifiers(baseName, event, true)]
-      if (fromCode && runFor(fromCode, view)) return true
+      if (runFor(scopeObj[prefix + modifiers(baseName, event, true)])) return true
     } else if (isChar && event.shiftKey) {
-      let withShift = scopeObj[prefix + modifiers(name, event, true)]
-      if (withShift && runFor(withShift, view)) return true
+      if (runFor(scopeObj[prefix + modifiers(name, event, true)])) return true
     }
   }
-  return !!prefix
-}
-
-function runFor(commands: readonly Command[], view: EditorView) {
-  for (let cmd of commands) if (cmd(view)) return true
-  return false
+  return fallthrough
 }
