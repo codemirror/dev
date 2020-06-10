@@ -5,50 +5,50 @@ import {highlighter} from "@codemirror/next/highlight"
 export const oneDarkTheme = EditorView.theme({
   wrap: {
     color: "#abb2bf",
-    background: "#282c34",
-    "& ::selection": {background: "#405948"},
+    backgroundColor: "#282c34",
+    "& ::selection": {backgroundColor: "#405948"},
     caretColor: "#528bff"
   },
 
   secondaryCursor: {borderLeft: "1.4px solid #528bff"},
-  secondarySelection: {background: "#405948"},
+  secondarySelection: {backgroundColor: "#405948"},
 
-  panels: {background: "#282c34", color: "#abb2bf"},
+  panels: {backgroundColor: "#282c34", color: "#abb2bf"},
   "panels.top": {borderBottom: "2px solid black"},
   "panels.bottom": {borderTop: "2px solid black"},
 
   searchMatch: {
-    background: "#42557b",
+    backgroundColor: "#42557b",
     border: "1px solid #457dff"
   },
   "searchMatch.selected": {
-    background: "#6199ff2f"
+    backgroundColor: "#6199ff2f"
   },
 
-  activeLine: {background: "#2c313c"},
-  selectionMatch: {background: "#354139"},
+  activeLine: {backgroundColor: "#2c313c"},
+  selectionMatch: {backgroundColor: "#354139"},
 
-  "matchingBracket, nonmatchingBracket": {background: "#515a6b", border: "1px solid #515a6b"},
+  "matchingBracket, nonmatchingBracket": {backgroundColor: "#515a6b", border: "1px solid #515a6b"},
 
   gutters: {
-    background: "#282c34",
+    backgroundColor: "#282c34",
     color: "#495162",
     border: "none"
   },
   "gutterElement.lineNumber": {color: "#495162"},
 
   foldPlaceholder: {
-    background: "none",
+    backgroundColor: "none",
     border: "none",
     color: "#ddd"
   },
 
   tooltip: {
     border: "1px solid #181a1f",
-    background: "#606862"
+    backgroundColor: "#606862"
   },
   "tooltip.autocomplete": {
-    "& > li[aria-selected]": {background: "#282c34"}
+    "& > li[aria-selected]": {backgroundColor: "#282c34"}
   }
 }, {dark: true})
 

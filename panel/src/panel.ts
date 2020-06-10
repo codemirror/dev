@@ -204,7 +204,7 @@ const baseTheme = EditorView.baseTheme({
     "& input, & button": {
       verticalAlign: "middle",
       color: "inherit",
-      background: "inherit",
+      backgroundColor: "inherit",
       fontSize: "70%"
     },
     "& button": {
@@ -220,7 +220,7 @@ const baseTheme = EditorView.baseTheme({
     padding: "2px 6px 4px"
   },
   "panels@light": {
-    background: "#f5f5f5",
+    backgroundColor: "#f5f5f5",
     color: "black",
     "& button": {
       backgroundImage: "linear-gradient(#eff1f5, #d9d9df)",
@@ -237,7 +237,7 @@ const baseTheme = EditorView.baseTheme({
     borderTop: "1px solid silver"
   },
   "panels@dark": {
-    background: "#333338",
+    backgroundColor: "#333338",
     color: "white",
     "& button": {
       backgroundImage: "linear-gradient(#555, #111)",

@@ -352,7 +352,7 @@ const baseTheme = EditorView.baseTheme({
       position: "absolute",
       top: "0",
       right: "4px",
-      background: "inherit",
+      backgroundColor: "inherit",
       border: "none",
       font: "inherit",
       padding: 0,
@@ -366,11 +366,11 @@ const baseTheme = EditorView.baseTheme({
     }
   },
 
-  "searchMatch@light": { background: "#ffa" },
-  "searchMatch@dark": { background: "#088" },
+  "searchMatch@light": { backgroundColor: "#ffa" },
+  "searchMatch@dark": { backgroundColor: "#088" },
 
-  "searchMatch.selected@light": { background: "#fca" },
-  "searchMatch.selected@dark": { background: "#808" }
+  "searchMatch.selected@light": { backgroundColor: "#fca" },
+  "searchMatch.selected@dark": { backgroundColor: "#808" }
 })
 
 const searchExtensions = [

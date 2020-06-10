@@ -255,7 +255,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
 
 const baseTheme = EditorView.baseTheme({
   foldPlaceholder: {
-    background: "#eee",
+    backgroundColor: "#eee",
     border: "1px solid silver",
     color: "#888",
     borderRadius: ".2em",

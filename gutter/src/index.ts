@@ -79,13 +79,13 @@ const baseTheme = EditorView.baseTheme({
   },
 
   "gutters@light": {
-    background: "#f5f5f5",
+    backgroundColor: "#f5f5f5",
     color: "#999",
     borderRight: "1px solid silver"
   },
 
   "gutters@dark": {
-    background: "#333338",
+    backgroundColor: "#333338",
     color: "#ccc"
   },
 

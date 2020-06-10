@@ -276,7 +276,7 @@ const style = EditorView.baseTheme({
 
     "& > li[aria-selected]": {
       background_fallback: "#bdf",
-      background: "Highlight",
+      backgroundColor: "Highlight",
       color_fallback: "white",
       color: "HighlightText"
     }

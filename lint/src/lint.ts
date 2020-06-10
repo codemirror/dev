@@ -436,7 +436,7 @@ const baseTheme = EditorView.baseTheme({
     font: "inherit",
     border: "none",
     padding: "2px 4px",
-    background: "#444",
+    backgroundColor: "#444",
     color: "white",
     borderRadius: "3px",
     marginLeft: "8px"
@@ -479,11 +479,11 @@ const baseTheme = EditorView.baseTheme({
       maxHeight: "100px",
       overflowY: "auto",
       "& [aria-selected]": {
-        background: "#ddd"
+        backgroundColor: "#ddd"
       },
       "&:focus [aria-selected]": {
         background_fallback: "#bdf",
-        background: "Highlight",
+        backgroundColor: "Highlight",
         color_fallback: "white",
         color: "HighlightText"
       },
@@ -494,7 +494,7 @@ const baseTheme = EditorView.baseTheme({
       position: "absolute",
       top: "0",
       right: "2px",
-      background: "inherit",
+      backgroundColor: "inherit",
       border: "none",
       font: "inherit",
       padding: 0,
