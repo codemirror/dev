@@ -187,6 +187,10 @@ export class CompositionView extends WidgetView {
 
   sync() { if (!this.dom) this.setDOM(this.widget.toDOM(this.editorView)) }
 
+  localPosFromDOM(node: Node, offset: number): number {
+    return !offset ? 0 : node.nodeType == 3 ? Math.min(offset, this.length) : this.length
+  }
+
   ignoreMutation(): boolean { return false }
 
   get overrideDOMText() { return null }
