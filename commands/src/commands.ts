@@ -351,6 +351,20 @@ export const deleteToLineEnd: Command = view => deleteBy(view, pos => {
   return Math.max(view.state.doc.length, pos + 1)
 })
 
+/// Delete all whitespace directly before a line end from the
+/// document.
+export const deleteTrailingWhitespace: StateCommand = ({state, dispatch}) => {
+  let changes = []
+  for (let pos = 0, iter = state.doc.iterLines(); !iter.next().done;) {
+    let trailing = iter.value.search(/\s+$/)
+    if (trailing > -1) changes.push({from: pos + trailing, to: pos + iter.value.length})
+    pos += iter.value.length + 1
+  }
+  if (!changes.length) return false
+  dispatch(state.update({changes}))
+  return true
+}
+
 /// Replace each selection range with a line break, leaving the cursor
 /// on the line before the break.
 export const splitLine: StateCommand = ({state, dispatch}) => {
