@@ -360,7 +360,18 @@ class LintPanel implements Panel {
       }
       i++
     })
-    while (i < this.items.length) this.items.pop()
+    while (i < this.items.length && !(this.items.length == 1 && this.items[0].diagnostic.from < 0)) {
+      needsSync = true
+      this.items.pop()
+    }
+    if (this.items.length == 0) {
+      this.items.push(new PanelItem(this.view, {
+        from: -1, to: -1,
+        severity: "info",
+        message: this.view.state.phrase("No diagnostics")
+      }))
+      needsSync = true
+    }
     if (newSelectedItem) {
       this.list.setAttribute("aria-activedescendant", newSelectedItem!.id)
       this.view.requestMeasure({
@@ -497,7 +508,7 @@ const baseTheme = EditorView.baseTheme({
       position: "absolute",
       top: "0",
       right: "2px",
-      backgroundColor: "inherit",
+      background: "inherit",
       border: "none",
       font: "inherit",
       padding: 0,
