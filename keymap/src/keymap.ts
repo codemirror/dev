@@ -17,6 +17,10 @@ import {Facet} from "@codemirror/next/state"
 /// `a-`), `Ctrl-` (or `c-` or `Control-`) and `Cmd-` (or `m-` or
 /// `Meta-`) are recognized.
 ///
+/// When a key binding contains multiple key names separated by
+/// spaces, it represents a multi-stroke binding, which will fire when
+/// the user presses the given keys after each other order.
+///
 /// You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
 /// other platforms. So `Mod-b` is `Ctrl-b` on Linux but `Cmd-b` on
 /// macOS.
@@ -104,6 +108,11 @@ const handleKeyEvents = EditorView.domEventHandlers({
 /// priorities determine their precedence (the ones specified early or
 /// with high priority get checked first). When a handler has returned
 /// `true` for a given key, no further handlers are called.
+///
+/// When a key is bound multiple times (either in a single keymap or
+/// in separate maps), the bound commands all get a chance to handle
+/// the key stroke, in order of precedence, until one of them returns
+/// true.
 export function keymap(bindings: readonly KeyBinding[], platform?: "mac" | "win" | "linux") {
   return [handleKeyEvents, keymaps.of(buildKeymap(bindings, platform || "key"))]
 }
@@ -114,20 +123,45 @@ export function runScopeHandlers(view: EditorView, event: KeyboardEvent, scope: 
   return runHandlers(view.state.facet(keymaps), event, view, scope)
 }
 
+let storedPrefix: {view: EditorView, prefix: string, scope: string} | null = null
+
+const PrefixTimeout = 4000
+
 function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform) {
   let bound: Keymap = Object.create(null)
+  let isPrefix: {[prefix: string]: boolean} = Object.create(null)
 
-  let add = (scope: string, name: string, command: Command) => {
+  let checkPrefix = (name: string, is: boolean) => {
+    let current = isPrefix[name]
+    if (current == null)
+      isPrefix[name] = is
+    else if (current != is)
+      throw new Error("Key binding " + name + " is used both as a regular binding and as a multi-stroke prefix")
+  }
+
+  let add = (scope: string, key: string, command: Command) => {
     let scopeObj = bound[scope] || (bound[scope] = Object.create(null))
-    ;(scopeObj[name] || (scopeObj[name] = [])).push(command)
+    let parts = key.split(/ (?!$)/).map(k => normalizeKeyName(k, platform))
+    for (let i = 1; i < parts.length; i++) {
+      let prefix = parts.slice(0, i).join(" ")
+      checkPrefix(prefix, true)
+      if (!scopeObj[prefix]) scopeObj[prefix] = [(view: EditorView) => {
+        let ourObj = storedPrefix = {view, prefix, scope}
+        setTimeout(() => { if (storedPrefix == ourObj) storedPrefix = null }, PrefixTimeout)
+        return true
+      }]
+    }
+    let full = parts.join(" ")
+    checkPrefix(full, false)
+    ;(scopeObj[full] || (scopeObj[full] = [])).push(command)
   }
 
   for (let b of bindings) {
     let name = b[platform] || b.key
     if (!name) continue
     for (let scope of b.scope ? b.scope.split(" ") : ["editor"]) {
-      add(scope, normalizeKeyName(name, platform), b.run)
-      if (b.shift) add(scope, normalizeKeyName("Shift-" + name, platform), b.shift)
+      add(scope, name, b.run)
+      if (b.shift) add(scope, "Shift-" + name, b.shift)
     }
   }
   return bound
@@ -135,22 +169,28 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
 
 function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: EditorView, scope: string): boolean {
   let name = keyName(event), isChar = name.length == 1 && name != " "
+  let prefix = ""
+  if (storedPrefix && storedPrefix.view == view && storedPrefix.scope == scope) {
+    prefix = storedPrefix.prefix + " "
+    storedPrefix = null
+  }
+
   for (let map of maps) {
     let scopeObj = map[scope]
     if (!scopeObj) continue
-    let direct = scopeObj[modifiers(name, event, !isChar)]
+    let direct = scopeObj[prefix + modifiers(name, event, !isChar)]
     if (direct && runFor(direct, view)) return true
     let baseName
     if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
         (baseName = base[event.keyCode]) && baseName != name) {
-      let fromCode = scopeObj[modifiers(baseName, event, true)]
+      let fromCode = scopeObj[prefix + modifiers(baseName, event, true)]
       if (fromCode && runFor(fromCode, view)) return true
     } else if (isChar && event.shiftKey) {
-      let withShift = scopeObj[modifiers(name, event, true)]
+      let withShift = scopeObj[prefix + modifiers(name, event, true)]
       if (withShift && runFor(withShift, view)) return true
     }
   }
-  return false
+  return !!prefix
 }
 
 function runFor(commands: readonly Command[], view: EditorView) {
