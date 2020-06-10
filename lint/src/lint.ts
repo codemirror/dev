@@ -3,6 +3,7 @@ import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
 import {StateEffect, StateField, Extension} from "@codemirror/next/state"
 import {hoverTooltip} from "@codemirror/next/tooltip"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
+import {KeyBinding} from "@codemirror/next/keymap"
 
 /// Describes a problem or hint for a piece of code.
 export interface Diagnostic {
@@ -170,7 +171,7 @@ export const closeLintPanel: Command = (view: EditorView) => {
 }
 
 /// Move the selection to the next diagnostic.
-export const nextLintDiagnostic: Command = (view: EditorView) => {
+export const nextDiagnostic: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
   let next = field.diagnostics.iter(view.state.selection.primary.from + 1)
@@ -181,6 +182,15 @@ export const nextLintDiagnostic: Command = (view: EditorView) => {
   view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
   return true
 }
+
+/// A set of default key bindings for the lint functionality.
+///
+/// - Ctrl-Shift-m (Cmd-Shift-m on macOS): [`openLintPanel`](#lint.openLintPanel)
+/// - F8: [\`nextDiagnostic\`](#lint.nextDiagnostic)
+export const lintKeymap: readonly KeyBinding[] = [
+  {key: "Mod-Shift-m", run: openLintPanel},
+  {key: "F8", run: nextDiagnostic}
+]
 
 const LintDelay = 500
 
