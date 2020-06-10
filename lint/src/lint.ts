@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
         WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "@codemirror/next/view"
-import {StateEffect, StateField, Extension} from "@codemirror/next/state"
+import {StateEffect, StateField, Extension, TransactionSpec, EditorState} from "@codemirror/next/state"
 import {hoverTooltip} from "@codemirror/next/tooltip"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 import {KeyBinding} from "@codemirror/next/keymap"
@@ -56,9 +56,33 @@ function findDiagnostic(diagnostics: DecorationSet, diagnostic: Diagnostic | nul
   return found
 }
 
+const tag = typeof Symbol == "undefined" ? "__lint-tag" : Symbol("lint")
+
+function maybeEnableLint(state: EditorState): {[tag: string]: Extension} | undefined {
+  return state.field(lintState, false) ? undefined : {[tag]: [
+    lintState,
+    EditorView.decorations.compute([lintState], state => {
+      let {selected, panel} = state.field(lintState)
+      return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
+        activeMark.range(selected.from, selected.to)
+      ])
+    }),
+    panels(),
+    hoverTooltip(lintTooltip),
+    baseTheme
+  ]}
+}
+
 /// State effect that is used to update the current set of
 /// diagnostics.
-export const setDiagnostics = StateEffect.define<readonly Diagnostic[]>()
+export function setDiagnostics(state: EditorState, diagnostics: readonly Diagnostic[]): TransactionSpec {
+  return {
+    effects: setDiagnosticsEffect.of(diagnostics),
+    replaceExtensions: maybeEnableLint(state)
+  }
+}
+
+const setDiagnosticsEffect = StateEffect.define<readonly Diagnostic[]>()
 
 const togglePanel = StateEffect.define<boolean>()
 
@@ -79,7 +103,7 @@ const lintState = StateField.define<LintState>({
     }
 
     for (let effect of tr.effects) {
-      if (effect.is(setDiagnostics)) {
+      if (effect.is(setDiagnosticsEffect)) {
         let ranges = Decoration.set(effect.value.map((d: Diagnostic) => {
           return d.from < d.to
             ? Decoration.mark({
@@ -106,23 +130,6 @@ const lintState = StateField.define<LintState>({
 })
 
 const activeMark = Decoration.mark({class: themeClass("lintRange.active")})
-
-/// Returns an extension that enables the linting functionality.
-/// Implicitly enabled by the [`linter`](#lint.linter) function.
-export function linting(): Extension {
-  return [
-    lintState,
-    EditorView.decorations.compute([lintState], state => {
-      let {selected, panel} = state.field(lintState)
-      return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
-        activeMark.range(selected.from, selected.to)
-      ])
-    }),
-    panels(),
-    hoverTooltip(lintTooltip),
-    baseTheme
-  ]
-}
 
 function lintTooltip(view: EditorView, check: (from: number, to: number) => boolean) {
   let {diagnostics} = view.state.field(lintState)
@@ -154,9 +161,9 @@ function lintTooltip(view: EditorView, check: (from: number, to: number) => bool
 /// Command to open and focus the lint panel.
 export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
-  if (!field) return false
-  if (!field.panel)
-    view.dispatch(view.state.update({effects: togglePanel.of(true)}))
+  if (!field || !field.panel)
+    view.dispatch(view.state.update({effects: togglePanel.of(true),
+                                     replaceExtensions: maybeEnableLint(view.state)}))
   let panel = getPanel(view, LintPanel.open)
   if (panel) (panel.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
@@ -174,10 +181,10 @@ export const closeLintPanel: Command = (view: EditorView) => {
 export const nextDiagnostic: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
-  let next = field.diagnostics.iter(view.state.selection.primary.from + 1)
+  let sel = view.state.selection.primary, next = field.diagnostics.iter(sel.to + 1)
   if (!next.value) {
     next = field.diagnostics.iter(0)
-    if (!next.value) return false
+    if (!next.value || next.from == sel.from && next.to == sel.to) return false
   }
   view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
   return true
@@ -198,7 +205,7 @@ const LintDelay = 500
 /// enables linting with that source. It will be called whenever the
 /// editor is idle (after its content changed).
 export function linter(source: (view: EditorView) => readonly Diagnostic[] | Promise<readonly Diagnostic[]>): Extension {
-  const runLintPlugin = ViewPlugin.fromClass(class {
+  return ViewPlugin.fromClass(class {
     lintTime = Date.now() + LintDelay
     set = true
 
@@ -217,8 +224,8 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
         Promise.resolve(source(this.view)).then(
           annotations => {
             if (this.view.state.doc == state.doc &&
-                (annotations.length || this.view.state.field(lintState).diagnostics.size))
-              this.view.dispatch(this.view.state.update({effects: setDiagnostics.of(annotations)}))
+                (annotations.length || this.view.state.field(lintState, false)?.diagnostics?.size))
+              this.view.dispatch(this.view.state.update(setDiagnostics(this.view.state, annotations)))
           },
           error => { logException(this.view.state, error) }
         )
@@ -235,10 +242,6 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
       }
     }
   })
-  return [
-    runLintPlugin,
-    linting()
-  ]
 }
 
 function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
