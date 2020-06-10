@@ -216,9 +216,6 @@ const baseTheme = EditorView.baseTheme({
       padding: ".2em .5em"
     }
   },
-  panel: {
-    padding: "2px 6px 4px"
-  },
   "panels@light": {
     backgroundColor: "#f5f5f5",
     color: "black",

@@ -11,7 +11,7 @@ function createLineDialog(view: EditorView): Panel {
   function go() {
     let n = parseInt(input.value, 10)
     view.dispatch(view.state.update({
-      replaceExtensions: {[tag]: []},
+      replaceExtensions: {[tag]: [baseTheme]},
       selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).start) : undefined
     }))
     view.focus()
@@ -19,7 +19,7 @@ function createLineDialog(view: EditorView): Panel {
   dom.addEventListener("keydown", event => {
     if (event.keyCode == 27) { // Escape
       event.preventDefault()
-      view.dispatch(view.state.update({replaceExtensions: {[tag]: []}}))
+      view.dispatch(view.state.update({replaceExtensions: {[tag]: [baseTheme]}}))
       view.focus()
     } else if (event.keyCode == 13) { // Enter
       event.preventDefault()
@@ -41,9 +41,16 @@ const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
 export const gotoLine: Command = view => {
   let panel = getPanel(view, createLineDialog)
   if (!panel) {
-    view.dispatch(view.state.update({replaceExtensions: {[tag]: [panels(), showPanel.of(createLineDialog)]}}))
+    view.dispatch(view.state.update({replaceExtensions: {[tag]: [panels(), showPanel.of(createLineDialog), baseTheme]}}))
     panel = getPanel(view, createLineDialog)
   }
   if (panel) panel.dom.querySelector("input")!.focus()
   return true
 }
+
+const baseTheme = EditorView.baseTheme({
+  "panel.gotoLine": {
+    padding: "2px 6px 4px",
+    "& label": { fontSize: "80%" }
+  }
+})

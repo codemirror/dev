@@ -347,6 +347,7 @@ function maybeAnnounceMatch(view: EditorView) {
 
 const baseTheme = EditorView.baseTheme({
   "panel.search": {
+    padding: "2px 6px 4px",
     position: "relative",
     "& [name=close]": {
       position: "absolute",
