@@ -92,28 +92,26 @@ type Keymap = {[scope: string]: {[key: string]: Command[]}}
 
 const keymaps = Facet.define<Keymap>()
 
+const handleKeyEvents = EditorView.domEventHandlers({
+  keydown(event, view) {
+    return runHandlers(view.state.facet(keymaps), event, view, "editor")
+  }
+})
+
 /// Create a view extension that registers a keymap.
 ///
 /// You can add multiple keymap extensions to an editor. Their
 /// priorities determine their precedence (the ones specified early or
-/// with high priority get to dispatch first). When a handler has
-/// returned `true` for a given key, no further handlers are called.
+/// with high priority get checked first). When a handler has returned
+/// `true` for a given key, no further handlers are called.
 export function keymap(bindings: readonly KeyBinding[], platform?: "mac" | "win" | "linux") {
-  let map = buildKeymap(bindings, platform || "key")
-  return [
-    EditorView.domEventHandlers({
-      keydown(event: KeyboardEvent, view: EditorView) {
-        return runHandlers(map, event, view, "editor")
-      }
-    }),
-    keymaps.of(map)
-  ]
+  return [handleKeyEvents, keymaps.of(buildKeymap(bindings, platform || "key"))]
 }
 
 /// Run the key handlers registered for a given scope. Returns true if
 /// any of them handled the event.
 export function runScopeHandlers(view: EditorView, event: KeyboardEvent, scope: string) {
-  return view.state.facet(keymaps).some(map => runHandlers(map, event, view, scope))
+  return runHandlers(view.state.facet(keymaps), event, view, scope)
 }
 
 function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform) {
@@ -135,20 +133,22 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
   return bound
 }
 
-function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope: string): boolean {
-  let scopeObj = map[scope]
-  if (!scopeObj) return false
+function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: EditorView, scope: string): boolean {
   let name = keyName(event), isChar = name.length == 1 && name != " "
-  let direct = scopeObj[modifiers(name, event, !isChar)]
-  if (direct && runFor(direct, view)) return true
-  let baseName
-  if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
-      (baseName = base[event.keyCode]) && baseName != name) {
-    let fromCode = scopeObj[modifiers(baseName, event, true)]
-    if (fromCode && runFor(fromCode, view)) return true
-  } else if (isChar && event.shiftKey) {
-    let withShift = scopeObj[modifiers(name, event, true)]
-    if (withShift && runFor(withShift, view)) return true
+  for (let map of maps) {
+    let scopeObj = map[scope]
+    if (!scopeObj) continue
+    let direct = scopeObj[modifiers(name, event, !isChar)]
+    if (direct && runFor(direct, view)) return true
+    let baseName
+    if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
+        (baseName = base[event.keyCode]) && baseName != name) {
+      let fromCode = scopeObj[modifiers(baseName, event, true)]
+      if (fromCode && runFor(fromCode, view)) return true
+    } else if (isChar && event.shiftKey) {
+      let withShift = scopeObj[modifiers(name, event, true)]
+      if (withShift && runFor(withShift, view)) return true
+    }
   }
   return false
 }
