@@ -1,5 +1,5 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "@codemirror/next/view"
-import {StateField, StateEffect, EditorSelection, SelectionRange} from "@codemirror/next/state"
+import {StateField, StateEffect, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 import {runScopeHandlers, KeyBinding} from "@codemirror/next/keymap"
 import {Text} from "@codemirror/next/text"
@@ -142,6 +142,21 @@ export const selectMatches = searchCommand((view, {query}) => {
   return true
 })
 
+/// Select all instances of the currently selected text.
+export const selectSelectionMatches: StateCommand = ({state, dispatch}) => {
+  let sel = state.selection
+  if (sel.ranges.length > 1 || sel.primary.empty) return false
+  let {from, to} = sel.primary
+  let ranges = [], primary = 0
+  for (let cur = new SearchCursor(state.doc, state.sliceDoc(from, to)); !cur.next().done;) {
+    if (ranges.length > 1000) return false
+    if (cur.value.from == from) primary = ranges.length
+    ranges.push(EditorSelection.range(cur.value.from, cur.value.to))
+  }
+  dispatch(state.update({selection: new EditorSelection(ranges, primary)}))
+  return true
+}
+
 /// Replace the current match of the search query.
 export const replaceNext = searchCommand((view, {query}) => {
   let {state} = view, next = findNextMatch(state.doc, state.selection.primary.from, query)
@@ -213,7 +228,8 @@ export const openSearchPanel: Command = view => {
 export const searchKeymap: readonly KeyBinding[] = [
   {key: "Mod-f", run: openSearchPanel, scope: "editor search-panel"},
   {key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel"},
-  {key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel"}
+  {key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel"},
+  {key: "Mod-Shift-l", run: selectSelectionMatches}
 ]
 
 /// Close the search panel.
