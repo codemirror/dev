@@ -279,6 +279,18 @@ export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
   return true
 }
 
+/// Simplify the current selection. When multiple ranges are selected,
+/// reduce it to its primary range. Otherwise, if the selection is
+/// non-empty, convert it to a cursor selection.
+export const simplifySelection: StateCommand = ({state, dispatch}) => {
+  let cur = state.selection, selection = null
+  if (cur.ranges.length > 1) selection = new EditorSelection([cur.primary])
+  else if (!cur.primary.empty) selection = new EditorSelection([EditorSelection.cursor(cur.primary.head)])
+  if (!selection) return false
+  dispatch(setSel(state, selection))
+  return true
+}
+
 function deleteBy(view: EditorView, by: (start: number) => number) {
   let {state} = view, changes = state.changeByRange(range => {
     let {from, to} = range
@@ -620,6 +632,7 @@ export const baseKeymap: readonly KeyBinding[] = ([
   {key: "Mod-End", run: cursorDocEnd, shift: selectDocEnd},
 
   {key: "Enter", run: insertNewlineAndIndent},
+  {key: "Escape", run: simplifySelection},
 
   {key: "Mod-a", run: selectAll},
   {key: "Mod-l", run: selectLine},
