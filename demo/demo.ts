@@ -19,6 +19,11 @@ import {highlightActiveLine, highlightSelectionMatches} from "@codemirror/next/h
 import {html} from "@codemirror/next/lang-html"
 import {defaultHighlighter} from "@codemirror/next/highlight"
 
+//import {esLint} from "@codemirror/next/lang-javascript"
+// @ts-ignore
+//import Linter from "eslint4b-prebuilt"
+//import {linter, lintKeymap} from "@codemirror/next/lint"
+
 //import {StreamSyntax} from "@codemirror/next/stream-syntax"
 //import legacyJS from "@codemirror/next/legacy-modes/src/javascript"
 
@@ -29,6 +34,7 @@ let state = EditorState.create({doc: `<script>
   });
 </script>
 `, extensions: [
+//  linter(esLint(new Linter)),
   lineNumbers(),
   specialChars(),
   history(),
@@ -49,6 +55,7 @@ let state = EditorState.create({doc: `<script>
     ...historyKeymap,
     ...foldKeymap,
     ...commentKeymap,
+//    ...lintKeymap,
     // FIXME move into exported keymaps
     {key: "Alt-g", run: gotoLine},
     {key: "Shift-Tab", run: indentSelection},
