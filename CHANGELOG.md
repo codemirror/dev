@@ -1,3 +1,119 @@
+## 0.7.0 (2020-06-11)
+
+### Breaking changes
+
+`EditorView.startMouseSelection` has been replaced with the `EditorView.mouseSelectionStyle` facet, which works somewhat differently.
+
+The `indentUnit` facet now takes a string, rather than a number, and allows a string of tabs to be specified.
+
+The text package no longer exports `isExtendingChar`. Use the new cluster break functions instead.
+
+Text direction is now represented as an enum (`Direction` from the view package) rather than a string.
+
+Selection ranges should be created with `EditorSelection.range` and `EditorSelection.cursor` now, rather than directly calling the constructor.
+
+The by-group selection motion commands like `moveWordLeft` have been renamed to contain 'group' rather than 'word' (`moveGroupLeft`).
+
+`EditorView.movePos` has been removed. Use the new cursor motion methods instead.
+
+The `keyboard` and `pointer` values for `Transaction.userEvent` have been renamed `keyboardselection` and `pointerselection`.
+
+Commands that move the selection are now prefixed with cursor (`cursorCharLeft`), and those that extend the selection are prefixed with select (`selectGroupForward`).
+
+Key bindings are no longer specified as objects, but as arrays of `KeyBinding` specs, one per binding.
+
+Matching delimiters in syntax trees are now registered with `NodeProp.openedBy`/`closedBy` instead of custom props exported from the syntax module.
+
+The lint package's interface was simplified to automatically enable the required extensions when necessary, rather than requiring them to be enabled when configuring the editor.
+
+### Bug fixes
+
+Indentation-related commands will now use tabs to indent when appropriate.
+
+The default key bindings on macOS are now a lot closer to how native editor interfaces behave.
+
+### New features
+
+The editor view now has a `scrollPosIntoView` method to scroll a given document position into view.
+
+Add a new package `rectangular-selection`, which implements rectangle selection on alt-drag.
+
+New `indentWithTabs` getter on the editor state, which indicates whether indentation should use tabs.
+
+The commands package now exports `indentMore` and `indentLess` commands, which unconditionally add/remove indentation on selected lines.
+
+The editor view now has a `bidiSpans` method to retrieve the text order for a given line.
+
+The text package now exports `nextClusterBreak` and `prevClusterBreak`, which can be used to find grapheme cluster breaks in a string.
+
+The new `EditorView` methods `moveByChar`, `moveByGroup`, and `moveToLineBoundary` can be used to compute cursor motion (in a bidi-aware way).
+
+The view method `moveVertically` can now be used to compute vertical cursor motion.
+
+`Line` objects now have a `findClusterBreak` method for more convenient by-cluster motion.
+
+New commands `movePageUp/Down`, `extendPageUp/Down`, `deleteGroupForward/Backward`.
+
+The view class now has a `lineWrapping` property that indicates whether line wrapping is enabled for the editor.
+
+`EditorView.lineWrapping` now holds an extension that enables line wrapping.
+
+Add forward/backward variants of many commands that only support left/right before.
+
+New commands `transposeChars`, `splitLine`, and `deleteToLineEnd` to support macOS's Emacs-style default bindings. New export `emacsStyleBaseKeymap` that contains these and other Emacs-style bindings.
+
+New commands `moveLineBoundaryForward`, `moveLineBoundaryBackward`, `extendLineBoundaryForward`, and `extendLineBoundaryBackward`.
+
+New commands `extendDocStart` and `extendDocEnd`.
+
+When copying or cutting without a selection, the editor will copy or cut by line.
+
+When pasting N lines while the selection has N active ranges, the editor will now paste one line into each range.
+
+The new `EditorState.lineBreak` property gives you the proper line break string for a state.
+
+New commands `moveLineUp/Down` and `copyLineUp/Down`, bound to Alt-ArrowUp/Down and Shift-Alt-ArrowUp/Down by default.
+
+New command `deleteLine`, bound to Shift-Mod-k by default.
+
+New commands `cursorMatchingBracket` and `selectMatchingBracket`.
+
+It is now possible to customize the DOM element that editor panels are placed into.
+
+The `panel` extension now has a `getPanel` accessor to retrieve the panel created by a given constructor function.
+
+New command `nextLintDiagnostic` to jump to the next linter message.
+
+The new `selectParentSyntax` command selects the syntax node around the selection.
+
+New commands `cursor`/`selectSyntaxLeft`/`Right` to jump over tokens or bracketed syntactic constructs.
+
+New commands `foldAll` and `unfoldAll`.
+
+The fold package now exports a default keymap `foldKeymap`
+
+The comment package now exports a `commentKeymap` binding.
+
+New command `selectLine`.
+
+The new `highlightActiveLine` extension can be used to style lines with a cursor on them.
+
+New extension `highlightSelectionMatches`, which enables highlighting of text that matches the current selection.
+
+When defining a highlighter, it is now possible to assign a style to multiple tags by separating them by commas in the property name.
+
+New theme package: theme-one-dark.
+
+Key bindings may now involve multiple key strokes (specified as a space-separated string of key names).
+
+Key bindings that include a `preventDefault` property will now cause the key event to be stopped even when the bound command(s) return false.
+
+New command: `deleteTrailingWhitespace`.
+
+New command `selectSelectionMatches` that selects all instances of the currently selected string.
+
+You can now pass a `parent` option to a view to append it to the DOM right away.
+
 ## 0.6.0 (2020-05-13)
 
 ### New features
