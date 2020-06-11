@@ -70,13 +70,19 @@ function getFoldable(state: EditorState, from: number, to: number) {
   return state.facet(EditorState.foldable).reduce<Range | null>((value, f) => value || f(state, from, to), null)
 }
 
+const tag = typeof Symbol == "undefined" ? "__codeFolding" : Symbol("codeFolding")
+
+function maybeEnable(state: EditorState) {
+  return state.field(foldState, false) ? undefined : {[tag]: codeFolding()}
+}
+
 /// Fold the lines that are selected, if possible.
 export const foldCode: Command = view => {
-  if (!view.state.field(foldState, false)) return false
   for (let line of selectedLines(view)) {
     let range = getFoldable(view.state, line.from, line.to)
     if (range) {
-      view.dispatch(view.state.update({effects: foldEffect.of(range)}))
+      view.dispatch(view.state.update({effects: foldEffect.of(range),
+                                       replaceExtensions: maybeEnable(view.state)}))
       return true
     }
   }
@@ -103,7 +109,8 @@ export const foldAll: Command = view => {
     if (range) effects.push(foldEffect.of(range))
     pos = (range ? view.lineAt(range.to) : line).to + 1
   }
-  if (effects.length) view.dispatch(view.state.update({effects}))
+  if (effects.length) view.dispatch(view.state.update({effects,
+                                                       replaceExtensions: maybeEnable(view.state)}))
   return !!effects.length
 }
 
@@ -130,8 +137,7 @@ export const foldKeymap: readonly KeyBinding[] = [
   {key: "Ctrl-Alt-]", run: unfoldAll}
 ]
 
-/// Used to configure the code folding extending.
-export interface FoldConfig {
+interface FoldConfig {
   /// A function that creates the DOM element used to indicate the
   /// position of folded code. When not given, the `placeholderText`
   /// option will be used instead.
@@ -150,13 +156,11 @@ const foldConfig = Facet.define<FoldConfig, Required<FoldConfig>>({
   combine(values) { return combineConfig(values, defaultConfig) }
 })
 
-/// Create an extension that enables code folding.
-export function codeFolding(config: FoldConfig = {}): Extension {
-  return [
-    foldConfig.of(config),
-    foldState,
-    baseTheme
-  ]
+/// Create an extension that configures code folding.
+export function codeFolding(config?: FoldConfig): Extension {
+  let result = [foldState, baseTheme]
+  if (config) result.push(foldConfig.of(config))
+  return result
 }
 
 class FoldWidget extends WidgetType<null> {
@@ -167,7 +171,6 @@ class FoldWidget extends WidgetType<null> {
     if (conf.placeholderDOM) return conf.placeholderDOM()
     let element = document.createElement("span")
     element.textContent = conf.placeholderText
-    // FIXME should this have a role? does it make sense to allow focusing by keyboard?
     element.setAttribute("aria-label", state.phrase("folded code"))
     element.title = state.phrase("unfold")
     element.className = themeClass("foldPlaceholder")
@@ -219,6 +222,7 @@ class FoldMarker extends GutterMarker {
 /// unfold the line.
 export function foldGutter(config: FoldGutterConfig = {}): Extension {
   let fullConfig = fillConfig(config, foldGutterDefaults)
+  let canFold = new FoldMarker(fullConfig, true), canUnfold = new FoldMarker(fullConfig, false)
   return [
     gutter({
       style: "foldGutter",
@@ -226,8 +230,8 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
         // FIXME optimize this. At least don't run it for updates that
         // don't change anything relevant
         let folded = foldInside(view.state, line.from, line.to)
-        if (folded) return new FoldMarker(fullConfig, false)
-        if (getFoldable(view.state, line.from, line.to)) return new FoldMarker(fullConfig, true)
+        if (folded) return canUnfold
+        if (getFoldable(view.state, line.from, line.to)) return canFold
         return null
       },
       initialSpacer() {
