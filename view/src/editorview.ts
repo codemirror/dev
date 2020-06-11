@@ -32,6 +32,10 @@ interface EditorConfig {
   /// Your implementation, if provided, should probably call the
   /// view's [`update` method](#view.EditorView.update).
   dispatch?: (tr: Transaction) => void
+  /// When given, the editor is immediately appended to the given
+  /// element on creation. (Otherwise, you'll have to place the view's
+  /// [`dom`](#view.EditorView.dom) element in the document yourself.)
+  parent?: Element
 }
 
 export const enum UpdateState {
@@ -128,7 +132,10 @@ export class EditorView {
   /// Construct a new view. You'll usually want to put `view.dom` into
   /// your document after creating a view, so that the user can see
   /// it.
-  constructor(config: EditorConfig = {}) {
+  constructor(
+    /// Configuration options.
+    config: EditorConfig = {}
+  ) {
     this.contentDOM = document.createElement("div")
 
     this.scrollDOM = document.createElement("div")
@@ -154,6 +161,8 @@ export class EditorView {
 
     ensureGlobalHandler()
     this.requestMeasure()
+
+    if (config.parent) config.parent.appendChild(this.dom)
   }
 
   /// Update the view for the given array of transactions. This will
@@ -183,7 +192,7 @@ export class EditorView {
     if (redrawn || scrollTo || this.viewState.mustEnforceCursorAssoc) this.requestMeasure()
   }
 
-  updatePlugins(update: ViewUpdate) {
+  private updatePlugins(update: ViewUpdate) {
     let prevSpecs = update.prevState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
     if (prevSpecs != specs) {
       let newPlugins = [], reused = []
