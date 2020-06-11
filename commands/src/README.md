@@ -1,58 +1,119 @@
-@pcBaseKeymap
+This package exports a collection of generic editing commands, along
+with key bindings for a lot of them.
 
-@macBaseKeymap
+### Keymaps
 
-@baseKeymap
+@standardKeymap
 
-### Cursor Motion
+@defaultKeymap
 
-@moveCharLeft
+@emacsStyleKeymap
 
-@moveCharRight
+### Selection
 
-@moveGroupLeft
+@simplifySelection
 
-@moveGroupRight
+#### By character
 
-@moveLineUp
+@cursorCharLeft
 
-@moveLineDown
+@selectCharLeft
 
-@movePageUp
+@cursorCharRight
 
-@movePageDown
+@selectCharRight
 
-@moveLineStart
+@cursorCharForward
 
-@moveLineEnd
+@selectCharForward
+
+@cursorCharBackward
+
+@selectCharBackward
+
+#### By group
+
+@cursorGroupLeft
+
+@selectGroupLeft
+
+@cursorGroupRight
+
+@selectGroupRight
+
+@cursorGroupForward
+
+@selectGroupForward
+
+@cursorGroupBackward
+
+@selectGroupBackward
+
+#### Vertical motion
+
+@cursorLineUp
+
+@selectLineUp
+
+@cursorLineDown
+
+@selectLineDown
+
+@cursorPageUp
+
+@selectPageUp
+
+@cursorPageDown
+
+@selectPageDown
+
+#### By line boundary
+
+@cursorLineBoundaryForward
+
+@selectLineBoundaryForward
+
+@cursorLineBoundaryBackward
+
+@selectLineBoundaryBackward
+
+@cursorLineStart
+
+@selectLineStart
+
+@cursorLineEnd
+
+@selectLineEnd
+
+@selectLine
+
+#### By document boundary
+
+@cursorDocStart
 
 @selectDocStart
+
+@cursorDocEnd
 
 @selectDocEnd
 
 @selectAll
 
-### Selection Extension
+#### By syntax
 
-@extendCharLeft
+@cursorSyntaxLeft
 
-@extendCharRight
+@selectSyntaxLeft
 
-@extendGroupLeft
+@cursorSyntaxRight
 
-@extendGroupRight
+@selectSyntaxRight
 
-@extendLineUp
+@selectParentSyntax
 
-@extendLineDown
+@cursorMatchingBracket
 
-@extendPageUp
-
-@extendPageDown
-
-@extendLineStart
-
-@extendLineEnd
+@selectMatchingBracket
 
 ### Deletion
 
@@ -64,12 +125,36 @@
 
 @deleteGroupForward
 
-### Indentation
+@deleteToLineEnd
 
-@insertNewlineAndIndent
+@deleteTrailingWhitespace
+
+### Line manipulation
+
+@splitLine
+
+@moveLineUp
+
+@moveLineDown
+
+@copyLineUp
+
+@copyLineDown
+
+@deleteLine
+
+### Indentation
 
 @indentSelection
 
 @indentMore
 
 @indentLess
+
+### Character manipulation
+
+@transposeChars
+
+@insertNewline
+
+@insertNewlineAndIndent

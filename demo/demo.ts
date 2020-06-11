@@ -4,7 +4,7 @@ import {keymap} from "@codemirror/next/keymap"
 import {history, historyKeymap} from "@codemirror/next/history"
 import {foldGutter, foldKeymap} from "@codemirror/next/fold"
 import {lineNumbers} from "@codemirror/next/gutter"
-import {baseKeymap, indentSelection} from "@codemirror/next/commands"
+import {defaultKeymap, indentSelection} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"
 import {closeBrackets} from "@codemirror/next/closebrackets"
 import {specialChars} from "@codemirror/next/special-chars"
@@ -50,7 +50,7 @@ let state = EditorState.create({doc: `<script>
   highlightActiveLine(),
   highlightSelectionMatches(),
   keymap([
-    ...baseKeymap,
+    ...defaultKeymap,
     ...searchKeymap,
     ...historyKeymap,
     ...foldKeymap,
