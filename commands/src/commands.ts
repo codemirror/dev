@@ -484,7 +484,8 @@ function getIndentation(cx: IndentContext, pos: number): number {
 }
 
 /// Replace the selection with a newline and indent the newly created
-/// line(s).
+/// line(s). If the current line consists only of whitespace, this
+/// will also delete that whitespace.
 export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean => {
   let i = 0, indentation = state.selection.ranges.map(r => {
     let indent = getIndentation(new IndentContext(state, undefined, r.from), r.from)
@@ -493,6 +494,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
   let changes = state.changeByRange(({from, to}) => {
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.end && /s/.test(line.slice(to - line.start, to + 1 - line.start))) to++
+    if (from > line.start && from < line.start + 100 && !/\S/.test(line.slice(0, from))) from = line.start
     return {changes: {from, to, insert: Text.of(["", indentString(state, indent)])},
             range: EditorSelection.cursor(from + 1 + indent)}
   })
