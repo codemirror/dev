@@ -1,5 +1,5 @@
-@Keymap
+@KeyBinding
 
 @keymap
 
-@NormalizedKeymap
+@runScopeHandlers

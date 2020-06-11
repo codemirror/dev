@@ -24,9 +24,7 @@ export class AnnotationType<T> {
   of(value: T): Annotation<T> { return new Annotation(this, value) }
 }
 
-/// Values passed to
-/// [`StateEffect.define`](#state.StateEffect^define).
-export interface StateEffectSpec<Value> {
+interface StateEffectSpec<Value> {
   /// Provides a way to map an effect like this through a position
   /// mapping. When not given, the effects will simply not be mapped.
   /// When the function returns `undefined`, that means the mapping
@@ -111,8 +109,8 @@ export type TransactionSpec = {
   /// scroll the current selection into view.
   scrollIntoView?: boolean,
   /// By default, transactions can be modified by [change
-  /// filters](#state.EditorState.changeFilter) and [transaction
-  /// filters](#state.EditorState.transactionFilter). You can set this
+  /// filters](#state.EditorState^changeFilter) and [transaction
+  /// filters](#state.EditorState^transactionFilter). You can set this
   /// to `false` to disable that.
   filter?: boolean,
   /// When given, the state will be reconfigured to use a new set of

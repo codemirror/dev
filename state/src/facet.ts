@@ -3,8 +3,7 @@ import {EditorState} from "./state"
 
 let nextID = 0
 
-/// Config object passed to [`defineFacet`](#state.defineFacet).
-export type FacetConfig<Input, Output> = {
+type FacetConfig<Input, Output> = {
   /// How to combine the input values into a single output value. When
   /// not given, the array of input values becomes the output. This
   /// will immediately be called on creating the facet, with an empty
@@ -67,8 +66,9 @@ export class Facet<Input, Output = readonly Input[]> {
   /// this value depends on, since your function is only called again
   /// for a new state when one of those parts changed.
   ///
-  /// In most cases, you'll want to use
-  /// [`StateField.provide`](#state.StateField^provide) instead.
+  /// In most cases, you'll want to use the
+  /// [`provide`](#state.StateField^define^config.provide) option when
+  /// defining a field instead.
   compute(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
     if (this.isStatic) throw new Error("Can't compute a static facet")
     return new FacetProvider<Input>(deps, this, Provider.Single, get)
@@ -82,15 +82,15 @@ export class Facet<Input, Output = readonly Input[]> {
   }
 
   /// Helper method for registering a facet source with a state field
-  /// via its [`provide`](#state.StateFieldSpec.provide) option.
+  /// via its [`provide`](#state.StateField^define^config.provide) option.
   /// Returns a value that can be passed to that option to make the
   /// field automatically provide a value for this facet.
   from<T>(get: (value: T) => Input, prec?: Precedence): (field: StateField<T>) => Extension {
     return field => maybePrec(prec, this.compute([field], state => get(state.field(field))))
   }
 
-  /// Helper for [providing](#state.StateFieldSpec.provide) a dynamic
-  /// number of values for this facet from a state field.
+  /// Helper for [providing](#state.StateField^define^config.provide)
+  /// a dynamic number of values for this facet from a state field.
   nFrom<T>(get: (value: T) => readonly Input[], prec?: Precedence): (field: StateField<T>) => Extension {
     return field => maybePrec(prec, this.computeN([field], state => get(state.field(field))))
   }
@@ -181,12 +181,7 @@ function dynamicFacetSlot<Input, Output>(
   }
 }
 
-/// Parameters passed when creating a
-/// [`StateField`](#state.StateField^define). The `Value` type
-/// parameter refers to the content of the field. Since it will be
-/// stored in (immutable) state objects, it should be an immutable
-/// value itself.
-export type StateFieldSpec<Value> = {
+type StateFieldSpec<Value> = {
   /// Creates the initial value for the field when a state is created.
   create: (state: EditorState) => Value,
 
@@ -281,7 +276,7 @@ export type Extension = {[isExtension]: true} | {extension: Extension} | readonl
 /// Individual extension values can be assigned a precedence to
 /// override this. Extensions that do not have a precedence set get
 /// the precedence of the nearest parent with a precedence, or
-/// [`Default`](#state.Precedence.Default) if there is no such parent.
+/// [`Default`](#state.Precedence^Default) if there is no such parent.
 /// The final ordering of extensions is determined by first sorting by
 /// precedence and then by order within each precedence.
 export class Precedence {

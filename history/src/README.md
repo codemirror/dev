@@ -1,6 +1,6 @@
-@HistoryConfig
-
 @history
+
+@historyKeymap
 
 @undo
 

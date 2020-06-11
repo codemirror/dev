@@ -15,7 +15,7 @@ export enum MapMode {
   TrackAfter
 }
 
-/// A change description is a variant of [change set](#text.ChangeSet)
+/// A change description is a variant of [change set](#state.ChangeSet)
 /// that doesn't store the inserted text. As such, it can't be
 /// applied, but is cheaper to store and manipulate.
 export class ChangeDesc {
@@ -177,7 +177,7 @@ export class ChangeDesc {
 }
 
 /// This type is used as argument to
-/// [`EditorState.changeSet`](#state.EditorState.changeSet) and in the
+/// [`EditorState.changes`](#state.EditorState.changes) and in the
 /// [`changes` field](#state.TransactionSpec.changes) of transaction
 /// specs to succinctly describe document changes. It may either be a
 /// plain object describing a change (a deletion, insertion, or
@@ -259,7 +259,7 @@ export class ChangeSet extends ChangeDesc {
     iterChanges(this, f, individual)
   }
 
-  /// Get a [change description](#text.ChangeDesc) for this change
+  /// Get a [change description](#state.ChangeDesc) for this change
   /// set.
   get desc() { return new ChangeDesc(this.sections) }
 

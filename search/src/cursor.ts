@@ -8,7 +8,7 @@ export class SearchCursor implements Iterator<{from: number, to: number}>{
   private iter: TextIterator
   /// The current match (only holds a meaningful value after
   /// [`next`](#search.SearchCursor.next) has been called and when
-  /// `done` is true).
+  /// `done` is false).
   value = {from: 0, to: 0}
   /// Whether the end of the iterated region has been reached.
   done = false
@@ -30,7 +30,7 @@ export class SearchCursor implements Iterator<{from: number, to: number}>{
   /// Text is always normalized with
   /// [`.normalize("NFKD")`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)
   /// (when supported).
-  constructor(readonly text: Text, query: string,
+  constructor(text: Text, query: string,
               from: number = 0, to: number = text.length,
               normalize?: (string: string) => string) {
     this.iter = text.iterRange(from, to)

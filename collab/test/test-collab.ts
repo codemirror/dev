@@ -1,7 +1,7 @@
 import {EditorState, Transaction, StateField, StateEffect, Extension, ChangeDesc} from "@codemirror/next/state"
 import {history, undo, redo, isolateHistory} from "@codemirror/next/history"
 import ist from "ist"
-import {collab, CollabConfig, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
+import {collab, receiveUpdates, sendableUpdates, Update, getClientID, getSyncedVersion} from "@codemirror/next/collab"
 
 class DummyServer {
   states: EditorState[] = []
@@ -9,7 +9,7 @@ class DummyServer {
   clientIDs: string[] = []
   delayed: number[] = []
 
-  constructor(doc: string = "", config: {n?: number, extensions?: Extension[], collabConf?: CollabConfig} = {}) {
+  constructor(doc: string = "", config: {n?: number, extensions?: Extension[], collabConf?: any} = {}) {
     let {n = 2, extensions = [], collabConf = {}} = config
     for (let i = 0; i < n; i++)
       this.states.push(EditorState.create({doc, extensions: [history(), collab(collabConf), ...extensions]}))
@@ -256,7 +256,7 @@ describe("collab", () => {
 
     let s = new DummyServer("hello", {
       extensions: [marks],
-      collabConf: {sharedEffects(tr) { return tr.effects.filter(e => e.is(addMark)) }}
+      collabConf: {sharedEffects(tr: Transaction) { return tr.effects.filter(e => e.is(addMark)) }}
     })
     s.delay(0, () => {
       s.delay(1, () => {

@@ -1,8 +1,7 @@
 import {EditorView, ViewPlugin, PluginField, ViewUpdate, themeClass} from "@codemirror/next/view"
 import {Facet, Extension} from "@codemirror/next/state"
 
-/// Configuration options passed to [`panels`](#panel.panels).
-export type PanelConfig = {
+type PanelConfig = {
   /// By default, panels will be placed inside the editor's DOM
   /// structure. You can use this option to override where panels with
   /// `top: true` are placed.

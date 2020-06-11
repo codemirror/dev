@@ -8,3 +8,5 @@ partially scrolled out of view.
 @Panel
 
 @showPanel
+
+@getPanel

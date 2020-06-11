@@ -179,7 +179,7 @@ function selectByGroup(view: EditorView, forward: boolean) {
   return extendSel(view, range => view.moveByGroup(range, forward))
 }
 
-/// Move the selection head one [group](#commands.moveGroupLeft) to
+/// Move the selection head one [group](#commands.cursorGroupLeft) to
 /// the left.
 export const selectGroupLeft: Command = view => selectByGroup(view, view.textDirection != Direction.LTR)
 /// Move the selection head one group to the right.
@@ -588,8 +588,8 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
 ///  - Ctrl-Alt-h: [`deleteGroupBackward`](#commands.deleteGroupBackward)
 ///  - Ctrl-o: [`splitLine`](#commands.splitLine)
 ///  - Ctrl-t: [`transposeChars`](#commands.transposeChars)
-///  - Alt-f: [`cursorGroupForward`](#commands.cursorGroupForward) ([`selectGroupForward`](#command.selectGroupForward) with Shift)
-///  - Alt-b: [`cursorGroupBackward`](#commands.cursorGroupBackward) ([`selectGroupBackward`](#command.selectGroupBackward) with Shift)
+///  - Alt-f: [`cursorGroupForward`](#commands.cursorGroupForward) ([`selectGroupForward`](#commands.selectGroupForward) with Shift)
+///  - Alt-b: [`cursorGroupBackward`](#commands.cursorGroupBackward) ([`selectGroupBackward`](#commands.selectGroupBackward) with Shift)
 ///  - Alt-<: [`cursorDocStart`](#commands.cursorDocStart)
 ///  - Alt->: [`cursorDocEnd`](#commands.cursorDocEnd)
 ///  - Ctrl-v: [`cursorPageDown`](#commands.cursorPageDown)
@@ -636,16 +636,16 @@ export const emacsStyleKeymap: readonly KeyBinding[] = [
 ///  - Cmd-ArrowRight (on macOS): [`cursorLineEnd`](#commands.cursorLineEnd) ([`selectLineEnd`](#commands.selectLineEnd) with Shift)
 ///  - ArrowUp: [`cursorLineUp`](#commands.cursorLineUp) ([`selectLineUp`](#commands.selectLineUp) with Shift)
 ///  - ArrowDown: [`cursorLineDown`](#commands.cursorLineDown) ([`selectLineDown`](#commands.selectLineDown) with Shift)
-///  - Cmd-ArrowUp (on macOS): [`cursorDocStart`](#commands.cursorDocStart) ([`selectDocStart`](commands.selectDocStart) with Shift)
-///  - Cmd-ArrowDown (on macOS): [`cursorDocEnd`](#commands.cursorDocEnd) ([`selectDocEnd`](commands.selectDocEnd) with Shift)
-///  - Ctrl-ArrowUp (on macOS): [`cursorPageUp`](#commands.cursorPageUp) ([`selectPageUp`](commands.selectPageUp) with Shift)
-///  - Ctrl-ArrowDown (on macOS): [`cursorPageDown`](#commands.cursorPageDown) ([`selectPageDown`](commands.selectPageDown) with Shift)
+///  - Cmd-ArrowUp (on macOS): [`cursorDocStart`](#commands.cursorDocStart) ([`selectDocStart`](#commands.selectDocStart) with Shift)
+///  - Cmd-ArrowDown (on macOS): [`cursorDocEnd`](#commands.cursorDocEnd) ([`selectDocEnd`](#commands.selectDocEnd) with Shift)
+///  - Ctrl-ArrowUp (on macOS): [`cursorPageUp`](#commands.cursorPageUp) ([`selectPageUp`](#commands.selectPageUp) with Shift)
+///  - Ctrl-ArrowDown (on macOS): [`cursorPageDown`](#commands.cursorPageDown) ([`selectPageDown`](#commands.selectPageDown) with Shift)
 ///  - PageUp: [`cursorPageUp`](#commands.cursorPageUp) ([`selectPageUp`](#commands.selectPageUp) with Shift)
 ///  - PageDown: [`cursorPageDown`](#commands.cursorPageDown) ([`selectPageDown`](#commands.selectPageDown) with Shift)
-///  - Home: [`cursorLineBoundaryBackward`](#commands.cursorLineBoundaryBackward) ([`selectLineBoundaryBackward`](commands.selectLineBoundaryBackward) with Shift)
-///  - End: [`cursorLineBoundaryForward`](#commands.cursorLineBoundaryForward) ([`selectLineBoundaryForward`](commands.selectLineBoundaryForward) with Shift)
-///  - Ctrl-Home (Cmd-Home on macOS): [`cursorDocStart`](#commands.cursorDocStart) ([`selectDocStart`](#selectDocStart) with Shift)
-///  - Ctrl-End (Cmd-Home on macOS): [`cursorDocEnd`](#commands.cursorDocEnd) ([`selectDocEnd`](#selectDocEnd) with Shift)
+///  - Home: [`cursorLineBoundaryBackward`](#commands.cursorLineBoundaryBackward) ([`selectLineBoundaryBackward`](#commands.selectLineBoundaryBackward) with Shift)
+///  - End: [`cursorLineBoundaryForward`](#commands.cursorLineBoundaryForward) ([`selectLineBoundaryForward`](#commands.selectLineBoundaryForward) with Shift)
+///  - Ctrl-Home (Cmd-Home on macOS): [`cursorDocStart`](#commands.cursorDocStart) ([`selectDocStart`](#commands.selectDocStart) with Shift)
+///  - Ctrl-End (Cmd-Home on macOS): [`cursorDocEnd`](#commands.cursorDocEnd) ([`selectDocEnd`](#commands.selectDocEnd) with Shift)
 ///  - Enter: [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent)
 ///  - Ctrl-a (Cmd-a on macOS): [`selectAll`](#commands.selectAll)
 ///  - Backspace: [`deleteCharBackward`](#commands.deleteCharBackward)

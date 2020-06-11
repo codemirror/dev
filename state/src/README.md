@@ -17,10 +17,13 @@ object.
 
 @Text
 
+@CharCategory
+
 ### Changes and Transactions
 
-CodeMirror treats changes to the document as [objects](#state.Change),
-which are usually part of a [transaction](#state.Transaction).
+CodeMirror treats changes to the document as
+[objects](#state.ChangeSet), which are usually part of a
+[transaction](#state.Transaction).
 
 This is how you'd make a change to a document (replacing “world” with
 “editor”) and create a new state with the updated document:
@@ -45,9 +48,9 @@ console.log(transaction.state.doc.toString()) // "hello editor"
 
 @Annotation
 
-@StateEffect
+@AnnotationType
 
-@StateEffectSpec
+@StateEffect
 
 @StateEffectType
 
@@ -62,11 +65,7 @@ extensions for the editor state.
 
 @Extension
 
-@StateFieldSpec
-
 @StateField
-
-@FacetConfig
 
 @Facet
 

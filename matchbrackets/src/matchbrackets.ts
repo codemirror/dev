@@ -3,16 +3,16 @@ import {EditorView, themeClass} from "@codemirror/next/view"
 import {Decoration, DecorationSet} from "@codemirror/next/view"
 import {Tree, Subtree, NodeType, NodeProp} from "lezer-tree"
 
-/// Configuration options
-export interface Config {
+interface Config {
   /// Whether the bracket matching should look at the character after
   /// the cursor when matching (if the one before isn't a bracket).
   /// Defaults to true.
   afterCursor?: boolean,
   /// The bracket characters to match, as a string of pairs. Defaults
   /// to `"()[]{}"`. Note that these are only used as fallback when
-  /// there is no [matching information](#syntax.openNodeProp) in the
-  /// syntax tree.
+  /// there is no [matching
+  /// information](https://lezer.codemirror.net/docs/ref/#tree.NodeProp^closedBy)
+  /// in the syntax tree.
   brackets?: string,
   /// The maximum distance to scan for matching brackets. This is only
   /// relevant for brackets not encoded in the syntax tree. Defaults

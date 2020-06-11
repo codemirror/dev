@@ -7,7 +7,7 @@ export interface Update {
   changes: ChangeSet,
   /// The effects in this update. There'll only ever be effects here
   /// when you configured your collab extension with a
-  /// [`sharedEffects`](#collab.CollabOptions.sharedEffects) option.
+  /// [`sharedEffects`](#collab.collab^config.sharedEffects) option.
   effects?: readonly StateEffect<any>[]
 }
 
@@ -36,8 +36,7 @@ class CollabState {
     readonly unconfirmed: readonly LocalUpdate[]) {}
 }
 
-/// Configuration passed to [`collab`](#collab.collab).
-export type CollabConfig = {
+type CollabConfig = {
   /// The starting document version. Will default to 0.
   startVersion?: number,
   /// This client's identifying [ID](#collab.getClientID). Will be a

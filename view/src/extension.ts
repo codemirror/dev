@@ -59,7 +59,7 @@ export interface PluginValue {
 
 /// Plugin fields are a mechanism for allowing plugins to provide
 /// values that can be retrieved through the
-/// [`pluginValues`](#view.EditorView.pluginValues) view method.
+/// [`pluginField`](#view.EditorView.pluginField) view method.
 export class PluginField<T> {
   static define<T>() { return new PluginField<T>() }
 

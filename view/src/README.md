@@ -1,15 +1,17 @@
 The “view” is the part of the editor that the user sees—a DOM
 component that displays the editor state and allows text input.
 
-@EditorConfig
-
 @EditorView
+
+@themeClass
 
 @BlockType
 
 @BlockInfo
 
-@themeClass
+@Direction
+
+@BidiSpan
 
 ### Extending the View
 
@@ -35,14 +37,6 @@ things are drawn is by providing decorations, which can add styling or
 replace content with an alternative representation.
 
 @Decoration
-
-@MarkDecorationSpec
-
-@WidgetDecorationSpec
-
-@LineDecorationSpec
-
-@ReplaceDecorationSpec
 
 @DecorationSet
 

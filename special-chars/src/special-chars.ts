@@ -3,8 +3,7 @@ import {combineConfig, Facet, Extension} from "@codemirror/next/state"
 import {countColumn} from "@codemirror/next/text"
 import {StyleModule} from "style-mod"
 
-/// Configure the special character highlighter.
-export interface SpecialCharConfig {
+interface SpecialCharConfig {
   /// An optional function that renders the placeholder elements.
   render?: ((code: number, description: string | null, placeHolder: string) => HTMLElement) | null
   /// Regular expression that matches the special characters to

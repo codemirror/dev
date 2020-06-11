@@ -1,5 +1,5 @@
-import {EditorView, ViewPlugin, Decoration, DecorationSet, MarkDecorationSpec,
-        WidgetDecorationSpec, WidgetType, ViewUpdate, Command, themeClass, logException} from "@codemirror/next/view"
+import {EditorView, ViewPlugin, Decoration, DecorationSet,
+        WidgetType, ViewUpdate, Command, themeClass, logException} from "@codemirror/next/view"
 import {StateEffect, StateField, Extension, TransactionSpec, EditorState} from "@codemirror/next/state"
 import {hoverTooltip} from "@codemirror/next/tooltip"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
@@ -109,11 +109,11 @@ const lintState = StateField.define<LintState>({
             ? Decoration.mark({
               attributes: {class: themeClass("lintRange." + d.severity)},
               diagnostic: d
-            } as MarkDecorationSpec).range(d.from, d.to)
+            }).range(d.from, d.to)
           : Decoration.widget({
             widget: new DiagnosticWidget(d),
             diagnostic: d
-          } as WidgetDecorationSpec).range(d.from)
+          }).range(d.from)
         }))
         value = new LintState(ranges, value.panel, findDiagnostic(ranges))
       } else if (effect.is(togglePanel)) {

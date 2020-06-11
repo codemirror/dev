@@ -22,15 +22,12 @@ export interface EditorStateConfig {
   /// The starting selection. Defaults to a cursor at the very start
   /// of the document.
   selection?: EditorSelection | {anchor: number, head?: number}
-  /// [State](#state.EditorState^extend) or
-  /// [view](#view.EditorView^extend) extensions to associate with
-  /// this state.
+  /// [Extension(s)](#state.Extension) to associate with this state.
   extensions?: Extension
 }
 
 /// The editor state class is a persistent (immutable) data structure.
-/// To update a state, you [create](#state.EditorState.t) and
-/// [apply](#state.Transaction.apply) a
+/// To update a state, you [create](#state.EditorState.update) a
 /// [transaction](#state.Transaction), which produces a _new_ state
 /// instance, without modifying the original object.
 ///
@@ -313,7 +310,7 @@ export class EditorState {
   /// A facet used to register extra [language
   /// data](#state.EditorState.languageDataAt) with a language. Values
   /// are objects with the target [document
-  /// type](#state.Syntax.topNodeType) in their `type` property, and any
+  /// type](#state.Syntax.docNodeType) in their `type` property, and any
   /// associated data in other properties.
   static addLanguageData = addLanguageData
 

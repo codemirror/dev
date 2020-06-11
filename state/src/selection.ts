@@ -119,8 +119,8 @@ export class EditorSelection {
   }
 
   /// Get the primary selection range. Usually, you should make sure
-  /// your code applies to _all_ ranges, by using transaction methods
-  /// like [`forEachRange`](#state.Transaction.forEachRange).
+  /// your code applies to _all_ ranges, by using methods like
+  /// [`changeByRange`](#state.EditorState.changeByRange).
   get primary(): SelectionRange { return this.ranges[this.primaryIndex] }
 
   /// Make sure the selection only has one range. Returns a selection

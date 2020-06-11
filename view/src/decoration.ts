@@ -4,9 +4,7 @@ import {WidgetView} from "./inlineview"
 import {attrsEq} from "./attributes"
 import {EditorView} from "./editorview"
 
-/// Options passed when [creating](#view.Decoration^mark) a mark
-/// decoration.
-export interface MarkDecorationSpec {
+interface MarkDecorationSpec {
   /// Whether the mark covers its start and end position or not. This
   /// influences whether content inserted at those positions becomes
   /// part of the mark. Defaults to false.
@@ -26,11 +24,13 @@ export interface MarkDecorationSpec {
   /// range—content is split on mark starts and ends, and each piece
   /// gets its own element.
   tagName?: string
+  /// Decoration specs allow other properties, which can be retrieved
+  /// through the decoration's [`spec`](#view.Decoration.spec)
+  /// property.
+  [other: string]: any
 }
 
-/// Options passed when [creating](#view.Decoration^widget) a widget
-/// decoration.
-export interface WidgetDecorationSpec {
+interface WidgetDecorationSpec {
   /// The type of widget to draw here.
   widget: WidgetType
   /// Which side of the given position the widget is on. When this is
@@ -44,11 +44,11 @@ export interface WidgetDecorationSpec {
   /// between lines, or an inline widget (the default) which is drawn
   /// between the surrounding text.
   block?: boolean
+  /// Other properties are allowed.
+  [other: string]: any
 }
 
-/// Options passed when [creating](#view.Decoration^replace) a
-/// replacing decoration.
-export interface ReplaceDecorationSpec {
+interface ReplaceDecorationSpec {
   /// An optional widget to drawn in the place of the replaced
   /// content.
   widget?: WidgetType
@@ -62,13 +62,15 @@ export interface ReplaceDecorationSpec {
   inclusiveEnd?: boolean
   /// Whether this is a block-level decoration. Defaults to false.
   block?: boolean
+  /// Other properties are allowed.
+  [other: string]: any
 }
 
-/// Options passed when [creating](#view.Decoration^line) a line
-/// decoration.
-export interface LineDecorationSpec {
+interface LineDecorationSpec {
   /// DOM attributes to add to the element wrapping the line.
   attributes?: {[key: string]: string}
+  /// Other properties are allowed.
+  [other: string]: any
 }
 
 /// Widgets added to the content are described by subclasses of this

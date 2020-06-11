@@ -20,8 +20,7 @@ export const isolateHistory = Annotation.define<"before" | "after" | "full">()
 /// be undone (and redone again).
 export const invertedEffects = Facet.define<(tr: Transaction) => readonly StateEffect<any>[]>()
 
-/// Options given when creating a history extension.
-export interface HistoryConfig {
+interface HistoryConfig {
   /// The minimum depth (amount of events) to store. Defaults to 100.
   minDepth?: number,
   /// The maximum time (in milliseconds) that adjacent events can be

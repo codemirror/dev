@@ -30,8 +30,7 @@ GutterMarker.prototype.mapMode = MapMode.TrackBefore
 
 type Handlers = {[event: string]: (view: EditorView, line: BlockInfo, event: any) => boolean}
 
-/// Configuration options when creating a generic gutter.
-export interface GutterConfig {
+interface GutterConfig {
   /// The theme selector for the gutter's wrapping DOM element. Will
   /// be prefixed with `"gutter."` for the gutter wrapper, and then
   /// suffixed with `"Element"` for the individual line elements.
@@ -319,9 +318,7 @@ function sameMarkers(a: readonly GutterMarker[], b: readonly GutterMarker[]): bo
   return true
 }
 
-/// Configuration options when [creating](#gutter.lineNumbers) a line
-/// number gutter.
-export interface LineNumberConfig {
+interface LineNumberConfig {
   /// How to display line numbers. Defaults to simply converting them
   /// to string.
   formatNumber?: (lineNo: number) => string

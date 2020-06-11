@@ -1,7 +1,6 @@
-export {EditorView, EditorConfig} from "./editorview"
+export {EditorView} from "./editorview"
 export {Command, ViewPlugin, PluginValue, PluginField, ViewUpdate, logException} from "./extension"
-export {Decoration, DecorationSet, WidgetType,
-        MarkDecorationSpec, WidgetDecorationSpec, LineDecorationSpec, ReplaceDecorationSpec, BlockType} from "./decoration"
+export {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
 export {BlockInfo} from "./heightmap"
 export {themeClass} from "./theme"
 export {MouseSelectionStyle} from "./input"

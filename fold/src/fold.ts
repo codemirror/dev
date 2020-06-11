@@ -187,9 +187,7 @@ class FoldWidget extends WidgetType<null> {
   static decoration = Decoration.replace({widget: new FoldWidget(null)})
 }
 
-/// Configuration used when defining a [fold
-/// gutter](#fold.foldGutter).
-export interface FoldGutterConfig {
+interface FoldGutterConfig {
   /// Text used to indicate that a given line can be folded. Defaults
   /// to `"⌄"`.
   openText?: string

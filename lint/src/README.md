@@ -1,13 +1,15 @@
+@lintKeymap
+
 @Diagnostic
 
 @Action
 
 @linter
 
-@linting
-
 @openLintPanel
 
 @closeLintPanel
+
+@nextDiagnostic
 
 @setDiagnostics

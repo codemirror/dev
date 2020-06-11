@@ -1,8 +1,4 @@
-@LineNumberConfig
-
 @lineNumbers
-
-@GutterConfig
 
 @gutter
 

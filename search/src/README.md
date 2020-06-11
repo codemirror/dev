@@ -1,15 +1,13 @@
-@SearchConfig
-
-@search
+@searchKeymap
 
 ### Commands
 
 @findNext
 @findPrevious
 @selectMatches
+@selectSelectionMatches
 @replaceNext
 @replaceAll
-@defaultSearchKeymap
 @openSearchPanel
 @closeSearchPanel
 

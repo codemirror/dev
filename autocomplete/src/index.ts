@@ -4,9 +4,19 @@ import {combineConfig, EditorState,
 import {keymap} from "@codemirror/next/keymap"
 import {Tooltip, tooltips, showTooltip} from "@codemirror/next/tooltip"
 
-export enum FilterType { Start, Fuzzy }
+/// Denotes how to
+/// [filter](#autocomplete.autocomplete^config.filterType)
+/// completions.
+export enum FilterType {
+  /// Only show completions that start with the currently typed text.
+  Start,
+  /// Show completions that have the typed text anywhere in their
+  /// content.
+  Fuzzy
+}
 
 export class AutocompleteContext {
+  /// @internal
   constructor(readonly explicit: boolean,
               readonly filterType: FilterType) {}
 
@@ -18,19 +28,29 @@ export class AutocompleteContext {
   }
 }
 
+/// The function signature for a completion source.
 export type Autocompleter =
   (state: EditorState, pos: number, context: AutocompleteContext) => readonly Completion[] | Promise<readonly Completion[]>
 
-export interface AutocompleteConfig {
-  override: Autocompleter | null
-  filterType: FilterType
+interface AutocompleteConfig {
+  /// Override the completion source used.
+  override?: Autocompleter | null
+  /// Configures how to filter completions.
+  filterType?: FilterType
 }
 
+/// Objects type used to represent completions.
 export interface Completion {
+  /// The label to show in the completion picker.
   label: string,
+  /// The start of the range that is being completed.
   start: number,
+  /// The end of the completed ranges.
   end: number,
-  apply?: string | ((view: EditorView) => void)
+  /// How to apply the completion. When this holds a string, the
+  /// completion range is replaced by that string. When it is a
+  /// function, that function is called to perform the completion.
+  apply?: string | ((view: EditorView) => void) // FIXME pass mapped range?
 }
 
 function retrieveCompletions(state: EditorState, pos: number, context: AutocompleteContext): Promise<readonly Completion[]> {
@@ -42,7 +62,7 @@ function retrieveCompletions(state: EditorState, pos: number, context: Autocompl
   return next(0)
 }
 
-const autocompleteConfig = Facet.define<Partial<AutocompleteConfig>, AutocompleteConfig>({
+const autocompleteConfig = Facet.define<AutocompleteConfig, Required<AutocompleteConfig>>({
   combine(configs) {
     return combineConfig(configs, {
       override: null,
@@ -51,7 +71,8 @@ const autocompleteConfig = Facet.define<Partial<AutocompleteConfig>, Autocomplet
   }
 })
 
-export function autocomplete(config: Partial<AutocompleteConfig> = {}): Extension {
+/// Returns an extension that enables autocompletion.
+export function autocomplete(config: AutocompleteConfig = {}): Extension {
   return [
     activeCompletion,
     autocompleteConfig.of(config),
@@ -84,6 +105,7 @@ function acceptCompletion(view: EditorView) {
   return true
 }
 
+/// Explicitly start autocompletion.
 export function startCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (active != null && active != "pending") return false

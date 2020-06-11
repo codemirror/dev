@@ -17,7 +17,7 @@ const chalky = "#e5c07b",
   selection = "#405948",
   cursor = "#528bff"
 
-export const oneDarkTheme = EditorView.theme({
+const oneDarkTheme = EditorView.theme({
   wrap: {
     color: lightWhite,
     backgroundColor: background,
@@ -70,7 +70,7 @@ export const oneDarkTheme = EditorView.theme({
   }
 }, {dark: true})
 
-export const oneDarkHighlighter = highlighter({
+const oneDarkHighlighter = highlighter({
   invalid: {color: invalid},
   comment: {color: lightDark},
   keyword: {color: purple},
@@ -88,4 +88,5 @@ export const oneDarkHighlighter = highlighter({
   heading: {fontWeight: "bold", color: coral}
 })
 
+/// Extension to enable the One Dark theme.
 export const oneDark: Extension = [oneDarkTheme, oneDarkHighlighter]

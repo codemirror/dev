@@ -1,5 +1,3 @@
-@Config
-
 @bracketMatching
 
 @matchBrackets

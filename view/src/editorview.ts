@@ -20,8 +20,7 @@ import browser from "./browser"
 import {applyDOMChange} from "./domchange"
 import {computeOrder, trivialOrder, BidiSpan, Direction} from "./bidi"
 
-/// Configuration parameters passed when creating an editor view.
-export interface EditorConfig {
+interface EditorConfig {
   /// The view's initial state. Defaults to an extension-less state
   /// with an empty document.
   state?: EditorState,
@@ -81,8 +80,8 @@ export class EditorView {
   /// All regular editor state updates should go through this. It
   /// takes a transaction, applies it, and updates the view to show
   /// the new state. Its implementation can be overridden with an
-  /// [option](#view.EditorConfig.dispatch). Does not have to be
-  /// called as a method.
+  /// [option](#view.EditorView.constructor^config.dispatch). Does not
+  /// have to be called as a method.
   readonly dispatch: (tr: Transaction) => void
 
   /// The document or shadow root that the view lives in.
@@ -372,10 +371,10 @@ export class EditorView {
   }
 
   /// Move a cursor position by [grapheme
-  /// cluster](#text.nextClusterBoundary). `forward` determines
-  /// whether the motion is away from the line start, or towards it.
-  /// Motion in bidirectional text is in visual order, in the editor's
-  /// [text direction](#view.EditorView.textDirection). When the start
+  /// cluster](#text.nextClusterBreak). `forward` determines whether
+  /// the motion is away from the line start, or towards it. Motion in
+  /// bidirectional text is in visual order, in the editor's [text
+  /// direction](#view.EditorView.textDirection). When the start
   /// position was the last one on the line, the returned position
   /// will be across the line break. If there is no further line, the
   /// original position is returned.
@@ -493,7 +492,7 @@ export class EditorView {
   /// Facet to add a [style
   /// module](https://github.com/marijnh/style-mod#readme) to an editor
   /// view. The view will ensure that the module is registered in its
-  /// [document root](#view.EditorConfig.root).
+  /// [document root](#view.EditorView.constructor^config.root).
   static styleModule = styleModule
 
   /// Facet that can be used to add DOM event handlers. The value
@@ -549,7 +548,7 @@ export class EditorView {
   /// providing the CSS styling for the selector.
   ///
   /// When `dark` is set to true, the theme will be marked as dark,
-  /// which causes the [base theme](#view.EditorView^baseThemes) rules
+  /// which causes the [base theme](#view.EditorView^baseTheme) rules
   /// marked with `@dark` to apply instead of those marked with
   /// `@light`.
   static theme(spec: {[selector: string]: Style}, options?: {dark: boolean}): Extension {

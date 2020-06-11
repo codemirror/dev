@@ -1,5 +1,5 @@
 Syntax highlighting is done by a
-[highlighter](#highlight.highligther), which maps style tags
+[highlighter](#highlight.highlighter), which maps style tags
 associated with a syntax tree to CSS styles, making sure each
 syntactic element is styled appropriately.
 
@@ -7,7 +7,7 @@ Because syntax tree node types and highlighters have to be able to
 talk the same language, CodeMirror uses a _closed_ vocabulary of
 syntax types. It is possible to [define](#highlight.TagSystem) your
 own vocabulary, but the vocabulary used by the
-[syntax](#state.EditorState.syntax) and the highlighter have to agree,
+[syntax](#state.EditorState^syntax) and the highlighter have to agree,
 or no highlighting happens.
 
 Each node can be assigned a _tag_. Tags have a type and one or more
