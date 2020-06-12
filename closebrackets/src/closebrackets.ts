@@ -1,5 +1,5 @@
 import {EditorView} from "@codemirror/next/view"
-import {EditorState, EditorSelection, Transaction, CharCategory} from "@codemirror/next/state"
+import {EditorState, EditorSelection, Transaction, CharCategory, Extension} from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
 import {codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
 import {keyName} from "w3c-keyname"
@@ -28,7 +28,9 @@ const defaults: Required<CloseBracketConfig> = {
 /// after the cursor. When closing a bracket directly in front of that
 /// closing bracket, the cursor moves over the existing bracket. When
 /// backspacing in between brackets, both are removed.
-export const closeBrackets = EditorView.domEventHandlers({keydown})
+export function closeBrackets(): Extension {
+  return eventHandler
+}
 
 const definedClosing = "()[]{}<>"
 
@@ -42,7 +44,7 @@ function config(state: EditorState, pos: number) {
   return state.languageDataAt<CloseBracketConfig>("closeBrackets", pos)[0] || defaults
 }
 
-function keydown(event: KeyboardEvent, view: EditorView) {
+const eventHandler = EditorView.domEventHandlers({keydown(event: KeyboardEvent, view: EditorView) {
   if (event.ctrlKey || event.metaKey) return false
 
   if (event.keyCode == 8) { // Backspace
@@ -58,7 +60,7 @@ function keydown(event: KeyboardEvent, view: EditorView) {
   if (!tr) return false
   view.dispatch(tr)
   return true
-}
+}})
 
 /// Function that implements the extension's backspace behavior.
 /// Exported mostly for testing purposes.

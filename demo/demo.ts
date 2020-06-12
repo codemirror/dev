@@ -44,7 +44,7 @@ let state = EditorState.create({doc: `<script>
   html(),
   defaultHighlighter,
   bracketMatching(),
-  closeBrackets,
+  closeBrackets(),
   autocomplete(),
   rectangularSelection(),
   highlightActiveLine(),
