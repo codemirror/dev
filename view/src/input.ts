@@ -22,6 +22,7 @@ export class InputState {
   }[] = []
 
   composing = false
+  compositionEndedAt = 0
 
   mouseSelection: MouseSelection | null = null
 
@@ -36,7 +37,7 @@ export class InputState {
     for (let type in handlers) {
       let handler = handlers[type]
       view.contentDOM.addEventListener(type, (event: Event) => {
-        if (!eventBelongsToEditor(view, event)) return
+        if (!eventBelongsToEditor(view, event) || this.ignoreDuringComposition(event)) return
         if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         else handler(view, event)
       })
@@ -75,6 +76,22 @@ export class InputState {
           logException(view.state, e)
         }
       }
+    }
+    return false
+  }
+
+  ignoreDuringComposition(event: Event): boolean {
+    if (!/^key/.test(event.type)) return false
+    if (this.composing) return true
+    // See https://www.stum.de/2016/06/24/handling-ime-events-in-javascript/.
+    // On some input method editors (IMEs), the Enter key is used to
+    // confirm character selection. On Safari, when Enter is pressed,
+    // compositionend and keydown events are sometimes emitted in the
+    // wrong order. The key event should still be ignored, even when
+    // it happens after the compositionend event.
+    if (browser.safari && event.timeStamp - this.compositionEndedAt < 500) {
+      this.compositionEndedAt = 0
+      return true
     }
     return false
   }
@@ -489,6 +506,7 @@ handlers.compositionstart = handlers.compositionupdate = view => {
 
 handlers.compositionend = view => {
   view.inputState.composing = false
+  view.inputState.compositionEndedAt = Date.now()
   setTimeout(() => {
     if (!view.inputState.composing) forceClearComposition(view)
   }, 50)
