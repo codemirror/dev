@@ -85,5 +85,46 @@ export const baseTheme = buildTheme(baseThemeID, {
   line: {
     display: "block",
     padding: "0 2px 0 4px"
+  },
+
+  button: {
+    verticalAlign: "middle",
+    color: "inherit",
+    fontSize: "70%",
+    padding: ".2em 1em",
+    borderRadius: "3px"
+  },
+
+  "button@light": {
+    backgroundImage: "linear-gradient(#eff1f5, #d9d9df)",
+    border: "1px solid #888",
+    "&:active": {
+      backgroundImage: "linear-gradient(#b4b4b4, #d0d3d6)"
+    }
+  },
+
+  "button@dark": {
+    backgroundImage: "linear-gradient(#555, #111)",
+    border: "1px solid #888",
+    "&:active": {
+      backgroundImage: "linear-gradient(#111, #333)"
+    }
+  },
+
+  textfield: {
+    verticalAlign: "middle",
+    color: "inherit",
+    fontSize: "70%",
+    border: "1px solid silver",
+    padding: ".2em .5em"
+  },
+
+  "textfield@light": {
+    backgroundColor: "white"
+  },
+
+  "textfield@dark": {
+    border: "1px solid #555",
+    backgroundColor: "inherit"
   }
 })

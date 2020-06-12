@@ -199,32 +199,11 @@ const baseTheme = EditorView.baseTheme({
     boxSizing: "border-box",
     position: "sticky",
     left: 0,
-    right: 0,
-    "& input, & button": {
-      verticalAlign: "middle",
-      color: "inherit",
-      backgroundColor: "inherit",
-      fontSize: "70%"
-    },
-    "& button": {
-      padding: ".2em 1em",
-      borderRadius: "3px"
-    },
-    "& input": {
-      border: "1px solid silver",
-      padding: ".2em .5em"
-    }
+    right: 0
   },
   "panels@light": {
     backgroundColor: "#f5f5f5",
-    color: "black",
-    "& button": {
-      backgroundImage: "linear-gradient(#eff1f5, #d9d9df)",
-      border: "1px solid #888",
-      "&:active": {
-        backgroundImage: "linear-gradient(#b4b4b4, #d0d3d6)"
-      }
-    }
+    color: "black"
   },
   "panels.top@light": {
     borderBottom: "1px solid silver"
@@ -234,16 +213,6 @@ const baseTheme = EditorView.baseTheme({
   },
   "panels@dark": {
     backgroundColor: "#333338",
-    color: "white",
-    "& button": {
-      backgroundImage: "linear-gradient(#555, #111)",
-      border: "1px solid #888",
-      "&:active": {
-        backgroundImage: "linear-gradient(#111, #333)"
-      }
-    },
-    "& input": {
-      border: "1px solid #555"
-    }
+    color: "white"
   }
 })

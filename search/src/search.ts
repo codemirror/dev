@@ -265,6 +265,7 @@ function buildPanel(conf: {
     value: conf.query.search,
     placeholder: p("Find"),
     "aria-label": p("Find"),
+    class: themeClass("textfield"),
     name: "search",
     onchange: update,
     onkeyup: update
@@ -273,6 +274,7 @@ function buildPanel(conf: {
     value: conf.query.replace,
     placeholder: p("Replace"),
     "aria-label": p("Replace"),
+    class: themeClass("textfield"),
     name: "replace",
     onchange: update,
     onkeyup: update
@@ -300,16 +302,19 @@ function buildPanel(conf: {
       replaceNext(conf.view)
     }
   }
+  function button(name: string, onclick: () => void, content: (Node | string)[]) {
+    return elt("button", {class: themeClass("button"), name, onclick}, content)
+  }
   let panel = elt("div", {onkeydown: keydown}, [
     searchField,
-    elt("button", {name: "next", onclick: () => findNext(conf.view)}, [p("next")]),
-    elt("button", {name: "prev", onclick: () => findPrevious(conf.view)}, [p("previous")]),
-    elt("button", {name: "select", onclick: () => selectMatches(conf.view)}, [p("all")]),
+    button("next", () => findNext(conf.view), [p("next")]),
+    button("prev", () => findPrevious(conf.view), [p("previous")]),
+    button("select", () => selectMatches(conf.view), [p("all")]),
     elt("label", null, [caseField, "match case"]),
     elt("br"),
     replaceField,
-    elt("button", {name: "replace", onclick: () => replaceNext(conf.view)}, [p("replace")]),
-    elt("button", {name: "replaceAll", onclick: () => replaceAll(conf.view)}, [p("replace all")]),
+    button("replace", () => replaceNext(conf.view), [p("replace")]),
+    button("replaceAll", () => replaceAll(conf.view), [p("replace all")]),
     elt("button", {name: "close", onclick: () => closeSearchPanel(conf.view), "aria-label": p("close")}, ["×"]),
     elt("div", {style: "position: absolute; top: -10000px", "aria-live": "polite"})
   ])

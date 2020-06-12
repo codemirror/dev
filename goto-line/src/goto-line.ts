@@ -1,12 +1,12 @@
 import {panels, Panel, getPanel, showPanel} from "@codemirror/next/panel"
 import {EditorSelection} from "@codemirror/next/state"
-import {EditorView, Command} from "@codemirror/next/view"
+import {EditorView, Command, themeClass} from "@codemirror/next/view"
 import {KeyBinding} from "@codemirror/next/keymap"
 
 function createLineDialog(view: EditorView): Panel {
   let dom = document.createElement("form")
-  dom.innerHTML = `<label>${view.state.phrase("Go to line:")} <input name=line></label>
-<button type=submit>${view.state.phrase("go")}</button>`
+  dom.innerHTML = `<label>${view.state.phrase("Go to line:")} <input class=${themeClass("textfield")} name=line></label>
+<button class=${themeClass("button")} type=submit>${view.state.phrase("go")}</button>`
   let input = dom.querySelector("input") as HTMLInputElement
 
   function go() {
