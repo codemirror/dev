@@ -11,7 +11,7 @@ import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection, mouseSelectionStyle,
-        exceptionSink, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
+        exceptionSink, updateListener, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
         decorations, MeasureRequest, UpdateFlag, editable} from "./extension"
 import {themeClass, theme, darkTheme, buildTheme, baseThemeID, baseDarkThemeID, baseLightThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
@@ -190,6 +190,7 @@ export class EditorView {
     this.updateAttrs()
     this.updateState = UpdateState.Idle
     if (redrawn || scrollTo || this.viewState.mustEnforceCursorAssoc) this.requestMeasure()
+    for (let listener of this.state.facet(updateListener)) listener(update) 
   }
 
   private updatePlugins(update: ViewUpdate) {
@@ -221,6 +222,7 @@ export class EditorView {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
     this.measureScheduled = 1 // Prevent requestMeasure calls from scheduling another animation frame
 
+    let updated = null
     for (let i = 0;; i++) {
       this.updateState = UpdateState.Measuring
       let changed = this.viewState.measure(this.docView, i > 0)
@@ -237,6 +239,8 @@ export class EditorView {
       })
       let update = new ViewUpdate(this, this.state)
       update.flags |= changed
+      if (!updated) updated = update
+      else updated.flags |= changed
       this.updateState = UpdateState.Updating
       this.updatePlugins(update)
       if (changed) this.docView.update(update)
@@ -253,6 +257,7 @@ export class EditorView {
 
     this.updateState = UpdateState.Idle
     this.measureScheduled = -1
+    if (updated) for (let listener of this.state.facet(updateListener)) listener(updated) 
   }
 
   /// Get the CSS classes for the currently active editor themes.
@@ -519,6 +524,10 @@ export class EditorView {
   /// from user-code-provided callbacks). This is mostly useful for
   /// debugging and logging. See [`logException`](#view.logException).
   static exceptionSink = exceptionSink
+
+  /// A facet that can be used to have a listener function be notified
+  /// every time the view updates.
+  static updateListener = updateListener
 
   /// Facet that controls whether the editor content is editable. When
   /// its the highest-precedence value is `false`, editing is
