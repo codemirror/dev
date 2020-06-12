@@ -126,5 +126,23 @@ export const baseTheme = buildTheme(baseThemeID, {
   "textfield@dark": {
     border: "1px solid #555",
     backgroundColor: "inherit"
-  }
+  },
+
+  secondarySelection: {
+    backgroundColor_fallback: "#3297FD",
+    color_fallback: "white !important",
+    backgroundColor: "Highlight",
+    color: "HighlightText !important"
+  },
+
+  secondaryCursor: {
+    display: "inline-block",
+    verticalAlign: "text-top",
+    width: 0,
+    height: "1.15em",
+    margin: "0 -0.7px -.7em"
+  },
+
+  "secondaryCursor@light": { borderLeft: "1.4px solid #555" },
+  "secondaryCursor@dark": { borderLeft: "1.4px solid #ddd" }
 })

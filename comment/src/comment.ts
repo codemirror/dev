@@ -1,6 +1,6 @@
 import {Text, Line} from "@codemirror/next/text"
 import {EditorState, Transaction, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
-import {KeyBinding} from "@codemirror/next/keymap"
+import {KeyBinding} from "@codemirror/next/view"
 
 /// An object of this type can be provided as [language
 /// data](#state.EditorState.languageDataAt) under a `"commentTokens"`

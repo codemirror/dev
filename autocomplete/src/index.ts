@@ -1,9 +1,8 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
 import {combineConfig, EditorState,
         Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "@codemirror/next/state"
-import {keymap} from "@codemirror/next/keymap"
 import {Tooltip, tooltips, showTooltip} from "@codemirror/next/tooltip"
-import {KeyBinding} from "@codemirror/next/keymap"
+import {keymap, KeyBinding} from "@codemirror/next/view"
 
 /// Denotes how to
 /// [filter](#autocomplete.autocomplete^config.filterType)

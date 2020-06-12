@@ -1,7 +1,7 @@
-import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass} from "@codemirror/next/view"
+import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass,
+        runScopeHandlers, KeyBinding} from "@codemirror/next/view"
 import {StateField, StateEffect, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
-import {runScopeHandlers, KeyBinding} from "@codemirror/next/keymap"
 import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 import {SearchCursor} from "./cursor"

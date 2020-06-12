@@ -1,8 +1,7 @@
 import {combineConfig, fillConfig, EditorState, StateEffect, ChangeDesc, Facet,
         StateField, Extension} from "@codemirror/next/state"
-import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass} from "@codemirror/next/view"
+import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass, KeyBinding} from "@codemirror/next/view"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
-import {KeyBinding} from "@codemirror/next/keymap"
 
 type Range = {from: number, to: number}
 

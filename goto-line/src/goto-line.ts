@@ -1,7 +1,6 @@
 import {panels, Panel, getPanel, showPanel} from "@codemirror/next/panel"
 import {EditorSelection} from "@codemirror/next/state"
-import {EditorView, Command, themeClass} from "@codemirror/next/view"
-import {KeyBinding} from "@codemirror/next/keymap"
+import {EditorView, Command, themeClass, KeyBinding} from "@codemirror/next/view"
 
 function createLineDialog(view: EditorView): Panel {
   let dom = document.createElement("form")

@@ -1,4 +1,7 @@
-import {Decoration, DecorationSet, Range, WidgetType, ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
+import {Decoration, DecorationSet, WidgetType} from "./decoration"
+import {Range} from "@codemirror/next/rangeset"
+import {ViewPlugin, ViewUpdate} from "./extension"
+import {EditorView} from "./editorview"
 import {combineConfig, Facet, Extension} from "@codemirror/next/state"
 import {countColumn} from "@codemirror/next/text"
 import {StyleModule} from "style-mod"
@@ -35,6 +38,15 @@ const Names: {[key: number]: string} = {
   65532: "object replacement"
 }
 
+let _supportsTabSize: null | boolean = null
+function supportsTabSize() {
+  if (_supportsTabSize == null && typeof document != "undefined" && document.body) {
+    let styles = document.body.style as any
+    _supportsTabSize = (styles.tabSize || styles.MozTabSize) != null
+  }
+  return _supportsTabSize || false
+}
+
 const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
   combine(configs) {
     // FIXME make configurations compose properly
@@ -43,10 +55,8 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
       specialChars: Specials,
       addSpecialChars: null
     })
-
-    let styles = document.body.style as any
-    config.replaceTabs = (styles.tabSize || styles.MozTabSize) == null
-    if (config.replaceTabs)
+    
+    if (config.replaceTabs = !supportsTabSize())
       config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
 
     if (config.addSpecialChars)
@@ -58,8 +68,13 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
 
 /// Returns an extension that installs highlighting of special
 /// characters.
-export function specialChars(config: SpecialCharConfig = {}): Extension {
-  return [specialCharConfig.of(config), specialCharPlugin, styleExt]
+export function highlightSpecialChars(
+  /// Configuration options.
+  config: SpecialCharConfig = {}
+): Extension {
+  let ext = [specialCharConfig.of(config), specialCharPlugin]
+  if (!supportsTabSize()) ext.push(tabStyleExt)
+  return ext
 }
 
 const specialCharPlugin = ViewPlugin.fromClass(class {
@@ -141,7 +156,7 @@ class TabWidget extends WidgetType<number> {
   toDOM() {
     let span = document.createElement("span")
     span.textContent = "\t"
-    span.className = style.tab
+    span.className = tabStyle.tab
     span.style.width = this.value + "px"
     return span
   }
@@ -149,11 +164,11 @@ class TabWidget extends WidgetType<number> {
   ignoreEvent(): boolean { return false }
 }
 
-const style = new StyleModule({
+const tabStyle = new StyleModule({
   tab: {
     display: "inline-block",
     overflow: "hidden",
     verticalAlign: "bottom"
   }
 })
-const styleExt = EditorView.styleModule.of(style)
+const tabStyleExt = EditorView.styleModule.of(tabStyle)

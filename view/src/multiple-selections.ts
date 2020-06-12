@@ -1,5 +1,7 @@
+import {DecorationSet, Decoration, WidgetType} from "./decoration"
+import {EditorView} from "./editorview"
+import {themeClass} from "./theme"
 import {EditorState, StateField, EditorSelection, Extension} from "@codemirror/next/state"
-import {DecorationSet, Decoration, WidgetType, EditorView, themeClass} from "@codemirror/next/view"
 
 const field = StateField.define<DecorationSet>({
   create(state) {
@@ -18,8 +20,7 @@ const field = StateField.define<DecorationSet>({
 export function multipleSelections(): Extension {
   return [
     EditorState.allowMultipleSelections.of(true),
-    field,
-    styles
+    field
   ]
 }
 
@@ -45,23 +46,3 @@ function decorateSelections(selection: EditorSelection): DecorationSet {
   }
   return Decoration.set(deco)
 }
-
-const styles = EditorView.baseTheme({
-  secondarySelection: {
-    backgroundColor_fallback: "#3297FD",
-    color_fallback: "white !important",
-    backgroundColor: "Highlight",
-    color: "HighlightText !important"
-  },
-
-  secondaryCursor: {
-    display: "inline-block",
-    verticalAlign: "text-top",
-    width: 0,
-    height: "1.15em",
-    margin: "0 -0.7px -.7em"
-  },
-
-  "secondaryCursor@light": { borderLeft: "1.4px solid #555" },
-  "secondaryCursor@dark": { borderLeft: "1.4px solid #ddd" }
-})

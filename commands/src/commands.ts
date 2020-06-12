@@ -1,8 +1,7 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange,
         IndentContext, ChangeSpec, CharCategory, Transaction} from "@codemirror/next/state"
 import {Text, Line, countColumn} from "@codemirror/next/text"
-import {EditorView, Command, Direction} from "@codemirror/next/view"
-import {KeyBinding} from "@codemirror/next/keymap"
+import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
 import {Subtree, NodeProp} from "lezer-tree"
 

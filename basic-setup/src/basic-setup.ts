@@ -1,13 +1,11 @@
+import {keymap, highlightSpecialChars, multipleSelections} from "@codemirror/next/view"
 import {Extension} from "@codemirror/next/state"
-import {keymap} from "@codemirror/next/keymap"
 import {history, historyKeymap} from "@codemirror/next/history"
 import {foldGutter, foldKeymap} from "@codemirror/next/fold"
 import {lineNumbers} from "@codemirror/next/gutter"
 import {defaultKeymap} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"
 import {closeBrackets} from "@codemirror/next/closebrackets"
-import {specialChars} from "@codemirror/next/special-chars"
-import {multipleSelections} from "@codemirror/next/multiple-selections"
 import {searchKeymap} from "@codemirror/next/search"
 import {autocomplete, autocompleteKeymap} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
@@ -26,10 +24,10 @@ import {lintKeymap} from "@codemirror/next/lint"
 ///
 ///  - [the default command bindings](#commands.defaultKeymap)
 ///  - [line numbers](#gutter.lineNumbers)
-///  - [special character highlighting](#special-chars.specialChars)
+///  - [special character highlighting](#view.highlightSpecialChars)
 ///  - [the undo history](#history.history)
 ///  - [a fold gutter](#fold.foldGutter)
-///  - [multiple selection support](#multiple-selections.multipleSelections)
+///  - [multiple selection support](#view.multipleSelections)
 ///  - [the default highlighter](#highlight.defaultHighlighter)
 ///  - [bracket matching](#matchbrackets.bracketMatching)
 ///  - [bracket closing](#closebrackets.closeBrackets)
@@ -52,7 +50,7 @@ import {lintKeymap} from "@codemirror/next/lint"
 /// desired.
 export const basicSetup: Extension = [
   lineNumbers(),
-  specialChars(),
+  highlightSpecialChars(),
   history(),
   foldGutter(),
   multipleSelections(),
