@@ -1,3 +1,11 @@
+## 0.7.1 (2020-06-12)
+
+### Bug fixes
+
+Fix an issue where using Enter during composition would insert a newline.
+
+Fix a problem where the library ignored platform-specific key bindings when building a keymap.
+
 ## 0.7.0 (2020-06-11)
 
 ### Breaking changes
