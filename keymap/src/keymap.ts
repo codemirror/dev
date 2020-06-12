@@ -124,7 +124,7 @@ const handleKeyEvents = EditorView.domEventHandlers({
 /// the key stroke, in order of precedence, until one of them returns
 /// true.
 export function keymap(bindings: readonly KeyBinding[], platform?: "mac" | "win" | "linux") {
-  return [handleKeyEvents, keymaps.of(buildKeymap(bindings, platform || "key"))]
+  return [handleKeyEvents, keymaps.of(buildKeymap(bindings, platform))]
 }
 
 /// Run the key handlers registered for a given scope. Returns true if
