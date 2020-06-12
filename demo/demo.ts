@@ -13,7 +13,7 @@ import {searchKeymap} from "@codemirror/next/search"
 import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
-import {gotoLine} from "@codemirror/next/goto-line"
+import {gotoLineKeymap} from "@codemirror/next/goto-line"
 import {highlightActiveLine, highlightSelectionMatches} from "@codemirror/next/highlight-selection"
 
 import {html} from "@codemirror/next/lang-html"
@@ -55,9 +55,9 @@ let state = EditorState.create({doc: `<script>
     ...historyKeymap,
     ...foldKeymap,
     ...commentKeymap,
+    ...gotoLineKeymap,
 //    ...lintKeymap,
     // FIXME move into exported keymaps
-    {key: "Alt-g", run: gotoLine},
     {key: "Shift-Tab", run: indentSelection},
     {key: "Mod-Space", run: startCompletion}
   ])
