@@ -1,8 +1,9 @@
-import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException} from "@codemirror/next/view"
+import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
 import {combineConfig, EditorState,
         Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "@codemirror/next/state"
 import {keymap} from "@codemirror/next/keymap"
 import {Tooltip, tooltips, showTooltip} from "@codemirror/next/tooltip"
+import {KeyBinding} from "@codemirror/next/keymap"
 
 /// Denotes how to
 /// [filter](#autocomplete.autocomplete^config.filterType)
@@ -33,6 +34,9 @@ export type Autocompleter =
   (state: EditorState, pos: number, context: AutocompleteContext) => readonly Completion[] | Promise<readonly Completion[]>
 
 interface AutocompleteConfig {
+  /// When enabled (defaults to true), autocompletion will start
+  /// whenever the user types something that can be completed.
+  activateOnTyping?: boolean
   /// Override the completion source used.
   override?: Autocompleter | null
   /// Configures how to filter completions.
@@ -65,6 +69,7 @@ function retrieveCompletions(state: EditorState, pos: number, context: Autocompl
 const autocompleteConfig = Facet.define<AutocompleteConfig, Required<AutocompleteConfig>>({
   combine(configs) {
     return combineConfig(configs, {
+      activateOnTyping: true,
       override: null,
       filterType: FilterType.Start
     })
@@ -82,8 +87,7 @@ export function autocomplete(config: AutocompleteConfig = {}): Extension {
     Precedence.Override.set(keymap([
       {key: "ArrowDown", run: moveCompletion("down")},
       {key: "ArrowUp", run: moveCompletion("up")},
-      {key: "Enter", run: acceptCompletion},
-      {key: "Escape", run: closeCompletion}
+      {key: "Enter", run: acceptCompletion}
     ]))
   ]
 }
@@ -106,7 +110,7 @@ function acceptCompletion(view: EditorView) {
 }
 
 /// Explicitly start autocompletion.
-export function startCompletion(view: EditorView) {
+export const startCompletion: Command = (view: EditorView) => {
   let active = view.state.field(activeCompletion)
   if (active != null && active != "pending") return false
   view.dispatch(view.state.update({effects: toggleCompletion.of(true)}))
@@ -127,12 +131,22 @@ function applyCompletion(view: EditorView, option: Completion) {
   }
 }
 
-function closeCompletion(view: EditorView) {
-  let active = view.state.field(activeCompletion)
+/// Close the currently active completion.
+export const closeCompletion: Command = (view: EditorView) => {
+  let active = view.state.field(activeCompletion, false)
   if (active == null) return false
   view.dispatch(view.state.update({effects: toggleCompletion.of(false)}))
   return true
 }
+
+/// Basic keybindings for autocompletion.
+///
+///  - Ctrl-Space (Cmd-Space on macOS): [`startCompletion`](#autocomplete.startCompletion)
+///  - Escape: [`closeCompletion`](#autocomplete.closeCompletion)
+export const autocompleteKeymap: readonly KeyBinding[] = [
+  {key: "Mod-Space", run: startCompletion},
+  {key: "Escape", run: closeCompletion}
+]
 
 type ActiveState = ActiveCompletion // There is a completion active
   | null // No completion active
@@ -148,7 +162,9 @@ const activeCompletion = StateField.define<ActiveState>({
 
   update(value, tr) {
     let event = tr.annotation(Transaction.userEvent)
-    if (event == "input" || event == "delete" && value) value = "pending"
+    if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
+        event == "delete" && value)
+      value = "pending"
     else if (tr.docChanged || tr.selection) value = null
     for (let effect of tr.effects) {
       if (effect.is(openCompletion))

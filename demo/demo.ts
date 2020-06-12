@@ -1,28 +1,10 @@
-import {EditorState} from "@codemirror/next/state"
-import {EditorView} from "@codemirror/next/view"
-import {keymap} from "@codemirror/next/keymap"
-import {history, historyKeymap} from "@codemirror/next/history"
-import {foldGutter, foldKeymap} from "@codemirror/next/fold"
-import {lineNumbers} from "@codemirror/next/gutter"
-import {defaultKeymap, indentSelection} from "@codemirror/next/commands"
-import {bracketMatching} from "@codemirror/next/matchbrackets"
-import {closeBrackets} from "@codemirror/next/closebrackets"
-import {specialChars} from "@codemirror/next/special-chars"
-import {multipleSelections} from "@codemirror/next/multiple-selections"
-import {searchKeymap} from "@codemirror/next/search"
-import {autocomplete, startCompletion} from "@codemirror/next/autocomplete"
-import {commentKeymap} from "@codemirror/next/comment"
-import {rectangularSelection} from "@codemirror/next/rectangular-selection"
-import {gotoLineKeymap} from "@codemirror/next/goto-line"
-import {highlightActiveLine, highlightSelectionMatches} from "@codemirror/next/highlight-selection"
-
+import {EditorState, EditorView, basicSetup} from "@codemirror/next/basic-setup"
 import {html} from "@codemirror/next/lang-html"
-import {defaultHighlighter} from "@codemirror/next/highlight"
 
 //import {esLint} from "@codemirror/next/lang-javascript"
 // @ts-ignore
 //import Linter from "eslint4b-prebuilt"
-//import {linter, lintKeymap} from "@codemirror/next/lint"
+//import {linter} from "@codemirror/next/lint"
 
 //import {StreamSyntax} from "@codemirror/next/stream-syntax"
 //import legacyJS from "@codemirror/next/legacy-modes/src/javascript"
@@ -34,33 +16,10 @@ let state = EditorState.create({doc: `<script>
   });
 </script>
 `, extensions: [
+  basicSetup,
+  html()
 //  linter(esLint(new Linter)),
-  lineNumbers(),
-  specialChars(),
-  history(),
-  foldGutter(),
-  multipleSelections(),
 //  new StreamSyntax(legacyJS()).extension,
-  html(),
-  defaultHighlighter,
-  bracketMatching(),
-  closeBrackets(),
-  autocomplete(),
-  rectangularSelection(),
-  highlightActiveLine(),
-  highlightSelectionMatches(),
-  keymap([
-    ...defaultKeymap,
-    ...searchKeymap,
-    ...historyKeymap,
-    ...foldKeymap,
-    ...commentKeymap,
-    ...gotoLineKeymap,
-//    ...lintKeymap,
-    // FIXME move into exported keymaps
-    {key: "Shift-Tab", run: indentSelection},
-    {key: "Mod-Space", run: startCompletion}
-  ])
 ]})
 
 ;(window as any).view = new EditorView({state, parent: document.querySelector("#editor")!})
