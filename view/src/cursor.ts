@@ -125,6 +125,7 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
 }
 
 export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bias: -1 | 1 = -1): number {
+  console.trace("query", x, y)
   let content = view.contentDOM.getBoundingClientRect(), block
   let halfLine = view.defaultLineHeight / 2
   for (let bounced = false;;) {

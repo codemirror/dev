@@ -343,6 +343,7 @@ function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | 
 function basicMouseSelection(view: EditorView, event: MouseEvent) {
   let start = queryPos(view, event), type = event.detail
   let startSel = view.state.selection
+  let last = start, lastEvent = event
   return {
     update(update) {
       if (update.changes) {
@@ -351,7 +352,9 @@ function basicMouseSelection(view: EditorView, event: MouseEvent) {
       }
     },
     get(event, extend, multiple) {
-      let cur = queryPos(view, event)
+      let cur
+      if (event.clientX == lastEvent.clientX && event.clientY == lastEvent.clientY) cur = last
+      else { cur = last = queryPos(view, event); lastEvent = event }
       if (!cur || !start) return startSel
       let range = rangeForClick(view, cur.pos, cur.bias, type)
       if (start.pos != cur.pos && !extend) {
