@@ -68,20 +68,20 @@ export class DocView extends ContentView {
       }
     }
 
-    // When the DOM nodes around the selection are moved to another
-    // parent, Chrome sometimes reports a different selection through
-    // getSelection than the one that it actually shows to the user.
-    // This forces a selection update when lines are joined to work
-    // around that. Issue #54
-    let forceSelection = browser.chrome && !this.compositionDeco.size && update &&
-      update.state.doc.lines != update.prevState.doc.lines
-
     if (!this.view.inputState?.composing) this.compositionDeco = Decoration.none
     else if (update.transactions.length) this.compositionDeco = computeCompositionDeco(this.view, update.changes)
 
     let prevDeco = this.decorations, deco = this.updateDeco()
     let decoDiff = findChangedDeco(prevDeco, deco, update.changes)
     changedRanges = ChangedRange.extendWithRanges(changedRanges, decoDiff)
+
+    // When the DOM nodes around the selection are moved to another
+    // parent, Chrome sometimes reports a different selection through
+    // getSelection than the one that it actually shows to the user.
+    // This forces a selection update when lines are joined, or decorations
+    // changed, to work around that. Issue #54 / #218
+    let forceSelection = browser.chrome && !this.compositionDeco.size && update &&
+      (update.state.doc.lines != update.prevState.doc.lines || decoDiff.length > 0)
 
     let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointerselection")
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
