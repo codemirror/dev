@@ -292,7 +292,7 @@ handlers.mousedown = (view, event: MouseEvent) => {
   }
   if (!style && event.button == 0) style = basicMouseSelection(view, event)
   if (style) {
-    focusPreventScroll(view.contentDOM)
+    if (view.root.activeElement != view.contentDOM) view.observer.ignore(() => focusPreventScroll(view.contentDOM))
     view.inputState.startMouseSelection(view, event, style)
   }
 }
