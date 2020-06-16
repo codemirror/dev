@@ -86,16 +86,23 @@ export function autocomplete(config: AutocompleteConfig = {}): Extension {
     Precedence.Override.set(keymap([
       {key: "ArrowDown", run: moveCompletion("down")},
       {key: "ArrowUp", run: moveCompletion("up")},
+      {key: "PageDown", run: moveCompletion("down", "page")},
+      {key: "PageUp", run: moveCompletion("up", "page")},
       {key: "Enter", run: acceptCompletion}
     ]))
   ]
 }
 
-function moveCompletion(dir: string) {
+function moveCompletion(dir: string, by?: string) {
   return (view: EditorView) => {
     let active = view.state.field(activeCompletion)
     if (!(active instanceof ActiveCompletion)) return false
-    let selected = (active.selected + (dir == "up" ? active.options.length - 1 : 1)) % active.options.length
+    let step = 1, tooltip
+    if (by == "page" && (tooltip = view.dom.querySelector(".cm-tooltip-autocomplete") as HTMLElement))
+      step = Math.max(2, Math.floor(tooltip.offsetHeight / (tooltip.firstChild as HTMLElement).offsetHeight))
+    let selected = active.selected + step * (dir == "up" ? -1 : 1)
+    if (selected < 0) selected = by == "page" ? 0 : active.options.length - 1
+    else if (selected >= active.options.length) selected = by == "page" ? active.options.length - 1 : 0
     view.dispatch(view.state.update({effects: selectCompletion.of(selected)}))
     return true
   }
