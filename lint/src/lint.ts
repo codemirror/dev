@@ -67,7 +67,7 @@ function maybeEnableLint(state: EditorState): {[tag: string]: Extension} | undef
       ])
     }),
     panels(),
-    hoverTooltip(lintTooltip, {hideOnChange: true}),
+    hoverTooltip(lintTooltip),
     baseTheme
   ]}
 }
