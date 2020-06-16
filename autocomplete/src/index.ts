@@ -1,7 +1,7 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
 import {combineConfig, EditorState,
         Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "@codemirror/next/state"
-import {Tooltip, tooltips, showTooltip} from "@codemirror/next/tooltip"
+import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 
 /// Denotes how to
@@ -194,18 +194,23 @@ class ActiveCompletion {
   constructor(readonly options: readonly Completion[],
               readonly selected: number,
               readonly id = "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36),
-              readonly tooltip = [completionTooltip()]) {}
+              readonly tooltip: readonly Tooltip[] = [{
+                pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
+                style: "autocomplete",
+                create: completionTooltip(options, id)
+              }]) {}
 }
+ 
 
-function createListBox(completion: ActiveCompletion) {
+function createListBox(options: readonly Completion[], id: string) {
   const ul = document.createElement("ul")
-  ul.id = completion.id
+  ul.id = id
   ul.setAttribute("role", "listbox")
   ul.setAttribute("aria-expanded", "true")
-  for (let i = 0; i < completion.options.length; i++) {
+  for (let i = 0; i < options.length; i++) {
     const li = ul.appendChild(document.createElement("li"))
-    li.id = completion.id + "-" + i
-    li.innerText = completion.options[i].label
+    li.id = id + "-" + i
+    li.innerText = options[i].label
     li.setAttribute("role", "option")
   }
   return ul
@@ -213,16 +218,13 @@ function createListBox(completion: ActiveCompletion) {
 
 // We allocate a new function instance every time the completion
 // changes to force redrawing/repositioning of the tooltip
-function completionTooltip() {
-  return (view: EditorView): Tooltip => {
-    let active = view.state.field(activeCompletion) as ActiveCompletion
-    let list = createListBox(active)
+function completionTooltip(options: readonly Completion[], id: string) {
+  return (view: EditorView): TooltipView => {
+    let list = createListBox(options, id)
     list.addEventListener("click", (e: MouseEvent) => {
       let index = 0, dom = e.target as HTMLElement | null
       for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-      let active = view.state.field(activeCompletion)
-      if (active instanceof ActiveCompletion && index < active.options.length)
-        applyCompletion(view, active.options[index])
+      if (index < options.length) applyCompletion(view, options[index])
     })
     function updateSel(view: EditorView) {
       let cur = view.state.field(activeCompletion)
@@ -234,9 +236,7 @@ function completionTooltip() {
       update(update: ViewUpdate) {
         if (update.state.field(activeCompletion) != update.prevState.field(activeCompletion))
           updateSel(update.view)
-      },
-      pos: active.options.reduce((m, o) => Math.min(m, o.start), 1e9),
-      style: "autocomplete"
+      }
     }
   }
 }

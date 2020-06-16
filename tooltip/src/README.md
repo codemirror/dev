@@ -5,6 +5,8 @@ position. This package helps manage and position such elements.
 
 @Tooltip
 
+@TooltipView
+
 @showTooltip
 
 @HoverTooltip

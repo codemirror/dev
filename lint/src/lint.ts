@@ -67,7 +67,7 @@ function maybeEnableLint(state: EditorState): {[tag: string]: Extension} | undef
       ])
     }),
     panels(),
-    hoverTooltip(lintTooltip),
+    hoverTooltip(lintTooltip, {hideOnChange: true}),
     baseTheme
   ]}
 }
@@ -143,19 +143,17 @@ function lintTooltip(view: EditorView, check: (from: number, to: number) => bool
   if (!found.length) return null
 
   return {
-    start: stackStart, end: stackEnd,
-    tooltip(view: EditorView) {
+    pos: stackStart,
+    end: stackEnd,
+    style: "lint",
+    create() {
       let dom = document.createElement("ul")
       for (let d of found) dom.appendChild(renderDiagnostic(view, d))
-      return {
-        pos: stackStart,
-        dom,
-        style: "lint",
-        hideOnChange: true
-      }
+      return {dom}
     }
   }
 }
+
 
 /// Command to open and focus the lint panel.
 export const openLintPanel: Command = (view: EditorView) => {
