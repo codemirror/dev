@@ -128,6 +128,9 @@ export class ViewPlugin<T extends PluginValue> {
     return this.provide(pluginDecorations, get || ((value: any) => value.decorations))
   }
 
+  /// Convenience method that extends a view plugin to automatically
+  /// register [DOM event
+  /// handlers](#view.EditorView^domEventHandlers).
   eventHandlers(handlers: {
     [Type in keyof HTMLElementEventMap]?: (this: T, event: HTMLElementEventMap[Type], view: EditorView) => boolean
   }): ViewPlugin<T> {

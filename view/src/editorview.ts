@@ -108,9 +108,9 @@ export class EditorView {
   inputState!: InputState
 
   /// @internal
-  readonly viewState: ViewState
+  public viewState: ViewState
   /// @internal
-  readonly docView: DocView
+  public docView: DocView
 
   private plugins: PluginInstance[] = []
   private editorAttrs: Attrs = {}
@@ -168,7 +168,9 @@ export class EditorView {
   /// Update the view for the given array of transactions. This will
   /// update the visible document and selection to match the state
   /// produced by the transactions, and notify view plugins of the
-  /// change.
+  /// change. You should usually call
+  /// [`dispatch`](#view.EditorView.dispatch) instead, which uses this
+  /// as a primitive.
   update(transactions: readonly Transaction[]) {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
@@ -191,6 +193,27 @@ export class EditorView {
     this.updateState = UpdateState.Idle
     if (redrawn || scrollTo || this.viewState.mustEnforceCursorAssoc) this.requestMeasure()
     for (let listener of this.state.facet(updateListener)) listener(update) 
+  }
+
+  /// Reset the view to the given state. (This will cause the entire
+  /// document to be redrawn and all view plugins to be reinitialized,
+  /// so you should probably only use it when the new state isn't
+  /// derived from the old state. Otherwise, use
+  /// [`update`](#view.EditorView.update) instead.)
+  setState(newState: EditorState) {
+    if (this.updateState != UpdateState.Idle)
+      throw new Error("Calls to EditorView.setState are not allowed while an update is in progress")
+    this.updateState = UpdateState.Updating
+    for (let plugin of this.plugins) plugin.destroy(this)
+    this.viewState = new ViewState(newState)
+    this.plugins = newState.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
+    this.docView = new DocView(this)
+    this.inputState.ensureHandlers(this)
+    this.mountStyles()
+    this.updateAttrs()
+    this.bidiCache = []
+    this.updateState = UpdateState.Idle
+    this.requestMeasure()
   }
 
   private updatePlugins(update: ViewUpdate) {
@@ -437,6 +460,8 @@ export class EditorView {
   /// Returns -1 if no valid position could be found.
   posAtCoords(coords: {x: number, y: number}): number {
     this.readMeasured()
+    // FIXME return null instead, so you at least get a type error
+    // when you forget the failure case?
     return posAtCoords(this, coords)
   }
 
@@ -514,7 +539,9 @@ export class EditorView {
   /// first such function to return true will be assumed to have handled
   /// that event, and no other handlers or built-in behavior will be
   /// activated for it.
-  static domEventHandlers(handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}): Extension {
+  static domEventHandlers(handlers: {
+    [Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean
+  }): Extension {
     return ViewPlugin.define(() => ({})).eventHandlers(handlers)
   }
 
