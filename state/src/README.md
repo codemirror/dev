@@ -69,6 +69,8 @@ extensions for the editor state.
 
 @Facet
 
+@precedence
+
 @Precedence
 
 @tagExtension
@@ -78,10 +80,6 @@ extensions for the editor state.
 @IndentContext
 
 @languageData
-
-@multipleSelections
-
-@highlightSpecialChars
 
 ### Utilities
 

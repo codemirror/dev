@@ -1,6 +1,6 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
 import {combineConfig, EditorState,
-        Transaction, Extension, StateField, StateEffect, Facet, Precedence} from "@codemirror/next/state"
+        Transaction, Extension, StateField, StateEffect, Facet, precedence} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 
@@ -83,13 +83,13 @@ export function autocomplete(config: AutocompleteConfig = {}): Extension {
     autocompletePlugin,
     style,
     tooltips(),
-    Precedence.Override.set(keymap([
+    precedence(keymap([
       {key: "ArrowDown", run: moveCompletion("down")},
       {key: "ArrowUp", run: moveCompletion("up")},
       {key: "PageDown", run: moveCompletion("down", "page")},
       {key: "PageUp", run: moveCompletion("up", "page")},
       {key: "Enter", run: acceptCompletion}
-    ]))
+    ]), "override")
   ]
 }
 
