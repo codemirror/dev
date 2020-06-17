@@ -1,7 +1,7 @@
 import {Facet} from "@codemirror/next/state"
 import {StyleModule, Style} from "style-mod"
 
-export const theme = Facet.define<string>()
+export const theme = Facet.define<string, string>({combine: strs => strs.join(" ")})
 
 export const darkTheme = Facet.define<boolean, boolean>({combine: values => values.indexOf(true) > -1})
 

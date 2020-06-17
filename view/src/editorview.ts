@@ -264,7 +264,7 @@ export class EditorView {
   get themeClasses() {
     return baseThemeID + " " +
       (this.state.facet(darkTheme) ? baseDarkThemeID : baseLightThemeID) + " " +
-      this.state.facet(theme).join(" ")
+      this.state.facet(theme)
   }
 
   private updateAttrs() {
