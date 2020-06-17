@@ -29,6 +29,18 @@ component that displays the editor state and allows text input.
 
 @MouseSelectionStyle
 
+@multipleSelections
+
+@highlightSpecialChars
+
+### Key bindings
+
+@KeyBinding
+
+@keymap
+
+@runScopeHandlers
+
 ### Decorations
 
 Your code should never, _never_ directly change the DOM structure

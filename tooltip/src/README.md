@@ -9,6 +9,4 @@ position. This package helps manage and position such elements.
 
 @showTooltip
 
-@HoverTooltip
-
 @hoverTooltip

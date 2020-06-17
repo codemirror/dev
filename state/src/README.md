@@ -79,6 +79,10 @@ extensions for the editor state.
 
 @languageData
 
+@multipleSelections
+
+@highlightSpecialChars
+
 ### Utilities
 
 @fillConfig
