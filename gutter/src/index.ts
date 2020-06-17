@@ -191,6 +191,10 @@ const gutterView = ViewPlugin.fromClass(class {
     }
     return change
   }
+
+  destroy() {
+    this.dom.remove()
+  }
 }).provide(PluginField.scrollMargins, value => {
   if (value.gutters.length == 0 || !value.fixed) return null
   return value.view.textDirection == Direction.LTR ? {left: value.dom.offsetWidth} : {right: value.dom.offsetWidth}
@@ -274,10 +278,6 @@ class SingleGutterView {
       if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)
     }
     return this.markers == prevMarkers
-  }
-
-  destroy() {
-    this.dom.remove()
   }
 }
 
