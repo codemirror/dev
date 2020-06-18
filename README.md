@@ -1,5 +1,8 @@
 # CodeMirror 6 prototype
 
+[![Build Status](https://travis-ci.org/codemirror/codemirror.next.svg)](https://travis-ci.org/codemirror/codemirror.next)
+[![NPM version](https://img.shields.io/npm/v/codemirror.next.svg)](https://www.npmjs.org/package/codemirror.next)
+
 This is the prototype of the next version of [CodeMirror](https://codemirror.net), a complete rewrite.
 
 Eventually, the content of this repository will move into different packages. For now, to reduce friction during development, it is a monorepo. Its content is published as the `@codemirror/next` package on [npm](https://npmjs.com).
