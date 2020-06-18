@@ -187,7 +187,7 @@ type StateFieldSpec<Value> = {
 
   /// Compute a new value from the field's previous value and a
   /// [transaction](#state.Transaction).
-  update: (value: Value, transaction: Transaction, newState: EditorState) => Value,
+  update: (value: Value, transaction: Transaction) => Value,
 
   /// Compare two values of the field, returning `true` when they are
   /// the same. This is used to avoid recomputing facets that depend
@@ -215,7 +215,7 @@ export class StateField<Value> {
     /// @internal
     readonly id: number,
     private createF: (state: EditorState) => Value,
-    private updateF: (value: Value, tr: Transaction, state: EditorState) => Value,
+    private updateF: (value: Value, tr: Transaction) => Value,
     private compareF: (a: Value, b: Value) => boolean,
     /// @internal
     readonly facets: readonly Extension[]
@@ -248,7 +248,7 @@ export class StateField<Value> {
       } else {
         oldVal = tr.startState.values[idx]
       }
-      let value = this.updateF(oldVal, tr!, state)
+      let value = this.updateF(oldVal, tr!)
       if (!changed && !this.compareF(oldVal, value)) changed = SlotStatus.Changed
       if (changed) state.values[idx] = value
       return changed

@@ -42,8 +42,8 @@ const historyField = StateField.define({
     return HistoryState.empty
   },
 
-  update(state: HistoryState, tr: Transaction, newState: EditorState): HistoryState {
-    let config = newState.facet(historyConfig)
+  update(state: HistoryState, tr: Transaction): HistoryState {
+    let config = tr.state.facet(historyConfig)
 
     let fromHist = tr.annotation(fromHistory)
     if (fromHist) {

@@ -42,17 +42,17 @@ const matchingMark = Decoration.mark({class: themeClass("matchingBracket")}),
 
 const bracketMatchingState = StateField.define<DecorationSet>({
   create() { return Decoration.none },
-  update(deco, tr, state) {
+  update(deco, tr) {
     if (!tr.docChanged && !tr.selection) return deco
     let decorations = []
-    let config = state.facet(bracketMatchingConfig)
-    for (let range of state.selection.ranges) {
+    let config = tr.state.facet(bracketMatchingConfig)
+    for (let range of tr.state.selection.ranges) {
       if (!range.empty) continue
-      let match = matchBrackets(state, range.head, -1, config)
-        || (range.head > 0 && matchBrackets(state, range.head - 1, 1, config))
+      let match = matchBrackets(tr.state, range.head, -1, config)
+        || (range.head > 0 && matchBrackets(tr.state, range.head - 1, 1, config))
         || (config.afterCursor &&
-            (matchBrackets(state, range.head, 1, config) ||
-             (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1, config))))
+            (matchBrackets(tr.state, range.head, 1, config) ||
+             (range.head < tr.state.doc.length && matchBrackets(tr.state, range.head + 1, -1, config))))
       if (!match) continue
       let mark = match.matched ? matchingMark : nonmatchingMark
       decorations.push(mark.range(match.start.from, match.start.to))

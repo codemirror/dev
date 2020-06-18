@@ -596,7 +596,7 @@ export class EditorView {
   /// which causes the [base theme](#view.EditorView^baseTheme) rules
   /// marked with `@dark` to apply instead of those marked with
   /// `@light`.
-  static theme(spec: {[selector: string]: Style}, options?: {dark: boolean}): Extension {
+  static theme(spec: {[selector: string]: Style}, options?: {dark?: boolean}): Extension {
     let prefix = StyleModule.newName()
     let result = [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
     if (options && options.dark) result.push(darkTheme.of(true))

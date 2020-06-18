@@ -90,14 +90,14 @@ export class StreamSyntax implements Syntax {
         start.tree = start.updatedTree
         return start
       },
-      update(value, tr, state) {
+      update(value, tr) {
         for (let effect of tr.effects) if (effect.is(setSyntax)) return effect.value
         if (!tr.docChanged) return value
         let changeStart = -1
         tr.changes.iterChangedRanges(from => changeStart = changeStart < 0 ? from : changeStart)
-        let {start, number} = state.doc.lineAt(changeStart)
+        let {start, number} = tr.state.doc.lineAt(changeStart)
         let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, start)
-        newValue.advanceFrontier(parserInst, state, Work.Apply)
+        newValue.advanceFrontier(parserInst, tr.state, Work.Apply)
         newValue.tree = newValue.updatedTree
         return newValue
       }

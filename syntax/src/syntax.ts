@@ -22,7 +22,7 @@ export class LezerSyntax implements Syntax {
     let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
       create(state) { return SyntaxState.advance(Tree.empty, parser, state.doc) },
-      update(value, tr, state) { return value.apply(tr, state, parser, setSyntax) }
+      update(value, tr) { return value.apply(tr, parser, setSyntax) }
     })
     this.extension = [
       EditorState.syntax.of(this),
@@ -168,14 +168,14 @@ class SyntaxState {
     return new SyntaxState(result.parsed, parse.pos, result.cache)
   }
 
-  apply(tr: Transaction, newState: EditorState, parser: Parser, effect: StateEffectType<SyntaxState>) {
+  apply(tr: Transaction, parser: Parser, effect: StateEffectType<SyntaxState>) {
     for (let e of tr.effects) if (e.is(effect)) return e.value
     if (!tr.docChanged) return this
     let ranges: ChangedRange[] = []
     tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
     return SyntaxState.advance(
       (this.parse ? takeTree(this.parse, this.updatedTree).cache : this.cache).applyChanges(ranges),
-      parser, newState.doc)
+      parser, tr.state.doc)
   }
 
   startParse(parser: Parser, doc: Text) {

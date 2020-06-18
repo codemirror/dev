@@ -94,7 +94,7 @@ describe("EditorState", () => {
   })
 
   it("allows facets computed from fields", () => {
-    let field = StateField.define({create: () => [0], update: (v, tr, state) => tr.docChanged ? [state.doc.length] : v})
+    let field = StateField.define({create: () => [0], update: (v, tr) => tr.docChanged ? [tr.state.doc.length] : v})
     let facet = Facet.define<number>()
     let state = EditorState.create({
       extensions: [field, facet.compute([field], state => state.field(field)[0]), facet.of(1)]
