@@ -1,6 +1,6 @@
 import {Text, TextIterator} from "@codemirror/next/text"
 
-const basicNormalize: (string: string) => string = String.prototype.normalize ? x => x.normalize("NFKD") : x => x
+const basicNormalize: (string: string) => string = typeof String.prototype.normalize == "function" ? x => x.normalize("NFKD") : x => x
 
 /// A search cursor provides an iterator over text matches in a
 /// document.

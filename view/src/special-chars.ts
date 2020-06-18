@@ -3,7 +3,7 @@ import {Range} from "@codemirror/next/rangeset"
 import {ViewPlugin, ViewUpdate} from "./extension"
 import {EditorView} from "./editorview"
 import {combineConfig, Facet, Extension} from "@codemirror/next/state"
-import {countColumn} from "@codemirror/next/text"
+import {countColumn, codePointAt} from "@codemirror/next/text"
 import {StyleModule} from "style-mod"
 
 interface SpecialCharConfig {
@@ -105,7 +105,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
     for (let pos = from, cursor = doc.iterRange(from, to), m; !cursor.next().done;) {
       if (!cursor.lineBreak) {
         while (m = config.specialChars.exec(cursor.value)) {
-          let code = m[0].codePointAt ? m[0].codePointAt(0) : m[0].charCodeAt(0), deco
+          let code = codePointAt(m[0], 0), deco
           if (code == null) continue
           if (code == 9) {
             let line = doc.lineAt(pos + m.index)
