@@ -11,5 +11,20 @@
 <div id=mocha></div>
 
 <script src="mocha.js"></script>
-<script>mocha.setup("bdd")</script>
+<script>
+  let options = {ui: "bdd"}
+  if (/\?.*\bselenium\b/.test(document.location)) options.reporter = function Reporter(runner, options) {
+    let passed = [], pending = [], failures = []
+    runner.on("pass", test => passed.push(test.fullTitle()))
+    runner.on("fail", (test, err) => failures.push({title: test.fullTitle(), err: String(err)}))
+    runner.on("pending", test => pending.push(test.fullTitle()))
+    runner.once("end", () => {
+      let out = document.createElement("pre")
+      out.className = "test-result"
+      out.textContent = JSON.stringify({passed, pending, failures}, null, 2)
+      document.body.appendChild(out)
+    })
+  }
+  mocha.setup(options)
+</script>
 <script type=module src="/_m/__/view/test/test.js"></script>

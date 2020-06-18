@@ -26,7 +26,7 @@ describe("EditorView extension", () => {
     ist(viewports[1].to, viewports[0].from, ">")
     cm.scrollDOM.scrollTop = 4000
     cm.measure()
-    ist(viewports.length, 3)
+    ist(viewports.length, 3, ">=")
   })
 
   it("calls update on plugins", () => {

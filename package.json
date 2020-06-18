@@ -3,7 +3,8 @@
   "version": "0.7.1",
   "description": "Text/code editor component",
   "scripts": {
-    "test": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js view/test/test-heightmap.js commands/test/test-*.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js",
+    "test": "npm run test-node && node bin/selenium.js --start-server",
+    "test-node": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js view/test/test-heightmap.js commands/test/test-*.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js",
     "prepare": "bin/cm.js build",
     "dev": "bin/cm.js devserver"
   },
@@ -68,16 +69,19 @@
     "w3c-keyname": "^2.2.4"
   },
   "devDependencies": {
+    "@codemirror/next": ".",
     "@types/mocha": "^5.2.0",
-    "serve-static": "^1.14.1",
+    "chromedriver": "^83.0.0",
     "eslint4b-prebuilt": "^6.7.1",
+    "esmoduleserve": "^0.1.2",
+    "geckodriver": "^1.19.1",
     "ist": "^1.1.6",
     "mocha": "^7.1.1",
-    "esmoduleserve": "^0.1.2",
     "rollup": "^1.25.3",
+    "selenium-webdriver": "^4.0.0-alpha.7",
+    "serve-static": "^1.14.1",
     "ts-node": "^8.2.0",
-    "typescript": "^3.8.3",
-    "@codemirror/next": "."
+    "typescript": "^3.8.3"
   },
   "repository": {
     "type": "git",
