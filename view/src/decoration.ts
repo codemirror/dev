@@ -274,7 +274,7 @@ export class PointDecoration extends Decoration {
     if (this.isReplace && (from > to || (from == to && this.startSide > 0 && this.endSide < 0)))
       throw new RangeError("Invalid range for replacement decoration")
     if (!this.isReplace && to != from)
-      throw new RangeError("Widget decorations can only create zero-length ranges")
+      throw new RangeError("Widget decorations can only have zero-length ranges")
     return super.range(from, to)
   }
 }

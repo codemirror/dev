@@ -155,8 +155,7 @@ export type RangeCursor<T> = {
   to: number
 }
 
-/// Arguments passed to [`RangeSet.update`](#rangeset.RangeSet.update).
-export type RangeSetUpdate<T extends RangeValue> = {
+type RangeSetUpdate<T extends RangeValue> = {
   /// An array of ranges to add. If given, this should be sorted by
   /// `from` position and `startSide` unless
   /// [`sort`](#rangeset.RangeSetUpdate.sort) is given as `true`.
@@ -211,7 +210,8 @@ export class RangeSet<T extends RangeValue> {
 
   /// Update the range set, optionally adding new ranges or filtering
   /// out existing ones.
-  update({add = [], sort = false, filter, filterFrom = 0, filterTo = this.length}: RangeSetUpdate<T>): RangeSet<T> {
+  update(updateSpec: RangeSetUpdate<T>): RangeSet<T> {
+    let {add = [], sort = false, filter, filterFrom = 0, filterTo = this.length} = updateSpec
     if (add.length == 0 && !filter) return this
     if (sort) add.slice().sort(cmpRange)
     if (this == RangeSet.empty) return add.length ? RangeSet.of(add) : this
@@ -374,6 +374,9 @@ export class RangeSetBuilder<T extends RangeValue> {
     this.maxPoint = -1
     if (newArrays) { this.from = []; this.to = []; this.value = [] }
   }
+
+  /// Create an empty builder.
+  constructor() {}
 
   /// Add a range. Ranges should be added in sorted (by `from` and
   /// `value.startSide`) order.

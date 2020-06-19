@@ -7,8 +7,6 @@ document changes.
 
 @Range
 
-@RangeSetUpdate
-
 @RangeSet
 
 @RangeCursor
