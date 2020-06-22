@@ -277,7 +277,7 @@ class SingleGutterView {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
       if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)
     }
-    return this.markers == prevMarkers
+    return this.markers != prevMarkers
   }
 }
 
