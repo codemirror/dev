@@ -1,6 +1,6 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
 import {combineConfig, EditorState,
-        Transaction, Extension, StateField, StateEffect, Facet, precedence} from "@codemirror/next/state"
+        Transaction, Extension, StateField, StateEffect, Facet, precedence, ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 
@@ -53,7 +53,7 @@ export interface Completion {
   /// How to apply the completion. When this holds a string, the
   /// completion range is replaced by that string. When it is a
   /// function, that function is called to perform the completion.
-  apply?: string | ((view: EditorView) => void) // FIXME pass mapped range?
+  apply?: string | ((view: EditorView, completion: Completion) => void)
 }
 
 function retrieveCompletions(state: EditorState, pos: number, context: AutocompleteContext): Promise<readonly Completion[]> {
@@ -125,15 +125,13 @@ export const startCompletion: Command = (view: EditorView) => {
 
 function applyCompletion(view: EditorView, option: Completion) {
   let apply = option.apply || option.label
-  // FIXME make sure option.from/to still point at the current
-  // doc, or keep a mapping in an active completion
   if (typeof apply == "string") {
     view.dispatch(view.state.update({
       changes: {from: option.from, to: option.to, insert: apply},
       selection: {anchor: option.from + apply.length}
     }))
   } else {
-    apply(view)
+    apply(view, option)
   }
 }
 
@@ -171,7 +169,11 @@ const activeCompletion = StateField.define<ActiveState>({
     if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
         event == "delete" && value)
       value = "pending"
-    else if (tr.docChanged || tr.selection) value = null
+    // FIXME also allow pending completionst o survive changes somehow
+    else if (tr.docChanged && value instanceof ActiveCompletion && !touchesCompletions(value.options, tr.changes))
+      value = value.map(tr.changes)
+    else if (tr.selection || tr.docChanged)
+      value = null
     for (let effect of tr.effects) {
       if (effect.is(openCompletion))
         value = new ActiveCompletion(effect.value, 0)
@@ -188,6 +190,11 @@ const activeCompletion = StateField.define<ActiveState>({
     EditorView.contentAttributes.from(active => active instanceof ActiveCompletion ? active.attrs : baseAttrs)
   ]
 })
+
+function touchesCompletions(completions: readonly Completion[], changes: ChangeDesc) {
+  return changes.length && changes.touchesRange(completions.reduce((m, c) => Math.min(m, c.from), 1e9),
+                                                completions.reduce((m, c) => Math.max(m, c.from), 0))
+}
 
 const baseAttrs = {"aria-autocomplete": "list"}, none: readonly any[] = []
 
@@ -206,8 +213,13 @@ class ActiveCompletion {
                 style: "autocomplete",
                 create: completionTooltip(options, id)
               }]) {}
+
+  map(changes: ChangeDesc) {
+    return new ActiveCompletion(
+      this.options.map(o => Object.assign({}, o, {from: changes.mapPos(o.from), to: changes.mapPos(o.to)})),
+      this.selected)
+  }
 }
- 
 
 function createListBox(options: readonly Completion[], id: string) {
   const ul = document.createElement("ul")
