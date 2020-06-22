@@ -379,11 +379,16 @@ export class EditorView {
     return this.viewState.blockAtHeight(height, ensureTop(editorTop, this.contentDOM))
   }
 
-  /// Find information for the line at the given vertical position.
-  /// The resulting block info might hold another array of block info
-  /// structs in its `type` field if this line consists of more than
-  /// one block.
-  lineAtHeight(height: number, editorTop?: number): BlockInfo {
+  /// Find information for the visual line (see
+  /// [`visualLineAt`](#view.EditorView.visualLineAt)) at the given
+  /// vertical position. The resulting block info might hold another
+  /// array of block info structs in its `type` field if this line
+  /// consists of more than one block.
+  ///
+  /// Heights are interpreted relative to the given `editorTop`
+  /// position. When not given, the top position of the editor's
+  /// [content element](#view.EditorView.contentDOM) is taken.
+  visualLineAtHeight(height: number, editorTop?: number): BlockInfo {
     this.readMeasured()
     return this.viewState.lineAtHeight(height, ensureTop(editorTop, this.contentDOM))
   }

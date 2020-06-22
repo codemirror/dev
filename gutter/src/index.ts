@@ -258,7 +258,7 @@ class SingleGutterView {
     this.elementClass = themeClass("gutterElement" + (this.config.style ? "." + this.config.style : ""))
     for (let prop in config.domEventHandlers) {
       this.dom.addEventListener(prop, (event: Event) => {
-        let line = view.lineAtHeight((event as MouseEvent).clientY)
+        let line = view.visualLineAtHeight((event as MouseEvent).clientY, view.contentDOM.getBoundingClientRect().top)
         if (config.domEventHandlers[prop](view, line, event)) event.preventDefault()
       })
     }
