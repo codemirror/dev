@@ -397,7 +397,7 @@ function completeTag(state: EditorState, tree: Subtree, from: number, to: number
   let result = []
   for (let tagName of allowedChildren(state.doc, tree))
     if (context.filter(tagName, text))
-      result.push({label: tagName, start: from, end: to})
+      result.push({label: tagName, from, to})
   return result
 }
 
@@ -406,16 +406,16 @@ function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: n
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   for (let open of openTags(state.doc, tree))
     if (context.filter(open, text))
-      result.push({label: open, start: from, end: to, apply: open + end})
+      result.push({label: open, from, to, apply: open + end})
   return result
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
   let result = []
   for (let tagName of allowedChildren(state.doc, tree))
-    result.push({label: "<" + tagName, start: pos, end: pos})
+    result.push({label: "<" + tagName, from: pos, to: pos})
   for (let open of openTags(state.doc, tree))
-    result.push({label: "</" + open + ">", start: pos, end: pos})
+    result.push({label: "</" + open + ">", from: pos, to: pos})
   return result
 }
 
@@ -425,7 +425,7 @@ function completeAttrName(state: EditorState, tree: Subtree, from: number, to: n
   let base = state.sliceDoc(from, to).toLowerCase()
   for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
     if (context.filter(attrName, base))
-      result.push({label: attrName, start: from, end: to})
+      result.push({label: attrName, from, to})
   }
   return result
 }
@@ -455,7 +455,7 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
       }
       for (let value of options) {
         if (context.filter(value, base))
-          result.push({label: value, start: from, end: to, apply: quoteStart + value + quoteEnd})
+          result.push({label: value, from, to, apply: quoteStart + value + quoteEnd})
       }
     }
   }

@@ -47,9 +47,9 @@ export interface Completion {
   /// The label to show in the completion picker.
   label: string,
   /// The start of the range that is being completed.
-  start: number,
+  from: number,
   /// The end of the completed ranges.
-  end: number,
+  to: number,
   /// How to apply the completion. When this holds a string, the
   /// completion range is replaced by that string. When it is a
   /// function, that function is called to perform the completion.
@@ -125,12 +125,12 @@ export const startCompletion: Command = (view: EditorView) => {
 
 function applyCompletion(view: EditorView, option: Completion) {
   let apply = option.apply || option.label
-  // FIXME make sure option.start/end still point at the current
+  // FIXME make sure option.from/to still point at the current
   // doc, or keep a mapping in an active completion
   if (typeof apply == "string") {
     view.dispatch(view.state.update({
-      changes: {from: option.start, to: option.end, insert: apply},
-      selection: {anchor: option.start + apply.length}
+      changes: {from: option.from, to: option.to, insert: apply},
+      selection: {anchor: option.from + apply.length}
     }))
   } else {
     apply(view)
@@ -202,7 +202,7 @@ class ActiveCompletion {
               readonly selected: number,
               readonly id = "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36),
               readonly tooltip: readonly Tooltip[] = [{
-                pos: options.reduce((m, o) => Math.min(m, o.start), 1e9),
+                pos: options.reduce((m, o) => Math.min(m, o.from), 1e9),
                 style: "autocomplete",
                 create: completionTooltip(options, id)
               }]) {}
