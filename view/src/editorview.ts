@@ -388,11 +388,17 @@ export class EditorView {
     return this.viewState.lineAtHeight(height, ensureTop(editorTop, this.contentDOM))
   }
 
-  /// Find the height information for the given line.
-  lineAt(pos: number, editorTop?: number): BlockInfo {
-    // FIXME separate line (extent, bidi, widgets) info from height queries
-    if (editorTop == null) this.readMeasured()
-    return this.viewState.lineAt(pos, ensureTop(editorTop, this.contentDOM))
+  /// Find the extent and height of the visual line (the content shown
+  /// in the editor as a line, which may be smaller than a document
+  /// line when broken up by block widgets, or bigger than a document
+  /// line when line breaks are covered by replaced decorations) at
+  /// the given position.
+  ///
+  /// Vertical positions are computed relative to the `editorTop`
+  /// argument. You can pass `view.dom.getBoundingClientRect().top`
+  /// here to get screen coordinates.
+  visualLineAt(pos: number, editorTop: number = 0): BlockInfo {
+    return this.viewState.lineAt(pos, editorTop)
   }
 
   /// Iterate over the height information of the lines in the

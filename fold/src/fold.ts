@@ -17,7 +17,7 @@ function selectedLines(view: EditorView) {
   let lines: BlockInfo[] = []
   for (let {head} of view.state.selection.ranges) {
     if (lines.some(l => l.from <= head && l.to >= head)) continue
-    lines.push(view.lineAt(head))
+    lines.push(view.visualLineAt(head))
   }
   return lines
 }
@@ -104,9 +104,9 @@ export const unfoldCode: Command = view => {
 export const foldAll: Command = view => {
   let {state} = view, effects = []
   for (let pos = 0; pos < state.doc.length;) {
-    let line = view.lineAt(pos, 0), range = getFoldable(state, line.from, line.to)
+    let line = view.visualLineAt(pos), range = getFoldable(state, line.from, line.to)
     if (range) effects.push(foldEffect.of(range))
-    pos = (range ? view.lineAt(range.to) : line).to + 1
+    pos = (range ? view.visualLineAt(range.to) : line).to + 1
   }
   if (effects.length) view.dispatch(view.state.update({effects,
                                                        replaceExtensions: maybeEnable(view.state)}))
@@ -175,7 +175,7 @@ class FoldWidget extends WidgetType<null> {
     element.className = themeClass("foldPlaceholder")
 
     element.onclick = event => {
-      let line = view.lineAt(view.posAtDOM(event.target as HTMLElement))
+      let line = view.visualLineAt(view.posAtDOM(event.target as HTMLElement))
       let folded = foldInside(view.state, line.from, line.to)
       if (folded) view.dispatch(view.state.update({effects: unfoldEffect.of(folded)}))
       event.preventDefault()

@@ -104,7 +104,7 @@ export const cursorPageUp: Command = view => cursorByPage(view, false)
 export const cursorPageDown: Command = view => cursorByPage(view, true)
 
 function moveByLineBoundary(view: EditorView, start: SelectionRange, forward: boolean) {
-  let line = view.lineAt(start.head), moved = view.moveToLineBoundary(start, forward)
+  let line = view.visualLineAt(start.head), moved = view.moveToLineBoundary(start, forward)
   if (moved.head == start.head && moved.head != (forward ? line.to : line.from))
     moved = view.moveToLineBoundary(start, forward, false)
   if (!forward && moved.head == line.from && line.length) {
@@ -122,9 +122,9 @@ export const cursorLineBoundaryForward: Command = view => moveSel(view, range =>
 export const cursorLineBoundaryBackward: Command = view => moveSel(view, range => moveByLineBoundary(view, range, false))
 
 /// Move the selection to the start of the line.
-export const cursorLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from, 1))
+export const cursorLineStart: Command = view => moveSel(view, range => EditorSelection.cursor(view.visualLineAt(range.head).from, 1))
 /// Move the selection to the end of the line.
-export const cursorLineEnd: Command = view => moveSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to, -1))
+export const cursorLineEnd: Command = view => moveSel(view, range => EditorSelection.cursor(view.visualLineAt(range.head).to, -1))
 
 function toMatchingBracket(state: EditorState, dispatch: (tr: Transaction) => void, extend: boolean) {
   let found = false, selection = updateSel(state.selection, range => {
@@ -220,9 +220,9 @@ export const selectLineBoundaryForward: Command = view => extendSel(view, range 
 export const selectLineBoundaryBackward: Command = view => extendSel(view, range => moveByLineBoundary(view, range, false))
 
 /// Move the selection head to the start of the line.
-export const selectLineStart: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).from))
+export const selectLineStart: Command = view => extendSel(view, range => EditorSelection.cursor(view.visualLineAt(range.head).from))
 /// Move the selection head to the end of the line.
-export const selectLineEnd: Command = view => extendSel(view, range => EditorSelection.cursor(view.lineAt(range.head).to))
+export const selectLineEnd: Command = view => extendSel(view, range => EditorSelection.cursor(view.visualLineAt(range.head).to))
 
 /// Move the selection to the start of the document.
 export const cursorDocStart: StateCommand = ({state, dispatch}) => {
@@ -357,7 +357,7 @@ export const deleteGroupForward: Command = view => deleteByGroup(view, true)
 /// the end of the line. If the cursor is directly at the end of the
 /// line, delete the line break after it.
 export const deleteToLineEnd: Command = view => deleteBy(view, pos => {
-  let lineEnd = view.lineAt(pos).to
+  let lineEnd = view.visualLineAt(pos).to
   if (pos < lineEnd) return lineEnd
   return Math.max(view.state.doc.length, pos + 1)
 })
