@@ -305,8 +305,8 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
   } else { // Triple click
     let line = LineView.find(view.docView, pos)
     if (line) return EditorSelection.range(line.posAtStart, line.posAtEnd)
-    let {start, end} = view.state.doc.lineAt(pos)
-    return EditorSelection.range(start, end)
+    let {from, to} = view.state.doc.lineAt(pos)
+    return EditorSelection.range(from, to)
   }
 }
 
@@ -448,7 +448,7 @@ function copiedRange(state: EditorState) {
       let line = state.doc.lineAt(from)
       if (line.number > upto) {
         content.push(line.slice())
-        ranges.push({from: line.start, to: Math.min(state.doc.length, line.end + 1)})
+        ranges.push({from: line.from, to: Math.min(state.doc.length, line.to + 1)})
       }
       upto = line.number
     }

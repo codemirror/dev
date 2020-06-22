@@ -94,7 +94,7 @@ export class IndentContext {
   textAfterPos(pos: number) {
     return this.state.sliceDoc(pos, Math.min(pos + 100,
                                              this.simulateBreak != null && this.simulateBreak >= pos ? this.simulateBreak : 1e9,
-                                             this.state.doc.lineAt(pos).end))
+                                             this.state.doc.lineAt(pos).to))
   }
 
   /// find the column position (taking tabs into account) of the given
@@ -106,7 +106,7 @@ export class IndentContext {
   /// Find the indentation column of the given document line.
   lineIndent(line: Line) {
     if (this.overrideIndentation) {
-      let override = this.overrideIndentation(line.start)
+      let override = this.overrideIndentation(line.from)
       if (override > -1) return override
     }
     let text = line.slice(0, Math.min(100, line.length))
@@ -115,9 +115,9 @@ export class IndentContext {
 
   /// Find the column for the given position.
   column(pos: number) {
-    let line = this.state.doc.lineAt(pos), text = line.slice(0, pos - line.start)
-    let result = this.countColumn(text, pos - line.start)
-    let override = this.overrideIndentation ? this.overrideIndentation(line.start) : -1
+    let line = this.state.doc.lineAt(pos), text = line.slice(0, pos - line.from)
+    let result = this.countColumn(text, pos - line.from)
+    let override = this.overrideIndentation ? this.overrideIndentation(line.from) : -1
     if (override > -1) result += override - this.countColumn(text, text.search(/\S/))
     return result
   }

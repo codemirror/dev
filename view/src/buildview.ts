@@ -22,7 +22,7 @@ export class ContentBuilder implements SpanIterator<Decoration> {
 
   posCovered() {
     if (this.content.length == 0)
-      return !this.breakAtStart && this.doc.lineAt(this.pos).start != this.pos
+      return !this.breakAtStart && this.doc.lineAt(this.pos).from != this.pos
     let last = this.content[this.content.length - 1]
     return !last.breakAfter && !(last instanceof BlockWidgetView && last.type == BlockType.WidgetBefore)
   }
@@ -102,7 +102,7 @@ export class ContentBuilder implements SpanIterator<Decoration> {
       } else {
         this.getLine().append(WidgetView.create(deco.widget || new NullWidget("span"), len, deco.startSide, open))
       }
-    } else if (this.doc.lineAt(this.pos).start == this.pos) { // Line decoration
+    } else if (this.doc.lineAt(this.pos).from == this.pos) { // Line decoration
       this.getLine().addLineDeco(deco as LineDecoration)
     }
 

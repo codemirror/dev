@@ -29,7 +29,7 @@ export function esLint(eslint: any, config?: any) {
   }
 
   function range(state: EditorState, from: number = 0, to: number = state.doc.length) {
-    let fromLine = state.doc.lineAt(from), offset = {line: fromLine.number - 1, col: from - fromLine.start, pos: from}
+    let fromLine = state.doc.lineAt(from), offset = {line: fromLine.number - 1, col: from - fromLine.from, pos: from}
     return eslint.verify(state.sliceDoc(from, to), config)
       .map((val: any) => translateDiagnostic(val, state.doc, offset))
   }
@@ -54,7 +54,7 @@ export function esLint(eslint: any, config?: any) {
 }
 
 function mapPos(line: number, col: number, doc: Text, offset: {line: number, col: number, pos: number}) {
-  return doc.line(line + offset.line).start + col + (line == 1 ? offset.col - 1 : -1)
+  return doc.line(line + offset.line).from + col + (line == 1 ? offset.col - 1 : -1)
 }
 
 function translateDiagnostic(input: any, doc: Text, offset: {line: number, col: number, pos: number}): Diagnostic {

@@ -16,7 +16,7 @@ function rectangleFor(state: EditorState, a: Pos, b: Pos) {
     for (let i = startLine; i <= endLine; i++) {
       let line = state.doc.line(i)
       if (line.length <= endOff)
-        ranges.push(EditorSelection.range(line.start + startOff, line.end + endOff))
+        ranges.push(EditorSelection.range(line.from + startOff, line.to + endOff))
     }
   } else {
     let startCol = Math.min(a.col, b.col), endCol = Math.max(a.col, b.col)
@@ -24,7 +24,7 @@ function rectangleFor(state: EditorState, a: Pos, b: Pos) {
       let line = state.doc.line(i), str = line.length > MaxOff ? line.slice(0, 2 * endCol) : line.slice()
       let start = findColumn(str, 0, startCol, state.tabSize), end = findColumn(str, 0, endCol, state.tabSize)
       if (!start.leftOver)
-        ranges.push(EditorSelection.range(line.start + start.offset, line.start + end.offset))
+        ranges.push(EditorSelection.range(line.from + start.offset, line.from + end.offset))
     }
   }
   return ranges
@@ -37,10 +37,10 @@ function absoluteColumn(view: EditorView, x: number) {
 
 function getPos(view: EditorView, event: MouseEvent) {
   let offset = view.posAtCoords({x: event.clientX, y: event.clientY}) // FIXME
-  let line = view.state.doc.lineAt(offset), off = offset - line.start
+  let line = view.state.doc.lineAt(offset), off = offset - line.from
   let col = off > MaxOff ? -1
     : off == line.length ? absoluteColumn(view, event.clientX)
-    : countColumn(line.slice(0, offset - line.start), 0, view.state.tabSize)
+    : countColumn(line.slice(0, offset - line.from), 0, view.state.tabSize)
   return {line: line.number, col, off}
 }
 
@@ -49,7 +49,7 @@ function rectangleSelectionStyle(view: EditorView, event: MouseEvent) {
   return {
     update(update) {
       if (update.docChanged) {
-        let newStart = update.changes.mapPos(update.prevState.doc.line(start.line).start)
+        let newStart = update.changes.mapPos(update.prevState.doc.line(start.line).from)
         let newLine = update.state.doc.lineAt(newStart)
         start = {line: newLine.number, col: start.col, off: Math.min(start.off, newLine.length)}
         startSel = startSel.map(update.changes)

@@ -95,8 +95,8 @@ export class StreamSyntax implements Syntax {
         if (!tr.docChanged) return value
         let changeStart = -1
         tr.changes.iterChangedRanges(from => changeStart = changeStart < 0 ? from : changeStart)
-        let {start, number} = tr.state.doc.lineAt(changeStart)
-        let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, start)
+        let {from, number} = tr.state.doc.lineAt(changeStart)
+        let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, from)
         newValue.advanceFrontier(parserInst, tr.state, Work.Apply)
         newValue.tree = newValue.updatedTree
         return newValue
@@ -170,8 +170,8 @@ class SyntaxState<ParseState> {
   findState(parser: StreamParserInstance<ParseState>, editorState: EditorState, line: number) {
     let cacheIndex = Math.min(this.cache.length - 1, (line - 1) >> CacheStepShift)
     let cachedLine = (cacheIndex << CacheStepShift) + 1
-    let startPos = editorState.doc.line(cachedLine).start
-    if (line - cachedLine > CacheStep && editorState.doc.line(line).start - startPos > MaxRecomputeDistance)
+    let startPos = editorState.doc.line(cachedLine).from
+    if (line - cachedLine > CacheStep && editorState.doc.line(line).from - startPos > MaxRecomputeDistance)
       return null
     let state = parser.copyState(this.cache[cacheIndex])
     let cursor = new StringStreamCursor(editorState.doc, startPos, editorState.tabSize)
@@ -223,7 +223,7 @@ class SyntaxState<ParseState> {
     let line = state.doc.lineAt(pos)
     let parseState = this.findState(parser, state, line.number)
     if (parseState == null) return -1
-    let text = line.slice(pos - line.start, Math.min(line.end, pos + 100) - line.start)
+    let text = line.slice(pos - line.from, Math.min(line.to, pos + 100) - line.from)
     return parser.indent(parseState, /^\s*(.*)/.exec(text)![1], state)
   }
 }

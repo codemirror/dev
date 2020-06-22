@@ -289,27 +289,27 @@ class HeightMapGap extends HeightMap {
   blockAt(height: number, doc: Text, top: number, offset: number) {
     let {firstLine, lastLine, lineHeight} = this.lines(doc, offset)
     let line = Math.max(0, Math.min(lastLine - firstLine, Math.floor((height - top) / lineHeight)))
-    let {start, length} = doc.line(firstLine + line)
-    return new BlockInfo(start, length, top + lineHeight * line, lineHeight, BlockType.Text)
+    let {from, length} = doc.line(firstLine + line)
+    return new BlockInfo(from, length, top + lineHeight * line, lineHeight, BlockType.Text)
   }
 
   lineAt(value: number, type: QueryType, doc: Text, top: number, offset: number) {
     if (type == QueryType.ByHeight) return this.blockAt(value, doc, top, offset)
     if (type == QueryType.ByPosNoHeight) {
-      let {start, end} = doc.lineAt(value)
-      return new BlockInfo(start, end - start, 0, 0, BlockType.Text)
+      let {from, to} = doc.lineAt(value)
+      return new BlockInfo(from, to - from, 0, 0, BlockType.Text)
     }
     let {firstLine, lineHeight} = this.lines(doc, offset)
-    let {start, length, number} = doc.lineAt(value)
-    return new BlockInfo(start, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.Text)
+    let {from, length, number} = doc.lineAt(value)
+    return new BlockInfo(from, length, top + lineHeight * (number - firstLine), lineHeight, BlockType.Text)
   }
 
   forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
     let {firstLine, lastLine, lineHeight} = this.lines(doc, offset)
     for (let line = firstLine; line <= lastLine; line++) {
-      let {start, end} = doc.line(line)
-      if (start > to) break
-      if (end >= from) f(new BlockInfo(start, end - start, top, top += lineHeight, BlockType.Text))
+      let {from, to} = doc.line(line)
+      if (from > to) break
+      if (to >= from) f(new BlockInfo(from, to - from, top, top += lineHeight, BlockType.Text))
     }
   }
 
@@ -532,26 +532,26 @@ class NodeBuilder implements SpanIterator<Decoration> {
       this.span(from, to)
     }
     if (this.lineEnd > -1 && this.lineEnd < this.pos)
-      this.lineEnd = this.oracle.doc.lineAt(this.pos).end
+      this.lineEnd = this.oracle.doc.lineAt(this.pos).to
   }
 
   enterLine() {
     if (this.lineStart > -1) return
-    let {start, end} = this.oracle.doc.lineAt(this.pos)
-    this.lineStart = start; this.lineEnd = end
-    if (this.writtenTo < start) {
-      if (this.writtenTo < start - 1 || this.nodes[this.nodes.length - 1] == null)
-        this.nodes.push(this.blankContent(this.writtenTo, start - 1))
+    let {from, to} = this.oracle.doc.lineAt(this.pos)
+    this.lineStart = from; this.lineEnd = to
+    if (this.writtenTo < from) {
+      if (this.writtenTo < from - 1 || this.nodes[this.nodes.length - 1] == null)
+        this.nodes.push(this.blankContent(this.writtenTo, from - 1))
       this.nodes.push(null)
     }
-    if (this.pos > start)
-      this.nodes.push(new HeightMapText(this.pos - start, -1))
+    if (this.pos > from)
+      this.nodes.push(new HeightMapText(this.pos - from, -1))
     this.writtenTo = this.pos
   }
 
   blankContent(from: number, to: number) {
     let gap = new HeightMapGap(to - from)
-    if (this.oracle.doc.lineAt(from).end == to) gap.flags |= Flag.SingleLine
+    if (this.oracle.doc.lineAt(from).to == to) gap.flags |= Flag.SingleLine
     return gap
   }
 

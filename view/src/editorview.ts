@@ -471,7 +471,7 @@ export class EditorView {
     let rect = this.docView.coordsAt(pos, side)
     if (!rect || rect.left == rect.right) return rect
     let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line)
-    let span = order[BidiSpan.find(order, pos - line.start, -1, side)]
+    let span = order[BidiSpan.find(order, pos - line.from, -1, side)]
     let x = (span.dir == Direction.LTR) == (side < 0) ? rect.right : rect.left
     return {left: x, right: x, top: rect.top, bottom: rect.bottom}
   }
@@ -497,9 +497,9 @@ export class EditorView {
   bidiSpans(line: Line) {
     if (line.length > MaxBidiLine) return trivialOrder(line.length)
     let dir = this.textDirection
-    for (let entry of this.bidiCache) if (entry.from == line.start && entry.dir == dir) return entry.order
+    for (let entry of this.bidiCache) if (entry.from == line.from && entry.dir == dir) return entry.order
     let order = computeOrder(line.slice(), this.textDirection)
-    this.bidiCache.push(new CachedOrder(line.start, line.end, dir, order))
+    this.bidiCache.push(new CachedOrder(line.from, line.to, dir, order))
     return order
   }
 

@@ -181,8 +181,8 @@ describe("doc", () => {
     ist.throws(() => doc0.line(doc0.lines + 1), /Invalid line/)
     for (let i = 1; i < doc0.lines; i += 5) {
       let l = doc0.line(i)
-      ist(l.start, (i - 1) * 101)
-      ist(l.end, i * 101 - 1)
+      ist(l.from, (i - 1) * 101)
+      ist(l.to, i * 101 - 1)
       ist(l.number, i)
       ist(l.slice(), line)
     }
@@ -193,8 +193,8 @@ describe("doc", () => {
     ist.throws(() => doc0.lineAt(doc0.length + 1), /Invalid position/)
     for (let i = 0; i < doc0.length; i += 5) {
       let l = doc0.lineAt(i)
-      ist(l.start, i - (i % 101))
-      ist(l.end, i - (i % 101) + 100)
+      ist(l.from, i - (i % 101))
+      ist(l.to, i - (i % 101) + 100)
       ist(l.number, Math.floor(i / 101) + 1)
       ist(l.slice(), line)
     }

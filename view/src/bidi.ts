@@ -182,7 +182,7 @@ export let movedOver = ""
 
 export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direction,
                              start: SelectionRange, forward: boolean) {
-  let startIndex = start.head - line.start, spanI = -1
+  let startIndex = start.head - line.from, spanI = -1
   if (startIndex == 0) {
     if (!forward || !line.length) return null
     if (order[0].level != dir) {
@@ -210,11 +210,11 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
   movedOver = line.slice(Math.min(startIndex, nextIndex), Math.max(startIndex, nextIndex))
 
   if (nextIndex != span.side(forward, dir))
-    return EditorSelection.cursor(nextIndex + line.start, indexForward ? -1 : 1, span.level)
+    return EditorSelection.cursor(nextIndex + line.from, indexForward ? -1 : 1, span.level)
   let nextSpan = spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)]
   if (!nextSpan && span.level != dir)
-    return EditorSelection.cursor(forward ? line.end : line.start, forward ? -1 : 1, dir)
+    return EditorSelection.cursor(forward ? line.to : line.from, forward ? -1 : 1, dir)
   if (nextSpan && nextSpan.level < span.level)
-    return EditorSelection.cursor(nextSpan.side(!forward, dir) + line.start, 0, nextSpan.level)
-  return EditorSelection.cursor(nextIndex + line.start, 0, span.level)
+    return EditorSelection.cursor(nextSpan.side(!forward, dir) + line.from, 0, nextSpan.level)
+  return EditorSelection.cursor(nextIndex + line.from, 0, span.level)
 }

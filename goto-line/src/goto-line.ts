@@ -12,7 +12,7 @@ function createLineDialog(view: EditorView): Panel {
     let n = parseInt(input.value, 10)
     view.dispatch(view.state.update({
       replaceExtensions: {[tag]: [baseTheme]},
-      selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).start) : undefined
+      selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).from) : undefined
     }))
     view.focus()
   }

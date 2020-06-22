@@ -237,12 +237,12 @@ class TextNode extends Text {
       let child = this.children[i], end = offset + child.length, endLine = line + child.lines - 1
       if ((isLine ? endLine : end) >= target) {
         let inner = child.lineInner(target, isLine, line, offset), add
-        if (inner.start == offset && (add = this.lineLengthTo(i))) {
-          ;(inner as any).start -= add
+        if (inner.from == offset && (add = this.lineLengthTo(i))) {
+          ;(inner as any).from -= add
           ;(inner as any).content = null
         }
-        if (inner.end == end && (add = this.lineLengthFrom(i + 1))) {
-          ;(inner as any).end += add
+        if (inner.to == end && (add = this.lineLengthFrom(i + 1))) {
+          ;(inner as any).to += add
           ;(inner as any).content = null
         }
         return inner
@@ -560,10 +560,10 @@ export class Line {
   /// @internal
   constructor(
     /// The position of the start of the line.
-    readonly start: number,
+    readonly from: number,
     /// The position at the end of the line (_before_ the line break,
     /// if this isn't the last line).
-    readonly end: number,
+    readonly to: number,
     /// This line's line number (1-based).
     readonly number: number,
     /// @internal
@@ -571,7 +571,7 @@ export class Line {
   ) {}
 
   /// The length of the line (not including any line break after it).
-  get length() { return this.end - this.start }
+  get length() { return this.to - this.from }
 
   /// Retrieve a part of the content of this line. This is a method,
   /// rather than, say, a string property, to avoid concatenating long
@@ -589,7 +589,7 @@ export class Line {
 
   /// @internal
   finish(text: Text): this {
-    if (this.content == null) this.content = new LineContent(text, this.start)
+    if (this.content == null) this.content = new LineContent(text, this.from)
     return this
   }
 
@@ -602,7 +602,7 @@ export class Line {
     if (start < 0 || start > this.length) throw new RangeError("Invalid position given to Line.findClusterBreak")
     let contextStart, context
     if (this.content == "string") {
-      contextStart = this.start
+      contextStart = this.from
       context = this.content
     } else {
       contextStart = Math.max(0, start - 256)

@@ -193,7 +193,7 @@ class LineCommenter {
           const lines = linesAcrossRange[i]
           for (const line of lines) {
             if (lines.length > 1 && column.isLineSkipped[line.number]) continue
-            const pos = line.start + column.minCol
+            const pos = line.from + column.minCol
             const posAfter = column.minCol + this.lineCommentToken.length
             const marginLen = line.slice(posAfter, posAfter + 1) == " " ? 1 : 0
             changes.push({from: pos, to: pos + this.lineCommentToken.length + marginLen})
@@ -208,7 +208,7 @@ class LineCommenter {
           const lines = linesAcrossRange[i]
           for (const line of lines) {
             if (lines.length <= 1 || !column.isLineSkipped[line.number])
-              changes.push({from: line.start + column.minCol, insert: this.lineCommentToken + this.margin})
+              changes.push({from: line.from + column.minCol, insert: this.lineCommentToken + this.margin})
           }
         }
         return state.update({changes})
@@ -244,8 +244,8 @@ class LineCommenter {
 function getLinesInRange(doc: Text, range: SelectionRange): Line[] {
   let line: Line = doc.lineAt(range.from)
   const lines = []
-  while (line.start + line.length < range.to ||
-    (line.start <= range.to && range.to <= line.end)) {
+  while (line.from + line.length < range.to ||
+    (line.from <= range.to && range.to <= line.to)) {
     lines.push(line)
     if (line.number + 1 <= doc.lines) {
       line = doc.line(line.number + 1)

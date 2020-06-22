@@ -82,7 +82,7 @@ export class TreeIndentContext extends IndentContext {
     let line = this.state.doc.lineAt(this.node.start)
     // Skip line starts that are covered by a sibling (or cousin, etc)
     for (;;) {
-      let atBreak = this.node.resolve(line.start)
+      let atBreak = this.node.resolve(line.from)
       while (atBreak.parent && atBreak.parent.start == atBreak.start) atBreak = atBreak.parent
       if (isParent(atBreak, this.node)) break
       line = this.state.doc.lineAt(atBreak.start)
@@ -108,7 +108,7 @@ function bracketedAligned(context: TreeIndentContext) {
     let next = tree.childAfter(pos)
     if (!next || next == last) return null
     if (!next.type.prop(NodeProp.skipped))
-      return next.start < openLine.end ? openToken : null
+      return next.start < openLine.to ? openToken : null
     pos = next.end
   }
 }

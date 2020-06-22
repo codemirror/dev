@@ -328,7 +328,7 @@ const Break = /[\s\.,:;?!]/
 // FIXME this is a kludge
 function maybeAnnounceMatch(view: EditorView) {
   let {from, to} = view.state.selection.primary
-  let lineStart = view.state.doc.lineAt(from).start, lineEnd = view.state.doc.lineAt(to).end
+  let lineStart = view.state.doc.lineAt(from).from, lineEnd = view.state.doc.lineAt(to).to
   let start = Math.max(lineStart, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin)
   let text = view.state.sliceDoc(start, end)
   if (start != lineStart) {

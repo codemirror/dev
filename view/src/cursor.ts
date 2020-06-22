@@ -15,7 +15,7 @@ declare global {
 
 export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   let categorize = state.charCategorizer(pos)
-  let line = state.doc.lineAt(pos), linePos = pos - line.start
+  let line = state.doc.lineAt(pos), linePos = pos - line.from
   if (line.length == 0) return EditorSelection.cursor(pos)
   if (linePos == 0) bias = 1
   else if (linePos == line.length) bias = -1
@@ -33,7 +33,7 @@ export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
     if (categorize(line.slice(to, next)) != cat) break
     to = next
   }
-  return EditorSelection.range(from + line.start, to + line.start)
+  return EditorSelection.range(from + line.from, to + line.from)
 }
 
 // Search the DOM for the {node, offset} position closest to the given
@@ -172,7 +172,7 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
 export function moveToLineBoundary(view: EditorView, start: SelectionRange, forward: boolean, includeWrap: boolean) {
   let line = view.state.doc.lineAt(start.head)
   let coords = !includeWrap || !view.lineWrapping ? null
-    : view.coordsAtPos(start.assoc < 0 && start.head > line.start ? start.head - 1 : start.head)
+    : view.coordsAtPos(start.assoc < 0 && start.head > line.from ? start.head - 1 : start.head)
   if (coords) {
     let editorRect = view.dom.getBoundingClientRect()
     let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
@@ -180,7 +180,7 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
     if (pos > -1) return EditorSelection.cursor(pos, forward ? -1 : 1)
   }
   let lineView = LineView.find(view.docView, start.head)
-  let end = lineView ? (forward ? lineView.posAtEnd : lineView.posAtStart) : (forward ? line.end : line.start)
+  let end = lineView ? (forward ? lineView.posAtEnd : lineView.posAtStart) : (forward ? line.to : line.from)
   return EditorSelection.cursor(end, forward ? -1 : 1)
 }
 
@@ -194,7 +194,7 @@ export function moveByChar(view: EditorView, start: SelectionRange, forward: boo
       char = "\n"
       line = view.state.doc.line(line.number + (forward ? 1 : -1))
       spans = view.bidiSpans(line)
-      next = EditorSelection.cursor(forward ? line.start : line.end)
+      next = EditorSelection.cursor(forward ? line.from : line.to)
     }
     if (!check) {
       if (!by) return next
@@ -235,18 +235,18 @@ export function moveVertically(view: EditorView, start: SelectionRange, forward:
   let {doc} = view.state, line = doc.lineAt(startPos), tabSize = view.state.tabSize
   let goal = start.goalColumn, goalCol = 0
   if (goal == null) {
-    for (const iter = doc.iterRange(line.start, startPos); !iter.next().done;)
+    for (const iter = doc.iterRange(line.from, startPos); !iter.next().done;)
       goalCol = countColumn(iter.value, goalCol, tabSize)
     goal = goalCol * view.defaultCharacterWidth
   } else {
     goalCol = Math.round(goal / view.defaultCharacterWidth)
   }
-  if (dir < 0 && line.start == 0) return EditorSelection.cursor(0, undefined, undefined, goal)
-  else if (dir > 0 && line.end == doc.length) return EditorSelection.cursor(line.end, undefined, undefined, goal)
+  if (dir < 0 && line.from == 0) return EditorSelection.cursor(0, undefined, undefined, goal)
+  else if (dir > 0 && line.to == doc.length) return EditorSelection.cursor(line.to, undefined, undefined, goal)
   let otherLine = doc.line(line.number + dir)
-  let result = otherLine.start
+  let result = otherLine.from
   let seen = 0
-  for (const iter = doc.iterRange(otherLine.start, otherLine.end); seen >= goalCol && !iter.next().done;) {
+  for (const iter = doc.iterRange(otherLine.from, otherLine.to); seen >= goalCol && !iter.next().done;) {
     const {offset, leftOver} = findColumn(iter.value, seen, goalCol, tabSize)
     seen = goalCol - leftOver
     result += offset

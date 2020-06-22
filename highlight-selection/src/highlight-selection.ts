@@ -75,7 +75,7 @@ export function highlightSelectionMatches(options?: HighlightOptions): Extension
 
 function wordAt(doc: Text, pos: number, check: (ch: string) => CharCategory) {
   let line = doc.lineAt(pos)
-  let from = pos - line.start, to = pos - line.start
+  let from = pos - line.from, to = pos - line.from
   while (from > 0) {
     let prev = line.findClusterBreak(from, false)
     if (check(line.slice(prev, from)) != CharCategory.Word) break
