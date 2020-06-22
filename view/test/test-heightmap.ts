@@ -137,6 +137,17 @@ describe("HeightMap", () => {
     ist(map.height, 61)
   })
 
+  it("doesn't set the heightChanged bit for small within-line replacements", () => {
+    let text = doc(10, 10, 10), oracle = o(text)
+    let map = mk(text, []).updateHeight(oracle, 0, false, new MeasuredHeights(0, [12, 12, 12]))
+    let newText = text.replace(21, 21, Text.of(["!"]))
+    map = map.applyChanges([], text, oracle.setDoc(newText), [new ChangedRange(21, 21, 21, 22)])
+    oracle.heightChanged = false
+    console.log(">>>>")
+    map = map.updateHeight(oracle, 0, false, new MeasuredHeights(0, [12, 12, 12]))
+    ist(oracle.heightChanged, false)
+  })
+
   it("can update lines across the tree", () => {
     let text = doc(...new Array(100).fill(10)), oracle = o(text)
     let map = mk(text).updateHeight(oracle, 0, false, new MeasuredHeights(0, new Array(100).fill(12)))

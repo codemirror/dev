@@ -113,9 +113,9 @@ export class BlockInfo {
 
 export enum QueryType { ByPos, ByHeight, ByPosNoHeight }
 
-const enum Flag { Break = 1, Outdated = 2 }
+const enum Flag { Break = 1, Outdated = 2, SingleLine = 4 }
 
-const Epsilon = 1e-10
+const Epsilon = 1e-4
 
 export abstract class HeightMap {
   constructor(
@@ -146,7 +146,7 @@ export abstract class HeightMap {
   // Base case is to replace a leaf node, which simply builds a tree
   // from the new nodes and returns that (HeightMapBranch and
   // HeightMapGap override this to actually use from/to)
-  replace(_from: number, _to: number, nodes: (HeightMap | null)[], _doc: Text): HeightMap {
+  replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
     return HeightMap.of(nodes)
   }
 
@@ -170,7 +170,7 @@ export abstract class HeightMap {
       }
       fromB += start.from - fromA; fromA = start.from
       let nodes = NodeBuilder.build(oracle, decorations, fromB, toB)
-      me = me.replace(fromA, toA, nodes, oracle.doc)
+      me = me.replace(fromA, toA, nodes)
     }
     return me.updateHeight(oracle, 0)
   }
@@ -251,12 +251,13 @@ class HeightMapText extends HeightMapBlock {
 
   constructor(length: number, height: number) { super(length, height, BlockType.Text) }
 
-  replace(from: number, _to: number, nodes: (HeightMap | null)[], doc: Text): HeightMap {
-    if (nodes.length == 1 && Math.abs(this.length - nodes[0]!.length) < 10 &&
-        (nodes[0] instanceof HeightMapText || nodes[0] instanceof HeightMapGap && doc.lineAt(from).length == nodes[0].length)) {
-      let node = nodes[0]!
+  replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
+    let node = nodes[0]
+    if (nodes.length == 1 && (node instanceof HeightMapText || node instanceof HeightMapGap && (node.flags & Flag.SingleLine)) &&
+        Math.abs(this.length - node.length) < 10) {
       if (node instanceof HeightMapGap) node = new HeightMapText(node.length, this.height)
       else node.height = this.height
+      if (!this.outdated) node.outdated = false
       return node
     } else {
       return HeightMap.of(nodes)
@@ -407,12 +408,12 @@ class HeightMapBranch extends HeightMap {
     }
   }
 
-  replace(from: number, to: number, nodes: (HeightMap | null)[], doc: Text): HeightMap {
+  replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     let rightStart = this.left.length + this.break
     if (to < rightStart)
-      return this.balanced(this.left.replace(from, to, nodes, doc), this.right)
+      return this.balanced(this.left.replace(from, to, nodes), this.right)
     if (from > this.left.length)
-      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes, doc))
+      return this.balanced(this.left, this.right.replace(from - rightStart, to - rightStart, nodes))
 
     let result: (HeightMap | null)[] = []
     if (from > 0) this.decomposeLeft(from, result)
@@ -540,12 +541,18 @@ class NodeBuilder implements SpanIterator<Decoration> {
     this.lineStart = start; this.lineEnd = end
     if (this.writtenTo < start) {
       if (this.writtenTo < start - 1 || this.nodes[this.nodes.length - 1] == null)
-        this.nodes.push(new HeightMapGap(start - this.writtenTo - 1))
+        this.nodes.push(this.blankContent(this.writtenTo, start - 1))
       this.nodes.push(null)
     }
     if (this.pos > start)
       this.nodes.push(new HeightMapText(this.pos - start, -1))
     this.writtenTo = this.pos
+  }
+
+  blankContent(from: number, to: number) {
+    let gap = new HeightMapGap(to - from)
+    if (this.oracle.doc.lineAt(from).end == to) gap.flags |= Flag.SingleLine
+    return gap
   }
 
   ensureLine() {
@@ -578,7 +585,7 @@ class NodeBuilder implements SpanIterator<Decoration> {
     if (this.lineStart > -1 && !(last instanceof HeightMapText) && !this.isCovered)
       this.nodes.push(new HeightMapText(0, -1))
     else if (this.writtenTo < this.pos || last == null)
-      this.nodes.push(new HeightMapGap(this.pos - this.writtenTo))
+      this.nodes.push(this.blankContent(this.writtenTo, this.pos))
     let pos = from
     for (let node of this.nodes) {
       if (node instanceof HeightMapText) node.updateHeight(this.oracle, pos)
