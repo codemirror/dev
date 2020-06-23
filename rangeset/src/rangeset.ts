@@ -1,4 +1,4 @@
-import {ChangeSet, MapMode} from "@codemirror/next/state"
+import {ChangeDesc, MapMode} from "@codemirror/next/state"
 
 /// Each range is associated with a value, which must inherit from
 /// this class.
@@ -115,7 +115,7 @@ class Chunk<T extends RangeValue> {
       if (f(this.from[i] + offset, this.to[i] + offset, this.value[i]) === false) return false
   }
 
-  map(offset: number, changes: ChangeSet) {
+  map(offset: number, changes: ChangeDesc) {
     let value: T[] = [], from = [], to = [], newPos = -1, maxPoint = -1
     for (let i = 0; i < this.value.length; i++) {
       let val = this.value[i], curFrom = this.from[i] + offset, curTo = this.to[i] + offset, newFrom, newTo
@@ -241,7 +241,7 @@ export class RangeSet<T extends RangeValue> {
   }
 
   /// Map this range set through a set of changes, return the new set.
-  map(changes: ChangeSet): RangeSet<T> {
+  map(changes: ChangeDesc): RangeSet<T> {
     if (changes.length == 0 || this == RangeSet.empty) return this
 
     let chunks = [], chunkPos = [], maxPoint = -1
@@ -297,7 +297,7 @@ export class RangeSet<T extends RangeValue> {
   /// the _new_ space, after these changes.
   static compare<T extends RangeValue>(
     oldSets: readonly RangeSet<T>[], newSets: readonly RangeSet<T>[],
-    textDiff: ChangeSet,
+    textDiff: ChangeDesc,
     comparator: RangeComparator<T>
   ) {
     let minPoint = comparator.minPointSize ?? -1
