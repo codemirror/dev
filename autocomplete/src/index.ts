@@ -3,6 +3,12 @@ import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, p
         ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
+import {snippet} from "./snippet"
+
+export {snippet}
+
+// FIXME design some kind of sorting regime that also works for
+// combined sources
 
 /// Denotes how to
 /// [filter](#autocomplete.autocomplete^config.filterType)
