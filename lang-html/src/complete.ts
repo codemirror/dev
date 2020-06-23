@@ -462,8 +462,8 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
   return result
 }
 
-export function completeHTML(state: EditorState, pos: number, context: AutocompleteContext) {
-  let tree = state.tree.resolve(pos, -1)
+export function completeHTML(context: AutocompleteContext) {
+  let {state, pos} = context, tree = state.tree.resolve(pos, -1)
   if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
     return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos, context)
       : completeTag(state, tree, tree.start, pos, context)

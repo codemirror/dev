@@ -1,6 +1,6 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
-import {combineConfig, EditorState,
-        Transaction, Extension, StateField, StateEffect, Facet, precedence, ChangeDesc} from "@codemirror/next/state"
+import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, precedence,
+        ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 
@@ -12,25 +12,53 @@ export enum FilterType {
   Start,
   /// Show completions that have the typed text anywhere in their
   /// content.
+  Include,
+  /// Show completions that include each character of the typed text,
+  /// in order (so `gBCR` could complete to `getBoundingClientRect`).
   Fuzzy
 }
 
 export class AutocompleteContext {
   /// @internal
-  constructor(readonly explicit: boolean,
-              readonly filterType: FilterType) {}
+  constructor(
+    /// The editor view that the completion happens in.
+    readonly view: EditorView,
+    /// The position at which the completion happens.
+    readonly pos: number,
+    /// Indicates whether completion was activated explicitly, or
+    /// implicitly by typing. The usual way to respond to this is to
+    /// only return completions when either there is part of a
+    /// completable entity at the cursor, or explicit is true.
+    readonly explicit: boolean,
+    /// The configured completion filter. Ignoring this won't break
+    /// anything, but supporting it is encouraged.
+    readonly filterType: FilterType
+  ) {}
 
+  /// The editor state.
+  get state() { return this.view.state }
+
+  /// Filter a given completion string against the partial input in
+  /// `text`. Will use `this.filterType`, returns `true` when the
+  /// completion should be shown.
   filter(completion: string, text: string) {
     if (this.filterType == FilterType.Start)
       return completion.length > text.length && completion.slice(0, text.length) == text
-    else
+    else if (this.filterType == FilterType.Include)
       return completion.length > text.length && completion.indexOf(text) > -1
+    // Fuzzy
+    for (let i = 0, j = 0; i < text.length; i++) {
+      let found = completion.indexOf(text[i], j)
+      if (found < 0) return false
+      j = found + 1
+    }
+    return true
   }
 }
 
 /// The function signature for a completion source.
 export type Autocompleter =
-  (state: EditorState, pos: number, context: AutocompleteContext) => readonly Completion[] | Promise<readonly Completion[]>
+  (context: AutocompleteContext) => readonly Completion[] | Promise<readonly Completion[]>
 
 interface AutocompleteConfig {
   /// When enabled (defaults to true), autocompletion will start
@@ -56,11 +84,11 @@ export interface Completion {
   apply?: string | ((view: EditorView, completion: Completion) => void)
 }
 
-function retrieveCompletions(state: EditorState, pos: number, context: AutocompleteContext): Promise<readonly Completion[]> {
-  let found = state.languageDataAt<Autocompleter>("autocomplete", pos)
+function retrieveCompletions(context: AutocompleteContext): Promise<readonly Completion[]> {
+  let found = context.view.state.languageDataAt<Autocompleter>("autocomplete", context.pos)
   function next(i: number): Promise<readonly Completion[]> {
     if (i == found.length) return Promise.resolve([])
-    return Promise.resolve(found[i](state, pos, context)).then(result => result.length ? result : next(i + 1))
+    return Promise.resolve(found[i](context)).then(result => result.length ? result : next(i + 1))
   }
   return next(0)
 }
@@ -169,7 +197,7 @@ const activeCompletion = StateField.define<ActiveState>({
     if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
         event == "delete" && value)
       value = "pending"
-    // FIXME also allow pending completionst o survive changes somehow
+    // FIXME also allow pending completionst to survive changes somehow
     else if (tr.docChanged && value instanceof ActiveCompletion && !touchesCompletions(value.options, tr.changes))
       value = value.map(tr.changes)
     else if (tr.selection || tr.docChanged)
@@ -303,15 +331,15 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
 
   startUpdate(explicit: boolean) {
     this.debounce = -1
-    let version = this.stateVersion, state = this.view.state, pos = state.selection.primary.head
-    let config = state.facet(autocompleteConfig)
-    let context = new AutocompleteContext(explicit, config.filterType)
-    ;(config.override ? Promise.resolve(config.override(state, pos, context)) : retrieveCompletions(state, pos, context))
+    let {view, stateVersion} = this
+    let config = view.state.facet(autocompleteConfig)
+    let context = new AutocompleteContext(this.view, view.state.selection.primary.head, explicit, config.filterType)
+    ;(config.override ? Promise.resolve(config.override(context)) : retrieveCompletions(context))
       .then(result => {
-        if (this.stateVersion != version || result.length == 0) return
-        this.view.dispatch(this.view.state.update({effects: openCompletion.of(result)}))
+        if (this.stateVersion != stateVersion || result.length == 0) return
+        view.dispatch(view.state.update({effects: openCompletion.of(result)}))
       })
-      .catch(e => logException(this.view.state, e))
+      .catch(e => logException(view.state, e))
   }
 })
 
