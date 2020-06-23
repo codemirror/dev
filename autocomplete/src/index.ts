@@ -32,7 +32,12 @@ export class AutocompleteContext {
     readonly explicit: boolean,
     /// The configured completion filter. Ignoring this won't break
     /// anything, but supporting it is encouraged.
-    readonly filterType: FilterType
+    readonly filterType: FilterType,
+    /// Function that allows completion to fall through to the next
+    /// source (or return the empty array if no further sources are
+    /// available). When your completer can't find any completions, it
+    /// is usually a good idea to return the result of calling this.
+    readonly next: () => Promise<readonly Completion[]>
   ) {}
 
   /// The editor state.
@@ -84,11 +89,13 @@ export interface Completion {
   apply?: string | ((view: EditorView, completion: Completion) => void)
 }
 
-function retrieveCompletions(context: AutocompleteContext): Promise<readonly Completion[]> {
-  let found = context.view.state.languageDataAt<Autocompleter>("autocomplete", context.pos)
+function retrieveCompletions(view: EditorView, explicit: boolean): Promise<readonly Completion[]> {
+  let config = view.state.facet(autocompleteConfig), pos = view.state.selection.primary.head
+  let sources = view.state.languageDataAt<Autocompleter>("autocomplete", pos)
+  if (config.override) sources = [config.override].concat(sources)
   function next(i: number): Promise<readonly Completion[]> {
-    if (i == found.length) return Promise.resolve([])
-    return Promise.resolve(found[i](context)).then(result => result.length ? result : next(i + 1))
+    return i == sources.length ? Promise.resolve([])
+      : Promise.resolve(sources[i](new AutocompleteContext(view, pos, explicit, config.filterType, () => next(i + 1))))
   }
   return next(0)
 }
@@ -332,14 +339,10 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   startUpdate(explicit: boolean) {
     this.debounce = -1
     let {view, stateVersion} = this
-    let config = view.state.facet(autocompleteConfig)
-    let context = new AutocompleteContext(this.view, view.state.selection.primary.head, explicit, config.filterType)
-    ;(config.override ? Promise.resolve(config.override(context)) : retrieveCompletions(context))
-      .then(result => {
-        if (this.stateVersion != stateVersion || result.length == 0) return
-        view.dispatch(view.state.update({effects: openCompletion.of(result)}))
-      })
-      .catch(e => logException(view.state, e))
+    retrieveCompletions(view, explicit).then(result => {
+      if (this.stateVersion != stateVersion || result.length == 0) return
+      view.dispatch(view.state.update({effects: openCompletion.of(result)}))
+    }).catch(e => logException(view.state, e))
   }
 })
 
