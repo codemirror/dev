@@ -3,12 +3,7 @@ import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, p
         ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
-import {snippet} from "./snippet"
-
-export {snippet}
-
-// FIXME design some kind of sorting regime that also works for
-// combined sources
+import {baseTheme} from "./theme"
 
 /// Denotes how to
 /// [filter](#autocomplete.autocomplete^config.filterType)
@@ -64,6 +59,12 @@ export class AutocompleteContext {
       j = found + 1
     }
     return true
+  }
+
+  /// Add the given completions to those returned by further
+  /// completion sources, sorting the result by label.
+  nextPlus(completions: readonly Completion[]): Promise<readonly Completion[]> {
+    return this.next().then(others => completions.concat(others).sort((a, b) => a.label < b.label ? -1 : a.label == b.label ? 0 : 1))
   }
 }
 
@@ -122,7 +123,7 @@ export function autocomplete(config: AutocompleteConfig = {}): Extension {
     activeCompletion,
     autocompleteConfig.of(config),
     autocompletePlugin,
-    style,
+    baseTheme,
     tooltips(),
     precedence(keymap([
       {key: "ArrowDown", run: moveCompletion("down")},
@@ -352,26 +353,4 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   }
 })
 
-const style = EditorView.baseTheme({
-  "tooltip.autocomplete": {
-    fontFamily: "monospace",
-    overflowY: "auto",
-    maxHeight: "10em",
-    listStyle: "none",
-    margin: 0,
-    padding: 0,
-
-    "& > li": {
-      cursor: "pointer",
-      padding: "1px 1em 1px 3px",
-      lineHeight: 1.2
-    },
-
-    "& > li[aria-selected]": {
-      background_fallback: "#bdf",
-      backgroundColor: "Highlight",
-      color_fallback: "white",
-      color: "HighlightText"
-    }
-  }
-})
+export {snippet, completeSnippets, SnippetSpec} from "./snippet"

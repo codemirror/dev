@@ -1,6 +1,8 @@
 import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} from "@codemirror/next/view"
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
-        Transaction, TransactionSpec, Text, StateCommand} from "@codemirror/next/state"
+        Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
+import {baseTheme} from "./theme"
+import {AutocompleteContext} from "./index"
 
 class Field {
   constructor(readonly seq: number | null,
@@ -45,16 +47,16 @@ class Snippet {
     let fields: Field[] = [], lines = [], m
     for (let line of template.split(/\r\n?|\n/)) {
       while (m = /[#$]\{(?:(\d+)(?::([^}]*))?|([^}]*))\}/.exec(line)) {
-        let seq = m[1] ? +m[1] : null, name = m[2] || m[3] || null, found = null
+        let seq = m[1] ? +m[1] : null, name = m[2] || m[3], found = null
         for (let f of fields) if (name ? f.name == name : seq != null && f.seq == seq) found = f
         if (!found) {
-          found = new Field(seq, name, [])
+          found = new Field(seq, name || null, [])
           let i = 0
           while (i < fields.length && (seq == null || (fields[i].seq != null && fields[i].seq! < seq))) i++
           fields.splice(i, 0, found)
         }
-        found.positions.push({line: lines.length, from: m.index, to: m.index + m[2].length})
-        line = line.slice(0, m.index) + m[2] + line.slice(m.index + m[0].length)
+        found.positions.push({line: lines.length, from: m.index, to: m.index + name.length})
+        line = line.slice(0, m.index) + name + line.slice(m.index + m[0].length)
       }
       lines.push(line)
     }
@@ -105,8 +107,9 @@ const snippetState = StateField.define<ActiveSnippet | null>({
       if (effect.is(setActive)) return effect.value
       if (effect.is(moveToField) && value) return new ActiveSnippet(value.ranges, effect.value)
     }
-    if (!value || tr.selection && !value.selectionInsideField(tr.selection)) return null
-    return tr.docChanged ? value.map(tr.changes) : value
+    if (value && tr.docChanged) value = value.map(tr.changes)
+    if (value && tr.selection && !value.selectionInsideField(tr.selection)) value = null
+    return value
   },
 
   provide: [EditorView.decorations.from(val => val ? val.deco : Decoration.none)]
@@ -159,8 +162,8 @@ export function snippet(template: string) {
 function moveField(dir: 1 | -1): StateCommand {
   return ({state, dispatch}) => {
     let active = state.field(snippetState, false)
-    if (!active) return false
-    let next = active.active + dir, last = !active.ranges.some(r => r.field == next + dir)
+    if (!active || dir < 0 && active.active == 0) return false
+    let next = active.active + dir, last = dir > 0 && !active.ranges.some(r => r.field == next + dir)
     dispatch(state.update({
       selection: fieldSelection(active.ranges, next),
       effects: setActive.of(last ? null : new ActiveSnippet(active.ranges, next))
@@ -169,12 +172,40 @@ function moveField(dir: 1 | -1): StateCommand {
   }
 }
 
-const snippetKeymap = keymap([
+const snippetKeymap = precedence(keymap([
   {key: "Tab", run: moveField(1), shift: moveField(-1)}
-])
+]), "override")
 
-const baseTheme = EditorView.baseTheme({
-  "snippetField@light": {backgroundColor: "#444"},
-  "snippetField@dark": {backgroundColor: "#ccc"},
-  "snippetFieldPosition": {display: "inline-block", border: "2px solid #888", marginRight: "-2px"},
-})
+/// Languages can export arrays of snippets using this format.
+/// [`completeSnippets`](#autocomplete.completeSnippets) can be used
+/// to turn them into a completion source.
+export type SnippetSpec = {
+  /// The word to match when completing.
+  keyword: string,
+  /// The user-readable label for the completion. Defaults to
+  /// `keyword` when not given.
+  name?: string,
+  /// The [snippet template](#autocomplete.snippet) to use.
+  snippet: string
+}
+
+/// Create a completion source from an array of snippet specs.
+export function completeSnippets(snippets: readonly SnippetSpec[]) {
+  let parsed = snippets.map(s => snippet(s.snippet))
+  return (context: AutocompleteContext) => {
+    let token = context.state.tree.resolve(context.pos, -1), tokenText = ""
+    let isAlpha = !token.firstChild && /[\w\u00a1-\uffff]/.test(tokenText = context.state.sliceDoc(token.start, token.end))
+    if (!isAlpha && !context.explicit) return context.next()
+    let from = isAlpha ? token.start : context.pos, text = isAlpha ? tokenText.slice(0, context.pos - token.start) : ""
+    let found = []
+    for (let i = 0; i < snippets.length; i++) {
+      let candidate = snippets[i]
+      if (!text || context.filter(candidate.keyword, text)) found.push({
+        label: candidate.name || candidate.keyword,
+        from, to: context.pos,
+        apply: parsed[i]
+      })
+    }
+    return context.nextPlus(found)
+  }
+}
