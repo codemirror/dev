@@ -18,12 +18,3 @@ export function combineConfig<Config>(
   for (let key in defaults) if (result[key] === undefined) result[key] = defaults[key]
   return result
 }
-
-/// Defaults the fields in a configuration object to values given in
-/// `defaults` if they are not already present.
-export function fillConfig<Config>(config: Config, defaults: Partial<Config>): Required<Config> {
-  let result: any = {}
-  for (let key in config) result[key] = config[key]
-  for (let key in defaults) if (result[key] === undefined) result[key] = defaults[key]
-  return result
-}

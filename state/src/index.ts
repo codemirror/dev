@@ -5,6 +5,6 @@ export {EditorSelection, SelectionRange} from "./selection"
 export {Transaction, TransactionSpec, StrictTransactionSpec,
         Annotation, AnnotationType, StateEffect, StateEffectType} from "./transaction"
 export {Text} from "@codemirror/next/text"
-export {combineConfig, fillConfig} from "./config"
+export {combineConfig} from "./config"
 export {ChangeSpec, ChangeSet, ChangeDesc, MapMode} from "./change"
 export {CharCategory} from "./charcategory"

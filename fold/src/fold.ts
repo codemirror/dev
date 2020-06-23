@@ -1,4 +1,4 @@
-import {combineConfig, fillConfig, EditorState, StateEffect, ChangeDesc, Facet,
+import {combineConfig, EditorState, StateEffect, ChangeDesc, Facet,
         StateField, Extension} from "@codemirror/next/state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass, KeyBinding} from "@codemirror/next/view"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
@@ -218,7 +218,7 @@ class FoldMarker extends GutterMarker {
 /// fold status indicator before lines which can be clicked to fold or
 /// unfold the line.
 export function foldGutter(config: FoldGutterConfig = {}): Extension {
-  let fullConfig = fillConfig(config, foldGutterDefaults)
+  let fullConfig = {...foldGutterDefaults, ...config}
   let canFold = new FoldMarker(fullConfig, true), canUnfold = new FoldMarker(fullConfig, false)
   return [
     gutter({

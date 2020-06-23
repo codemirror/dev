@@ -83,6 +83,4 @@ extensions for the editor state.
 
 ### Utilities
 
-@fillConfig
-
 @combineConfig

@@ -255,8 +255,7 @@ export function hoverTooltip(
       if (value && tr.docChanged) {
         let newPos = tr.changes.mapPos(value.pos, -1, MapMode.TrackDel)
         if (newPos < 0) return null
-        let copy: Tooltip = Object.create(null)
-        for (let prop in value) (copy as any)[prop] = (value as any)[prop]
+        let copy: Tooltip = Object.assign(Object.create(null), value)
         copy.pos = newPos
         if (value.end != null) copy.end = tr.changes.mapPos(value.end)
         return copy

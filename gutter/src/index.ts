@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, PluginField, ViewUpdate, BlockType, BlockInfo, themeClass, Direction} from "@codemirror/next/view"
 import {Range, RangeValue, RangeSet, RangeCursor} from "@codemirror/next/rangeset"
-import {combineConfig, fillConfig, MapMode, Facet, Extension, EditorState} from "@codemirror/next/state"
+import {combineConfig, MapMode, Facet, Extension, EditorState} from "@codemirror/next/state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -66,7 +66,7 @@ const activeGutters = Facet.define<Required<GutterConfig>>()
 
 /// Define an editor gutter.
 export function gutter(config: GutterConfig): Extension {
-  return [gutters(), activeGutters.of(fillConfig(config, defaults))]
+  return [gutters(), activeGutters.of({...defaults, ...config})]
 }
 
 const baseTheme = EditorView.baseTheme({
@@ -333,8 +333,7 @@ const lineNumberConfig = Facet.define<LineNumberConfig, Required<LineNumberConfi
   combine(values) {
     return combineConfig<Required<LineNumberConfig>>(values, {formatNumber: String, domEventHandlers: {}}, {
       domEventHandlers(a: Handlers, b: Handlers) {
-        let result: Handlers = {}
-        for (let event in a) result[event] = a[event]
+        let result: Handlers = Object.assign({}, a)
         for (let event in b) {
           let exists = result[event], add = b[event]
           result[event] = exists ? (view, line, event) => exists(view, line, event) || add(view, line, event) : add
