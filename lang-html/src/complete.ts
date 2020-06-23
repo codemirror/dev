@@ -478,6 +478,6 @@ export function completeHTML(context: AutocompleteContext) {
   } else if (tree.name == "Is" || tree.name == "AttributeValue" || tree.name == "UnquotedAttributeValue") {
     return completeAttrValue(state, tree, tree.name == "Is" ? pos : tree.start, pos, context)
   } else {
-    return []
+    return context.next()
   }
 }

@@ -2,8 +2,12 @@ import {parser} from "lezer-javascript"
 import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
 import {languageData} from "@codemirror/next/state"
 import {styleTags} from "@codemirror/next/highlight"
+import {completeSnippets} from "@codemirror/next/autocomplete"
+import {snippets} from "./snippets"
 
 const statementIndent = continuedIndent({except: /^{/})
+
+export {snippets}
 
 /// A syntax provider based on the [Lezer JavaScript
 /// parser](https://github.com/lezer-parser/javascript), extended with
@@ -13,6 +17,7 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     Script: {
       closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
       commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
+      autocomplete: completeSnippets(snippets)
     }
   }),
   indentNodeProp.add(type => {
