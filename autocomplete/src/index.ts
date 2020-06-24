@@ -141,7 +141,7 @@ export function autocomplete(config: AutocompleteConfig = {}): Extension {
 function moveCompletion(dir: string, by?: string) {
   return (view: EditorView) => {
     let active = view.state.field(activeCompletion)
-    if (!(active instanceof ActiveCompletion)) return false
+    if (!(active instanceof ActiveCompletion) || Date.now() - active.timeStamp < CompletionInteractMargin) return false
     let step = 1, tooltip
     if (by == "page" && (tooltip = view.dom.querySelector(".cm-tooltip-autocomplete") as HTMLElement))
       step = Math.max(2, Math.floor(tooltip.offsetHeight / (tooltip.firstChild as HTMLElement).offsetHeight))
@@ -153,12 +153,11 @@ function moveCompletion(dir: string, by?: string) {
   }
 }
 
-// FIXME don't return true when the completion has only just popped
-// up, to not get in the way when people quickly type something and
-// hit enter just as the completion shows
+const CompletionInteractMargin = 75
+
 function acceptCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
-  if (!(active instanceof ActiveCompletion)) return false
+  if (!(active instanceof ActiveCompletion) || Date.now() - active.timeStamp < CompletionInteractMargin) return false
   applyCompletion(view, active.options[active.selected])
   return true
 }
@@ -217,7 +216,7 @@ const activeCompletion = StateField.define<ActiveState>({
     if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
         event == "delete" && value)
       value = "pending"
-    // FIXME also allow pending completionst to survive changes somehow
+    // FIXME also allow pending completions to survive changes somehow
     else if (tr.docChanged && value instanceof ActiveCompletion && !touchesCompletions(value.options, tr.changes))
       value = value.map(tr.changes)
     else if (tr.selection || tr.docChanged)
@@ -228,7 +227,7 @@ const activeCompletion = StateField.define<ActiveState>({
       else if (effect.is(toggleCompletion))
         value = effect.value ? "pendingExplicit" : null
       else if (effect.is(selectCompletion) && value instanceof ActiveCompletion)
-        value = new ActiveCompletion(value.options, effect.value, value.id, value.tooltip)
+        value = new ActiveCompletion(value.options, effect.value, value.timeStamp, value.id, value.tooltip)
     }
     return value
   },
@@ -255,6 +254,7 @@ class ActiveCompletion {
 
   constructor(readonly options: readonly Completion[],
               readonly selected: number,
+              readonly timeStamp = Date.now(),
               readonly id = "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36),
               readonly tooltip: readonly Tooltip[] = [{
                 pos: options.reduce((m, o) => Math.min(m, o.from), 1e9),
@@ -265,7 +265,8 @@ class ActiveCompletion {
   map(changes: ChangeDesc) {
     return new ActiveCompletion(
       this.options.map(o => Object.assign({}, o, {from: changes.mapPos(o.from), to: changes.mapPos(o.to)})),
-      this.selected)
+      this.selected,
+      this.timeStamp)
   }
 }
 
