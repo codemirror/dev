@@ -689,8 +689,6 @@ export const standardKeymap: readonly KeyBinding[] = ([
   {mac: "Alt-Delete", run: deleteGroupForward},
 ] as KeyBinding[]).concat(emacsStyleKeymap.map(b => ({mac: b.key, run: b.run, shift: b.shift})))
 
-// FIXME find some reasonable binding for indentSelection
-
 /// The default keymap. Includes all bindings from
 /// [`standardKeymap`](#commands.standardKeymap) plus the following:
 ///
@@ -705,6 +703,7 @@ export const standardKeymap: readonly KeyBinding[] = ([
 /// - Ctrl-i (Cmd-i on macOS): [`selectParentSyntax`](#commands.selectParentSyntax)
 /// - Ctrl-[ (Cmd-[ on macOS): [`indentLess`](#commands.indentLess)
 /// - Ctrl-] (Cmd-] on macOS): [`indentMore`](#commands.indentMore)
+/// - Ctrl-Alt-\\ (Cmd-Alt-\\ on macOS): [`indentSelection`](#commands.indentSelection)
 /// - Shift-Ctrl-k (Shift-Cmd-k on macOS): [`deleteLine`](#commands.deleteLine)
 /// - Shift-Ctrl-\\ (Shift-Cmd-\\ on macOS): [`cursorMatchingBracket`](#commands.cursorMatchingBracket)
 export const defaultKeymap: readonly KeyBinding[] = ([
@@ -724,6 +723,7 @@ export const defaultKeymap: readonly KeyBinding[] = ([
 
   {key: "Mod-[", run: indentLess},
   {key: "Mod-]", run: indentMore},
+  {key: "Mod-Alt-\\", run: indentSelection},
 
   {key: "Shift-Mod-k", run: deleteLine},
 
