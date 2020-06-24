@@ -163,6 +163,7 @@ export class EditorSelection {
   /// Sort and merge the given set of ranges, creating a valid
   /// selection.
   static create(ranges: readonly SelectionRange[], primaryIndex: number = 0) {
+    if (ranges.length == 0) throw new RangeError("A selection needs at least one range")
     for (let pos = 0, i = 0; i < ranges.length; i++) {
       let range = ranges[i]
       if (range.empty ? range.from <= pos : range.from < pos) return normalized(ranges.slice(), primaryIndex)

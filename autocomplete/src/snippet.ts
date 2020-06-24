@@ -4,10 +4,11 @@ import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
 import {baseTheme} from "./theme"
 import {AutocompleteContext} from "./index"
 
-class Field {
-  constructor(readonly seq: number | null,
-              readonly name: string | null,
-              readonly positions: {line: number, from: number, to: number}[]) {}
+class FieldPos {
+  constructor(readonly field: number,
+              readonly line: number,
+              readonly from: number,
+              readonly to: number) {}
 }
 
 class FieldRange {
@@ -20,7 +21,7 @@ class FieldRange {
 
 class Snippet {
   constructor(readonly lines: readonly string[],
-              readonly fields: readonly Field[]) {}
+              readonly fieldPositions: readonly FieldPos[]) {}
 
   instantiate(state: EditorState, pos: number) {
     let text = [], lineStart = [pos]
@@ -35,32 +36,32 @@ class Snippet {
       text.push(line)
       pos += line.length + 1
     }
-    let ranges = []
-    for (let i = 0; i < this.fields.length; i++) {
-      for (let pos of this.fields[i].positions)
-        ranges.push(new FieldRange(i, lineStart[pos.line] + pos.from, lineStart[pos.line] + pos.to))
-    }
+    let ranges = this.fieldPositions.map(
+      pos => new FieldRange(pos.field, lineStart[pos.line] + pos.from, lineStart[pos.line] + pos.to))
     return {text, ranges}
   }
 
   static parse(template: string) {
-    let fields: Field[] = [], lines = [], m
+    let fields: {seq: number | null, name: string | null}[] = []
+    let lines = [], positions = [], m
     for (let line of template.split(/\r\n?|\n/)) {
       while (m = /[#$]\{(?:(\d+)(?::([^}]*))?|([^}]*))\}/.exec(line)) {
-        let seq = m[1] ? +m[1] : null, name = m[2] || m[3], found = null
-        for (let f of fields) if (name ? f.name == name : seq != null && f.seq == seq) found = f
-        if (!found) {
-          found = new Field(seq, name || null, [])
+        let seq = m[1] ? +m[1] : null, name = m[2] || m[3], found = -1
+        for (let i = 0; i < fields.length; i++) {
+          if (name ? fields[i].name == name : seq != null && fields[i].seq == seq) found = i
+        }
+        if (found < 0) {
           let i = 0
           while (i < fields.length && (seq == null || (fields[i].seq != null && fields[i].seq! < seq))) i++
-          fields.splice(i, 0, found)
+          fields.splice(i, 0, {seq, name: name || null})
+          found = i
         }
-        found.positions.push({line: lines.length, from: m.index, to: m.index + name.length})
+        positions.push(new FieldPos(found, lines.length, m.index, m.index + name.length))
         line = line.slice(0, m.index) + name + line.slice(m.index + m[0].length)
       }
       lines.push(line)
     }
-    return new Snippet(lines, fields)
+    return new Snippet(lines, positions)
   }
 }
 
@@ -172,8 +173,16 @@ function moveField(dir: 1 | -1): StateCommand {
   }
 }
 
+const clearSnippet: StateCommand = ({state, dispatch}) => {
+  let active = state.field(snippetState, false)
+  if (!active) return false
+  dispatch(state.update({effects: setActive.of(null)}))
+  return true
+}
+
 const snippetKeymap = precedence(keymap([
-  {key: "Tab", run: moveField(1), shift: moveField(-1)}
+  {key: "Tab", run: moveField(1), shift: moveField(-1)},
+  {key: "Escape", run: clearSnippet}
 ]), "override")
 
 /// Languages can export arrays of snippets using this format.
