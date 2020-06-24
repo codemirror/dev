@@ -1,5 +1,5 @@
 import {EditorState, Text} from "@codemirror/next/state"
-import {AutocompleteContext} from "@codemirror/next/autocomplete"
+import {AutocompleteContext, CompletionResult} from "@codemirror/next/autocomplete"
 import {Subtree} from "lezer-tree"
 
 type AttrSpec = {[attrName: string]: null | readonly string[]}
@@ -394,40 +394,39 @@ function openTags(doc: Text, tree: Subtree) {
 
 function completeTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
   let text = state.doc.sliceString(from, to).toLowerCase()
-  let result = []
+  let options = []
   for (let tagName of allowedChildren(state.doc, tree))
-    if (context.filter(tagName, text, true))
-      result.push({label: tagName, from, to})
-  return result
+    if (context.filter(tagName, text, true)) options.push({label: tagName})
+  return {from, to, options}
 }
 
 function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let result = [], text = state.sliceDoc(from, to).toLowerCase()
+  let options = [], text = state.sliceDoc(from, to).toLowerCase()
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   for (let open of openTags(state.doc, tree))
     if (context.filter(open, text, true))
-      result.push({label: open, from, to, apply: open + end})
-  return result
+      options.push({label: open, apply: open + end})
+  return {from, to, options}
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
-  let result = []
+  let options = []
   for (let tagName of allowedChildren(state.doc, tree))
-    result.push({label: "<" + tagName, from: pos, to: pos})
+    options.push({label: "<" + tagName})
   for (let open of openTags(state.doc, tree))
-    result.push({label: "</" + open + ">", from: pos, to: pos})
-  return result
+    options.push({label: "</" + open + ">"})
+  return {from: pos, to: pos, options}
 }
 
 function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let result = []
+  let options = []
   let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
   let base = state.sliceDoc(from, to).toLowerCase()
   for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
     if (context.filter(attrName, base, true))
-      result.push({label: attrName, from, to})
+      options.push({label: attrName})
   }
-  return result
+  return {from, to, options}
 }
 
 function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
@@ -438,14 +437,14 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
     from: tree.start,
     to: tree.parent.start
   })
-  let result = []
+  let options = []
   if (attrName) {
-    let options: readonly string[] | null | undefined = GlobalAttrs[attrName]
-    if (!options) {
+    let attrs: readonly string[] | null | undefined = GlobalAttrs[attrName]
+    if (!attrs) {
       let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
-      options = info?.attrs && info.attrs[attrName]
+      attrs = info?.attrs && info.attrs[attrName]
     }
-    if (options) {
+    if (attrs) {
       let base = state.sliceDoc(from, to).toLowerCase(), quoteStart = '"', quoteEnd = '"'
       if (/^['"]/.test(base)) {
         quoteStart = ""
@@ -453,16 +452,16 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
         base = base.slice(1)
         from++
       }
-      for (let value of options) {
+      for (let value of attrs) {
         if (context.filter(value, base, true))
-          result.push({label: value, from, to, apply: quoteStart + value + quoteEnd})
+          options.push({label: value, apply: quoteStart + value + quoteEnd})
       }
     }
   }
-  return result
+  return {from, to, options}
 }
 
-export function completeHTML(context: AutocompleteContext) {
+export function completeHTML(context: AutocompleteContext): CompletionResult | null {
   let {state, pos} = context, tree = state.tree.resolve(pos, -1)
   if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
     return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos, context)
@@ -478,6 +477,6 @@ export function completeHTML(context: AutocompleteContext) {
   } else if (tree.name == "Is" || tree.name == "AttributeValue" || tree.name == "UnquotedAttributeValue") {
     return completeAttrValue(state, tree, tree.name == "Is" ? pos : tree.start, pos, context)
   } else {
-    return []
+    return null
   }
 }
