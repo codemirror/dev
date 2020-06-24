@@ -1,6 +1,6 @@
 import ist from "ist"
 import {EditorState, IndentContext} from "@codemirror/next/state"
-import {javascript} from "@codemirror/next/lang-javascript"
+import {javascriptSyntax} from "@codemirror/next/lang-javascript"
 
 function getIndent(state: EditorState, pos: number): number {
   for (let f of state.facet(EditorState.indentation)) {
@@ -13,7 +13,7 @@ function getIndent(state: EditorState, pos: number): number {
 function check(code: string) {
   return () => {
     code = /^\n*([^]*)/.exec(code)![1]
-    let state = EditorState.create({doc: code, extensions: [javascript()]})
+    let state = EditorState.create({doc: code, extensions: [javascriptSyntax]})
     for (let pos = 0, lines = code.split("\n"), i = 0; i < lines.length; i++) {
       let line = lines[i], indent = /^\s*/.exec(line)![0].length
       ist(`${getIndent(state, pos)} (${i + 1})`, `${indent} (${i + 1})`)

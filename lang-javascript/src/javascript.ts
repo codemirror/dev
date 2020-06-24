@@ -7,8 +7,6 @@ import {snippets} from "./snippets"
 
 const statementIndent = continuedIndent({except: /^{/})
 
-export {snippets}
-
 /// A syntax provider based on the [Lezer JavaScript
 /// parser](https://github.com/lezer-parser/javascript), extended with
 /// highlighting and indentation information.
@@ -66,13 +64,21 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     ".": "derefOperator",
     ", ;": "separator"
   })
-))
-
-/// Returns an extension that installs the JavaScript syntax provider.
-export function javascript(): Extension {
-  return [javascriptSyntax, javascriptSyntax.languageData.of({
+), {
+  languageData: {
     closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
-    commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
-    autocomplete: completeSnippets(snippets)
-  })]
+    commentTokens: {line: "//", block: {open: "/*", close: "*/"}}
+  }
+})
+
+/// Returns an extension that installs JavaScript support features
+/// (completion of [snippets](#javascript.snippets)).
+export function javascriptSupport(): Extension {
+  return javascriptSyntax.languageData.of({autocomplete: completeSnippets(snippets)})
+}
+
+/// Returns an extension that installs the JavaScript syntax and
+/// support features.
+export function javascript(): Extension {
+  return [javascriptSyntax, javascriptSupport()]
 }

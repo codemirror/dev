@@ -53,11 +53,13 @@ export const cssSyntax = new LezerSyntax(parser.withProps(
     "[ ]": "squareBracket",
     "{ }": "brace"
   })
-))
+), {
+  languageData: {
+    commentTokens: {block: {open: "/*", close: "*/"}}
+  }
+})
 
 /// Returns an extension that installs the CSS syntax provider.
 export function css(): Extension {
-  return [cssSyntax.extension, cssSyntax.languageData.of({
-    commentTokens: {block: {open: "/*", close: "*/"}}
-  })]
+  return cssSyntax
 }

@@ -44,12 +44,14 @@ export const pythonSyntax = new LezerSyntax(parser.withProps(
     ".": "derefOperator",
     ", ;": "separator"
   })
-))
+), {
+  languageData: {
+    closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']},
+    commentTokens: {line: "#"}
+  }
+})
 
 /// Returns an extension that installs the Python syntax provider.
 export function python(): Extension {
-  return [pythonSyntax, pythonSyntax.languageData.of({
-    closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']},
-    commentTokens: {line: "#"}
-  })]
+  return pythonSyntax
 }

@@ -26,9 +26,15 @@ export class LezerSyntax implements Syntax {
   /// [`withProps`](https://lezer.codemirror.net/docs/ref/#lezer.Parser.withProps)
   /// method to register CodeMirror-specific syntax node props in the
   /// parser, before passing it to this constructor.
-  constructor(parser: Parser) {
+  ///
+  /// When [language data](#state.EditorState.languageDataAt) is
+  /// given, it will be included in the syntax object's extension.
+  constructor(parser: Parser, config: {languageData?: {[name: string]: any}} = {}) {
     let setSyntax = StateEffect.define<SyntaxState>()
-    this.languageData = Facet.define<{[name: string]: any}>()
+    let {languageData} = config
+    this.languageData = Facet.define<{[name: string]: any}>({
+      combine: languageData ? values => values.concat(languageData!) : undefined
+    })
     parser = this.parser = parser.withProps(languageDataProp.add({[parser.topType.name]: this.languageData}))
     
     this.field = StateField.define<SyntaxState>({

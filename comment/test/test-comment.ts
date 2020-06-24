@@ -1,7 +1,7 @@
 import ist from "ist"
 import {SelectionRange, EditorState, EditorSelection, Extension, StateCommand} from "@codemirror/next/state"
 import {toggleLineComment, CommentTokens, toggleBlockComment} from "@codemirror/next/comment"
-import {html} from "@codemirror/next/lang-html"
+import {htmlSyntax} from "@codemirror/next/lang-html"
 
 describe("comment", () => {
   const defaultConfig: CommentTokens = {line: "//", block: {open: "/*", close: "*/"}}
@@ -163,7 +163,7 @@ describe("comment", () => {
   // This is a |line comment
   console.log("Hello");
 </script>
-<!-- HTML only provides block comments -->`, undefined, [html()])
+<!-- HTML only provides block comments -->`, undefined, [htmlSyntax])
 
     toggleLineComment({state, dispatch(tr) { state = tr.state }})
     same(state, s(`<script>

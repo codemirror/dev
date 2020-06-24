@@ -1,7 +1,7 @@
 import {configureHTML} from "lezer-html"
 import {Subtree} from "lezer-tree"
 import {cssSyntax} from "@codemirror/next/lang-css"
-import {javascriptSyntax} from "@codemirror/next/lang-javascript"
+import {javascriptSyntax, javascriptSupport} from "@codemirror/next/lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
 import {styleTags} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
@@ -49,13 +49,22 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
     ProcessingInst: "operator meta",
     DoctypeDecl: "labelName meta"
   })
-))
-
-/// Returns an extension that installs the HTML syntax provider.
-export function html(): Extension {
-  return [htmlSyntax, htmlSyntax.languageData.of({
-    autocomplete: completeHTML,
+), {
+  languageData: {
     commentTokens: {block: {open: "<!--", close: "-->"}},
-  })]
-}
+  }
+})
 
+/// HTML tag completion. Opens and closes tags and attributes in a
+/// context-aware way.
+export const htmlCompletion = htmlSyntax.languageData.of({autocomplete: completeHTML})
+
+/// An extension that installs HTML-related functionality
+/// ([`htmlCompletion`](#lang-html.htmlCompletion) and
+/// [`javascriptSupport`](#lang-javascript.javascriptSupport)).
+export function htmlSupport(): Extension { return [htmlCompletion, javascriptSupport()] }
+
+/// Returns an extension that installs the HTML
+/// [syntax](#lang-html.htmlSyntax) and
+/// [support](#lang-html.htmlSupport).
+export function html(): Extension { return [htmlSyntax, htmlSupport()] }
