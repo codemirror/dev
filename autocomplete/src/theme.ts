@@ -30,6 +30,6 @@ export const baseTheme = EditorView.baseTheme({
     width: 0,
     height: "1.15em",
     margin: "0 -0.7px -.7em",
-    borderLeft: "1.4px solid #888"
+    borderLeft: "1.4px dotted #888"
   }
 })

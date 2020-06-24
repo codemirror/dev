@@ -195,7 +195,7 @@ export function completeSnippets(snippets: readonly SnippetSpec[]) {
   return (context: AutocompleteContext) => {
     let token = context.state.tree.resolve(context.pos, -1), tokenText = ""
     let isAlpha = !token.firstChild && /[\w\u00a1-\uffff]/.test(tokenText = context.state.sliceDoc(token.start, token.end))
-    if (!isAlpha && !context.explicit) return context.next()
+    if (!isAlpha && !context.explicit) return []
     let from = isAlpha ? token.start : context.pos, text = isAlpha ? tokenText.slice(0, context.pos - token.start) : ""
     let found = []
     for (let i = 0; i < snippets.length; i++) {
@@ -206,6 +206,6 @@ export function completeSnippets(snippets: readonly SnippetSpec[]) {
         apply: parsed[i]
       })
     }
-    return context.nextPlus(found)
+    return found
   }
 }

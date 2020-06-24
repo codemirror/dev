@@ -33,12 +33,7 @@ export class AutocompleteContext {
     readonly explicit: boolean,
     /// The configured completion filter. Ignoring this won't break
     /// anything, but supporting it is encouraged.
-    readonly filterType: FilterType,
-    /// Function that allows completion to fall through to the next
-    /// source (or return the empty array if no further sources are
-    /// available). When your completer can't find any completions, it
-    /// is usually a good idea to return the result of calling this.
-    readonly next: () => Promise<readonly Completion[]>
+    readonly filterType: FilterType
   ) {}
 
   /// The editor state.
@@ -59,12 +54,6 @@ export class AutocompleteContext {
       j = found + 1
     }
     return true
-  }
-
-  /// Add the given completions to those returned by further
-  /// completion sources, sorting the result by label.
-  nextPlus(completions: readonly Completion[]): Promise<readonly Completion[]> {
-    return this.next().then(others => completions.concat(others).sort((a, b) => a.label < b.label ? -1 : a.label == b.label ? 0 : 1))
   }
 }
 
@@ -100,11 +89,13 @@ function retrieveCompletions(view: EditorView, explicit: boolean): Promise<reado
   let config = view.state.facet(autocompleteConfig), pos = view.state.selection.primary.head
   let sources = view.state.languageDataAt<Autocompleter>("autocomplete", pos)
   if (config.override) sources = [config.override].concat(sources)
-  function next(i: number): Promise<readonly Completion[]> {
-    return i == sources.length ? Promise.resolve([])
-      : Promise.resolve(sources[i](new AutocompleteContext(view, pos, explicit, config.filterType, () => next(i + 1))))
-  }
-  return next(0)
+  if (!sources.length) return Promise.resolve([])
+  let context = new AutocompleteContext(view, pos, explicit, config.filterType)
+  return Promise.all(sources.map(source => source(context))).then(results => {
+    let all = []
+    for (let result of results) for (let elt of result) all.push(elt)
+    return all.sort((a, b) => a.label < b.label ? -1 : a.label == b.label ? 0 : 1)
+  })
 }
 
 const autocompleteConfig = Facet.define<AutocompleteConfig, Required<AutocompleteConfig>>({
