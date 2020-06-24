@@ -396,7 +396,7 @@ function completeTag(state: EditorState, tree: Subtree, from: number, to: number
   let text = state.doc.sliceString(from, to).toLowerCase()
   let result = []
   for (let tagName of allowedChildren(state.doc, tree))
-    if (context.filter(tagName, text))
+    if (context.filter(tagName, text, true))
       result.push({label: tagName, from, to})
   return result
 }
@@ -405,7 +405,7 @@ function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: n
   let result = [], text = state.sliceDoc(from, to).toLowerCase()
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   for (let open of openTags(state.doc, tree))
-    if (context.filter(open, text))
+    if (context.filter(open, text, true))
       result.push({label: open, from, to, apply: open + end})
   return result
 }
@@ -424,7 +424,7 @@ function completeAttrName(state: EditorState, tree: Subtree, from: number, to: n
   let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
   let base = state.sliceDoc(from, to).toLowerCase()
   for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
-    if (context.filter(attrName, base))
+    if (context.filter(attrName, base, true))
       result.push({label: attrName, from, to})
   }
   return result
@@ -454,7 +454,7 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
         from++
       }
       for (let value of options) {
-        if (context.filter(value, base))
+        if (context.filter(value, base, true))
           result.push({label: value, from, to, apply: quoteStart + value + quoteEnd})
       }
     }

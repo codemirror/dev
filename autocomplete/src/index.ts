@@ -33,7 +33,11 @@ export class AutocompleteContext {
     readonly explicit: boolean,
     /// The configured completion filter. Ignoring this won't break
     /// anything, but supporting it is encouraged.
-    readonly filterType: FilterType
+    readonly filterType: FilterType,
+    /// Indicates whether completion has been configured to be
+    /// case-sensitive. Again, this should be taken as a hint, not a
+    /// requirement.
+    readonly caseSensitive: boolean
   ) {}
 
   /// The editor state.
@@ -42,7 +46,11 @@ export class AutocompleteContext {
   /// Filter a given completion string against the partial input in
   /// `text`. Will use `this.filterType`, returns `true` when the
   /// completion should be shown.
-  filter(completion: string, text: string) {
+  filter(completion: string, text: string, caseSensitive = this.caseSensitive) {
+    if (!caseSensitive) {
+      completion = completion.toLowerCase()
+      text = text.toLowerCase()
+    }
     if (this.filterType == FilterType.Start)
       return completion.length > text.length && completion.slice(0, text.length) == text
     else if (this.filterType == FilterType.Include)
@@ -69,6 +77,9 @@ interface AutocompleteConfig {
   override?: Autocompleter | null
   /// Configures how to filter completions.
   filterType?: FilterType
+  /// Configures whether completion is case-sensitive (defaults to
+  /// false).
+  caseSensitive?: boolean
 }
 
 /// Objects type used to represent completions.
@@ -90,7 +101,7 @@ function retrieveCompletions(view: EditorView, explicit: boolean): Promise<reado
   let sources = view.state.languageDataAt<Autocompleter>("autocomplete", pos)
   if (config.override) sources = [config.override].concat(sources)
   if (!sources.length) return Promise.resolve([])
-  let context = new AutocompleteContext(view, pos, explicit, config.filterType)
+  let context = new AutocompleteContext(view, pos, explicit, config.filterType, config.caseSensitive)
   return Promise.all(sources.map(source => source(context))).then(results => {
     let all = []
     for (let result of results) for (let elt of result) all.push(elt)
@@ -103,7 +114,8 @@ const autocompleteConfig = Facet.define<AutocompleteConfig, Required<Autocomplet
     return combineConfig(configs, {
       activateOnTyping: true,
       override: null,
-      filterType: FilterType.Start
+      filterType: FilterType.Start,
+      caseSensitive: false
     })
   }
 })
