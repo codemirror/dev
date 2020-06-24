@@ -1,4 +1,4 @@
-import {Tree, NodeType, NodeProp} from "lezer-tree"
+import {Tree, NodeProp} from "lezer-tree"
 import {Line, countColumn} from "@codemirror/next/text"
 import {EditorState} from "./state"
 import {Transaction, TransactionSpec, StrictTransactionSpec} from "./transaction"
@@ -20,13 +20,12 @@ export const transactionFilter = Facet.define<
   (tr: StrictTransactionSpec, state: EditorState) => TransactionSpec | readonly TransactionSpec[]
 >()
 
-/// A node prop that can be stored on a grammar's top node to
-/// associate information with the language. Different extension might
-/// use different properties from this object (which they typically
-/// export as an interface).
-export const languageData = new NodeProp<{[key: string]: any}>()
+/// A node prop stored on a grammar's top node to indicate the facet
+/// used to store [language data](#state.EditorState.languageDataAt)
+/// related to that language.
+export const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
 
-export const addLanguageData = Facet.define<{type?: NodeType} & {[key: string]: any}>()
+export const globalLanguageData = Facet.define<{[name: string]: any}>()
 
 /// Syntax [parsing services](#state.EditorState^syntax) must provide
 /// this interface.
@@ -47,13 +46,15 @@ export interface Syntax {
   /// user command can be appropriate.
   ensureTree(state: EditorState, upto: number, timeout?: number): Tree | null
 
-  /// The node type at the root of trees produced by this syntax.
-  docNodeType: NodeType
+  /// A facet through which to install [language
+  /// data](#state.EditorState.languageDataAt) for this language.
+  languageData: Facet<{[name: string]: any}>
 
-  /// Return the document node type for the given position. This'll
-  /// usually be the be the grammar's top node, but with nested
-  /// grammars it may be the type of some nested document.
-  docNodeTypeAt(state: EditorState, pos: number): NodeType
+  /// Return the facet that stores the language data for the given
+  /// position. This'll usually be the be the grammar's own [language
+  /// data](#state.Syntax.languageData), but with nested grammars it
+  /// may be the data facet from some inner language.
+  languageDataFacetAt(state: EditorState, pos: number): Facet<{[name: string]: any}>
 }
 
 /// Indentation contexts are used when calling

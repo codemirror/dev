@@ -1,6 +1,6 @@
 import {parser} from "lezer-python"
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
-import {languageData} from "@codemirror/next/state"
+import {Extension} from "@codemirror/next/state"
 import {Subtree} from "lezer-tree"
 import {styleTags} from "@codemirror/next/highlight"
 
@@ -8,10 +8,6 @@ import {styleTags} from "@codemirror/next/highlight"
 /// parser](https://github.com/lezer-parser/python), extended with
 /// highlighting and indentation information.
 export const pythonSyntax = new LezerSyntax(parser.withProps(
-  languageData.add({
-    Script: {closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']},
-             commentTokens: {line: "#"}}
-  }),
   indentNodeProp.add({
     Body: continuedIndent()
   }),
@@ -51,4 +47,9 @@ export const pythonSyntax = new LezerSyntax(parser.withProps(
 ))
 
 /// Returns an extension that installs the Python syntax provider.
-export function python() { return pythonSyntax.extension }
+export function python(): Extension {
+  return [pythonSyntax, pythonSyntax.languageData.of({
+    closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']},
+    commentTokens: {line: "#"}
+  })]
+}

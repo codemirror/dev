@@ -4,7 +4,7 @@ import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionFlag,
         TransactionSpec, StrictTransactionSpec, ResolvedTransactionSpec} from "./transaction"
-import {Syntax, IndentContext, allowMultipleSelections, languageData, addLanguageData,
+import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
         changeFilter, transactionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 import {CharCategory, makeCategorizer} from "./charcategory"
@@ -307,12 +307,10 @@ export class EditorState {
     return syntax.length ? syntax[0].getTree(this) : Tree.empty
   }
 
-  /// A facet used to register extra [language
-  /// data](#state.EditorState.languageDataAt) with a language. Values
-  /// are objects with the target [document
-  /// type](#state.Syntax.docNodeType) in their `type` property, and any
-  /// associated data in other properties.
-  static addLanguageData = addLanguageData
+  /// A facet used to register [language
+  /// data](#state.EditorState.languageDataAt) that should apply
+  /// throughout the document, regardless of language.
+  static globalLanguageData = globalLanguageData
 
   /// Find the values for a given language data field, either provided
   /// by the [syntax](#state.languageData) or through the
@@ -321,19 +319,14 @@ export class EditorState {
   /// given position. Values provided by the facet, in precedence
   /// order, will appear before those provided by the syntax.
   languageDataAt<T>(name: string, pos: number): readonly T[] {
-    let values: T[] | null = null
+    let values: T[] = []
     let syntax = this.facet(EditorState.syntax)
-    let type = syntax.length ? syntax[0].docNodeTypeAt(this, pos) : null
-    for (let added of this.facet(addLanguageData)) {
-      if ((added.type == null || added.type == type) && Object.prototype.hasOwnProperty.call(added, name))
-        (values || (values = [])).push(added[name])
+    for (let i = syntax.length ? 0 : 1; i < 2; i++) {
+      let source = this.facet(i ? globalLanguageData : syntax[0].languageDataFacetAt(this, pos))
+      for (let obj of source) if (Object.prototype.hasOwnProperty.call(obj, name))
+        values.push(obj[name])
     }
-    if (type) {
-      let langData = type.prop(languageData)
-      if (langData && Object.prototype.hasOwnProperty.call(langData, name))
-        (values || (values = [])).push(langData[name])
-    }
-    return values || none
+    return values
   }
 
   /// A facet that registers a code folding service. When called with
@@ -369,5 +362,3 @@ export class EditorState {
   /// the user experience.)
   static transactionFilter = transactionFilter
 }
-
-const none: readonly any[] = []

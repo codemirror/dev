@@ -1,5 +1,6 @@
 import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType, IndentContext} from "@codemirror/next/state"
+import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType, IndentContext,
+        Facet, languageDataProp} from "@codemirror/next/state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "@codemirror/next/view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
 import {defaultTags} from "@codemirror/next/highlight"
@@ -43,13 +44,13 @@ class StreamParserInstance<State> {
   indent: (state: State, textAfter: string, editorState: EditorState) => number
   docType: number
 
-  constructor(spec: StreamParser<State>) {
+  constructor(spec: StreamParser<State>, languageData: Facet<{[name: string]: any}>) {
     this.token = spec.token
     this.blankLine = spec.blankLine || (() => {})
     this.startState = spec.startState || (() => (true as any))
     this.copyState = spec.copyState || defaultCopyState
     this.indent = spec.indent || (() => -1)
-    this.docType = docID(spec.docProps || [])
+    this.docType = docID((spec.docProps || []).concat([[languageDataProp, languageData]]))
   }
 
   readToken(state: State, stream: StringStream, editorState: EditorState) {
@@ -78,10 +79,12 @@ export class StreamSyntax implements Syntax {
   /// The extension that installs this syntax provider.
   public extension: Extension
   private parser: StreamParserInstance<any>
+  public languageData: Facet<{[name: string]: any}>
 
   /// Create a stream syntax.
   constructor(parser: StreamParser<any>) {
-    let parserInst = this.parser = new StreamParserInstance(parser)
+    this.languageData = Facet.define<{[name: string]: any}>()
+    let parserInst = this.parser = new StreamParserInstance(parser, this.languageData)
     let setSyntax = StateEffect.define<SyntaxState<any>>()
     this.field = StateField.define<SyntaxState<any>>({
       create(state) {
@@ -127,10 +130,8 @@ export class StreamSyntax implements Syntax {
     return field.frontierPos < upto ? null : field.updatedTree
   }
 
-  get docNodeType() { return typeArray[this.parser.docType] }
-
   // FIXME allow modes to extend this?
-  docNodeTypeAt() { return typeArray[this.parser.docType] }
+  languageDataFacetAt() { return this.languageData }
 }
 
 const CacheStepShift = 6, CacheStep = 1 << CacheStepShift

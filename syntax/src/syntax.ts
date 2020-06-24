@@ -1,7 +1,8 @@
 import {Parser, InputStream, ParseContext} from "lezer"
-import {Tree, Subtree, NodeProp, ChangedRange} from "lezer-tree"
+import {Tree, Subtree, ChangedRange} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
-import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType} from "@codemirror/next/state"
+import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
+        Facet, languageDataProp} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
@@ -9,17 +10,27 @@ import {syntaxFolding} from "./fold"
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
 export class LezerSyntax implements Syntax {
+  /// The Lezer parser used by this syntax.
+  readonly parser: Parser
+
+  /// @internal
   readonly field: StateField<SyntaxState>
+
   /// The extension value to install this provider.
   readonly extension: Extension
+
+  readonly languageData: Facet<{[name: string]: any}>
 
   /// Create a syntax instance for the given parser. You'll usually
   /// want to use the
   /// [`withProps`](https://lezer.codemirror.net/docs/ref/#lezer.Parser.withProps)
   /// method to register CodeMirror-specific syntax node props in the
   /// parser, before passing it to this constructor.
-  constructor(readonly parser: Parser) {
+  constructor(parser: Parser) {
     let setSyntax = StateEffect.define<SyntaxState>()
+    this.languageData = Facet.define<{[name: string]: any}>()
+    parser = this.parser = parser.withProps(languageDataProp.add({[parser.topType.name]: this.languageData}))
+    
     this.field = StateField.define<SyntaxState>({
       create(state) { return SyntaxState.advance(Tree.empty, parser, state.doc) },
       update(value, tr) { return value.apply(tr, parser, setSyntax) }
@@ -54,19 +65,17 @@ export class LezerSyntax implements Syntax {
     return field.parse!.pos < upto ? null : field.stopParse()
   }
 
-  get docNodeType() { return this.parser.topType }
-
-  docNodeTypeAt(state: EditorState, pos: number) {
-    let type = this.docNodeType
+  languageDataFacetAt(state: EditorState, pos: number) {
     if (this.parser.hasNested) {
       let tree = this.getTree(state)
       let target: Subtree | null = tree.resolve(pos)
       while (target) {
-        if (target.type.prop(NodeProp.top)) return target.type
+        let facet = target.type.prop(languageDataProp)
+        if (facet) return facet
         target = target.parent
       }
     }
-    return type
+    return this.languageData
   }
 }
 

@@ -3,9 +3,9 @@ import {Subtree} from "lezer-tree"
 import {cssSyntax} from "@codemirror/next/lang-css"
 import {javascriptSyntax} from "@codemirror/next/lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
-import {languageData} from "@codemirror/next/state"
 import {styleTags} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
+import {Extension} from "@codemirror/next/state"
 
 /// A syntax provider based on the [Lezer HTML
 /// parser](https://github.com/lezer-parser/html), wired up with the
@@ -23,12 +23,6 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
    },
    parser: cssSyntax.parser}
 ]).withProps(
-  languageData.add({
-     Document: {
-       autocomplete: completeHTML,
-       commentTokens: {block: {open: "<!--", close: "-->"}},
-    },
-  }),
   indentNodeProp.add(type => {
     if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
     if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
@@ -58,4 +52,10 @@ export const htmlSyntax = new LezerSyntax(configureHTML([
 ))
 
 /// Returns an extension that installs the HTML syntax provider.
-export function html() { return htmlSyntax.extension }
+export function html(): Extension {
+  return [htmlSyntax, htmlSyntax.languageData.of({
+    autocomplete: completeHTML,
+    commentTokens: {block: {open: "<!--", close: "-->"}},
+  })]
+}
+

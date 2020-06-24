@@ -1,8 +1,8 @@
 import {parser} from "lezer-javascript"
 import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
-import {languageData} from "@codemirror/next/state"
 import {styleTags} from "@codemirror/next/highlight"
 import {completeSnippets} from "@codemirror/next/autocomplete"
+import {Extension} from "@codemirror/next/state"
 import {snippets} from "./snippets"
 
 const statementIndent = continuedIndent({except: /^{/})
@@ -13,13 +13,6 @@ export {snippets}
 /// parser](https://github.com/lezer-parser/javascript), extended with
 /// highlighting and indentation information.
 export const javascriptSyntax = new LezerSyntax(parser.withProps(
-  languageData.add({
-    Script: {
-      closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
-      commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
-      autocomplete: completeSnippets(snippets)
-    }
-  }),
   indentNodeProp.add(type => {
     if (type.name == "IfStatement") return continuedIndent({except: /^\s*({|else\b)/})
     if (type.name == "TryStatement") return continuedIndent({except: /^\s*({|catch|finally)\b/})
@@ -76,4 +69,10 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
 ))
 
 /// Returns an extension that installs the JavaScript syntax provider.
-export function javascript() { return javascriptSyntax.extension }
+export function javascript(): Extension {
+  return [javascriptSyntax, javascriptSyntax.languageData.of({
+    closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
+    commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
+    autocomplete: completeSnippets(snippets)
+  })]
+}

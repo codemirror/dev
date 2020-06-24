@@ -689,6 +689,8 @@ export const standardKeymap: readonly KeyBinding[] = ([
   {mac: "Alt-Delete", run: deleteGroupForward},
 ] as KeyBinding[]).concat(emacsStyleKeymap.map(b => ({mac: b.key, run: b.run, shift: b.shift})))
 
+// FIXME find some reasonable binding for indentSelection
+
 /// The default keymap. Includes all bindings from
 /// [`standardKeymap`](#commands.standardKeymap) plus the following:
 ///

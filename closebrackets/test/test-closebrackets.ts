@@ -1,6 +1,6 @@
 import ist from "ist"
 import {handleInsertion, handleBackspace} from "@codemirror/next/closebrackets"
-import {EditorState, Transaction, EditorSelection, languageData} from "@codemirror/next/state"
+import {EditorState, Transaction, EditorSelection} from "@codemirror/next/state"
 import {StreamSyntax} from "@codemirror/next/stream-syntax"
 
 function s(doc = "", anchor = 0, head = anchor) {
@@ -71,7 +71,6 @@ describe("closeBrackets", () => {
   })
 
   const syntax = new StreamSyntax({
-    docProps: [[languageData, {closeBrackets: {brackets: ["(", "'", "'''"]}}]],
     token(stream) {
       if (stream.match("'''")) {
         while (!stream.match("'''") && !stream.eol()) stream.next()
@@ -85,9 +84,10 @@ describe("closeBrackets", () => {
       }
     }
   })
+  const data = syntax.languageData.of({closeBrackets: {brackets: ["(", "'", "'''"]}})
 
   function st(doc = "", anchor = 0, head = anchor) {
-    return EditorState.create({doc, selection: EditorSelection.single(anchor, head), extensions: [syntax.extension]})
+    return EditorState.create({doc, selection: EditorSelection.single(anchor, head), extensions: [syntax, data]})
   }
 
   it("skips closing quotes", () => {

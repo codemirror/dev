@@ -42,7 +42,7 @@ export function esLint(eslint: any, config?: any) {
     // FIXME move to async parsing?
     syntax.getTree(view.state).iterate({
       enter(type, start, end) {
-        if (type == javascriptSyntax.docNodeType) {
+        if (type == javascriptSyntax.parser.topType) {
           for (let d of range(view.state, start, end)) found.push(d)
           return false
         }
