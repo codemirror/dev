@@ -52,9 +52,9 @@ export class AutocompleteContext {
       text = text.toLowerCase()
     }
     if (this.filterType == FilterType.Start)
-      return completion.length > text.length && completion.slice(0, text.length) == text
+      return completion.slice(0, text.length) == text
     else if (this.filterType == FilterType.Include)
-      return completion.length > text.length && completion.indexOf(text) > -1
+      return completion.indexOf(text) > -1
     // Fuzzy
     for (let i = 0, j = 0; i < text.length; i++) {
       let found = completion.indexOf(text[i], j)
@@ -153,6 +153,9 @@ function moveCompletion(dir: string, by?: string) {
   }
 }
 
+// FIXME don't return true when the completion has only just popped
+// up, to not get in the way when people quickly type something and
+// hit enter just as the completion shows
 function acceptCompletion(view: EditorView) {
   let active = view.state.field(activeCompletion)
   if (!(active instanceof ActiveCompletion)) return false
