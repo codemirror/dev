@@ -97,7 +97,7 @@ export class TextView extends InlineView {
 function textCoords(text: Node, pos: number, side: number, length: number): Rect {
   let from = pos, to = pos
   if (pos == 0 && side < 0 || pos == length && side >= 0) {
-    if (!(browser.webkit || browser.gecko)) { // These browsers reliably return valid rectangles for empty ranges
+    if (!(browser.chrome || browser.gecko)) { // These browsers reliably return valid rectangles for empty ranges
       if (pos) from--; else to++
     }
   } else {

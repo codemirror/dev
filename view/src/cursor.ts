@@ -110,7 +110,7 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
       if (rect.left - 1 <= x && rect.right + 1 >= x &&
           rect.top - 1 <= y && rect.bottom + 1 >= y) {
         let right = x >= (rect.left + rect.right) / 2, after = right
-        if (browser.webkit || browser.gecko) {
+        if (browser.chrome || browser.gecko) {
           // Check for RTL on browsers that support getting client
           // rects for empty ranges.
           range.setEnd(node, i)
