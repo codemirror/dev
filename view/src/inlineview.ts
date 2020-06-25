@@ -2,7 +2,7 @@ import {Text} from "@codemirror/next/text"
 import {ContentView, DOMPos} from "./contentview"
 import {WidgetType} from "./decoration"
 import {attrsEq} from "./attributes"
-import {Rect} from "./dom"
+import {Rect, flattenRect} from "./dom"
 import browser from "./browser"
 import {Open} from "./buildview"
 
@@ -95,10 +95,11 @@ export class TextView extends InlineView {
 }
 
 function textCoords(text: Node, pos: number, side: number, length: number): Rect {
-  let from = pos, to = pos
+  let from = pos, to = pos, flatten = 0
   if (pos == 0 && side < 0 || pos == length && side >= 0) {
     if (!(browser.chrome || browser.gecko)) { // These browsers reliably return valid rectangles for empty ranges
-      if (pos) from--; else to++
+      if (pos) { from--; flatten = 1 } // FIXME this is wrong in RTL text
+      else { to++; flatten = -1 }
     }
   } else {
     if (side < 0) from--; else to++
@@ -106,7 +107,8 @@ function textCoords(text: Node, pos: number, side: number, length: number): Rect
   let range = document.createRange()
   range.setEnd(text, to)
   range.setStart(text, from)
-  return range.getBoundingClientRect()
+  let rect = range.getBoundingClientRect()
+  return flatten ? flattenRect(rect, flatten < 0) : rect
 }
 
 // Also used for collapsed ranges that don't have a placeholder widget!

@@ -5,7 +5,7 @@ import {StyleModule, Style} from "style-mod"
 import {DocView} from "./docview"
 import {ContentView} from "./contentview"
 import {InputState} from "./input"
-import {Rect, focusPreventScroll} from "./dom"
+import {Rect, focusPreventScroll, flattenRect} from "./dom"
 import {posAtCoords, moveByChar, moveToLineBoundary, byGroup, moveVertically} from "./cursor"
 import {BlockInfo} from "./heightmap"
 import {ViewState} from "./viewstate"
@@ -479,12 +479,11 @@ export class EditorView {
   /// Get the screen coordinates at the given document position.
   coordsAtPos(pos: number, side: -1 | 1 = 1): Rect | null {
     this.readMeasured()
+    let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line)
     let rect = this.docView.coordsAt(pos, side)
     if (!rect || rect.left == rect.right) return rect
-    let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line)
     let span = order[BidiSpan.find(order, pos - line.from, -1, side)]
-    let x = (span.dir == Direction.LTR) == (side < 0) ? rect.right : rect.left
-    return {left: x, right: x, top: rect.top, bottom: rect.bottom}
+    return flattenRect(rect, (span.dir == Direction.LTR) == (side > 0))
   }
 
   /// The default width of a character in the editor. May not

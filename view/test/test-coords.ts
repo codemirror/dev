@@ -3,7 +3,7 @@ import ist from "ist"
 
 describe("EditorView coords", () => {
   it("can find coordinates for simple text", () => {
-    let cm = tempEditor("one two\nthree"), prev = null
+    let cm = tempEditor("one two\n\nthree"), prev = null
     for (let i = 0; i < cm.state.doc.length; i++) {
       let coords = cm.coordsAtPos(i)!
       if (prev) ist(prev.top < coords.top - 5 || prev.left < coords.left)

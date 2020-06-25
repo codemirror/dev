@@ -49,6 +49,9 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length
   }
 
+  // Will return a rectangle directly before (when side < 0), after
+  // (side > 0) or directly on (when the browser supports it) the
+  // given position.
   coordsAt(_pos: number, _side: number): Rect | null { return null }
 
   sync() {

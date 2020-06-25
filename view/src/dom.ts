@@ -77,6 +77,11 @@ export function maxOffset(node: Node): number {
 
 export type Rect = {left: number, right: number, top: number, bottom: number}
 
+export function flattenRect(rect: Rect, left: boolean) {
+  let x = left ? rect.left : rect.right
+  return {left: x, right: x, top: rect.top, bottom: rect.bottom}
+}
+
 function windowRect(win: Window): Rect {
   return {left: 0, right: win.innerWidth,
           top: 0, bottom: win.innerHeight}
