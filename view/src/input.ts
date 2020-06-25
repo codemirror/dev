@@ -38,6 +38,7 @@ export class InputState {
       let handler = handlers[type]
       view.contentDOM.addEventListener(type, (event: Event) => {
         if (!eventBelongsToEditor(view, event) || this.ignoreDuringComposition(event)) return
+        if (this.mustFlushObserver(event)) view.observer.forceFlush()
         if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         else handler(view, event)
       })
@@ -94,6 +95,10 @@ export class InputState {
       return true
     }
     return false
+  }
+
+  mustFlushObserver(event: Event) {
+    return event.type == "keydown" || event.type == "compositionend"
   }
 
   startMouseSelection(view: EditorView, event: MouseEvent, style: MouseSelectionStyle) {

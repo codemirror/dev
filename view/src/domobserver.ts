@@ -1,7 +1,7 @@
 import browser from "./browser"
 import {ContentView, Dirty} from "./contentview"
 import {EditorView} from "./editorview"
-import {hasSelection, getSelection, DOMSelection} from "./dom"
+import {hasSelection, getSelection, DOMSelection, isEquivalentPosition} from "./dom"
 
 const observeOptions = {
   childList: true,
@@ -21,11 +21,11 @@ export class DOMObserver {
   active: boolean = false
   ignoreSelection: DOMSelection = new DOMSelection
 
+  delayedFlush = -1
+  queue: MutationRecord[] = []
+
   onSelectionChange: any
   onCharData: any
-
-  charDataQueue: MutationRecord[] = []
-  charDataTimeout: any = null
 
   scrollTargets: HTMLElement[] = []
   intersection: IntersectionObserver | null = null
@@ -38,17 +38,41 @@ export class DOMObserver {
               private onChange: (from: number, to: number, typeOver: boolean) => boolean,
               private onScrollChanged: () => void) {
     this.dom = view.contentDOM
-    this.observer = new MutationObserver(mutations => this.flush(mutations))
+    this.observer = new MutationObserver(mutations => {
+      for (let mut of mutations) this.queue.push(mut)
+      // IE11 will sometimes (on typing over a selection or
+      // backspacing out a single character text node) call the
+      // observer callback before actually updating the DOM
+      if (browser.ie && browser.ie_version <= 11 &&
+          mutations.some(m => m.type == "childList" && m.removedNodes.length ||
+                         m.type == "characterData" && m.oldValue!.length > m.target.nodeValue!.length))
+        this.flushSoon()
+      else
+        this.flush()
+    })
+
     if (useCharData)
       this.onCharData = (event: MutationEvent) => {
-        this.charDataQueue.push({target: event.target,
-                                 type: "characterData",
-                                 oldValue: event.prevValue} as MutationRecord)
-        if (this.charDataTimeout == null) this.charDataTimeout = setTimeout(() => this.flush(), 20)
+        this.queue.push({target: event.target,
+                         type: "characterData",
+                         oldValue: event.prevValue} as MutationRecord)
+        this.flushSoon()
       }
+
     this.onSelectionChange = () => {
-      if (this.view.root.activeElement == this.dom) this.flush()
+      if (this.view.root.activeElement != this.dom) return
+      // Deletions on IE11 fire their events in the wrong order, giving
+      // us a selection change event before the DOM changes are
+      // reported.
+      if (browser.ie && browser.ie_version <= 11 && !this.view.state.selection.primary.empty) {
+        let sel = getSelection(this.view.root)
+        // Selection.isCollapsed isn't reliable on IE
+        if (sel.focusNode && isEquivalentPosition(sel.focusNode, sel.focusOffset, sel.anchorNode, sel.anchorOffset))
+          return this.flushSoon()
+      }
+      this.flush()
     }
+
     this.start()
 
     this.onScroll = this.onScroll.bind(this)
@@ -125,16 +149,6 @@ export class DOMObserver {
       this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData)
   }
 
-  takeCharRecords(): MutationRecord[] {
-    let result = this.charDataQueue
-    if (result.length) {
-      this.charDataQueue = []
-      clearTimeout(this.charDataTimeout)
-      this.charDataTimeout = null
-    }
-    return result
-  }
-
   clearSelection() {
     this.ignoreSelection.set(getSelection(this.view.root))
   }
@@ -142,14 +156,31 @@ export class DOMObserver {
   // Throw away any pending changes
   clear() {
     this.observer.takeRecords()
-    this.takeCharRecords()
+    this.queue.length = 0
     this.clearSelection()
   }
 
+  flushSoon() {
+    if (this.delayedFlush < 0)
+      this.delayedFlush = window.setTimeout(() => { this.delayedFlush = -1; this.flush() }, 20)
+  }
+
+  forceFlush() {
+    if (this.delayedFlush >= 0) {
+      window.clearTimeout(this.delayedFlush)
+      this.delayedFlush = -1
+      this.flush()
+    }
+  }
+
   // Apply pending changes, if any
-  flush(records: MutationRecord[] = this.observer.takeRecords()) {
-    if (this.charDataQueue.length)
-      records = records.concat(this.takeCharRecords())
+  flush() {
+    if (this.delayedFlush >= 0) return
+
+    let records = this.queue
+    for (let mut of this.observer.takeRecords()) records.push(mut)
+    if (records.length) this.queue = []
+
     let selection = getSelection(this.view.root)
     let newSel = !this.ignoreSelection.eq(selection) && hasSelection(this.dom, selection)
     if (records.length == 0 && !newSel) return
