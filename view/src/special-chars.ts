@@ -47,6 +47,8 @@ function supportsTabSize() {
   return _supportsTabSize || false
 }
 
+const UnicodeRegexpSupport = /x/.unicode != null ? "gu" : "g"
+
 const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
   combine(configs) {
     // FIXME make configurations compose properly
@@ -57,10 +59,10 @@ const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharCo
     })
     
     if (config.replaceTabs = !supportsTabSize())
-      config.specialChars = new RegExp("\t|" + config.specialChars.source, "gu")
+      config.specialChars = new RegExp("\t|" + config.specialChars.source, UnicodeRegexpSupport)
 
     if (config.addSpecialChars)
-      config.specialChars = new RegExp(config.specialChars.source + "|" + config.addSpecialChars.source, "gu")
+      config.specialChars = new RegExp(config.specialChars.source + "|" + config.addSpecialChars.source, UnicodeRegexpSupport)
 
     return config
   }
