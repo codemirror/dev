@@ -340,8 +340,19 @@ function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | 
   return {pos, bias: findPositionSide(view, pos, event.clientX, event.clientY)}
 }
 
+const BadMouseDetail = browser.ie && browser.ie_version <= 11
+let lastMouseDown: MouseEvent | null = null, lastMouseDownCount = 0
+
+function getClickType(event: MouseEvent) {
+  if (!BadMouseDetail) return event.detail
+  let last = lastMouseDown
+  lastMouseDown = event
+  return lastMouseDownCount = !last || (last.timeStamp > Date.now() - 400 && Math.abs(last.clientX - event.clientX) < 2 &&
+                                        Math.abs(last.clientY - event.clientY) < 2) ? (lastMouseDownCount + 1) % 3 : 1
+}
+
 function basicMouseSelection(view: EditorView, event: MouseEvent) {
-  let start = queryPos(view, event), type = event.detail
+  let start = queryPos(view, event), type = getClickType(event)
   let startSel = view.state.selection
   let last = start, lastEvent = event
   return {
