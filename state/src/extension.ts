@@ -94,7 +94,7 @@ export class IndentContext {
   /// or the next 100 characters, whichever is shorter.
   textAfterPos(pos: number) {
     return this.state.sliceDoc(pos, Math.min(pos + 100,
-                                             this.simulateBreak != null && this.simulateBreak >= pos ? this.simulateBreak : 1e9,
+                                             this.simulateBreak != null && this.simulateBreak > pos ? this.simulateBreak : 1e9,
                                              this.state.doc.lineAt(pos).to))
   }
 
