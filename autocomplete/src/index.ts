@@ -432,4 +432,19 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   }
 })
 
+/// Given a a fixed array of options, return an autocompleter that
+/// compares those options to the current
+/// [token](#autocomplete.AutocompleteContext.tokenBefore) and returns
+/// the matching ones.
+export function completeFromList(list: readonly (string | Completion)[]): Autocompleter {
+  let options = list.map(o => typeof o == "string" ? {label: o} : o) as Completion[]
+  let filterDownOn = options.every(o => /^\w+$/.test(o.label)) ? /^\w+$/ : undefined
+  return (context: AutocompleteContext) => {
+    let token = context.tokenBefore()
+    return {from: token.from, to: token.to,
+            options: options.filter(o => context.filter(o.label, token.text)),
+            filterDownOn}
+  }
+}
+
 export {snippet, completeSnippets, SnippetSpec} from "./snippet"
