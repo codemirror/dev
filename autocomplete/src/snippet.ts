@@ -202,15 +202,14 @@ export type SnippetSpec = {
 export function completeSnippets(snippets: readonly SnippetSpec[]) {
   let parsed = snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)}))
   return (context: AutocompleteContext) => {
-    let token = context.state.tree.resolve(context.pos, -1), tokenText = ""
-    let isAlpha = !token.firstChild && /[\w\u00a1-\uffff]/.test(tokenText = context.state.sliceDoc(token.start, token.end))
+    let token = context.tokenBefore()
+    let isAlpha = /[\w\u00a1-\uffff]/.test(token.text)
     if (!isAlpha && !context.explicit) return []
-    let from = isAlpha ? token.start : context.pos, text = isAlpha ? tokenText.slice(0, context.pos - token.start) : ""
     let options = []
     for (let i = 0; i < snippets.length; i++) {
       let candidate = snippets[i]
-      if (!text || context.filter(candidate.keyword, text)) options.push(parsed[i])
+      if (!token.text || context.filter(candidate.keyword, token.text)) options.push(parsed[i])
     }
-    return {from, to: context.pos, options}
+    return {from: token.from, to: context.pos, options, filterDownOn: /^[\w\u00a1-\uffff]+$/}
   }
 }

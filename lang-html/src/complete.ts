@@ -392,12 +392,14 @@ function openTags(doc: Text, tree: Subtree) {
   return open
 }
 
+const identifier = /^[:\-\.\w\u00b7-\uffff]+$/
+
 function completeTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
   let text = state.doc.sliceString(from, to).toLowerCase()
   let options = []
   for (let tagName of allowedChildren(state.doc, tree))
     if (context.filter(tagName, text, true)) options.push({label: tagName})
-  return {from, to, options}
+  return {from, to, options, filterDownOn: identifier}
 }
 
 function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
@@ -406,7 +408,7 @@ function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: n
   for (let open of openTags(state.doc, tree))
     if (context.filter(open, text, true))
       options.push({label: open, apply: open + end})
-  return {from, to, options}
+  return {from, to, options, filterDownOn: identifier}
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
@@ -415,7 +417,7 @@ function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
     options.push({label: "<" + tagName})
   for (let open of openTags(state.doc, tree))
     options.push({label: "</" + open + ">"})
-  return {from: pos, to: pos, options}
+  return {from: pos, to: pos, options, filterDownOn: identifier}
 }
 
 function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
@@ -426,7 +428,7 @@ function completeAttrName(state: EditorState, tree: Subtree, from: number, to: n
     if (context.filter(attrName, base, true))
       options.push({label: attrName})
   }
-  return {from, to, options}
+  return {from, to, options, filterDownOn: identifier}
 }
 
 function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {

@@ -156,7 +156,7 @@ export class ChangeDesc {
   /// Check whether these changes touch a given range. When one of the
   /// changes entirely covers the range, the string `"cover"` is
   /// returned.
-  touchesRange(from: number, to: number): boolean | "cover" {
+  touchesRange(from: number, to = from): boolean | "cover" {
     for (let i = 0, pos = 0; i < this.sections.length && pos <= to;) {
       let len = this.sections[i++], ins = this.sections[i++], end = pos + len
       if (ins >= 0 && pos <= to && end >= from) return pos < from && end > to ? "cover" : true

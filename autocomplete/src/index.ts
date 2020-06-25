@@ -1,6 +1,6 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
 import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, precedence,
-        ChangeDesc} from "@codemirror/next/state"
+        ChangeDesc, EditorState} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 import {baseTheme} from "./theme"
@@ -22,8 +22,8 @@ export enum FilterType {
 export class AutocompleteContext {
   /// @internal
   constructor(
-    /// The editor view that the completion happens in.
-    readonly view: EditorView,
+    /// The editor state that the completion happens in.
+    readonly state: EditorState,
     /// The position at which the completion happens.
     readonly pos: number,
     /// Indicates whether completion was activated explicitly, or
@@ -39,9 +39,6 @@ export class AutocompleteContext {
     /// requirement.
     readonly caseSensitive: boolean
   ) {}
-
-  /// The editor state.
-  get state() { return this.view.state }
 
   /// Filter a given completion string against the partial input in
   /// `text`. Will use `this.filterType`, returns `true` when the
@@ -63,6 +60,19 @@ export class AutocompleteContext {
     }
     return true
   }
+
+  /// Get the extent, content, and (if there is a token) type of the
+  /// token before `this.pos`.
+  tokenBefore() {
+    let from = this.pos, type = null, text = ""
+    let token = this.state.tree.resolve(this.pos, -1)
+    if (!token.firstChild && token.start < this.pos) {
+      from = token.start
+      type = token.type
+      text = this.state.sliceDoc(from, this.pos)
+    }
+    return {from, to: this.pos, text, type}
+  }
 }
 
 /// Interface for objects returned by completion sources.
@@ -73,11 +83,29 @@ export interface CompletionResult {
   to: number,
   /// The completions
   options: readonly Completion[],
-  /// Whether the library is responsible for filtering the completions
-  /// (defaults to false). When `true`, further typing will not query
-  /// the completion source again, but instead continue filtering the
-  /// given list of options.
-  filter?: boolean
+  /// When given, further input that matches the regexp will cause the
+  /// given options to be re-filtered with the extended string, rather
+  /// than calling the completion source anew. This can help with
+  /// responsiveness, since it allows the completion list to be
+  /// updated synchronously.
+  filterDownOn?: RegExp
+}
+
+function canRefilter(result: CompletionResult, state: EditorState, changes?: ChangeDesc) {
+  if (!result.filterDownOn) return false
+  let to = changes ? changes.mapPos(result.to) : result.to, pos = state.selection.primary.head
+  if (pos < to || pos > to + 20) return false
+  return pos == to || result.filterDownOn.test(state.sliceDoc(to, pos))
+}
+
+function refilter(result: CompletionResult, context: AutocompleteContext) {
+  let text = context.state.sliceDoc(result.from, context.pos)
+  return {
+    from: result.from,
+    to: context.pos,
+    options: result.options.filter(opt => context.filter(opt.label, text)),
+    filterDownOn: result.filterDownOn
+  }
 }
 
 /// Objects type used to represent individual completions.
@@ -116,17 +144,10 @@ class CombinedResult {
               readonly options: readonly {completion: Completion, source: number}[]) {}
 
   static create(sources: readonly Autocompleter[],
-                results: readonly (CompletionResult | null)[],
-                context: AutocompleteContext) {
+                results: readonly (CompletionResult | null)[]) {
     let options = []
     for (let i = 0, result; i < results.length; i++) if (result = results[i]) {
-      let prefix = null
-      for (let option of result.options) {
-        if (!result.filter ||
-            (result.from == result.to ? context.explicit :
-             context.filter(prefix || (prefix = context.state.sliceDoc(result.from, result.to)), option.label)))
-          options.push({completion: option, source: i})
-      }
+      for (let option of result.options) options.push({completion: option, source: i})
     }
     return new CombinedResult(sources, results,
                               options.sort(({completion: {label: a}}, {completion: {label: b}}) => a < b ? -1 : a == b ? 0 : 1))
@@ -140,13 +161,23 @@ class CombinedResult {
                               this.results.map(r => r && {...r, ...{from: changes.mapPos(r.from), to: changes.mapPos(r.to)}}),
                               this.options)
   }
+
+  refilterAll(state: EditorState) {
+    let config = state.facet(autocompleteConfig), pos = state.selection.primary.head
+    let context = new AutocompleteContext(state, pos, false, config.filterType, config.caseSensitive)
+    return CombinedResult.create(this.sources, this.results.map(r => r && refilter(r, context)))
+  }
 }
 
-function retrieveCompletions(view: EditorView, explicit: boolean): Promise<CombinedResult> {
-  let config = view.state.facet(autocompleteConfig), pos = view.state.selection.primary.head
-  let sources = config.override ? [config.override] : view.state.languageDataAt<Autocompleter>("autocomplete", pos)
-  let context = new AutocompleteContext(view, pos, explicit, config.filterType, config.caseSensitive)
-  return Promise.all(sources.map(source => source(context))).then(results => CombinedResult.create(sources, results, context))
+function retrieveCompletions(state: EditorState, pending: PendingCompletion): Promise<CombinedResult> {
+  let config = state.facet(autocompleteConfig), pos = state.selection.primary.head
+  let sources = config.override ? [config.override] : state.languageDataAt<Autocompleter>("autocomplete", pos)
+  let context = new AutocompleteContext(state, pos, pending.explicit, config.filterType, config.caseSensitive)
+  return Promise.all(sources.map(source => {
+    let prevIndex = pending.prev ? pending.prev.result.sources.indexOf(source) : -1
+    let prev = prevIndex < 0 ? null : pending.prev!.result.results[prevIndex]
+    return (prev && canRefilter(prev, state) && refilter(prev, context)) || source(context)
+  })).then(results => CombinedResult.create(sources, results))
 }
 
 const autocompleteConfig = Facet.define<AutocompleteConfig, Required<AutocompleteConfig>>({
@@ -204,8 +235,9 @@ function acceptCompletion(view: EditorView) {
 
 /// Explicitly start autocompletion.
 export const startCompletion: Command = (view: EditorView) => {
-  let active = view.state.field(activeCompletion)
-  if (active != null && active != "pending") return false
+  let active = view.state.field(activeCompletion, false)
+  if (active === undefined) return false
+  if (active instanceof ActiveCompletion || (active instanceof PendingCompletion && active.explicit)) return false
   view.dispatch(view.state.update({effects: toggleCompletion.of(true)}))
   return true
 }
@@ -241,33 +273,38 @@ export const autocompleteKeymap: readonly KeyBinding[] = [
   {key: "Escape", run: closeCompletion}
 ]
 
-type ActiveState = ActiveCompletion // There is a completion active
-  | null // No completion active
-  | "pending" // Must update after user input
-  | "pendingExplicit" // Must update after explicit completion command
-
 const openCompletion = StateEffect.define<CombinedResult>()
 const toggleCompletion = StateEffect.define<boolean>()
 const selectCompletion = StateEffect.define<number>()
 
-const activeCompletion = StateField.define<ActiveState>({
+function touchesCompletion(tr: Transaction, completion: ActiveCompletion | PendingCompletion) {
+  return completion instanceof ActiveCompletion ? tr.changes.touchesRange(completion.result.from, completion.result.to)
+    : tr.changes.touchesRange(tr.state.selection.primary.head)
+}
+
+const activeCompletion = StateField.define<ActiveCompletion | PendingCompletion | null>({
   create() { return null },
 
   update(value, tr) {
     let event = tr.annotation(Transaction.userEvent)
-    if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
-        event == "delete" && value)
-      value = "pending"
-    // FIXME also allow pending completions to survive changes somehow
-    else if (tr.docChanged && value instanceof ActiveCompletion && !tr.changes.touchesRange(value.result.from, value.result.to))
-      value = value.map(tr.changes)
-    else if (tr.selection || tr.docChanged)
+    if (event == "input" && value instanceof ActiveCompletion &&
+        value.result.results.every(r => !r || canRefilter(r, tr.state, tr.changes))) {
+      value = new ActiveCompletion(value.result.map(tr.changes).refilterAll(tr.state), 0, value.timeStamp)
+    } else if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
+               event == "delete" && value) {
+      let prev = value instanceof ActiveCompletion ? value : value instanceof PendingCompletion ? value.prev : null
+      value = new PendingCompletion(prev, value instanceof PendingCompletion ? value.explicit : false)
+    } else if (value && (tr.selection || tr.docChanged && touchesCompletion(tr, value))) {
+      // Clear on selection changes or changes that touch the completion
       value = null
+    } else if (tr.docChanged && value instanceof ActiveCompletion) {
+      value = new ActiveCompletion(value.result.map(tr.changes), value.selected, value.timeStamp)
+    }
     for (let effect of tr.effects) {
       if (effect.is(openCompletion))
         value = new ActiveCompletion(effect.value, 0)
       else if (effect.is(toggleCompletion))
-        value = effect.value ? "pendingExplicit" : null
+        value = effect.value ? new PendingCompletion(null, true) : null
       else if (effect.is(selectCompletion) && value instanceof ActiveCompletion)
         value = new ActiveCompletion(value.result, effect.value, value.timeStamp, value.id, value.tooltip)
     }
@@ -298,10 +335,11 @@ class ActiveCompletion {
                 style: "autocomplete",
                 create: completionTooltip(result, id)
               }]) {}
+}
 
-  map(changes: ChangeDesc) {
-    return new ActiveCompletion(this.result.map(changes), this.selected, this.timeStamp)
-  }
+class PendingCompletion {
+  constructor(readonly prev: ActiveCompletion | null,
+              readonly explicit: boolean) {}
 }
 
 function createListBox(result: CombinedResult, id: string) {
@@ -377,17 +415,17 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   update(update: ViewUpdate) {
     if (!update.docChanged && !update.selectionSet &&
         update.prevState.field(activeCompletion) == update.state.field(activeCompletion)) return
-    this.stateVersion++
+    if (update.docChanged || update.selectionSet) this.stateVersion++
     if (this.debounce > -1) clearTimeout(this.debounce)
-    let active = update.state.field(activeCompletion)
-    this.debounce = active == "pending" || active == "pendingExplicit"
-      ? setTimeout(() => this.startUpdate(active == "pendingExplicit"), DebounceTime) : -1
+    const active = update.state.field(activeCompletion)
+    this.debounce = active instanceof PendingCompletion
+      ? setTimeout(() => this.startUpdate(active), DebounceTime) : -1
   }
 
-  startUpdate(explicit: boolean) {
+  startUpdate(pending: PendingCompletion) {
     this.debounce = -1
     let {view, stateVersion} = this
-    retrieveCompletions(view, explicit).then(result => {
+    retrieveCompletions(view.state, pending).then(result => {
       if (this.stateVersion != stateVersion || result.options.length == 0) return
       view.dispatch(view.state.update({effects: openCompletion.of(result)}))
     }).catch(e => logException(view.state, e))
