@@ -154,8 +154,11 @@ const gutterView = ViewPlugin.fromClass(class {
     let contexts = this.gutters.map(gutter => new UpdateContext(gutter, this.view.viewport))
     this.view.viewportLines(line => {
       let text: BlockInfo | undefined
-      if (Array.isArray(line.type)) text = line.type.find(b => b.type == BlockType.Text)
-      else text = line.type == BlockType.Text ? line : undefined
+      if (Array.isArray(line.type)) {
+        for (let b of line.type) if (b.type == BlockType.Text) { text = b; break }
+      } else {
+        text = line.type == BlockType.Text ? line : undefined
+      }
       if (!text) return
 
       for (let cx of contexts) cx.line(this.view, text)

@@ -30,7 +30,8 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
     } else {
       let views = []
       for (let i = 0; i < tooltips.length; i++) {
-        let tip = tooltips[i], known = this.tooltips.findIndex(t => t.create == tip.create)
+        let tip = tooltips[i], known = -1
+        for (let i = 0; i < this.tooltips.length; i++) if (this.tooltips[i].create == tip.create) known = i
         if (known < 0) {
           views[i] = this.createTooltip(tip)
         } else {
