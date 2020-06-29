@@ -9,7 +9,7 @@ const line = "1234567890".repeat(10)
 const lines = new Array(200).fill(line), text0 = lines.join("\n")
 const doc0 = Text.of(lines)
 
-describe("doc", () => {
+describe("Text", () => {
   it("handles basic replacement", () => {
     let doc = Text.of(["one", "two", "three"])
     ist(doc.replace(2, 5, Text.of(["foo", "bar"])).toString(), "onfoo\nbarwo\nthree")
@@ -202,5 +202,14 @@ describe("doc", () => {
 
   it("can delete a range at the start of a child node", () => {
     ist(doc0.replace(0, 100, Text.of(["x"])).toString(), "x" + text0.slice(100))
+  })
+
+  it("can retrieve pieces of text", () => {
+    for (let i = 0; i < 500; i++) {
+      let from = Math.floor(Math.random() * (doc0.length - 1))
+      let to = Math.random() < .5 ? from + 2 : from + Math.floor(Math.random() * (doc0.length - 1 - from)) + 1
+      ist(doc0.sliceString(from, to), text0.slice(from, to))
+      ist(doc0.slice(from, to).toString(), text0.slice(from, to))
+    }
   })
 })

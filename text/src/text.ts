@@ -188,7 +188,16 @@ class TextLeaf extends Text {
   }
 
   sliceString(from: number, to = this.length, lineSep = "\n") {
-    return sliceText(this.text, from, to).join(lineSep)
+    let result = ""
+    for (let pos = 0, i = 0; pos <= to && i < this.text.length; i++) {
+      let line = this.text[i], end = pos + line.length
+      if (pos > from && i)
+        result += lineSep
+      if (from < end && to > pos)
+        result += line.slice(Math.max(0, from - pos), to - pos)
+      pos = end + 1
+    }
+    return result
   }
 
   flatten(target: string[]) {
@@ -313,7 +322,11 @@ class TextNode extends Text {
     let result = ""
     for (let i = 0, pos = 0; pos < to && i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
-      if (from < end && to > pos) result += child.sliceString(from - pos, to - pos, lineSep)
+      if (from < end && to > pos) {
+        let part = child.sliceString(from - pos, to - pos, lineSep)
+        if (from >= pos && to <= end) return part
+        result += part
+      }
       pos = end
     }
     return result
