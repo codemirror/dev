@@ -2,7 +2,6 @@ import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
 import {EditorSelection} from "./selection"
 import {Extension} from "./facet"
-import {changeFilter, transactionFilter} from "./extension"
 
 /// Annotations are tagged values that are used to add metadata to
 /// transactions in an extensible way. They should be used to model
@@ -180,7 +179,6 @@ export class Transaction {
     /// [reconfigures](#state.ReconfigurationSpec) the state.
     readonly reconfigured: ReconfigurationSpec | undefined,
     private flags: number
-
   ) {
     if (!this.annotations.some((a: Annotation<any>) => a.type == Transaction.time))
       this.annotations = this.annotations.concat(Transaction.time.of(Date.now()))
@@ -220,6 +218,9 @@ export class Transaction {
 }
 
 export class ResolvedTransactionSpec implements StrictTransactionSpec {
+  // @internal
+  finished: Transaction | null = null
+
   constructor(readonly changes: ChangeSet,
               readonly selection: EditorSelection | undefined,
               readonly effects: readonly StateEffect<any>[],
@@ -268,56 +269,6 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
       a.filter && b.filter,
       !b.reconfigure ? a.reconfigure : b.reconfigure.full || !a.reconfigure ? b.reconfigure
         : Object.assign({}, a.reconfigure, b.reconfigure))
-  }
-
-  filterChanges(state: EditorState) {
-    if (!this.filter) return this
-    let result: boolean | readonly number[] = true
-    for (let filter of state.facet(changeFilter)) {
-      let value = filter(this, state)
-      if (value === false) { result = false; break }
-      if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
-    }
-    if (result === true) return this
-    let changes, back
-    if (result === false) {
-      back = this.changes.invertedDesc
-      changes = ChangeSet.empty(state.doc.length)
-    } else {
-      let filtered = this.changes.filter(result)
-      changes = filtered.changes
-      back = filtered.filtered.invertedDesc
-    }
-
-    return new ResolvedTransactionSpec(
-      changes,
-      this.selection && this.selection.map(back),
-      StateEffect.mapEffects(this.effects, back),
-      this.annotations,
-      this.scrollIntoView,
-      this.filter,
-      this.reconfigure)
-  }
-
-  filterTransaction(state: EditorState) {
-    if (!this.filter) return this
-    let result: ResolvedTransactionSpec = this
-    let filters = state.facet(transactionFilter)
-    for (let i = filters.length - 1; i >= 0; i--)
-      result = ResolvedTransactionSpec.create(state, filters[i](result, state))
-    return result
-  }
-}
-
-function joinRanges(a: readonly number[], b: readonly number[]) {
-  let result = []
-  for (let iA = 0, iB = 0;;) {
-    let from, to
-    if (iA < a.length && (iB == b.length || b[iB] >= a[iA])) { from = a[iA++]; to = a[iA++] }
-    else if (iB < b.length) { from = b[iB++]; to = b[iB++] }
-    else return result
-    if (!result.length || result[result.length - 1] < from) result.push(from, to)
-    else if (result[result.length - 1] < to) result[result.length - 1] = to
   }
 }
 

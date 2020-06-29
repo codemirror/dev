@@ -2,8 +2,8 @@ import {Text} from "@codemirror/next/text"
 import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
-import {Transaction, TransactionFlag,
-        TransactionSpec, StrictTransactionSpec, ResolvedTransactionSpec} from "./transaction"
+import {Transaction, TransactionSpec, StrictTransactionSpec, ResolvedTransactionSpec,
+        TransactionFlag, StateEffect} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
         changeFilter, transactionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
@@ -98,15 +98,8 @@ export class EditorState {
   /// [reconfiguration](#state.TransactionSpec.reconfigure), later
   /// specs take precedence over earlier ones.
   update(...specs: readonly TransactionSpec[]): Transaction {
-    let spec = ResolvedTransactionSpec.create(this, specs).filterChanges(this).filterTransaction(this)
-    if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
-    let conf = this.config
-    if (spec.reconfigure)
-      conf = Configuration.resolve(spec.reconfigure.full || conf.source, spec.reconfigure, this)
-    let flags = spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0
-    let tr = new Transaction(this, spec.changes, spec.selection, spec.effects, spec.annotations, spec.reconfigure, flags)
-    new EditorState(conf, spec.changes.apply(this.doc), spec.selection || this.selection.map(spec.changes), tr)
-    return tr
+    let spec = ResolvedTransactionSpec.create(this, specs)
+    return finishTransaction(this, filterTransaction(this, filterChanges(this, spec)))
   }
 
   /// Create a [transaction spec](#state.StrictTransactionSpec) that
@@ -358,8 +351,76 @@ export class EditorState {
   /// array of specs (which will be combined in the same way as the
   /// arguments to [`EditorState.update`](#state.EditorState.update)).
   ///
+  /// The function passed to the filter as third argument can be used
+  /// to force computation of the full
+  /// [transaction](#state.Transaction) for the current spec (which is
+  /// only done on demand for efficiency reasons).
+  ///
   /// (This functionality should be used with care. Indiscriminately
   /// modifying transaction is likely to break something or degrade
   /// the user experience.)
   static transactionFilter = transactionFilter
+}
+
+function finishTransaction(state: EditorState, spec: ResolvedTransactionSpec) {
+  if (spec.finished) return spec.finished
+  if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
+  let conf = state.config
+  if (spec.reconfigure)
+    conf = Configuration.resolve(spec.reconfigure.full || conf.source, spec.reconfigure, state)
+  let flags = spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0
+  let tr = new Transaction(state, spec.changes, spec.selection, spec.effects, spec.annotations, spec.reconfigure, flags)
+  new EditorState(conf, spec.changes.apply(state.doc),
+                  spec.selection || (spec.changes ? state.selection.map(spec.changes) : state.selection),
+                  tr)
+  return spec.finished = tr
+}
+
+function filterTransaction(state: EditorState, spec: ResolvedTransactionSpec) {
+  if (!spec.filter) return spec
+  let filters = state.facet(transactionFilter)
+  for (let i = filters.length - 1; i >= 0; i--)
+    spec = ResolvedTransactionSpec.create(state, filters[i](spec, state, () => finishTransaction(state, spec)))
+  return spec
+}
+
+function joinRanges(a: readonly number[], b: readonly number[]) {
+  let result = []
+  for (let iA = 0, iB = 0;;) {
+    let from, to
+    if (iA < a.length && (iB == b.length || b[iB] >= a[iA])) { from = a[iA++]; to = a[iA++] }
+    else if (iB < b.length) { from = b[iB++]; to = b[iB++] }
+    else return result
+    if (!result.length || result[result.length - 1] < from) result.push(from, to)
+    else if (result[result.length - 1] < to) result[result.length - 1] = to
+  }
+}
+
+function filterChanges(state: EditorState, spec: ResolvedTransactionSpec) {
+  if (!spec.filter) return spec
+  let result: boolean | readonly number[] = true
+  for (let filter of state.facet(changeFilter)) {
+    let value = filter(spec, state)
+    if (value === false) { result = false; break }
+    if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
+  }
+  if (result === true) return spec
+  let changes, back
+  if (result === false) {
+    back = spec.changes.invertedDesc
+    changes = ChangeSet.empty(state.doc.length)
+  } else {
+    let filtered = spec.changes.filter(result)
+    changes = filtered.changes
+    back = filtered.filtered.invertedDesc
+  }
+
+  return new ResolvedTransactionSpec(
+    changes,
+    spec.selection && spec.selection.map(back),
+    StateEffect.mapEffects(spec.effects, back),
+    spec.annotations,
+    spec.scrollIntoView,
+    spec.filter,
+    spec.reconfigure)
 }

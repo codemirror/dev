@@ -17,7 +17,7 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
 export const changeFilter = Facet.define<(tr: StrictTransactionSpec, state: EditorState) => boolean | readonly number[]>()
 
 export const transactionFilter = Facet.define<
-  (tr: StrictTransactionSpec, state: EditorState) => TransactionSpec | readonly TransactionSpec[]
+  (tr: StrictTransactionSpec, oldState: EditorState, finish: () => Transaction) => TransactionSpec | readonly TransactionSpec[]
 >()
 
 /// A node prop stored on a grammar's top node to indicate the facet
