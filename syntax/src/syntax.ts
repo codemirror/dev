@@ -249,9 +249,9 @@ class HighlightWorker {
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (done || field.parse!.badness > .8) {
       let tree = field.stopParse(done, state.doc.length)
-      this.view.dispatch(state.update({
+      this.view.dispatch({
         effects: this.setSyntax.of(new SyntaxState(tree, state.doc.length, field.cache))
-      }))
+      })
     } else {
       this.scheduleWork()
     }

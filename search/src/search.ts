@@ -100,7 +100,7 @@ export const findNext = searchCommand((view, state) => {
   let {from, to} = view.state.selection.primary
   let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, state.query)
   if (!next || next.from == from && next.to == to) return false
-  view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
+  view.dispatch({selection: {anchor: next.from, head: next.to}, scrollIntoView: true})
   maybeAnnounceMatch(view)
   return true
 })
@@ -128,7 +128,7 @@ export const findPrevious = searchCommand((view, {query}) => {
   let range = findPrevInRange(query, state.doc, 0, state.selection.primary.to - 1) ||
     findPrevInRange(query, state.doc, state.selection.primary.from + 1, state.doc.length)
   if (!range) return false
-  view.dispatch(state.update({selection: {anchor: range.from, head: range.to}, scrollIntoView: true}))
+  view.dispatch({selection: {anchor: range.from, head: range.to}, scrollIntoView: true})
   maybeAnnounceMatch(view)
   return true
 })
@@ -138,7 +138,7 @@ export const selectMatches = searchCommand((view, {query}) => {
   let cursor = query.cursor(view.state.doc), ranges: SelectionRange[] = []
   while (!cursor.next().done) ranges.push(EditorSelection.range(cursor.value.from, cursor.value.to))
   if (!ranges.length) return false
-  view.dispatch(view.state.update({selection: EditorSelection.create(ranges)}))
+  view.dispatch({selection: EditorSelection.create(ranges)})
   return true
 })
 
@@ -170,7 +170,7 @@ export const replaceNext = searchCommand((view, {query}) => {
     let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - query.replace.length
     selection = {anchor: next.from - off, head: next.to - off}
   }
-  view.dispatch(state.update({changes, selection, scrollIntoView: !!selection}))
+  view.dispatch({changes, selection, scrollIntoView: !!selection})
   if (next) maybeAnnounceMatch(view)
   return true
 })
@@ -184,7 +184,7 @@ export const replaceAll = searchCommand((view, {query}) => {
     changes.push({from, to, insert: query.replace})
   }
   if (!changes.length) return false
-  view.dispatch(view.state.update({changes}))
+  view.dispatch({changes})
   return true
 })
 
@@ -197,7 +197,7 @@ function createSearchPanel(view: EditorView) {
       updateQuery(q: Query) {
         if (!query.eq(q)) {
           query = q
-          view.dispatch(view.state.update({effects: setQuery.of(query)}))
+          view.dispatch({effects: setQuery.of(query)})
         }
       }
     }),
@@ -215,8 +215,8 @@ const tag = typeof Symbol == "function" ? Symbol("search") : "__search-tag"
 export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState, false)
   if (state && state.panel.length) return false
-  view.dispatch(view.state.update({effects: togglePanel.of(true),
-                                   replaceExtensions: state ? undefined : {[tag]: searchExtensions}}))
+  view.dispatch({effects: togglePanel.of(true),
+                 replaceExtensions: state ? undefined : {[tag]: searchExtensions}})
   return true
 }
 
@@ -238,7 +238,7 @@ export const closeSearchPanel: Command = view => {
   if (!state || !state.panel.length) return false
   let panel = getPanel(view, createSearchPanel)
   if (panel && panel.dom.contains(view.root.activeElement)) view.focus()
-  view.dispatch(view.state.update({effects: togglePanel.of(false)}))
+  view.dispatch({effects: togglePanel.of(false)})
   return true
 }
 

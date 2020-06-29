@@ -80,8 +80,8 @@ export const foldCode: Command = view => {
   for (let line of selectedLines(view)) {
     let range = getFoldable(view.state, line.from, line.to)
     if (range) {
-      view.dispatch(view.state.update({effects: foldEffect.of(range),
-                                       replaceExtensions: maybeEnable(view.state)}))
+      view.dispatch({effects: foldEffect.of(range),
+                     replaceExtensions: maybeEnable(view.state)})
       return true
     }
   }
@@ -96,7 +96,7 @@ export const unfoldCode: Command = view => {
     let folded = foldInside(view.state, line.from, line.to)
     if (folded) effects.push(unfoldEffect.of(folded))
   }
-  if (effects.length) view.dispatch(view.state.update({effects}))
+  if (effects.length) view.dispatch({effects})
   return effects.length > 0
 }
 
@@ -108,8 +108,8 @@ export const foldAll: Command = view => {
     if (range) effects.push(foldEffect.of(range))
     pos = (range ? view.visualLineAt(range.to) : line).to + 1
   }
-  if (effects.length) view.dispatch(view.state.update({effects,
-                                                       replaceExtensions: maybeEnable(view.state)}))
+  if (effects.length) view.dispatch({effects,
+                                     replaceExtensions: maybeEnable(view.state)})
   return !!effects.length
 }
 
@@ -119,7 +119,7 @@ export const unfoldAll: Command = view => {
   if (!field || !field.size) return false
   let effects: StateEffect<any>[] = []
   field.between(0, view.state.doc.length, (from, to) => { effects.push(unfoldEffect.of({from, to})) })
-  view.dispatch(view.state.update({effects}))
+  view.dispatch({effects})
   return true
 }
 
@@ -177,7 +177,7 @@ class FoldWidget extends WidgetType<null> {
     element.onclick = event => {
       let line = view.visualLineAt(view.posAtDOM(event.target as HTMLElement))
       let folded = foldInside(view.state, line.from, line.to)
-      if (folded) view.dispatch(view.state.update({effects: unfoldEffect.of(folded)}))
+      if (folded) view.dispatch({effects: unfoldEffect.of(folded)})
       event.preventDefault()
     }
     return element
@@ -238,12 +238,12 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
         click: (view, line) => {
           let folded = foldInside(view.state, line.from, line.to)
           if (folded) {
-            view.dispatch(view.state.update({effects: unfoldEffect.of(folded)}))
+            view.dispatch({effects: unfoldEffect.of(folded)})
             return true
           }
           let range = getFoldable(view.state, line.from, line.to)
           if (range) {
-            view.dispatch(view.state.update({effects: foldEffect.of(range)}))
+            view.dispatch({effects: foldEffect.of(range)})
             return true
           }
           return false

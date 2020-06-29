@@ -159,8 +159,8 @@ function lintTooltip(view: EditorView, check: (from: number, to: number) => bool
 export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field || !field.panel)
-    view.dispatch(view.state.update({effects: togglePanel.of(true),
-                                     replaceExtensions: maybeEnableLint(view.state)}))
+    view.dispatch({effects: togglePanel.of(true),
+                   replaceExtensions: maybeEnableLint(view.state)})
   let panel = getPanel(view, LintPanel.open)
   if (panel) (panel.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true
@@ -170,7 +170,7 @@ export const openLintPanel: Command = (view: EditorView) => {
 export const closeLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field || !field.panel) return false
-  view.dispatch(view.state.update({effects: togglePanel.of(false)}))
+  view.dispatch({effects: togglePanel.of(false)})
   return true
 }
 
@@ -183,7 +183,7 @@ export const nextDiagnostic: Command = (view: EditorView) => {
     next = field.diagnostics.iter(0)
     if (!next.value || next.from == sel.from && next.to == sel.to) return false
   }
-  view.dispatch(view.state.update({selection: {anchor: next.from, head: next.to}, scrollIntoView: true}))
+  view.dispatch({selection: {anchor: next.from, head: next.to}, scrollIntoView: true})
   return true
 }
 
@@ -222,7 +222,7 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
           annotations => {
             if (this.view.state.doc == state.doc &&
                 (annotations.length || this.view.state.field(lintState, false)?.diagnostics?.size))
-              this.view.dispatch(this.view.state.update(setDiagnostics(this.view.state, annotations)))
+              this.view.dispatch(setDiagnostics(this.view.state, annotations))
           },
           error => { logException(this.view.state, error) }
         )
@@ -414,11 +414,11 @@ class LintPanel implements Panel {
     let field = this.view.state.field(lintState)
     let selection = findDiagnostic(field.diagnostics, this.items[selectedIndex].diagnostic)
     if (!selection) return
-    this.view.dispatch(this.view.state.update({
+    this.view.dispatch({
       selection: {anchor: selection.from, head: selection.to},
       scrollIntoView: true,
       effects: movePanelSelection.of(selection)
-    }))
+    })
   }
 
   get style() { return "lint" }

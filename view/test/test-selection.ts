@@ -37,7 +37,7 @@ describe("EditorView selection", () => {
   it("syncs the DOM selection with the editor selection", () => {
     let cm = requireFocus(tempEditor("abc\n\ndef"))
     function test(pos: number, node: Node, offset: number) {
-      cm.dispatch(cm.state.update({selection: {anchor: pos}}))
+      cm.dispatch({selection: {anchor: pos}})
       let sel = window.getSelection()!
       ist(isEquivalentPosition(node, offset, sel.focusNode, sel.focusOffset))
     }

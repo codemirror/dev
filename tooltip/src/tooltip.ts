@@ -186,7 +186,7 @@ class HoverPlugin {
     let open = pos < 0 ? null : this.source(this.view, (from, to) => {
       return from <= pos && to >= pos && (from == to || isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY))
     })
-    if (open) this.view.dispatch(this.view.state.update({effects: this.setHover.of(open)}))
+    if (open) this.view.dispatch({effects: this.setHover.of(open)})
   }
 
   mousemove(event: MouseEvent) {
@@ -197,7 +197,7 @@ class HoverPlugin {
       let {pos} = tooltip, end = tooltip.end ?? pos
       if ((pos == end ? this.view.posAtCoords({x: event.clientX, y: event.clientY}) != pos
            : !isOverRange(this.view, pos, end, event.clientX, event.clientY, HoverMaxDist)))
-        this.view.dispatch(this.view.state.update({effects: this.setHover.of(null)}))
+        this.view.dispatch({effects: this.setHover.of(null)})
     }
   }
 
@@ -208,7 +208,7 @@ class HoverPlugin {
   mouseleave() {
     this.mouseInside = false
     if (this.active)
-      this.view.dispatch(this.view.state.update({effects: this.setHover.of(null)}))
+      this.view.dispatch({effects: this.setHover.of(null)})
   }
 
   destroy() {

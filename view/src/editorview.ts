@@ -1,4 +1,5 @@
-import {EditorState, Transaction, Extension, precedence, ChangeDesc, EditorSelection, SelectionRange} from "@codemirror/next/state"
+import {EditorState, Transaction, TransactionSpec, Extension, precedence, ChangeDesc,
+        EditorSelection, SelectionRange} from "@codemirror/next/state"
 import {Line} from "@codemirror/next/text"
 import {StyleModule, Style} from "style-mod"
 
@@ -81,12 +82,7 @@ export class EditorView {
   /// actually drawn.
   get visibleRanges(): readonly {from: number, to: number}[] { return this.viewState.visibleRanges }
   
-  /// All regular editor state updates should go through this. It
-  /// takes a transaction, applies it, and updates the view to show
-  /// the new state. Its implementation can be overridden with an
-  /// [option](#view.EditorView.constructor^config.dispatch). Does not
-  /// have to be called as a method.
-  readonly dispatch: (tr: Transaction) => void
+  private _dispatch: (tr: Transaction) => void
 
   /// The document or shadow root that the view lives in.
   readonly root: DocumentOrShadowRoot
@@ -145,7 +141,8 @@ export class EditorView {
     this.dom = document.createElement("div")
     this.dom.appendChild(this.scrollDOM)
 
-    this.dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
+    this._dispatch = config.dispatch || ((tr: Transaction) => this.update([tr]))
+    this.dispatch = this.dispatch.bind(this)
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.viewState = new ViewState(config.state || EditorState.create())
@@ -163,6 +160,19 @@ export class EditorView {
     this.requestMeasure()
 
     if (config.parent) config.parent.appendChild(this.dom)
+  }
+
+  /// All regular editor state updates should go through this. It
+  /// takes a transaction or transaction spec and updates the view to
+  /// show the new state produced by that transaction. Its
+  /// implementation can be overridden with an
+  /// [option](#view.EditorView.constructor^config.dispatch). Does not
+  /// have to be called as a method.
+  dispatch(tr: Transaction): void
+  dispatch(...specs: TransactionSpec[]): void
+  dispatch(...input: (Transaction | TransactionSpec)[]) {
+    this._dispatch(input.length == 1 && input[0] instanceof Transaction ? input[0]
+                   : this.state.update(...input as TransactionSpec[]))
   }
 
   /// Update the view for the given array of transactions. This will

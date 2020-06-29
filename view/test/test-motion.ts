@@ -105,7 +105,7 @@ describe("EditorView.moveVertically", () => {
     let last = cm.moveVertically(cur(10), true).head
     ist(last, 19, "<")
     ist(last, 14, ">")
-    cm.dispatch(cm.state.update({selection: {anchor: 1}})) // Clear goal columns
+    cm.dispatch({selection: {anchor: 1}}) // Clear goal columns
     ist(cm.moveVertically(cur(last), false).head, 10)
     ist(cm.moveVertically(cur(12), false).head, 4)
     ist(cm.moveVertically(cur(13), false).head, 5)

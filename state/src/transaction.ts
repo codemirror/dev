@@ -166,6 +166,8 @@ export class Transaction {
     readonly effects: readonly StateEffect<any>[],
     private annotations: readonly Annotation<any>[],
     private flags: number
+    // FIXME store actual reconfiguration data, so that a similar
+    // transaction for another state can be derived from this value
   ) {
     if (!this.annotations.some((a: Annotation<any>) => a.type == Transaction.time))
       this.annotations = this.annotations.concat(Transaction.time.of(Date.now()))

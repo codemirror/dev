@@ -267,7 +267,7 @@ class HighlightWorker implements PluginValue {
     let end = this.view.viewport.to
     field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice, end)
     if (field.frontierPos < end) this.scheduleWork()
-    else this.view.dispatch(state.update({effects: this.setSyntax.of(field.copy())}))
+    else this.view.dispatch({effects: this.setSyntax.of(field.copy())})
   }
 
   destroy() {

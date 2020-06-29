@@ -41,7 +41,7 @@ describe("DOM changes", () => {
 
   it("properly handles selection for ambiguous backspace", () => {
     let cm = tempEditor("foo")
-    cm.dispatch(cm.state.update({selection: {anchor: 2}}))
+    cm.dispatch({selection: {anchor: 2}})
     cm.domAtPos(1).node.nodeValue = "fo"
     cm.inputState.lastKeyCode = 8
     cm.inputState.lastKeyTime = Date.now()
@@ -58,7 +58,7 @@ describe("DOM changes", () => {
 
   it("handles replacing a selection with a prefix of itself", () => {
     let cm = tempEditor("foo\nbar")
-    cm.dispatch(cm.state.update({selection: {anchor: 0, head: 7}}))
+    cm.dispatch({selection: {anchor: 0, head: 7}})
     cm.contentDOM.textContent = "f"
     flush(cm)
     ist(cm.state.doc.toString(), "f")
@@ -66,7 +66,7 @@ describe("DOM changes", () => {
 
   it("handles replacing a selection with a suffix of itself", () => {
     let cm = tempEditor("foo\nbar")
-    cm.dispatch(cm.state.update({selection: {anchor: 0, head: 7}}))
+    cm.dispatch({selection: {anchor: 0, head: 7}})
     cm.contentDOM.textContent = "r"
     flush(cm)
     ist(cm.state.doc.toString(), "r")
@@ -74,7 +74,7 @@ describe("DOM changes", () => {
 
   it("handles replacing a selection with a prefix of itself and something else", () => {
     let cm = tempEditor("foo\nbar")
-    cm.dispatch(cm.state.update({selection: {anchor: 0, head: 7}}))
+    cm.dispatch({selection: {anchor: 0, head: 7}})
     cm.contentDOM.textContent = "fa"
     flush(cm)
     ist(cm.state.doc.toString(), "fa")
@@ -82,7 +82,7 @@ describe("DOM changes", () => {
 
   it("handles replacing a selection with a suffix of itself and something else", () => {
     let cm = tempEditor("foo\nbar")
-    cm.dispatch(cm.state.update({selection: {anchor: 0, head: 7}}))
+    cm.dispatch({selection: {anchor: 0, head: 7}})
     cm.contentDOM.textContent = "br"
     flush(cm)
     ist(cm.state.doc.toString(), "br")
@@ -90,7 +90,7 @@ describe("DOM changes", () => {
 
   it("handles replacing a selection with new content that shares a prefix and a suffix", () => {
     let cm = tempEditor("foo\nbar")
-    cm.dispatch(cm.state.update({selection: {anchor: 1, head: 6}}))
+    cm.dispatch({selection: {anchor: 1, head: 6}})
     cm.contentDOM.textContent = "fo--ar"
     flush(cm)
     ist(cm.state.doc.toString(), "fo--ar")
@@ -98,7 +98,7 @@ describe("DOM changes", () => {
 
   it("handles appending", () => {
     let cm = tempEditor("foo\nbar")
-    cm.dispatch(cm.state.update({selection: {anchor: 7}}))
+    cm.dispatch({selection: {anchor: 7}})
     cm.contentDOM.appendChild(document.createElement("div"))
     flush(cm)
     ist(cm.state.doc.toString(), "foo\nbar\n")

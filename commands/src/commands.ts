@@ -301,7 +301,7 @@ function deleteBy(view: EditorView, by: (start: number) => number) {
     return from == to ? {range} : {changes: {from, to}, range: EditorSelection.cursor(from)}
   })
   if (changes.changes.empty) return false
-  view.dispatch(view.state.update(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("delete")}))
+  view.dispatch(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("delete")})
   return true
 }
 
@@ -460,7 +460,7 @@ export const deleteLine: Command = view => {
     return {from, to}
   }))
   let selection = updateSel(state.selection, range => view.moveVertically(range, true)).map(changes)
-  view.dispatch(state.update({changes, selection, scrollIntoView: true}))
+  view.dispatch({changes, selection, scrollIntoView: true})
   return true
 }
 
