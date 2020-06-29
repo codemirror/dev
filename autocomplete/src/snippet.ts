@@ -116,8 +116,6 @@ const snippetState = StateField.define<ActiveSnippet | null>({
   provide: [EditorView.decorations.from(val => val ? val.deco : Decoration.none)]
 })
 
-const tag = typeof Symbol == "undefined" ? "__snippet" : Symbol("snippet")
-
 function fieldSelection(ranges: readonly FieldRange[], field: number) {
   return EditorSelection.create(ranges.filter(r => r.field == field).map(r => EditorSelection.range(r.from, r.to)))
 }
@@ -154,7 +152,7 @@ export function snippet(template: string) {
     if (ranges.length > 1) {
       spec.effects = setActive.of(new ActiveSnippet(ranges, 0))
       if (editor.state.field(snippetState, false) === undefined)
-        spec.replaceExtensions = {[tag]: [snippetState, snippetKeymap, baseTheme]}
+        spec.reconfigure = {append: [snippetState, snippetKeymap, baseTheme]}
     }
     editor.dispatch(editor.state.update(spec))
   }

@@ -1,7 +1,7 @@
 import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
 import {EditorSelection} from "./selection"
-import {Extension, ExtensionMap} from "./facet"
+import {Extension} from "./facet"
 import {changeFilter, transactionFilter} from "./extension"
 
 /// Annotations are tagged values that are used to add metadata to
@@ -113,18 +113,30 @@ export type TransactionSpec = {
   /// filters](#state.EditorState^transactionFilter). You can set this
   /// to `false` to disable that.
   filter?: boolean,
-  /// When given, the state will be reconfigured to use a new set of
-  /// extensions instead of its old configuration.
-  reconfigure?: Extension,
-  /// [Tagged extensions](#state.tagExtension) can be used to
-  /// partially configure a state by replacing specific parts of its
-  /// configuration. When replacing a tag that doesn't exist in the
-  /// original configuration, the given extension will be added to the
-  /// end of the configuration.
+  /// Specifies that the state should be reconfigured.
+  reconfigure?: ReconfigurationSpec
+}
+
+/// Type used in [transaction specs](#state.TransactionSpec) to
+/// indicate how the state should be reconfigured.
+export type ReconfigurationSpec = {
+  /// If given, this will replace the state's entire
+  /// [configuration](#state.EditorStateConfig.extensions) with a
+  /// new configuration derived from the given extension. Previously
+  /// replaced extensions are reset.
+  full?: Extension,
+  /// When given, this extension is appended to the current
+  /// configuration.
+  append?: Extension,
+  /// Any other properties _replace_ extensions with the
+  /// [tag](#state.tagExtension) corresponding to their property
+  /// name. (Note that, though TypeScript can't express this yet,
+  /// properties may also be symbols.)
   ///
-  /// Note that the keys in this object may also be symbols, even
-  /// though the TypeScript type can't currently express that.
-  replaceExtensions?: ExtensionMap
+  /// This causes the current configuration to be updated by
+  /// dropping the extensions previous associated with the tag (if
+  /// any) and replacing them with the given extension.
+  [tag: string]: Extension | undefined
 }
 
 /// A [transactions spec](#state.TransactionSpec) with most of its
@@ -138,8 +150,7 @@ export type StrictTransactionSpec = {
   annotations: readonly Annotation<any>[],
   scrollIntoView: boolean,
   filter: boolean,
-  reconfigure: Extension | undefined,
-  replaceExtensions: ExtensionMap | undefined
+  reconfigure: ReconfigurationSpec | undefined
 }
 
 export const enum TransactionFlag { reconfigured = 1, scrollIntoView = 2 }
@@ -216,8 +227,7 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
               readonly annotations: readonly Annotation<any>[],
               readonly scrollIntoView: boolean,
               readonly filter: boolean,
-              readonly reconfigure: Extension | undefined,
-              readonly replaceExtensions: ExtensionMap | undefined) {}
+              readonly reconfigure: ReconfigurationSpec | undefined) {}
 
   static create(state: EditorState, specs: TransactionSpec | readonly TransactionSpec[]): ResolvedTransactionSpec {
     let spec: TransactionSpec
@@ -229,6 +239,13 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
     } else {
       spec = specs as TransactionSpec
     }
+    let reconf = spec.reconfigure
+    if (reconf && reconf.append) {
+      reconf = Object.assign({}, reconf)
+      let tag = typeof Symbol == "undefined" ? "__append" + Math.floor(Math.random() * 0xffffffff) : Symbol("appendConf")
+      reconf[tag as string] = reconf.append
+      reconf.append = undefined
+    }
     let sel = spec.selection
     return new ResolvedTransactionSpec(
       spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
@@ -237,8 +254,7 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
       !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
       !!spec.scrollIntoView,
       spec.filter !== false,
-      spec.reconfigure,
-      spec.replaceExtensions)
+      reconf)
   }
 
   combine(b: ResolvedTransactionSpec) {
@@ -251,8 +267,8 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
       a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
       a.scrollIntoView || b.scrollIntoView,
       a.filter && b.filter,
-      b.reconfigure || a.reconfigure,
-      b.replaceExtensions || (b.reconfigure ? undefined : a.replaceExtensions))
+      !b.reconfigure ? a.reconfigure : b.reconfigure.full || !a.reconfigure ? b.reconfigure
+        : Object.assign({}, a.reconfigure, b.reconfigure))
   }
 
   filterChanges(state: EditorState) {
@@ -281,8 +297,7 @@ export class ResolvedTransactionSpec implements StrictTransactionSpec {
       this.annotations,
       this.scrollIntoView,
       this.filter,
-      this.reconfigure,
-      this.replaceExtensions)
+      this.reconfigure)
   }
 
   filterTransaction(state: EditorState) {

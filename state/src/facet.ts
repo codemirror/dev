@@ -321,7 +321,7 @@ export function tagExtension(tag: string | symbol, extension: Extension) {
   return new TaggedExtension(tag, extension)
 }
 
-export type ExtensionMap = {[tag: string]: Extension}
+export type ExtensionMap = {[tag: string]: Extension | undefined}
 
 type DynamicSlot = (state: EditorState, tr: Transaction | null) => number
 
@@ -415,9 +415,9 @@ function flatten(extension: Extension, replacements: ExtensionMap) {
     }
   }
   inner(extension, Prec.default)
-  for (let key of allKeys(replacements)) if (!(key in tagsSeen)) {
+  for (let key of allKeys(replacements)) if (!(key in tagsSeen) && key != "full" && replacements[key as any]) {
     tagsSeen[key] = true
-    inner(replacements[key as any], Prec.default)
+    inner(replacements[key as any]!, Prec.default)
   }
   return result.reduce((a, b) => a.concat(b))
 }

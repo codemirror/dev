@@ -55,10 +55,8 @@ function findDiagnostic(diagnostics: DecorationSet, diagnostic: Diagnostic | nul
   return found
 }
 
-const tag = typeof Symbol == "undefined" ? "__lint-tag" : Symbol("lint")
-
-function maybeEnableLint(state: EditorState): {[tag: string]: Extension} | undefined {
-  return state.field(lintState, false) ? undefined : {[tag]: [
+function maybeEnableLint(state: EditorState) {
+  return state.field(lintState, false) ? undefined : {append: [
     lintState,
     EditorView.decorations.compute([lintState], state => {
       let {selected, panel} = state.field(lintState)
@@ -77,7 +75,7 @@ function maybeEnableLint(state: EditorState): {[tag: string]: Extension} | undef
 export function setDiagnostics(state: EditorState, diagnostics: readonly Diagnostic[]): TransactionSpec {
   return {
     effects: setDiagnosticsEffect.of(diagnostics),
-    replaceExtensions: maybeEnableLint(state)
+    reconfigure: maybeEnableLint(state)
   }
 }
 
@@ -160,7 +158,7 @@ export const openLintPanel: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field || !field.panel)
     view.dispatch({effects: togglePanel.of(true),
-                   replaceExtensions: maybeEnableLint(view.state)})
+                   reconfigure: maybeEnableLint(view.state)})
   let panel = getPanel(view, LintPanel.open)
   if (panel) (panel.dom.querySelector(".cm-panel-lint ul") as HTMLElement).focus()
   return true

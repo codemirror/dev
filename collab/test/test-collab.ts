@@ -221,7 +221,7 @@ describe("collab", () => {
   it("client ids survive reconfiguration", () => {
     let ext = collab()
     let state = EditorState.create({extensions: [ext]})
-    let state2 = state.update({reconfigure: [ext]}).state
+    let state2 = state.update({reconfigure: {full: ext}}).state
     ist(getClientID(state), getClientID(state2))
   })
 

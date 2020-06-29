@@ -209,14 +209,12 @@ function createSearchPanel(view: EditorView) {
   }
 }
 
-const tag = typeof Symbol == "function" ? Symbol("search") : "__search-tag"
-
 /// Make sure the search panel is open and focused.
 export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState, false)
   if (state && state.panel.length) return false
   view.dispatch({effects: togglePanel.of(true),
-                 replaceExtensions: state ? undefined : {[tag]: searchExtensions}})
+                 reconfigure: state ? undefined : {append: searchExtensions}})
   return true
 }
 

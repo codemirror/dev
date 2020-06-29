@@ -42,7 +42,7 @@ describe("EditorState", () => {
     let deflt = EditorState.create({}), two = EditorState.create({extensions: [EditorState.tabSize.of(2)]})
     ist(deflt.tabSize, 4)
     ist(two.tabSize, 2)
-    let updated = deflt.update({reconfigure: [EditorState.tabSize.of(8)]}).state
+    let updated = deflt.update({reconfigure: {full: EditorState.tabSize.of(8)}}).state
     ist(updated.tabSize, 8)
   })
 
@@ -52,7 +52,7 @@ describe("EditorState", () => {
     ist(deflt.toText("a\nb").lines, 2)
     ist(crlf.facet(EditorState.lineSeparator), "\r\n")
     ist(crlf.toText("a\nb").lines, 1)
-    let updated = crlf.update({reconfigure: [EditorState.lineSeparator.of("\n")]}).state
+    let updated = crlf.update({reconfigure: {full: EditorState.lineSeparator.of("\n")}}).state
     ist(updated.facet(EditorState.lineSeparator), "\n")
   })
 
@@ -71,17 +71,17 @@ describe("EditorState", () => {
     let field = StateField.define({create: () => 0, update: val => val + 1})
     let start = EditorState.create({extensions: [field]}).update({}).state
     ist(start.field(field), 1)
-    ist(start.update({reconfigure: [field]}).state.field(field), 2)
-    ist(start.update({reconfigure: []}).state.field(field, false), undefined)
+    ist(start.update({reconfigure: {full: field}}).state.field(field), 2)
+    ist(start.update({reconfigure: {full: []}}).state.field(field, false), undefined)
   })
 
   it("can replace extension groups", () => {
     let g = Symbol("A"), f = Facet.define<number>()
     let state = EditorState.create({extensions: [tagExtension(g, f.of(10)), f.of(20)]})
     ist(state.facet(f).join(), "10,20")
-    let state2 = state.update({replaceExtensions: {[g]: [f.of(1), f.of(2)]}}).state
+    let state2 = state.update({reconfigure: {[g]: [f.of(1), f.of(2)]}}).state
     ist(state2.facet(f).join(), "1,2,20")
-    let state3 = state2.update({replaceExtensions: {[g]: f.of(3)}}).state
+    let state3 = state2.update({reconfigure: {[g]: f.of(3)}}).state
     ist(state3.facet(f).join(), "3,20")
   })
 

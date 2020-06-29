@@ -11,7 +11,7 @@ function createLineDialog(view: EditorView): Panel {
   function go() {
     let n = parseInt(input.value, 10)
     view.dispatch({
-      replaceExtensions: {[tag]: [baseTheme]},
+      reconfigure: {append: [baseTheme]},
       selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).from) : undefined
     })
     view.focus()
@@ -19,7 +19,7 @@ function createLineDialog(view: EditorView): Panel {
   dom.addEventListener("keydown", event => {
     if (event.keyCode == 27) { // Escape
       event.preventDefault()
-      view.dispatch({replaceExtensions: {[tag]: [baseTheme]}})
+      view.dispatch({reconfigure: {append: [baseTheme]}})
       view.focus()
     } else if (event.keyCode == 13) { // Enter
       event.preventDefault()
@@ -31,8 +31,6 @@ function createLineDialog(view: EditorView): Panel {
   return {dom, style: "gotoLine", pos: -10}
 }
 
-const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
-
 /// Command that shows a dialog asking the user for a line number, and
 /// when a valid number is provided, moves the cursor to that line.
 ///
@@ -41,7 +39,7 @@ const tag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
 export const gotoLine: Command = view => {
   let panel = getPanel(view, createLineDialog)
   if (!panel) {
-    view.dispatch({replaceExtensions: {[tag]: [panels(), showPanel.of(createLineDialog), baseTheme]}})
+    view.dispatch({reconfigure: {append: [panels(), showPanel.of(createLineDialog), baseTheme]}})
     panel = getPanel(view, createLineDialog)
   }
   if (panel) panel.dom.querySelector("input")!.focus()

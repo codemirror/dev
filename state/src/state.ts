@@ -100,9 +100,10 @@ export class EditorState {
   update(...specs: readonly TransactionSpec[]): Transaction {
     let spec = ResolvedTransactionSpec.create(this, specs).filterChanges(this).filterTransaction(this)
     if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
-    let reconf = spec.reconfigure || spec.replaceExtensions, conf = !reconf ? this.config
-      : Configuration.resolve(spec.reconfigure || this.config.source, spec.replaceExtensions, this)
-    let flags = (reconf ? TransactionFlag.reconfigured : 0) | (spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0)
+    let conf = this.config
+    if (spec.reconfigure)
+      conf = Configuration.resolve(spec.reconfigure.full || conf.source, spec.reconfigure, this)
+    let flags = (spec.reconfigure ? TransactionFlag.reconfigured : 0) | (spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0)
     let tr = new Transaction(this, spec.changes, spec.selection, spec.effects, spec.annotations, flags)
     new EditorState(conf, spec.changes.apply(this.doc), spec.selection || this.selection.map(spec.changes), tr)
     return tr

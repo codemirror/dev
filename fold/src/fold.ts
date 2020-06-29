@@ -69,10 +69,8 @@ function getFoldable(state: EditorState, from: number, to: number) {
   return state.facet(EditorState.foldable).reduce<Range | null>((value, f) => value || f(state, from, to), null)
 }
 
-const tag = typeof Symbol == "undefined" ? "__codeFolding" : Symbol("codeFolding")
-
 function maybeEnable(state: EditorState) {
-  return state.field(foldState, false) ? undefined : {[tag]: codeFolding()}
+  return state.field(foldState, false) ? undefined : {append: codeFolding()}
 }
 
 /// Fold the lines that are selected, if possible.
@@ -81,7 +79,7 @@ export const foldCode: Command = view => {
     let range = getFoldable(view.state, line.from, line.to)
     if (range) {
       view.dispatch({effects: foldEffect.of(range),
-                     replaceExtensions: maybeEnable(view.state)})
+                     reconfigure: maybeEnable(view.state)})
       return true
     }
   }
@@ -108,8 +106,7 @@ export const foldAll: Command = view => {
     if (range) effects.push(foldEffect.of(range))
     pos = (range ? view.visualLineAt(range.to) : line).to + 1
   }
-  if (effects.length) view.dispatch({effects,
-                                     replaceExtensions: maybeEnable(view.state)})
+  if (effects.length) view.dispatch({effects, reconfigure: maybeEnable(view.state)})
   return !!effects.length
 }
 
