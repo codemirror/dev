@@ -1,3 +1,69 @@
+## 0.8.0 (2020-06-29)
+
+### Breaking changes
+
+`closeBrackets` is now a function, rather than an extension value.
+
+The keymap, special-chars, and multiple-selections packages have been merged into the view package.
+
+The way tooltips are declared changed somewhat to fix an issue with tooltips that stay active across document changes.
+
+Assigning precedences to extension is now done using a plain `precedence` function, rather than a class.
+
+The new state is no longer passed to state field `update` functions (it is part of the transaction anyway now).
+
+The `start` and `end` properties of `Line` have been renamed to `from` and `to` for consistency.
+
+`EditorView.lineAt` is now called `visualLineAt`. Its second argument now defaults to 0.
+
+`EditorView.lineAtHeight` is now called `visualLineAtHeight`.
+
+The `fillConfig` utility is no longer part of the library (the library depends on `Object.assign` now, which provides a standard way to do the same thing).
+
+Completion sources now get all their arguments as properties of the context object.
+
+Language-specific data is now stored in a facet attached to the syntax object, rather than directly in a node prop.
+
+Reconfiguring transactions are now specified in a slightly different way.
+
+### Bug fixes
+
+Fix an issue where the selection was unnecessarily moved to the start of the document when clicking on an unfocused editor.
+
+Work around an issue where sometimes the selection would end in the wrong place on Chrome (because the browser reports a different selection from the one it displays.
+
+Fix an issue where disabling the gutter extension would leave its DOM element in the editor.
+
+### New features
+
+The `EditorView.updateListener` facet can be used to have an external function listening for view updates.
+
+The goto-line package now exports a `gotoLineKeymap` extension.
+
+The new basic-setup package pulls together all the core extensions into a single configuration value.
+
+You can now move through completions with PageUp and PageDown
+
+The editor view now has a [`setState`](https://codemirror.net/6/docs/ref/#view.EditorView.setState) method to reset its state (again).
+
+The autocomplete package now exports functionality for completing to 'snippets' (longer pieces of text with fields that can be filled in one at a time).
+
+`LezerSyntax` instances can now directly specify inherent language data (such as comment syntax).
+
+Language packages now export their supporting extensions (if any) as a separate 'support' value.
+
+Autocompletion can now be configured to ask for case-sensitivity.
+
+Completion results can now specify a `filterDownOn` property to allow the list to be cheaply updated as the user continues typing.
+
+The autocomplete package now exports a `completeFromList` helper to easily construct a completer from a list of options.
+
+`EditorView.dispatch` can now be directly called with transaction specs (rather than always calling `view.state.update` to create its argument).
+
+It is now possible to append extensions from transactions.
+
+Transaction filters can now request the full transaction for the (current) transaction spec if they need it.
+
 ## 0.7.1 (2020-06-12)
 
 ### Bug fixes
