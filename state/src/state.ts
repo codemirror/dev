@@ -103,8 +103,8 @@ export class EditorState {
     let conf = this.config
     if (spec.reconfigure)
       conf = Configuration.resolve(spec.reconfigure.full || conf.source, spec.reconfigure, this)
-    let flags = (spec.reconfigure ? TransactionFlag.reconfigured : 0) | (spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0)
-    let tr = new Transaction(this, spec.changes, spec.selection, spec.effects, spec.annotations, flags)
+    let flags = spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0
+    let tr = new Transaction(this, spec.changes, spec.selection, spec.effects, spec.annotations, spec.reconfigure, flags)
     new EditorState(conf, spec.changes.apply(this.doc), spec.selection || this.selection.map(spec.changes), tr)
     return tr
   }

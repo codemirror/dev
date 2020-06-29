@@ -153,7 +153,7 @@ export type StrictTransactionSpec = {
   reconfigure: ReconfigurationSpec | undefined
 }
 
-export const enum TransactionFlag { reconfigured = 1, scrollIntoView = 2 }
+export const enum TransactionFlag { scrollIntoView = 1 }
 
 /// Changes to the editor state are grouped into transactions.
 /// Typically, a user action creates a single transaction, which may
@@ -176,9 +176,11 @@ export class Transaction {
     /// The effects added to the transaction.
     readonly effects: readonly StateEffect<any>[],
     private annotations: readonly Annotation<any>[],
+    /// Holds an object when this transaction
+    /// [reconfigures](#state.ReconfigurationSpec) the state.
+    readonly reconfigured: ReconfigurationSpec | undefined,
     private flags: number
-    // FIXME store actual reconfiguration data, so that a similar
-    // transaction for another state can be derived from this value
+
   ) {
     if (!this.annotations.some((a: Annotation<any>) => a.type == Transaction.time))
       this.annotations = this.annotations.concat(Transaction.time.of(Date.now()))
@@ -196,9 +198,6 @@ export class Transaction {
   /// Query whether the selection should be scrolled into view after
   /// applying this transaction.
   get scrolledIntoView(): boolean { return (this.flags & TransactionFlag.scrollIntoView) > 0 }
-
-  /// Indicates whether the transaction reconfigures the state.
-  get reconfigured(): boolean { return (this.flags & TransactionFlag.reconfigured) > 0 }
 
   /// Annotation used to store transaction timestamps.
   static time = Annotation.define<number>()
