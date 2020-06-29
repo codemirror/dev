@@ -81,7 +81,7 @@ extensions for the editor state.
 
 @IndentContext
 
-@languageData
+@languageDataProp
 
 ### Utilities
 
