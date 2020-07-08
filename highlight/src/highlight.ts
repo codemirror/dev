@@ -84,7 +84,7 @@ export class TagSystem {
   /// manually defining [node properties](#highlight.TagSystem.prop)
   /// for this system.
   get(name: string) {
-    let value = name.charCodeAt(0) == 43 ? 1 : 0 // Check for leading '+'
+    let value = name.charCodeAt(0) == 43 ? Inherit : 0 // Check for leading '+'
     for (let part of (value ? name.slice(1) : name).split(" ")) if (part) {
       let flag = this.flags.indexOf(part)
       if (flag > -1) {
