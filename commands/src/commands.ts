@@ -315,7 +315,7 @@ const deleteByChar = (view: EditorView, forward: boolean) => deleteBy(view, pos 
     return pos
   }
   let target = line.findClusterBreak(pos - line.from, forward) + line.from
-  if (target == pos && line.number != (forward ? state.doc.lines : 0))
+  if (target == pos && line.number != (forward ? state.doc.lines : 1))
     target += forward ? 1 : -1
   return target
 })
