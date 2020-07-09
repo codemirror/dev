@@ -498,7 +498,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
   })
   let changes = state.changeByRange(({from, to}) => {
     let indent = indentation[i++], line = state.doc.lineAt(to)
-    while (to < line.to && /s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
+    while (to < line.to && /\s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
     if (from > line.from && from < line.from + 100 && !/\S/.test(line.slice(0, from))) from = line.from
     return {changes: {from, to, insert: Text.of(["", indentString(state, indent)])},
             range: EditorSelection.cursor(from + 1 + indent)}
