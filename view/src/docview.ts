@@ -109,14 +109,14 @@ export class DocView extends ContentView {
       // recompute the scroll position without a layout)
       this.dom.style.height = this.view.viewState.heightMap.height + "px"
       this.dom.style.minWidth = this.minWidth ? this.minWidth + "px" : ""
-      let selContext = browser.chrome && !forceSelection ? selectionContext(this.view.root) : null
-      this.sync()
-      this.dirty = Dirty.Not
       // Chrome will sometimes, when DOM mutations occur directly
       // around the selection, get confused and report a different
       // selection from the one it displays (issue #218). This tries
       // to detect that situation.
-      if (selContext && needChromeSelectionReset(selContext, this.view.root)) forceSelection = true
+      let track = browser.chrome ? {node: getSelection(this.view.root).focusNode!, written: false} : undefined
+      this.sync(track)
+      this.dirty = Dirty.Not
+      if (track?.written) forceSelection = true
       this.updateSelection(forceSelection, pointerSel)
       this.dom.style.height = ""
     })
@@ -496,17 +496,6 @@ function nextToUneditable(node: Node, offset: number) {
   return (offset && (node.childNodes[offset - 1] as any).contentEditable == "false" ? NextTo.Before : 0) |
     (offset < node.childNodes.length && (node.childNodes[offset] as any).contentEditable == "false" ? NextTo.After : 0)
 }
-
-function selectionContext(root: DocumentOrShadowRoot): [Node, number, Node | null, Node | null] | null {
-  let {focusOffset: offset, focusNode: node} = getSelection(root)
-  return node && node.nodeType == 1 ? [node, offset, node.childNodes[offset - 1], node.childNodes[offset]] : null
-}
-
-function needChromeSelectionReset(context: [Node, number, Node | null, Node | null], root: DocumentOrShadowRoot) {
-  let newContext = selectionContext(root)
-  return newContext ? newContext.some((v, i) => v != context[i]) : false
-}
-
 
 class DecorationComparator {
   changes: number[] = []

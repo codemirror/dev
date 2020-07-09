@@ -54,24 +54,26 @@ export abstract class ContentView {
   // given position.
   coordsAt(_pos: number, _side: number): Rect | null { return null }
 
-  sync() {
+  sync(track?: {node: Node, written: boolean}) {
     if (this.dirty & Dirty.Node) {
       let parent = this.dom as HTMLElement, pos: Node | null = null
       for (let child of this.children) {
         if (child.dirty) {
           let next = pos ? pos.nextSibling : parent.firstChild
           if (next && !child.dom && !ContentView.get(next)) child.reuseDOM(next)
-          child.sync()
+          child.sync(track)
           child.dirty = Dirty.Not
         }
+        if (track && track.node == parent && pos != child.dom) track.written = true
         syncNodeInto(parent, pos, child.dom!)
         pos = child.dom!
       }
       let next: Node | null = pos ? pos.nextSibling : parent.firstChild
+      if (next && track && track.node == parent) track.written = true
       while (next) next = rm(next)
     } else if (this.dirty & Dirty.Child) {
       for (let child of this.children) if (child.dirty) {
-        child.sync()
+        child.sync(track)
         child.dirty = Dirty.Not
       }
     }

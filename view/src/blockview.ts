@@ -161,7 +161,7 @@ export class LineView extends ContentView implements BlockView {
   // FIXME might need another hack to work around Firefox's behavior
   // of not actually displaying the cursor even though it's there in
   // the DOM
-  sync() {
+  sync(track?: {node: Node, written: boolean}) {
     if (!this.dom) {
       this.setDOM(document.createElement("div"))
       this.dom!.className = LineClass
@@ -172,7 +172,7 @@ export class LineView extends ContentView implements BlockView {
       this.dom!.classList.add(LineClass)
       this.prevAttrs = undefined
     }
-    super.sync()
+    super.sync(track)
     let last = this.dom!.lastChild
     if (!last || (last.nodeName != "BR" && !(ContentView.get(last) instanceof TextView))) {
       let hack = document.createElement("BR")

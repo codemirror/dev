@@ -46,9 +46,10 @@ export class TextView extends InlineView {
     }
   }
 
-  sync() {
+  sync(track?: {node: Node, written: boolean}) {
     if (!this.dom) this.createDOM()
     if (this.textDOM!.nodeValue != this.text) {
+      if (track && track.node == this.textDOM) track.written = true
       this.textDOM!.nodeValue = this.text
       let dom = this.dom!
       if (this.textDOM != dom && (this.dom!.firstChild != this.textDOM || dom.lastChild != this.textDOM)) {
