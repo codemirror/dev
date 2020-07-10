@@ -1,4 +1,4 @@
-import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command} from "@codemirror/next/view"
+import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command, themeClass} from "@codemirror/next/view"
 import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, precedence,
         ChangeDesc, EditorState} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
@@ -44,10 +44,8 @@ export class AutocompleteContext {
   /// `text`. Will use `this.filterType`, returns `true` when the
   /// completion should be shown.
   filter(completion: string, text: string, caseSensitive = this.caseSensitive) {
-    if (!caseSensitive) {
-      completion = completion.toLowerCase()
+    if (!caseSensitive && completion == completion.toLowerCase())
       text = text.toLowerCase()
-    }
     if (this.filterType == FilterType.Start)
       return completion.slice(0, text.length) == text
     else if (this.filterType == FilterType.Include)
@@ -115,7 +113,15 @@ export interface Completion {
   /// How to apply the completion. When this holds a string, the
   /// completion range is replaced by that string. When it is a
   /// function, that function is called to perform the completion.
-  apply?: string | ((view: EditorView, result: CompletionResult, completion: Completion) => void)
+  apply?: string | ((view: EditorView, result: CompletionResult, completion: Completion) => void),
+  /// The type of the completion. This is used to pick an icon to show
+  /// for the completion. Icons are styled with a theme selector
+  /// created by appending the given type name to `"completionIcon."`.
+  /// You can define or restyle icons by defining these selectors. The
+  /// base library defines simple icons for `class`, `constant`,
+  /// `enum`, `function`, `interface`, `keyword`, `method`,
+  /// `namespace`, `property`, `text`, `type`, and `variable`.
+  type?: string
 }
 
 /// The function signature for a completion source. Such a function
@@ -348,9 +354,12 @@ function createListBox(result: CombinedResult, id: string) {
   ul.setAttribute("role", "listbox")
   ul.setAttribute("aria-expanded", "true")
   for (let i = 0; i < result.options.length; i++) {
+    let {completion} = result.options[i]
     const li = ul.appendChild(document.createElement("li"))
     li.id = id + "-" + i
-    li.innerText = result.options[i].completion.label
+    let icon = li.appendChild(document.createElement("div"))
+    icon.className = themeClass("completionIcon" + (completion.type ? "." + completion.type : ""))
+    li.appendChild(document.createTextNode(completion.label))
     li.setAttribute("role", "option")
   }
   return ul

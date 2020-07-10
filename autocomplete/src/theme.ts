@@ -31,5 +31,48 @@ export const baseTheme = EditorView.baseTheme({
     height: "1.15em",
     margin: "0 -0.7px -.7em",
     borderLeft: "1.4px dotted #888"
+  },
+
+  completionIcon: {
+    fontSize: "90%",
+    width: ".8em",
+    display: "inline-block",
+    textAlign: "center",
+    paddingRight: ".6em",
+    opacity: "0.6"
+  },
+
+  "completionIcon.function, completionIcon.method": {
+    "&:after": { content: "'ƒ'" }
+  },
+  "completionIcon.class": {
+    "&:after": { content: "'○'" }
+  },
+  "completionIcon.interface": {
+    "&:after": { content: "'◌'" }
+  },
+  "completionIcon.variable": {
+    "&:after": { content: "'𝑥'" }
+  },
+  "completionIcon.constant": {
+    "&:after": { content: "'𝐶'" }
+  },
+  "completionIcon.type": {
+    "&:after": { content: "'𝑡'" }
+  },
+  "completionIcon.enum": {
+    "&:after": { content: "'∪'" }
+  },
+  "completionIcon.property": {
+    "&:after": { content: "'□'" }
+  },
+  "completionIcon.keyword": {
+    "&:after": { content: "'🔑\uFE0E'" } // Disable emoji rendering
+  },
+  "completionIcon.namespace": {
+    "&:after": { content: "'▢'" }
+  },
+  "completionIcon.text": {
+    "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" }
   }
 })

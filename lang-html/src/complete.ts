@@ -311,7 +311,7 @@ const GlobalAttrs: AttrSpec = {
   itemref: null,
   itemscope: ["itemscope"],
   itemtype: null,
-  lang: ["en", "es"],
+  lang: ["ar", "bn", "de", "en-GB", "en-US", "es", "fr", "hi", "id", "ja", "pa", "pt", "ru", "tr", "zh"],
   spellcheck: Bool,
   autocorrect: Bool,
   autocapitalize: Bool,
@@ -398,7 +398,7 @@ function completeTag(state: EditorState, tree: Subtree, from: number, to: number
   let text = state.doc.sliceString(from, to).toLowerCase()
   let options = []
   for (let tagName of allowedChildren(state.doc, tree))
-    if (context.filter(tagName, text, true)) options.push({label: tagName})
+    if (context.filter(tagName, text, true)) options.push({label: tagName, type: "type"})
   return {from, to, options, filterDownOn: identifier}
 }
 
@@ -407,16 +407,16 @@ function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: n
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   for (let open of openTags(state.doc, tree))
     if (context.filter(open, text, true))
-      options.push({label: open, apply: open + end})
+      options.push({label: open, apply: open + end, type: "type"})
   return {from, to, options, filterDownOn: identifier}
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
   let options = []
   for (let tagName of allowedChildren(state.doc, tree))
-    options.push({label: "<" + tagName})
+    options.push({label: "<" + tagName, type: "type"})
   for (let open of openTags(state.doc, tree))
-    options.push({label: "</" + open + ">"})
+    options.push({label: "</" + open + ">", type: "type"})
   return {from: pos, to: pos, options, filterDownOn: identifier}
 }
 
@@ -426,7 +426,7 @@ function completeAttrName(state: EditorState, tree: Subtree, from: number, to: n
   let base = state.sliceDoc(from, to).toLowerCase()
   for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
     if (context.filter(attrName, base, true))
-      options.push({label: attrName})
+      options.push({label: attrName, type: "property"})
   }
   return {from, to, options, filterDownOn: identifier}
 }
@@ -456,7 +456,7 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
       }
       for (let value of attrs) {
         if (context.filter(value, base, true))
-          options.push({label: value, apply: quoteStart + value + quoteEnd})
+          options.push({label: value, apply: quoteStart + value + quoteEnd, type: "constant"})
       }
     }
   }
