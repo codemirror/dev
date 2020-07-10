@@ -283,9 +283,9 @@ const warned: string[] = []
 function tokenID(tag: string): number {
   let id = tokenTable[tag]
   if (id == null) {
-    let tagID = 0
+    let props = {}
     try {
-      tagID = defaultTags.get(tag)
+      props = defaultTags.addTagProp(tag, props)
     } catch(e) {
       if (!(e instanceof RangeError)) throw e
       if (warned.indexOf(tag) < 0) {
@@ -295,7 +295,7 @@ function tokenID(tag: string): number {
       return tokenID("")
     }
     id = tokenTable[tag] = typeArray.length
-    typeArray.push(new NodeType(tag ? tag.replace(/ /g, "_") : "_", defaultTags.prop.set({}, tagID), id))
+    typeArray.push(new NodeType(tag ? tag.replace(/ /g, "_") : "_", props, id))
   }
   return id
 }

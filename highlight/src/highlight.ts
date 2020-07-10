@@ -1,10 +1,8 @@
-import {Tree, NodeType, NodeProp} from "lezer-tree"
+import {Tree, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
 import {EditorState, Extension} from "@codemirror/next/state"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
-
-const Inherit = 1
 
 /// A tag system defines a set of node (token) tags used for
 /// highlighting. You'll usually want to use the
@@ -28,10 +26,8 @@ export class TagSystem {
   /// @internal
   parents: number[]
 
-  /// A [node
-  /// prop](https://lezer.codemirror.net/docs/ref#tree.NodeProp) used
-  /// to associate styling tag information with syntax tree nodes.
-  prop = new NodeProp<number>()
+  /// @internal
+  prop = new NodeProp<Rule>()
 
   /// Define a tag system. Each tag identifies a type of syntactic
   /// element, which can have a single type and any number of flags.
@@ -76,16 +72,14 @@ export class TagSystem {
       if (id == null) throw new RangeError(`Unknown parent type '${name}' specified`)
       return id
     })
-    if (this.flags.length > 29 || this.typeNames.length > Math.pow(2, 29 - this.flags.length))
+    if (this.flags.length > 30 || this.typeNames.length > Math.pow(2, 30 - this.flags.length))
       throw new RangeError("Too many style tag flags to fit in a 30-bit integer")
   }
 
-  /// Parse a tag name into a numeric ID. Only necessary if you are
-  /// manually defining [node properties](#highlight.TagSystem.prop)
-  /// for this system.
+  /// @internal
   get(name: string) {
-    let value = name.charCodeAt(0) == 43 ? Inherit : 0 // Check for leading '+'
-    for (let part of (value ? name.slice(1) : name).split(" ")) if (part) {
+    let value = 0
+    for (let part of name.split(" ")) if (part) {
       let flag = this.flags.indexOf(part)
       if (flag > -1) {
         value += 1 << flag
@@ -99,18 +93,36 @@ export class TagSystem {
     return value
   }
 
+  /// @internal
+  getWithMode(name: string) {
+    let mode = name[0] == "+" ? Mode.Inherit : name[0] == "!" ? Mode.Opaque : Mode.Normal
+    return {mode, tag: this.get(mode == Mode.Normal ? name : name.slice(1))}
+  }
+
+  /// Manually add a highlighting tag to a set of node props.
+  addTagProp(name: string, props: {[prop: number]: any} = {}) {
+    let {mode, tag} = this.getWithMode(name)
+    return this.prop.set(props, new Rule(tag, mode, noContext))
+  }
+
   /// Create a
   /// [`PropSource`](https://lezer.codemirror.net/docs/ref#tree.PropSource)
-  /// that adds node properties for this system. `tags` should map
-  /// node type
-  /// [selectors](https://lezer.codemirror.net/docs/ref#tree.NodeType^match)
-  /// to tag names.
+  /// that adds node properties for this system. See
+  /// [`styleTags`](#highlight.styleTags) for documentation of the
+  /// argument object.
   add(tags: {[selector: string]: string}) {
-    let match = NodeType.match(tags)
-    return this.prop.add((type: NodeType) => {
-      let found = match(type)
-      return found == null ? undefined : this.get(found)
-    })
+    let byName: {[name: string]: Rule} = Object.create(null)
+    for (let prop in tags) {
+      let value = tags[prop]
+      let {mode, tag} = this.getWithMode(value)
+      for (let part of prop.split(" ")) {
+        let stack = part.split("/"), inner = stack[stack.length - 1]
+        let context = stack.length > 1 ? stack.slice(0, stack.length - 1).map(s => s == "*" ? null : s) : noContext
+        let rule = new Rule(tag, mode, context)
+        byName[inner] = rule.sort(byName[inner])
+      }
+    }
+    return this.prop.add(byName)
   }
 
   /// Create a highlighter extension for this system, styling the
@@ -128,7 +140,7 @@ export class TagSystem {
     let flags = tag & this.flagMask, spec = 0
     for (let i = 1; i <= this.flags.length; i++)
       if (flags & (1 << i)) spec++
-    for (let type = tag >> (this.flags.length + 1); type; type = this.parents[type]) spec += 1000
+    for (let type = tag >> this.typeShift; type; type = this.parents[type]) spec += 1000
     return spec
   }
 }
@@ -192,12 +204,66 @@ export const defaultTags = new TagSystem({
   ]
 })
 
+const enum Mode { Opaque, Inherit, Normal }
+
+const noContext: readonly (string | null)[] = []
+
+class Rule {
+  constructor(readonly tag: number,
+              readonly mode: Mode,
+              readonly context: readonly (string | null)[],
+              public next?: Rule) {}
+
+  sort(other: Rule | undefined) {
+    if (!other || other.context.length < this.context.length) {
+      this.next = other
+      return this
+    }
+    other.next = this.sort(other.next)
+    return other
+  }
+}
+
 /// Used to add a set of tags to a language syntax via
 /// [`Parser.withProps`](https://lezer.codemirror.net/docs/ref#lezer.Parser.withProps).
-/// The argument object can use syntax node selectors (see
-/// [`NodeType.match`](https://lezer.codemirror.net/docs/ref#tree.NodeType^match))
-/// as property names, and tag names (in the [default tag
-/// system](#highlight.defaultTags)) as values.
+///
+/// The argument object maps node selectors to [tag
+/// names](#highlight.TagSystem), optionally prefixed with:
+///
+///  - `+`, to make the style apply not just to the node itself, but
+///    also to child nodes (which by default replace the styles
+///    assigned by their parent nodes)
+///
+///  - `!` to make a node _opaque_, meaning its child nodes are
+///    ignored for styling purposes.
+///
+/// Node selectors can be [node
+/// names](https://lezer.codemirror.net/docs/ref#tree.NodeType.name),
+/// or groups of node names separated by spaces. It is possible to
+/// combine multiple node names with slashes, as in
+/// `"Block/Declaration/VariableName"`, to match the final node but
+/// only if its direct parent nodes are the other nodes mentioned. A
+/// `*` can be used as a wildcard in such a path. (But only matches a
+/// single parent—wildcards that match multiple parents aren't
+/// supported, both for efficiency reasons and because Lezer trees
+/// make it rather hard to reason about what they would match.)
+///
+/// For example:
+///
+/// ```javascript
+/// parser.withProps(
+///   styleTags({
+///     // Style Number and BigNumber nodes
+///     "Number BigNumber": "number",
+///     // Style Escape nodes whose parent is String
+///     "String/Escape": "escape",
+///     // Style anything inside Attributes nodes
+///     "Attributes": "!meta",
+///     // Add a style to all content inside Italic nodes
+///     "Italic": "+emphasis"
+///   })
+/// )
+/// ```
 export const styleTags = (tags: {[selector: string]: string}) => defaultTags.add(tags)
 
 /// Create a highlighter theme that adds the given styles to the given
@@ -258,7 +324,12 @@ class Highlighter implements PluginValue {
   tree: Tree
   decorations: DecorationSet
 
-  constructor(view: EditorView, private prop: NodeProp<number>, private styling: Styling) {
+  // Reused stacks for buildDeco
+  nodeStack: string[] = [""]
+  classStack: string[] = [""]
+  inheritStack: string[] = [""]
+
+  constructor(view: EditorView, private prop: NodeProp<Rule>, private styling: Styling) {
     this.tree = view.state.tree
     this.decorations = this.buildDeco(view.visibleRanges, this.tree)
   }
@@ -277,44 +348,52 @@ class Highlighter implements PluginValue {
 
   buildDeco(ranges: readonly {from: number, to: number}[], tree: Tree) {
     let builder = new RangeSetBuilder<Decoration>()
-    let start = 0
+    let start: number, curClass: string, depth: number
     function flush(pos: number, style: string) {
       if (pos > start && style)
         builder.add(start, pos, Decoration.mark({class: style})) // FIXME cache these
       start = pos
     }
 
+    let {nodeStack, classStack, inheritStack} = this
     for (let {from, to} of ranges) {
-      start = from
-      // The current node's own classes
-      let curClass = ""
-      let context: string[] = []
-      let inherited: string[] = []
+      curClass = ""; depth = 0; start = from
       tree.iterate({
         from, to,
         enter: (type, start) => {
-          let inheritedClass = inherited.length ? inherited[inherited.length - 1] : ""
+          depth++
+          let inheritedClass = inheritStack[depth - 1]
           let cls = inheritedClass
-          let style = type.prop(this.prop)
-          if (style != null) {
-            let val = this.styling.match(style)
-            if (val) {
-              if (cls) cls += " "
-              cls += val
+          let rule = type.prop(this.prop), opaque = false
+          while (rule) {
+            if (!rule.context.length || matchContext(rule.context, nodeStack, depth)) {
+              let style = this.styling.match(rule.tag)
+              if (style) {
+                if (cls) cls += " "
+                cls += style
+                if (rule.mode == Mode.Inherit) inheritedClass = cls
+                else if (rule.mode == Mode.Opaque) opaque = true
+              }
+              break
             }
-            if (style & Inherit) inheritedClass = cls
+            rule = rule.next
           }
-          context.push(cls)
-          if (inheritedClass) inherited.push(inheritedClass)
           if (cls != curClass) {
             flush(start, curClass)
             curClass = cls
           }
+          if (opaque) {
+            depth--
+            return false
+          }
+          classStack[depth] = cls
+          inheritStack[depth] = inheritedClass
+          nodeStack[depth] = type.name
+          return undefined
         },
         leave: (_t, _s, end) => {
-          context.pop()
-          inherited.pop()
-          let backTo = context.length ? context[context.length - 1] : ""
+          depth--
+          let backTo = classStack[depth]
           if (backTo != curClass) {
             flush(Math.min(to, end), curClass)
             curClass = backTo
@@ -324,6 +403,15 @@ class Highlighter implements PluginValue {
     }
     return builder.finish()
   }
+}
+
+function matchContext(context: readonly (null | string)[], stack: readonly string[], depth: number) {
+  if (context.length > depth - 1) return false
+  for (let d = depth - 1, i = context.length - 1; i >= 0; i--, d--) {
+    let check = context[i]
+    if (check && check != stack[d]) return false
+  }
+  return true
 }
 
 /// A default highlighter (works well with light themes).
