@@ -164,6 +164,7 @@ export const defaultTags = new TagSystem({
     "propertyName=name",
     "className=name",
     "labelName=name",
+    "functionName=name",
     "namespace=name",
     "literal",
     "string=literal",
