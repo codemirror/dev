@@ -1,4 +1,4 @@
-module.exports = function(config) {
+export default function(config) {
   let lang = config && config.lang || "js"
   return {
     startState(es) {
