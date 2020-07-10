@@ -649,8 +649,8 @@ export const emacsStyleKeymap: readonly KeyBinding[] = [
 ///  - Ctrl-a (Cmd-a on macOS): [`selectAll`](#commands.selectAll)
 ///  - Backspace: [`deleteCharBackward`](#commands.deleteCharBackward)
 ///  - Delete: [`deleteCharForward`](#commands.deleteCharForward)
-///  - Ctrl-Backspace (Ctrl-Alt-Backspace on macOS): [`deleteGroupBackward`](#commands.deleteGroupBackward)
-///  - Ctrl-Delete (Alt-Backspace and Alt-Delete on macOS): [`deleteGroupForward`](#commands.deleteGroupForward)
+///  - Ctrl-Backspace (Alt-Backspace on macOS): [`deleteGroupBackward`](#commands.deleteGroupBackward)
+///  - Ctrl-Delete (Alt-Delete on macOS): [`deleteGroupForward`](#commands.deleteGroupForward)
 export const standardKeymap: readonly KeyBinding[] = ([
   {key: "ArrowLeft", run: cursorCharLeft, shift: selectCharLeft},
   {key: "Mod-ArrowLeft", mac: "Alt-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft},
@@ -683,10 +683,8 @@ export const standardKeymap: readonly KeyBinding[] = ([
 
   {key: "Backspace", run: deleteCharBackward},
   {key: "Delete", run: deleteCharForward},
-  {key: "Mod-Backspace", mac: "Ctrl-Alt-Backspace", run: deleteGroupBackward},
-  {key: "Mod-Delete", mac: "Alt-Backspace", run: deleteGroupForward},
-
-  {mac: "Alt-Delete", run: deleteGroupForward},
+  {key: "Mod-Backspace", mac: "Alt-Backspace", run: deleteGroupBackward},
+  {key: "Mod-Delete", mac: "Alt-Delete", run: deleteGroupForward},
 ] as KeyBinding[]).concat(emacsStyleKeymap.map(b => ({mac: b.key, run: b.run, shift: b.shift})))
 
 /// The default keymap. Includes all bindings from
