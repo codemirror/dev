@@ -218,6 +218,7 @@ export function byGroup(view: EditorView, pos: number, start: string) {
 
 export function moveVertically(view: EditorView, start: SelectionRange, forward: boolean, distance?: number) {
   let startPos = start.head, dir: -1 | 1 = forward ? 1 : -1
+  if (startPos == (forward ? view.state.doc.length : 0)) return EditorSelection.cursor(startPos)
   let startCoords = view.coordsAtPos(startPos)
   if (startCoords) {
     let rect = view.dom.getBoundingClientRect()
@@ -241,8 +242,8 @@ export function moveVertically(view: EditorView, start: SelectionRange, forward:
   } else {
     goalCol = Math.round(goal / view.defaultCharacterWidth)
   }
-  if (dir < 0 && line.from == 0) return EditorSelection.cursor(0, undefined, undefined, goal)
-  else if (dir > 0 && line.to == doc.length) return EditorSelection.cursor(line.to, undefined, undefined, goal)
+  if (dir < 0 && line.from == 0) return EditorSelection.cursor(0)
+  else if (dir > 0 && line.to == doc.length) return EditorSelection.cursor(line.to)
   let otherLine = doc.line(line.number + dir)
   let result = otherLine.from
   let seen = 0
