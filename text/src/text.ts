@@ -639,11 +639,11 @@ class LineContent {
     }
     for (let result = "", pos = 0, i = 0;; i++) {
       if (i == this.strings!.length) this.strings!.push(this.cursor!.next().value)
-      let string = this.strings![i], end = pos + string.length
-      if (end <= from) continue
-      result += string.slice(Math.max(0, from - pos), Math.min(string.length, to - pos))
-      if (end >= to) return result
+      let string = this.strings![i], start = pos
       pos += string.length
+      if (pos <= from) continue
+      result += string.slice(Math.max(0, from - start), Math.min(string.length, to - start))
+      if (pos >= to) return result
     }
   }
 }

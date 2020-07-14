@@ -212,4 +212,11 @@ describe("Text", () => {
       ist(doc0.slice(from, to).toString(), text0.slice(from, to))
     }
   })
+
+  it("can read part of a long line", () => {
+    let line = Text.of(["a".repeat(1000) + "XYZ" + "b".repeat(1000)]).line(1)
+    ist(line.slice(0, 50), "a".repeat(50))
+    ist(line.slice(2000, 2003), "bbb")
+    ist(line.slice(999, 1004), "aXYZb")
+  })
 })
