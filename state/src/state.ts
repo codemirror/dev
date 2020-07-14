@@ -367,7 +367,9 @@ function finishTransaction(state: EditorState, spec: ResolvedTransactionSpec) {
   if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
   let conf = state.config
   if (spec.reconfigure)
-    conf = Configuration.resolve(spec.reconfigure.full || conf.source, spec.reconfigure, state)
+    conf = Configuration.resolve(spec.reconfigure.full || conf.source,
+                                 Object.assign(conf.replacements, spec.reconfigure, {full: undefined}),
+                                 state)
   let flags = spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0
   let tr = new Transaction(state, spec.changes, spec.selection, spec.effects, spec.annotations, spec.reconfigure, flags)
   new EditorState(conf, spec.changes.apply(state.doc),
