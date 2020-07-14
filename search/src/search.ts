@@ -212,9 +212,24 @@ function createSearchPanel(view: EditorView) {
 /// Make sure the search panel is open and focused.
 export const openSearchPanel: Command = view => {
   let state = view.state.field(searchState, false)
-  if (state && state.panel.length) return false
-  view.dispatch({effects: togglePanel.of(true),
-                 reconfigure: state ? undefined : {append: searchExtensions}})
+  if (state && state.panel.length) {
+    let panel = getPanel(view, createSearchPanel)
+    if (!panel) return false
+    ;(panel.dom.querySelector("[name=search]") as HTMLInputElement).focus()
+  } else {
+    view.dispatch({effects: togglePanel.of(true),
+                   reconfigure: state ? undefined : {append: searchExtensions}})
+  }
+  return true
+}
+
+/// Close the search panel.
+export const closeSearchPanel: Command = view => {
+  let state = view.state.field(searchState, false)
+  if (!state || !state.panel.length) return false
+  let panel = getPanel(view, createSearchPanel)
+  if (panel && panel.dom.contains(view.root.activeElement)) view.focus()
+  view.dispatch({effects: togglePanel.of(false)})
   return true
 }
 
@@ -227,18 +242,9 @@ export const searchKeymap: readonly KeyBinding[] = [
   {key: "Mod-f", run: openSearchPanel, scope: "editor search-panel"},
   {key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel"},
   {key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel"},
+  {key: "Escape", run: closeSearchPanel, scope: "editor search-panel"},
   {key: "Mod-Shift-l", run: selectSelectionMatches}
 ]
-
-/// Close the search panel.
-export const closeSearchPanel: Command = view => {
-  let state = view.state.field(searchState, false)
-  if (!state || !state.panel.length) return false
-  let panel = getPanel(view, createSearchPanel)
-  if (panel && panel.dom.contains(view.root.activeElement)) view.focus()
-  view.dispatch({effects: togglePanel.of(false)})
-  return true
-}
 
 function elt(name: string, props: null | {[prop: string]: any} = null, children: (Node | string)[] = []) {
   let e = document.createElement(name)
@@ -289,9 +295,6 @@ function buildPanel(conf: {
   function keydown(e: KeyboardEvent) {
     if (runScopeHandlers(conf.view, e, "search-panel")) {
       e.preventDefault()
-    } else if (e.keyCode == 27) {
-      e.preventDefault()
-      closeSearchPanel(conf.view)
     } else if (e.keyCode == 13 && e.target == searchField) {
       e.preventDefault()
       ;(e.shiftKey ? findPrevious : findNext)(conf.view)
