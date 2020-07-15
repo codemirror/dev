@@ -7,7 +7,7 @@ import {EditorSelection, Transaction, Annotation, Text} from "@codemirror/next/s
 // FIXME reconsider this kludge (does it break reading dom text with newlines?)
 const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
-export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean): boolean {
+export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
   let change, newSel
   let sel = view.state.selection.primary, bounds
   if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
@@ -39,7 +39,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       newSel = EditorSelection.single(anchor, head)
   }
 
-  if (!change && !newSel) return false
+  if (!change && !newSel) return
 
   // Heuristic to notice typing over a selected character
   if (!change && typeOver && !sel.empty && newSel && newSel.primary.empty)
@@ -59,7 +59,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
           dispatchKey(view, "Backspace", 8)) ||
          (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 0 &&
           dispatchKey(view, "Delete", 46))))
-      return view.state != startState
+      return
 
     let tr
     if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
@@ -75,7 +75,6 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       }
     }
     view.dispatch(tr, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")})
-    return true
   } else if (newSel && !newSel.primary.eq(sel)) {
     let scrollIntoView = false, annotations: Annotation<any> | undefined
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
@@ -83,9 +82,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       else annotations = Transaction.userEvent.of(view.inputState.lastSelectionOrigin!)
     }
     view.dispatch({selection: newSel, scrollIntoView, annotations})
-    return true
   }
-  return false
 }
 
 function findDiff(a: string, b: string, preferredPos: number, preferredSide: string | null)

@@ -35,7 +35,7 @@ export class DOMObserver {
   parentCheck = -1
 
   constructor(private view: EditorView,
-              private onChange: (from: number, to: number, typeOver: boolean) => boolean,
+              private onChange: (from: number, to: number, typeOver: boolean) => void,
               private onScrollChanged: () => void) {
     this.dom = view.contentDOM
     this.observer = new MutationObserver(mutations => {
@@ -198,8 +198,9 @@ export class DOMObserver {
       }
     }
 
-    let apply = from > -1 || newSel
-    if (!apply || !this.onChange(from, to, typeOver)) {
+    let startState = this.view.state
+    if (from > -1 || newSel) this.onChange(from, to, typeOver)
+    if (this.view.state == startState) { // The view wasn't updated
       if (this.view.docView.dirty) {
         this.ignore(() => this.view.docView.sync())
         this.view.docView.dirty = Dirty.Not
