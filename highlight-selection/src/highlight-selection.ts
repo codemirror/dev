@@ -100,7 +100,7 @@ const matchHighlighter = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
-    if (update.selectionSet || update.docChanged) this.decorations = this.getDeco(update.view)
+    if (update.selectionSet || update.docChanged || update.viewportChanged) this.decorations = this.getDeco(update.view)
   }
 
   getDeco(view: EditorView) {
