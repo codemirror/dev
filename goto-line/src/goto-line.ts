@@ -2,6 +2,8 @@ import {panels, Panel, getPanel, showPanel} from "@codemirror/next/panel"
 import {EditorSelection} from "@codemirror/next/state"
 import {EditorView, Command, themeClass, KeyBinding} from "@codemirror/next/view"
 
+const extTag = typeof Symbol == "undefined" ? "__goto-line" : Symbol("goto-line")
+
 function createLineDialog(view: EditorView): Panel {
   let dom = document.createElement("form")
   dom.innerHTML = `<label>${view.state.phrase("Go to line:")} <input class=${themeClass("textfield")} name=line></label>
@@ -11,8 +13,9 @@ function createLineDialog(view: EditorView): Panel {
   function go() {
     let n = parseInt(input.value, 10)
     view.dispatch({
-      reconfigure: {append: [baseTheme]},
-      selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).from) : undefined
+      reconfigure: {[extTag]: [baseTheme]},
+      selection: !isNaN(n) && n > 0 && n <= view.state.doc.lines ? EditorSelection.cursor(view.state.doc.line(n).from) : undefined,
+      scrollIntoView: true
     })
     view.focus()
   }
