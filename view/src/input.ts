@@ -170,8 +170,9 @@ class MouseSelection {
     this.select(event)
   }
 
-  up() {
+  up(event: MouseEvent) {
     if (this.dragging == null) this.select(this.startEvent)
+    if (!this.dragging) event.preventDefault()
     this.destroy()
   }
 
