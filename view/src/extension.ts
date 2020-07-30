@@ -24,6 +24,8 @@ export const exceptionSink = Facet.define<(exception: any) => void>()
 
 export const updateListener = Facet.define<(update: ViewUpdate) => void>()
 
+export const inputHandler = Facet.define<(view: EditorView, from: number, to: number, text: string) => boolean>()
+
 /// Log or report an unhandled exception in client code. Should
 /// probably only be used by extension code that allows client code to
 /// provide functions, and calls those functions in a context where an

@@ -13,7 +13,7 @@ import {ViewState} from "./viewstate"
 import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection, mouseSelectionStyle,
         exceptionSink, updateListener, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
-        decorations, MeasureRequest, UpdateFlag, editable} from "./extension"
+        decorations, MeasureRequest, UpdateFlag, editable, inputHandler} from "./extension"
 import {themeClass, theme, darkTheme, buildTheme, baseThemeID, baseDarkThemeID, baseLightThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
@@ -564,6 +564,13 @@ export class EditorView {
   }): Extension {
     return ViewPlugin.define(() => ({})).eventHandlers(handlers)
   }
+
+  /// An input handler can be used to override the way changes to the
+  /// content are handled. A handler is passed the document positions
+  /// between which the change was found, and the new content. When it
+  /// returns true, no further input handlers are called and the
+  /// default behavior is prevented.
+  static inputHandler = inputHandler
 
   /// Allows you to provide a function that should be called when the
   /// library catches an exception from an extension (mostly from view

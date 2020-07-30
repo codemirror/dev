@@ -1,5 +1,6 @@
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
+import {inputHandler} from "./extension"
 import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
 import {EditorSelection, Transaction, Annotation, Text} from "@codemirror/next/state"
@@ -8,7 +9,7 @@ import {EditorSelection, Transaction, Annotation, Text} from "@codemirror/next/s
 const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
 
 export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
-  let change, newSel
+  let change: undefined | {from: number, to: number, insert: Text}, newSel
   let sel = view.state.selection.primary, bounds
   if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
     let {from, to} = bounds
@@ -59,6 +60,10 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
           dispatchKey(view, "Backspace", 8)) ||
          (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 0 &&
           dispatchKey(view, "Delete", 46))))
+      return
+
+    let text = change.insert.toString()
+    if (view.state.facet(inputHandler).some(h => h(view, change!.from, change!.to, text)))
       return
 
     let tr

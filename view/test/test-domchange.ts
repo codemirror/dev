@@ -165,4 +165,14 @@ describe("DOM changes", () => {
     flush(cm)
     ist(cm.state.doc.toString(), "abcdx")
   })
+
+  it("calls input handlers", () => {
+    let cm = tempEditor("abc", [EditorView.inputHandler.of((_v, from, to, insert) => {
+      cm.dispatch({changes: {from, to, insert: insert.toUpperCase()}})
+      return true
+    })])
+    cm.domAtPos(0).node.appendChild(document.createTextNode("d"))
+    flush(cm)
+    ist(cm.state.doc.toString(), "abcD")
+  })
 })
