@@ -393,11 +393,16 @@ function allKeys(obj: ExtensionMap) {
 
 function flatten(extension: Extension, replacements: ExtensionMap) {
   let result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], []]
-  let seen = new Set<Extension>()
+  let seen = new Map<Extension, number>()
   let tagsSeen = Object.create(null)
   function inner(ext: Extension, prec: number) {
-    if (seen.has(ext)) return
-    seen.add(ext)
+    let known = seen.get(ext)
+    if (known != null) {
+      if (known >= prec) return
+      let found = result[known].indexOf(ext as any)
+      if (found > -1) result[known].splice(found, 1)
+    }
+    seen.set(ext, prec)
     if (Array.isArray(ext)) {
       for (let e of ext) inner(e, prec)
     } else if (ext instanceof TaggedExtension) {
