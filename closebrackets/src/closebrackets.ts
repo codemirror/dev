@@ -1,8 +1,7 @@
-import {EditorView} from "@codemirror/next/view"
-import {EditorState, EditorSelection, Transaction, CharCategory, Extension} from "@codemirror/next/state"
+import {EditorView, KeyBinding} from "@codemirror/next/view"
+import {EditorState, EditorSelection, Transaction, CharCategory, Extension, StateCommand} from "@codemirror/next/state"
 import {Text} from "@codemirror/next/text"
 import {codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
-import {keyName} from "w3c-keyname"
 
 /// Configures bracket closing behavior for a syntax (via
 /// [`languageData`](#state.languageData)) using the `"closeBrackets"`
@@ -26,10 +25,9 @@ const defaults: Required<CloseBracketConfig> = {
 /// Extension to enable bracket-closing behavior. When a closeable
 /// bracket is typed, its closing bracket is immediately inserted
 /// after the cursor. When closing a bracket directly in front of that
-/// closing bracket, the cursor moves over the existing bracket. When
-/// backspacing in between brackets, both are removed.
+/// closing bracket, the cursor moves over the existing bracket.
 export function closeBrackets(): Extension {
-  return eventHandler
+  return EditorView.inputHandler.of(handleInput)
 }
 
 const definedClosing = "()[]{}<>"
@@ -44,27 +42,19 @@ function config(state: EditorState, pos: number) {
   return state.languageDataAt<CloseBracketConfig>("closeBrackets", pos)[0] || defaults
 }
 
-const eventHandler = EditorView.domEventHandlers({keydown(event: KeyboardEvent, view: EditorView) {
-  if (event.ctrlKey || event.metaKey) return false
-
-  if (event.keyCode == 8) { // Backspace
-    let tr = handleBackspace(view.state)
-    if (!tr) return false
-    view.dispatch(tr)
-    return true
-  }
-
-  let key = keyName(event)
-  if (key.length > 2 || key.length == 2 && codePointSize(codePointAt(key, 0)) == 1) return false
-  let tr = handleInsertion(view.state, key)
+function handleInput(view: EditorView, from: number, to: number, insert: string) {
+  let sel = view.state.selection.primary
+  if (insert.length > 2 || insert.length == 2 && codePointSize(codePointAt(insert, 0)) == 1 ||
+      from != sel.from || to != sel.to) return false
+  let tr = handleInsertion(view.state, insert)
   if (!tr) return false
   view.dispatch(tr)
   return true
-}})
+}
 
-/// Function that implements the extension's backspace behavior.
-/// Exported mostly for testing purposes.
-export function handleBackspace(state: EditorState) {
+/// Command that implements deleting a pair of matching brackets when
+/// the cursor is between them.
+export const deleteBracketPair: StateCommand = ({state, dispatch}) => {
   let conf = config(state, state.selection.primary.head)
   let tokens = conf.brackets || defaults.brackets
   let dont = null, changes = state.changeByRange(range => {
@@ -78,11 +68,17 @@ export function handleBackspace(state: EditorState) {
     }
     return {range: dont = range}
   })
-  return dont ? null : state.update(changes, {scrollIntoView: true})
+  if (!dont) dispatch(state.update(changes, {scrollIntoView: true}))
+  return !dont
 }
 
-/// Implements the extension's behavior on text insertion. Again,
-/// exported mostly for testing.
+/// Close-brackets related key bindings. Binds Backspace to
+/// [`deleteBracketPair`](#closebrackets.deleteBracketPair).
+export const closeBracketsKeymap: readonly KeyBinding[] = [
+  {key: "Backspace", run: deleteBracketPair}
+]
+
+/// Implements the extension's behavior on text insertion. @internal
 export function handleInsertion(state: EditorState, ch: string): Transaction | null {
   let conf = config(state, state.selection.primary.head)
   let tokens = conf.brackets || defaults.brackets

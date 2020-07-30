@@ -5,7 +5,7 @@ import {foldGutter, foldKeymap} from "@codemirror/next/fold"
 import {lineNumbers} from "@codemirror/next/gutter"
 import {defaultKeymap} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"
-import {closeBrackets} from "@codemirror/next/closebrackets"
+import {closeBrackets, closeBracketsKeymap} from "@codemirror/next/closebrackets"
 import {searchKeymap} from "@codemirror/next/search"
 import {autocomplete, autocompleteKeymap} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
@@ -62,6 +62,7 @@ export const basicSetup: Extension = [
   highlightActiveLine(),
   highlightSelectionMatches(),
   keymap([
+    ...closeBracketsKeymap,
     ...defaultKeymap,
     ...searchKeymap,
     ...historyKeymap,

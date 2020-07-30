@@ -1,16 +1,26 @@
 import ist from "ist"
-import {handleInsertion, handleBackspace} from "@codemirror/next/closebrackets"
-import {EditorState, Transaction, EditorSelection} from "@codemirror/next/state"
+import {handleInsertion, deleteBracketPair} from "@codemirror/next/closebrackets"
+import {EditorState, Transaction, EditorSelection, StateCommand} from "@codemirror/next/state"
 import {StreamSyntax} from "@codemirror/next/stream-syntax"
 
 function s(doc = "", anchor = 0, head = anchor) {
   return EditorState.create({doc, selection: EditorSelection.single(anchor, head)})
 }
 
-function same(s0: null | Transaction, s1: EditorState) {
+function same(s0: null | Transaction | EditorState, s1: EditorState) {
   ist(s0)
-  ist(s0!.state.doc.toString(), s1.doc.toString())
-  ist(JSON.stringify(s0!.selection), JSON.stringify(s1.selection))
+  let s: EditorState = s0 instanceof Transaction ? s0.state : s0!
+  ist(s.doc.toString(), s1.doc.toString())
+  ist(JSON.stringify(s.selection), JSON.stringify(s1.selection))
+}
+
+function app(s: EditorState, cmd: StateCommand) {
+  cmd({state: s, dispatch: (tr) => s = tr.state})
+  return s
+}
+
+function canApp(s: EditorState, cmd: StateCommand) {
+  return !!cmd({state: s, dispatch: () => {}})
 }
 
 describe("closeBrackets", () => {
@@ -107,14 +117,14 @@ describe("closeBrackets", () => {
   })
 
   it("backspaces out pairs of brackets", () => {
-    same(handleBackspace(st("()", 1)), st(""))
-    same(handleBackspace(st("okay ''", 6)), st("okay ", 5))
+    same(app(st("()", 1), deleteBracketPair), st(""))
+    same(app(st("okay ''", 6), deleteBracketPair), st("okay ", 5))
   })
 
   it("doesn't backspace out non-brackets", () => {
-    ist(!handleBackspace(st("(]", 1)))
-    ist(!handleBackspace(st("(", 1)))
-    ist(!handleBackspace(st("-]", 1)))
-    ist(!handleBackspace(st("", 0)))
+    ist(!canApp(st("(]", 1), deleteBracketPair))
+    ist(!canApp(st("(", 1), deleteBracketPair))
+    ist(!canApp(st("-]", 1), deleteBracketPair))
+    ist(!canApp(st("", 0), deleteBracketPair))
   })
 })

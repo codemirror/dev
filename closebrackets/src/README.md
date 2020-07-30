@@ -2,6 +2,6 @@
 
 @closeBrackets
 
-@handleBackspace
+@closeBracketsKeymap
 
-@handleInsertion
+@deleteBracketPair
