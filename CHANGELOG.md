@@ -1,3 +1,31 @@
+## 0.9.0 (2020-07-30)
+
+### Breaking changes
+
+The backspace behavior in the `closebrackets` package is no longer implicitly included in the extension returned by `closeBrackets()`.
+
+### Bug fixes
+
+Fix a crash when running `deleteCharBackward` when the cursor is at the start of the document.
+
+Fix a bug in `Line.slice` that would cause it to loop infinitely on long lines.
+
+Make sure the DOM is reset when `dispatch` fails to update the view.
+
+Fix an issue where double-clicking on a selection in Chrome would leave you with just a cursor, not a selected word.
+
+### New features
+
+Highlighting information for a syntax (as in `styleTags`) can now prefix tag names with `!` to make them override the styling of any child nodes for that syntax node.
+
+It is now possible, when specifying syntax highlighting information, to write rules for a node that apply only when its parent nodes are of a given type. This uses `/` syntax, as in `"Declaration/Identifier": "className"`.
+
+Completion items can now specify a `type` property that determines the icon shown next to them.
+
+`EditorView.inputHandler` can now be used to override the way text input (via the DOM) is handled.
+
+The `closebrackets` package now exports its backspace behavior as a command (`deleteBracketPair`) and a set of bindings that bind it to backspace as `closeBracketsKeymap`.
+
 ## 0.8.0 (2020-06-29)
 
 ### Breaking changes
