@@ -163,9 +163,9 @@ class HoverPlugin {
               readonly field: StateField<Tooltip | null>,
               readonly setHover: StateEffectType<Tooltip | null>) {
     this.checkHover = this.checkHover.bind(this)
-    view.dom.addEventListener("mouseenter", this.mouseenter)
-    view.dom.addEventListener("mouseleave", this.mouseleave)
-    view.dom.addEventListener("mousemove", this.mousemove)
+    view.dom.addEventListener("mouseenter", this.mouseenter = this.mouseenter.bind(this))
+    view.dom.addEventListener("mouseleave", this.mouseleave = this.mouseleave.bind(this))
+    view.dom.addEventListener("mousemove", this.mousemove = this.mousemove.bind(this))
   }
 
   get active() {
@@ -212,9 +212,9 @@ class HoverPlugin {
   }
 
   destroy() {
-    this.view.dom.removeEventListener("mouseenter", this.mouseenter.bind(this))
-    this.view.dom.removeEventListener("mouseleave", this.mouseleave.bind(this))
-    this.view.dom.removeEventListener("mousemove", this.mousemove.bind(this))
+    this.view.dom.removeEventListener("mouseenter", this.mouseenter)
+    this.view.dom.removeEventListener("mouseleave", this.mouseleave)
+    this.view.dom.removeEventListener("mousemove", this.mousemove)
   }
 }
 
