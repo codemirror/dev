@@ -295,7 +295,7 @@ function tokenID(tag: string): number {
       return tokenID("")
     }
     id = tokenTable[tag] = typeArray.length
-    typeArray.push(new NodeType(tag ? tag.replace(/ /g, "_") : "_", props, id))
+    typeArray.push(new (NodeType as any)(tag ? tag.replace(/ /g, "_") : "_", props, id))
   }
   return id
 }
@@ -305,6 +305,6 @@ function docID(props: readonly [NodeProp<any>, any][]) {
   let obj = Object.create(null)
   for (let [prop, value] of props) prop.set(obj, value)
   let id = typeArray.length
-  typeArray.push(new NodeType("document", obj, id))
+  typeArray.push(new (NodeType as any)("document", obj, id))
   return id
 }
