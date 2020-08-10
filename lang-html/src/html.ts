@@ -52,6 +52,7 @@ export const htmlSyntax = LezerSyntax.define(configureHTML([
 ), {
   languageData: {
     commentTokens: {block: {open: "<!--", close: "-->"}},
+    indentOnInput: /^\s*<\/$/
   }
 })
 

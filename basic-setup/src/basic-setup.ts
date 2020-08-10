@@ -1,4 +1,4 @@
-import {keymap, highlightSpecialChars, multipleSelections} from "@codemirror/next/view"
+import {keymap, highlightSpecialChars, multipleSelections, indentOnInput} from "@codemirror/next/view"
 import {Extension} from "@codemirror/next/state"
 import {history, historyKeymap} from "@codemirror/next/history"
 import {foldGutter, foldKeymap} from "@codemirror/next/fold"
@@ -28,6 +28,7 @@ import {lintKeymap} from "@codemirror/next/lint"
 ///  - [the undo history](#history.history)
 ///  - [a fold gutter](#fold.foldGutter)
 ///  - [multiple selection support](#view.multipleSelections)
+///  - [reindentation on input](#view.indentOnInput)
 ///  - [the default highlighter](#highlight.defaultHighlighter)
 ///  - [bracket matching](#matchbrackets.bracketMatching)
 ///  - [bracket closing](#closebrackets.closeBrackets)
@@ -54,6 +55,7 @@ export const basicSetup: Extension = [
   history(),
   foldGutter(),
   multipleSelections(),
+  indentOnInput(),
   defaultHighlighter,
   bracketMatching(),
   closeBrackets(),

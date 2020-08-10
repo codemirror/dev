@@ -33,6 +33,8 @@ component that displays the editor state and allows text input.
 
 @highlightSpecialChars
 
+@indentOnInput
+
 ### Key bindings
 
 @KeyBinding

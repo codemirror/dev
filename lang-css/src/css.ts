@@ -55,7 +55,8 @@ export const cssSyntax = LezerSyntax.define(parser.withProps(
   })
 ), {
   languageData: {
-    commentTokens: {block: {open: "/*", close: "*/"}}
+    commentTokens: {block: {open: "/*", close: "*/"}},
+    indentOnInput: /^\s*\}$/
   }
 })
 

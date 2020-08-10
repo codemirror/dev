@@ -79,7 +79,8 @@ export const javascriptSyntax = LezerSyntax.define(parser.withProps(
 ), {
   languageData: {
     closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]},
-    commentTokens: {line: "//", block: {open: "/*", close: "*/"}}
+    commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
+    indentOnInput: /^\s*(?:case |default:|\{|\})$/
   }
 })
 

@@ -47,7 +47,8 @@ export const pythonSyntax = LezerSyntax.define(parser.withProps(
 ), {
   languageData: {
     closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']},
-    commentTokens: {line: "#"}
+    commentTokens: {line: "#"},
+    indentOnInput: /^\s*[\}\]\)]$/
   }
 })
 
