@@ -7,7 +7,7 @@ import {styleTags} from "@codemirror/next/highlight"
 /// A syntax provider based on the [Lezer Python
 /// parser](https://github.com/lezer-parser/python), extended with
 /// highlighting and indentation information.
-export const pythonSyntax = new LezerSyntax(parser.withProps(
+export const pythonSyntax = LezerSyntax.define(parser.withProps(
   indentNodeProp.add({
     Body: continuedIndent()
   }),

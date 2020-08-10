@@ -7,7 +7,7 @@ import {Extension} from "@codemirror/next/state"
 /// A syntax provider based on the [Lezer CSS
 /// parser](https://github.com/lezer-parser/css), extended with
 /// highlighting and indentation information.
-export const cssSyntax = new LezerSyntax(parser.withProps(
+export const cssSyntax = LezerSyntax.define(parser.withProps(
   indentNodeProp.add({
     Declaration: continuedIndent()
   }),

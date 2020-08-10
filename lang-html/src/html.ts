@@ -11,7 +11,7 @@ import {Extension} from "@codemirror/next/state"
 /// parser](https://github.com/lezer-parser/html), wired up with the
 /// JavaScript and CSS parsers to parse the content of `<script>` and
 /// `<style>` tags.
-export const htmlSyntax = new LezerSyntax(configureHTML([
+export const htmlSyntax = LezerSyntax.define(configureHTML([
   {tag: "script",
    attrs(attrs) {
      return !attrs.type || /^(?:text|application)\/(?:x-)?(?:java|ecma)script$|^module$|^$/i.test(attrs.type)

@@ -10,7 +10,7 @@ const statementIndent = continuedIndent({except: /^{/})
 /// A syntax provider based on the [Lezer JavaScript
 /// parser](https://github.com/lezer-parser/javascript), extended with
 /// highlighting and indentation information.
-export const javascriptSyntax = new LezerSyntax(parser.withProps(
+export const javascriptSyntax = LezerSyntax.define(parser.withProps(
   indentNodeProp.add(type => {
     if (type.name == "IfStatement") return continuedIndent({except: /^\s*({|else\b)/})
     if (type.name == "TryStatement") return continuedIndent({except: /^\s*({|catch|finally)\b/})
@@ -91,6 +91,7 @@ export function javascriptSupport(): Extension {
 
 /// Returns an extension that installs the JavaScript syntax and
 /// support features.
-export function javascript(): Extension {
-  return [javascriptSyntax, javascriptSupport()]
+export function javascript(config: {jsx?: boolean, typescript?: boolean} = {}): Extension {
+  let dialect = (config.jsx ? ["jsx"] : []).concat(config.typescript ? ["ts"] : []).join(" ")
+  return [dialect ? javascriptSyntax.withDialect(dialect) : javascriptSyntax, javascriptSupport()]
 }

@@ -10,36 +10,26 @@ import {syntaxFolding} from "./fold"
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
 export class LezerSyntax implements Syntax {
-  /// The Lezer parser used by this syntax.
-  readonly parser: Parser
-
   /// @internal
   readonly field: StateField<SyntaxState>
 
   /// The extension value to install this provider.
   readonly extension: Extension
 
-  readonly languageData: Facet<{[name: string]: any}>
-
-  /// Create a syntax instance for the given parser. You'll usually
-  /// want to use the
-  /// [`withProps`](https://lezer.codemirror.net/docs/ref/#lezer.Parser.withProps)
-  /// method to register CodeMirror-specific syntax node props in the
-  /// parser, before passing it to this constructor.
-  ///
-  /// When [language data](#state.EditorState.languageDataAt) is
-  /// given, it will be included in the syntax object's extension.
-  constructor(parser: Parser, config: {languageData?: {[name: string]: any}} = {}) {
+  /// @internal
+  constructor(
+    /// The Lezer parser used by this syntax.
+    readonly parser: Parser,
+    /// The dialect enabled for the parser.
+    readonly dialect: string,
+    /// The [language data](#state.EditorState.languageDataAt) data
+    /// facet used for this language.
+    readonly languageData: Facet<{[name: string]: any}>
+  ) {
     let setSyntax = StateEffect.define<SyntaxState>()
-    let {languageData} = config
-    this.languageData = Facet.define<{[name: string]: any}>({
-      combine: languageData ? values => values.concat(languageData!) : undefined
-    })
-    parser = this.parser = parser.withProps(languageDataProp.add({[parser.topType.name]: this.languageData}))
-    
     this.field = StateField.define<SyntaxState>({
-      create(state) { return SyntaxState.advance(Tree.empty, parser, state.doc) },
-      update(value, tr) { return value.apply(tr, parser, setSyntax) }
+      create: state => SyntaxState.advance(Tree.empty, this, state.doc),
+      update: (value, tr) => value.apply(tr, this, setSyntax)
     })
     this.extension = [
       EditorState.syntax.of(this),
@@ -48,6 +38,29 @@ export class LezerSyntax implements Syntax {
       syntaxIndentation(this),
       syntaxFolding(this)
     ]
+  }
+
+  /// Create a syntax instance for the given parser. You'll usually
+  /// want to use the
+  /// [`withProps`](https://lezer.codemirror.net/docs/ref/#lezer.Parser.withProps)
+  /// method to register CodeMirror-specific syntax node props in the
+  /// parser, before passing it to this constructor.
+  static define(parser: Parser, config: {
+    /// When [language data](#state.EditorState.languageDataAt) is
+    /// given, it will be included in the syntax object's extension.
+    languageData?: {[name: string]: any},
+    /// The dialect of the grammar to use, if any.
+    dialect?: string
+  } = {}) {
+    let languageData = Facet.define<{[name: string]: any}>({
+      combine: config.languageData ? values => values.concat(config.languageData!) : undefined
+    })
+    return new LezerSyntax(parser.withProps(languageDataProp.add({[parser.topType.name]: languageData})),
+                           config.dialect || "", languageData)
+  }
+
+  withDialect(dialect: string) {
+    return new LezerSyntax(this.parser, dialect, this.languageData)
   }
 
   getTree(state: EditorState) {
@@ -61,7 +74,7 @@ export class LezerSyntax implements Syntax {
   ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
     let field = state.field(this.field)
     if (field.upto >= upto) return field.updatedTree
-    if (!field.parse) field.startParse(this.parser, state.doc)
+    if (!field.parse) field.startParse(this, state.doc)
 
     if (field.parse!.pos < upto) {
       let done = work(field.parse!, timeout, upto)
@@ -175,26 +188,26 @@ class SyntaxState {
     this.updatedTree = tree
   }
 
-  static advance(cache: Tree, parser: Parser, doc: Text) {
-    let parse = parser.startParse(new DocStream(doc), {cache})
+  static advance(cache: Tree, syntax: LezerSyntax, doc: Text) {
+    let parse = syntax.parser.startParse(new DocStream(doc), {cache, dialect: syntax.dialect})
     let done = work(parse, Work.Apply)
     if (done) return new SyntaxState(done, doc.length, done)
     let result = takeTree(parse, cache)
     return new SyntaxState(result.parsed, parse.pos, result.cache)
   }
 
-  apply(tr: Transaction, parser: Parser, effect: StateEffectType<SyntaxState>) {
+  apply(tr: Transaction, syntax: LezerSyntax, effect: StateEffectType<SyntaxState>) {
     for (let e of tr.effects) if (e.is(effect)) return e.value
     if (!tr.docChanged) return this
     let ranges: ChangedRange[] = []
     tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
     return SyntaxState.advance(
       (this.parse ? takeTree(this.parse, this.updatedTree).cache : this.cache).applyChanges(ranges),
-      parser, tr.state.doc)
+      syntax, tr.state.doc)
   }
 
-  startParse(parser: Parser, doc: Text) {
-    this.parse = parser.startParse(new DocStream(doc), {cache: this.cache})
+  startParse(syntax: LezerSyntax, doc: Text) {
+    this.parse = syntax.parser.startParse(new DocStream(doc), {cache: this.cache, dialect: syntax.dialect})
   }
 
   stopParse(tree?: Tree | null, upto?: number) {
@@ -245,7 +258,7 @@ class HighlightWorker {
     this.working = -1
     let {state} = this.view, field = state.field(this.syntax.field)
     if (field.upto >= state.doc.length) return
-    if (!field.parse) field.startParse(this.syntax.parser, state.doc)
+    if (!field.parse) field.startParse(this.syntax, state.doc)
     let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (done || field.parse!.badness > .8) {
       let tree = field.stopParse(done, state.doc.length)
