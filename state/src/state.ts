@@ -269,10 +269,19 @@ export class EditorState {
     return unit.charCodeAt(0) == 9 ? this.tabSize * unit.length : unit.length
   }
 
-  /// Whether indentation should use tabs. Will be true when the
+  /// Create an indentation string that covers columns 0 to `cols`.
+  /// Will use tabs for as much of the columns as possible when the
   /// [`indentUnit`](#state.EditorState^indentUnit) facet contains
   /// tabs.
-  get indentWithTabs() { return this.facet(EditorState.indentUnit).charCodeAt(0) == 9 }
+  indentString(cols: number) {
+    let result = ""
+    if (this.facet(EditorState.indentUnit).charCodeAt(0) == 9) while (cols >= this.tabSize) {
+      result += "\t"
+      cols -= this.tabSize
+    }
+    for (let i = 0; i < cols; i++) result += " "
+    return result
+  }    
 
   /// Registers translation phrases. The
   /// [`phrase`](#state.EditorState.phrase) method will look through

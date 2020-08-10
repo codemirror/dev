@@ -464,16 +464,6 @@ export const deleteLine: Command = view => {
   return true
 }
 
-function indentString(state: EditorState, n: number) {
-  let result = ""
-  if (state.indentWithTabs) while (n >= state.tabSize) {
-    result += "\t"
-    n -= state.tabSize
-  }
-  for (let i = 0; i < n; i++) result += " "
-  return result
-}
-
 function getIndentation(cx: IndentContext, pos: number): number {
   for (let f of cx.state.facet(EditorState.indentation)) {
     let result = f(cx, pos)
@@ -500,7 +490,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let indent = indentation[i++], line = state.doc.lineAt(to)
     while (to < line.to && /\s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
     if (from > line.from && from < line.from + 100 && !/\S/.test(line.slice(0, from))) from = line.from
-    return {changes: {from, to, insert: Text.of(["", indentString(state, indent)])},
+    return {changes: {from, to, insert: Text.of(["", state.indentString(indent)])},
             range: EditorSelection.cursor(from + 1 + indent)}
   })
   dispatch(state.update(changes, {scrollIntoView: true}))
@@ -538,7 +528,7 @@ export const indentSelection: StateCommand = ({state, dispatch}) => {
     let indent = getIndentation(context, line.from)
     if (indent < 0) return
     let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, 200)))![0]
-    let norm = indentString(state, indent)
+    let norm = state.indentString(indent)
     if (cur != norm || range.from < line.from + cur.length) {
       updated[line.from] = indent
       changes.push({from: line.from, to: line.from + cur.length, insert: norm})
@@ -564,7 +554,7 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
     let lineStart = line.slice(0, Math.min(line.length, 200))
     let space = /^\s*/.exec(lineStart)![0]
     if (!space) return
-    let col = countColumn(space, 0, state.tabSize), insert = indentString(state, Math.max(0, col - state.indentUnit)), keep = 0
+    let col = countColumn(space, 0, state.tabSize), insert = state.indentString(Math.max(0, col - state.indentUnit)), keep = 0
     while (keep < space.length && keep < insert.length && space.charCodeAt(keep) == insert.charCodeAt(keep)) keep++
     changes.push({from: line.from + keep, to: line.from + space.length, insert: insert.slice(keep)})
   })))

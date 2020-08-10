@@ -109,13 +109,13 @@ describe("EditorState", () => {
   it("tracks indent units", () => {
     let s0 = EditorState.create({})
     ist(s0.indentUnit, 2)
-    ist(s0.indentWithTabs, false)
+    ist(s0.indentString(4), "    ")
     let s1 = EditorState.create({extensions: EditorState.indentUnit.of("   ")})
     ist(s1.indentUnit, 3)
-    ist(s1.indentWithTabs, false)
+    ist(s1.indentString(4), "    ")
     let s2 = EditorState.create({extensions: [EditorState.indentUnit.of("\t"), EditorState.tabSize.of(8)]})
     ist(s2.indentUnit, 8)
-    ist(s2.indentWithTabs, true)
+    ist(s2.indentString(16), "\t\t")
   })
 
   describe("changeByRange", () => {
