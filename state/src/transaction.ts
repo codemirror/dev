@@ -1,7 +1,9 @@
 import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
-import {EditorSelection} from "./selection"
+import {EditorSelection, checkSelection} from "./selection"
+import {changeFilter, transactionFilter} from "./extension"
 import {Extension} from "./facet"
+import {Text} from "@codemirror/next/text"
 
 /// Annotations are tagged values that are used to add metadata to
 /// transactions in an extensible way. They should be used to model
@@ -138,30 +140,16 @@ export type ReconfigurationSpec = {
   [tag: string]: Extension | undefined
 }
 
-/// A [transactions spec](#state.TransactionSpec) with most of its
-/// fields narrowed down to more predictable types. This type is used
-/// to pass something more usable than a raw transaction spec to, for
-/// example, [change filters](#state.EditorState^changeFilter).
-export type StrictTransactionSpec = {
-  changes: ChangeSet,
-  selection: EditorSelection | undefined,
-  effects: readonly StateEffect<any>[],
-  annotations: readonly Annotation<any>[],
-  scrollIntoView: boolean,
-  filter: boolean,
-  reconfigure: ReconfigurationSpec | undefined
-}
-
-export const enum TransactionFlag { scrollIntoView = 1 }
-
 /// Changes to the editor state are grouped into transactions.
 /// Typically, a user action creates a single transaction, which may
 /// contain any number of document changes, may change the selection,
 /// or have other effects. Create a transaction by calling
 /// [`EditorState.update`](#state.EditorState.update).
 export class Transaction {
-  /// The new state created by the transaction.
-  readonly state!: EditorState
+  /// @internal
+  _doc: Text | null = null
+  /// @internal
+  _state: EditorState | null = null
 
   /// @internal
   constructor(
@@ -174,14 +162,41 @@ export class Transaction {
     readonly selection: EditorSelection | undefined,
     /// The effects added to the transaction.
     readonly effects: readonly StateEffect<any>[],
-    private annotations: readonly Annotation<any>[],
+    /// @internal
+    readonly annotations: readonly Annotation<any>[],
     /// Holds an object when this transaction
     /// [reconfigures](#state.ReconfigurationSpec) the state.
-    readonly reconfigured: ReconfigurationSpec | undefined,
-    private flags: number
+    readonly reconfigure: ReconfigurationSpec | undefined,
+    /// Whether the selection should be scrolled into view after this
+    /// transaction is dispatched.
+    readonly scrollIntoView: boolean
   ) {
-    if (!this.annotations.some((a: Annotation<any>) => a.type == Transaction.time))
-      this.annotations = this.annotations.concat(Transaction.time.of(Date.now()))
+    if (selection) checkSelection(selection, changes.newLength)
+    if (!annotations.some((a: Annotation<any>) => a.type == Transaction.time))
+      this.annotations = annotations.concat(Transaction.time.of(Date.now()))
+  }
+
+  /// The new document produced by the transaction. (Mostly exposed so
+  /// that [transaction filters](#state.EditorState^transactionFilter)
+  /// can look at the new document without forcing an entire new state
+  /// to be computed by accessing
+  /// [`.state`](#state.Transaction.state).
+  get newDoc() {
+    return this._doc || (this._doc = this.changes.apply(this.startState.doc))
+  }
+
+  /// The new selection produced by the transaction. If
+  /// [`this.selection`](#state.Transaction.selection) is undefined,
+  /// this will [map](#state.EditorSelection.map) the start state's
+  /// current selection through the changes made by the transaction.
+  get newSelection() {
+    return this.selection || this.startState.selection.map(this.changes)
+  }
+
+  /// The new state created by the transaction.
+  get state() {
+    if (!this._state) this.startState.applyTransaction(this)
+    return this._state!
   }
 
   /// Get the value of the given annotation type, if any.
@@ -192,10 +207,6 @@ export class Transaction {
 
   /// Indicates whether the transaction changed the document.
   get docChanged(): boolean { return !this.changes.empty }
-
-  /// Query whether the selection should be scrolled into view after
-  /// applying this transaction.
-  get scrolledIntoView(): boolean { return (this.flags & TransactionFlag.scrollIntoView) > 0 }
 
   /// Annotation used to store transaction timestamps.
   static time = Annotation.define<number>()
@@ -217,59 +228,102 @@ export class Transaction {
   static addToHistory = Annotation.define<boolean>()
 }
 
-export class ResolvedTransactionSpec implements StrictTransactionSpec {
-  // @internal
-  finished: Transaction | null = null
-
-  constructor(readonly changes: ChangeSet,
-              readonly selection: EditorSelection | undefined,
-              readonly effects: readonly StateEffect<any>[],
-              readonly annotations: readonly Annotation<any>[],
-              readonly scrollIntoView: boolean,
-              readonly filter: boolean,
-              readonly reconfigure: ReconfigurationSpec | undefined) {}
-
-  static create(state: EditorState, specs: TransactionSpec | readonly TransactionSpec[]): ResolvedTransactionSpec {
-    let spec: TransactionSpec
-    if (Array.isArray(specs)) {
-      if (specs.length) return specs.map(s => ResolvedTransactionSpec.create(state, s)).reduce((a, b) => a.combine(b))
-      spec = {}
-    } else if (specs instanceof ResolvedTransactionSpec) {
-      return specs
-    } else {
-      spec = specs as TransactionSpec
-    }
-    let reconf = spec.reconfigure
-    if (reconf && reconf.append) {
-      reconf = Object.assign({}, reconf)
-      let tag = typeof Symbol == "undefined" ? "__append" + Math.floor(Math.random() * 0xffffffff) : Symbol("appendConf")
-      reconf[tag as string] = reconf.append
-      reconf.append = undefined
-    }
-    let sel = spec.selection
-    return new ResolvedTransactionSpec(
-      spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
-      sel && (sel instanceof EditorSelection ? sel : EditorSelection.single(sel.anchor, sel.head)),
-      !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
-      !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
-      !!spec.scrollIntoView,
-      spec.filter !== false,
-      reconf)
+function joinRanges(a: readonly number[], b: readonly number[]) {
+  let result = []
+  for (let iA = 0, iB = 0;;) {
+    let from, to
+    if (iA < a.length && (iB == b.length || b[iB] >= a[iA])) { from = a[iA++]; to = a[iA++] }
+    else if (iB < b.length) { from = b[iB++]; to = b[iB++] }
+    else return result
+    if (!result.length || result[result.length - 1] < from) result.push(from, to)
+    else if (result[result.length - 1] < to) result[result.length - 1] = to
   }
+}
 
-  combine(b: ResolvedTransactionSpec) {
-    let a: ResolvedTransactionSpec = this
+function resolveTransactionInner(state: EditorState, spec: TransactionSpec): {
+  changes: ChangeSet,
+  selection: EditorSelection | undefined,
+  effects: readonly StateEffect<any>[],
+  annotations: readonly Annotation<any>[],
+  scrollIntoView: boolean,
+  filter: boolean,
+  reconfigure: ReconfigurationSpec | undefined
+} {
+  let reconf = spec.reconfigure
+  if (reconf && reconf.append) {
+    reconf = Object.assign({}, reconf)
+    let tag = typeof Symbol == "undefined" ? "__append" + Math.floor(Math.random() * 0xffffffff) : Symbol("appendConf")
+    reconf[tag as string] = reconf.append
+    reconf.append = undefined
+  }
+  let sel = spec.selection
+  return {
+    changes: spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
+    selection: sel && (sel instanceof EditorSelection ? sel : EditorSelection.single(sel.anchor, sel.head)),
+    effects: !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
+    annotations: !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
+    scrollIntoView: !!spec.scrollIntoView,
+    filter: spec.filter !== false,
+    reconfigure: reconf
+  }
+}
+
+export function resolveTransaction(state: EditorState, specs: readonly TransactionSpec[], filter: boolean): Transaction {
+  let a = resolveTransactionInner(state, specs.length ? specs[0] : {})
+  for (let i = 1; i < specs.length; i++) {
+    let b = resolveTransactionInner(state, specs[i])
     let changesA = a.changes.mapDesc(b.changes, true), changesB = b.changes.map(a.changes)
-    return new ResolvedTransactionSpec(
-      a.changes.compose(changesB),
-      b.selection ? b.selection.map(changesA) : a.selection ? a.selection.map(changesB) : undefined,
-      StateEffect.mapEffects(a.effects, changesB).concat(StateEffect.mapEffects(b.effects, changesA)),
-      a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
-      a.scrollIntoView || b.scrollIntoView,
-      a.filter && b.filter,
-      !b.reconfigure ? a.reconfigure : b.reconfigure.full || !a.reconfigure ? b.reconfigure
-        : Object.assign({}, a.reconfigure, b.reconfigure))
+    a = {
+      changes: a.changes.compose(changesB),
+      selection: b.selection ? b.selection.map(changesA) : a.selection ? a.selection.map(changesB) : undefined,
+      effects: StateEffect.mapEffects(a.effects, changesB).concat(StateEffect.mapEffects(b.effects, changesA)),
+      annotations: a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
+      scrollIntoView: a.scrollIntoView || b.scrollIntoView,
+      filter: a.filter && b.filter,
+      reconfigure: !b.reconfigure ? a.reconfigure : b.reconfigure.full || !a.reconfigure ? b.reconfigure
+        : Object.assign({}, a.reconfigure, b.reconfigure)
+    }
   }
+
+  let tr = new Transaction(state, a.changes, a.selection, a.effects, a.annotations, a.reconfigure, a.scrollIntoView)
+  return filter && a.filter ? filterTransaction(tr) : tr
+}
+
+// Finish a transaction by applying filters if necessary.
+function filterTransaction(tr: Transaction) {
+  let state = tr.startState
+
+  // Change filters
+  let result: boolean | readonly number[] = true
+  for (let filter of state.facet(changeFilter)) {
+    let value = filter(tr)
+    if (value === false) { result = false; break }
+    if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
+  }
+  if (result !== true) {
+    let changes, back
+    if (result === false) {
+      back = tr.changes.invertedDesc
+      changes = ChangeSet.empty(state.doc.length)
+    } else {
+      let filtered = tr.changes.filter(result)
+      changes = filtered.changes
+      back = filtered.filtered.invertedDesc
+    }
+    tr = new Transaction(state, changes, tr.selection && tr.selection.map(back),
+                         StateEffect.mapEffects(tr.effects, back),
+                         tr.annotations, tr.reconfigure, tr.scrollIntoView)
+  }
+
+  // Transaction filters
+  let filters = state.facet(transactionFilter)
+  for (let i = filters.length - 1; i >= 0; i--) {
+    let filtered = filters[i](tr)
+    if (filtered instanceof Transaction) tr = filtered
+    else if (Array.isArray(filtered) && filtered.length == 1 && filtered[0] instanceof Transaction) tr = filtered[0]
+    else tr = resolveTransaction(state, Array.isArray(filtered) ? filtered : [filtered], false)
+  }
+  return tr
 }
 
 const none: readonly any[] = []

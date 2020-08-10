@@ -127,7 +127,7 @@ class FacetProvider<Input> {
     }
 
     return (state: EditorState, tr: Transaction | null) => {
-      if (!tr || tr.reconfigured) {
+      if (!tr || tr.reconfigure) {
         state.values[idx] = getter(state)
         return SlotStatus.Changed
       } else {
@@ -162,7 +162,7 @@ function dynamicFacetSlot<Input, Output>(
   let idx = addresses[facet.id] >> 1
 
   return (state: EditorState, tr: Transaction | null) => {
-    let oldAddr = !tr ? null : tr.reconfigured ? tr.startState.config.address[facet.id] : idx << 1
+    let oldAddr = !tr ? null : tr.reconfigure ? tr.startState.config.address[facet.id] : idx << 1
     let changed = oldAddr == null
     for (let dynAddr of dynamic) {
       if (ensureAddr(state, dynAddr) & SlotStatus.Changed) changed = true
@@ -241,7 +241,7 @@ export class StateField<Value> {
         return SlotStatus.Changed
       }
       let oldVal, changed = 0
-      if (tr.reconfigured) {
+      if (tr.reconfigure) {
         let oldIdx = maybeIndex(tr.startState, this.id)
         oldVal = oldIdx == null ? this.createF(tr.startState) : tr.startState.values[oldIdx]
         changed = SlotStatus.Changed

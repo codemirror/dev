@@ -2,8 +2,7 @@ import {Text} from "@codemirror/next/text"
 import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
-import {Transaction, TransactionSpec, StrictTransactionSpec, ResolvedTransactionSpec,
-        TransactionFlag, StateEffect} from "./transaction"
+import {Transaction, TransactionSpec, resolveTransaction} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
         changeFilter, transactionFilter} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
@@ -52,7 +51,7 @@ export class EditorState {
     tr: Transaction | null = null
   ) {
     this.status = config.statusTemplate.slice()
-    if (tr && !tr.reconfigured) {
+    if (tr && !tr.reconfigure) {
       this.values = tr.startState.values.slice()
     } else {
       this.values = config.dynamicSlots.map(_ => null)
@@ -64,7 +63,9 @@ export class EditorState {
     }
 
     this.applying = tr
-    if (tr) (tr as any).state = this
+    // Fill in the computed state immediately, so that further queries
+    // for it made during the update return this state
+    if (tr) tr._state = this
     for (let i = 0; i < this.config.dynamicSlots.length; i++) ensureAddr(this, i << 1)
     this.applying = null
   }
@@ -98,13 +99,22 @@ export class EditorState {
   /// [reconfiguration](#state.TransactionSpec.reconfigure), later
   /// specs take precedence over earlier ones.
   update(...specs: readonly TransactionSpec[]): Transaction {
-    let spec = ResolvedTransactionSpec.create(this, specs)
-    return finishTransaction(this, filterTransaction(this, filterChanges(this, spec)))
+    return resolveTransaction(this, specs, true)
   }
 
-  /// Create a [transaction spec](#state.StrictTransactionSpec) that
-  /// replaces every selection range with the given content.
-  replaceSelection(text: string | Text): StrictTransactionSpec {
+  /// @internal
+  applyTransaction(tr: Transaction) {
+    let conf = this.config
+    if (tr.reconfigure)
+      conf = Configuration.resolve(tr.reconfigure.full || conf.source,
+                                   Object.assign(conf.replacements, tr.reconfigure, {full: undefined}),
+                                   this)
+    new EditorState(conf, tr.newDoc, tr.newSelection, tr)
+  }
+
+  /// Create a [transaction](#state.Transaction) that replaces every
+  /// selection range with the given content.
+  replaceSelection(text: string | Text) {
     if (typeof text == "string") text = this.toText(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
                                          range: EditorSelection.cursor(range.from + text.length)}))
@@ -119,7 +129,10 @@ export class EditorState {
   /// changeset and selection, and return it as a [transaction
   /// spec](#state.StrictTransactionSpec), which can be passed to
   /// [`update`](#state.EditorState.update).
-  changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): StrictTransactionSpec {
+  changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): {
+    changes: ChangeSet,
+    selection: EditorSelection
+  } {
     let sel = this.selection
     let result1 = f(sel.ranges[0])
     let changes = this.changes(result1.changes), ranges = [result1.range]
@@ -130,10 +143,10 @@ export class EditorState {
       ranges.push(result.range.map(changes.mapDesc(newChanges, true)))
       changes = changes.compose(newMapped)
     }
-    return ResolvedTransactionSpec.create(this, {
+    return {
       changes,
       selection: EditorSelection.create(ranges, sel.primaryIndex)
-    })
+    }
   }
 
   /// Create a [change set](#state.ChangeSet) from the given change
@@ -347,82 +360,17 @@ export class EditorState {
   /// replace transaction specs before they are applied. This will
   /// only be applied for transactions that don't have
   /// [`filter`](#state.TransactionSpec.filter) set to `false`. You
-  /// can either return a single spec (possibly the input spec), or an
-  /// array of specs (which will be combined in the same way as the
+  /// can either return a single (possibly the input transaction), or
+  /// an array of specs (which will be combined in the same way as the
   /// arguments to [`EditorState.update`](#state.EditorState.update)).
   ///
-  /// The function passed to the filter as third argument can be used
-  /// to force computation of the full
-  /// [transaction](#state.Transaction) for the current spec (which is
-  /// only done on demand for efficiency reasons).
+  /// When possible, it is recommended to avoid accessing
+  /// [`Transaction.state`](#state.Transaction.state) in a filter,
+  /// since it will force creation of a state that will then be
+  /// discarded again, if the transaction is actually filtered.
   ///
   /// (This functionality should be used with care. Indiscriminately
   /// modifying transaction is likely to break something or degrade
   /// the user experience.)
   static transactionFilter = transactionFilter
-}
-
-function finishTransaction(state: EditorState, spec: ResolvedTransactionSpec) {
-  if (spec.finished) return spec.finished
-  if (spec.selection) checkSelection(spec.selection, spec.changes.newLength)
-  let conf = state.config
-  if (spec.reconfigure)
-    conf = Configuration.resolve(spec.reconfigure.full || conf.source,
-                                 Object.assign(conf.replacements, spec.reconfigure, {full: undefined}),
-                                 state)
-  let flags = spec.scrollIntoView ? TransactionFlag.scrollIntoView : 0
-  let tr = new Transaction(state, spec.changes, spec.selection, spec.effects, spec.annotations, spec.reconfigure, flags)
-  new EditorState(conf, spec.changes.apply(state.doc),
-                  spec.selection || (spec.changes ? state.selection.map(spec.changes) : state.selection),
-                  tr)
-  return spec.finished = tr
-}
-
-function filterTransaction(state: EditorState, spec: ResolvedTransactionSpec) {
-  if (!spec.filter) return spec
-  let filters = state.facet(transactionFilter)
-  for (let i = filters.length - 1; i >= 0; i--)
-    spec = ResolvedTransactionSpec.create(state, filters[i](spec, state, () => finishTransaction(state, spec)))
-  return spec
-}
-
-function joinRanges(a: readonly number[], b: readonly number[]) {
-  let result = []
-  for (let iA = 0, iB = 0;;) {
-    let from, to
-    if (iA < a.length && (iB == b.length || b[iB] >= a[iA])) { from = a[iA++]; to = a[iA++] }
-    else if (iB < b.length) { from = b[iB++]; to = b[iB++] }
-    else return result
-    if (!result.length || result[result.length - 1] < from) result.push(from, to)
-    else if (result[result.length - 1] < to) result[result.length - 1] = to
-  }
-}
-
-function filterChanges(state: EditorState, spec: ResolvedTransactionSpec) {
-  if (!spec.filter) return spec
-  let result: boolean | readonly number[] = true
-  for (let filter of state.facet(changeFilter)) {
-    let value = filter(spec, state)
-    if (value === false) { result = false; break }
-    if (Array.isArray(value)) result = result === true ? value : joinRanges(result, value)
-  }
-  if (result === true) return spec
-  let changes, back
-  if (result === false) {
-    back = spec.changes.invertedDesc
-    changes = ChangeSet.empty(state.doc.length)
-  } else {
-    let filtered = spec.changes.filter(result)
-    changes = filtered.changes
-    back = filtered.filtered.invertedDesc
-  }
-
-  return new ResolvedTransactionSpec(
-    changes,
-    spec.selection && spec.selection.map(back),
-    StateEffect.mapEffects(spec.effects, back),
-    spec.annotations,
-    spec.scrollIntoView,
-    spec.filter,
-    spec.reconfigure)
 }

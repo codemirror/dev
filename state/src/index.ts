@@ -2,7 +2,7 @@ export {EditorStateConfig, EditorState} from "./state"
 export {StateCommand, Syntax, languageDataProp, IndentContext} from "./extension"
 export {Facet, StateField, Extension, precedence, Precedence, tagExtension} from "./facet"
 export {EditorSelection, SelectionRange} from "./selection"
-export {Transaction, TransactionSpec, ReconfigurationSpec, StrictTransactionSpec,
+export {Transaction, TransactionSpec, ReconfigurationSpec,
         Annotation, AnnotationType, StateEffect, StateEffectType} from "./transaction"
 export {Text} from "@codemirror/next/text"
 export {combineConfig} from "./config"

@@ -159,7 +159,8 @@ describe("EditorState", () => {
     it("can split changes", () => {
       // Disallows changes in the middle third of the document
       let state = EditorState.create({extensions: [
-        EditorState.changeFilter.of((_tr, state) => [Math.floor(state.doc.length / 3), Math.floor(2 * state.doc.length / 3)])
+        EditorState.changeFilter.of(tr => [Math.floor(tr.startState.doc.length / 3),
+                                           Math.floor(2 * tr.startState.doc.length / 3)])
       ], doc: "onetwo"})
       ist(state.update({changes: {from: 0, to: 6}}).state.doc.toString(), "et")
     })

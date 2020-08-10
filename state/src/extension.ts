@@ -1,7 +1,7 @@
 import {Tree, NodeProp} from "lezer-tree"
 import {Line, countColumn} from "@codemirror/next/text"
 import {EditorState} from "./state"
-import {Transaction, TransactionSpec, StrictTransactionSpec} from "./transaction"
+import {Transaction, TransactionSpec} from "./transaction"
 import {Facet} from "./facet"
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
@@ -14,11 +14,9 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   static: true
 })
 
-export const changeFilter = Facet.define<(tr: StrictTransactionSpec, state: EditorState) => boolean | readonly number[]>()
+export const changeFilter = Facet.define<(tr: Transaction) => boolean | readonly number[]>()
 
-export const transactionFilter = Facet.define<
-  (tr: StrictTransactionSpec, oldState: EditorState, finish: () => Transaction) => TransactionSpec | readonly TransactionSpec[]
->()
+export const transactionFilter = Facet.define<(tr: Transaction) => TransactionSpec | readonly TransactionSpec[]>()
 
 /// A node prop stored on a grammar's top node to indicate the facet
 /// used to store [language data](#state.EditorState.languageDataAt)

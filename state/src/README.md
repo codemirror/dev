@@ -44,8 +44,6 @@ console.log(transaction.state.doc.toString()) // "hello editor"
 
 @ReconfigurationSpec
 
-@StrictTransactionSpec
-
 @Transaction
 
 @Annotation
