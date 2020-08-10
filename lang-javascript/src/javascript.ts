@@ -45,7 +45,7 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     Label: "labelName",
     PropertyName: "propertyName",
     PropertyNameDefinition: "propertyName definition",
-    "PostfixOp UpdateOp": "updateOperator",
+    UpdateOp: "updateOperator",
     LineComment: "lineComment",
     BlockComment: "blockComment",
     Number: "number",
@@ -62,7 +62,19 @@ export const javascriptSyntax = new LezerSyntax(parser.withProps(
     "[ ]": "squareBracket",
     "{ }": "brace",
     ".": "derefOperator",
-    ", ;": "separator"
+    ", ;": "separator",
+
+    TypeName: "typeName",
+    TypeDefinition: "typeName definition",
+    "type enum interface implements namespace module declare": "keyword definition",
+    "abstract global privacy readonly": "modifier",
+    "is keyof unique infer": "operatorKeyword",
+
+    JSXAttributeValue: "string",
+    JSXText: "content",
+    "JSXStartTag JSXStartCloseTag JSXSelfCloseEndTag JSXEndTag": "angleBracket",
+    "JSXIdentifier JSXNameSpacedName": "typeName",
+    "JSXAttribute/JSXIdentifier JSXAttribute/JSXNameSpacedName": "propertyName"
   })
 ), {
   languageData: {
