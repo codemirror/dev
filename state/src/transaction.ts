@@ -1,7 +1,7 @@
 import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
 import {EditorSelection, checkSelection} from "./selection"
-import {changeFilter, transactionFilter} from "./extension"
+import {changeFilter, transactionFilter, lineSeparator} from "./extension"
 import {Extension} from "./facet"
 import {Text} from "@codemirror/next/text"
 
@@ -292,7 +292,7 @@ function resolveTransactionInner(state: EditorState, spec: TransactionSpec, docS
   let sel = spec.selection
   return {
     changes: spec.changes instanceof ChangeSet ? spec.changes
-      : ChangeSet.of(spec.changes || [], docSize, state.facet(EditorState.lineSeparator)),
+      : ChangeSet.of(spec.changes || [], docSize, state.facet(lineSeparator)),
     selection: sel && (sel instanceof EditorSelection ? sel : EditorSelection.single(sel.anchor, sel.head)),
     effects: !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
     annotations: !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],

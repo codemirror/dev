@@ -4,7 +4,7 @@ import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionSpec, resolveTransaction} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
-        changeFilter, transactionFilter} from "./extension"
+        changeFilter, transactionFilter, lineSeparator} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 import {CharCategory, makeCategorizer} from "./charcategory"
 
@@ -241,10 +241,7 @@ export class EditorState {
   /// When you configure a value here, only that precise separator
   /// will be used, allowing you to round-trip documents through the
   /// editor without normalizing line separators.
-  static lineSeparator = Facet.define<string, string | undefined>({
-    combine: values => values.length ? values[0] : undefined,
-    static: true
-  })
+  static lineSeparator = lineSeparator
 
   /// Get the proper [line-break](#state.EditorState^lineSeparator)
   /// string for this state.

@@ -14,6 +14,11 @@ export const allowMultipleSelections = Facet.define<boolean, boolean>({
   static: true
 })
 
+export const lineSeparator = Facet.define<string, string | undefined>({
+  combine: values => values.length ? values[0] : undefined,
+  static: true
+})
+
 export const changeFilter = Facet.define<(tr: Transaction) => boolean | readonly number[]>()
 
 export const transactionFilter = Facet.define<(tr: Transaction) => TransactionSpec | readonly TransactionSpec[]>()
