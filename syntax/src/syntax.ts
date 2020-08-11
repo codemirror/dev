@@ -87,7 +87,7 @@ export class LezerSyntax implements Syntax {
   languageDataFacetAt(state: EditorState, pos: number) {
     if (this.parser.hasNested) {
       let tree = this.getTree(state)
-      let target: Subtree | null = tree.resolve(pos)
+      let target: Subtree | null = tree.resolve(pos, -1)
       while (target) {
         let facet = target.type.prop(languageDataProp)
         if (facet) return facet
