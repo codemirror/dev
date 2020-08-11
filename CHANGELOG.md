@@ -1,3 +1,35 @@
+## 0.10.0 (2020-08-11)
+
+### Breaking changes
+
+`LezerSyntax` instances are now created with `LezerSyntax.define` instead of `new LezerSyntax`.
+
+Transaction and change filters are now passed a full transaction as argument.
+
+The `ResolvedTransactionSpec` type is no longer part of the interface.
+
+The `reconfigured` property on transactions has been renamed to `reconfigure`. Similarly, the `scrolledIntoView` property is now called `scrollIntoView`.
+
+Editor state objects no longer have an `indentWithTabs` property.
+
+### Bug fixes
+
+Fix an issue where language data at the end of an unfinished nested grammar at the end of the document would use the outer language instead of the inner.
+
+### New features
+
+A `LezerSyntax` instance can now specify a dialect to parse.
+
+Transactions now have a `newDoc` property that allows you to access the updated document before the new state has been created.
+
+The `indentString` property on editor states can be used to compute an indentation string of a given column width.
+
+The view package now exports an `indentOnInput` extension that enables automatic reindentation when certain patterns are typed at the start of a line. The basic setup enables this.
+
+When the cursor is between matching brackets, `insertNewlineAndIndent` will insert an additional newline after the cursor.
+
+Transaction specs now support a `sequential` property, which causes them to be interpreted in the document space as produced by earlier specs.
+
 ## 0.9.0 (2020-07-30)
 
 ### Breaking changes
