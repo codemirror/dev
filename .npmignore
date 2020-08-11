@@ -1,4 +1,5 @@
 /website
+/bin
 /*/src/*.js
 /*/src/*.ts
 !/*/src/*.d.ts
@@ -7,4 +8,5 @@
 /*/test
 /node_modules
 /demo
+/.travis.yml
 .tern-*
