@@ -295,7 +295,8 @@ const activeCompletion = StateField.define<ActiveCompletion | PendingCompletion 
     let event = tr.annotation(Transaction.userEvent)
     if (event == "input" && value instanceof ActiveCompletion &&
         value.result.results.every(r => !r || canRefilter(r, tr.state, tr.changes))) {
-      value = new ActiveCompletion(value.result.map(tr.changes).refilterAll(tr.state), 0, value.timeStamp)
+      let filtered = value.result.map(tr.changes).refilterAll(tr.state)
+      value = filtered.options.length ? new ActiveCompletion(filtered, 0, value.timeStamp) : null
     } else if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
                event == "delete" && value) {
       let prev = value instanceof ActiveCompletion ? value : value instanceof PendingCompletion ? value.prev : null
@@ -435,9 +436,12 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     this.debounce = -1
     let {view, stateVersion} = this
     retrieveCompletions(view.state, pending).then(result => {
-      if (this.stateVersion != stateVersion || result.options.length == 0) return
-      view.dispatch({effects: openCompletion.of(result)})
-    }).catch(e => logException(view.state, e))
+      if (this.stateVersion != stateVersion) return
+      view.dispatch({effects: result.options.length == 0 ? toggleCompletion.of(false) : openCompletion.of(result)})
+    }).catch(e => {
+      view.dispatch({effects: toggleCompletion.of(false)})
+      logException(view.state, e)
+    })
   }
 })
 
