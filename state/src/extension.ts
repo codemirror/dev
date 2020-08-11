@@ -62,27 +62,28 @@ export interface Syntax {
 /// lines.
 export class IndentContext {
   /// Create an indent context.
-  ///
-  /// The optional second argument can be used to override line
-  /// indentations provided to the indentation helper function, which
-  /// is useful when implementing region indentation, where
-  /// indentation for later lines needs to refer to previous lines,
-  /// which may have been reindented compared to the original start
-  /// state. If given, this function should return -1 for lines (given
-  /// by start position) that didn't change, and an updated
-  /// indentation otherwise.
-  ///
-  /// The third argument can be used to make it look, to the indent
-  /// logic, like a line break was added at the given position (which
-  /// is mostly just useful for implementing
-  /// [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent).
   constructor(
     /// The editor state.
     readonly state: EditorState,
     /// @internal
-    readonly overrideIndentation?: (pos: number) => number,
-    /// @internal
-    readonly simulateBreak?: number
+    readonly options: {
+      /// Override line indentations provided to the indentation
+      /// helper function, which is useful when implementing region
+      /// indentation, where indentation for later lines needs to refer
+      /// to previous lines, which may have been reindented compared to
+      /// the original start state. If given, this function should
+      /// return -1 for lines (given by start position) that didn't
+      /// change, and an updated indentation otherwise.
+      overrideIndentation?: (pos: number) => number,
+      /// Make it look, to the indent logic, like a line break was
+      /// added at the given position (which is mostly just useful for
+      /// implementing
+      /// [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent).
+      simulateBreak?: number,
+      /// When `simulateBreak` is given, this can be used to make the
+      /// simulate break behave like a double line break.
+      simulateDoubleBreak?: boolean
+    } = {}
   ) {}
 
   /// The indent unit (number of columns per indentation level).
@@ -91,8 +92,10 @@ export class IndentContext {
   /// Get the text directly after `pos`, either the entire line
   /// or the next 100 characters, whichever is shorter.
   textAfterPos(pos: number) {
+    let sim = this.options?.simulateBreak
+    if (pos == sim && this.options?.simulateDoubleBreak) return ""
     return this.state.sliceDoc(pos, Math.min(pos + 100,
-                                             this.simulateBreak != null && this.simulateBreak > pos ? this.simulateBreak : 1e9,
+                                             sim != null && sim > pos ? sim : 1e9,
                                              this.state.doc.lineAt(pos).to))
   }
 
@@ -104,9 +107,10 @@ export class IndentContext {
 
   /// Find the indentation column of the given document line.
   lineIndent(line: Line) {
-    if (this.overrideIndentation) {
-      let override = this.overrideIndentation(line.from)
-      if (override > -1) return override
+    let override = this.options?.overrideIndentation
+    if (override) {
+      let overriden = override(line.from)
+      if (overriden > -1) return overriden
     }
     let text = line.slice(0, Math.min(100, line.length))
     return this.countColumn(text, text.search(/\S/))
@@ -116,7 +120,7 @@ export class IndentContext {
   column(pos: number) {
     let line = this.state.doc.lineAt(pos), text = line.slice(0, pos - line.from)
     let result = this.countColumn(text, pos - line.from)
-    let override = this.overrideIndentation ? this.overrideIndentation(line.from) : -1
+    let override = this.options?.overrideIndentation ? this.options.overrideIndentation(line.from) : -1
     if (override > -1) result += override - this.countColumn(text, text.search(/\S/))
     return result
   }

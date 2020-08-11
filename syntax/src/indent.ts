@@ -40,13 +40,17 @@ function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
   return -1
 }
 
+function ignoreClosed(cx: TreeIndentContext) {
+  return cx.pos == cx.options?.simulateBreak && cx.options?.simulateDoubleBreak
+}
+
 function indentStrategy(tree: Subtree): ((context: TreeIndentContext) => number) | null {
   let strategy = tree.type.prop(indentNodeProp)
   if (strategy) return strategy
   let first = tree.firstChild, close: readonly string[] | undefined
   if (first && (close = first.type.prop(NodeProp.closedBy))) {
     let last = tree.lastChild, closed = last && close.indexOf(last.name) > -1
-    return cx => delimitedStrategy(cx, true, 1, undefined, closed ? last!.start : undefined)
+    return cx => delimitedStrategy(cx, true, 1, undefined, closed && !ignoreClosed(cx) ? last!.start : undefined)
   }
   return tree.parent == null ? topIndent : null
 }
@@ -64,7 +68,7 @@ export class TreeIndentContext extends IndentContext {
     /// The syntax tree node for which the indentation strategy is
     /// registered.
     readonly node: Subtree) {
-    super(base.state, base.overrideIndentation, base.simulateBreak)
+    super(base.state, base.options)
   }
 
   /// Get the text directly after `this.pos`, either the entire line
@@ -102,13 +106,15 @@ function isParent(parent: Subtree, of: Subtree) {
 function bracketedAligned(context: TreeIndentContext) {
   let tree = context.node
   let openToken = tree.childAfter(tree.start), last = tree.lastChild
-  if (!openToken || context.simulateBreak == openToken.end) return null
+  if (!openToken) return null
+  let sim = context.options?.simulateBreak
   let openLine = context.state.doc.lineAt(openToken.start)
+  let lineEnd = sim == null || sim <= openLine.from ? openLine.to : Math.min(openLine.to, sim)
   for (let pos = openToken.end;;) {
     let next = tree.childAfter(pos)
     if (!next || next == last) return null
     if (!next.type.prop(NodeProp.skipped))
-      return next.start < openLine.to ? openToken : null
+      return next.start < lineEnd ? openToken : null
     pos = next.end
   }
 }

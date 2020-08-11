@@ -478,19 +478,35 @@ export const insertNewline: StateCommand = ({state, dispatch}) => {
   return true
 }
 
+function isBetweenBrackets(state: EditorState, pos: number): {from: number, to: number} | null {
+  if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1))) return {from: pos, to: pos}
+  let context = state.tree.resolve(pos)
+  let before = context.childBefore(pos), after = context.childAfter(pos), closedBy
+  if (before && after && before.end <= pos && after.start >= pos &&
+      (closedBy = before.type.prop(NodeProp.closedBy)) && closedBy.indexOf(after.name) > -1)
+    return {from: before.end, to: after.start}
+  return null
+}
+
 /// Replace the selection with a newline and indent the newly created
 /// line(s). If the current line consists only of whitespace, this
-/// will also delete that whitespace.
+/// will also delete that whitespace. When the cursor is between
+/// matching brackets, an additional newline will be inserted after
+/// the cursor.
 export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean => {
-  let i = 0, indentation = state.selection.ranges.map(r => {
-    let indent = getIndentation(new IndentContext(state, undefined, r.from), r.from)
-    return indent > -1 ? indent : /^\s*/.exec(state.doc.lineAt(r.from).slice(0, 50))![0].length
-  })
   let changes = state.changeByRange(({from, to}) => {
-    let indent = indentation[i++], line = state.doc.lineAt(to)
+    let explode = from == to && isBetweenBrackets(state, from)
+    let cx = new IndentContext(state, {simulateBreak: from, simulateDoubleBreak: !!explode})
+    let indent = getIndentation(cx, from)
+    if (indent < 0) indent = /^\s*/.exec(state.doc.lineAt(from).slice(0, 50))![0].length
+
+    let line = state.doc.lineAt(from)
     while (to < line.to && /\s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
-    if (from > line.from && from < line.from + 100 && !/\S/.test(line.slice(0, from))) from = line.from
-    return {changes: {from, to, insert: Text.of(["", state.indentString(indent)])},
+    if (explode) ({from, to} = explode)
+    else if (from > line.from && from < line.from + 100 && !/\S/.test(line.slice(0, from))) from = line.from
+    let insert = ["", state.indentString(indent)]
+    if (explode) insert.push(state.indentString(cx.lineIndent(line)))
+    return {changes: {from, to, insert: Text.of(insert)},
             range: EditorSelection.cursor(from + 1 + indent)}
   })
   dispatch(state.update(changes, {scrollIntoView: true}))
@@ -520,10 +536,10 @@ function changeBySelectedLine(state: EditorState, f: (line: Line, changes: Chang
 /// information.
 export const indentSelection: StateCommand = ({state, dispatch}) => {
   let updated: {[lineStart: number]: number} = Object.create(null)
-  let context = new IndentContext(state, start => {
+  let context = new IndentContext(state, {overrideIndentation: start => {
     let found = updated[start]
     return found == null ? -1 : found
-  })
+  }})
   let changes = changeBySelectedLine(state, (line, changes, range) => {
     let indent = getIndentation(context, line.from)
     if (indent < 0) return

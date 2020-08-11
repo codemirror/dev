@@ -108,5 +108,14 @@ describe("commands", () => {
 
     it("deletes selected text", () =>
        test("{<one>two", "{\n  |two"))
+
+    it("can explode brackets", () =>
+       test("let x = [|]", "let x = [\n  |\n]"))
+
+    it("can explode in indented positions", () =>
+       test("{\n  foo(|)", "{\n  foo(\n    |\n  )"))
+
+    it("can explode brackets with whitespace", () =>
+       test("foo( | )", "foo(\n  |\n)"))
   })
 })
