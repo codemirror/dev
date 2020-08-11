@@ -103,19 +103,29 @@ export type TransactionSpec = {
   /// _after_ the transaction.
   selection?: EditorSelection | {anchor: number, head?: number},
   /// Attach [state effects](#state.StateEffect) to this transaction.
+  /// Again, when they contain positions and this same spec makes
+  /// changes, those positions should refer to positions in the
+  /// updated document.
   effects?: StateEffect<any> | readonly StateEffect<any>[],
   /// Set [annotations](#state.Annotation) for this transaction.
   annotations?: Annotation<any> | readonly Annotation<any>[],
   /// When set to `true`, the transaction is marked as needing to
   /// scroll the current selection into view.
   scrollIntoView?: boolean,
+  /// Specifies that the state should be reconfigured.
+  reconfigure?: ReconfigurationSpec
   /// By default, transactions can be modified by [change
   /// filters](#state.EditorState^changeFilter) and [transaction
   /// filters](#state.EditorState^transactionFilter). You can set this
   /// to `false` to disable that.
   filter?: boolean,
-  /// Specifies that the state should be reconfigured.
-  reconfigure?: ReconfigurationSpec
+  /// Normally, when multiple specs are combined (for example by
+  /// [`EditorState.update`](#state.EditorState.update)), the
+  /// positions in `changes` are taken to refer to the document
+  /// positions in the initial document. When a spec has `sequental`
+  /// set to true, its positions will be taken to refer to the
+  /// document created by the specs before it instead.
+  sequential?: boolean
 }
 
 /// Type used in [transaction specs](#state.TransactionSpec) to
@@ -240,15 +250,38 @@ function joinRanges(a: readonly number[], b: readonly number[]) {
   }
 }
 
-function resolveTransactionInner(state: EditorState, spec: TransactionSpec): {
+type ResolvedSpec = {
   changes: ChangeSet,
   selection: EditorSelection | undefined,
   effects: readonly StateEffect<any>[],
   annotations: readonly Annotation<any>[],
   scrollIntoView: boolean,
-  filter: boolean,
   reconfigure: ReconfigurationSpec | undefined
-} {
+}
+
+function mergeTransaction(a: ResolvedSpec, b: ResolvedSpec, sequential: boolean): ResolvedSpec {
+  let mapForA, mapForB, changes
+  if (sequential) {
+    mapForA = b.changes
+    mapForB = ChangeSet.empty(b.changes.length)
+    changes = a.changes.compose(b.changes)
+  } else {
+    mapForA = b.changes.map(a.changes)
+    mapForB = a.changes.mapDesc(b.changes, true)
+    changes = a.changes.compose(mapForA)
+  }
+  return {
+    changes,
+    selection: b.selection ? b.selection.map(mapForB) : a.selection?.map(mapForA),
+    effects: StateEffect.mapEffects(a.effects, mapForA).concat(StateEffect.mapEffects(b.effects, mapForB)),
+    annotations: a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
+    scrollIntoView: a.scrollIntoView || b.scrollIntoView,
+    reconfigure: !b.reconfigure ? a.reconfigure : b.reconfigure.full || !a.reconfigure ? b.reconfigure
+      : Object.assign({}, a.reconfigure, b.reconfigure)
+  }
+}
+
+function resolveTransactionInner(state: EditorState, spec: TransactionSpec, docSize: number): ResolvedSpec {
   let reconf = spec.reconfigure
   if (reconf && reconf.append) {
     reconf = Object.assign({}, reconf)
@@ -258,35 +291,26 @@ function resolveTransactionInner(state: EditorState, spec: TransactionSpec): {
   }
   let sel = spec.selection
   return {
-    changes: spec.changes ? state.changes(spec.changes) : ChangeSet.empty(state.doc.length),
+    changes: spec.changes instanceof ChangeSet ? spec.changes
+      : ChangeSet.of(spec.changes || [], docSize, state.facet(EditorState.lineSeparator)),
     selection: sel && (sel instanceof EditorSelection ? sel : EditorSelection.single(sel.anchor, sel.head)),
     effects: !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
     annotations: !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
     scrollIntoView: !!spec.scrollIntoView,
-    filter: spec.filter !== false,
     reconfigure: reconf
   }
 }
 
 export function resolveTransaction(state: EditorState, specs: readonly TransactionSpec[], filter: boolean): Transaction {
-  let a = resolveTransactionInner(state, specs.length ? specs[0] : {})
+  let s = resolveTransactionInner(state, specs.length ? specs[0] : {}, state.doc.length)
+  if (specs.length && specs[0].filter === false) filter = false
   for (let i = 1; i < specs.length; i++) {
-    let b = resolveTransactionInner(state, specs[i])
-    let changesA = a.changes.mapDesc(b.changes, true), changesB = b.changes.map(a.changes)
-    a = {
-      changes: a.changes.compose(changesB),
-      selection: b.selection ? b.selection.map(changesA) : a.selection ? a.selection.map(changesB) : undefined,
-      effects: StateEffect.mapEffects(a.effects, changesB).concat(StateEffect.mapEffects(b.effects, changesA)),
-      annotations: a.annotations.length ? a.annotations.concat(b.annotations) : b.annotations,
-      scrollIntoView: a.scrollIntoView || b.scrollIntoView,
-      filter: a.filter && b.filter,
-      reconfigure: !b.reconfigure ? a.reconfigure : b.reconfigure.full || !a.reconfigure ? b.reconfigure
-        : Object.assign({}, a.reconfigure, b.reconfigure)
-    }
+    if (specs[i].filter === false) filter = false
+    let seq = !!specs[i].sequential
+    s = mergeTransaction(s, resolveTransactionInner(state, specs[i], seq ? s.changes.newLength : state.doc.length), seq)
   }
-
-  let tr = new Transaction(state, a.changes, a.selection, a.effects, a.annotations, a.reconfigure, a.scrollIntoView)
-  return filter && a.filter ? filterTransaction(tr) : tr
+  let tr = new Transaction(state, s.changes, s.selection, s.effects, s.annotations, s.reconfigure, s.scrollIntoView)
+  return filter ? filterTransaction(tr) : tr
 }
 
 // Finish a transaction by applying filters if necessary.

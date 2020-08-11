@@ -1,6 +1,5 @@
 import ist from "ist"
-import {EditorState, StateField, Facet, tagExtension,
-        EditorSelection, Annotation, ChangeSet} from "@codemirror/next/state"
+import {EditorState, StateField, Facet, tagExtension, EditorSelection, Annotation} from "@codemirror/next/state"
 
 describe("EditorState", () => {
   it("holds doc and selection properties", () => {
@@ -193,11 +192,10 @@ describe("EditorState", () => {
       ist(state.update({selection: {anchor: 7}}).selection!.primary.to, 4)
     }),
 
-    it("can append changes", () => {
+    it("can append sequential changes", () => {
       let state = EditorState.create({
         extensions: EditorState.transactionFilter.of(tr => {
-          let len = tr.changes.newLength
-          return {...tr, changes: tr.changes.compose(ChangeSet.of({from: len, insert: "!"}, len))}
+          return [tr, {changes: {from: tr.changes.newLength, insert: "!"}, sequential: true}]
         }),
         doc: "one two"
       })
