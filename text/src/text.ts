@@ -41,23 +41,19 @@ export abstract class Text implements Iterable<string> {
   lineAt(pos: number): Line {
     if (pos < 0 || pos > this.length)
       throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
-    for (let i = 0; i < lineCache.length; i += 2) {
-      if (lineCache[i] != this) continue
-      let line = lineCache[i + 1]
-      if (line.start <= pos && line.end >= pos) return line
+    for (let line of lineCache) {
+      if (line.doc == this && line.from <= pos && line.to >= pos) return line
     }
-    return cacheLine(this, this.lineInner(pos, false, 1, 0).finish(this))
+    return cacheLine(this.lineInner(pos, false, 1, 0).finish(this))
   }
 
   /// Get the description for the given (1-based) line number.
   line(n: number): Line {
     if (n < 1 || n > this.lines) throw new RangeError(`Invalid line number ${n} in ${this.lines}-line document`)
-    for (let i = 0; i < lineCache.length; i += 2) {
-      if (lineCache[i] != this) continue
-      let line = lineCache[i + 1]
-      if (line.number == n) return line
+    for (let line of lineCache) {
+      if (line.doc == this && line.number == n) return line
     }
-    return cacheLine(this, this.lineInner(n, true, 1, 0).finish(this))
+    return cacheLine(this.lineInner(n, true, 1, 0).finish(this))
   }
 
   /// @internal
@@ -140,13 +136,10 @@ export abstract class Text implements Iterable<string> {
 if (typeof Symbol != "undefined")
   Text.prototype[Symbol.iterator] = function() { return this.iter() }
 
-let lineCache: any[] = [], lineCachePos = -2, lineCacheSize = 12
+let lineCache: Line[] = [], lineCachePos = -1, lineCacheSize = 10
 
-function cacheLine(text: Text, line: Line): Line {
-  lineCachePos = (lineCachePos + 2) % lineCacheSize
-  lineCache[lineCachePos] = text
-  lineCache[lineCachePos + 1] = line
-  return line
+function cacheLine(line: Line): Line {
+  return lineCache[lineCachePos = (lineCachePos + 1) % lineCacheSize] = line
 }
 
 // Leaves store an array of strings. There are always line breaks
@@ -570,6 +563,9 @@ class LineCursor implements TextIterator {
 /// This type describes a line in the document. It is created
 /// on-demand when lines are [queried](#text.Text.lineAt).
 export class Line {
+  /// The document that the line is part of.
+  doc!: Text
+
   /// @internal
   constructor(
     /// The position of the start of the line.
@@ -592,17 +588,18 @@ export class Line {
   /// is going to be doing a lot of line-reading, to read only the
   /// parts it needs.
   slice(from: number = 0, to: number = this.length) {
-    if (typeof this.content == "string")
-      return to == from + 1 ? this.content.charAt(from) : this.content.slice(from, to)
     if (from == to) return ""
-    let result = this.content!.slice(from, to)
+    if (typeof this.content == "string")
+      return this.content.slice(from, to)
+    if (!this.content) this.content = new LineContent(this.doc, this.from)
+    let result = this.content.slice(from, to)
     if (from == 0 && to == this.length) this.content = result
     return result
   }
 
   /// @internal
   finish(text: Text): this {
-    if (this.content == null) this.content = new LineContent(text, this.from)
+    this.doc = text
     return this
   }
 
