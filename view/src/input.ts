@@ -1,4 +1,4 @@
-import {EditorSelection, EditorState, SelectionRange, Transaction} from "@codemirror/next/state"
+import {EditorSelection, EditorState, SelectionRange, Transaction, ChangeSpec, Text} from "@codemirror/next/state"
 import {EditorView} from "./editorview"
 import {ContentView} from "./contentview"
 import {LineView} from "./blockview"
@@ -256,13 +256,24 @@ function capturePaste(view: EditorView) {
 }
 
 function doPaste(view: EditorView, input: string) {
-  let text = view.state.toText(input), i = 1
-  let changes = text.lines == view.state.selection.ranges.length ?
-    view.state.changeByRange(range => {
+  let {state} = view, changes, i = 1, text = state.toText(input)
+  let byLine = text.lines == state.selection.ranges.length
+  let linewise = lastLinewiseCopy && state.selection.ranges.every(r => r.empty) && lastLinewiseCopy == text.toString()
+  if (linewise) {
+    changes = {
+      changes: state.selection.ranges.map(r => state.doc.lineAt(r.from))
+        .filter((l, i, a) => i == 0 || a[i - 1] != l)
+        .map(line => ({from: line.from, insert: (byLine ? text.line(i++).slice() : input) + state.lineBreak}))
+    }
+  } else if (byLine) {
+    changes = state.changeByRange(range => {
       let line = text.line(i++)
       return {changes: {from: range.from, to: range.to, insert: line.slice()},
               range: EditorSelection.cursor(range.from + line.length)}
-    }) : view.state.replaceSelection(text)
+    })
+  } else {
+    changes = state.replaceSelection(text)
+  }
   view.dispatch(changes, {
     annotations: Transaction.userEvent.of("paste"),
     scrollIntoView: true
@@ -453,7 +464,7 @@ function captureCopy(view: EditorView, text: string) {
 }
 
 function copiedRange(state: EditorState) {
-  let content = [], ranges: {from: number, to: number}[] = []
+  let content = [], ranges: {from: number, to: number}[] = [], linewise = false
   for (let range of state.selection.ranges) if (!range.empty) {
     content.push(state.sliceDoc(range.from, range.to))
     ranges.push(range)
@@ -469,14 +480,18 @@ function copiedRange(state: EditorState) {
       }
       upto = line.number
     }
+    linewise = true
   }
 
-  return {text: content.join(state.lineBreak), ranges}
+  return {text: content.join(state.lineBreak), ranges, linewise}
 }
 
+let lastLinewiseCopy: string | null = null
+
 handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
-  let {text, ranges} = copiedRange(view.state)
+  let {text, ranges, linewise} = copiedRange(view.state)
   if (!text) return
+  lastLinewiseCopy = linewise ? text : null
 
   let data = brokenClipboardAPI ? null : event.clipboardData
   if (data) {
