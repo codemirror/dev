@@ -75,6 +75,3 @@ export const basicSetup: Extension = [
     ...lintKeymap
   ])
 ]
-
-export {EditorView} from "@codemirror/next/view"
-export {EditorState} from "@codemirror/next/state"
