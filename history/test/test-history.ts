@@ -321,6 +321,19 @@ describe("history", () => {
     ist(state.doc.toString(), "b")
   })
 
+  it("properly maps selections through non-history changes", () => {
+    let state = mkState({}, "abc")
+    state = state.update({selection: EditorSelection.create([EditorSelection.cursor(0),
+                                                             EditorSelection.cursor(1),
+                                                             EditorSelection.cursor(2)])}).state
+    state = state.update({changes: {from: 0, to: 3, insert: "d"}}).state
+    state = state.update({changes: [{from: 0, insert: "x"}, {from: 1, insert: "y"}],
+                          annotations: Transaction.addToHistory.of(false)}).state
+    state = command(state, undo)
+    ist(state.doc.toString(), "xabcy")
+    ist(state.selection.ranges.map(r => r.from).join(","), "0,2,3")
+  })
+
   describe("undoSelection", () => {
     it("allows to undo a change", () => {
       let state = mkState()
