@@ -203,7 +203,8 @@ const Tags: TagSpec = {
       typemustmatch: ["typemustmatch"]
     }
   },
-  ol: { attrs: { reversed: ["reversed"], start: null, type: ["1", "a", "A", "i", "I"] } },
+  ol: { attrs: { reversed: ["reversed"], start: null, type: ["1", "a", "A", "i", "I"] },
+        children: ["li", "script", "template", "ul", "ol"] },
   optgroup: { attrs: { disabled: ["disabled"], label: null } },
   option: { attrs: { disabled: ["disabled"], label: null, selected: ["selected"], value: null } },
   output: { attrs: { for: null, form: null, name: null } },
@@ -279,7 +280,7 @@ const Tags: TagSpec = {
   },
   tt: S,
   u: S,
-  ul: S,
+  ul: { children: ["li", "script", "template", "ul", "ol"] },
   var: S,
   video: {
     attrs: {
@@ -358,7 +359,8 @@ const GlobalAttrs: AttrSpec = {
   "aria-valuetext": null
 }
 
-const AllTags = Object.keys(Tags), GlobalAttrNames = Object.keys(GlobalAttrs)
+const AllTags = Object.keys(Tags)
+const GlobalAttrNames = Object.keys(GlobalAttrs)
 
 function elementName(doc: Text, tree: Subtree) {
   let tag = tree.firstChild
@@ -394,21 +396,17 @@ function openTags(doc: Text, tree: Subtree) {
 
 const identifier = /^[:\-\.\w\u00b7-\uffff]+$/
 
-function completeTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let text = state.doc.sliceString(from, to).toLowerCase()
-  let options = []
-  for (let tagName of allowedChildren(state.doc, tree))
-    if (context.filter(tagName, text, true)) options.push({label: tagName, type: "type"})
-  return {from, to, options, filterDownOn: identifier}
+function completeTag(state: EditorState, tree: Subtree, from: number, to: number) {
+  return {from, to,
+          options: allowedChildren(state.doc, tree).map(tagName => ({label: tagName, type: "type"})),
+          filterDownOn: identifier}
 }
 
-function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let options = [], text = state.sliceDoc(from, to).toLowerCase()
+function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number) {
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
-  for (let open of openTags(state.doc, tree))
-    if (context.filter(open, text, true))
-      options.push({label: open, apply: open + end, type: "type"})
-  return {from, to, options, filterDownOn: identifier}
+  return {from, to,
+          options: openTags(state.doc, tree).map(tag => ({label: tag, apply: tag + end, type: "type"})),
+          filterDownOn: identifier}
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
@@ -420,18 +418,15 @@ function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
   return {from: pos, to: pos, options, filterDownOn: identifier}
 }
 
-function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
-  let options = []
+function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number) {
   let elt = findParentElement(tree), info = elt ? Tags[elementName(state.doc, elt)] : null
-  let base = state.sliceDoc(from, to).toLowerCase()
-  for (let attrName of (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)) {
-    if (context.filter(attrName, base, true))
-      options.push({label: attrName, type: "property"})
-  }
-  return {from, to, options, filterDownOn: identifier}
+  let names = (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)
+  return {from, to,
+          options: names.map(attrName => ({label: attrName, type: "property"})),
+          filterDownOn: identifier}
 }
 
-function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number, context: AutocompleteContext) {
+function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number) {
   let attrName = tree.parent?.iterate({
     enter(type, from, to) {
       return type.name == "AttributeName" ? state.sliceDoc(from, to) : undefined
@@ -454,10 +449,8 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
         base = base.slice(1)
         from++
       }
-      for (let value of attrs) {
-        if (context.filter(value, base, true))
-          options.push({label: value, apply: quoteStart + value + quoteEnd, type: "constant"})
-      }
+      for (let value of attrs)
+        options.push({label: value, apply: quoteStart + value + quoteEnd, type: "constant"})
     }
   }
   return {from, to, options}
@@ -466,18 +459,18 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
 export function completeHTML(context: AutocompleteContext): CompletionResult | null {
   let {state, pos} = context, tree = state.tree.resolve(pos, -1)
   if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
-    return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos, context)
-      : completeTag(state, tree, tree.start, pos, context)
+    return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos)
+      : completeTag(state, tree, tree.start, pos)
   } else if (tree.name == "StartTag") {
-    return completeTag(state, tree, pos, pos, context)
+    return completeTag(state, tree, pos, pos)
   } else if (tree.name == "StartCloseTag") {
-    return completeCloseTag(state, tree, pos, pos, context)
+    return completeCloseTag(state, tree, pos, pos)
   } else if (context.explicit && (tree.name == "Element" || tree.name == "Text" || tree.name == "Document")) {
     return completeStartTag(state, tree, pos)
   } else if (context.explicit && (tree.name == "OpenTag" || tree.name == "SelfClosingTag") || tree.name == "AttributeName") {
-    return completeAttrName(state, tree, tree.name == "AttributeName" ? tree.start : pos, pos, context)
+    return completeAttrName(state, tree, tree.name == "AttributeName" ? tree.start : pos, pos)
   } else if (tree.name == "Is" || tree.name == "AttributeValue" || tree.name == "UnquotedAttributeValue") {
-    return completeAttrValue(state, tree, tree.name == "Is" ? pos : tree.start, pos, context)
+    return completeAttrValue(state, tree, tree.name == "Is" ? pos : tree.start, pos)
   } else {
     return null
   }

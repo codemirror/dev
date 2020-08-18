@@ -4,20 +4,7 @@ import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, p
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 import {baseTheme} from "./theme"
-
-/// Denotes how to
-/// [filter](#autocomplete.autocomplete^config.filterType)
-/// completions.
-export enum FilterType {
-  /// Only show completions that start with the currently typed text.
-  Start,
-  /// Show completions that have the typed text anywhere in their
-  /// content.
-  Include,
-  /// Show completions that include each character of the typed text,
-  /// in order (so `gBCR` could complete to `getBoundingClientRect`).
-  Fuzzy
-}
+import {FuzzyMatcher} from "./filter"
 
 export class AutocompleteContext {
   /// @internal
@@ -30,34 +17,8 @@ export class AutocompleteContext {
     /// implicitly by typing. The usual way to respond to this is to
     /// only return completions when either there is part of a
     /// completable entity at the cursor, or explicit is true.
-    readonly explicit: boolean,
-    /// The configured completion filter. Ignoring this won't break
-    /// anything, but supporting it is encouraged.
-    readonly filterType: FilterType,
-    /// Indicates whether completion has been configured to be
-    /// case-sensitive. Again, this should be taken as a hint, not a
-    /// requirement.
-    readonly caseSensitive: boolean
+    readonly explicit: boolean
   ) {}
-
-  /// Filter a given completion string against the partial input in
-  /// `text`. Will use `this.filterType`, returns `true` when the
-  /// completion should be shown.
-  filter(completion: string, text: string, caseSensitive = this.caseSensitive) {
-    if (!caseSensitive && completion == completion.toLowerCase())
-      text = text.toLowerCase()
-    if (this.filterType == FilterType.Start)
-      return completion.slice(0, text.length) == text
-    else if (this.filterType == FilterType.Include)
-      return completion.indexOf(text) > -1
-    // Fuzzy
-    for (let i = 0, j = 0; i < text.length; i++) {
-      let found = completion.indexOf(text[i], j)
-      if (found < 0) return false
-      j = found + 1
-    }
-    return true
-  }
 
   /// Get the extent, content, and (if there is a token) type of the
   /// token before `this.pos`.
@@ -77,8 +38,9 @@ export class AutocompleteContext {
 export interface CompletionResult {
   /// The start of the range that is being completed.
   from: number,
-  /// The end of the completed range.
-  to: number,
+  /// The end of the range that is being completed. Defaults to the
+  /// primary cursor position.
+  to?: number,
   /// The completions
   options: readonly Completion[],
   /// When given, further input that matches the regexp will cause the
@@ -91,19 +53,11 @@ export interface CompletionResult {
 
 function canRefilter(result: CompletionResult, state: EditorState, changes?: ChangeDesc) {
   if (!result.filterDownOn) return false
-  let to = changes ? changes.mapPos(result.to) : result.to, pos = state.selection.primary.head
-  if (pos < to || pos > to + 20) return false
-  return pos == to || result.filterDownOn.test(state.sliceDoc(to, pos))
-}
-
-function refilter(result: CompletionResult, context: AutocompleteContext) {
-  let text = context.state.sliceDoc(result.from, context.pos)
-  return {
-    from: result.from,
-    to: context.pos,
-    options: result.options.filter(opt => context.filter(opt.label, text)),
-    filterDownOn: result.filterDownOn
-  }
+  let from = changes ? changes.mapPos(result.from) : result.from
+  let pos = state.selection.primary.head
+  let to = result.to == null ? pos : changes ? changes.mapPos(result.to, 1) : result.to
+  if (pos <= from || pos > to + 20) return false
+  return pos <= to || result.filterDownOn.test(state.sliceDoc(to, pos))
 }
 
 /// Objects type used to represent individual completions.
@@ -137,62 +91,69 @@ interface AutocompleteConfig {
   activateOnTyping?: boolean
   /// Override the completion source used.
   override?: Autocompleter | null
-  /// Configures how to filter completions.
-  filterType?: FilterType
-  /// Configures whether completion is case-sensitive (defaults to
-  /// false).
-  caseSensitive?: boolean
 }
+
+class Option {
+  constructor(readonly completion: Completion,
+              readonly source: number,
+              readonly match: readonly number[]) {}
+}
+
+function cmpOption(a: Option, b: Option) {
+  let dScore = b.match[0] - a.match[0]
+  if (dScore) return dScore
+  let lA = a.completion.label, lB = b.completion.label
+  return lA < lB ? -1 : lA == lB ? 0 : 1
+}
+
+const MaxOptions = 300
 
 class CombinedResult {
   constructor(readonly sources: readonly Autocompleter[],
               readonly results: readonly (CompletionResult | null)[],
-              readonly options: readonly {completion: Completion, source: number}[]) {}
+              readonly options: readonly Option[],
+              readonly cursor: number) {}
 
   static create(sources: readonly Autocompleter[],
-                results: readonly (CompletionResult | null)[]) {
-    let options = []
-    for (let i = 0, result; i < results.length; i++) if (result = results[i]) {
-      for (let option of result.options) options.push({completion: option, source: i})
+                results: readonly (CompletionResult | null)[],
+                state: EditorState) {
+    let options = [], pos = state.selection.primary.head
+    for (let i = 0, result; i < results.length; i++) if ((result = results[i]) && result.from <= pos) {
+      let matcher = new FuzzyMatcher(state.sliceDoc(result.from, pos))
+      for (let option of result.options) {
+        let match = matcher.match(option.label)
+        if (match) options.push(new Option(option, i, match))
+      }
     }
-    return new CombinedResult(sources, results,
-                              options.sort(({completion: {label: a}}, {completion: {label: b}}) => a < b ? -1 : a == b ? 0 : 1))
+    options.sort(cmpOption)
+    return !options.length ? null
+      : new CombinedResult(sources, results, options.length > MaxOptions ? options.slice(0, MaxOptions) : options, pos)
   }
 
   get from() { return this.results.reduce((m, r) => r ? Math.min(m, r.from) : m, 1e9) }
-  get to() { return this.results.reduce((m, r) => r ? Math.max(m, r.to) : m, 0) }
-
-  map(changes: ChangeDesc) {
-    return new CombinedResult(this.sources,
-                              this.results.map(r => r && {...r, ...{from: changes.mapPos(r.from), to: changes.mapPos(r.to)}}),
-                              this.options)
-  }
-
-  refilterAll(state: EditorState) {
-    let config = state.facet(autocompleteConfig), pos = state.selection.primary.head
-    let context = new AutocompleteContext(state, pos, false, config.filterType, config.caseSensitive)
-    return CombinedResult.create(this.sources, this.results.map(r => r && refilter(r, context)))
-  }
+  get to() { return this.results.reduce((m, r) => r ? Math.max(m, r.to ?? this.cursor) : m, 0) }
 }
 
-function retrieveCompletions(state: EditorState, pending: PendingCompletion): Promise<CombinedResult> {
+function mapResults(results: readonly (CompletionResult | null)[], mapping: ChangeDesc) {
+  return results.map(r => r && {...r, from: mapping.mapPos(r.from), to: r.to == null ? undefined : mapping.mapPos(r.to)})
+}
+
+function retrieveCompletions(state: EditorState, pending: PendingCompletion): Promise<CombinedResult | null> {
   let config = state.facet(autocompleteConfig), pos = state.selection.primary.head
   let sources = config.override ? [config.override] : state.languageDataAt<Autocompleter>("autocomplete", pos)
-  let context = new AutocompleteContext(state, pos, pending.explicit, config.filterType, config.caseSensitive)
+  let context = new AutocompleteContext(state, pos, pending.explicit)
   return Promise.all(sources.map(source => {
     let prevIndex = pending.prev ? pending.prev.result.sources.indexOf(source) : -1
     let prev = prevIndex < 0 ? null : pending.prev!.result.results[prevIndex]
-    return (prev && canRefilter(prev, state) && refilter(prev, context)) || source(context)
-  })).then(results => CombinedResult.create(sources, results))
+    return prev || source(context)
+  })).then(results => CombinedResult.create(sources, results, state))
 }
 
 const autocompleteConfig = Facet.define<AutocompleteConfig, Required<AutocompleteConfig>>({
   combine(configs) {
     return combineConfig(configs, {
       activateOnTyping: true,
-      override: null,
-      filterType: FilterType.Start,
-      caseSensitive: false
+      override: null
     })
   }
 })
@@ -254,7 +215,7 @@ function applyCompletion(view: EditorView, combined: CombinedResult, index: numb
   let result = combined.results[option.source]!
   if (typeof apply == "string") {
     view.dispatch({
-      changes: {from: result.from, to: result.to, insert: apply},
+      changes: {from: result.from, to: result.to ?? view.state.selection.primary.head, insert: apply},
       selection: {anchor: result.from + apply.length}
     })
   } else {
@@ -293,19 +254,23 @@ const activeCompletion = StateField.define<ActiveCompletion | PendingCompletion 
 
   update(value, tr) {
     let event = tr.annotation(Transaction.userEvent)
-    if (event == "input" && value instanceof ActiveCompletion &&
+    if ((event == "input" || event == "delete") && value instanceof ActiveCompletion &&
         value.result.results.every(r => !r || canRefilter(r, tr.state, tr.changes))) {
-      let filtered = value.result.map(tr.changes).refilterAll(tr.state)
-      value = filtered.options.length ? new ActiveCompletion(filtered, 0, value.timeStamp) : null
+      let filtered = CombinedResult.create(value.result.sources, mapResults(value.result.results, tr.changes), tr.state)
+      return filtered && new ActiveCompletion(filtered, 0, value.timeStamp)
     } else if (event == "input" && (value || tr.state.facet(autocompleteConfig).activateOnTyping) ||
-               event == "delete" && value) {
+               event == "delete" && value && (value instanceof ActiveCompletion &&
+                                              value.result.from <= tr.state.selection.primary.head)) {
       let prev = value instanceof ActiveCompletion ? value : value instanceof PendingCompletion ? value.prev : null
       value = new PendingCompletion(prev, value instanceof PendingCompletion ? value.explicit : false)
     } else if (value && (tr.selection || tr.docChanged && touchesCompletion(tr, value))) {
       // Clear on selection changes or changes that touch the completion
       value = null
     } else if (tr.docChanged && value instanceof ActiveCompletion) {
-      value = new ActiveCompletion(value.result.map(tr.changes), value.selected, value.timeStamp)
+      let {result} = value
+      value = new ActiveCompletion(new CombinedResult(result.sources, mapResults(result.results, tr.changes), result.options,
+                                                      tr.state.selection.primary.head),
+                                   value.selected, value.timeStamp)
     }
     for (let effect of tr.effects) {
       if (effect.is(openCompletion))
@@ -355,12 +320,21 @@ function createListBox(result: CombinedResult, id: string) {
   ul.setAttribute("role", "listbox")
   ul.setAttribute("aria-expanded", "true")
   for (let i = 0; i < result.options.length; i++) {
-    let {completion} = result.options[i]
+    let {completion, match} = result.options[i]
     const li = ul.appendChild(document.createElement("li"))
     li.id = id + "-" + i
     let icon = li.appendChild(document.createElement("div"))
     icon.className = themeClass("completionIcon" + (completion.type ? "." + completion.type : ""))
-    li.appendChild(document.createTextNode(completion.label))
+    let {label} = completion, off = 0
+    for (let j = 1; j < match.length;) {
+      let from = match[j++], to = match[j++]
+      if (from > off) li.appendChild(document.createTextNode(label.slice(off, from)))
+      let span = li.appendChild(document.createElement("span"))
+      span.appendChild(document.createTextNode(label.slice(from, to)))
+      span.className = themeClass("completionMatchedText")
+      off = to
+    }
+    if (off < label.length) li.appendChild(document.createTextNode(label.slice(off)))
     li.setAttribute("role", "option")
   }
   return ul
@@ -437,7 +411,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     let {view, stateVersion} = this
     retrieveCompletions(view.state, pending).then(result => {
       if (this.stateVersion != stateVersion) return
-      view.dispatch({effects: result.options.length == 0 ? toggleCompletion.of(false) : openCompletion.of(result)})
+      view.dispatch({effects: result ? openCompletion.of(result) : toggleCompletion.of(false)})
     }).catch(e => {
       view.dispatch({effects: toggleCompletion.of(false)})
       logException(view.state, e)
@@ -454,9 +428,7 @@ export function completeFromList(list: readonly (string | Completion)[]): Autoco
   let filterDownOn = options.every(o => /^\w+$/.test(o.label)) ? /^\w+$/ : undefined
   return (context: AutocompleteContext) => {
     let token = context.tokenBefore()
-    return {from: token.from, to: token.to,
-            options: options.filter(o => context.filter(o.label, token.text)),
-            filterDownOn}
+    return {from: token.from, options, filterDownOn}
   }
 }
 

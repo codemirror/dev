@@ -4,6 +4,7 @@ export const baseTheme = EditorView.baseTheme({
   "tooltip.autocomplete": {
     fontFamily: "monospace",
     overflowY: "auto",
+    whiteSpace: "nowrap",
     maxHeight: "10em",
     listStyle: "none",
     margin: 0,
@@ -31,6 +32,10 @@ export const baseTheme = EditorView.baseTheme({
     height: "1.15em",
     margin: "0 -0.7px -.7em",
     borderLeft: "1.4px dotted #888"
+  },
+
+  completionMatchedText: {
+    textDecoration: "underline"
   },
 
   completionIcon: {

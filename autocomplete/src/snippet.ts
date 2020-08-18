@@ -198,16 +198,11 @@ export type SnippetSpec = {
 
 /// Create a completion source from an array of snippet specs.
 export function completeSnippets(snippets: readonly SnippetSpec[]): Autocompleter {
-  let parsed = snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)}))
+  let options = snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)}))
   return (context: AutocompleteContext) => {
     let token = context.tokenBefore()
     let isAlpha = /[\w\u00a1-\uffff]/.test(token.text)
     if (!isAlpha && !context.explicit) return null
-    let options = []
-    for (let i = 0; i < snippets.length; i++) {
-      let candidate = snippets[i]
-      if (!token.text || context.filter(candidate.keyword, token.text)) options.push(parsed[i])
-    }
     return {from: token.from, to: context.pos, options, filterDownOn: /^[\w\u00a1-\uffff]+$/}
   }
 }
