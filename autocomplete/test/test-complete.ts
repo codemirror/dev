@@ -1,6 +1,8 @@
 import {EditorView} from "@codemirror/next/view"
 import {EditorState, EditorSelection, Transaction} from "@codemirror/next/state"
-import {Autocompleter, autocomplete, AutocompleteContext, startCompletion, currentCompletions} from "@codemirror/next/autocomplete"
+import {Autocompleter, autocomplete, AutocompleteContext, startCompletion,
+        currentCompletions} from "@codemirror/next/autocomplete"
+import ist from "ist"
 
 const Timeout = 1000, Chunk = 15
 
@@ -26,7 +28,7 @@ class Runner {
     })
   }
 
-  runTest(spec: TestSpec, f: (view: EditorView, sync: Sync) => Promise<void>) {
+  runTest(name: string, spec: TestSpec, f: (view: EditorView, sync: Sync) => Promise<void>) {
     let syncing: {get: (state: EditorState) => any, value: any, resolve: () => void} | null = null
     let view = new EditorView({
       state: EditorState.create({
@@ -58,7 +60,7 @@ class Runner {
     let tests = this.tests
     if (filter) tests = tests.filter(t => t.name.indexOf(filter) > -1)
     for (let from = 0; from < tests.length; from += Chunk) {
-      let active = tests.slice(from, Math.min(tests.length, from + Chunk)).map(t => this.runTest(t.spec, t.f))
+      let active = tests.slice(from, Math.min(tests.length, from + Chunk)).map(t => this.runTest(t.name, t.spec, t.f))
       let cleanup = () => {
         for (let {view} of active) view.destroy()
       }
@@ -115,7 +117,9 @@ const words = "one onetwothree OneTwoThree two three"
 describe("autocomplete", () => {
   // Putting all tests together in a single `it` to allow them to run
   // concurrently.
-  it("works", () => {
+  it("works", function() {
+    this.timeout(5000)
+
     let run = new Runner
 
     run.options("prefers by-word matches", "ott", [from(words)], "OneTwoThree onetwothree")
@@ -191,6 +195,8 @@ describe("autocomplete", () => {
       await sync(options, "tag2")
       del(view)
       await sync(options, "tag1")
+      del(view)
+      await sync(options, "tag0")
     })
 
     run.test("adjust completions when changes happen during query", {
@@ -205,10 +211,22 @@ describe("autocomplete", () => {
     run.test("doesn't cancel completions when deleting before they finish", {
       sources: [slow(tagged(false), 80)]
     }, async (view, sync) => {
-      type(view, "ab")
+      type(view, "ta")
       await new Promise(resolve => setTimeout(resolve, 80))
       del(view)
       await sync(options, "tag1")
+    })
+
+    run.test("preserves the dialog on irrelevant changes", {
+      sources: [from("one two")],
+      doc: "woo o"
+    }, async (view, sync) => {
+      startCompletion(view)
+      await sync(options, "one")
+      let dialog = view.dom.querySelector(".cm-tooltip")
+      ist(dialog)
+      view.dispatch({changes: {from: 0, insert: "!"}})
+      ist(view.dom.querySelector(".cm-tooltip"), dialog)
     })
 
     return run.finish()

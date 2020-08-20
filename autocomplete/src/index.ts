@@ -1,10 +1,12 @@
 import {ViewPlugin, PluginValue, ViewUpdate, EditorView, logException, Command, themeClass} from "@codemirror/next/view"
 import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, precedence,
-        EditorState} from "@codemirror/next/state"
+        EditorState, ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 import {baseTheme} from "./theme"
 import {FuzzyMatcher} from "./filter"
+
+function cur(state: EditorState) { return state.selection.primary.head }
 
 /// Objects type used to represent individual completions.
 export interface Completion {
@@ -96,13 +98,11 @@ export interface CompletionResult {
   span?: RegExp
 }
 
-const enum Pending { No, Implicit, Explicit }
-
 const MaxOptions = 300
 
-function sortOptions(active: readonly ActiveCompletion[], state: EditorState) {
+function sortOptions(active: readonly ActiveSource[], state: EditorState) {
   let options = []
-  for (let a of active) {
+  for (let a of active) if (a.hasResult()) {
     let matcher = new FuzzyMatcher(state.sliceDoc(a.from, a.to)), match
     for (let option of a.result.options) if (match = matcher.match(option.label)) {
       options.push(new Option(option, a, match))
@@ -118,79 +118,69 @@ class CompletionDialog {
               readonly tooltip: readonly Tooltip[],
               readonly timestamp: number,
               readonly selected: number) {}
+
+  setSelected(selected: number, id: string) {
+    return selected == this.selected || selected >= this.options.length ? this
+      : new CompletionDialog(this.options, makeAttrs(id, selected), this.tooltip, this.timestamp, selected)
+  }
+
+  static build(active: readonly ActiveSource[], state: EditorState, id: string, prev: CompletionDialog | null) {
+    let options = sortOptions(active, state)
+    if (!options.length) return null
+    let selected = 0
+    if (prev) {
+      let selectedValue = prev.options[prev.selected].completion
+      for (let i = 0; i < options.length && !selected; i++) {
+        if (options[i].completion == selectedValue) selected = i
+      }
+    }
+    return new CompletionDialog(options, makeAttrs(id, selected), [{
+      pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
+      style: "autocomplete",
+      create: completionTooltip(options, id)
+    }], prev ? prev.timestamp : Date.now(), selected)
+  }
 }
 
-
 class CompletionState {
-  constructor(readonly active: readonly ActiveCompletion[],
-              readonly pending: Pending,
+  constructor(readonly active: readonly ActiveSource[],
               readonly id: string,
               readonly open: CompletionDialog | null) {}
 
   static start() {
-    return new CompletionState(none, Pending.No, "cm-ac-" + Math.floor(Math.random() * 1679616).toString(36), null)
-  }
-
-  setSelected(selected: number) {
-    let open = this.open
-    return !open || selected == open.selected ? this
-      : new CompletionState(this.active, this.pending, this.id,
-                            new CompletionDialog(open.options, makeAttrs(this.id, selected), open.tooltip, open.timestamp, selected))
-  }
-
-  setPending(pending: Pending) {
-    return pending == this.pending ? this : new CompletionState(this.active, pending, this.id, this.open)
-  }
-
-  setActive(active: readonly ActiveCompletion[], state: EditorState) {
-    let options = sortOptions(active, state), open = null
-    if (options.length) {
-      let selected = 0
-      if (this.open) {
-        let selectedValue = this.open.options[this.open.selected].completion
-        for (let i = 0; i < options.length && !selected; i++) {
-          if (options[i].completion == selectedValue) selected = i
-        }
-      }
-      open = new CompletionDialog(options, makeAttrs(this.id, selected), [{
-        pos: active.reduce((a, b) => Math.min(a, b.from), 1e8),
-        style: "autocomplete",
-        create: completionTooltip(options, this.id)
-      }], this.open ? this.open.timestamp : Date.now(), selected)
-    }
-    return new CompletionState(active, this.pending, this.id, open)
+    return new CompletionState(none, "cm-ac-" + Math.floor(Math.random() * 2e6).toString(36), null)
   }
 
   update(tr: Transaction) {
-    let value: CompletionState = this
-    let event = tr.annotation(Transaction.userEvent), cur = tr.state.selection.primary.head
-    if (event == "input" && (value.active.length || tr.state.facet(autocompleteConfig).activateOnTyping) ||
-        event == "delete" && value.active.some(a => a.from < cur || a.from == cur && a.explicit))
-      value = value.setPending(Pending.Implicit)
-    else if (tr.selection || tr.changes.touchesRange(tr.state.selection.primary.head))
-      value = value.setPending(Pending.No)
+    let {state} = tr, conf = state.facet(autocompleteConfig)
+    let sources = conf.override || state.languageDataAt<Autocompleter>("autocomplete", cur(state))
+    let active: readonly ActiveSource[] = sources.map(source => {
+      let value = this.active.find(s => s.source == source) || new ActiveSource(source, State.Inactive, false)
+      return value.update(tr)
+    })
+    if (active.length == this.active.length && active.every((a, i) => a == this.active[i])) active = this.active
 
-    if (value.active.length) {
-      let active = []
-      for (let a of value.active) {
-        let updated = a.update(tr)
-        if (updated) active.push(updated)
-      }
-      value = value.setActive(active, tr.state)
-    }
+    let open = tr.selection || active.some(a => a.hasResult() && tr.changes.touchesRange(a.from, a.to)) ||
+      !sameResults(active, this.active) ? CompletionDialog.build(active, state, this.id, this.open) : this.open
+    for (let effect of tr.effects) if (effect.is(setSelectedEffect)) open = open && open.setSelected(effect.value, this.id)
 
-    for (let effect of tr.effects) {
-      if (effect.is(setCompletionState))
-        value = effect.value
-      else if (effect.is(toggleCompletion))
-        value = effect.value ? value.setPending(Pending.Explicit) : value.setActive(none, tr.state).setPending(Pending.No)
-    }
-    return value
+    return active == this.active && open == this.open ? this : new CompletionState(active, this.id, open)
   }
 
   get tooltip(): readonly Tooltip[] { return this.open ? this.open.tooltip : none }
 
   get attrs() { return this.open ? this.open.attrs : baseAttrs }
+}
+
+function sameResults(a: readonly ActiveSource[], b: readonly ActiveSource[]) {
+  if (a == b) return true
+  for (let iA = 0, iB = 0;;) {
+    while (iA < a.length && !a[iA].hasResult) iA++
+    while (iB < b.length && !b[iB].hasResult) iB++
+    let endA = iA == a.length, endB = iB == b.length
+    if (endA || endB) return endA == endB
+    if ((a[iA++] as ActiveResult).result != (b[iB++] as ActiveResult).result) return false
+  }
 }
 
 function makeAttrs(id: string, selected: number): {[name: string]: string} {
@@ -210,26 +200,76 @@ function cmpOption(a: Option, b: Option) {
   return lA < lB ? -1 : lA == lB ? 0 : 1
 }
 
-class ActiveCompletion {
+const enum State { Inactive = 0, Pending = 1, Result = 2 }
+
+class ActiveSource {
   constructor(readonly source: Autocompleter,
+              readonly state: State,
+              readonly explicit: boolean) {}
+
+  hasResult(): this is ActiveResult { return false }
+
+  update(tr: Transaction): ActiveSource {
+    let event = tr.annotation(Transaction.userEvent), value: ActiveSource = this
+    if (event == "input" || event == "delete")
+      value = value.handleUserEvent(tr, event)
+    else if (tr.docChanged)
+      value = value.handleChange(tr)
+    else if (tr.selection && value.state != State.Inactive)
+      value = new ActiveSource(value.source, State.Inactive, false)
+
+    for (let effect of tr.effects) {
+      if (effect.is(toggleCompletionEffect)) {
+        value = effect.value ? new ActiveSource(value.source, State.Pending, true)
+          : new ActiveSource(value.source, State.Inactive, false)
+      } else if (effect.is(setActiveEffect)) {
+        for (let active of effect.value) if (active.source == value.source) value = active
+      }
+    }
+    return value
+  }
+
+  handleUserEvent(_tr: Transaction, type: "input" | "delete"): ActiveSource {
+    return type == "delete" ? this : new ActiveSource(this.source, State.Pending, false)
+  }
+
+  handleChange(tr: Transaction): ActiveSource {
+    return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, State.Inactive, false) : this
+  }
+}
+
+class ActiveResult extends ActiveSource {
+  constructor(source: Autocompleter,
+              explicit: boolean,
               readonly result: CompletionResult,
               readonly from: number,
               readonly to: number,
-              readonly span: RegExp | null,
-              readonly explicit: boolean) {}
+              readonly span: RegExp | null) {
+    super(source, State.Result, explicit)
+  }
 
-  update(tr: Transaction) {
+  hasResult(): this is ActiveResult { return true }
+
+  handleUserEvent(tr: Transaction, type: "input" | "delete"): ActiveSource {
     let from = tr.changes.mapPos(this.from), to = tr.changes.mapPos(this.to, 1)
-    // Change isn't relevant
-    if (!tr.selection && !tr.changes.touchesRange(this.from, this.to))
-      return new ActiveCompletion(this.source, this.result, from, to, this.span, this.explicit)
-    let event = tr.annotation(Transaction.userEvent)
-    if ((event == "input" || event == "delete") && this.span) {
-      let cur = tr.state.selection.primary.head
-      if ((this.explicit ? cur >= from : cur > from) && cur <= to && this.span.test(tr.state.sliceDoc(from, to)))
-        return new ActiveCompletion(this.source, this.result, from, to, this.span, this.explicit)
-    }
-    return null
+    let pos = cur(tr.state)
+    if ((this.explicit ? pos < from : pos <= from) || pos > to)
+      return new ActiveSource(this.source, type == "input" ? State.Pending : State.Inactive, false)
+    if (this.span && this.span.test(tr.state.sliceDoc(from, to)))
+      return new ActiveResult(this.source, this.explicit, this.result, from, to, this.span)
+    return new ActiveSource(this.source, State.Pending, this.explicit)
+  }
+
+  handleChange(tr: Transaction): ActiveSource {
+    return tr.changes.touchesRange(this.from, this.to)
+      ? new ActiveSource(this.source, State.Inactive, false)
+      : new ActiveResult(this.source, this.explicit, this.result,
+                         tr.changes.mapPos(this.from), tr.changes.mapPos(this.to, 1), this.span)
+  }
+
+  map(mapping: ChangeDesc) {
+    return new ActiveResult(this.source, this.explicit, this.result,
+                            mapping.mapPos(this.from), mapping.mapPos(this.to, 1), this.span)
   }
 }
 
@@ -243,7 +283,7 @@ interface AutocompleteConfig {
 
 class Option {
   constructor(readonly completion: Completion,
-              readonly source: ActiveCompletion,
+              readonly source: ActiveResult,
               readonly match: readonly number[]) {}
 }
 
@@ -286,7 +326,7 @@ function moveCompletion(dir: string, by?: string) {
     let selected = cState.open.selected + step * (dir == "up" ? -1 : 1), {length} = cState.open.options
     if (selected < 0) selected = by == "page" ? 0 : length - 1
     else if (selected >= length) selected = by == "page" ? length - 1 : 0
-    view.dispatch({effects: setCompletionState.of(cState.setSelected(selected))})
+    view.dispatch({effects: setSelectedEffect.of(selected)})
     return true
   }
 }
@@ -302,8 +342,7 @@ function acceptCompletion(view: EditorView) {
 export const startCompletion: Command = (view: EditorView) => {
   let cState = view.state.field(completionState, false)
   if (!cState) return false
-  if (cState.open || cState.pending == Pending.Explicit) return false
-  view.dispatch({effects: toggleCompletion.of(true)})
+  view.dispatch({effects: toggleCompletionEffect.of(true)})
   return true
 }
 
@@ -323,8 +362,8 @@ function applyCompletion(view: EditorView, option: Option) {
 /// Close the currently active completion.
 export const closeCompletion: Command = (view: EditorView) => {
   let cState = view.state.field(completionState, false)
-  if (!cState || !(cState.open || cState.pending == Pending.Explicit)) return false
-  view.dispatch({effects: toggleCompletion.of(false)})
+  if (!cState || !cState.active.some(a => a.state != State.Inactive)) return false
+  view.dispatch({effects: toggleCompletionEffect.of(false)})
   return true
 }
 
@@ -337,8 +376,11 @@ export const autocompleteKeymap: readonly KeyBinding[] = [
   {key: "Escape", run: closeCompletion}
 ]
 
-const setCompletionState = StateEffect.define<CompletionState>()
-const toggleCompletion = StateEffect.define<boolean>()
+const toggleCompletionEffect = StateEffect.define<boolean>()
+const setActiveEffect = StateEffect.define<readonly ActiveSource[]>({
+  map(sources, mapping) { return sources.map(s => s.hasResult() && !mapping.empty ? s.map(mapping) : s) }
+})
+const setSelectedEffect = StateEffect.define<number>()
 
 const completionState = StateField.define<CompletionState>({
   create() { return CompletionState.start() },
@@ -357,7 +399,8 @@ const completionState = StateField.define<CompletionState>({
 /// returns `null`.
 export function completionStatus(state: EditorState): null | "active" | "pending" {
   let cState = state.field(completionState, false)
-  return !cState ? null : cState.open ? "active" : cState.pending == Pending.No ? null : "pending"
+  return cState && cState.active.some(a => a.state == State.Pending) ? "pending"
+    : cState && cState.active.some(a => a.state != State.Inactive) ? "active" : null
 }
 
 /// Returns the available completions as an array.
@@ -440,108 +483,126 @@ function scrollIntoView(container: HTMLElement, element: HTMLElement) {
   else if (self.bottom > parent.bottom) container.scrollTop += self.bottom - parent.bottom
 }
 
-class PendingQuery {
+class RunningQuery {
+  time = Date.now()
+
   constructor(readonly source: Autocompleter,
+              readonly explicit: boolean,
               readonly updates: Transaction[],
               public stopped: boolean,
-              public done: ActiveCompletion | null) {}
+              // Note that 'undefined' means 'not done yet', whereas
+              // 'null' means 'query returned null'.
+              public done: undefined | CompletionResult | null) {}
 }
 
-const DebounceTime = 50
+const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000
 
 const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   debounceUpdate = -1
-  retrieving: PendingQuery[] = []
+  running: RunningQuery[] = []
   debounceAccept = -1
 
-  constructor(readonly view: EditorView) {}
+  constructor(readonly view: EditorView) {
+    for (let active of view.state.field(completionState).active)
+      if (active.state == State.Pending) this.startQuery(active)
+  }
 
   update(update: ViewUpdate) {
     let cState = update.state.field(completionState)
-    if (!update.docChanged && !update.selectionSet && update.prevState.field(completionState) == cState) return
-    if (this.debounceUpdate > -1) clearTimeout(this.debounceUpdate)
-    this.debounceUpdate = cState.pending == Pending.No ? -1 : setTimeout(() => this.startUpdate(), DebounceTime)
+    if (!update.selectionSet && !update.docChanged && update.prevState.field(completionState) == cState) return
+
     let doesReset = update.transactions.some(tr => {
       let event = tr.annotation(Transaction.userEvent)
       return (tr.selection || tr.docChanged) && event != "input" && event != "delete"
     })
-    for (let i = 0; i < this.retrieving.length; i++) {
-      let query = this.retrieving[i]
-      if (doesReset) {
+    for (let i = 0; i < this.running.length; i++) {
+      let query = this.running[i]
+      if (doesReset ||
+          query.updates.length + update.transactions.length > MaxUpdateCount && query.time - Date.now() > MinAbortTime) {
         query.stopped = true // FIXME allow signalling an abort to the provider somehow
-        this.retrieving.splice(i--, 1)
-      } else if (query.done) {
-        query.done = update.transactions.reduce((done, tr) => done && done.update(tr), query.done as ActiveCompletion | null)
-        if (!query.done) this.retrieving.splice(i--, 1)
+        this.running.splice(i--, 1)
       } else {
         query.updates.push(...update.transactions)
       }
     }
+
+    if (this.debounceUpdate > -1) clearTimeout(this.debounceUpdate)
+    this.debounceUpdate = cState.active.some(a => a.state == State.Pending && !this.running.some(q => q.source == a.source))
+      ? setTimeout(() => this.startUpdate(), DebounceTime) : -1
   }
 
   startUpdate() {
     this.debounceUpdate = -1
-    let {state} = this.view
-    let cState = state.field(completionState)
-    if (cState.pending == Pending.No) return
-    let pos = state.selection.primary.head
-    for (let source of state.facet(autocompleteConfig).override || state.languageDataAt<Autocompleter>("autocomplete", pos)) {
-      if (cState.active.some(a => a.source == source) || this.retrieving.some(s => s.source == source))
-        continue
-      this.startQuery(source, cState.pending == Pending.Explicit)
+    let {state} = this.view, cState = state.field(completionState)
+    for (let active of cState.active) {
+      if (active.state == State.Pending && !this.running.some(r => r.source == active.source))
+        this.startQuery(active)
     }
-    this.view.dispatch({effects: setCompletionState.of(cState.setPending(Pending.No))})
   }
 
-  startQuery(source: Autocompleter, explicit: boolean) {
-    let {state} = this.view, pos = state.selection.primary.head
-    let pending = new PendingQuery(source, [], false, null)
-    this.retrieving.push(pending)
-    Promise.resolve(source(new AutocompleteContext(state, pos, explicit))).then(result => {
-      if (pending.stopped) {
-        // Drop the result
-      } else if (!result) {
-        this.retrieving.splice(this.retrieving.indexOf(pending), 1)
-      } else {
-        let active: ActiveCompletion | null = new ActiveCompletion(pending.source, result, result.from, result.to ?? pos,
-                                                                   result.span ? ensureAnchor(result.span, true) : null,
-                                                                   explicit)
-        for (let tr of pending.updates) active = active && active.update(tr)
-        if (active) {
-          pending.done = active
-          this.scheduleAccept()
-        } else {
-          this.retrieving.splice(this.retrieving.indexOf(pending), 1)
-          this.startQuery(source, explicit)
-        }
+  startQuery(active: ActiveSource) {
+    let {state} = this.view, pos = cur(state)
+    let pending = new RunningQuery(active.source, active.explicit, [], false, undefined)
+    this.running.push(pending)
+    // FIXME add a timeout mechanism? Or make that depend on the number of transactions added?
+    Promise.resolve(active.source(new AutocompleteContext(state, pos, active.explicit))).then(result => {
+      if (!pending.stopped) {
+        pending.done = result || null
+        this.scheduleAccept()
       }
     }, err => {
-      this.view.dispatch({effects: toggleCompletion.of(false)})
+      this.view.dispatch({effects: toggleCompletionEffect.of(false)})
       logException(this.view.state, err)
     })
   }
 
   scheduleAccept() {
-    if (this.retrieving.every(q => q.done)) this.accept()
+    if (this.running.every(q => q.done !== undefined)) this.accept()
     else if (this.debounceAccept < 0) this.debounceAccept = setTimeout(() => this.accept(), DebounceTime)
   }
 
+  // For each finished query in this.running, try to create a result
+  // or, if appropriate, restart the query.
   accept() {
     if (this.debounceAccept > -1) clearTimeout(this.debounceAccept)
     this.debounceAccept = -1
 
-    let active = []
-    for (let i = 0; i < this.retrieving.length; i++) {
-      let query = this.retrieving[i]
+    let updated: ActiveSource[] = []
+    for (let i = 0; i < this.running.length; i++) {
+      let query = this.running[i]
+      if (query.done === undefined) continue
+      this.running.splice(i--, 1)
+
       if (query.done) {
-        this.retrieving.splice(i--, 1)
-        active.push(query.done)
+        let active: ActiveSource = new ActiveResult(
+          query.source, query.explicit, query.done, query.done.from,
+          query.done.to ?? cur(query.updates.length ? query.updates[0].startState : this.view.state),
+          query.done.span ? ensureAnchor(query.done.span, true) : null)
+        // Replay the transactions that happened since the start of
+        // the request and see if that preserves the result
+        for (let tr of query.updates) active = active.update(tr)
+        if (active.hasResult()) {
+          updated.push(active)
+          continue
+        }
+      }
+
+      let current = this.view.state.field(completionState).active.find(a => a.source == query.source)
+      if (current && current.state == State.Pending) {
+        if (query.done == null) {
+          // Explicitly failed. Should clear the pending status if it
+          // hasn't been re-set in the meantime.
+          let active = new ActiveSource(query.source, State.Inactive, false)
+          for (let tr of query.updates) active = active.update(tr)
+          if (active.state != State.Pending) updated.push(active)
+        } else {
+          // Cleared by subsequent transactions. Restart.
+          this.startQuery(current)
+        }
       }
     }
-    if (active.length) {
-      let {state} = this.view, cState = state.field(completionState)
-      this.view.dispatch({effects: setCompletionState.of(cState.setActive(cState.active.concat(active), state))})
-    }
+
+    if (updated.length) this.view.dispatch({effects: setActiveEffect.of(updated)})
   }
 })
 

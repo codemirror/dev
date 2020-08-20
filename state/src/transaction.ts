@@ -18,6 +18,10 @@ export class Annotation<T> {
 
   /// Define a new type of annotation.
   static define<T>() { return new AnnotationType<T>() }
+
+  // This is just to get less sloppy typing (where StateEffect is a subtype of Annotation)
+  // @ts-ignore
+  private _isAnnotation!: true
 }
 
 /// Marker that identifies a type of [annotation](#state.Annotation).
