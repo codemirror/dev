@@ -7,5 +7,6 @@ import "./test-extension"
 import "./test-motion"
 import "./test-composition"
 import "./test-bidi"
+import "../../autocomplete/test/test-complete"
 
 mocha.run()

@@ -2,7 +2,7 @@ import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} f
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
         Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
 import {baseTheme} from "./theme"
-import {AutocompleteContext, Autocompleter} from "./index"
+import {AutocompleteContext, Autocompleter, Completion} from "./index"
 
 class FieldPos {
   constructor(readonly field: number,
@@ -145,9 +145,9 @@ function fieldSelection(ranges: readonly FieldRange[], field: number) {
 /// a custom order.
 export function snippet(template: string) {
   let snippet = Snippet.parse(template)
-  return (editor: {state: EditorState, dispatch: (tr: Transaction) => void}, range: {from: number, to?: number}) => {
-    let {text, ranges} = snippet.instantiate(editor.state, range.from)
-    let spec: TransactionSpec = {changes: {from: range.from, to: range.to, insert: Text.of(text)}}
+  return (editor: {state: EditorState, dispatch: (tr: Transaction) => void}, _completion: Completion, from: number, to: number) => {
+    let {text, ranges} = snippet.instantiate(editor.state, from)
+    let spec: TransactionSpec = {changes: {from, to, insert: Text.of(text)}}
     if (ranges.length) spec.selection = fieldSelection(ranges, 0)
     if (ranges.length > 1) {
       spec.effects = setActive.of(new ActiveSnippet(ranges, 0))
@@ -198,11 +198,11 @@ export type SnippetSpec = {
 
 /// Create a completion source from an array of snippet specs.
 export function completeSnippets(snippets: readonly SnippetSpec[]): Autocompleter {
-  let options = snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)}))
+  let options: Completion[] = snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)}))
   return (context: AutocompleteContext) => {
     let token = context.tokenBefore()
     let isAlpha = /[\w\u00a1-\uffff]/.test(token.text)
     if (!isAlpha && !context.explicit) return null
-    return {from: token.from, to: context.pos, options, filterDownOn: /^[\w\u00a1-\uffff]+$/}
+    return {from: token.from, options, span: /^[\w\u00a1-\uffff]+$/}
   }
 }

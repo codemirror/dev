@@ -399,14 +399,14 @@ const identifier = /^[:\-\.\w\u00b7-\uffff]+$/
 function completeTag(state: EditorState, tree: Subtree, from: number, to: number) {
   return {from, to,
           options: allowedChildren(state.doc, tree).map(tagName => ({label: tagName, type: "type"})),
-          filterDownOn: identifier}
+          span: identifier}
 }
 
 function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number) {
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   return {from, to,
           options: openTags(state.doc, tree).map(tag => ({label: tag, apply: tag + end, type: "type"})),
-          filterDownOn: identifier}
+          span: identifier}
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
@@ -415,7 +415,7 @@ function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
     options.push({label: "<" + tagName, type: "type"})
   for (let open of openTags(state.doc, tree))
     options.push({label: "</" + open + ">", type: "type"})
-  return {from: pos, to: pos, options, filterDownOn: identifier}
+  return {from: pos, to: pos, options, span: identifier}
 }
 
 function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number) {
@@ -423,7 +423,7 @@ function completeAttrName(state: EditorState, tree: Subtree, from: number, to: n
   let names = (info && info.attrs ? Object.keys(info.attrs).concat(GlobalAttrNames) : GlobalAttrNames)
   return {from, to,
           options: names.map(attrName => ({label: attrName, type: "property"})),
-          filterDownOn: identifier}
+          span: identifier}
 }
 
 function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: number) {
