@@ -1,7 +1,7 @@
 import {EditorView} from "@codemirror/next/view"
 import {EditorState, EditorSelection, Transaction} from "@codemirror/next/state"
 import {Autocompleter, autocomplete, AutocompleteContext, startCompletion,
-        currentCompletions} from "@codemirror/next/autocomplete"
+        currentCompletions, completionStatus, completeFromList} from "@codemirror/next/autocomplete"
 import ist from "ist"
 
 const Timeout = 1000, Chunk = 15
@@ -227,6 +227,28 @@ describe("autocomplete", () => {
       ist(dialog)
       view.dispatch({changes: {from: 0, insert: "!"}})
       ist(view.dom.querySelector(".cm-tooltip"), dialog)
+    })
+
+    run.test("complete from list", {sources: [once(completeFromList(["one", "two", "three"]))], doc: "t"}, async (view, sync) => {
+      startCompletion(view)
+      await sync(options, "three two")
+      type(view, "h")
+      await sync(options, "three")
+      del(view)
+      await sync(options, "three two")
+      del(view)
+      await sync(options, "one three two")
+    })
+
+    run.test("complete from nonalphabetic list", {
+      sources: [completeFromList(["$foo.bar", "$baz.boop", "$foo.quux"])]
+    }, async (view, sync) => {
+      type(view, "x")
+      await sync(v => completionStatus(v), null)
+      type(view, "$")
+      await sync(options, "$baz.boop $foo.bar $foo.quux")
+      type(view, "foo.b")
+      await sync(options, "$foo.bar")
     })
 
     return run.finish()

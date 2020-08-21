@@ -2,7 +2,7 @@ import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} f
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
         Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
 import {baseTheme} from "./theme"
-import {AutocompleteContext, Autocompleter, Completion} from "./index"
+import {Completion} from "./index"
 
 class FieldPos {
   constructor(readonly field: number,
@@ -194,15 +194,4 @@ export type SnippetSpec = {
   name?: string,
   /// The [snippet template](#autocomplete.snippet) to use.
   snippet: string
-}
-
-/// Create a completion source from an array of snippet specs.
-export function completeSnippets(snippets: readonly SnippetSpec[]): Autocompleter {
-  let options: Completion[] = snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)}))
-  return (context: AutocompleteContext) => {
-    let token = context.tokenBefore()
-    let isAlpha = /[\w\u00a1-\uffff]/.test(token.text)
-    if (!isAlpha && !context.explicit) return null
-    return {from: token.from, options, span: /^[\w\u00a1-\uffff]+$/}
-  }
 }

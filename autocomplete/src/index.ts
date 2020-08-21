@@ -3,14 +3,19 @@ import {combineConfig, Transaction, Extension, StateField, StateEffect, Facet, p
         EditorState, ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, TooltipView, tooltips, showTooltip} from "@codemirror/next/tooltip"
 import {keymap, KeyBinding} from "@codemirror/next/view"
+import {Subtree} from "lezer-tree"
 import {baseTheme} from "./theme"
 import {FuzzyMatcher} from "./filter"
+import {snippet, SnippetSpec} from "./snippet"
+export {snippet, SnippetSpec}
 
 function cur(state: EditorState) { return state.selection.primary.head }
 
 /// Objects type used to represent individual completions.
 export interface Completion {
-  /// The label to show in the completion picker.
+  /// The label to show in the completion picker. This is what input
+  /// is matched agains to determine whether a completion matches (and
+  /// how well it matches).
   label: string,
   /// How to apply the completion. When this holds a string, the
   /// completion range is replaced by that string. When it is a
@@ -43,15 +48,12 @@ export class AutocompleteContext {
 
   /// Get the extent, content, and (if there is a token) type of the
   /// token before `this.pos`.
-  tokenBefore() { // FIXME this is not the right approach
-    let from = this.pos, type = null, text = ""
-    let token = this.state.tree.resolve(this.pos, -1)
-    if (!token.firstChild && token.start < this.pos) {
-      from = token.start
-      type = token.type
-      text = this.state.sliceDoc(from, this.pos)
-    }
-    return {from, to: this.pos, text, type}
+  tokenBefore(types: readonly string[]) {
+    let token: Subtree | null = this.state.tree.resolve(this.pos, -1)
+    while (token && types.indexOf(token.name) < 0) token = token.parent
+    return token ? {from: token.start, to: this.pos,
+                    text: this.state.sliceDoc(token.start, this.pos),
+                    type: token.type} : null
   }
 
   /// Get the match of the given expression directly before the
@@ -255,7 +257,7 @@ class ActiveResult extends ActiveSource {
     let pos = cur(tr.state)
     if ((this.explicit ? pos < from : pos <= from) || pos > to)
       return new ActiveSource(this.source, type == "input" ? State.Pending : State.Inactive, false)
-    if (this.span && this.span.test(tr.state.sliceDoc(from, to)))
+    if (this.span && (from == to || this.span.test(tr.state.sliceDoc(from, to))))
       return new ActiveResult(this.source, this.explicit, this.result, from, to, this.span)
     return new ActiveSource(this.source, State.Pending, this.explicit)
   }
@@ -544,7 +546,6 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
     let {state} = this.view, pos = cur(state)
     let pending = new RunningQuery(active.source, active.explicit, [], false, undefined)
     this.running.push(pending)
-    // FIXME add a timeout mechanism? Or make that depend on the number of transactions added?
     Promise.resolve(active.source(new AutocompleteContext(state, pos, active.explicit))).then(result => {
       if (!pending.stopped) {
         pending.done = result || null
@@ -606,18 +607,37 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
   }
 })
 
+function toSet(chars: {[ch: string]: true}) {
+  let flat = Object.keys(chars).join("")
+  let words = /\w/.test(flat)
+  if (words) flat = flat.replace(/\w/g, "")
+  return `[${words ? "\\w" : ""}${flat.replace(/[^\w\s]/g, "\\$&")}]`
+}
+
+function prefixMatch(options: readonly Completion[]) {
+  let first = Object.create(null), rest = Object.create(null)
+  for (let {label} of options) {
+    first[label[0]] = true
+    for (let i = 1; i < label.length; i++) rest[label[i]] = true
+  }
+  let source = toSet(first) + toSet(rest) + "*$"
+  return [new RegExp("^" + source), new RegExp(source)]
+}
+
 /// Given a a fixed array of options, return an autocompleter that
 /// compares those options to the current
 /// [token](#autocomplete.AutocompleteContext.tokenBefore) and returns
 /// the matching ones.
 export function completeFromList(list: readonly (string | Completion)[]): Autocompleter {
   let options = list.map(o => typeof o == "string" ? {label: o} : o) as Completion[]
-  let span = options.every(o => /^\w+$/.test(o.label)) ? /^\w+$/
-    : new RegExp(`^(${options.map(o => o.label.replace(/[^\s\w]/g, "\\$&")).join("|")})$`)
+  let [span, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options)
   return (context: AutocompleteContext) => {
-    let token = context.tokenBefore()
-    return {from: token.from, options, span}
+    let token = context.matchBefore(match)
+    return token || context.explicit ? {from: token ? token.from : context.pos, options, span} : null
   }
 }
 
-export {snippet, completeSnippets, SnippetSpec} from "./snippet"
+/// Create a completion source from an array of snippet specs.
+export function completeSnippets(snippets: readonly SnippetSpec[]): Autocompleter {
+  return completeFromList(snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)})))
+}
