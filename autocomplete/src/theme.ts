@@ -1,5 +1,7 @@
 import {EditorView} from "@codemirror/next/view"
 
+export const MaxInfoWidth = 300
+
 export const baseTheme = EditorView.baseTheme({
   "tooltip.autocomplete": {
     "& > ul": {
@@ -24,6 +26,11 @@ export const baseTheme = EditorView.baseTheme({
         color: "HighlightText"
       }
     }
+  },
+
+  "tooltip.completionInfo": {
+    padding: "3px 9px",
+    maxWidth: MaxInfoWidth + "px",
   },
 
   "snippetField@light": {backgroundColor: "#ddd"},

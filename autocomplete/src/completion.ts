@@ -12,6 +12,10 @@ export interface Completion {
   /// An optional bit of information to show (with a different style)
   /// after the label.
   detail?: string,
+  /// Additional info to show when the completion is selected. Can be
+  /// a plain string or a function that'll render the DOM structure to
+  /// show when invoked.
+  info?: string | ((completion: Completion) => Node),
   /// How to apply the completion. When this holds a string, the
   /// completion range is replaced by that string. When it is a
   /// function, that function is called to perform the completion.
