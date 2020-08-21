@@ -134,7 +134,7 @@ function sortOptions(active: readonly ActiveSource[], state: EditorState) {
 class CompletionDialog {
   constructor(readonly options: readonly Option[],
               readonly attrs: {[name: string]: string},
-              readonly tooltip: readonly Tooltip[],
+              readonly tooltip: readonly [Tooltip],
               readonly timestamp: number,
               readonly selected: number) {}
 
@@ -159,6 +159,11 @@ class CompletionDialog {
       create: completionTooltip(options, id)
     }], prev ? prev.timestamp : Date.now(), selected)
   }
+
+  map(changes: ChangeDesc) {
+    return new CompletionDialog(this.options, this.attrs, [{...this.tooltip[0], pos: changes.mapPos(this.tooltip[0].pos)}],
+                                this.timestamp, this.selected)
+  }
 }
 
 class CompletionState {
@@ -180,7 +185,8 @@ class CompletionState {
     if (active.length == this.active.length && active.every((a, i) => a == this.active[i])) active = this.active
 
     let open = tr.selection || active.some(a => a.hasResult() && tr.changes.touchesRange(a.from, a.to)) ||
-      !sameResults(active, this.active) ? CompletionDialog.build(active, state, this.id, this.open) : this.open
+      !sameResults(active, this.active) ? CompletionDialog.build(active, state, this.id, this.open)
+      : this.open && tr.docChanged ? this.open.map(tr.changes) : this.open
     for (let effect of tr.effects) if (effect.is(setSelectedEffect)) open = open && open.setSelected(effect.value, this.id)
 
     return active == this.active && open == this.open ? this : new CompletionState(active, this.id, open)
