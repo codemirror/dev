@@ -1,5 +1,5 @@
 import {EditorState, Text} from "@codemirror/next/state"
-import {AutocompleteContext, CompletionResult} from "@codemirror/next/autocomplete"
+import {CompletionContext, CompletionResult} from "@codemirror/next/autocomplete"
 import {Subtree} from "lezer-tree"
 
 type AttrSpec = {[attrName: string]: null | readonly string[]}
@@ -456,7 +456,7 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
   return {from, to, options}
 }
 
-export function completeHTML(context: AutocompleteContext): CompletionResult | null {
+export function completeHTML(context: CompletionContext): CompletionResult | null {
   let {state, pos} = context, tree = state.tree.resolve(pos, -1)
   if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
     return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos)

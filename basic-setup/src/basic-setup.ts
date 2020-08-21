@@ -7,7 +7,7 @@ import {defaultKeymap} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"
 import {closeBrackets, closeBracketsKeymap} from "@codemirror/next/closebrackets"
 import {searchKeymap} from "@codemirror/next/search"
-import {autocomplete, autocompleteKeymap} from "@codemirror/next/autocomplete"
+import {autocompletion, completionKeymap} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
 import {gotoLineKeymap} from "@codemirror/next/goto-line"
@@ -59,7 +59,7 @@ export const basicSetup: Extension = [
   defaultHighlighter,
   bracketMatching(),
   closeBrackets(),
-  autocomplete(),
+  autocompletion(),
   rectangularSelection(),
   highlightActiveLine(),
   highlightSelectionMatches(),
@@ -71,7 +71,7 @@ export const basicSetup: Extension = [
     ...foldKeymap,
     ...commentKeymap,
     ...gotoLineKeymap,
-    ...autocompleteKeymap,
+    ...completionKeymap,
     ...lintKeymap
   ])
 ]

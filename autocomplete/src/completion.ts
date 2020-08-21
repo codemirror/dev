@@ -27,7 +27,7 @@ export interface Completion {
 }
 
 /// An instance of this is passed to completion source functions.
-export class AutocompleteContext {
+export class CompletionContext {
   /// @internal
   abortListeners: (() => void)[] | null = []
 
@@ -70,7 +70,7 @@ export class AutocompleteContext {
 
   /// Allows you to register abort handlers, which will be called when
   /// the query is
-  /// [aborted](#autocomplete.AutocompleteContext.aborted).
+  /// [aborted](#autocomplete.CompletionContext.aborted).
   addEventListener(_type: "abort", listener: () => void) {
     if (this.abortListeners) this.abortListeners.push(listener)
   }
@@ -80,8 +80,8 @@ export class AutocompleteContext {
 /// may return its [result](#autocomplete.CompletionResult)
 /// synchronously or as a promise. Returning null indicates no
 /// completions are available.
-export type Autocompleter =
-  (context: AutocompleteContext) => CompletionResult | null | Promise<CompletionResult | null>
+export type CompletionSource =
+  (context: CompletionContext) => CompletionResult | null | Promise<CompletionResult | null>
 
 /// Interface for objects returned by completion sources.
 export interface CompletionResult {

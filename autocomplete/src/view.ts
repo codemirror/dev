@@ -1,8 +1,8 @@
-import {EditorView, KeyBinding, Command, ViewPlugin, PluginValue, ViewUpdate, logException} from "@codemirror/next/view"
+import {EditorView, Command, ViewPlugin, PluginValue, ViewUpdate, logException} from "@codemirror/next/view"
 import {Transaction} from "@codemirror/next/state"
 import {completionState, setSelectedEffect, toggleCompletionEffect, setActiveEffect, State,
         ActiveSource, ActiveResult} from "./state"
-import {cur, CompletionResult, Autocompleter, AutocompleteContext, applyCompletion, ensureAnchor} from "./completion"
+import {cur, CompletionResult, CompletionSource, CompletionContext, applyCompletion, ensureAnchor} from "./completion"
 
 const CompletionInteractMargin = 75
 
@@ -44,15 +44,6 @@ export const closeCompletion: Command = (view: EditorView) => {
   return true
 }
 
-/// Basic keybindings for autocompletion.
-///
-///  - Ctrl-Space (Cmd-Space on macOS): [`startCompletion`](#autocomplete.startCompletion)
-///  - Escape: [`closeCompletion`](#autocomplete.closeCompletion)
-export const autocompleteKeymap: readonly KeyBinding[] = [
-  {key: "Mod-Space", run: startCompletion},
-  {key: "Escape", run: closeCompletion}
-]
-
 class RunningQuery {
   time = Date.now()
   updates: Transaction[] = []
@@ -60,13 +51,13 @@ class RunningQuery {
   // 'query returned null'.
   done: undefined | CompletionResult | null = undefined
 
-  constructor(readonly source: Autocompleter,
-              readonly context: AutocompleteContext) {}
+  constructor(readonly source: CompletionSource,
+              readonly context: CompletionContext) {}
 }
 
 const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000
 
-export const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
+export const completionPlugin = ViewPlugin.fromClass(class implements PluginValue {
   debounceUpdate = -1
   running: RunningQuery[] = []
   debounceAccept = -1
@@ -115,7 +106,7 @@ export const autocompletePlugin = ViewPlugin.fromClass(class implements PluginVa
 
   startQuery(active: ActiveSource) {
     let {state} = this.view, pos = cur(state)
-    let context = new AutocompleteContext(state, pos, active.explicit)
+    let context = new CompletionContext(state, pos, active.explicit)
     let pending = new RunningQuery(active.source, context)
     this.running.push(pending)
     Promise.resolve(active.source(context)).then(result => {

@@ -1,22 +1,22 @@
 import {tooltips} from "@codemirror/next/tooltip"
 import {precedence, Extension, EditorState} from "@codemirror/next/state"
-import {keymap} from "@codemirror/next/view"
-import {AutocompleteContext, Completion, Autocompleter} from "./completion"
-import {completionState, autocompleteConfig, AutocompleteConfig, State} from "./state"
-import {autocompletePlugin, moveCompletion, acceptCompletion} from "./view"
+import {keymap, KeyBinding} from "@codemirror/next/view"
+import {CompletionContext, Completion, CompletionSource} from "./completion"
+import {completionState, completionConfig, CompletionConfig, State} from "./state"
+import {completionPlugin, moveCompletion, acceptCompletion, startCompletion, closeCompletion} from "./view"
 import {SnippetSpec, snippet} from "./snippet"
 import {baseTheme} from "./theme"
 
 export {snippet, SnippetSpec} from "./snippet"
-export {Completion, AutocompleteContext, Autocompleter, CompletionResult} from "./completion"
-export {startCompletion, closeCompletion, autocompleteKeymap} from "./view"
+export {Completion, CompletionContext, CompletionSource, CompletionResult} from "./completion"
+export {startCompletion, closeCompletion} from "./view"
 
 /// Returns an extension that enables autocompletion.
-export function autocomplete(config: AutocompleteConfig = {}): Extension {
+export function autocompletion(config: CompletionConfig = {}): Extension {
   return [
     completionState,
-    autocompleteConfig.of(config),
-    autocompletePlugin,
+    completionConfig.of(config),
+    completionPlugin,
     baseTheme,
     tooltips(),
     precedence(keymap([
@@ -28,6 +28,15 @@ export function autocomplete(config: AutocompleteConfig = {}): Extension {
     ]), "override")
   ]
 }
+
+/// Basic keybindings for autocompletion.
+///
+///  - Ctrl-Space (Cmd-Space on macOS): [`startCompletion`](#autocomplete.startCompletion)
+///  - Escape: [`closeCompletion`](#autocomplete.closeCompletion)
+export const completionKeymap: readonly KeyBinding[] = [
+  {key: "Mod-Space", run: startCompletion},
+  {key: "Escape", run: closeCompletion}
+]
 
 function toSet(chars: {[ch: string]: true}) {
   let flat = Object.keys(chars).join("")
@@ -48,19 +57,19 @@ function prefixMatch(options: readonly Completion[]) {
 
 /// Given a a fixed array of options, return an autocompleter that
 /// compares those options to the current
-/// [token](#autocomplete.AutocompleteContext.tokenBefore) and returns
+/// [token](#autocomplete.CompletionContext.tokenBefore) and returns
 /// the matching ones.
-export function completeFromList(list: readonly (string | Completion)[]): Autocompleter {
+export function completeFromList(list: readonly (string | Completion)[]): CompletionSource {
   let options = list.map(o => typeof o == "string" ? {label: o} : o) as Completion[]
   let [span, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options)
-  return (context: AutocompleteContext) => {
+  return (context: CompletionContext) => {
     let token = context.matchBefore(match)
     return token || context.explicit ? {from: token ? token.from : context.pos, options, span} : null
   }
 }
 
 /// Create a completion source from an array of snippet specs.
-export function completeSnippets(snippets: readonly SnippetSpec[]): Autocompleter {
+export function completeSnippets(snippets: readonly SnippetSpec[]): CompletionSource {
   return completeFromList(snippets.map(s => ({label: s.keyword, detail: s.detail, apply: snippet(s.snippet)})))
 }
 

@@ -1,6 +1,6 @@
 import {EditorView} from "@codemirror/next/view"
 import {EditorState, EditorSelection, Transaction} from "@codemirror/next/state"
-import {Autocompleter, autocomplete, AutocompleteContext, startCompletion,
+import {CompletionSource, autocompletion, CompletionContext, startCompletion,
         currentCompletions, completionStatus, completeFromList} from "@codemirror/next/autocomplete"
 import ist from "ist"
 
@@ -11,7 +11,7 @@ type Sync = <T>(get: (state: EditorState) => T, value: T) => Promise<void>
 type TestSpec = {
   doc?: string,
   selection?: number,
-  sources: readonly Autocompleter[]
+  sources: readonly CompletionSource[]
 }
 
 class Runner {
@@ -21,7 +21,7 @@ class Runner {
     this.tests.push({name, spec, f})
   }
 
-  options(name: string, doc: string, sources: readonly Autocompleter[], list: string) {
+  options(name: string, doc: string, sources: readonly CompletionSource[], list: string) {
     this.test(name, {doc, sources}, (view, sync) => {
       startCompletion(view)
       return sync(options, list)
@@ -34,7 +34,7 @@ class Runner {
       state: EditorState.create({
         doc: spec.doc,
         selection: EditorSelection.single(spec.selection ?? (spec.doc ? spec.doc.length : 0)),
-        extensions: autocomplete({override: spec.sources})
+        extensions: autocompletion({override: spec.sources})
       }),
       parent: document.querySelector("#workspace")! as HTMLElement,
       dispatch: tr => {
@@ -69,7 +69,7 @@ class Runner {
   }
 }
 
-function from(list: string): Autocompleter {
+function from(list: string): CompletionSource {
   return cx => {
     let word = cx.matchBefore(/\w+$/)
     if (!word && !cx.explicit) return null
@@ -77,7 +77,7 @@ function from(list: string): Autocompleter {
   }
 }
 
-function tagged(span: boolean): Autocompleter {
+function tagged(span: boolean): CompletionSource {
   return cx => {
     let word = cx.matchBefore(/\w+$/)
     return {from: word ? word.from : cx.pos, options: [{label: "tag" + cx.pos}], span: span ? /\w*/ : undefined}
@@ -88,13 +88,13 @@ function sleep(delay: number) {
   return new Promise(resolve => setTimeout(() => resolve(), delay))
 }
 
-function slow(c: Autocompleter, delay: number): Autocompleter {
-  return (cx: AutocompleteContext) => new Promise(resolve => setTimeout(() => resolve(c(cx)), delay))
+function slow(c: CompletionSource, delay: number): CompletionSource {
+  return (cx: CompletionContext) => new Promise(resolve => setTimeout(() => resolve(c(cx)), delay))
 }
 
-function once(c: Autocompleter): Autocompleter {
+function once(c: CompletionSource): CompletionSource {
   let done = false
-  return (cx: AutocompleteContext) => {
+  return (cx: CompletionContext) => {
     if (done) throw new Error("Used 'once' completer multiple times")
     done = true
     return c(cx)

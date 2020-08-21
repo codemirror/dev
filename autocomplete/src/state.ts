@@ -1,7 +1,7 @@
 import {EditorView} from "@codemirror/next/view"
 import {combineConfig, Transaction, StateField, StateEffect, Facet, EditorState, ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, showTooltip} from "@codemirror/next/tooltip"
-import {Option, Autocompleter, CompletionResult, cur} from "./completion"
+import {Option, CompletionSource, CompletionResult, cur} from "./completion"
 import {FuzzyMatcher} from "./filter"
 import {completionTooltip} from "./tooltip"
 
@@ -69,8 +69,8 @@ export class CompletionState {
   }
 
   update(tr: Transaction) {
-    let {state} = tr, conf = state.facet(autocompleteConfig)
-    let sources = conf.override || state.languageDataAt<Autocompleter>("autocomplete", cur(state))
+    let {state} = tr, conf = state.facet(completionConfig)
+    let sources = conf.override || state.languageDataAt<CompletionSource>("autocomplete", cur(state))
     let active: readonly ActiveSource[] = sources.map(source => {
       let value = this.active.find(s => s.source == source) || new ActiveSource(source, State.Inactive, false)
       return value.update(tr)
@@ -121,7 +121,7 @@ function cmpOption(a: Option, b: Option) {
 export const enum State { Inactive = 0, Pending = 1, Result = 2 }
 
 export class ActiveSource {
-  constructor(readonly source: Autocompleter,
+  constructor(readonly source: CompletionSource,
               readonly state: State,
               readonly explicit: boolean) {}
 
@@ -157,7 +157,7 @@ export class ActiveSource {
 }
 
 export class ActiveResult extends ActiveSource {
-  constructor(source: Autocompleter,
+  constructor(source: CompletionSource,
               explicit: boolean,
               readonly result: CompletionResult,
               readonly from: number,
@@ -191,15 +191,15 @@ export class ActiveResult extends ActiveSource {
   }
 }
 
-export interface AutocompleteConfig {
+export interface CompletionConfig {
   /// When enabled (defaults to true), autocompletion will start
   /// whenever the user types something that can be completed.
   activateOnTyping?: boolean
   /// Override the completion sources used.
-  override?: readonly Autocompleter[] | null
+  override?: readonly CompletionSource[] | null
 }
 
-export const autocompleteConfig = Facet.define<AutocompleteConfig, Required<AutocompleteConfig>>({
+export const completionConfig = Facet.define<CompletionConfig, Required<CompletionConfig>>({
   combine(configs) {
     return combineConfig(configs, {
       activateOnTyping: true,
