@@ -68,7 +68,9 @@ class CompletionTooltip {
       for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
       if (index < options.length) applyCompletion(view, options[index])
     })
-    this.list.addEventListener("scroll", () => this.view.requestMeasure(this.placeInfo))
+    this.list.addEventListener("scroll", () => {
+      if (this.info) this.view.requestMeasure(this.placeInfo)
+    })
   }
 
   mount() { this.updateSel() }
@@ -76,6 +78,10 @@ class CompletionTooltip {
   update(update: ViewUpdate) {
     if (update.state.field(this.stateField) != update.prevState.field(this.stateField))
       this.updateSel()
+  }
+
+  positioned() {
+    if (this.info) this.view.requestMeasure(this.placeInfo)
   }
 
   updateSel() {
@@ -125,8 +131,8 @@ class CompletionTooltip {
   positionInfo(pos: {top: number, left: boolean} | null) {
     if (this.info && pos) {
       this.info.style.top = pos.top + "px"
-      if (pos.left) this.info.style.right = "100%"
-      else this.info.style.left = "100%"
+      this.info.style.right = pos.left ? "100%" : ""
+      this.info.style.left = pos.left ? "" : "100%"
     }
   }
 }

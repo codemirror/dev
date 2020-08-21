@@ -74,7 +74,8 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
   writeMeasure(measured: Measured) {
     let {editor} = measured
     for (let i = 0; i < this.tooltipViews.length; i++) {
-      let tooltip = this.tooltips[i], {dom} = this.tooltipViews[i], pos = measured.pos[i], size = measured.size[i]
+      let tooltip = this.tooltips[i], tView = this.tooltipViews[i], {dom} = tView
+      let pos = measured.pos[i], size = measured.size[i]
       // Hide tooltips that are outside of the editor.
       if (!pos || pos.bottom <= editor.top || pos.top >= editor.bottom || pos.right <= editor.left || pos.left >= editor.right) {
         dom.style.top = "-10000px"
@@ -89,6 +90,7 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
         above = !above
       dom.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
       dom.style.left = (left - editor.left) + "px"
+      if (tView.positioned) tView.positioned()
     }
   }
 
@@ -146,6 +148,8 @@ export interface TooltipView {
   mount?(view: EditorView): void
   /// Update the DOM element for a change in the view's state.
   update?(update: ViewUpdate): void
+  /// Called when the tooltip has been (re)positioned.
+  positioned?(): void
 }
 
 /// Behavior by which an extension can provide a tooltip to be shown.
