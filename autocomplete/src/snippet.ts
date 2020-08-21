@@ -2,7 +2,7 @@ import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} f
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
         Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
 import {baseTheme} from "./theme"
-import {Completion} from "./index"
+import {Completion} from "./completion"
 
 class FieldPos {
   constructor(readonly field: number,

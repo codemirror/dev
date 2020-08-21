@@ -2,25 +2,27 @@ import {EditorView} from "@codemirror/next/view"
 
 export const baseTheme = EditorView.baseTheme({
   "tooltip.autocomplete": {
-    fontFamily: "monospace",
-    overflowY: "auto",
-    whiteSpace: "nowrap",
-    maxHeight: "10em",
-    listStyle: "none",
-    margin: 0,
-    padding: 0,
+    "& > ul": {
+      fontFamily: "monospace",
+      overflowY: "auto",
+      whiteSpace: "nowrap",
+      maxHeight: "10em",
+      listStyle: "none",
+      margin: 0,
+      padding: 0,
 
-    "& > li": {
-      cursor: "pointer",
-      padding: "1px 1em 1px 3px",
-      lineHeight: 1.2
-    },
+      "& > li": {
+        cursor: "pointer",
+        padding: "1px 1em 1px 3px",
+        lineHeight: 1.2
+      },
 
-    "& > li[aria-selected]": {
-      background_fallback: "#bdf",
-      backgroundColor: "Highlight",
-      color_fallback: "white",
-      color: "HighlightText"
+      "& > li[aria-selected]": {
+        background_fallback: "#bdf",
+        backgroundColor: "Highlight",
+        color_fallback: "white",
+        color: "HighlightText"
+      }
     }
   },
 
