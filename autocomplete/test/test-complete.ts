@@ -84,6 +84,10 @@ function tagged(span: boolean): Autocompleter {
   }
 }
 
+function sleep(delay: number) {
+  return new Promise(resolve => setTimeout(() => resolve(), delay))
+}
+
 function slow(c: Autocompleter, delay: number): Autocompleter {
   return (cx: AutocompleteContext) => new Promise(resolve => setTimeout(() => resolve(c(cx)), delay))
 }
@@ -203,7 +207,7 @@ describe("autocomplete", () => {
       sources: [slow(once(from("one ok")), 100)]
     }, async (view, sync) => {
       type(view, "o")
-      await new Promise(resolve => setTimeout(resolve, 80))
+      await sleep(80)
       type(view, "n")
       await sync(options, "one")
     })
@@ -212,7 +216,7 @@ describe("autocomplete", () => {
       sources: [slow(tagged(false), 80)]
     }, async (view, sync) => {
       type(view, "ta")
-      await new Promise(resolve => setTimeout(resolve, 80))
+      await sleep(80)
       del(view)
       await sync(options, "tag1")
     })
@@ -249,6 +253,24 @@ describe("autocomplete", () => {
       await sync(options, "$baz.boop $foo.bar $foo.quux")
       type(view, "foo.b")
       await sync(options, "$foo.bar")
+    })
+
+    let events: string[] = []
+    run.test("calls abort handlers", {
+      sources: [async cx => {
+        events.push("start " + cx.aborted)
+        cx.addEventListener("abort", () => events.push("aborted"))
+        await sleep(50)
+        events.push("fin " + cx.aborted)
+        return from("one two")(cx)
+      }],
+      doc: "one two\nthree four "
+    }, async (view) => {
+      startCompletion(view)
+      await sleep(80)
+      view.dispatch({selection: {anchor: 1}})
+      await sleep(80)
+      ist(events.join(", "), "start false, aborted, fin true")
     })
 
     return run.finish()

@@ -34,6 +34,9 @@ export interface Completion {
 /// An instance of this is passed to completion source functions.
 export class AutocompleteContext {
   /// @internal
+  abortListeners: (() => void)[] | null = []
+
+  /// @internal
   constructor(
     /// The editor state that the completion happens in.
     readonly state: EditorState,
@@ -64,6 +67,17 @@ export class AutocompleteContext {
     let str = line.slice(start - line.from, this.pos - line.from)
     let found = str.search(ensureAnchor(expr, false))
     return found < 0 ? null : {from: start + found, to: this.pos, text: str.slice(found)}
+  }
+
+  /// Yields true when the query has been aborted. Can be useful in
+  /// asynchronous queries to avoid doing work that will be ignored.
+  get aborted() { return this.abortListeners == null }
+
+  /// Allows you to register abort handlers, which will be called when
+  /// the query is
+  /// [aborted](#autocomplete.AutocompleteContext.aborted).
+  addEventListener(_type: "abort", listener: () => void) {
+    if (this.abortListeners) this.abortListeners.push(listener)
   }
 }
 
@@ -487,14 +501,13 @@ function scrollIntoView(container: HTMLElement, element: HTMLElement) {
 
 class RunningQuery {
   time = Date.now()
+  updates: Transaction[] = []
+  // Note that 'undefined' means 'not done yet', whereas 'null' means
+  // 'query returned null'.
+  done: undefined | CompletionResult | null = undefined
 
   constructor(readonly source: Autocompleter,
-              readonly explicit: boolean,
-              readonly updates: Transaction[],
-              public stopped: boolean,
-              // Note that 'undefined' means 'not done yet', whereas
-              // 'null' means 'query returned null'.
-              public done: undefined | CompletionResult | null) {}
+              readonly context: AutocompleteContext) {}
 }
 
 const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000
@@ -521,7 +534,11 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
       let query = this.running[i]
       if (doesReset ||
           query.updates.length + update.transactions.length > MaxUpdateCount && query.time - Date.now() > MinAbortTime) {
-        query.stopped = true // FIXME allow signalling an abort to the provider somehow
+        for (let handler of query.context.abortListeners!) {
+          try { handler() }
+          catch(e) { logException(this.view.state, e) }
+        }
+        query.context.abortListeners = null
         this.running.splice(i--, 1)
       } else {
         query.updates.push(...update.transactions)
@@ -544,10 +561,11 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
 
   startQuery(active: ActiveSource) {
     let {state} = this.view, pos = cur(state)
-    let pending = new RunningQuery(active.source, active.explicit, [], false, undefined)
+    let context = new AutocompleteContext(state, pos, active.explicit)
+    let pending = new RunningQuery(active.source, context)
     this.running.push(pending)
-    Promise.resolve(active.source(new AutocompleteContext(state, pos, active.explicit))).then(result => {
-      if (!pending.stopped) {
+    Promise.resolve(active.source(context)).then(result => {
+      if (!pending.context.aborted) {
         pending.done = result || null
         this.scheduleAccept()
       }
@@ -576,7 +594,7 @@ const autocompletePlugin = ViewPlugin.fromClass(class implements PluginValue {
 
       if (query.done) {
         let active: ActiveSource = new ActiveResult(
-          query.source, query.explicit, query.done, query.done.from,
+          query.source, query.context.explicit, query.done, query.done.from,
           query.done.to ?? cur(query.updates.length ? query.updates[0].startState : this.view.state),
           query.done.span ? ensureAnchor(query.done.span, true) : null)
         // Replay the transactions that happened since the start of
