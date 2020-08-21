@@ -23,7 +23,12 @@ export interface Completion {
   /// base library defines simple icons for `class`, `constant`,
   /// `enum`, `function`, `interface`, `keyword`, `method`,
   /// `namespace`, `property`, `text`, `type`, and `variable`.
-  type?: string
+  type?: string,
+  /// When given, should be a number from -99 to 99 that adjusts how
+  /// this completion is ranked compared to other completions that
+  /// match the input as well as this one. A negative number moves it
+  /// down the list, a positive number moves it up.
+  boost?: number
 }
 
 /// An instance of this is passed to completion source functions.

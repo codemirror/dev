@@ -3,10 +3,10 @@ import {codePointAt, codePointSize, fromCodePoint} from "@codemirror/next/text"
 // Scores are counted from 0 (great match) down to negative numbers,
 // assigning specific penalty values for specific shortcomings.
 const enum Penalty {
-  Gap = -11,      // Added for each gap in the match (not counted for by-word matches)
-  NotStart = -7,  // The match doesn't start at the start of the word
-  CaseFold = -2,  // At least one character needed to be case-folded to match
-  ByWord = -1     // The match is by-word, meaning each char in the pattern matches the start of a word in the string
+  Gap = -1100,      // Added for each gap in the match (not counted for by-word matches)
+  NotStart = -700,  // The match doesn't start at the start of the word
+  CaseFold = -200,  // At least one character needed to be case-folded to match
+  ByWord = -100     // The match is by-word, meaning each char in the pattern matches the start of a word in the string
 }
 
 const enum Tp { NonWord, Upper, Lower }
@@ -43,7 +43,7 @@ export class FuzzyMatcher {
   //
   // The score is a number that is more negative the worse the match
   // is. See `Penalty` above.
-  match(word: string): readonly number[] | null {
+  match(word: string): number[] | null {
     if (this.pattern.length == 0) return [0]
     if (word.length < this.pattern.length) return null
     let {chars, folded, any, precise, byWord} = this

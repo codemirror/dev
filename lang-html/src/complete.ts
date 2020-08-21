@@ -397,25 +397,27 @@ function openTags(doc: Text, tree: Subtree) {
 const identifier = /^[:\-\.\w\u00b7-\uffff]+$/
 
 function completeTag(state: EditorState, tree: Subtree, from: number, to: number) {
+  let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   return {from, to,
-          options: allowedChildren(state.doc, tree).map(tagName => ({label: tagName, type: "type"})),
-          span: identifier}
+          options: allowedChildren(state.doc, tree).map(tagName => ({label: tagName, type: "type"})).concat(
+            openTags(state.doc, tree).map((tag, i) => ({label: "/" + tag, apply: "/" + tag + end, type: "type", boost: 99 - i}))),
+          span: /^\/?[:\-\.\w\u00b7-\uffff]*$/}
 }
 
 function completeCloseTag(state: EditorState, tree: Subtree, from: number, to: number) {
   let end = /\s*>/.test(state.sliceDoc(to, to + 5)) ? "" : ">"
   return {from, to,
-          options: openTags(state.doc, tree).map(tag => ({label: tag, apply: tag + end, type: "type"})),
+          options: openTags(state.doc, tree).map((tag, i) => ({label: tag, apply: tag + end, type: "type", boost: 99 - i})),
           span: identifier}
 }
 
 function completeStartTag(state: EditorState, tree: Subtree, pos: number) {
-  let options = []
+  let options = [], level = 0
   for (let tagName of allowedChildren(state.doc, tree))
     options.push({label: "<" + tagName, type: "type"})
   for (let open of openTags(state.doc, tree))
-    options.push({label: "</" + open + ">", type: "type"})
-  return {from: pos, to: pos, options, span: identifier}
+    options.push({label: "</" + open + ">", type: "type", boost: 99 - level++})
+  return {from: pos, to: pos, options, span: /^<\/?[:\-\.\w\u00b7-\uffff]*$/}
 }
 
 function completeAttrName(state: EditorState, tree: Subtree, from: number, to: number) {
@@ -457,7 +459,7 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
 }
 
 export function completeHTML(context: CompletionContext): CompletionResult | null {
-  let {state, pos} = context, tree = state.tree.resolve(pos, -1)
+  let {state, pos} = context, around = state.tree.resolve(pos), tree = around.resolve(pos, -1)
   if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
     return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.start, pos)
       : completeTag(state, tree, tree.start, pos)
@@ -465,7 +467,7 @@ export function completeHTML(context: CompletionContext): CompletionResult | nul
     return completeTag(state, tree, pos, pos)
   } else if (tree.name == "StartCloseTag") {
     return completeCloseTag(state, tree, pos, pos)
-  } else if (context.explicit && (tree.name == "Element" || tree.name == "Text" || tree.name == "Document")) {
+  } else if (context.explicit && (around.name == "Element" || around.name == "Text" || around.name == "Document")) {
     return completeStartTag(state, tree, pos)
   } else if (context.explicit && (tree.name == "OpenTag" || tree.name == "SelfClosingTag") || tree.name == "AttributeName") {
     return completeAttrName(state, tree, tree.name == "AttributeName" ? tree.start : pos, pos)
