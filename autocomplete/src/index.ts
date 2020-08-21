@@ -17,6 +17,9 @@ export interface Completion {
   /// is matched agains to determine whether a completion matches (and
   /// how well it matches).
   label: string,
+  /// An optional bit of information to show (with a different style)
+  /// after the label.
+  detail?: string,
   /// How to apply the completion. When this holds a string, the
   /// completion range is replaced by that string. When it is a
   /// function, that function is called to perform the completion.
@@ -436,16 +439,23 @@ function createListBox(options: readonly Option[], id: string) {
     li.id = id + "-" + i
     let icon = li.appendChild(document.createElement("div"))
     icon.className = themeClass("completionIcon" + (completion.type ? "." + completion.type : ""))
-    let {label} = completion, off = 0
+    let labelElt = li.appendChild(document.createElement("span"))
+    labelElt.className = themeClass("completionLabel")
+    let {label, detail} = completion, off = 0
     for (let j = 1; j < match.length;) {
       let from = match[j++], to = match[j++]
-      if (from > off) li.appendChild(document.createTextNode(label.slice(off, from)))
-      let span = li.appendChild(document.createElement("span"))
+      if (from > off) labelElt.appendChild(document.createTextNode(label.slice(off, from)))
+      let span = labelElt.appendChild(document.createElement("span"))
       span.appendChild(document.createTextNode(label.slice(from, to)))
       span.className = themeClass("completionMatchedText")
       off = to
     }
-    if (off < label.length) li.appendChild(document.createTextNode(label.slice(off)))
+    if (off < label.length) labelElt.appendChild(document.createTextNode(label.slice(off)))
+    if (detail) {
+      let detailElt = li.appendChild(document.createElement("span"))
+      detailElt.className = themeClass("completionDetail")
+      detailElt.textContent = detail
+    }
     li.setAttribute("role", "option")
   }
   return ul
@@ -657,5 +667,5 @@ export function completeFromList(list: readonly (string | Completion)[]): Autoco
 
 /// Create a completion source from an array of snippet specs.
 export function completeSnippets(snippets: readonly SnippetSpec[]): Autocompleter {
-  return completeFromList(snippets.map(s => ({label: s.name || s.keyword, apply: snippet(s.snippet)})))
+  return completeFromList(snippets.map(s => ({label: s.keyword, detail: s.detail, apply: snippet(s.snippet)})))
 }

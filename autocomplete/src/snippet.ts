@@ -189,9 +189,8 @@ const snippetKeymap = precedence(keymap([
 export type SnippetSpec = {
   /// The word to match when completing.
   keyword: string,
-  /// The user-readable label for the completion. Defaults to
-  /// `keyword` when not given.
-  name?: string,
+  /// An optional detail to show after the keyword.
+  detail?: string,
   /// The [snippet template](#autocomplete.snippet) to use.
   snippet: string
 }

@@ -38,6 +38,11 @@ export const baseTheme = EditorView.baseTheme({
     textDecoration: "underline"
   },
 
+  completionDetail: {
+    marginLeft: "0.5em",
+    fontStyle: "italic"
+  },
+
   completionIcon: {
     fontSize: "90%",
     width: ".8em",
