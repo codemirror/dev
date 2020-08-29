@@ -347,4 +347,11 @@ describe("ChangeSet", () => {
       }
     }
   })
+
+  it("can be serialized to JSON", () => {
+    for (let i = 0; i < 100; i++) {
+      let size = r(20) + 1, set = ChangeSet.of(rChanges(size, r(4)), size)
+      ist(String(ChangeSet.fromJSON(set.toJSON())), String(set))
+    }
+  })
 })

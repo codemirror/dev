@@ -24,7 +24,6 @@ export class ChangeDesc {
   // unaffected sections, and the length of the replacement content
   // otherwise. So an insertion would be (0, n>0), a deletion (n>0,
   // 0), and a replacement two positive numbers.
-
   /// @internal
   constructor(readonly sections: readonly number[]) {}
 
@@ -293,6 +292,18 @@ export class ChangeSet extends ChangeDesc {
             filtered: new ChangeDesc(filteredSections)}
   }
 
+  /// Serialize this change set to a JSON-representable value.
+  toJSON() {
+    let parts: (number | [number, (readonly string[])?])[] = []
+    for (let i = 0; i < this.sections.length; i += 2) {
+      let len = this.sections[i], ins = this.sections[i + 1]
+      if (ins < 0) parts.push(len)
+      else if (ins == 0) parts.push([len])
+      else parts.push([len, this.inserted[i >> 1].toJSON()])
+    }
+    return parts
+  }
+
   /// Create a change set for the given changes, for a document of the
   /// given length, using `lineSep` as line separator.
   static of(changes: ChangeSpec, length: number, lineSep?: string): ChangeSet {
@@ -337,6 +348,25 @@ export class ChangeSet extends ChangeDesc {
   /// Create an empty changeset of the given length.
   static empty(length: number) {
     return new ChangeSet(length ? [length, -1] : [], [])
+  }
+
+  /// Create a changeset from its JSON representation (as produced by
+  /// [`toJSON`](#state.ChangeSet.toJSON).
+  static fromJSON(json: readonly (number | [number, (readonly string[])?])[]) {
+    let sections = [], inserted = []
+    for (let i = 0; i < json.length; i++) {
+      let part = json[i]
+      if (typeof part == "number") {
+        sections.push(part, -1)
+      } else if (part.length == 1) {
+        sections.push(part[0], 0)
+      } else {
+        while (inserted.length < i - 1) inserted.push(Text.empty)
+        inserted[i] = Text.of(part[1]!)
+        sections.push(part[0], inserted[i].length)
+      }
+    }
+    return new ChangeSet(sections, inserted)
   }
 }
 

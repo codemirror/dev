@@ -118,6 +118,15 @@ export abstract class Text implements Iterable<string> {
   /// @internal
   toString() { return this.sliceString(0) }
 
+  /// Convert the document to an array of lines (which can be
+  /// deserialized again via [`Text.of`](#text.Text^of).
+  toJSON() {
+    let lines: string[] = []
+    for (let iter = this.iterLines(); !iter.next().done;)
+      lines.push(iter.value)
+    return lines
+  }
+
   /// @internal
   protected constructor() {}
 
