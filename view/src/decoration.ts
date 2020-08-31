@@ -152,7 +152,7 @@ export abstract class Decoration extends RangeValue {
     readonly spec: any) { super() }
 
   /// @internal
-  get point() { return false }
+  point!: boolean
 
   /// @internal
   get heightRelevant() { return false }
@@ -202,6 +202,8 @@ export abstract class Decoration extends RangeValue {
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
 }
 
+Decoration.prototype.point = false
+
 export class MarkDecoration extends Decoration {
   constructor(spec: MarkDecorationSpec) {
     let {start, end} = getInclusive(spec)
@@ -229,8 +231,6 @@ export class LineDecoration extends Decoration {
     super(-Side.BigInline, -Side.BigInline, null, spec)
   }
 
-  get point() { return true }
-
   eq(other: Decoration): boolean {
     return other instanceof LineDecoration && attrsEq(this.spec.attributes, other.spec.attributes)
   }
@@ -242,6 +242,7 @@ export class LineDecoration extends Decoration {
 }
 
 LineDecoration.prototype.mapMode = MapMode.TrackBefore
+LineDecoration.prototype.point = true
 
 export class PointDecoration extends Decoration {
   constructor(spec: any,
@@ -252,8 +253,6 @@ export class PointDecoration extends Decoration {
     super(startSide, endSide, widget, spec)
     this.mapMode = !block ? MapMode.TrackDel : startSide < 0 ? MapMode.TrackBefore : MapMode.TrackAfter
   }
-
-  get point() { return true }
 
   // Only relevant when this.block == true
   get type() {
@@ -278,6 +277,8 @@ export class PointDecoration extends Decoration {
     return super.range(from, to)
   }
 }
+
+PointDecoration.prototype.point = true
 
 function getInclusive(spec: {inclusive?: boolean, inclusiveStart?: boolean, inclusiveEnd?: boolean}): {start: boolean, end: boolean} {
   let {inclusiveStart: start, inclusiveEnd: end} = spec
