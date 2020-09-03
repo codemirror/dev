@@ -213,4 +213,14 @@ function release() {
   run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"])
 }
 
+function ensureSelfLink() {
+  let parent = path.join(root, "node_modules", "@codemirror"), link = path.join(parent, "next")
+  if (!fs.existsSync(link)) {
+    fs.mkdirSync(parent, {recursive: true})
+    fs.symlinkSync("../..", link)
+  }
+}
+
+ensureSelfLink()
+
 start()

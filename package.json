@@ -69,7 +69,6 @@
     "w3c-keyname": "^2.2.4"
   },
   "devDependencies": {
-    "@codemirror/next": ".",
     "@types/mocha": "^5.2.0",
     "chromedriver": "83.0.0",
     "eslint4b-prebuilt": "^6.7.1",
