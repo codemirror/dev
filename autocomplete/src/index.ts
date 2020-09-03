@@ -70,7 +70,7 @@ export function completeFromList(list: readonly (string | Completion)[]): Comple
 
 /// Create a completion source from an array of snippet specs.
 export function completeSnippets(snippets: readonly SnippetSpec[]): CompletionSource {
-  return completeFromList(snippets.map(s => ({label: s.keyword, detail: s.detail, apply: snippet(s.snippet)})))
+  return completeFromList(snippets.map(s => Object.assign({}, s, {apply: snippet(s.snippet)})))
 }
 
 /// Get the current completion status. When completions are available,

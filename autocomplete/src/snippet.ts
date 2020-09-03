@@ -186,11 +186,7 @@ const snippetKeymap = precedence(keymap([
 /// Languages can export arrays of snippets using this format.
 /// [`completeSnippets`](#autocomplete.completeSnippets) can be used
 /// to turn them into a completion source.
-export type SnippetSpec = {
-  /// The word to match when completing.
-  keyword: string,
-  /// An optional detail to show after the keyword.
-  detail?: string,
+export interface SnippetSpec extends Completion {
   /// The [snippet template](#autocomplete.snippet) to use.
   snippet: string
 }
