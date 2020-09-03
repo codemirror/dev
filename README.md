@@ -19,6 +19,4 @@ to start a server that automatically rebuilds the bundles when the code changes 
 
 Please see [the website](https://codemirror.net/6/) for more information and [docs](https://codemirror.net/6/docs/ref).
 
-There's a Matrix room for dev discussion at [#codemirror6:matrix.org](https://matrix.to/#/#codemirror6:matrix.org).
-
 This code is dual-licensed under the MIT and GPL-v3 licenses. This means that you, as user, may choose one of these licenses to abide by. I.e. if complying with the GPL is problematic for you, you can choose the more liberal MIT license.
