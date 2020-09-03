@@ -102,7 +102,7 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
 const baseTheme = EditorView.baseTheme({
   tooltip: {
     position: "absolute",
-    border: "1px solid silver",
+    border: "1px solid #ddd",
     backgroundColor: "#f5f5f5",
     zIndex: 100
   }

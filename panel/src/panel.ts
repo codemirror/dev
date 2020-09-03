@@ -206,10 +206,10 @@ const baseTheme = EditorView.baseTheme({
     color: "black"
   },
   "panels.top@light": {
-    borderBottom: "1px solid silver"
+    borderBottom: "1px solid #ddd"
   },
   "panels.bottom@light": {
-    borderTop: "1px solid silver"
+    borderTop: "1px solid #ddd"
   },
   "panels@dark": {
     backgroundColor: "#333338",
