@@ -314,7 +314,7 @@ class TaggedExtension {
 
 /// Tagged extensions can be used to make a configuration dynamic.
 /// Tagging an extension allows you to later
-/// [replace](#state.TransactionSpec.replaceExtensions) it with
+/// [replace](#state.TransactionSpec.reconfigure) it with
 /// another extension. A given tag may only occur once within a given
 /// configuration.
 export function tagExtension(tag: string | symbol, extension: Extension) {

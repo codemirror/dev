@@ -158,17 +158,19 @@ export type RangeCursor<T> = {
 type RangeSetUpdate<T extends RangeValue> = {
   /// An array of ranges to add. If given, this should be sorted by
   /// `from` position and `startSide` unless
-  /// [`sort`](#rangeset.RangeSetUpdate.sort) is given as `true`.
+  /// [`sort`](#rangeset.RangeSet.update^updateSpec.sort) is given as
+  /// `true`.
   add?: readonly Range<T>[]
   /// Indicates whether the library should sort the ranges in `add`.
   sort?: boolean
   /// Filter the ranges already in the set. Only those for which this
   /// function returns `true` are kept.
   filter?: (from: number, to: number, value: T) => boolean,
-  filterFrom?: number
-  /// These can be used to limit the range on which the filter is
+  /// Can be used to limit the range on which the filter is
   /// applied. Filtering only a small range, as opposed to the entire
   /// set, can make updates cheaper.
+  filterFrom?: number
+  /// The end position to applly the filter to.
   filterTo?: number
 }
 

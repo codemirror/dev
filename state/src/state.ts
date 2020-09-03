@@ -127,7 +127,7 @@ export class EditorState {
   /// space of the document produced by the call's own changes). This
   /// method will merge all the changes and ranges into a single
   /// changeset and selection, and return it as a [transaction
-  /// spec](#state.StrictTransactionSpec), which can be passed to
+  /// spec](#state.TransactionSpec), which can be passed to
   /// [`update`](#state.EditorState.update).
   changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): {
     changes: ChangeSet,
@@ -215,7 +215,7 @@ export class EditorState {
   /// A facet that, when enabled, causes the editor to allow multiple
   /// ranges to be selected. You should probably not use this
   /// directly, but let a plugin like
-  /// [multiple-selections](#multiple-selections) handle it (which
+  /// [multiple-selections](#view.multipleSelections) handle it (which
   /// also makes sure the selections are visible in the view).
   static allowMultipleSelections = allowMultipleSelections
 
@@ -326,9 +326,9 @@ export class EditorState {
   static globalLanguageData = globalLanguageData
 
   /// Find the values for a given language data field, either provided
-  /// by the [syntax](#state.languageData) or through the
-  /// [`addLanguageData`](#state.EditorState^addLanguageData) facet,
-  /// for the [document type](#state.Syntax.docNodeTypeAt) at the
+  /// by the [syntax](#syntax.LezerSyntax.languageData) or through the
+  /// [`globalLanguageData`](#state.EditorState^globalLanguageData) facet,
+  /// for the [language](#state.Syntax.languageDataFacetAt) at the
   /// given position. Values provided by the facet, in precedence
   /// order, will appear before those provided by the syntax.
   languageDataAt<T>(name: string, pos: number): readonly T[] {

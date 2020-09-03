@@ -32,7 +32,7 @@ import {lintKeymap} from "@codemirror/next/lint"
 ///  - [the default highlighter](#highlight.defaultHighlighter)
 ///  - [bracket matching](#matchbrackets.bracketMatching)
 ///  - [bracket closing](#closebrackets.closeBrackets)
-///  - [autocompletion](#autocomplete.autocomplete)
+///  - [autocompletion](#autocomplete.autocompletion)
 ///  - [rectangular selection](#rectangular-selection.rectangularSelection)
 ///  - [active line highlighting](#highlight-selection.highlightActiveLine)
 ///  - [selection match highlighting](#highlight-selection.highlightSelectionMatches)

@@ -85,7 +85,7 @@ export const javascriptSyntax = LezerSyntax.define(parser.withProps(
 })
 
 /// Returns an extension that installs JavaScript support features
-/// (completion of [snippets](#javascript.snippets)).
+/// (completion of [snippets](#lang-javascript.snippets)).
 export function javascriptSupport(): Extension {
   return javascriptSyntax.languageData.of({autocomplete: completeSnippets(snippets)})
 }

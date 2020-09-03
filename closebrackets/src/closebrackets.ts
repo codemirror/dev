@@ -4,7 +4,7 @@ import {Text} from "@codemirror/next/text"
 import {codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
 
 /// Configures bracket closing behavior for a syntax (via
-/// [`languageData`](#state.languageData)) using the `"closeBrackets"`
+/// [language data](#state.languageDataAt)) using the `"closeBrackets"`
 /// identifier.
 export interface CloseBracketConfig {
   /// The opening brackets to close. Defaults to `["(", "[", "{", "'",
