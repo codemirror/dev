@@ -1,3 +1,45 @@
+## 0.11.0 (2020-09-03)
+
+### Breaking changes
+
+Autocompletion contexts no longer have a `filter` method. Completion sources shouldn't filter anymore, but leave that to the plugin.
+
+The `filterDownOn` property on completion results is now called `span`.
+
+`AutocompleteContext.tokenBefore` now takes a list of token type names, and only returns tokens of those types. (In its previous form, it was too error-prone.)
+
+Snippet specs no longer support a `name` property (use `detail` instead).
+
+A number of exports from the autocomplete plugin were renamed: `autocomplete` to `autocompletion`, `AutocompleteContext` to `CompletionContext`, `Autocompleter` to `CompletionSource`.
+
+`SnippetSpec` objects are now a subclass of `Completion` (which mostly means that their `keyword` property was renamed to `label`).
+
+### Bug fixes
+
+Fix issue that could cause crashes or incorrectly mapped selections in the history when making changes with `addToHistory` set to false.
+
+Fuzzy completion matching got a lot more clever, and presents results ordered by match quality.
+
+### New features
+
+Text copied linewise will now be inserted as lines above the selection when pasted into an empty selection.
+
+The completion list now shows the matched parts of the strings.
+
+The autocomplete package now exports two new functions, `completionStatus` and `currentCompletions`, that let external code query its state.
+
+A new method `matchBefore` on the autocompletion context can now be used to easily find the text matching a given regexp before the cursor.
+
+Completion contexts now have `aborted` and `addEventListener(abort, ...)` properties to allow asynchronous completion queries to stop doing work when cancelled.
+
+Completions now support a `detail` property to add some extra text after their label.
+
+Completions can now have a `boost` property to influence the way they are sorted compared to other completions that match the input equally well.
+
+Completions can now have an `info` property that provides extra information to be shown next to the completion when it is selected.
+
+`ChangeSet` now has a `toJSON` method and a static `fromJSON` method to serialize to and deserialize from JSON.
+
 ## 0.10.0 (2020-08-11)
 
 ### Breaking changes
