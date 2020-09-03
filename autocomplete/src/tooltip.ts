@@ -16,6 +16,7 @@ function createListBox(options: readonly Option[], id: string) {
     li.id = id + "-" + i
     let icon = li.appendChild(document.createElement("div"))
     icon.className = themeClass("completionIcon" + (completion.type ? "." + completion.type : ""))
+    icon.setAttribute("aria-hidden", "true")
     let labelElt = li.appendChild(document.createElement("span"))
     labelElt.className = themeClass("completionLabel")
     let {label, detail} = completion, off = 0
