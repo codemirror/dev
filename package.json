@@ -70,14 +70,14 @@
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
-    "chromedriver": "83.0.0",
+    "chromedriver": "^85.0.0",
     "eslint4b-prebuilt": "^6.7.1",
     "esmoduleserve": "^0.1.2",
     "geckodriver": "^1.19.1",
     "ist": "^1.1.6",
     "mocha": "^7.1.1",
     "rollup": "^1.25.3",
-    "selenium-webdriver": "4.0.0-alpha.7",
+    "selenium-webdriver": "^4.0.0-alpha.7",
     "serve-static": "^1.14.1",
     "ts-node": "^8.2.0",
     "typescript": "^3.8.3"

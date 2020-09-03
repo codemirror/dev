@@ -5,3 +5,5 @@ addons:
   chrome: stable
 sudo: false
 cache: npm
+env:
+  - DETECT_CHROMEDRIVER_VERSION=true
