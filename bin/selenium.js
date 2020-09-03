@@ -57,4 +57,7 @@ if (startServer) {
     if (await runFor(new Builder().forBrowser("firefox").setFirefoxOptions(new firefox.Options().headless()))) failed = true
   }
   process.exit(failed ? 1 : 0)
-})()
+})().catch(e => {
+  console.log(e)
+  process.exit(1)
+})
