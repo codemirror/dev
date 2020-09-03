@@ -143,7 +143,6 @@ describe("HeightMap", () => {
     let newText = text.replace(21, 21, Text.of(["!"]))
     map = map.applyChanges([], text, oracle.setDoc(newText), [new ChangedRange(21, 21, 21, 22)])
     oracle.heightChanged = false
-    console.log(">>>>")
     map = map.updateHeight(oracle, 0, false, new MeasuredHeights(0, [12, 12, 12]))
     ist(oracle.heightChanged, false)
   })
