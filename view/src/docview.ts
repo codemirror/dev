@@ -439,6 +439,8 @@ export function computeCompositionDeco(view: EditorView, changes: ChangeSet): De
   let cView = view.docView.nearest(textNode)
   let from: number, to: number, topNode = textNode
   if (cView instanceof InlineView) {
+    // FIXME revisit this when nested range decorations are implemented
+    while (cView.parent instanceof InlineView) cView = cView.parent
     from = cView.posAtStart
     to = from + cView.length
     topNode = cView.dom!

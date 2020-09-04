@@ -1,7 +1,7 @@
 import {SpanIterator, RangeSet} from "@codemirror/next/rangeset"
 import {DecorationSet, Decoration, PointDecoration, LineDecoration, MarkDecoration, BlockType, WidgetType} from "./decoration"
 import {BlockView, LineView, BlockWidgetView} from "./blockview"
-import {WidgetView, TextView} from "./inlineview"
+import {InlineView, WidgetView, TextView, MarkView} from "./inlineview"
 import {Text, TextIterator} from "@codemirror/next/text"
 
 export const enum Open { Start = 1, End = 2 }
@@ -62,7 +62,10 @@ export class ContentBuilder implements SpanIterator<Decoration> {
         }
       }
       let take = Math.min(this.text.length - this.textOff, length)
-      this.getLine().append(new TextView(this.text.slice(this.textOff, this.textOff + take), tagName, clss, attrs))
+      let node: InlineView = new TextView(this.text.slice(this.textOff, this.textOff + take))
+      if (tagName || clss || attrs)
+        node = new MarkView(tagName || "span", clss, attrs, 0 /* FIXME */, [node], node.length)
+      this.getLine().append(node)
       length -= take
       this.textOff += take
     }

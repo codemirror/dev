@@ -1,6 +1,6 @@
 import {ContentView, DOMPos} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView} from "./inlineview"
+import {InlineView, TextView, WidgetView, mergeInlineChildren, inlineDOMAtPos} from "./inlineview"
 import {clientRectsFor, Rect} from "./dom"
 import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
@@ -33,63 +33,7 @@ export class LineView extends ContentView implements BlockView {
       if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
     }
     if (takeDeco) this.setDeco(source ? source.attrs : null)
-
-    let elts = source ? source.children : []
-    let cur = this.childCursor()
-    let {i: toI, off: toOff} = cur.findPos(to, 1)
-    let {i: fromI, off: fromOff} = cur.findPos(from, -1)
-    let dLen = from - to
-    for (let view of elts) dLen += view.length
-    this.length += dLen
-
-    // Both from and to point into the same text view
-    if (fromI == toI && fromOff) {
-      let start = this.children[fromI]
-      // Maybe just update that view and be done
-      if (elts.length == 1 && start.merge(fromOff, toOff, elts[0])) return true
-      if (elts.length == 0) { start.merge(fromOff, toOff, null); return true }
-      // Otherwise split it, so that we don't have to worry about aliasing front/end afterwards
-      let after = start.slice(toOff)
-      if (after.merge(0, 0, elts[elts.length - 1])) elts[elts.length - 1] = after
-      else elts.push(after)
-      toI++
-      toOff = 0
-    }
-
-    // Make sure start and end positions fall on node boundaries
-    // (fromOff/toOff are no longer used after this), and that if the
-    // start or end of the elts can be merged with adjacent nodes,
-    // this is done
-    if (toOff) {
-      let end = this.children[toI]
-      if (elts.length && end.merge(0, toOff, elts[elts.length - 1])) elts.pop()
-      else end.merge(0, toOff, null)
-    } else if (toI < this.children.length && elts.length &&
-               this.children[toI].merge(0, 0, elts[elts.length - 1])) {
-      elts.pop()
-    }
-    if (fromOff) {
-      let start = this.children[fromI]
-      if (elts.length && start.merge(fromOff, undefined, elts[0])) elts.shift()
-      else start.merge(fromOff, undefined, null)
-      fromI++
-    } else if (fromI && elts.length && this.children[fromI - 1].merge(this.children[fromI - 1].length, undefined, elts[0])) {
-      elts.shift()
-    }
-
-    // Then try to merge any mergeable nodes at the start and end of
-    // the changed range
-    while (fromI < toI && elts.length && this.children[toI - 1].become(elts[elts.length - 1])) {
-      elts.pop()
-      toI--
-    }
-    while (fromI < toI && elts.length && this.children[fromI].become(elts[0])) {
-      elts.shift()
-      fromI++
-    }
-
-    // And if anything remains, splice the child array to insert the new elts
-    if (elts.length || fromI != toI) this.replaceChildren(fromI, toI, elts)
+    mergeInlineChildren(this, from, to, source ? source.children : none)
     return true
   }
 
@@ -143,19 +87,7 @@ export class LineView extends ContentView implements BlockView {
   }
 
   domAtPos(pos: number): DOMPos {
-    let i = 0
-    for (let off = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = off + child.length
-      if (end == off && child.getSide() <= 0) continue
-      if (pos > off && pos < end && child.dom!.parentNode == this.dom) return child.domAtPos(pos - off)
-      if (pos <= off) break
-      off = end
-    }
-    for (; i > 0; i--) {
-      let before = this.children[i - 1].dom!
-      if (before.parentNode == this.dom) return DOMPos.after(before)
-    }
-    return new DOMPos(this.dom!, 0)
+    return inlineDOMAtPos(this.dom!, this.children, pos)
   }
 
   // FIXME might need another hack to work around Firefox's behavior
@@ -174,7 +106,7 @@ export class LineView extends ContentView implements BlockView {
     }
     super.sync(track)
     let last = this.dom!.lastChild
-    if (!last || (last.nodeName != "BR" && !(ContentView.get(last) instanceof TextView))) {
+    if (!last || (last.nodeName != "BR" && (ContentView.get(last) instanceof WidgetView))) {
       let hack = document.createElement("BR")
       ;(hack as any).cmIgnore = true
       this.dom!.appendChild(hack)
