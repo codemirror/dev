@@ -453,7 +453,10 @@ class LayerCursor<T extends RangeValue> {
   chunkIndex!: number
   rangeIndex!: number
 
-  constructor(readonly layer: RangeSet<T>, readonly skip: Set<Chunk<T>> | null, readonly minPoint: number) {}
+  constructor(readonly layer: RangeSet<T>,
+              readonly skip: Set<Chunk<T>> | null,
+              readonly minPoint: number,
+              readonly rank = 0) {}
 
   get startSide() { return this.value ? this.value.startSide : 0 }
   get endSide() { return this.value ? this.value.endSide : 0 }
@@ -524,6 +527,7 @@ class HeapCursor<T extends RangeValue> {
   from!: number
   to!: number
   value!: T | null
+  rank!: number
   
   constructor(readonly heap: LayerCursor<T>[]) {}
 
@@ -533,9 +537,11 @@ class HeapCursor<T extends RangeValue> {
     minPoint: number = -1
   ): HeapCursor<T> | LayerCursor<T> {
     let heap = []
-    for (let set of sets) for (let cur = set; cur != RangeSet.empty; cur = cur.nextLayer) {
-      if (cur.maxPoint >= minPoint)
-        heap.push(new LayerCursor(cur, skip, minPoint))
+    for (let i = 0; i < sets.length; i++) {
+      for (let cur = sets[i]; cur != RangeSet.empty; cur = cur.nextLayer) {
+        if (cur.maxPoint >= minPoint)
+          heap.push(new LayerCursor(cur, skip, minPoint, i))
+      }
     }
     return heap.length == 1 ? heap[0] : new HeapCursor(heap)
   }
@@ -559,11 +565,13 @@ class HeapCursor<T extends RangeValue> {
     if (this.heap.length == 0) {
       this.from = this.to = Far
       this.value = null
+      this.rank = -1
     } else {
       let top = this.heap[0]
       this.from = top.from
       this.to = top.to
       this.value = top.value
+      this.rank = top.rank
       if (top.value) top.next()
       heapBubble(this.heap, 0)
     }
@@ -591,6 +599,7 @@ class SpanCursor<T extends RangeValue> {
 
   active: T[] = []
   activeTo: number[] = []
+  activeRank: number[] = []
   minActive = -1
 
   // A currently active point range, if any
@@ -608,7 +617,7 @@ class SpanCursor<T extends RangeValue> {
 
   goto(pos: number, side: number = -Far) {
     this.cursor.goto(pos, side)
-    this.active.length = this.activeTo.length = 0
+    this.active.length = this.activeTo.length = this.activeRank.length = 0
     this.minActive = -1
     this.to = pos
     this.endSide = side
@@ -625,6 +634,7 @@ class SpanCursor<T extends RangeValue> {
   removeActive(index: number) {
     remove(this.active, index)
     remove(this.activeTo, index)
+    remove(this.activeRank, index)
     this.minActive = findMinIndex(this.active, this.activeTo)
   }
 
@@ -652,8 +662,11 @@ class SpanCursor<T extends RangeValue> {
       } else {
         let nextVal = this.cursor.value
         if (!nextVal.point) { // Opening a range
-          this.active.push(nextVal)
-          this.activeTo.push(this.cursor.to)
+          let activePos = 0, {rank, to} = this.cursor
+          while (activePos < this.activeRank.length && this.activeRank[activePos] <= rank) activePos++
+          insert(this.active, activePos, nextVal)
+          insert(this.activeTo, activePos, to)
+          insert(this.activeRank, activePos, rank)
           this.minActive = findMinIndex(this.active, this.activeTo)
           this.cursor.next()
         } else { // New point
@@ -685,7 +698,7 @@ function compare<T extends RangeValue>(a: SpanCursor<T>, startA: number,
       if (!(a.point && b.point && (a.point == b.point || a.point.eq(b.point))))
         comparator.comparePoint(pos, clipEnd, a.point, b.point)
     } else {
-      if (clipEnd > pos && !sameSet(a.active, b.active)) comparator.compareRange(pos, clipEnd, a.active, b.active)
+      if (clipEnd > pos && !sameValues(a.active, b.active)) comparator.compareRange(pos, clipEnd, a.active, b.active)
     }
     if (end > endB) break
     pos = end
@@ -694,19 +707,20 @@ function compare<T extends RangeValue>(a: SpanCursor<T>, startA: number,
   }
 }
 
-function sameSet<T extends RangeValue>(a: T[], b: T[]) {
+function sameValues<T extends RangeValue>(a: T[], b: T[]) {
   if (a.length != b.length) return false
-  outer: for (let i = 0; i < a.length; i++) {
-    for (let j = 0; j < b.length; j++)
-      if (a[i] == b[i] || a[i].eq(b[j])) continue outer
-    return false
-  }
+  for (let i = 0; i < a.length; i++) if (a[i] != b[i] && !a[i].eq(b[i])) return false
   return true
 }
 
 function remove<T>(array: T[], index: number) {
-  let last = array.pop()!
-  if (index != array.length) array[index] = last
+  for (let i = index, e = array.length - 1; i < e; i++) array[i] = array[i + 1]
+  array.pop()
+}
+
+function insert<T>(array: T[], index: number, value: T) {
+  for (let i = array.length - 1; i >= index; i--) array[i + 1] = array[i]
+  array[index] = value
 }
 
 function findMinIndex(value: RangeValue[], array: number[]) {

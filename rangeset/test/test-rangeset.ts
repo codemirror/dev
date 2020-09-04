@@ -22,7 +22,7 @@ class Value extends RangeValue {
   static names(v: readonly Value[]): string {
     let result = []
     for (let val of v) if (val.name || val.point) result.push(val.name || "POINT")
-    return result.sort().join("/")
+    return result.join("/")
   }
 }
 
@@ -280,14 +280,21 @@ describe("RangeSet", () => {
       let set = mkSet(decos), start = 20, end = start + 6
       let expected = ""
       for (let pos = start; pos < end; pos += (pos % 2 ? 1 : 2))
-        expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=span" + Math.floor(pos / 2) + "/wide"
+        expected += (expected ? " " : "") + (Math.min(end, pos + (pos % 2 ? 1 : 2)) - pos) + "=wide/span" + Math.floor(pos / 2)
       test(set, start, end, expected)
     })
 
     it("reads from multiple sets at once", () => {
       let one = mkSet([mk(2, 3, "x"), mk(5, 10, "y"), mk(10, 12, "z")])
       let two = mkSet([mk(0, 6, "a"), mk(10, 12, "b")])
-      test([one, two], 0, 12, "2=a 1=a/x 2=a 1=a/y 4=y 2=b/z")
+      test([one, two], 0, 12, "2=a 1=x/a 2=a 1=y/a 4=y 2=z/b")
+    })
+
+    it("orders active ranges by origin set", () => {
+      let one = mkSet([mk(2, 10, "a"), mk(20, 30, "a")])
+      let two = mkSet([mk(3, 4, "b"), mk(8, 12, "b"), mk(18, 22, "b")])
+      let three = mkSet([mk(0, 25, "c")])
+      test([one, two, three], 0, 25, "2=c 1=a/c 1=a/b/c 4=a/c 2=a/b/c 2=b/c 6=c 2=b/c 2=a/b/c 3=a/c")
     })
 
     it("doesn't get confused by same-place points", () => {
