@@ -9,10 +9,21 @@ import {Open} from "./buildview"
 const none: any[] = []
 
 export abstract class InlineView extends ContentView {
+  // Imperatively splice the given view into the current one, covering
+  // offsets `from` to `to` (defaults to `this.length`). When no
+  // source is given, just delete the given range from this view.
+  // Should check whether the merge is possible and return false if it
+  // isn't.
   abstract merge(from: number, to?: number, source?: InlineView | null): boolean
-  match(_other: InlineView) { return false }
+  /// Return true when this view is equivalent to `other` and can take
+  /// on its role.
+  become(_other: InlineView) { return false }
   get children() { return none }
+  // Return a new view representing the given part of this view.
   abstract slice(from: number, to?: number): InlineView
+  // When this is a zero-length view with a side, this should return a
+  // negative number to indicate it is before its position, or a
+  // positive number when after its position.
   getSide() { return 0 }
 }
 
@@ -147,7 +158,7 @@ export class WidgetView extends InlineView {
     return true
   }
 
-  match(other: InlineView): boolean {
+  become(other: InlineView): boolean {
     if (other.length == this.length && other instanceof WidgetView && other.side == this.side) {
       if (this.widget.constructor == other.widget.constructor) {
         if (!this.widget.eq(other.widget.value)) this.markDirty(true)
