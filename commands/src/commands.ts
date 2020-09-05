@@ -21,9 +21,12 @@ function moveSel({state, dispatch}: {state: EditorState, dispatch: (tr: Transact
   return true
 }
 
+function rangeEnd(range: SelectionRange, forward: boolean) {
+  return EditorSelection.cursor(forward ? range.to : range.from)
+}
+
 function cursorByChar(view: EditorView, forward: boolean) {
-  return moveSel(view, range =>
-                 range.empty ? view.moveByChar(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
+  return moveSel(view, range => range.empty ? view.moveByChar(range, forward) : rangeEnd(range, forward))
 }
 
 /// Move the selection one character to the left (which is backward in
@@ -38,8 +41,7 @@ export const cursorCharForward: Command = view => cursorByChar(view, true)
 export const cursorCharBackward: Command = view => cursorByChar(view, false)
 
 function cursorByGroup(view: EditorView, forward: boolean) {
-  return moveSel(view, range =>
-                 range.empty ? view.moveByGroup(range, forward) : EditorSelection.cursor(forward ? range.to : range.from))
+  return moveSel(view, range => range.empty ? view.moveByGroup(range, forward) : rangeEnd(range, forward))
 }
 
 /// Move the selection across one group of word or non-word (but also
@@ -86,7 +88,7 @@ export const cursorSyntaxRight: Command =
   view => moveSel(view, range => moveBySyntax(view.state, range, view.textDirection == Direction.LTR))
 
 function cursorByLine(view: EditorView, forward: boolean) {
-  return moveSel(view, range => view.moveVertically(range, forward))
+  return moveSel(view, range => range.empty ? view.moveVertically(range, forward) : rangeEnd(range, forward))
 }
 
 /// Move the selection one line up.
@@ -95,7 +97,7 @@ export const cursorLineUp: Command = view => cursorByLine(view, false)
 export const cursorLineDown: Command = view => cursorByLine(view, true)
 
 function cursorByPage(view: EditorView, forward: boolean) {
-  return moveSel(view, range => view.moveVertically(range, forward, view.dom.clientHeight))
+  return moveSel(view, range => range.empty ? view.moveVertically(range, forward, view.dom.clientHeight) : rangeEnd(range, forward))
 }
 
 /// Move the selection one page up.
