@@ -1,15 +1,14 @@
 import {ContentView, DOMPos} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView, WidgetView, mergeInlineChildren, inlineDOMAtPos} from "./inlineview"
+import {InlineView, TextView, WidgetView, mergeInlineChildren, inlineDOMAtPos, joinInlineInto} from "./inlineview"
 import {clientRectsFor, Rect} from "./dom"
 import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
-import {Open} from "./buildview"
 import {themeClass} from "./theme"
 import {Text} from "@codemirror/next/state"
 
 export interface BlockView extends ContentView {
-  merge(from: number, to: number, source: ContentView | null, takeDeco: boolean): boolean
+  merge(from: number, to: number, source: ContentView | null, takeDeco: boolean, openStart: number, openEnd: number): boolean
   match(other: BlockView): boolean
   split(at: number): BlockView
   type: BlockType
@@ -27,13 +26,13 @@ export class LineView extends ContentView implements BlockView {
   breakAfter = 0
 
   // Consumes source
-  merge(from: number, to: number, source: BlockView | null, takeDeco: boolean): boolean {
+  merge(from: number, to: number, source: BlockView | null, takeDeco: boolean, openStart: number, openEnd: number): boolean {
     if (source) {
       if (!(source instanceof LineView)) return false
       if (!this.dom) source.transferDOM(this) // Reuse source.dom when appropriate
     }
     if (takeDeco) this.setDeco(source ? source.attrs : null)
-    mergeInlineChildren(this, from, to, source ? source.children : none)
+    mergeInlineChildren(this, from, to, source ? source.children : none, openStart, openEnd)
     return true
   }
 
@@ -43,11 +42,11 @@ export class LineView extends ContentView implements BlockView {
     if (this.length == 0) return end
     let {i, off} = this.childPos(at)
     if (off) {
-      end.append(this.children[i].slice(off))
-      this.children[i].merge(off, undefined, null)
+      end.append(this.children[i].slice(off), 0)
+      this.children[i].merge(off, this.children[i].length, null, 0, 0)
       i++
     }
-    for (let j = i; j < this.children.length; j++) end.append(this.children[j])
+    for (let j = i; j < this.children.length; j++) end.append(this.children[j], 0)
     while (i > 0 && this.children[i - 1].length == 0) { this.children[i - 1].parent = null; i-- }
     this.children.length = i
     this.markDirty()
@@ -74,10 +73,8 @@ export class LineView extends ContentView implements BlockView {
   }
 
   // Only called when building a line view in ContentBuilder
-  append(child: InlineView) {
-    this.children.push(child)
-    child.setParent(this)
-    this.length += child.length
+  append(child: InlineView, openStart: number) {
+    joinInlineInto(this, child, openStart)
   }
 
   // Only called when building a line view in ContentBuilder
@@ -159,24 +156,14 @@ export class BlockWidgetView extends ContentView implements BlockView {
   parent!: DocView | null
   breakAfter = 0
 
-  constructor(
-    public widget: WidgetType,
-    public length: number,
-    public type: BlockType,
-    // This is set by the builder and used to distinguish between
-    // adjacent widgets and parts of the same widget when calling
-    // `merge`. It's kind of silly that it's an instance variable, but
-    // it's hard to route there otherwise.
-    public open: number = 0) {
+  constructor(public widget: WidgetType, public length: number, public type: BlockType) {
     super()
   }
 
-  merge(from: number, to: number, source: ContentView | null): boolean {
-    if (!(source instanceof BlockWidgetView) || !source.open ||
-        from > 0 && !(source.open & Open.Start) ||
-        to < this.length && !(source.open & Open.End)) return false
-    if (!this.widget.compare(source.widget))
-      throw new Error("Trying to merge an open widget with an incompatible node")
+  merge(from: number, to: number, source: ContentView | null, _takeDeco: boolean, openStart: number, openEnd: number): boolean {
+    if (!(source instanceof BlockWidgetView) || !this.widget.compare(source.widget) ||
+        from > 0 && openStart <= 0 || to < this.length && openEnd <= 0)
+      return false
     this.length = from + source.length + (this.length - to)
     return true
   }

@@ -80,25 +80,56 @@ describe("EditorView decoration", () => {
     ist(secondLine.firstChild, secondLineText)
   })
 
-  it("combines decoration classes", () => {
-    let cm = decoEditor("abcdef", [d(0, 4, {class: "a"}), d(2, 6, {class: "b"})])
-    ist(cm.contentDOM.querySelectorAll(".a").length, 2)
-    ist(cm.contentDOM.querySelectorAll(".b").length, 2)
-    ist(cm.contentDOM.querySelectorAll(".a.b").length, 1)
-  })
-
-  it("combines decoration styles", () => {
-    let cm = decoEditor("abc", [d(1, 2, {attributes: {style: "color: red"}}),
-                                d(1, 2, {attributes: {style: "text-decoration: underline"}})])
-    let span = cm.contentDOM.querySelector("span")!
-    ist(span.style.color, "red")
-    ist(span.style.textDecoration, "underline")
+  it("nests decoration elements", () => {
+    let cm = tempEditor("abcdef", [decos(Decoration.set([d(0, 4, {class: "a"})])),
+                                   decos(Decoration.set([d(2, 6, {class: "b"})]))])
+    let a = cm.contentDOM.querySelectorAll(".a"), b = cm.contentDOM.querySelectorAll(".b")
+    ist(a.length, 1)
+    ist(b.length, 2)
+    ist(a[0].textContent, "abcd")
+    ist(b[0].textContent, "cd")
+    ist(b[0].parentNode, a[0])
+    ist(b[1].textContent, "ef")
   })
 
   it("drops entirely deleted decorations", () => {
     let cm = decoEditor("abc", [d(1, 2, {inclusiveStart: true, inclusiveEnd: true, tagName: "strong"})])
     cm.dispatch({changes: {from: 0, to: 3, insert: "a"}})
     ist(cm.contentDOM.querySelector("strong"), null)
+  })
+
+  it("doesn't merge separate decorations", () => {
+    let cm = decoEditor("abcd", [d(0, 2, {class: "a"}), d(2, 4, {class: "a"})])
+    ist(cm.contentDOM.querySelectorAll(".a").length, 2)
+    cm.dispatch({changes: {from: 1, to: 3}})
+    ist(cm.contentDOM.querySelectorAll(".a").length, 2)
+  })
+
+  it("keeps decorations together when deleting inside of them", () => {
+    let cm = decoEditor("one\ntwo", [d(1, 6, {class: "a"})])
+    ist(cm.contentDOM.querySelectorAll(".a").length, 2)
+    cm.dispatch({changes: {from: 2, to: 5}})
+    ist(cm.contentDOM.querySelectorAll(".a").length, 1)
+  })
+
+  it("does merge recreated decorations", () => {
+    let cm = decoEditor("abcde", [d(1, 4, {class: "c"})])
+    cm.dispatch({changes: {from: 2, to: 5, insert: "CDE"},
+                 effects: [filterDeco.of(() => false),
+                           addDeco.of([d(1, 4, {class: "c"})])]})
+    let a = cm.contentDOM.querySelectorAll(".c")
+    ist(a.length, 1)
+    ist(a[0].textContent, "bCD")
+  })
+
+  it("breaks low-precedence ranges for high-precedence wrappers", () => {
+    let cm = tempEditor("abc", [decos(Decoration.set([d(0, 2, {class: "a"})])),
+                                 decos(Decoration.set([d(1, 3, {class: "b"})]))])
+    let a = cm.contentDOM.querySelectorAll(".a")
+    let b = cm.contentDOM.querySelectorAll(".b")
+    ist(a.length, 1)
+    ist(b.length, 2)
+    ist(b[0].parentNode, a[0])
   })
 
   it("properly updates the viewport gap when changes fall inside it", () => {
@@ -224,6 +255,34 @@ describe("EditorView decoration", () => {
       let cm = decoEditor("one\ntwo", [w(3, new WordWidget("A"))])
       cm.dispatch({effects: [filterDeco.of(() => false), addDeco.of([w(5, new WordWidget("B"))])]})
       ist(cm.contentDOM.querySelectorAll("strong").length, 1)
+    })
+
+    it("can wrap widgets in marks", () => {
+      let cm = tempEditor("abcd", [decos(Decoration.set([d(0, 4, {class: "a"})])),
+                                   decos(Decoration.set([w(2, new WordWidget("hi"))])),
+                                   decos(Decoration.set([d(1, 3, {class: "b"})]))])
+      let a = cm.contentDOM.querySelectorAll(".a")
+      let b = cm.contentDOM.querySelectorAll(".b")
+      let wordElt = cm.contentDOM.querySelector("strong")
+      ist(a.length, 1)
+      ist(b.length, 2)
+      ist(wordElt)
+      ist(wordElt!.parentNode, a[0])
+      ist(b[0].parentNode, a[0])
+      ist(b[0].textContent, "b")
+      ist(b[1].textContent, "c")
+      cm.dispatch({effects: [filterDeco.of(from => from != 2)]})
+      ist(cm.contentDOM.querySelectorAll(".b").length, 1)
+    })
+
+    it("wraps widgets even when the mark starts at the same offset", () => {
+      let cm = tempEditor("abcd", [decos(Decoration.set([d(1, 3, {class: "a"})])),
+                                   decos(Decoration.set([Decoration.replace({widget: new WordWidget("X")}).range(1, 3)]))])
+      let a = cm.contentDOM.querySelectorAll(".a")
+      let w = cm.contentDOM.querySelectorAll("strong")
+      ist(a.length, 1)
+      ist(w.length, 1)
+      ist(w[0].parentNode, a[0])
     })
   })
 

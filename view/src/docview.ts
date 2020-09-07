@@ -128,20 +128,20 @@ export class DocView extends ContentView {
       let next = i >= 0 ? changes[i] : null
       if (!next) break
       let {fromA, toA, fromB, toB} = next
-      let {content, breakAtStart} = ContentBuilder.build(this.view.state.doc, fromB, toB, deco)
+      let {content, breakAtStart, openStart, openEnd} = ContentBuilder.build(this.view.state.doc, fromB, toB, deco)
       let {i: toI, off: toOff} = cursor.findPos(toA, 1)
       let {i: fromI, off: fromOff} = cursor.findPos(fromA, -1)
-      this.replaceRange(fromI, fromOff, toI, toOff, content, breakAtStart)
+      this.replaceRange(fromI, fromOff, toI, toOff, content, breakAtStart, openStart, openEnd)
     }
   }
 
   private replaceRange(fromI: number, fromOff: number, toI: number, toOff: number,
-                       content: BlockView[], breakAtStart: number) {
+                       content: BlockView[], breakAtStart: number, openStart: number, openEnd: number) {
     let before = this.children[fromI], last = content.length ? content[content.length - 1] : null
     let breakAtEnd = last ? last.breakAfter : breakAtStart
     // Change within a single line
     if (fromI == toI && !breakAtStart && !breakAtEnd && content.length < 2 &&
-        before.merge(fromOff, toOff, content.length ? last : null, fromOff == 0))
+        before.merge(fromOff, toOff, content.length ? last : null, fromOff == 0, openStart, openEnd))
       return
 
     let after = this.children[toI]
@@ -155,12 +155,12 @@ export class DocView extends ContentView {
       }
       // If the element after the replacement should be merged with
       // the last replacing element, update `content`
-      if (!breakAtEnd && last && after.merge(0, toOff, last, true)) {
+      if (!breakAtEnd && last && after.merge(0, toOff, last, true, 0, openEnd)) {
         content[content.length - 1] = after
       } else {
         // Remove the start of the after element, if necessary, and
         // add it to `content`.
-        if (toOff || after.children.length && after.children[0].length == 0) after.merge(0, toOff, null, false)
+        if (toOff || after.children.length && after.children[0].length == 0) after.merge(0, toOff, null, false, 0, openEnd)
         content.push(after)
       }
     } else if (after.breakAfter) {
@@ -175,10 +175,10 @@ export class DocView extends ContentView {
 
     before.breakAfter = breakAtStart
     if (fromOff > 0) {
-      if (!breakAtStart && content.length && before.merge(fromOff, before.length, content[0], false)) {
+      if (!breakAtStart && content.length && before.merge(fromOff, before.length, content[0], false, openStart, 0)) {
         before.breakAfter = content.shift()!.breakAfter
       } else if (fromOff < before.length || before.children.length && before.children[before.children.length - 1].length == 0) {
-        before.merge(fromOff, before.length, null, false)
+        before.merge(fromOff, before.length, null, false, openStart, 0)
       }
       fromI++
     }
@@ -376,10 +376,10 @@ export class DocView extends ContentView {
 
   updateDeco() {
     return this.decorations = [
-      ...this.view.state.facet(decorationsFacet),
       this.computeBlockGapDeco(),
       this.view.viewState.lineGapDeco,
       this.compositionDeco,
+      ...this.view.state.facet(decorationsFacet),
       ...this.view.pluginField(pluginDecorations)
     ]
   }
@@ -439,7 +439,6 @@ export function computeCompositionDeco(view: EditorView, changes: ChangeSet): De
   let cView = view.docView.nearest(textNode)
   let from: number, to: number, topNode = textNode
   if (cView instanceof InlineView) {
-    // FIXME revisit this when nested range decorations are implemented
     while (cView.parent instanceof InlineView) cView = cView.parent
     from = cView.posAtStart
     to = from + cView.length

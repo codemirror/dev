@@ -57,6 +57,7 @@ export interface RangeComparator<T extends RangeValue> {
   minPointSize?: number
 }
 
+// FIXME document openEnd etc
 /// Methods used when iterating over the spans created by a set of
 /// ranges. The entire iterated range will be covered with either
 /// `span` or `point` calls.
@@ -64,11 +65,9 @@ export interface SpanIterator<T extends RangeValue> {
   /// Called for any ranges not covered by point decorations. `active`
   /// holds the values that the range is marked with (and may be
   /// empty).
-  span(from: number, to: number, active: readonly T[]): void
-  /// Called when going over a point decoration. `openStart` and
-  /// `openEnd` indicate whether the point decoration exceeded the
-  /// range we're iterating over at its start and end.
-  point(from: number, to: number, value: T, openStart: boolean, openEnd: boolean): void
+  span(from: number, to: number, active: readonly T[], openEnd: number): void
+  /// Called when going over a point decoration.
+  point(from: number, to: number, value: T, active: readonly T[], openEnd: number): void
   /// When given and greater than -1, only points of at least this
   /// size are taken into account.
   minPointSize?: number
@@ -320,16 +319,24 @@ export class RangeSet<T extends RangeValue> {
   /// the iterator about the ranges covering every given piece of
   /// content.
   static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
-                                     iterator: SpanIterator<T>) {
+                                     iterator: SpanIterator<T>): number {
+    // FIXME don't do the open tracking unless necessary
     let cursor = new SpanCursor(sets, null, iterator.minPointSize ?? -1).goto(from), pos = from
+    let open = cursor.openStart
     for (;;) {
       let curTo = Math.min(cursor.to, to)
-      if (cursor.point) iterator.point(pos, curTo, cursor.point, cursor.pointFrom < from, cursor.to > to)
-      else if (curTo > pos) iterator.span(pos, curTo, cursor.active)
+      if (cursor.point) {
+        iterator.point(pos, curTo, cursor.point, cursor.activeForPoint(curTo), open)
+        open = cursor.openEnd(curTo) + (cursor.to > curTo ? 1 : 0)
+      } else if (curTo > pos) {
+        iterator.span(pos, curTo, cursor.active, open)
+        open = cursor.openEnd(curTo)
+      }
       if (cursor.to > to) break
       pos = cursor.to
       cursor.next()
     }
+    return open
   }
 
   /// Create a range set for the given range or array of ranges. By
@@ -605,9 +612,11 @@ class SpanCursor<T extends RangeValue> {
   // A currently active point range, if any
   point: T | null = null
   pointFrom = 0
+  pointRank = 0
 
   to = -Far
   endSide = 0
+  openStart = -1
 
   constructor(sets: readonly RangeSet<T>[],
               skip: Set<Chunk<T>> | null,
@@ -621,6 +630,7 @@ class SpanCursor<T extends RangeValue> {
     this.minActive = -1
     this.to = pos
     this.endSide = side
+    this.openStart = -1
     this.next()
     return this
   }
@@ -638,11 +648,22 @@ class SpanCursor<T extends RangeValue> {
     this.minActive = findMinIndex(this.active, this.activeTo)
   }
 
+  addActive(trackOpen: number[] | null) {
+    let i = 0, {value, to, rank} = this.cursor
+    while (i < this.activeRank.length && this.activeRank[i] <= rank) i++
+    insert(this.active, i, value)
+    insert(this.activeTo, i, to)
+    insert(this.activeRank, i, rank)
+    if (trackOpen) insert(trackOpen, i, this.cursor.from)
+    this.minActive = findMinIndex(this.active, this.activeTo)
+  }
+
   // After calling this, if `this.point` != null, the next range is a
   // point. Otherwise, it's a regular range, covered by `this.active`.
   next() {
     let from = this.to
     this.point = null
+    let trackOpen = this.openStart < 0 ? [] : null, trackExtra = 0
     for (;;) {
       let a = this.minActive
       if (a > -1 && (this.activeTo[a] - this.cursor.from || this.active[a].endSide - this.cursor.startSide) < 0) {
@@ -652,6 +673,7 @@ class SpanCursor<T extends RangeValue> {
           break
         }
         this.removeActive(a)
+        if (trackOpen) remove(trackOpen, a)
       } else if (!this.cursor.value) {
         this.to = this.endSide = Far
         break
@@ -662,24 +684,46 @@ class SpanCursor<T extends RangeValue> {
       } else {
         let nextVal = this.cursor.value
         if (!nextVal.point) { // Opening a range
-          let activePos = 0, {rank, to} = this.cursor
-          while (activePos < this.activeRank.length && this.activeRank[activePos] <= rank) activePos++
-          insert(this.active, activePos, nextVal)
-          insert(this.activeTo, activePos, to)
-          insert(this.activeRank, activePos, rank)
-          this.minActive = findMinIndex(this.active, this.activeTo)
+          this.addActive(trackOpen)
           this.cursor.next()
         } else { // New point
           this.point = nextVal
           this.pointFrom = this.cursor.from
+          this.pointRank = this.cursor.rank
           this.to = this.cursor.to
           this.endSide = nextVal.endSide
+          if (this.cursor.from < from) trackExtra = 1
           this.cursor.next()
+          while (this.cursor.from == from && !this.cursor.value.point) {
+            this.addActive(trackOpen)
+            this.cursor.next()
+          }
           if (this.to > from) this.forward(this.to, this.endSide)
           break
         }
       }
     }
+    if (trackOpen) {
+      let openStart = 0
+      while (openStart < trackOpen.length && trackOpen[openStart] < from) openStart++
+      this.openStart = openStart + trackExtra
+    }
+  }
+
+  activeForPoint(to: number) {
+    if (!this.active.length) return this.active
+    let active = []
+    for (let i = 0; i < this.active.length; i++) {
+      if (this.activeRank[i] > this.pointRank) break
+      if (this.activeTo[i] >= to) active.push(this.active[i])
+    }
+    return active
+  }
+
+  openEnd(to: number) {
+    let open = 0
+    while (open < this.activeTo.length && this.activeTo[open] > to) open++
+    return open
   }
 }
 

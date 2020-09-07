@@ -1,7 +1,7 @@
 import {MapMode} from "@codemirror/next/state"
 import {RangeValue, Range, RangeSet} from "@codemirror/next/rangeset"
 import {WidgetView} from "./inlineview"
-import {attrsEq} from "./attributes"
+import {attrsEq, Attrs} from "./attributes"
 import {EditorView} from "./editorview"
 
 interface MarkDecorationSpec {
@@ -137,8 +137,7 @@ export enum BlockType {
 
 /// A decoration provides information on how to draw or style a piece
 /// of content. You'll usually use it wrapped in a
-/// [`Range`](#rangeset.Range), which adds a start and
-/// end position.
+/// [`Range`](#rangeset.Range), which adds a start and end position.
 export abstract class Decoration extends RangeValue {
   /// @internal
   constructor(
@@ -202,22 +201,27 @@ export abstract class Decoration extends RangeValue {
   hasHeight() { return this.widget ? this.widget.estimatedHeight > -1 : false }
 }
 
-Decoration.prototype.point = false
-
 export class MarkDecoration extends Decoration {
+  tagName: string
+  class: string
+  attrs: Attrs | null
+
   constructor(spec: MarkDecorationSpec) {
     let {start, end} = getInclusive(spec)
     super(Side.BigInline * (start ? -1 : 1),
           Side.BigInline * (end ? 1 : -1),
           null, spec)
+    this.tagName = spec.tagName || "span"
+    this.class = spec.class || ""
+    this.attrs = spec.attributes || null
   }
 
   eq(other: Decoration): boolean {
     return this == other ||
       other instanceof MarkDecoration &&
-      this.spec.tagName == other.spec.tagName &&
-      this.spec.class == other.spec.class &&
-      attrsEq(this.spec.attributes || null, other.spec.attributes || null)
+      this.tagName == other.tagName &&
+      this.class == other.class &&
+      attrsEq(this.attrs, other.attrs)
   }
 
   range(from: number, to = from) {
@@ -225,6 +229,8 @@ export class MarkDecoration extends Decoration {
     return super.range(from, to)
   }
 }
+
+MarkDecoration.prototype.point = false
 
 export class LineDecoration extends Decoration {
   constructor(spec: LineDecorationSpec) {
