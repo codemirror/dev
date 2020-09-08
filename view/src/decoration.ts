@@ -159,7 +159,13 @@ export abstract class Decoration extends RangeValue {
   abstract eq(other: Decoration): boolean
 
   /// Create a mark decoration, which influences the styling of the
-  /// text in its range.
+  /// content in its range. Nested mark decorations will cause nested
+  /// DOM elements to be created. Nesting order is determined by
+  /// precedence of the [facet](#view.EditorView^decorations) or
+  /// (below the facet-provided decorations) [view
+  /// plugin](#view.ViewPlugin.decorations). Such elements are broken
+  /// on line boundaries and on the boundaries of higher-precedence
+  /// decorations.
   static mark(spec: MarkDecorationSpec): Decoration {
     return new MarkDecoration(spec)
   }

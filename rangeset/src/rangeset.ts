@@ -57,17 +57,22 @@ export interface RangeComparator<T extends RangeValue> {
   minPointSize?: number
 }
 
-// FIXME document openEnd etc
 /// Methods used when iterating over the spans created by a set of
 /// ranges. The entire iterated range will be covered with either
 /// `span` or `point` calls.
 export interface SpanIterator<T extends RangeValue> {
   /// Called for any ranges not covered by point decorations. `active`
   /// holds the values that the range is marked with (and may be
-  /// empty).
-  span(from: number, to: number, active: readonly T[], openEnd: number): void
-  /// Called when going over a point decoration.
-  point(from: number, to: number, value: T, active: readonly T[], openEnd: number): void
+  /// empty). `openStart` indicates how many of those ranges are open
+  /// (continued) at the start of the span.
+  span(from: number, to: number, active: readonly T[], openStart: number): void
+  /// Called when going over a point decoration. The active range
+  /// decorations that cover the point and have a higher precedence
+  /// are provided in `active`. The open count in `openStart` counts
+  /// the number of those ranges that started before the point and. If
+  /// the point started before the iterated range, `openStart` will be
+  /// `active.length + 1` to signal this.
+  point(from: number, to: number, value: T, active: readonly T[], openStart: number): void
   /// When given and greater than -1, only points of at least this
   /// size are taken into account.
   minPointSize?: number
@@ -317,10 +322,11 @@ export class RangeSet<T extends RangeValue> {
 
   /// Iterate over a group of range sets at the same time, notifying
   /// the iterator about the ranges covering every given piece of
-  /// content.
+  /// content. Returns the open count (see
+  /// [`SpanIterator.range`](#rangeset.SpanIterator.range)) at the end
+  /// of the iteration.
   static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
                                      iterator: SpanIterator<T>): number {
-    // FIXME don't do the open tracking unless necessary
     let cursor = new SpanCursor(sets, null, iterator.minPointSize ?? -1).goto(from), pos = from
     let open = cursor.openStart
     for (;;) {
