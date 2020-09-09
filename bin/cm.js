@@ -217,7 +217,7 @@ function ensureSelfLink() {
   let parent = path.join(root, "node_modules", "@codemirror"), link = path.join(parent, "next")
   if (!fs.existsSync(link)) {
     fs.mkdirSync(parent, {recursive: true})
-    fs.symlinkSync("../..", link)
+    fs.symlinkSync("../..", link, "junction")
   }
 }
 
