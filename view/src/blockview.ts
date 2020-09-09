@@ -1,4 +1,4 @@
-import {ContentView, DOMPos} from "./contentview"
+import {ContentView, DOMPos, coordsInChildren} from "./contentview"
 import {DocView} from "./docview"
 import {InlineView, TextView, WidgetView, mergeInlineChildren, inlineDOMAtPos, joinInlineInto} from "./inlineview"
 import {clientRectsFor, Rect} from "./dom"
@@ -124,13 +124,7 @@ export class LineView extends ContentView implements BlockView {
   }
 
   coordsAt(pos: number, side: number): Rect | null {
-    for (let off = 0, i = 0; i < this.children.length; i++) {
-      let child = this.children[i], end = off + child.length
-      if (end != off && (side <= 0 || end == this.length ? end >= pos : end > pos))
-        return child.coordsAt(pos - off, side)
-      off = end
-    }
-    return (this.dom!.lastChild as HTMLElement).getBoundingClientRect()
+    return coordsInChildren(this, pos, side)
   }
 
   match(_other: ContentView) { return false }

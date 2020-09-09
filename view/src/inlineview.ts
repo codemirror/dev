@@ -1,5 +1,5 @@
 import {Text as DocText} from "@codemirror/next/text"
-import {ContentView, DOMPos} from "./contentview"
+import {ContentView, DOMPos, coordsInChildren} from "./contentview"
 import {WidgetType, MarkDecoration} from "./decoration"
 import {Rect, flattenRect} from "./dom"
 import browser from "./browser"
@@ -120,6 +120,10 @@ export class MarkView extends InlineView {
 
   domAtPos(pos: number): DOMPos {
     return inlineDOMAtPos(this.dom!, this.children, pos)
+  }
+
+  coordsAt(pos: number, side: number): Rect | null {
+    return coordsInChildren(this, pos, side)
   }
 }
 

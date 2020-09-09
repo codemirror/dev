@@ -222,3 +222,13 @@ export class ChildCursor {
     }
   }
 }
+
+export function coordsInChildren(view: ContentView, pos: number, side: number): Rect | null {
+  for (let off = 0, i = 0; i < view.children.length; i++) {
+    let child = view.children[i], end = off + child.length
+    if (end != off && (side <= 0 || end == view.length ? end >= pos : end > pos))
+      return child.coordsAt(pos - off, side)
+    off = end
+  }
+  return (view.dom!.lastChild as HTMLElement).getBoundingClientRect()
+}
