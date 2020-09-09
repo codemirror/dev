@@ -18,7 +18,7 @@ export function buildTheme(mainID: string, spec: {[name: string]: Style}) {
         id = narrow[2] == "dark" ? baseDarkThemeID : baseLightThemeID
         piece = narrow[1]
       }
-      let parts = piece.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " ")
+      let parts = piece.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " /*|*/ ")
       for (let i = 1; i <= parts.length; i++) selector += ".cm-" + parts.slice(0, i).join("-")
       return selector
     }).join(", ")
