@@ -33,7 +33,7 @@ const oneDarkTheme = EditorView.theme({
   "panels.bottom": {borderTop: "2px solid black"},
 
   searchMatch: {
-    backgroundColor: "#42557b",
+    backgroundColor: "#72a1ff59",
     border: "1px solid #457dff"
   },
   "searchMatch.selected": {
@@ -41,10 +41,10 @@ const oneDarkTheme = EditorView.theme({
   },
 
   activeLine: {backgroundColor: "#2c313c"},
-  selectionMatch: {backgroundColor: "#354139"},
+  selectionMatch: {backgroundColor: "#aafe661a"},
 
   "matchingBracket, nonmatchingBracket": {
-    backgroundColor: "#515a6b",
+    backgroundColor: "#bad0f847",
     border: "1px solid #515a6b"
   },
 

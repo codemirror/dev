@@ -1,7 +1,7 @@
 import {Tree, NodeProp} from "lezer-tree"
 import {Style, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
-import {EditorState, Extension} from "@codemirror/next/state"
+import {EditorState, Extension, precedence} from "@codemirror/next/state"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
 /// A tag system defines a set of node (token) tags used for
@@ -130,7 +130,7 @@ export class TagSystem {
   highlighter(spec: {[tag: string]: Style}): Extension {
     let styling = new Styling(this, spec)
     return [
-      ViewPlugin.define(view => new Highlighter(view, this.prop, styling)).decorations(),
+      precedence(ViewPlugin.define(view => new Highlighter(view, this.prop, styling)).decorations(), "fallback"),
       EditorView.styleModule.of(styling.module)
     ]
   }

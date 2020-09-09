@@ -459,7 +459,7 @@ const baseTheme = EditorView.baseTheme({
   "lintRange.error": { backgroundImage: underline("#d11") },
   "lintRange.warning": { backgroundImage: underline("orange") },
   "lintRange.info": { backgroundImage: underline("#999") },
-  "lintRange.active": { backgroundColor: "#fec" },
+  "lintRange.active": { backgroundColor: "#ffdd9980" },
 
   lintPoint: {
     position: "relative",

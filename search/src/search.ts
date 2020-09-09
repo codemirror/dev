@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, ViewUpdate, Command, Decoration, DecorationSet, themeClass,
         runScopeHandlers, KeyBinding} from "@codemirror/next/view"
-import {StateField, StateEffect, EditorSelection, SelectionRange, StateCommand} from "@codemirror/next/state"
+import {StateField, StateEffect, EditorSelection, SelectionRange, StateCommand, precedence} from "@codemirror/next/state"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
@@ -373,16 +373,16 @@ const baseTheme = EditorView.baseTheme({
     }
   },
 
-  "searchMatch@light": { backgroundColor: "#ffa" },
-  "searchMatch@dark": { backgroundColor: "#088" },
+  "searchMatch@light": { backgroundColor: "#ffff0054" },
+  "searchMatch@dark": { backgroundColor: "#00ffff8a" },
 
-  "searchMatch.selected@light": { backgroundColor: "#fca" },
-  "searchMatch.selected@dark": { backgroundColor: "#808" }
+  "searchMatch.selected@light": { backgroundColor: "#ff6a0054" },
+  "searchMatch.selected@dark": { backgroundColor: "#ff00ff8a" }
 })
 
 const searchExtensions = [
   searchState,
-  searchHighlighter,
+  precedence(searchHighlighter, "override"),
   panels(),
   baseTheme
 ]
