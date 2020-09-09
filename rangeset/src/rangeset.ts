@@ -332,7 +332,7 @@ export class RangeSet<T extends RangeValue> {
     for (;;) {
       let curTo = Math.min(cursor.to, to)
       if (cursor.point) {
-        iterator.point(pos, curTo, cursor.point, cursor.activeForPoint(curTo), open)
+        iterator.point(pos, curTo, cursor.point, cursor.activeForPoint(cursor.to), open)
         open = cursor.openEnd(curTo) + (cursor.to > curTo ? 1 : 0)
       } else if (curTo > pos) {
         iterator.span(pos, curTo, cursor.active, open)
@@ -700,10 +700,6 @@ class SpanCursor<T extends RangeValue> {
           this.endSide = nextVal.endSide
           if (this.cursor.from < from) trackExtra = 1
           this.cursor.next()
-          while (this.cursor.from == from && !this.cursor.value.point) {
-            this.addActive(trackOpen)
-            this.cursor.next()
-          }
           if (this.to > from) this.forward(this.to, this.endSide)
           break
         }
@@ -721,7 +717,8 @@ class SpanCursor<T extends RangeValue> {
     let active = []
     for (let i = 0; i < this.active.length; i++) {
       if (this.activeRank[i] > this.pointRank) break
-      if (this.activeTo[i] >= to) active.push(this.active[i])
+      if (this.activeTo[i] > to || this.activeTo[i] == to && this.active[i].endSide > this.point!.endSide)
+        active.push(this.active[i])
     }
     return active
   }

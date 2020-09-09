@@ -276,8 +276,10 @@ describe("EditorView decoration", () => {
     })
 
     it("wraps widgets even when the mark starts at the same offset", () => {
-      let cm = tempEditor("abcd", [decos(Decoration.set([d(1, 3, {class: "a"})])),
-                                   decos(Decoration.set([Decoration.replace({widget: new WordWidget("X")}).range(1, 3)]))])
+      let repl = Decoration.replace({widget: new WordWidget("X"),
+                                     inclusive: false})
+      let cm = tempEditor("abcd", [decos(Decoration.set([d(1, 3, {class: "a", inclusive: true})])),
+                                   decos(Decoration.set([repl.range(1, 3)]))])
       let a = cm.contentDOM.querySelectorAll(".a")
       let w = cm.contentDOM.querySelectorAll("strong")
       ist(a.length, 1)
