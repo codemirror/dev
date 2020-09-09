@@ -23,7 +23,7 @@ export const pythonSyntax = LezerSyntax.define(parser.withProps(
     "import from def class global nonlocal lambda": "keyword definition",
     "with as print": "keyword",
     self: "self",
-    Boolean: "atom",
+    Boolean: "bool",
     None: "null",
     VariableName: "variableName",
     PropertyName: "propertyName",

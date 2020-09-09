@@ -41,7 +41,7 @@ export const javaSyntax = LezerSyntax.define(parser.withProps(
     CharacterLiteral: "character",
     LineComment: "lineComment",
     BlockComment: "blockComment",
-    BooleanLiteral: "atom",
+    BooleanLiteral: "bool",
     PrimitiveType: "typeName standard",
     TypeName: "typeName",
     Identifier: "name",

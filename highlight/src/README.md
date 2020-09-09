@@ -39,6 +39,7 @@ other types.
    * **`number`**
      * **`integer`**
      * **`float`**
+   * **`bool`**
    * **`regexp`**
    * **`escape`**
    * **`color`**
