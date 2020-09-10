@@ -155,10 +155,10 @@ export class BlockWidgetView extends ContentView implements BlockView {
   }
 
   merge(from: number, to: number, source: ContentView | null, _takeDeco: boolean, openStart: number, openEnd: number): boolean {
-    if (!(source instanceof BlockWidgetView) || !this.widget.compare(source.widget) ||
-        from > 0 && openStart <= 0 || to < this.length && openEnd <= 0)
+    if (source && (!(source instanceof BlockWidgetView) || !this.widget.compare(source.widget) ||
+                   from > 0 && openStart <= 0 || to < this.length && openEnd <= 0))
       return false
-    this.length = from + source.length + (this.length - to)
+    this.length = from + (source ? source.length : 0) + (this.length - to)
     return true
   }
 

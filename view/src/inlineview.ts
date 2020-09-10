@@ -168,8 +168,8 @@ export class WidgetView extends InlineView {
   getSide() { return this.side }
 
   merge(from: number, to: number, source: InlineView | null, openStart: number, openEnd: number) {
-    if (!(source instanceof WidgetView) || !this.widget.compare(source.widget) ||
-        from > 0 && openStart <= 0 || to < this.length && openEnd <= 0)
+    if (source && (!(source instanceof WidgetView) || !this.widget.compare(source.widget) ||
+                   from > 0 && openStart <= 0 || to < this.length && openEnd <= 0))
       return false
     this.length = from + (source ? source.length : 0) + (this.length - to)
     return true
