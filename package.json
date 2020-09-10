@@ -53,6 +53,7 @@
     "./basic-setup": "./basic-setup/dist/index.js",
     "./lang-javascript": "./lang-javascript/dist/index.js",
     "./lang-java": "./lang-java/dist/index.js",
+    "./lang-cpp": "./lang-cpp/dist/index.js",
     "./lang-python": "./lang-python/dist/index.js",
     "./lang-css": "./lang-css/dist/index.js",
     "./lang-html": "./lang-html/dist/index.js",
@@ -61,6 +62,7 @@
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
     "lezer": "^0.10.3",
+    "lezer-cpp": "^0.10.1",
     "lezer-css": "^0.10.1",
     "lezer-html": "^0.10.0",
     "lezer-javascript": "^0.10.1",
