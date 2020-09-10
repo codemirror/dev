@@ -24,9 +24,9 @@ export const javascriptSyntax = LezerSyntax.define(parser.withProps(
     return undefined
   }),
   foldNodeProp.add({
-    Block(tree) { return {from: tree.start + 1, to: tree.end - 1} },
-    ObjectExpression(tree) { return {from: tree.start + 1, to: tree.end - 1} },
-    ArrayExpression(tree) { return {from: tree.start + 1, to: tree.end - 1} },
+    "Block ClassBody SwitchBody EnumBody ObjectExpression ArrayExpression"(tree) {
+      return {from: tree.start + 1, to: tree.end - 1}
+    },
     BlockComment(tree) { return {from: tree.start + 2, to: tree.end - 2} }
   }),
   styleTags({
