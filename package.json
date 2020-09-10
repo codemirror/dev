@@ -60,10 +60,10 @@
   },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "lezer": "^0.10.0",
-    "lezer-css": "^0.10.0",
+    "lezer": "^0.10.3",
+    "lezer-css": "^0.10.1",
     "lezer-html": "^0.10.0",
-    "lezer-javascript": "^0.10.0",
+    "lezer-javascript": "^0.10.1",
     "lezer-java": "^0.10.0",
     "lezer-python": "^0.10.0",
     "lezer-tree": "^0.10.0",
