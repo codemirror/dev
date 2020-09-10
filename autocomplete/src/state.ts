@@ -74,7 +74,7 @@ export class CompletionState {
     let sources = conf.override || state.languageDataAt<CompletionSource>("autocomplete", cur(state))
     let active: readonly ActiveSource[] = sources.map(source => {
       let value = this.active.find(s => s.source == source) || new ActiveSource(source, State.Inactive, false)
-      return value.update(tr)
+      return value.update(tr, conf)
     })
     if (active.length == this.active.length && active.every((a, i) => a == this.active[i])) active = this.active
 
@@ -128,10 +128,10 @@ export class ActiveSource {
 
   hasResult(): this is ActiveResult { return false }
 
-  update(tr: Transaction): ActiveSource {
+  update(tr: Transaction, conf: Required<CompletionConfig>): ActiveSource {
     let event = tr.annotation(Transaction.userEvent), value: ActiveSource = this
     if (event == "input" || event == "delete")
-      value = value.handleUserEvent(tr, event)
+      value = value.handleUserEvent(tr, event, conf)
     else if (tr.docChanged)
       value = value.handleChange(tr)
     else if (tr.selection && value.state != State.Inactive)
@@ -148,8 +148,8 @@ export class ActiveSource {
     return value
   }
 
-  handleUserEvent(_tr: Transaction, type: "input" | "delete"): ActiveSource {
-    return type == "delete" ? this : new ActiveSource(this.source, State.Pending, false)
+  handleUserEvent(_tr: Transaction, type: "input" | "delete", conf: Required<CompletionConfig>): ActiveSource {
+    return type == "delete" || !conf.activateOnTyping ? this : new ActiveSource(this.source, State.Pending, false)
   }
 
   handleChange(tr: Transaction): ActiveSource {
@@ -169,11 +169,11 @@ export class ActiveResult extends ActiveSource {
 
   hasResult(): this is ActiveResult { return true }
 
-  handleUserEvent(tr: Transaction, type: "input" | "delete"): ActiveSource {
+  handleUserEvent(tr: Transaction, type: "input" | "delete", conf: Required<CompletionConfig>): ActiveSource {
     let from = tr.changes.mapPos(this.from), to = tr.changes.mapPos(this.to, 1)
     let pos = cur(tr.state)
     if ((this.explicit ? pos < from : pos <= from) || pos > to)
-      return new ActiveSource(this.source, type == "input" ? State.Pending : State.Inactive, false)
+      return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? State.Pending : State.Inactive, false)
     if (this.span && (from == to || this.span.test(tr.state.sliceDoc(from, to))))
       return new ActiveResult(this.source, this.explicit, this.result, from, to, this.span)
     return new ActiveSource(this.source, State.Pending, this.explicit)

@@ -1,7 +1,7 @@
 import {EditorView, Command, ViewPlugin, PluginValue, ViewUpdate, logException} from "@codemirror/next/view"
 import {Transaction} from "@codemirror/next/state"
 import {completionState, setSelectedEffect, toggleCompletionEffect, setActiveEffect, State,
-        ActiveSource, ActiveResult} from "./state"
+        ActiveSource, ActiveResult, completionConfig} from "./state"
 import {cur, CompletionResult, CompletionSource, CompletionContext, applyCompletion, ensureAnchor} from "./completion"
 
 const CompletionInteractMargin = 75
@@ -132,6 +132,7 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
     this.debounceAccept = -1
 
     let updated: ActiveSource[] = []
+    let conf = this.view.state.facet(completionConfig)
     for (let i = 0; i < this.running.length; i++) {
       let query = this.running[i]
       if (query.done === undefined) continue
@@ -144,7 +145,7 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
           query.done.span ? ensureAnchor(query.done.span, true) : null)
         // Replay the transactions that happened since the start of
         // the request and see if that preserves the result
-        for (let tr of query.updates) active = active.update(tr)
+        for (let tr of query.updates) active = active.update(tr, conf)
         if (active.hasResult()) {
           updated.push(active)
           continue
@@ -157,7 +158,7 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
           // Explicitly failed. Should clear the pending status if it
           // hasn't been re-set in the meantime.
           let active = new ActiveSource(query.source, State.Inactive, false)
-          for (let tr of query.updates) active = active.update(tr)
+          for (let tr of query.updates) active = active.update(tr, conf)
           if (active.state != State.Pending) updated.push(active)
         } else {
           // Cleared by subsequent transactions. Restart.
