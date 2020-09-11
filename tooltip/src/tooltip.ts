@@ -128,7 +128,8 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
   }
 
   onscroll() {
-    if (this.tooltips.length) this.view.requestMeasure(this.measureReq)
+    if (this.view.inView && this.tooltips.some(t => t.pos >= this.view.viewport.from && t.pos <= this.view.viewport.to))
+      this.view.requestMeasure(this.measureReq)
   }
 })
 
