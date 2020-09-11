@@ -84,7 +84,7 @@ export class EditorView {
 
   /// Returns false when the editor is entirely scrolled out of view
   /// or otherwise hidden.
-  get inView() { return this.observer.intersecting }
+  get inView() { return this.viewState.inView }
   
   private _dispatch: (tr: Transaction) => void
 
@@ -263,6 +263,7 @@ export class EditorView {
     for (let i = 0;; i++) {
       this.updateState = UpdateState.Measuring
       let changed = this.viewState.measure(this.docView, i > 0)
+      if (!i) for (let plugin of this.plugins) plugin.measure(this)
       let measuring = this.measureRequests
       if (!changed && !measuring.length && this.viewState.scrollTo == null) break
       this.measureRequests = []

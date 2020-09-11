@@ -59,6 +59,12 @@ export interface PluginValue {
   /// Called when the plugin is no longer going to be used. Should
   /// revert any changes the plugin made to the DOM.
   destroy?(): void
+
+  /// If present, this method will be called when the editor measures
+  /// its layout. It can call
+  /// [`requestMeasure`](#view.EditorView.requestMeasure) when it
+  /// considers it necessary (but shouldn't do anything beyond that).
+  measure?(): void
 }
 
 declare const isFieldProvider: unique symbol
@@ -173,11 +179,7 @@ export const domEventHandlers = PluginField.define<{
 }>()
 
 export class PluginInstance {
-  updateFunc: (update: ViewUpdate) => void
-
-  constructor(readonly value: PluginValue, readonly spec: ViewPlugin<any>) {
-    this.updateFunc = this.value.update ? this.value.update.bind(this.value) : () => undefined
-  }
+  constructor(readonly value: PluginValue, readonly spec: ViewPlugin<any>) {}
 
   static create(spec: ViewPlugin<any>, view: EditorView) {
     let value
@@ -194,8 +196,9 @@ export class PluginInstance {
   }
 
   update(update: ViewUpdate) {
+    if (!this.value.update) return this
     try {
-      this.updateFunc(update)
+      this.value.update(update)
       return this
     } catch (e) {
       logException(update.state, e, "CodeMirror plugin crashed")
@@ -205,8 +208,17 @@ export class PluginInstance {
   }
 
   destroy(view: EditorView) {
-    try { if (this.value.destroy) this.value.destroy() }
-    catch (e) { logException(view.state, e, "CodeMirror plugin crashed") }
+    if (this.value.destroy) {
+      try { this.value.destroy() }
+      catch (e) { logException(view.state, e, "CodeMirror plugin crashed") }
+    }
+  }
+
+  measure(view: EditorView) {
+    if (this.value.measure) {
+      try { this.value.measure() }
+      catch(e) { logException(view.state, e, "CodeMirror plugin crashed") }
+    }
   }
 
   static dummy = new PluginInstance({}, ViewPlugin.define(() => ({})))

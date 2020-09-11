@@ -85,6 +85,7 @@ const enum LG { Margin = 10000, HalfMargin = LG.Margin >> 1,  MinViewPort = LG.M
 export class ViewState {
   // These are contentDOM-local coordinates
   pixelViewport: Rect = {left: 0, right: window.innerWidth, top: 0, bottom: 0}
+  inView = true
 
   paddingTop = 0
   paddingBottom = 0
@@ -165,8 +166,8 @@ export class ViewState {
     let pixelViewport = this.printing ? {top: -1e8, bottom: 1e8, left: -1e8, right: 1e8} : visiblePixelRange(dom, this.paddingTop)
     let dTop = pixelViewport.top - this.pixelViewport.top, dBottom = pixelViewport.bottom - this.pixelViewport.bottom
     this.pixelViewport = pixelViewport
-    if (this.pixelViewport.bottom <= this.pixelViewport.top ||
-        this.pixelViewport.right <= this.pixelViewport.left) return 0
+    this.inView = this.pixelViewport.bottom > this.pixelViewport.top && this.pixelViewport.right > this.pixelViewport.left
+    if (!this.inView) return 0
 
     let lineHeights = docView.measureVisibleLineHeights()
     let refresh = false, bias = 0
