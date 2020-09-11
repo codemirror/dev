@@ -81,6 +81,10 @@ export class EditorView {
   /// these ranges, which are the subset of the viewport that is
   /// actually drawn.
   get visibleRanges(): readonly {from: number, to: number}[] { return this.viewState.visibleRanges }
+
+  /// Returns false when the editor is entirely scrolled out of view
+  /// or otherwise hidden.
+  get inView() { return this.observer.intersecting }
   
   private _dispatch: (tr: Transaction) => void
 
