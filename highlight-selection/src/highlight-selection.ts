@@ -33,7 +33,9 @@ const activeLineHighlighter = ViewPlugin.fromClass(class {
     }
     return Decoration.set(deco)
   }
-}).decorations()
+}, {
+  decorations: v => v.decorations
+})
 
 type HighlightOptions = {
   /// Determines whether, when nothing is selected, the word around
@@ -136,7 +138,9 @@ const matchHighlighter = ViewPlugin.fromClass(class {
     }
     return Decoration.set(deco)
   }
-}).decorations()
+}, {
+  decorations: v => v.decorations
+})
 
 const defaultTheme = EditorView.baseTheme({
   "activeLine@light": { backgroundColor: "#e8f2ff" },

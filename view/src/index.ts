@@ -1,5 +1,5 @@
 export {EditorView} from "./editorview"
-export {Command, ViewPlugin, PluginValue, PluginField, ViewUpdate, logException} from "./extension"
+export {Command, ViewPlugin, PluginValue, PluginSpec, PluginFieldProvider, PluginField, ViewUpdate, logException} from "./extension"
 export {Decoration, DecorationSet, WidgetType, BlockType} from "./decoration"
 export {BlockInfo} from "./heightmap"
 export {themeClass} from "./theme"

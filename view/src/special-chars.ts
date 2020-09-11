@@ -123,7 +123,9 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
       pos += cursor.value.length
     }
   }
-}).decorations()
+}, {
+  decorations: v => v.decorations
+})
 
 // Assigns placeholder characters from the Control Pictures block to
 // ASCII control characters

@@ -562,7 +562,7 @@ export class EditorView {
   static domEventHandlers(handlers: {
     [Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean
   }): Extension {
-    return ViewPlugin.define(() => ({})).eventHandlers(handlers)
+    return ViewPlugin.define(() => ({}), {eventHandlers: handlers})
   }
 
   /// An input handler can be used to override the way changes to the

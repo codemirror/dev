@@ -74,7 +74,9 @@ const searchHighlighter = ViewPlugin.fromClass(class {
     }
     return builder.finish()
   }
-}).decorations()
+}, {
+  decorations: v => v.decorations
+})
 
 function searchCommand(f: (view: EditorView, state: SearchState) => boolean): Command {
   return view => {

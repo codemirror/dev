@@ -126,7 +126,9 @@ const panelPlugin = ViewPlugin.fromClass(class {
     this.top.sync([])
     this.bottom.sync([])
   }
-}).provide(PluginField.scrollMargins, value => ({top: value.top.scrollMargin(), bottom: value.bottom.scrollMargin()}))
+}, { 
+  provide: PluginField.scrollMargins.from(value => ({top: value.top.scrollMargin(), bottom: value.bottom.scrollMargin()}))
+})
 
 function panelClass(panel: Panel) {
   return themeClass(panel.style ? `panel.${panel.style}` : "panel")

@@ -61,10 +61,33 @@ export interface PluginValue {
   destroy?(): void
 }
 
+declare const isFieldProvider: unique symbol
+
+/// Used to [declare](#view.PluginSpec.provide) which
+/// [fields](#view.PluginValue) a [view plugin](#view.ViewPlugin)
+/// provides.
+export class PluginFieldProvider<V> {
+  // @ts-ignore
+  private [isFieldProvider]!: true
+
+  /// @internal
+  constructor(
+    /// @internal
+    readonly field: PluginField<any>,
+    /// @internal
+    readonly get: (value: V) => any
+  ) {}
+}
+
 /// Plugin fields are a mechanism for allowing plugins to provide
 /// values that can be retrieved through the
 /// [`pluginField`](#view.EditorView.pluginField) view method.
 export class PluginField<T> {
+  from<V extends PluginValue>(get: (value: V) => T): PluginFieldProvider<V> {
+    return new PluginFieldProvider(this, get)
+  }
+
+  /// Define a new plugin field.
   static define<T>() { return new PluginField<T>() }
 
   /// Plugins can provide additional scroll margins (space around the
@@ -79,10 +102,33 @@ let nextPluginID = 0
 
 export const viewPlugin = Facet.define<ViewPlugin<any>>()
 
+/// Provides additional information when defining a [view
+/// plugin](#view.ViewPlugin).
+export interface PluginSpec<V extends PluginValue> {
+  /// Register the given [event
+  /// handlers](#view.EditorView^domEventHandlers) for the plugin.
+  /// When called, these will have their `this` bound to the plugin
+  /// value.
+  eventHandlers?: {
+    [Type in keyof HTMLElementEventMap]?: (this: V, event: HTMLElementEventMap[Type], view: EditorView) => boolean
+  },
+
+  /// Allow the plugin to provide decorations. When given, this should
+  /// contain one or more functions that take the plugin value and
+  /// return a [decoration set](#view.DecorationSet).
+  decorations?: (value: V) => DecorationSet | readonly ((value: V) => DecorationSet)[]
+
+  /// Specify that the plugin provides [plugin
+  /// field](#view.PluginField) values. Use a field's
+  /// [`from`](#view.PluginField.from) method to create these
+  /// providers.
+  provide?: PluginFieldProvider<V> | readonly PluginFieldProvider<V>[],
+}
+
 /// View plugins associate stateful values with a view. They can
 /// influence the way the content is drawn, and are notified of things
 /// that happen in the view.
-export class ViewPlugin<T extends PluginValue> {
+export class ViewPlugin<V extends PluginValue> {
   /// Instances of this class act as extensions.
   extension: Extension
 
@@ -90,53 +136,31 @@ export class ViewPlugin<T extends PluginValue> {
     /// @internal
     readonly id: number,
     /// @internal
-    readonly create: (view: EditorView) => T,
+    readonly create: (view: EditorView) => V,
     /// @internal
-    readonly fields: readonly {field: PluginField<any>, get: (plugin: T) => any}[]
+    readonly fields: readonly PluginFieldProvider<V>[]
   ) {
     this.extension = viewPlugin.of(this)
   }
 
   /// Define a plugin from a constructor function that creates the
   /// plugin's value, given an editor view.
-  static define<T extends PluginValue>(create: (view: EditorView) => T) {
-    return new ViewPlugin<T>(nextPluginID++, create, [])
+  static define<V extends PluginValue>(create: (view: EditorView) => V, spec?: PluginSpec<V>) {
+    let {eventHandlers, provide, decorations} = spec || {}
+    let fields = []
+    if (provide) for (let provider of Array.isArray(provide) ? provide : [provide])
+      fields.push(provider)
+    if (eventHandlers)
+      fields.push(domEventHandlers.from((value: V) => ({plugin: value, handlers: eventHandlers} as any)))
+    if (decorations) for (let get of Array.isArray(decorations) ? decorations : [decorations])
+      fields.push(pluginDecorations.from(get))
+    return new ViewPlugin<V>(nextPluginID++, create, fields)
   }
 
   /// Create a plugin for a class whose constructor takes a single
   /// editor view as argument.
-  static fromClass<T extends PluginValue>(cls: {new (view: EditorView): T}) {
-    return ViewPlugin.define(view => new cls(view))
-  }
-
-  /// Create a new version of this plugin that provides a given
-  /// [plugin field](#view.PluginField).
-  provide<V>(field: PluginField<V>, get: (plugin: T) => V) {
-    return new ViewPlugin(this.id, this.create, this.fields.concat({field, get}))
-  }
-
-  /// Create a new version of this plugin that provides decorations.
-  /// Decorations provided by plugins can observe the editor and base
-  /// on, for example, the current viewport. On the other hand, they
-  /// should not influence the viewport, for example through collapsed
-  /// regions or large widgets.
-  ///
-  /// When the plugin value type has a `decorations` property, that is
-  /// used to provide the decorations when no explicit getter is
-  /// provided.
-  decorations<V extends {decorations: DecorationSet} & PluginValue>(this: ViewPlugin<V>): ViewPlugin<T>
-  decorations(get: (plugin: T) => DecorationSet): ViewPlugin<T>
-  decorations(get?: (plugin: T) => DecorationSet) {
-    return this.provide(pluginDecorations, get || ((value: any) => value.decorations))
-  }
-
-  /// Convenience method that extends a view plugin to automatically
-  /// register [DOM event
-  /// handlers](#view.EditorView^domEventHandlers).
-  eventHandlers(handlers: {
-    [Type in keyof HTMLElementEventMap]?: (this: T, event: HTMLElementEventMap[Type], view: EditorView) => boolean
-  }): ViewPlugin<T> {
-    return this.provide(domEventHandlers, (value: T) => ({plugin: value, handlers}))
+  static fromClass<V extends PluginValue>(cls: {new (view: EditorView): V}, spec?: PluginSpec<V>) {
+    return ViewPlugin.define(view => new cls(view), spec)
   }
 }
 

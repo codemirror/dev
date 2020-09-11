@@ -130,7 +130,9 @@ export class TagSystem {
   highlighter(spec: {[tag: string]: Style}): Extension {
     let styling = new Styling(this, spec)
     return [
-      precedence(ViewPlugin.define(view => new Highlighter(view, this.prop, styling)).decorations(), "fallback"),
+      precedence(ViewPlugin.define<Highlighter>(view => new Highlighter(view, this.prop, styling), {
+        decorations: v => v.decorations
+      }), "fallback"),
       EditorView.styleModule.of(styling.module)
     ]
   }

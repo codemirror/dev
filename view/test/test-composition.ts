@@ -63,7 +63,7 @@ function widgets(positions: number[], sides: number[]): ViewPlugin<any> {
   return ViewPlugin.define(() => ({
     decorations: startDeco,
     update(update: ViewUpdate) { this.decorations = this.decorations.map(update.changes) }
-  })).decorations()
+  }), {decorations: v => v.decorations})
 }
 
 describe("Composition", () => {
