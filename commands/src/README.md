@@ -117,6 +117,10 @@ with key bindings for a lot of them.
 
 ### Deletion
 
+@deleteCodePointBackward
+
+@deleteCodePointForward
+
 @deleteCharBackward
 
 @deleteCharForward

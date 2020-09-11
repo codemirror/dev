@@ -1,6 +1,6 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange,
         IndentContext, ChangeSpec, CharCategory, Transaction} from "@codemirror/next/state"
-import {Text, Line, countColumn} from "@codemirror/next/text"
+import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
 import {Subtree, NodeProp} from "lezer-tree"
@@ -307,7 +307,7 @@ function deleteBy(view: EditorView, by: (start: number) => number) {
   return true
 }
 
-const deleteByChar = (view: EditorView, forward: boolean) => deleteBy(view, pos => {
+const deleteByChar = (view: EditorView, forward: boolean, codePoint: boolean) => deleteBy(view, pos => {
   let {state} = view, line = state.doc.lineAt(pos), before
   if (!forward && pos > line.from && pos < line.from + 200 &&
       !/[^ \t]/.test(before = line.slice(0, pos - line.from))) {
@@ -316,17 +316,32 @@ const deleteByChar = (view: EditorView, forward: boolean) => deleteBy(view, pos 
     for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) pos--
     return pos
   }
-  let target = line.findClusterBreak(pos - line.from, forward) + line.from
+  let target
+  if (codePoint) {
+    let next = line.slice(pos - line.from + (forward ? 0 : -2),
+                          pos - line.from + (forward ? 2 : 0))
+    let size = next ? codePointSize(codePointAt(next, 0)) : 1
+    target = forward ? Math.min(state.doc.length, pos + size) : Math.max(0, pos - size)
+  } else {
+    target = line.findClusterBreak(pos - line.from, forward) + line.from
+  }
   if (target == pos && line.number != (forward ? state.doc.lines : 1))
     target += forward ? 1 : -1
   return target
 })
 
+/// Delete the selection, or, for cursor selections, the code point
+/// before the cursor.
+export const deleteCodePointBackward: Command = view => deleteByChar(view, false, true)
+/// Delete the selection, or, for cursor selections, the code point
+/// after the cursor.
+export const deleteCodePointForward: Command = view => deleteByChar(view, true, true)
+
 /// Delete the selection, or, for cursor selections, the character
 /// before the cursor.
-export const deleteCharBackward: Command = view => deleteByChar(view, false)
+export const deleteCharBackward: Command = view => deleteByChar(view, false, false)
 /// Delete the selection or the character after the cursor.
-export const deleteCharForward: Command = view => deleteByChar(view, true)
+export const deleteCharForward: Command = view => deleteByChar(view, true, false)
 
 const deleteByGroup = (view: EditorView, forward: boolean) => deleteBy(view, pos => {
   let {state} = view, line = state.doc.lineAt(pos), categorize = state.charCategorizer(pos)
@@ -655,7 +670,7 @@ export const emacsStyleKeymap: readonly KeyBinding[] = [
 ///  - Ctrl-End (Cmd-Home on macOS): [`cursorDocEnd`](#commands.cursorDocEnd) ([`selectDocEnd`](#commands.selectDocEnd) with Shift)
 ///  - Enter: [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent)
 ///  - Ctrl-a (Cmd-a on macOS): [`selectAll`](#commands.selectAll)
-///  - Backspace: [`deleteCharBackward`](#commands.deleteCharBackward)
+///  - Backspace: [`deleteCodePointBackward`](#commands.deleteCodePointBackward)
 ///  - Delete: [`deleteCharForward`](#commands.deleteCharForward)
 ///  - Ctrl-Backspace (Alt-Backspace on macOS): [`deleteGroupBackward`](#commands.deleteGroupBackward)
 ///  - Ctrl-Delete (Alt-Delete on macOS): [`deleteGroupForward`](#commands.deleteGroupForward)
@@ -689,7 +704,7 @@ export const standardKeymap: readonly KeyBinding[] = ([
 
   {key: "Mod-a", run: selectAll},
 
-  {key: "Backspace", run: deleteCharBackward},
+  {key: "Backspace", run: deleteCodePointBackward},
   {key: "Delete", run: deleteCharForward},
   {key: "Mod-Backspace", mac: "Alt-Backspace", run: deleteGroupBackward},
   {key: "Mod-Delete", mac: "Alt-Delete", run: deleteGroupForward},

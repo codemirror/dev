@@ -644,7 +644,11 @@ class LineContent {
       this.strings = [this.cursor.next(this.start).value]
     }
     for (let result = "", pos = 0, i = 0;; i++) {
-      if (i == this.strings!.length) this.strings!.push(this.cursor!.next().value)
+      if (i == this.strings!.length) {
+        let next = this.cursor!.next().value
+        if (!next) return result
+        this.strings!.push(next)
+      }
       let string = this.strings![i], start = pos
       pos += string.length
       if (pos <= from) continue
