@@ -11,13 +11,41 @@ type Measured = {
   innerHeight: number
 }
 
+function ensureScrollHandlers(dom: Node | null, handler: () => void, prev: (HTMLElement | Window)[]) {
+  let i = 0, changed: (HTMLElement | Window)[] | null = null
+  while (dom) {
+    if (dom.nodeType == 1) {
+      if (!changed && i < prev.length && prev[i] == dom) i++
+      else if (!changed) changed = prev.slice(0, i)
+      if (changed) changed.push(dom as HTMLElement)
+      dom = dom.parentNode
+    } else if (dom.nodeType == 11) { // Shadow root
+      dom = (dom as ShadowRoot).host
+    } else {
+      break
+    }
+  }
+  if (i < prev.length && !changed) changed = prev.slice(0, i)
+  if (changed) {
+    changed.push(window)
+    for (let dom of prev) dom.removeEventListener("scroll", handler)
+    for (let dom of changed) dom.addEventListener("scroll", handler)
+  }
+  return changed || prev
+}
+
+function removeScrollHandlers(handler: () => void, elts: (HTMLElement | Window)[]) {
+  while (elts.length) elts.pop()!.removeEventListener("scroll", handler)
+}
+
 const tooltipPlugin = ViewPlugin.fromClass(class {
   tooltips: readonly Tooltip[]
   tooltipViews: TooltipView[]
   measureReq: {read: () => Measured, write: (m: Measured) => void, key: any}
+  scrollRegistered: (HTMLElement | Window)[] = []
 
   constructor(readonly view: EditorView) {
-    view.scrollDOM.addEventListener("scroll", this.onscroll = this.onscroll.bind(this))
+    this.onscroll = this.onscroll.bind(this)
     this.measureReq = {read: this.readMeasure.bind(this), write: this.writeMeasure.bind(this), key: this}
     this.tooltips = view.state.facet(showTooltip)
     this.tooltipViews = this.tooltips.map(tp => this.createTooltip(tp))
@@ -42,7 +70,12 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
       for (let t of this.tooltipViews) if (views.indexOf(t) < 0) t.dom.remove()
       this.tooltips = tooltips
       this.tooltipViews = views
-      if (this.tooltips.length) this.view.requestMeasure(this.measureReq)
+      if (this.tooltips.length) {
+        this.scrollRegistered = ensureScrollHandlers(update.view.scrollDOM, this.onscroll, [])
+        this.view.requestMeasure(this.measureReq)
+      } else {
+        removeScrollHandlers(this.onscroll, this.scrollRegistered)
+      }
     }
 
     if (update.docChanged && this.tooltips.length) this.view.requestMeasure(this.measureReq)
@@ -57,7 +90,7 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
   }
 
   destroy() {
-    this.view.scrollDOM.removeEventListener("scroll", this.onscroll)
+    removeScrollHandlers(this.onscroll, this.scrollRegistered)
     for (let {dom} of this.tooltipViews) dom.remove()
   }
 
@@ -88,8 +121,8 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
       if (!tooltip.strictSide &&
           (above ? pos.top - (size.bottom - size.top) < 0 : pos.bottom + (size.bottom - size.top) > measured.innerHeight))
         above = !above
-      dom.style.top = ((above ? pos.top - height : pos.bottom) - editor.top) + "px"
-      dom.style.left = (left - editor.left) + "px"
+      dom.style.top = (above ? pos.top - height : pos.bottom) + "px"
+      dom.style.left = left + "px"
       if (tView.positioned) tView.positioned()
     }
   }
@@ -101,7 +134,7 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
 
 const baseTheme = EditorView.baseTheme({
   tooltip: {
-    position: "absolute",
+    position: "fixed",
     border: "1px solid #ddd",
     backgroundColor: "#f5f5f5",
     zIndex: 100
