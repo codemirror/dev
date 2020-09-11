@@ -1,3 +1,39 @@
+## 0.12.0 (2020-09-11)
+
+### Breaking changes
+
+The way overlapping mark decorations are handled has changed. The editor will now create a separate element for each decoration, and nested them in order of the predecence of the sources that created them (higher precedence wrapping lower precedence, decorations from the state facet wrapping decorations from view plugins).
+
+Registering decorations, event handlers, or other plugin values for a view plugin is now done differently (with an argument to `ViewPlugin.define` or `ViewPlugin.fromClass`, rather than method calls on the returned value).
+
+### Bug fixes
+
+Vertical cursor motion when the selection isn't empty will now properly collapse it to the appropriate side, rather than moving from the selection head.
+
+Fix the `activateOnTyping` option to the autocomplete system.
+
+The default backspace binding now deletes by code point, not character.
+
+Tooltips are no longer cut off by scrollable parent elements.
+
+### New features
+
+`StreamParser` now allows an optional `tagSystem` property to use a custom tag system.
+
+Elements created for mark decorations can now span multiple child elements (raw text, or elements created for lower-precedence marks or widgets).
+
+There is now a lang-java package with a Java syntax.
+
+There is now a dedicated syntax tag for boolean literals ("bool").
+
+Add a C++ syntax.
+
+New commands `deleteCodePointForward`/`Backward`.
+
+The editor view now has an `inView` getter that tells you if the editor is in view at all.
+
+View plugins can now provide a `measure` method that gets called when the view measures itself.
+
 ## 0.11.0 (2020-09-03)
 
 ### Breaking changes
