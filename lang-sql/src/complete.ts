@@ -1,4 +1,4 @@
-import {Completion, CompletionContext, CompletionSource, completeFromList} from "@codemirror/next/autocomplete"
+import {Completion, CompletionContext, CompletionSource, completeFromList, ifNotIn} from "@codemirror/next/autocomplete"
 import {EditorState} from "@codemirror/next/state"
 import {Subtree} from "lezer"
 import {Type} from "./parser.terms"
@@ -47,7 +47,7 @@ function maybeQuoteCompletions(quote: string | null, completions: readonly Compl
   return completions.map(c => ({...c, label: quote + c.label + quote, apply: undefined}))
 }
 
-const Span = /^[`'"]?\w*$/
+const Span = /^\w*$/, QuotedSpan = /^[`'"]?\w*[`'"]?$/
 
 export function completeFromSchema(schema: {[table: string]: readonly (string | Completion)[]},
                                    tables?: readonly Completion[],
@@ -74,15 +74,17 @@ export function completeFromSchema(schema: {[table: string]: readonly (string | 
       from,
       to: quoteAfter ? context.pos + 1 : undefined,
       options: maybeQuoteCompletions(quoted, options),
-      span: Span
+      span: quoted ? QuotedSpan : Span
     }
   }
 }
 
 export function completeKeywords(keywords: {[name: string]: number}) {
-  return completeFromList(Object.keys(keywords).map(keyword => ({
+  let completions =  Object.keys(keywords).map(keyword => ({
     label: keyword,
     type: keywords[keyword] == Type ? "type" : "keyword",
     boost: -1
-  })))
+  }))
+  return ifNotIn(["QuotedIdentifier", "SpecialVar", "String", "LineComment", "BlockComment"],
+                 completeFromList(completions))
 }
