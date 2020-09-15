@@ -142,7 +142,8 @@ export class TagSystem {
     let flags = tag & this.flagMask, spec = 0
     for (let i = 1; i <= this.flags.length; i++)
       if (flags & (1 << i)) spec++
-    for (let type = tag >> this.typeShift; type; type = this.parents[type]) spec += 1000
+    for (let type = tag >> this.typeShift; type; type = this.parents[type])
+      spec += /#/.test(this.typeNames[type]) ? 500 : 1000
     return spec
   }
 }
@@ -430,10 +431,11 @@ export const defaultHighlighter = highlighter({
   "atom, bool": {color: "#219"},
   number: {color: "#164"},
   string: {color: "#a11"},
-  "regexp, escape": {color: "#e40"},
+  "regexp, escape, string#2": {color: "#e40"},
   "variableName definition": {color: "#00f"},
   typeName: {color: "#085"},
   className: {color: "#167"},
+  "name#2": {color: "#256"},
   "propertyName definition": {color: "#00c"},
   comment: {color: "#940"},
   meta: {color: "#555"},
