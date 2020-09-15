@@ -1,6 +1,7 @@
 import {tooltips} from "@codemirror/next/tooltip"
 import {precedence, Extension, EditorState} from "@codemirror/next/state"
 import {keymap, KeyBinding} from "@codemirror/next/view"
+import {Subtree} from "lezer-tree"
 import {CompletionContext, Completion, CompletionSource} from "./completion"
 import {completionState, completionConfig, CompletionConfig, State} from "./state"
 import {completionPlugin, moveCompletion, acceptCompletion, startCompletion, closeCompletion} from "./view"
@@ -65,6 +66,16 @@ export function completeFromList(list: readonly (string | Completion)[]): Comple
   return (context: CompletionContext) => {
     let token = context.matchBefore(match)
     return token || context.explicit ? {from: token ? token.from : context.pos, options, span} : null
+  }
+}
+
+/// Wrap the given completion source so that it will not fire when the
+/// cursor is in a syntax node with one of the given names.
+export function ifNotIn(nodes: readonly string[], source: CompletionSource) {
+  return (context: CompletionContext) => {
+    for (let pos: Subtree | null = context.state.tree.resolve(context.pos, -1); pos; pos = pos.parent)
+      if (nodes.indexOf(pos.name) > -1) return null
+    return source(context)
   }
 }
 
