@@ -62,7 +62,7 @@
   },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
-    "lezer": "^0.10.3",
+    "lezer": "^0.10.4",
     "lezer-cpp": "^0.10.1",
     "lezer-css": "^0.10.1",
     "lezer-html": "^0.10.0",
@@ -80,6 +80,7 @@
     "esmoduleserve": "^0.1.2",
     "geckodriver": "^1.19.1",
     "ist": "^1.1.6",
+    "lezer-generator": "^0.10.5",
     "mocha": "^7.1.1",
     "rollup": "^1.25.3",
     "selenium-webdriver": "^4.0.0-alpha.7",
