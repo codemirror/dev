@@ -1,7 +1,10 @@
-import {parser as plainParser} from "./parser"
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {Extension} from "@codemirror/next/state"
+import {Completion} from "@codemirror/next/autocomplete"
 import {styleTags} from "@codemirror/next/highlight"
+import {parser as plainParser} from "./parser"
 import {tokens, Dialect, tokensFor, SQLKeywords, SQLTypes, dialect} from "./tokens"
+import {completeFromSchema, completeKeywords} from "./complete"
 
 let parser = plainParser.withProps(
   indentNodeProp.add(type => {
@@ -65,27 +68,57 @@ type SQLDialectSpec = {
   identifierQuotes?: string
 }
 
-class SQLDialect {
+/// Represents an SQL dialect.
+export class SQLDialect {
   /// @internal
   constructor(
     /// @internal
     readonly dialect: Dialect,
     /// The syntax for this dialect.
-    readonly syntax: LezerSyntax
+    readonly syntax: LezerSyntax,
+    /// An extension to install this dialect as editor syntax.
+    readonly extension: Extension
   ) {}
 
+  /// Create an extension that provides schema-based autocompletion
+  /// for this dialect.
+  schemaCompletion(options: {
+    /// An object that maps table names to options (columns) that can
+    /// be completed for that table. Use lower-case names here.
+    schema: {[table: string]: readonly (string | Completion)[]},
+    /// By default, the completions for the table names will be
+    /// generated from the `schema` object. But if you want to
+    /// customize them, you can pass an array of completions through
+    /// this option.
+    tables?: readonly Completion[],
+    /// When given, columns from the named table can be completed
+    /// directly at the top level.
+    defaultTable?: string
+  }) {
+    return this.syntax.languageData.of({
+      autocomplete: completeFromSchema(options.schema, options.tables, options.defaultTable)
+    })
+  }
+
+  /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
     let d = dialect(spec, spec.keywords, spec.types, spec.builtin)
-    return new SQLDialect(d, LezerSyntax.define(parser.withTokenizer(tokens, tokensFor(d)), {
+    let syntax = LezerSyntax.define(parser.withTokenizer(tokens, tokensFor(d)), {
       languageData: {
-        commentTokens: {line: "--", block: {open: "/*", close: "*/"}}
+        commentTokens: {line: "--", block: {open: "/*", close: "*/"}},
+        closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}
       }
-    }))
+    })
+    return new SQLDialect(d, syntax, [syntax.extension, syntax.languageData.of({
+      autocomplete: completeKeywords(d.words)
+    })])
   }
 }
 
+/// The standard SQL dialect.
 export const StandardSQL = SQLDialect.define({})
 
+/// Dialect for [PostgreSQL](https://www.postgresql.org).
 export const PostgreSQL = SQLDialect.define({
   charSetCasts: true,
   operatorChars: "+-*/<>=~!@#%^&|`?",
@@ -100,6 +133,7 @@ const MySQLTypes = SQLTypes + "bool blob long longblob longtext medium mediumblo
 
 const MySQLBuiltin = "charset clear connect edit ego exit go help nopager notee nowarning pager print prompt quit rehash source status system tee"
 
+/// [MySQL](https://dev.mysql.com/) dialect.
 export const MySQL = SQLDialect.define({
   operatorChars: "*+-%<>!=&|^",
   charSetCasts: true,
@@ -113,6 +147,8 @@ export const MySQL = SQLDialect.define({
   builtin: MySQLBuiltin
 })
 
+/// Variant of [`MySQL`](#lang-sql.MySQL) for
+/// [MariaDB](https://mariadb.org/).
 export const MariaSQL = SQLDialect.define({
   operatorChars: "*+-%<>!=&|^",
   charSetCasts: true,
@@ -126,6 +162,8 @@ export const MariaSQL = SQLDialect.define({
   builtin: MySQLBuiltin
 })
 
+/// SQL dialect for Microsoft [SQL
+/// Server](https://www.microsoft.com/en-us/sql-server).
 export const MSSQL = SQLDialect.define({
   keywords: SQLKeywords + "trigger proc view index for add constraint key primary foreign collate clustered nonclustered declare exec go if use index holdlock nolock nowait paglock pivot readcommitted readcommittedlock readpast readuncommitted repeatableread rowlock serializable snapshot tablock tablockx unpivot updlock with",
   types: SQLTypes + "bigint smallint smallmoney tinyint money real text nvarchar ntext varbinary image cursor hierarchyid uniqueidentifier sql_variant xml table",
@@ -134,6 +172,7 @@ export const MSSQL = SQLDialect.define({
   specialVar: "@"
 })
 
+/// [SQLite](https://sqlite.org/) dialect.
 export const SQLite = SQLDialect.define({
   keywords: SQLKeywords + "abort analyze attach autoincrement conflict database detach exclusive fail glob ignore index indexed instead isnull notnull offset plan pragma query raise regexp reindex rename replace temp vacuum virtual",
   types: SQLTypes + "bool blob long longblob longtext medium mediumblob mediumint mediumtext tinyblob tinyint tinytext text bigint int2 int8 year unsigned signed real",
@@ -143,12 +182,14 @@ export const SQLite = SQLDialect.define({
   specialVar: "@:?$"
 })
 
+/// Dialect for [Cassandra](https://cassandra.apache.org/)'s SQL-ish query language.
 export const Cassandra = SQLDialect.define({
   keywords: "add all allow alter and any apply as asc authorize batch begin by clustering columnfamily compact consistency count create custom delete desc distinct drop each_quorum exists filtering from grant if in index insert into key keyspace keyspaces level limit local_one local_quorum modify nan norecursive nosuperuser not of on one order password permission permissions primary quorum rename revoke schema select set storage superuser table three to token truncate ttl two type unlogged update use user users using values where with writetime infinity NaN",
   types: SQLTypes + "ascii bigint blob counter frozen inet list map static text timeuuid tuple uuid varint",
   slashComments: true
 })
 
+/// [PL/SQL](https://en.wikipedia.org/wiki/PL/SQL) dialect.
 export const PLSQL = SQLDialect.define({
   keywords: SQLKeywords + "abort accept access add all alter and any array arraylen as asc assert assign at attributes audit authorization avg base_table begin between binary_integer body boolean by case cast char char_base check close cluster clusters colauth column comment commit compress connect connected constant constraint crash create current currval cursor data_base database date dba deallocate debugoff debugon decimal declare default definition delay delete desc digits dispose distinct do drop else elseif elsif enable end entry escape exception exception_init exchange exclusive exists exit external fast fetch file for force form from function generic goto grant group having identified if immediate in increment index indexes indicator initial initrans insert interface intersect into is key level library like limited local lock log logging long loop master maxextents maxtrans member minextents minus mislabel mode modify multiset new next no noaudit nocompress nologging noparallel not nowait number_base object of off offline on online only open option or order out package parallel partition pctfree pctincrease pctused pls_integer positive positiven pragma primary prior private privileges procedure public raise range raw read rebuild record ref references refresh release rename replace resource restrict return returning returns reverse revoke rollback row rowid rowlabel rownum rows run savepoint schema segment select separate session set share snapshot some space split sql start statement storage subtype successful synonym tabauth table tables tablespace task terminate then to trigger truncate type union unique unlimited unrecoverable unusable update use using validate value values variable view views when whenever where while with work",
   builtin: "appinfo arraysize autocommit autoprint autorecovery autotrace blockterminator break btitle cmdsep colsep compatibility compute concat copycommit copytypecheck define describe echo editfile embedded escape exec execute feedback flagger flush heading headsep instance linesize lno loboffset logsource long longchunksize markup native newpage numformat numwidth pagesize pause pno recsep recsepchar release repfooter repheader serveroutput shiftinout show showmode size spool sqlblanklines sqlcase sqlcode sqlcontinue sqlnumber sqlpluscompatibility sqlprefix sqlprompt sqlterminator suffix tab term termout time timing trimout trimspool ttitle underline verify version wrap",
