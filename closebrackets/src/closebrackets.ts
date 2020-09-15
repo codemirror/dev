@@ -63,7 +63,8 @@ export const deleteBracketPair: StateCommand = ({state, dispatch}) => {
       for (let token of tokens) {
         if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
           return {changes: {from: range.head - token.length, to: range.head + token.length},
-                  range: EditorSelection.cursor(range.head - token.length)}
+                  range: EditorSelection.cursor(range.head - token.length),
+                  annotations: Transaction.userEvent.of("delete")}
       }
     }
     return {range: dont = range}
@@ -114,7 +115,7 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
               range: EditorSelection.cursor(range.head + open.length)}
     return {range: dont = range}
   })
-  return dont ? null : state.update(changes, {scrollIntoView: true})
+  return dont ? null : state.update(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")})
 }
 
 function handleClose(state: EditorState, _open: string, close: string) {
@@ -154,7 +155,7 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
     }
     return {range: dont = range}
   })
-  return dont ? null : state.update(changes, {scrollIntoView: true})
+  return dont ? null : state.update(changes, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")})
 }
 
 function nodeStart(state: EditorState, pos: number) {
