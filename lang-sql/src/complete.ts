@@ -1,7 +1,7 @@
 import {Completion, CompletionContext, CompletionSource, completeFromList, ifNotIn} from "@codemirror/next/autocomplete"
 import {EditorState} from "@codemirror/next/state"
 import {Subtree} from "lezer"
-import {Type} from "./parser.terms"
+import {Type} from "./sql.grammar.terms"
 
 function tokenBefore(tree: Subtree) {
   for (;;) {

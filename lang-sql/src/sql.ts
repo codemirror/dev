@@ -2,7 +2,7 @@ import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codem
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
 import {styleTags} from "@codemirror/next/highlight"
-import {parser as plainParser} from "./parser"
+import {parser as plainParser} from "./sql.grammar"
 import {tokens, Dialect, tokensFor, SQLKeywords, SQLTypes, dialect} from "./tokens"
 import {completeFromSchema, completeKeywords} from "./complete"
 

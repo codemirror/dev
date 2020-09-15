@@ -2,7 +2,7 @@ import {ExternalTokenizer, InputStream} from "lezer"
 import {whitespace, LineComment, BlockComment, String, Number, Bool, Null,
         ParenL, ParenR, BraceL, BraceR, BracketL, BracketR, Semi, Dot,
         Operator, Punctuation, SpecialVar, Identifier, QuotedIdentifier,
-        Keyword, Type, Builtin} from "./parser.terms"
+        Keyword, Type, Builtin} from "./sql.grammar.terms"
 
 const enum Ch {
   Newline = 10,
