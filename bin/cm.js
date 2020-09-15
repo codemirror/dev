@@ -82,7 +82,8 @@ function rollupConfig(pkg) {
       file: path.join(pkg.dir, "dist", "index.js"),
       sourcemap: true,
       externalLiveBindings: false
-    }
+    },
+    plugins: [require("lezer-generator/rollup").lezer()]
   }
 }
 
