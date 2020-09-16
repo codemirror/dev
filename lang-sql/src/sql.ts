@@ -75,30 +75,11 @@ export class SQLDialect {
     /// @internal
     readonly dialect: Dialect,
     /// The syntax for this dialect.
-    readonly syntax: LezerSyntax,
-    /// An extension to install this dialect as editor syntax.
-    readonly extension: Extension
+    readonly syntax: LezerSyntax
   ) {}
 
-  /// Create an extension that provides schema-based autocompletion
-  /// for this dialect.
-  schemaCompletion(options: {
-    /// An object that maps table names to options (columns) that can
-    /// be completed for that table. Use lower-case names here.
-    schema: {[table: string]: readonly (string | Completion)[]},
-    /// By default, the completions for the table names will be
-    /// generated from the `schema` object. But if you want to
-    /// customize them, you can pass an array of completions through
-    /// this option.
-    tables?: readonly Completion[],
-    /// When given, columns from the named table can be completed
-    /// directly at the top level.
-    defaultTable?: string
-  }) {
-    return this.syntax.languageData.of({
-      autocomplete: completeFromSchema(options.schema, options.tables, options.defaultTable)
-    })
-  }
+  /// Returns the syntax for this dialect as an extension.
+  get extension() { return this.syntax.extension }
 
   /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
@@ -109,10 +90,44 @@ export class SQLDialect {
         closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}
       }
     })
-    return new SQLDialect(d, syntax, [syntax.extension, syntax.languageData.of({
-      autocomplete: completeKeywords(d.words)
-    })])
+    return new SQLDialect(d, syntax)
   }
+}
+
+/// Options used to configure an SQL extension.
+export type SQLConfig = {
+  /// The [dialect](#lang-sql.SQLDialect) to use. Defaults to
+  /// [`StandardSQL`](#lang-sql.StandardSQL).
+  dialect?: SQLDialect,
+  /// An object that maps table names to options (columns) that can
+  /// be completed for that table. Use lower-case names here.
+  schema?: {[table: string]: readonly (string | Completion)[]},
+  /// By default, the completions for the table names will be
+  /// generated from the `schema` object. But if you want to
+  /// customize them, you can pass an array of completions through
+  /// this option.
+  tables?: readonly Completion[],
+  /// When given, columns from the named table can be completed
+  /// directly at the top level.
+  defaultTable?: string
+}
+
+/// Returns an extension that installs JavaScript support features
+/// (completion of keywords, and optionally
+/// [schema-based](#lang-sql.SQLOptions.schema) completion).
+export function sqlSupport(config: SQLConfig): Extension {
+  let dialect = config.dialect || StandardSQL
+  let result = [dialect.syntax.languageData.of({
+    autocomplete: completeKeywords(dialect.dialect.words)
+  })]
+  if (config.schema) result.push(dialect.syntax.languageData.of({
+    autocomplete: completeFromSchema(config.schema, config.tables, config.defaultTable)
+  }))
+  return result
+}
+
+export function sql(config: SQLConfig): Extension {
+  return [config.dialect || StandardSQL, sqlSupport(config)]
 }
 
 /// The standard SQL dialect.
