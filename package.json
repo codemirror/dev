@@ -58,6 +58,7 @@
     "./lang-css": "./lang-css/dist/index.js",
     "./lang-html": "./lang-html/dist/index.js",
     "./lang-sql": "./lang-sql/dist/index.js",
+    "./lang-xml": "./lang-xml/dist/index.js",
     "./theme-one-dark": "./theme-one-dark/dist/index.js"
   },
   "license": "(MIT OR GPL-3.0)",
@@ -70,6 +71,7 @@
     "lezer-java": "^0.10.0",
     "lezer-python": "^0.10.0",
     "lezer-tree": "^0.10.0",
+    "lezer-xml": "^0.10.1",
     "style-mod": "^2.3.0",
     "w3c-keyname": "^2.2.4"
   },
