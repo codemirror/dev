@@ -426,7 +426,6 @@ export const defaultHighlighter = highlighter({
   link: {textDecoration: "underline"},
   strong: {fontWeight: "bold"},
   emphasis: {fontStyle: "italic"},
-  invalid: {color: "#f00"},
   keyword: {color: "#708"},
   "atom, bool": {color: "#219"},
   number: {color: "#164"},
@@ -439,4 +438,5 @@ export const defaultHighlighter = highlighter({
   "propertyName definition": {color: "#00c"},
   comment: {color: "#940"},
   meta: {color: "#555"},
+  invalid: {color: "#f00"},
 })
