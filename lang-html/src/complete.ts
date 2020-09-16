@@ -436,7 +436,7 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
     from: tree.start,
     to: tree.parent.start
   })
-  let options = []
+  let options = [], span = undefined
   if (attrName) {
     let attrs: readonly string[] | null | undefined = GlobalAttrs[attrName]
     if (!attrs) {
@@ -446,16 +446,19 @@ function completeAttrValue(state: EditorState, tree: Subtree, from: number, to: 
     if (attrs) {
       let base = state.sliceDoc(from, to).toLowerCase(), quoteStart = '"', quoteEnd = '"'
       if (/^['"]/.test(base)) {
+        span = base[0] == '"' ? /^[^"]*$/ : /^[^']*$/
         quoteStart = ""
         quoteEnd = state.sliceDoc(to, to + 1) == base[0] ? "" : base[0]
         base = base.slice(1)
         from++
+      } else {
+        span = /^[^\s<>='"]*$/
       }
       for (let value of attrs)
         options.push({label: value, apply: quoteStart + value + quoteEnd, type: "constant"})
     }
   }
-  return {from, to, options}
+  return {from, to, options, span}
 }
 
 export function completeHTML(context: CompletionContext): CompletionResult | null {
