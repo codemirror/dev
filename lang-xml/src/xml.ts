@@ -2,6 +2,7 @@ import {parser} from "lezer-xml"
 import {continuedIndent, delimitedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
 import {styleTags} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
+import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 
 /// A syntax provider based on the [Lezer XML
 /// parser](https://github.com/lezer-parser/xml), extended with
@@ -41,8 +42,26 @@ export const xmlSyntax = LezerSyntax.define(parser.withProps(
   }
 })
 
+/// Used to configure the XML extension.
+export type XMLConfig = {
+  /// Provide a schema to create completions from.
+  elements?: readonly ElementSpec[],
+  /// Supporting attribute descriptions for the schema specified in
+  /// [`elements`](#lang-xml.XMLConfig.elements).
+  attributes?: readonly AttrSpec[]
+}
+
+/// Return an extension that installs XML support functionality.
+export function xmlSupport(conf: XMLConfig): Extension {
+  if (conf.elements)
+    return xmlSyntax.languageData.of({
+      autocomplete: completeFromSchema(conf.elements, conf.attributes || [])
+    })
+  return []
+}
+
 /// Returns an extension that installs the XML syntax and
 /// support features.
-export function xml(): Extension {
-  return [xmlSyntax]
+export function xml(conf: XMLConfig): Extension {
+  return [xmlSyntax, xmlSupport(conf)]
 }
