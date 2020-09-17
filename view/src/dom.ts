@@ -75,6 +75,7 @@ export function maxOffset(node: Node): number {
   return node.nodeType == 3 ? node.nodeValue!.length : node.childNodes.length
 }
 
+/// Basic rectangle type.
 export type Rect = {left: number, right: number, top: number, bottom: number}
 
 export function flattenRect(rect: Rect, left: boolean) {

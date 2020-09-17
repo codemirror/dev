@@ -9,6 +9,7 @@ export {KeyBinding, keymap, runScopeHandlers} from "./keymap"
 export {multipleSelections} from "./multiple-selections"
 export {highlightSpecialChars} from "./special-chars"
 export {indentOnInput} from "./indent-on-input"
+export {Rect} from "./dom"
 export {Range} from "@codemirror/next/rangeset"
 
 import {HeightMap, HeightOracle, MeasuredHeights, QueryType} from "./heightmap"
