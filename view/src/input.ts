@@ -49,7 +49,6 @@ export class InputState {
       view.inputState.lastKeyCode = event.keyCode
       view.inputState.lastKeyTime = Date.now()
     })
-    if (view.root.activeElement == view.contentDOM) view.dom.classList.add("cm-focused")
     this.notifiedFocused = view.hasFocus
     this.ensureHandlers(view)
   }
