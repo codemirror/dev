@@ -1,6 +1,6 @@
 import {Completion, CompletionSource} from "@codemirror/next/autocomplete"
 import {EditorState, Text} from "@codemirror/next/state"
-import {Subtree} from "lezer-tree"
+import {Subtree, NodeProp} from "lezer-tree"
 
 /// Describes an element in your XML document schema.
 export type ElementSpec = {
@@ -76,12 +76,12 @@ function findLocation(state: EditorState, pos: number): Location {
   for (let cur = at; !inTag && cur.parent; cur = cur.parent)
     if (cur.name == "OpenTag" || cur.name == "CloseTag" || cur.name == "SelfClosingTag")
       inTag = cur
-  if (inTag && inTag.end > pos) {
+  if (inTag && (inTag.end > pos || inTag.lastChild!.type.prop(NodeProp.error))) {
     let elt = inTag.parent!
     if (at.name == "TagName" || at.name == "MismatchedTagName")
-      return {type: inTag.name == "CloseTag" ? "closeTag" : "openTag",
-              from: at.start,
-              context: elt}
+      return inTag.name == "CloseTag"
+        ? {type: "closeTag", from: at.start, context: elt}
+        : {type: "openTag", from: at.start, context: findParentElement(elt)}
     if (at.name == "AttributeName")
       return {type: "attrName", from: at.start, context: inTag}
     if (at.name == "AttributeValue")
@@ -97,7 +97,7 @@ function findLocation(state: EditorState, pos: number): Location {
       return {type: "attrName", from: pos, context: inTag}
     return null
   }
-  while (at.parent && at.end == pos) at = at.parent
+  while (at.parent && at.end == pos && !at.lastChild?.type.prop(NodeProp.error)) at = at.parent
   if (at.name == "Element" || at.name == "Text" || at.name == "Document")
     return {type: "tag", from: pos, context: at.name == "Element" ? at : findParentElement(at)}
   return null
@@ -149,7 +149,7 @@ export function completeFromSchema(eltSpecs: readonly ElementSpec[], attrSpecs: 
   for (let s of eltSpecs) {
     let attrs = globalAttrs, attrVals = attrValues
     if (s.attributes) attrs = attrs.concat(s.attributes.map(s => {
-      if (typeof s == "string") return allAttrs.find(a => a.label == s) || valueCompletion(s)
+      if (typeof s == "string") return allAttrs.find(a => a.label == s) || {label: s, type: "property"}
       if (s.values) {
         if (attrVals == attrValues) attrVals = Object.create(attrVals)
         attrVals[s.name] = s.values.map(valueCompletion)
@@ -216,7 +216,9 @@ export function completeFromSchema(eltSpecs: readonly ElementSpec[], attrSpecs: 
       }
     } else if (type == "tag") {
       let parentName = elementName(doc, context), parent = byName[parentName]
-      let closing = parent ? [parent.closeCompletion] : parentName ? [{label: parentName, type: "type", boost: 2}] : []
+      let closing = [], last = context && context.lastChild
+      if (parentName && (!last || last.name != "CloseTag" || tagName(doc, last) != parentName))
+        closing.push(parent ? parent.closeCompletion : {label: "</" + parentName + ">", type: "type", boost: 2})
       return {
         from,
         options: closing.concat((parent?.children || (context ? allElements : topElements)).map(e => e.openCompletion)),

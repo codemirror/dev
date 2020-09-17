@@ -52,16 +52,14 @@ export type XMLConfig = {
 }
 
 /// Return an extension that installs XML support functionality.
-export function xmlSupport(conf: XMLConfig): Extension {
-  if (conf.elements)
-    return xmlSyntax.languageData.of({
-      autocomplete: completeFromSchema(conf.elements, conf.attributes || [])
-    })
-  return []
+export function xmlSupport(conf: XMLConfig = {}): Extension {
+  return xmlSyntax.languageData.of({
+    autocomplete: completeFromSchema(conf.elements || [], conf.attributes || [])
+  })
 }
 
 /// Returns an extension that installs the XML syntax and
 /// support features.
-export function xml(conf: XMLConfig): Extension {
+export function xml(conf?: XMLConfig): Extension {
   return [xmlSyntax, xmlSupport(conf)]
 }
