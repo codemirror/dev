@@ -89,6 +89,7 @@ export class ViewState {
 
   paddingTop = 0
   paddingBottom = 0
+  contentWidth = 0
 
   heightOracle: HeightOracle = new HeightOracle
   heightMap: HeightMap = HeightMap.empty()
@@ -170,25 +171,34 @@ export class ViewState {
     if (!this.inView) return 0
 
     let lineHeights = docView.measureVisibleLineHeights()
-    let refresh = false, bias = 0
+    let refresh = false, bias = 0, result = 0, oracle = this.heightOracle
 
     if (!repeated) {
-      if (this.heightOracle.mustRefresh(lineHeights, whiteSpace, direction)) {
+      let contentWidth = docView.dom.clientWidth
+      if (oracle.mustRefresh(lineHeights, whiteSpace, direction) ||
+          oracle.lineWrapping && Math.abs(contentWidth - this.contentWidth) > oracle.charWidth) {
         let {lineHeight, charWidth} = docView.measureTextSize()
-        refresh = this.heightOracle.refresh(whiteSpace, direction, lineHeight, charWidth,
-                                            (docView.dom).clientWidth / charWidth, lineHeights)
-        if (refresh) docView.minWidth = 0
+        refresh = oracle.refresh(whiteSpace, direction, lineHeight, charWidth,
+                                            contentWidth / charWidth, lineHeights)
+        if (refresh) {
+          docView.minWidth = 0
+          result |= UpdateFlag.Geometry
+        }
+      }
+      if (this.contentWidth != contentWidth) {
+        this.contentWidth = contentWidth
+        result |= UpdateFlag.Geometry
       }
 
       if (dTop > 0 && dBottom > 0) bias = Math.max(dTop, dBottom)
       else if (dTop < 0 && dBottom < 0) bias = Math.min(dTop, dBottom)
     }
 
-    this.heightOracle.heightChanged = false
+    oracle.heightChanged = false
     this.heightMap = this.heightMap.updateHeight(
-      this.heightOracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights))
+      oracle, 0, refresh, new MeasuredHeights(this.viewport.from, lineHeights))
 
-    let result = this.heightOracle.heightChanged ? UpdateFlag.Height : 0
+    if (oracle.heightChanged) result |= UpdateFlag.Height
     if (!this.viewportIsAppropriate(this.viewport, bias) ||
         this.scrollTo && (this.scrollTo.head < this.viewport.from || this.scrollTo.head > this.viewport.to)) {
       this.viewport = this.getViewport(bias, this.scrollTo)

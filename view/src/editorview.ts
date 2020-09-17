@@ -295,7 +295,7 @@ export class EditorView {
 
     this.updateState = UpdateState.Idle
     this.measureScheduled = -1
-    if (updated) for (let listener of this.state.facet(updateListener)) listener(updated) 
+    if (updated) for (let listener of this.state.facet(updateListener)) listener(updated)
   }
 
   /// Get the CSS classes for the currently active editor themes.

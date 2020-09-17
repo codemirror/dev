@@ -249,7 +249,7 @@ export const decorations = Facet.define<DecorationSet>()
 
 export const styleModule = Facet.define<StyleModule>()
 
-export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, Oracle = 8, LineGaps = 16 }
+export const enum UpdateFlag { Focus = 1, Height = 2, Viewport = 4, LineGaps = 8, Geometry = 16 }
 
 export class ChangedRange {
   constructor(readonly fromA: number, readonly toA: number, readonly fromB: number, readonly toB: number) {}
@@ -335,6 +335,12 @@ export class ViewUpdate {
   /// Indicates whether the line height in the editor changed in this update.
   get heightChanged() {
     return (this.flags & UpdateFlag.Height) > 0
+  }
+
+  /// Returns true when the document changed or the size of the editor
+  /// or the lines or characters within it has changed.
+  get geometryChanged() {
+    return this.docChanged || (this.flags & (UpdateFlag.Geometry | UpdateFlag.Height)) > 0
   }
 
   /// True when this update indicates a focus change.
