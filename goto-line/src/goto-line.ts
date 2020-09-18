@@ -50,7 +50,7 @@ export const gotoLine: Command = view => {
 }
 
 const baseTheme = EditorView.baseTheme({
-  "panel.gotoLine": {
+  "$panel.gotoLine": {
     padding: "2px 6px 4px",
     "& label": { fontSize: "80%" }
   }

@@ -72,7 +72,7 @@
     "lezer-python": "^0.10.0",
     "lezer-tree": "^0.10.0",
     "lezer-xml": "^0.10.1",
-    "style-mod": "^2.3.1",
+    "style-mod": "^3.0.0",
     "w3c-keyname": "^2.2.4"
   },
   "devDependencies": {

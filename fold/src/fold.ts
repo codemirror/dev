@@ -139,7 +139,7 @@ interface FoldConfig {
   /// option will be used instead.
   placeholderDOM?: (() => HTMLElement) | null,
   /// Text to use as placeholder for folded text. Defaults to `"…"`.
-  /// Will be styled with the `foldPlaceholder` theme selector.
+  /// Will be styled with the `$foldPlaceholder` theme class.
   placeholderText?: string
 }
 
@@ -252,7 +252,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
 }
 
 const baseTheme = EditorView.baseTheme({
-  foldPlaceholder: {
+  $foldPlaceholder: {
     backgroundColor: "#eee",
     border: "1px solid #ddd",
     color: "#888",
@@ -262,7 +262,7 @@ const baseTheme = EditorView.baseTheme({
     cursor: "pointer"
   },
 
-  "gutterElement.foldGutter": {
+  "$gutterElement.foldGutter": {
     padding: "0 1px",
     cursor: "pointer"
   }

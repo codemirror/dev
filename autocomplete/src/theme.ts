@@ -3,7 +3,7 @@ import {EditorView} from "@codemirror/next/view"
 export const MaxInfoWidth = 300
 
 export const baseTheme = EditorView.baseTheme({
-  "tooltip.autocomplete": {
+  "$tooltip.autocomplete": {
     "& > ul": {
       fontFamily: "monospace",
       overflowY: "auto",
@@ -28,14 +28,14 @@ export const baseTheme = EditorView.baseTheme({
     }
   },
 
-  "tooltip.completionInfo": {
+  "$tooltip.completionInfo": {
     padding: "3px 9px",
     maxWidth: MaxInfoWidth + "px",
   },
 
-  "snippetField@light": {backgroundColor: "#ddd"},
-  "snippetField@dark": {backgroundColor: "#333"},
-  "snippetFieldPosition": {
+  "$$light $snippetField": {backgroundColor: "#ddd"},
+  "$$dark $snippetField": {backgroundColor: "#333"},
+  "$snippetFieldPosition": {
     verticalAlign: "text-top",
     width: 0,
     height: "1.15em",
@@ -43,16 +43,16 @@ export const baseTheme = EditorView.baseTheme({
     borderLeft: "1.4px dotted #888"
   },
 
-  completionMatchedText: {
+  $completionMatchedText: {
     textDecoration: "underline"
   },
 
-  completionDetail: {
+  $completionDetail: {
     marginLeft: "0.5em",
     fontStyle: "italic"
   },
 
-  completionIcon: {
+  $completionIcon: {
     fontSize: "90%",
     width: ".8em",
     display: "inline-block",
@@ -61,37 +61,37 @@ export const baseTheme = EditorView.baseTheme({
     opacity: "0.6"
   },
 
-  "completionIcon.function, completionIcon.method": {
+  "$completionIcon.function, $completionIcon.method": {
     "&:after": { content: "'ƒ'" }
   },
-  "completionIcon.class": {
+  "$completionIcon.class": {
     "&:after": { content: "'○'" }
   },
-  "completionIcon.interface": {
+  "$completionIcon.interface": {
     "&:after": { content: "'◌'" }
   },
-  "completionIcon.variable": {
+  "$completionIcon.variable": {
     "&:after": { content: "'𝑥'" }
   },
-  "completionIcon.constant": {
+  "$completionIcon.constant": {
     "&:after": { content: "'𝐶'" }
   },
-  "completionIcon.type": {
+  "$completionIcon.type": {
     "&:after": { content: "'𝑡'" }
   },
-  "completionIcon.enum": {
+  "$completionIcon.enum": {
     "&:after": { content: "'∪'" }
   },
-  "completionIcon.property": {
+  "$completionIcon.property": {
     "&:after": { content: "'□'" }
   },
-  "completionIcon.keyword": {
+  "$completionIcon.keyword": {
     "&:after": { content: "'🔑\uFE0E'" } // Disable emoji rendering
   },
-  "completionIcon.namespace": {
+  "$completionIcon.namespace": {
     "&:after": { content: "'▢'" }
   },
-  "completionIcon.text": {
+  "$completionIcon.text": {
     "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" }
   }
 })

@@ -75,7 +75,7 @@ export function highlightSpecialChars(
   config: SpecialCharConfig = {}
 ): Extension {
   let ext = [specialCharConfig.of(config), specialCharPlugin]
-  if (!supportsTabSize()) ext.push(tabStyleExt)
+  if (!supportsTabSize()) ext.push(tabStyle)
   return ext
 }
 
@@ -160,7 +160,7 @@ class TabWidget extends WidgetType<number> {
   toDOM() {
     let span = document.createElement("span")
     span.textContent = "\t"
-    span.className = tabStyle.tab
+    span.className = tab
     span.style.width = this.value + "px"
     return span
   }
@@ -168,11 +168,10 @@ class TabWidget extends WidgetType<number> {
   ignoreEvent(): boolean { return false }
 }
 
-const tabStyle = new StyleModule({
-  tab: {
+const tab = StyleModule.newName(), tabStyle = EditorView.styleModule.of(new StyleModule({
+  ["." + tab]: {
     display: "inline-block",
     overflow: "hidden",
     verticalAlign: "bottom"
   }
-})
-const tabStyleExt = EditorView.styleModule.of(tabStyle)
+}))

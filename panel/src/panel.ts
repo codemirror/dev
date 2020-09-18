@@ -36,9 +36,9 @@ export interface Panel {
   mount?(): void
   /// Update the DOM for a given view update.
   update?(update: ViewUpdate): void
-  /// An optional theme selector. By default, panels are themed as
-  /// `"panel"`. If you pass `"foo"` here, your panel is themed as
-  /// `"panel.foo"`.
+  /// An optional theme class. By default, panels are themed as
+  /// `$panel`. If you pass `"foo"` here, your panel is themed as
+  /// `$panel.foo`.
   style?: string,
   /// Whether the panel should be at the top or bottom of the editor.
   /// Defaults to false.
@@ -197,23 +197,23 @@ function rm(node: ChildNode) {
 }
 
 const baseTheme = EditorView.baseTheme({
-  panels: {
+  $panels: {
     boxSizing: "border-box",
     position: "sticky",
     left: 0,
     right: 0
   },
-  "panels@light": {
+  "$$light $panels": {
     backgroundColor: "#f5f5f5",
     color: "black"
   },
-  "panels.top@light": {
+  "$$light $panels.top": {
     borderBottom: "1px solid #ddd"
   },
-  "panels.bottom@light": {
+  "$$light $panels.bottom": {
     borderTop: "1px solid #ddd"
   },
-  "panels@dark": {
+  "$$dark $panels": {
     backgroundColor: "#333338",
     color: "white"
   }

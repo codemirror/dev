@@ -1,7 +1,7 @@
 import {EditorState, Transaction, TransactionSpec, Extension, precedence, ChangeDesc,
         EditorSelection, SelectionRange} from "@codemirror/next/state"
 import {Line} from "@codemirror/next/text"
-import {StyleModule, Style} from "style-mod"
+import {StyleModule, StyleSpec} from "style-mod"
 
 import {DocView} from "./docview"
 import {ContentView} from "./contentview"
@@ -14,7 +14,7 @@ import {ViewUpdate, styleModule,
         contentAttributes, editorAttributes, clickAddsSelectionRange, dragMovesSelection, mouseSelectionStyle,
         exceptionSink, updateListener, logException, viewPlugin, ViewPlugin, PluginInstance, PluginField,
         decorations, MeasureRequest, UpdateFlag, editable, inputHandler} from "./extension"
-import {themeClass, theme, darkTheme, buildTheme, baseThemeID, baseDarkThemeID, baseLightThemeID, baseTheme} from "./theme"
+import {themeClass, theme, darkTheme, buildTheme, baseThemeID, baseTheme} from "./theme"
 import {DOMObserver} from "./domobserver"
 import {Attrs, updateAttrs, combineAttrs} from "./attributes"
 import browser from "./browser"
@@ -301,7 +301,7 @@ export class EditorView {
   /// Get the CSS classes for the currently active editor themes.
   get themeClasses() {
     return baseThemeID + " " +
-      (this.state.facet(darkTheme) ? baseDarkThemeID : baseLightThemeID) + " " +
+      (this.state.facet(darkTheme) ? "cm-dark" : "cm-light") + " " +
       this.state.facet(theme)
   }
 
@@ -554,9 +554,10 @@ export class EditorView {
   }
 
   /// Facet to add a [style
-  /// module](https://github.com/marijnh/style-mod#readme) to an editor
-  /// view. The view will ensure that the module is registered in its
-  /// [document root](#view.EditorView.constructor^config.root).
+  /// module](https://github.com/marijnh/style-mod#documentation) to
+  /// an editor view. The view will ensure that the module is
+  /// registered in its [document
+  /// root](#view.EditorView.constructor^config.root).
   static styleModule = styleModule
 
   /// Facet that can be used to add DOM event handlers. The value
@@ -618,17 +619,30 @@ export class EditorView {
   /// mechanism for providing decorations.
   static decorations = decorations
 
-  /// Create a theme extension. The argument object should map [theme
-  /// selectors](#view.themeClass) to styles, which are (potentially
-  /// nested) [style
-  /// declarations](https://github.com/marijnh/style-mod#documentation)
-  /// providing the CSS styling for the selector.
+  /// Create a theme extension. The first argument can be a
+  /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
+  /// style spec providing the styles for the theme. These will be
+  /// prefixed with a generated class for the style.
+  ///
+  /// It is highly recommended you use _theme classes_, rather than
+  /// regular CSS classes, in your selectors. These are prefixed with
+  /// a `$` instead of a `.`, and will be expanded (as with
+  /// [`themeClass`](#view.themeClass)) to one or more prefixed class
+  /// names. So for example `$content` targets the editor's [content
+  /// element](#view.EditorView.contentDOM).
+  ///
+  /// Because the selectors will be prefixed with a scope class,
+  /// directly matching the editor's [wrapper
+  /// element](#view.EditorView.dom), which is the element on which
+  /// the scope class will be added, needs to be explicitly
+  /// differentiated by adding an additional `$` to the front of the
+  /// pattern. For example `$$focused $panel` will expand to something
+  /// like `.[scope].cm-focused .cm-panel`.
   ///
   /// When `dark` is set to true, the theme will be marked as dark,
-  /// which causes the [base theme](#view.EditorView^baseTheme) rules
-  /// marked with `@dark` to apply instead of those marked with
-  /// `@light`.
-  static theme(spec: {[selector: string]: Style}, options?: {dark?: boolean}): Extension {
+  /// which will add the `$dark` selector to the wrapper element (as
+  /// opposed to `$light` when a light theme is active).
+  static theme(spec: {[selector: string]: StyleSpec}, options?: {dark?: boolean}): Extension {
     let prefix = StyleModule.newName()
     let result = [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
     if (options && options.dark) result.push(darkTheme.of(true))
@@ -637,16 +651,16 @@ export class EditorView {
 
   /// Create an extension that adds styles to the base theme. The
   /// given object works much like the one passed to
-  /// [`theme`](#view.EditorView^theme), but allows selectors to be
-  /// marked by adding `@dark` to their end to only apply when there
-  /// is a dark theme active, or by `@light` to only apply when there
-  /// is _no_ dark theme active.
-  static baseTheme(spec: {[selector: string]: Style}): Extension {
+  /// [`theme`](#view.EditorView^theme). You'll often want to qualify
+  /// base styles with `$dark` or `$light` so they only apply when
+  /// there is a dark or light theme active. For example `"$$dark
+  /// $myHighlight"`.
+  static baseTheme(spec: {[selector: string]: StyleSpec}): Extension {
     return precedence(styleModule.of(buildTheme(baseThemeID, spec)), "fallback")
   }
 
   /// An extension that enables line wrapping in the editor.
-  static lineWrapping = EditorView.theme({content: {whiteSpace: "pre-wrap"}})
+  static lineWrapping = EditorView.theme({$content: {whiteSpace: "pre-wrap"}})
 
   /// Facet that provides attributes for the editor's editable DOM
   /// element.

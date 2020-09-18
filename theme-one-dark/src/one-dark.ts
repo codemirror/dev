@@ -18,54 +18,54 @@ const chalky = "#e5c07b",
   cursor = "#528bff"
 
 const oneDarkTheme = EditorView.theme({
-  wrap: {
+  $wrap: {
     color: lightWhite,
     backgroundColor: background,
     "& ::selection": {backgroundColor: selection},
     caretColor: cursor
   },
 
-  secondaryCursor: {borderLeft: `1.4px solid ${cursor}`},
-  secondarySelection: {backgroundColor: selection},
+  $secondaryCursor: {borderLeft: `1.4px solid ${cursor}`},
+  $secondarySelection: {backgroundColor: selection},
 
-  panels: {backgroundColor: background, color: lightWhite},
-  "panels.top": {borderBottom: "2px solid black"},
-  "panels.bottom": {borderTop: "2px solid black"},
+  $panels: {backgroundColor: background, color: lightWhite},
+  "$panels.top": {borderBottom: "2px solid black"},
+  "$panels.bottom": {borderTop: "2px solid black"},
 
-  searchMatch: {
+  $searchMatch: {
     backgroundColor: "#72a1ff59",
     border: "1px solid #457dff"
   },
-  "searchMatch.selected": {
+  "$searchMatch.selected": {
     backgroundColor: "#6199ff2f"
   },
 
-  activeLine: {backgroundColor: "#2c313c"},
-  selectionMatch: {backgroundColor: "#aafe661a"},
+  $activeLine: {backgroundColor: "#2c313c"},
+  $selectionMatch: {backgroundColor: "#aafe661a"},
 
-  "matchingBracket, nonmatchingBracket": {
+  "$matchingBracket, $nonmatchingBracket": {
     backgroundColor: "#bad0f847",
     border: "1px solid #515a6b"
   },
 
-  gutters: {
+  $gutters: {
     backgroundColor: background,
     color: "#495162",
     border: "none"
   },
-  "gutterElement.lineNumber": {color: "inherit"},
+  "$gutterElement.lineNumber": {color: "inherit"},
 
-  foldPlaceholder: {
+  $foldPlaceholder: {
     backgroundColor: "none",
     border: "none",
     color: "#ddd"
   },
 
-  tooltip: {
+  $tooltip: {
     border: "1px solid #181a1f",
     backgroundColor: "#606862"
   },
-  "tooltip.autocomplete": {
+  "$tooltip.autocomplete": {
     "& > li[aria-selected]": {backgroundColor: background}
   }
 }, {dark: true})

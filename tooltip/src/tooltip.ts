@@ -102,7 +102,7 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
 })
 
 const baseTheme = EditorView.baseTheme({
-  tooltip: {
+  $tooltip: {
     position: "fixed",
     border: "1px solid #ddd",
     backgroundColor: "#f5f5f5",
@@ -129,7 +129,7 @@ export interface Tooltip {
   /// A constructor function that creates the tooltip's [DOM
   /// representation](#tooltip.TooltipView).
   create(view: EditorView): TooltipView
-  /// An extra theme selector to use for the tooltip. By default,
+  /// An extra theme class to use for the tooltip. By default,
   /// it'll be themed as `"tooltip"`, but you can pass a name, say
   /// `"mine"`, to style it as `"tooltip.mine"` instead.
   style?: string

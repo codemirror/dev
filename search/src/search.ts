@@ -354,7 +354,7 @@ function maybeAnnounceMatch(view: EditorView) {
 }
 
 const baseTheme = EditorView.baseTheme({
-  "panel.search": {
+  "$panel.search": {
     padding: "2px 6px 4px",
     position: "relative",
     "& [name=close]": {
@@ -375,11 +375,11 @@ const baseTheme = EditorView.baseTheme({
     }
   },
 
-  "searchMatch@light": { backgroundColor: "#ffff0054" },
-  "searchMatch@dark": { backgroundColor: "#00ffff8a" },
+  "$$light $searchMatch": { backgroundColor: "#ffff0054" },
+  "$$dark $searchMatch": { backgroundColor: "#00ffff8a" },
 
-  "searchMatch.selected@light": { backgroundColor: "#ff6a0054" },
-  "searchMatch.selected@dark": { backgroundColor: "#ff00ff8a" }
+  "$$light $searchMatch.selected": { backgroundColor: "#ff6a0054" },
+  "$$dark $searchMatch.selected": { backgroundColor: "#ff00ff8a" }
 })
 
 const searchExtensions = [

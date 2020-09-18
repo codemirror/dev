@@ -2,8 +2,8 @@ import {EditorView, ViewPlugin, Decoration, DecorationSet, ViewUpdate, themeClas
 import {Facet, combineConfig, Text, CharCategory, Extension} from "@codemirror/next/state"
 import {SearchCursor} from "@codemirror/next/search"
 
-/// Mark lines that have a cursor on them with the \`activeLine\`
-/// theme selector.
+/// Mark lines that have a cursor on them with the \`$activeLine\`
+/// theme class.
 export function highlightActiveLine(): Extension {
   return [defaultTheme, activeLineHighlighter]
 }
@@ -66,7 +66,7 @@ const highlightConfig = Facet.define<HighlightOptions, Required<HighlightOptions
 })
 
 /// This extension highlights text that matches the selection. It uses
-/// the `selectionMatch` theme selector for the highlighting. When
+/// the `$selectionMatch` theme class for the highlighting. When
 /// `highlightWordAroundCursor` is enabled, the word at the cursor
 /// itself will be highlighted with `selectionMatch.main`.
 export function highlightSelectionMatches(options?: HighlightOptions): Extension {
@@ -143,12 +143,8 @@ const matchHighlighter = ViewPlugin.fromClass(class {
 })
 
 const defaultTheme = EditorView.baseTheme({
-  "activeLine@light": { backgroundColor: "#e8f2ff" },
-  "activeLine@dark": { backgroundColor: "#223039" },
-  "selectionMatch": {
-    backgroundColor: "#99ff7780",
-    ".cm-searchMatch &": {
-      backgroundColor: "transparent"
-    }
-  }
+  "$$light $activeLine": { backgroundColor: "#eff5ff" },
+  "$$dark $activeLine": { backgroundColor: "#223039" },
+  "$selectionMatch": { backgroundColor: "#99ff7780" },
+  "$searchMatch $selectionMatch": {backgroundColor: "transparent"}
 })

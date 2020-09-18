@@ -31,7 +31,7 @@ GutterMarker.prototype.mapMode = MapMode.TrackBefore
 type Handlers = {[event: string]: (view: EditorView, line: BlockInfo, event: any) => boolean}
 
 interface GutterConfig {
-  /// The theme selector for the gutter's wrapping DOM element. Will
+  /// The theme class for the gutter's wrapping DOM element. Will
   /// be prefixed with `"gutter."` for the gutter wrapper, and then
   /// suffixed with `"Element"` for the individual line elements.
   style?: string
@@ -70,25 +70,25 @@ export function gutter(config: GutterConfig): Extension {
 }
 
 const baseTheme = EditorView.baseTheme({
-  gutters: {
+  $gutters: {
     display: "flex",
     height: "100%",
     boxSizing: "border-box",
     left: 0
   },
 
-  "gutters@light": {
+  "$$light $gutters": {
     backgroundColor: "#f5f5f5",
     color: "#999",
     borderRight: "1px solid #ddd"
   },
 
-  "gutters@dark": {
+  "$$dark $gutters": {
     backgroundColor: "#333338",
     color: "#ccc"
   },
 
-  gutter: {
+  $gutter: {
     display: "flex !important", // Necessary -- prevents margin collapsing
     flexDirection: "column",
     flexShrink: 0,
@@ -97,11 +97,11 @@ const baseTheme = EditorView.baseTheme({
     overflow: "hidden"
   },
 
-  gutterElement: {
+  $gutterElement: {
     boxSizing: "border-box"
   },
 
-  "gutterElement.lineNumber": {
+  "$gutterElement.lineNumber": {
     padding: "0 3px 0 5px",
     minWidth: "20px",
     textAlign: "right",

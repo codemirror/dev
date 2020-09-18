@@ -432,16 +432,16 @@ function underline(color: string) {
 }
 
 const baseTheme = EditorView.baseTheme({
-  diagnostic: {
+  $diagnostic: {
     padding: "3px 6px 3px 8px",
     marginLeft: "-1px",
     display: "block"
   },
-  "diagnostic.error": { borderLeft: "5px solid #d11" },
-  "diagnostic.warning": { borderLeft: "5px solid orange" },
-  "diagnostic.info": { borderLeft: "5px solid #999" },
+  "$diagnostic.error": { borderLeft: "5px solid #d11" },
+  "$diagnostic.warning": { borderLeft: "5px solid orange" },
+  "$diagnostic.info": { borderLeft: "5px solid #999" },
 
-  diagnosticAction: {
+  $diagnosticAction: {
     font: "inherit",
     border: "none",
     padding: "2px 4px",
@@ -451,17 +451,17 @@ const baseTheme = EditorView.baseTheme({
     marginLeft: "8px"
   },
 
-  lintRange: {
+  $lintRange: {
     backgroundPosition: "left bottom",
     backgroundRepeat: "repeat-x"
   },
 
-  "lintRange.error": { backgroundImage: underline("#d11") },
-  "lintRange.warning": { backgroundImage: underline("orange") },
-  "lintRange.info": { backgroundImage: underline("#999") },
-  "lintRange.active": { backgroundColor: "#ffdd9980" },
+  "$lintRange.error": { backgroundImage: underline("#d11") },
+  "$lintRange.warning": { backgroundImage: underline("orange") },
+  "$lintRange.info": { backgroundImage: underline("#999") },
+  "$lintRange.active": { backgroundColor: "#ffdd9980" },
 
-  lintPoint: {
+  $lintPoint: {
     position: "relative",
 
     "&:after": {
@@ -475,14 +475,14 @@ const baseTheme = EditorView.baseTheme({
     }
   },
 
-  "lintPoint.warning": {
+  "$lintPoint.warning": {
     "&:after": { borderBottomColor: "orange" }
   },
-  "lintPoint.info": {
+  "$lintPoint.info": {
     "&:after": { borderBottomColor: "#999" }
   },
 
-  "panel.lint": {
+  "$panel.lint": {
     position: "relative",
     "& ul": {
       maxHeight: "100px",
@@ -511,7 +511,7 @@ const baseTheme = EditorView.baseTheme({
     }
   },
 
-  "tooltip.lint": {
+  "$tooltip.lint": {
     padding: 0,
     margin: 0
   }

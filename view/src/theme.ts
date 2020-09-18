@@ -1,42 +1,48 @@
 import {Facet} from "@codemirror/next/state"
-import {StyleModule, Style} from "style-mod"
+import {StyleModule, StyleSpec} from "style-mod"
 
 export const theme = Facet.define<string, string>({combine: strs => strs.join(" ")})
 
 export const darkTheme = Facet.define<boolean, boolean>({combine: values => values.indexOf(true) > -1})
 
 export const baseThemeID = StyleModule.newName()
-export const baseLightThemeID = StyleModule.newName()
-export const baseDarkThemeID = StyleModule.newName()
 
-export function buildTheme(mainID: string, spec: {[name: string]: Style}) {
-  let styles = Object.create(null)
-  for (let prop in spec) {
-    let selector = prop.split(/\s*,\s*/).map(piece => {
-      let id = mainID, narrow
-      if (id == baseThemeID && (narrow = /^(.*?)@(light|dark)$/.exec(piece))) {
-        id = narrow[2] == "dark" ? baseDarkThemeID : baseLightThemeID
-        piece = narrow[1]
-      }
-      let parts = piece.split("."), selector = "." + id + (parts[0] == "wrap" ? "" : " /*|*/ ")
-      for (let i = 1; i <= parts.length; i++) selector += ".cm-" + parts.slice(0, i).join("-")
-      return selector
-    }).join(", ")
-    styles[selector] = spec[prop]
-  }
-  return new StyleModule(styles, {generateClasses: false})
+function expandThemeClasses(sel: string) {
+  return sel.replace(/\$\w[\w\.]*/g, cls => {
+    let parts = cls.slice(1).split("."), result = ""
+    for (let i = 1; i <= parts.length; i++) result += ".cm-" + parts.slice(0, i).join("-")
+    return result
+  })
 }
 
-/// Create a set of CSS class names for the given theme selector,
-/// which can be added to a DOM element within an editor to make
-/// themes able to style it. Theme selectors can be single words or
-/// words separated by dot characters. In the latter case, the
-/// returned classes combine those that match the full name and those
-/// that match some prefix—for example `"panel.search"` will match
-/// both the theme styles specified as `"panel.search"` and those with
-/// just `"panel"`. More specific theme styles (with more dots) take
-/// precedence.
+export function buildTheme(mainID: string, spec: {[name: string]: StyleSpec}) {
+  let scope = "." + mainID
+  return new StyleModule(spec, {
+    process(sel) {
+      sel = expandThemeClasses(sel)
+      let top = /^\s*\$/.exec(sel)
+      return top ? scope + sel.slice(top[0].length) : scope + " " + sel
+    },
+    extend(template, sel) {
+      template = expandThemeClasses(template)
+      return sel.slice(0, scope.length + 1) == scope + " "
+        ? scope + " " + template.replace(/&/, sel.slice(scope.length + 1))
+        : template.replace(/&/, sel)
+    }
+  })
+}
+
+/// Create a set of CSS class names for the given theme class, which
+/// can be added to a DOM element within an editor to make themes able
+/// to style it. Theme classes can be single words or words separated
+/// by dot characters. In the latter case, the returned classes
+/// combine those that match the full name and those that match some
+/// prefix—for example `"panel.search"` will match both the theme
+/// styles specified as `"panel.search"` and those with just
+/// `"panel"`. More specific theme classes (with more dots) take
+/// precedence over less specific ones.
 export function themeClass(selector: string): string {
+  if (selector.indexOf(".") < 0) return "cm-" + selector
   let parts = selector.split("."), result = ""
   for (let i = 1; i <= parts.length; i++)
     result += (result ? " " : "") + "cm-" + parts.slice(0, i).join("-")
@@ -44,10 +50,10 @@ export function themeClass(selector: string): string {
 }    
 
 export const baseTheme = buildTheme(baseThemeID, {
-  wrap: {
+  $: {
     position: "relative !important",
     boxSizing: "border-box",
-    "&.cm-focused": {
+    "&$focused": {
       // FIXME it would be great if we could directly use the browser's
       // default focus outline, but it appears we can't, so this tries to
       // approximate that
@@ -58,16 +64,17 @@ export const baseTheme = buildTheme(baseThemeID, {
     flexDirection: "column"
   },
 
-  scroller: {
+  $scroller: {
     display: "flex !important",
     alignItems: "flex-start !important",
     fontFamily: "monospace",
     lineHeight: 1.4,
     height: "100%",
-    overflowX: "auto"
+    overflowX: "auto",
+    position: "relative"
   },
 
-  content: {
+  $content: {
     margin: 0,
     flexGrow: 2,
     minHeight: "100%",
@@ -79,15 +86,15 @@ export const baseTheme = buildTheme(baseThemeID, {
     outline: "none"
   },
 
-  "content@light": { caretColor: "black" },
-  "content@dark": { caretColor: "white" },
+  "$$light $content": { caretColor: "black" },
+  "$$dark $content": { caretColor: "white" },
 
-  line: {
+  $line: {
     display: "block",
     padding: "0 2px 0 4px"
   },
 
-  button: {
+  $button: {
     verticalAlign: "middle",
     color: "inherit",
     fontSize: "70%",
@@ -95,7 +102,7 @@ export const baseTheme = buildTheme(baseThemeID, {
     borderRadius: "3px"
   },
 
-  "button@light": {
+  "$$light $button": {
     backgroundImage: "linear-gradient(#eff1f5, #d9d9df)",
     border: "1px solid #888",
     "&:active": {
@@ -103,7 +110,7 @@ export const baseTheme = buildTheme(baseThemeID, {
     }
   },
 
-  "button@dark": {
+  "$$dark $button": {
     backgroundImage: "linear-gradient(#555, #111)",
     border: "1px solid #888",
     "&:active": {
@@ -111,7 +118,7 @@ export const baseTheme = buildTheme(baseThemeID, {
     }
   },
 
-  textfield: {
+  $textfield: {
     verticalAlign: "middle",
     color: "inherit",
     fontSize: "70%",
@@ -119,23 +126,23 @@ export const baseTheme = buildTheme(baseThemeID, {
     padding: ".2em .5em"
   },
 
-  "textfield@light": {
+  "$$light $textfield": {
     backgroundColor: "white"
   },
 
-  "textfield@dark": {
+  "$$dark $textfield": {
     border: "1px solid #555",
     backgroundColor: "inherit"
   },
 
-  secondarySelection: {
+  $secondarySelection: {
     backgroundColor_fallback: "#3297FD",
     color_fallback: "white !important",
     backgroundColor: "Highlight",
     color: "HighlightText !important"
   },
 
-  secondaryCursor: {
+  $secondaryCursor: {
     display: "inline-block",
     verticalAlign: "text-top",
     width: 0,
@@ -143,6 +150,6 @@ export const baseTheme = buildTheme(baseThemeID, {
     margin: "0 -0.7px -.7em"
   },
 
-  "secondaryCursor@light": { borderLeft: "1.4px solid #555" },
-  "secondaryCursor@dark": { borderLeft: "1.4px solid #ddd" }
+  "$$light $secondaryCursor": { borderLeft: "1.4px solid #555" },
+  "$$dark $secondaryCursor": { borderLeft: "1.4px solid #ddd" }
 })

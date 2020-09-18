@@ -1,5 +1,5 @@
 import {Tree, NodeProp} from "lezer-tree"
-import {Style, StyleModule} from "style-mod"
+import {StyleSpec, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
 import {EditorState, Extension, precedence} from "@codemirror/next/state"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
@@ -127,7 +127,7 @@ export class TagSystem {
 
   /// Create a highlighter extension for this system, styling the
   /// given tags using the given CSS objects.
-  highlighter(spec: {[tag: string]: Style}): Extension {
+  highlighter(spec: {[tag: string]: StyleSpec}): Extension {
     let styling = new Styling(this, spec)
     return [
       precedence(ViewPlugin.define<Highlighter>(view => new Highlighter(view, this.prop, styling), {
@@ -277,24 +277,23 @@ export const styleTags = (tags: {[selector: string]: string}) => defaultTags.add
 /// names. The values should be
 /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
 /// style objects that define the CSS for that tag.
-export const highlighter = (spec: {[tag: string]: Style}) => defaultTags.highlighter(spec)
+export const highlighter = (spec: {[tag: string]: StyleSpec}) => defaultTags.highlighter(spec)
 
 class StyleRule {
   constructor(public type: number, public flags: number, public specificity: number, public cls: string) {}
 }
 
 class Styling {
-  module: StyleModule<{[name: string]: string}>
+  module: StyleModule
   rules: readonly StyleRule[]
   cache: {[tag: number]: string} = Object.create(null)
 
-  constructor(private tags: TagSystem, spec: {[name: string]: Style}) {
+  constructor(private tags: TagSystem, spec: {[name: string]: StyleSpec}) {
     let modSpec = Object.create(null)
-    let nextCls = 0
     let rules: StyleRule[] = []
     for (let prop in spec) {
-      let cls = "c" + nextCls++
-      modSpec[cls] = spec[prop]
+      let cls = StyleModule.newName()
+      modSpec["." + cls] = spec[prop]
       for (let part of prop.split(/\s*,\s*/)) {
         let tag = tags.get(part)
         rules.push(new StyleRule(tag >> tags.typeShift, tag & tags.flagMask, tags.specificity(tag), cls))
@@ -313,7 +312,7 @@ class Styling {
       for (let rule of this.rules) {
         if (rule.type == type && (rule.flags & flags) == rule.flags) {
           if (result) result += " "
-          result += this.module[rule.cls]
+          result += rule.cls
           flags &= ~rule.flags
           if (type) break
         }
