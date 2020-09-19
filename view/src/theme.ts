@@ -93,6 +93,41 @@ export const baseTheme = buildTheme(baseThemeID, {
     padding: "0 2px 0 4px"
   },
 
+  $selectionLayer: {
+    zIndex: -1,
+    contain: "size style"
+  },
+
+  $selectionBackground: {
+    position: "absolute",
+    background: "#d9d9d9" // FIXME dark variant
+  },
+  "$$focused $selectionBackground": {
+    background: "#d7d4f0"
+  },
+
+  $cursorLayer: {
+    zIndex: 100,
+    contain: "size style"
+  },
+  "$$focused $cursorLayer": {
+    animation: "steps(1) cm-blink 1.2s infinite"
+  },
+
+  "@keyframes cm-blink": {"0%": {}, "50%": {visibility: "hidden"}, "100%": {}},
+  "@keyframes cm-blink2": {"0%": {}, "50%": {visibility: "hidden"}, "100%": {}},
+
+  $cursor: {
+    position: "absolute",
+    borderLeft: "1.2px solid #aaa",
+    marginLeft: "-0.6px",
+    pointerEvents: "none"
+  },
+
+  "$$focused $cursor": {
+    borderLeft: "1.2px solid black",
+  },
+
   $button: {
     verticalAlign: "middle",
     color: "inherit",
@@ -132,23 +167,5 @@ export const baseTheme = buildTheme(baseThemeID, {
   "$$dark $textfield": {
     border: "1px solid #555",
     backgroundColor: "inherit"
-  },
-
-  $secondarySelection: {
-    backgroundColor_fallback: "#3297FD",
-    color_fallback: "white !important",
-    backgroundColor: "Highlight",
-    color: "HighlightText !important"
-  },
-
-  $secondaryCursor: {
-    display: "inline-block",
-    verticalAlign: "text-top",
-    width: 0,
-    height: "1.15em",
-    margin: "0 -0.7px -.7em"
-  },
-
-  "$$light $secondaryCursor": { borderLeft: "1.4px solid #555" },
-  "$$dark $secondaryCursor": { borderLeft: "1.4px solid #ddd" }
+  }
 })

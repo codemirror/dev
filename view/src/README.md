@@ -35,7 +35,7 @@ component that displays the editor state and allows text input.
 
 @MouseSelectionStyle
 
-@multipleSelections
+@drawSelection
 
 @highlightSpecialChars
 
