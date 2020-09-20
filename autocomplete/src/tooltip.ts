@@ -64,10 +64,11 @@ class CompletionTooltip {
               readonly stateField: StateField<CompletionState>) {
     this.dom = document.createElement("div")
     this.list = this.dom.appendChild(createListBox(options, id))
-    this.list.addEventListener("click", (e: MouseEvent) => {
+    this.list.addEventListener("mousedown", (e: MouseEvent) => {
       let index = 0, dom = e.target as HTMLElement | null
       for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
       if (index < options.length) applyCompletion(view, options[index])
+      e.preventDefault()
     })
     this.list.addEventListener("scroll", () => {
       if (this.info) this.view.requestMeasure(this.placeInfo)
