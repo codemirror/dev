@@ -20,8 +20,7 @@ export function buildTheme(mainID: string, spec: {[name: string]: StyleSpec}) {
   return new StyleModule(spec, {
     process(sel) {
       sel = expandThemeClasses(sel)
-      let top = /^\s*\$/.exec(sel)
-      return top ? scope + sel.slice(top[0].length) : scope + " " + sel
+      return /\$/.test(sel) ? sel.replace(/\$/, scope) : scope + " " + sel
     },
     extend(template, sel) {
       template = expandThemeClasses(template)
