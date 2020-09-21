@@ -143,6 +143,7 @@ function lintTooltip(view: EditorView, check: (from: number, to: number) => bool
   return {
     pos: stackStart,
     end: stackEnd,
+    above: view.state.doc.lineAt(stackStart).to < stackEnd,
     style: "lint",
     create() {
       let dom = document.createElement("ul")
