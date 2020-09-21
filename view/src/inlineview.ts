@@ -1,7 +1,7 @@
 import {Text as DocText} from "@codemirror/next/text"
 import {ContentView, DOMPos, coordsInChildren} from "./contentview"
 import {WidgetType, MarkDecoration} from "./decoration"
-import {Rect, flattenRect} from "./dom"
+import {Rect, flattenRect, tempRange} from "./dom"
 import browser from "./browser"
 
 const none: any[] = []
@@ -137,7 +137,7 @@ function textCoords(text: Node, pos: number, side: number, length: number): Rect
   } else {
     if (side < 0) from--; else to++
   }
-  let range = document.createRange()
+  let range = tempRange()
   range.setEnd(text, to)
   range.setStart(text, from)
   let rect = range.getBoundingClientRect()

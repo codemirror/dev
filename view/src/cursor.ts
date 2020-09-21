@@ -4,7 +4,7 @@ import {BlockType} from "./decoration"
 import {WidgetView} from "./inlineview"
 import {LineView} from "./blockview"
 import {findColumn, countColumn} from "@codemirror/next/text"
-import {clientRectsFor} from "./dom"
+import {clientRectsFor, tempRange} from "./dom"
 import {moveVisually, movedOver, Direction} from "./bidi"
 import browser from "./browser"
 
@@ -99,7 +99,7 @@ function domPosAtCoords(parent: HTMLElement, x: number, y: number): {node: Node,
 }
 
 function domPosInText(node: Text, x: number, y: number): {node: Node, offset: number} {
-  let len = node.nodeValue!.length, range = document.createRange()
+  let len = node.nodeValue!.length, range = tempRange()
   for (let i = 0; i < len; i++) {
     range.setEnd(node, i + 1)
     range.setStart(node, i)

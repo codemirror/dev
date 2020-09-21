@@ -27,7 +27,7 @@ export function hasSelection(dom: HTMLElement, selection: Selection): boolean {
 
 export function clientRectsFor(dom: Node): DOMRectList {
   if (dom.nodeType == 3) {
-    let range = document.createRange()
+    let range = tempRange()
     range.setEnd(dom, dom.nodeValue!.length)
     range.setStart(dom, 0)
     return range.getClientRects() as DOMRectList
@@ -190,3 +190,7 @@ export function focusPreventScroll(dom: HTMLElement) {
     }
   }
 }
+
+let scratchRange: Range | null
+
+export function tempRange() { return scratchRange || (scratchRange = document.createRange()) }

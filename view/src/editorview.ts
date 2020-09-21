@@ -494,9 +494,9 @@ export class EditorView {
   /// Get the screen coordinates at the given document position.
   coordsAtPos(pos: number, side: -1 | 1 = 1): Rect | null {
     this.readMeasured()
-    let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line)
     let rect = this.docView.coordsAt(pos, side)
     if (!rect || rect.left == rect.right) return rect
+    let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line)
     let span = order[BidiSpan.find(order, pos - line.from, -1, side)]
     return flattenRect(rect, (span.dir == Direction.LTR) == (side > 0))
   }
