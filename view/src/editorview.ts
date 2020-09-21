@@ -257,7 +257,7 @@ export class EditorView {
   /// @internal
   measure() {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
-    this.measureScheduled = 1 // Prevent requestMeasure calls from scheduling another animation frame
+    this.measureScheduled = -1 // Prevent requestMeasure calls from scheduling another animation frame
 
     let updated = null
     for (let i = 0;; i++) {
