@@ -100,20 +100,32 @@ export const baseTheme = buildTheme(baseThemeID, {
 
   $selectionBackground: {
     position: "absolute",
-    background: "#d9d9d9" // FIXME dark variant
   },
-  "$$focused $selectionBackground": {
+  "$$light $selectionBackground": {
+    background: "#d9d9d9"
+  },
+  "$$dark $selectionBackground": {
+    background: "#222"
+  },
+  "$$focused$light $selectionBackground": {
     background: "#d7d4f0"
+  },
+  "$$focused$dark $selectionBackground": {
+    background: "#233"
   },
 
   $cursorLayer: {
     zIndex: 100,
-    contain: "size style"
+    contain: "size style",
+    pointerEvents: "none"
   },
   "$$focused $cursorLayer": {
     animation: "steps(1) cm-blink 1.2s infinite"
   },
 
+  // Two animations defined so that we can switch between them to
+  // restart the animation without forcing another style
+  // recomputation.
   "@keyframes cm-blink": {"0%": {}, "50%": {visibility: "hidden"}, "100%": {}},
   "@keyframes cm-blink2": {"0%": {}, "50%": {visibility: "hidden"}, "100%": {}},
 

@@ -5,40 +5,38 @@ import {EditorView} from "./editorview"
 import {themeClass} from "./theme"
 import {Direction} from "./bidi"
 import {Rect} from "./dom"
+import browser from "./browser"
+
+const CanHidePrimary = !browser.ios // FIXME test IE, Android
 
 type SelectionConfig = {
-  /// Configures whether the primary cursor should be drawn. This
-  /// defaults to false, since not all platforms allow you to hide the
-  /// cursor, and drawing cursors forces an additional DOM relayout
-  /// for every update because of the need to measure the cursor
-  /// position.
-  drawPrimaryCursor?: boolean
   /// The length of a full cursor blink cycle, in milliseconds.
-  /// Defaults to 1200. Can be set to 0 to disable blinking. When
-  /// `drawPrimaryCursor` is off, secondary cursors don't blink, to
-  /// avoid unsynchronized blinking between the native and
-  /// library-drawn cursors.
-  blinkRate?: number
+  /// Defaults to 1200. Can be set to 0 to disable blinking.
+  cursorBlinkRate?: number
   /// Whether to show a the cursor for non-empty ranges. Defaults to
-  /// true. (Note that, even when `drawPrimaryCursor` is false, this
-  /// will force drawing of the primary cursor when the primary range
-  /// isn't empty, since the native cursor won't be visible then.)
+  /// true.
   drawRangeCursor?: boolean
 }
 
 const selectionConfig = Facet.define<SelectionConfig, Required<SelectionConfig>>({
   combine(configs) {
     return combineConfig(configs, {
-      drawPrimaryCursor: false,
-      blinkRate: 1200,
+      cursorBlinkRate: 1200,
       drawRangeCursor: true
     }, {
-      drawPrimaryCursor: (a, b) => a || b,
-      blinkRate: (a, b) => Math.min(a, b),
+      cursorBlinkRate: (a, b) => Math.min(a, b),
       drawRangeCursor: (a, b) => a || b
     })
   }
 })
+
+export function drawSelection(config: SelectionConfig = {}): Extension {
+  return [
+    selectionConfig.of(config),
+    drawSelectionPlugin,
+    hideNativeSelection
+  ]
+}
 
 type Measure = {rangePieces: Piece[], cursors: Piece[]}
 
@@ -69,7 +67,6 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
   measureReq: {read: () => Measure, write: (value: Measure) => void}
   selectionLayer: HTMLElement
   cursorLayer: HTMLElement
-  blinkRate: number = -1
 
   constructor(readonly view: EditorView) {
     this.measureReq = {read: this.readPos.bind(this), write: this.drawSel.bind(this)}
@@ -84,19 +81,16 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
   }
 
   setBlinkRate() {
-    let conf = this.view.state.facet(selectionConfig)
-    let rate = conf.drawPrimaryCursor ? conf.blinkRate : 0
-    if (rate == this.blinkRate) return
-    this.blinkRate = rate
-    this.cursorLayer.style.animationDuration = rate + "ms"
+    this.cursorLayer.style.animationDuration = this.view.state.facet(selectionConfig).cursorBlinkRate + "ms"
   }
 
   update(update: ViewUpdate) {
-    if (update.selectionSet || update.geometryChanged || update.viewportChanged)
+    let confChanged = update.prevState.facet(selectionConfig) != update.state.facet(selectionConfig)
+    if (confChanged || update.selectionSet || update.geometryChanged || update.viewportChanged)
       this.view.requestMeasure(this.measureReq)
     if (update.transactions.some(tr => tr.scrollIntoView))
       this.cursorLayer.style.animationName = this.cursorLayer.style.animationName == "cm-blink" ? "cm-blink2" : "cm-blink"
-    this.setBlinkRate()
+    if (confChanged) this.setBlinkRate()
   }
 
   readPos(): Measure {
@@ -105,7 +99,7 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
     let cursors = []
     for (let r of state.selection.ranges) {
       let prim = r == state.selection.primary
-      if (r.empty ? !prim || conf.drawPrimaryCursor : conf.drawRangeCursor) {
+      if (r.empty ? !prim || CanHidePrimary : conf.drawRangeCursor) {
         let piece = measureCursor(this.view, r, prim)
         if (piece) cursors.push(piece)
       }
@@ -132,23 +126,12 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
   }
 })
 
-const hideNativeCursor = EditorView.theme({
-  $content: { caretColor: "transparent !important" }
-})
 const hideNativeSelection = EditorView.theme({
   $content: {
+    caretColor: "transparent !important",
     "& ::selection": {backgroundColor: "transparent !important"}
   }
 })
-
-export function drawSelection(config: SelectionConfig = {}): Extension {
-  return [
-    selectionConfig.of(config),
-    drawSelectionPlugin,
-    hideNativeSelection,
-    config.drawPrimaryCursor ? hideNativeCursor : []
-  ]
-}
 
 function cmpCoords(a: Rect, b: Rect) {
   return a.top - b.top || a.left - b.left
