@@ -252,7 +252,7 @@ export const selectDocEnd: StateCommand = ({state, dispatch}) => {
 
 /// Select the entire document.
 export const selectAll: StateCommand = ({state, dispatch}) => {
-  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}, annotations: Transaction.userEvent.of("keyboarselection")}))
+  dispatch(state.update({selection: {anchor: 0, head: state.doc.length}, annotations: Transaction.userEvent.of("keyboardselection")}))
   return true
 }
 
