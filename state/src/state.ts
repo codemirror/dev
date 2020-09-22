@@ -213,10 +213,11 @@ export class EditorState {
   }
 
   /// A facet that, when enabled, causes the editor to allow multiple
-  /// ranges to be selected. You should probably not use this
-  /// directly, but let a plugin like
-  /// [multiple-selections](#view.multipleSelections) handle it (which
-  /// also makes sure the selections are visible in the view).
+  /// ranges to be selected. Be careful though, because by default the
+  /// editor relies on the native DOM selection, which cannot handle
+  /// multiple selections. An extension like
+  /// [`drawSelection`](#view.drawSelection) can be used to make
+  /// secondary selections visible to the user.
   static allowMultipleSelections = allowMultipleSelections
 
   /// Facet that defines a way to query for automatic indentation
