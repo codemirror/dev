@@ -1,0 +1,5 @@
+{
+  "main": "dist/index.js",
+  "types": "src/json",
+  "type": "module"
+}
