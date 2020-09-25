@@ -85,7 +85,8 @@ const oneDarkHighlighter = highlighter({
   strong: {fontWeight: "bold"},
   emphasis: {fontStyle: "italic"},
   link: {color: dark, textDecoration: "underline"},
-  heading: {fontWeight: "bold", color: coral}
+  heading: {fontWeight: "bold", color: coral},
+  "atom, bool": { color: whiskey }
 })
 
 /// Extension to enable the One Dark theme.
