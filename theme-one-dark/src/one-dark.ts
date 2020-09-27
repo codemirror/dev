@@ -25,8 +25,8 @@ const oneDarkTheme = EditorView.theme({
     caretColor: cursor
   },
 
-  $secondaryCursor: {borderLeft: `1.4px solid ${cursor}`},
-  $secondarySelection: {backgroundColor: selection},
+  $cursor: {borderLeftColor: cursor},
+  $selectionBackground: {backgroundColor: selection},
 
   $panels: {backgroundColor: background, color: lightWhite},
   "$panels.top": {borderBottom: "2px solid black"},
