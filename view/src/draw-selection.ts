@@ -216,6 +216,11 @@ function measureRange(view: EditorView, range: SelectionRange): Piece[] {
         if (pos >= endPos) break
       }
     }
+    if (horizontal.length == 0) {
+      let coords = view.coordsAtPos(start, -1)!
+      top = Math.min(coords.top, top)
+      bottom = Math.max(coords.bottom, bottom)
+    }
  
     return {top, bottom, horizontal}
   }
