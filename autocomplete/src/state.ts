@@ -1,9 +1,10 @@
 import {EditorView} from "@codemirror/next/view"
-import {combineConfig, Transaction, StateField, StateEffect, Facet, EditorState, ChangeDesc} from "@codemirror/next/state"
+import {Transaction, StateField, StateEffect, EditorState, ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, showTooltip} from "@codemirror/next/tooltip"
 import {Option, CompletionSource, CompletionResult, cur} from "./completion"
 import {FuzzyMatcher} from "./filter"
 import {completionTooltip} from "./tooltip"
+import {CompletionConfig, completionConfig} from "./config"
 
 const MaxOptions = 300
 
@@ -50,7 +51,7 @@ class CompletionDialog {
     return new CompletionDialog(options, makeAttrs(id, selected), [{
       pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
       style: "autocomplete",
-      create: completionTooltip(options, id, completionState)
+      create: completionTooltip(completionState)
     }], prev ? prev.timestamp : Date.now(), selected)
   }
 
@@ -191,24 +192,6 @@ export class ActiveResult extends ActiveSource {
                             mapping.mapPos(this.from), mapping.mapPos(this.to, 1), this.span)
   }
 }
-
-export interface CompletionConfig {
-  /// When enabled (defaults to true), autocompletion will start
-  /// whenever the user types something that can be completed.
-  activateOnTyping?: boolean
-  /// Override the completion sources used.
-  override?: readonly CompletionSource[] | null
-}
-
-export const completionConfig = Facet.define<CompletionConfig, Required<CompletionConfig>>({
-  combine(configs) {
-    return combineConfig(configs, {
-      activateOnTyping: true,
-      override: null
-    })
-  }
-})
-
 
 export const toggleCompletionEffect = StateEffect.define<boolean>()
 export const setActiveEffect = StateEffect.define<readonly ActiveSource[]>({

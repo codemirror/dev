@@ -2,15 +2,16 @@ import {EditorView, themeClass, ViewUpdate, Direction} from "@codemirror/next/vi
 import {StateField} from "@codemirror/next/state"
 import {TooltipView} from "@codemirror/next/tooltip"
 import {CompletionState} from "./state"
+import {completionConfig} from "./config"
 import {Option, applyCompletion} from "./completion"
 import {MaxInfoWidth} from "./theme"
 
-function createListBox(options: readonly Option[], id: string) {
+function createListBox(options: readonly Option[], id: string, range: {from: number, to: number}) {
   const ul = document.createElement("ul")
   ul.id = id
   ul.setAttribute("role", "listbox")
   ul.setAttribute("aria-expanded", "true")
-  for (let i = 0; i < options.length; i++) {
+  for (let i = range.from; i < range.to; i++) {
     let {completion, match} = options[i]
     const li = ul.appendChild(document.createElement("li"))
     li.id = id + "-" + i
@@ -36,6 +37,8 @@ function createListBox(options: readonly Option[], id: string) {
     }
     li.setAttribute("role", "option")
   }
+  if (range.from) ul.classList.add(themeClass("completionListIncompleteTop"))
+  if (range.to < options.length) ul.classList.add(themeClass("completionListIncompleteBottom"))
   return ul
 }
 
@@ -48,6 +51,16 @@ function createInfoDialog(option: Option) {
   return dom
 }
 
+function rangeAroundSelected(total: number, selected: number, max: number) {
+  if (total <= max) return {from: 0, to: total}
+  if (selected <= (total >> 1)) {
+    let off = Math.floor(selected / max)
+    return {from: off * max, to: (off + 1) * max}
+  }
+  let off = Math.floor((total - selected) / max)
+  return {from: total - (off + 1) * max, to: total - off * max}
+}
+
 class CompletionTooltip {
   dom: HTMLElement
   info: HTMLElement | null = null
@@ -57,19 +70,23 @@ class CompletionTooltip {
     write: (pos: {left: boolean, top: number} | null) => this.positionInfo(pos),
     key: this
   }
+  range: {from: number, to: number}
 
   constructor(readonly view: EditorView,
-              readonly options: readonly Option[],
-              readonly id: string,
               readonly stateField: StateField<CompletionState>) {
+    let cState = view.state.field(stateField)
+    let {options, selected} = cState.open!
+    let config = view.state.facet(completionConfig)
+    this.range = rangeAroundSelected(options.length, selected, config.maxRenderedOptions)
+
     this.dom = document.createElement("div")
-    this.list = this.dom.appendChild(createListBox(options, id))
-    this.list.addEventListener("mousedown", (e: MouseEvent) => {
-      let index = 0, dom = e.target as HTMLElement | null
+    this.dom.addEventListener("mousedown", (e: MouseEvent) => {
+      let index = this.range.from, dom = e.target as HTMLElement | null
       for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
       if (index < options.length) applyCompletion(view, options[index])
       e.preventDefault()
     })
+    this.list = this.dom.appendChild(createListBox(options, cState.id, this.range))
     this.list.addEventListener("scroll", () => {
       if (this.info) this.view.requestMeasure(this.placeInfo)
     })
@@ -87,22 +104,30 @@ class CompletionTooltip {
   }
 
   updateSel() {
-    let cState = this.view.state.field(this.stateField)
-    if (cState.open) {
-      if (this.updateSelectedOption(cState.open.selected)) {
-        if (this.info) {this.info.remove(); this.info = null}
-        let option = cState.open.options[cState.open.selected]
-        if (option.completion.info) {
-          this.info = this.dom.appendChild(createInfoDialog(option)) as HTMLElement
-          this.view.requestMeasure(this.placeInfo)
-        }
+    let cState = this.view.state.field(this.stateField), open = cState.open!
+    if (open.selected < this.range.from || open.selected >= this.range.to) {
+      this.range = rangeAroundSelected(open.options.length, open.selected,
+                                       this.view.state.facet(completionConfig).maxRenderedOptions)
+      this.list.remove()
+      this.list = this.dom.appendChild(createListBox(open.options, cState.id, this.range))
+      this.list.addEventListener("scroll", () => {
+        if (this.info) this.view.requestMeasure(this.placeInfo)
+      })
+    }
+
+    if (this.updateSelectedOption(open.selected)) {
+      if (this.info) {this.info.remove(); this.info = null}
+      let option = open.options[open.selected]
+      if (option.completion.info) {
+        this.info = this.dom.appendChild(createInfoDialog(option)) as HTMLElement
+        this.view.requestMeasure(this.placeInfo)
       }
     }
   }
 
   updateSelectedOption(selected: number) {
     let set: null | HTMLElement = null
-    for (let opt = this.list.firstChild as (HTMLElement | null), i = 0; opt;
+    for (let opt = this.list.firstChild as (HTMLElement | null), i = this.range.from; opt;
          opt = opt.nextSibling as (HTMLElement | null), i++) {
       if (i == selected) {
         if (!opt.hasAttribute("aria-selected")) {
@@ -141,8 +166,8 @@ class CompletionTooltip {
 
 // We allocate a new function instance every time the completion
 // changes to force redrawing/repositioning of the tooltip
-export function completionTooltip(options: readonly Option[], id: string, stateField: StateField<CompletionState>) {
-  return (view: EditorView): TooltipView => new CompletionTooltip(view, options, id, stateField)
+export function completionTooltip(stateField: StateField<CompletionState>) {
+  return (view: EditorView): TooltipView => new CompletionTooltip(view, stateField)
 }
 
 function scrollIntoView(container: HTMLElement, element: HTMLElement) {

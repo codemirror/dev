@@ -28,6 +28,13 @@ export const baseTheme = EditorView.baseTheme({
     }
   },
 
+  "$completionListIncompleteTop:before, $completionListIncompleteBottom:after": {
+    content: '"···"',
+    opacity: 0.5,
+    display: "block",
+    textAlign: "center"
+  },
+
   "$tooltip.completionInfo": {
     padding: "3px 9px",
     maxWidth: MaxInfoWidth + "px",

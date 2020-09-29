@@ -1,7 +1,8 @@
 import {EditorView, Command, ViewPlugin, PluginValue, ViewUpdate, logException} from "@codemirror/next/view"
 import {Transaction} from "@codemirror/next/state"
 import {completionState, setSelectedEffect, toggleCompletionEffect, setActiveEffect, State,
-        ActiveSource, ActiveResult, completionConfig} from "./state"
+        ActiveSource, ActiveResult} from "./state"
+import {completionConfig} from "./config"
 import {cur, CompletionResult, CompletionSource, CompletionContext, applyCompletion, ensureAnchor} from "./completion"
 
 const CompletionInteractMargin = 75
