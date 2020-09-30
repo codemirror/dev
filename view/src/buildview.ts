@@ -118,7 +118,9 @@ export class ContentBuilder implements SpanIterator<Decoration> {
   }
 }
 
-class NullWidget extends WidgetType<string> {
-  toDOM() { return document.createElement(this.value) }
-  updateDOM(elt: HTMLElement) { return elt.nodeName.toLowerCase() == this.value }
+class NullWidget extends WidgetType {
+  constructor(readonly tag: string) { super() }
+  eq(other: NullWidget) { return other.tag == this.tag }
+  toDOM() { return document.createElement(this.tag) }
+  updateDOM(elt: HTMLElement) { return elt.nodeName.toLowerCase() == this.tag }
 }

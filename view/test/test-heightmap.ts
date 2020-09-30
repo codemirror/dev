@@ -30,11 +30,13 @@ describe("HeightMap", () => {
     ist(mk(doc(10, 10, 8)).length, 30)
   })
 
-  class MyWidget extends WidgetType<number> {
+  class MyWidget extends WidgetType {
+    constructor(readonly value: number) { super() }
+    eq(other: MyWidget) { return this.value == other.value }
     toDOM() { return document.body }
     get estimatedHeight() { return this.value }
   }
-  class NoHeightWidget extends WidgetType<null> {
+  class NoHeightWidget extends WidgetType {
     toDOM() { return document.body }
   }
 
@@ -48,7 +50,7 @@ describe("HeightMap", () => {
 
   it("ignores irrelevant decorations", () => {
     let map = mk(doc(10, 10, 20, 5),
-                 [Decoration.widget({widget: new NoHeightWidget(null)}).range(5),
+                 [Decoration.widget({widget: new NoHeightWidget}).range(5),
                   Decoration.mark({class: "ahah"}).range(25, 46)])
     ist(map.length, 48)
     ist(map.toString(), "gap(48)")

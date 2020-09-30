@@ -26,7 +26,7 @@ function d(from: number, to: any, spec: any = null) {
   return Decoration.mark(typeof spec == "string" ? {attributes: {[spec]: "y"}} : spec).range(from, to)
 }
 
-function w(pos: number, widget: WidgetType<any>, side: number = 0) {
+function w(pos: number, widget: WidgetType, side: number = 0) {
   return Decoration.widget({widget, side}).range(pos)
 }
 
@@ -145,17 +145,18 @@ describe("EditorView decoration", () => {
     })
   })
 
-  class WordWidget extends WidgetType<string> {
-    eq(otherValue: string) { return this.value.toLowerCase() == otherValue.toLowerCase() }
+  class WordWidget extends WidgetType {
+    constructor(readonly word: string) { super() }
+    eq(other: WordWidget) { return this.word.toLowerCase() == other.word.toLowerCase() }
     toDOM() {
       let dom = document.createElement("strong")
-      dom.textContent = this.value
+      dom.textContent = this.word
       return dom
     }
   }
 
   describe("widget", () => {
-    class OtherWidget extends WidgetType<string> {
+    class OtherWidget extends WidgetType {
       toDOM() { return document.createElement("img") }
     }
 
@@ -206,7 +207,7 @@ describe("EditorView decoration", () => {
       let elt = cm.contentDOM.querySelector("strong")
       cm.dispatch({effects: [
         filterDeco.of(() => false),
-        addDeco.of([w(4, new OtherWidget("hi"))])
+        addDeco.of([w(4, new OtherWidget)])
       ]})
       ist(elt, cm.contentDOM.querySelector("strong"), "!=")
     })
@@ -400,10 +401,12 @@ describe("EditorView decoration", () => {
     })
   })
 
-  class BlockWidget extends WidgetType<string> {
+  class BlockWidget extends WidgetType {
+    constructor(readonly name: string) { super() }
+    eq(other: BlockWidget) { return this.name == other.name }
     toDOM() {
       let elt = document.createElement("hr")
-      elt.setAttribute("data-name", this.value)
+      elt.setAttribute("data-name", this.name)
       return elt
     }
   }

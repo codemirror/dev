@@ -30,7 +30,7 @@ const foldState = StateField.define<DecorationSet>({
     folded = folded.map(tr.changes)
     for (let e of tr.effects) {
       if (e.is(foldEffect) && !foldExists(folded, e.value.from, e.value.to))
-        folded = folded.update({add: [FoldWidget.decoration.range(e.value.from, e.value.to)]})
+        folded = folded.update({add: [foldWidget.range(e.value.from, e.value.to)]})
       else if (e.is(unfoldEffect)) {
         folded = folded.update({filter: (from, to) => e.value.from != from || e.value.to != to,
                                 filterFrom: e.value.from, filterTo: e.value.to})
@@ -159,7 +159,7 @@ export function codeFolding(config?: FoldConfig): Extension {
   return result
 }
 
-class FoldWidget extends WidgetType<null> {
+const foldWidget = Decoration.replace({widget: new class extends WidgetType {
   ignoreEvents() { return false }
 
   toDOM(view: EditorView) {
@@ -179,9 +179,7 @@ class FoldWidget extends WidgetType<null> {
     }
     return element
   }
-
-  static decoration = Decoration.replace({widget: new FoldWidget(null)})
-}
+}})
 
 interface FoldGutterConfig {
   /// Text used to indicate that a given line can be folded. Defaults

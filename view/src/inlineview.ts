@@ -2,6 +2,7 @@ import {Text as DocText} from "@codemirror/next/text"
 import {ContentView, DOMPos, coordsInChildren} from "./contentview"
 import {WidgetType, MarkDecoration} from "./decoration"
 import {Rect, flattenRect, tempRange} from "./dom"
+import {CompositionWidget} from "./docview"
 import browser from "./browser"
 
 const none: any[] = []
@@ -178,7 +179,7 @@ export class WidgetView extends InlineView {
   become(other: InlineView): boolean {
     if (other.length == this.length && other instanceof WidgetView && other.side == this.side) {
       if (this.widget.constructor == other.widget.constructor) {
-        if (!this.widget.eq(other.widget.value)) this.markDirty(true)
+        if (!this.widget.eq(other.widget)) this.markDirty(true)
         this.widget = other.widget
         return true
       }
@@ -214,9 +215,11 @@ export class WidgetView extends InlineView {
 }
 
 export class CompositionView extends WidgetView {
-  domAtPos(pos: number) { return new DOMPos(this.widget.value.text, pos) }
+  widget!: CompositionWidget
 
-  sync() { if (!this.dom) this.setDOM(this.widget.toDOM(this.editorView)) }
+  domAtPos(pos: number) { return new DOMPos(this.widget.text, pos) }
+
+  sync() { if (!this.dom) this.setDOM(this.widget.toDOM()) }
 
   localPosFromDOM(node: Node, offset: number): number {
     return !offset ? 0 : node.nodeType == 3 ? Math.min(offset, this.length) : this.length
@@ -226,7 +229,7 @@ export class CompositionView extends WidgetView {
 
   get overrideDOMText() { return null }
 
-  coordsAt(pos: number, side: number) { return textCoords(this.widget.value.text, pos, side, this.length) }
+  coordsAt(pos: number, side: number) { return textCoords(this.widget.text, pos, side, this.length) }
 }
 
 export function mergeInlineChildren(parent: ContentView & {children: InlineView[]},

@@ -137,13 +137,16 @@ function placeHolder(code: number): string | null {
 
 const DefaultPlaceholder = "\u2022"
 
-class SpecialCharWidget extends WidgetType<number> {
-  constructor(private options: Required<SpecialCharConfig>, code: number) { super(code) }
+class SpecialCharWidget extends WidgetType {
+  constructor(readonly options: Required<SpecialCharConfig>,
+              readonly code: number) { super() }
+
+  eq(other: SpecialCharWidget) { return other.code == this.code }
 
   toDOM() {
-    let ph = placeHolder(this.value) || DefaultPlaceholder
-    let desc = "Control character " + (Names[this.value] || this.value)
-    let custom = this.options.render && this.options.render(this.value, desc, ph)
+    let ph = placeHolder(this.code) || DefaultPlaceholder
+    let desc = "Control character " + (Names[this.code] || this.code)
+    let custom = this.options.render && this.options.render(this.code, desc, ph)
     if (custom) return custom
     let span = document.createElement("span")
     span.textContent = ph
@@ -156,12 +159,16 @@ class SpecialCharWidget extends WidgetType<number> {
   ignoreEvent(): boolean { return false }
 }
 
-class TabWidget extends WidgetType<number> {
+class TabWidget extends WidgetType {
+  constructor(readonly width: number) { super() }
+
+  eq(other: TabWidget) { return other.width == this.width }
+
   toDOM() {
     let span = document.createElement("span")
     span.textContent = "\t"
     span.className = tab
-    span.style.width = this.value + "px"
+    span.style.width = this.width + "px"
     return span
   }
 

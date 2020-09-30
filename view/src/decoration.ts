@@ -78,27 +78,28 @@ interface LineDecorationSpec {
 /// structure for a widget until it is needed, and to avoid redrawing
 /// widgets even when the decorations that define them are recreated.
 /// `T` can be a type of value passed to instances of the widget type.
-export abstract class WidgetType<T = any> {
-  /// Create an instance of this widget type.
-  constructor(
-    /// @internal
-    readonly value: T
-  ) {}
+export abstract class WidgetType {
   /// Build the DOM structure for this widget instance.
   abstract toDOM(view: EditorView): HTMLElement
-  /// Compare this instance to another instance of the same class. By
-  /// default, it'll compare the instances' parameters with `===`.
-  eq(value: T): boolean { return this.value === value }
-  /// Update a DOM element created by a widget of the same type but
-  /// with a different value to reflect this widget. May return true
-  /// to indicate that it could update, false to indicate it couldn't
-  /// (in which case the widget will be redrawn). The default
+
+  /// Compare this instance to another instance of the same type.
+  /// (TypeScript can't express this, but only instances of the same
+  /// specific class will be passed to this method.) This is used to
+  /// avoid redrawing widgets when they are replace by a new
+  /// decoration of the same type. The default implementation just
+  /// returns `false`, which may be wasteful.
+  eq(_widget: WidgetType): boolean { return false }
+
+  /// Update a DOM element created by a widget of the same type (but
+  /// different, non-`eq` content) to reflect this widget. May return
+  /// true to indicate that it could update, false to indicate it
+  /// couldn't (in which case the widget will be redrawn). The default
   /// implementation just returns false.
   updateDOM(_dom: HTMLElement): boolean { return false }
 
   /// @internal
   compare(other: WidgetType): boolean {
-    return this == other || this.constructor == other.constructor && this.eq(other.value)
+    return this == other || this.constructor == other.constructor && this.eq(other)
   }
 
   /// The estimated height this widget will have, to be used when

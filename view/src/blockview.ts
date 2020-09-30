@@ -190,7 +190,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
   match(other: ContentView) {
     if (other instanceof BlockWidgetView && other.type == this.type &&
         other.widget.constructor == this.widget.constructor) {
-      if (!other.widget.eq(this.widget.value)) this.markDirty(true)
+      if (!other.widget.eq(this.widget)) this.markDirty(true)
       this.widget = other.widget
       this.length = other.length
       this.breakAfter = other.breakAfter

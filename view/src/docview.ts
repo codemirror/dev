@@ -408,20 +408,24 @@ export class DocView extends ContentView {
 // that.
 const MaxNodeHeight = 1e7
 
-class BlockGapWidget extends WidgetType<number> {
+class BlockGapWidget extends WidgetType {
+  constructor(readonly height: number) { super() }
+
   toDOM() {
     let elt = document.createElement("div")
     this.updateDOM(elt)
     return elt
   }
 
+  eq(other: BlockGapWidget) { return other.height == this.height }
+
   updateDOM(elt: HTMLElement) {
-    if (this.value < MaxNodeHeight) {
+    if (this.height < MaxNodeHeight) {
       while (elt.lastChild) elt.lastChild.remove()
-      elt.style.height = this.value + "px"
+      elt.style.height = this.height + "px"
     } else {
       elt.style.height = ""
-      for (let remaining = this.value; remaining > 0; remaining -= MaxNodeHeight) {
+      for (let remaining = this.height; remaining > 0; remaining -= MaxNodeHeight) {
         let fill = elt.appendChild(document.createElement("div"))
         fill.style.height = Math.min(remaining, MaxNodeHeight) + "px"
       }
@@ -429,7 +433,7 @@ class BlockGapWidget extends WidgetType<number> {
     return true
   }
 
-  get estimatedHeight() { return this.value }
+  get estimatedHeight() { return this.height }
 }
 
 export function computeCompositionDeco(view: EditorView, changes: ChangeSet): DecorationSet {
@@ -462,13 +466,15 @@ export function computeCompositionDeco(view: EditorView, changes: ChangeSet): De
     return Decoration.none
   }
 
-  return Decoration.set(Decoration.replace({widget: new CompositionWidget({top: topNode, text: textNode})}).range(newFrom, newTo))
+  return Decoration.set(Decoration.replace({widget: new CompositionWidget(topNode, textNode)}).range(newFrom, newTo))
 }
 
-class CompositionWidget extends WidgetType<{top: Node, text: Node}> {
-  eq(value: {top: Node, text: Node}) { return this.value.top == value.top && this.value.text == value.text }
+export class CompositionWidget extends WidgetType {
+  constructor(readonly top: Node, readonly text: Node) { super() }
 
-  toDOM() { return this.value.top as HTMLElement }
+  eq(other: CompositionWidget) { return this.top == other.top && this.text == other.text }
+
+  toDOM() { return this.top as HTMLElement }
 
   ignoreEvent() { return false }
 

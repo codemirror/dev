@@ -65,15 +65,14 @@ class Snippet {
   }
 }
 
-class FieldMarker extends WidgetType<null> {
+let fieldMarker = Decoration.widget({widget: new class extends WidgetType {
   toDOM() {
     let span = document.createElement("span")
     span.className = themeClass("snippetFieldPosition")
     return span
   }
-}
-
-let fieldMarker = Decoration.widget({widget: new FieldMarker(null)})
+  ignoreEvent() { return false }
+}})
 let fieldRange = Decoration.mark({class: themeClass("snippetField")})
 
 class ActiveSnippet {

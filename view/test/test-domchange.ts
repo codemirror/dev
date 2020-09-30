@@ -152,11 +152,11 @@ describe("DOM changes", () => {
   })
 
   it("doesn't insert newlines for block widgets", () => {
-    class Widget extends WidgetType<any> {
+    class Widget extends WidgetType {
       toDOM() { return document.createElement("div") }
     }
     let field = StateField.define<DecorationSet>({
-      create() { return Decoration.set(Decoration.widget({widget: new Widget(null) }).range(4)) },
+      create() { return Decoration.set(Decoration.widget({widget: new Widget }).range(4)) },
       update(v) { return v },
       provide: [EditorView.decorations]
     })

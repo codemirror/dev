@@ -258,10 +258,14 @@ function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
   return dom
 }
 
-class DiagnosticWidget extends WidgetType<Diagnostic> {
+class DiagnosticWidget extends WidgetType {
+  constructor(readonly diagnostic: Diagnostic) {super()}
+
+  eq(other: DiagnosticWidget) { return other.diagnostic == this.diagnostic }
+
   toDOM() {
     let elt = document.createElement("span")
-    elt.className = themeClass("lintPoint." + this.value.severity)
+    elt.className = themeClass("lintPoint." + this.diagnostic.severity)
     return elt
   }
 }

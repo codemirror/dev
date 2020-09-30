@@ -56,9 +56,9 @@ function wordDeco(state: EditorState): DecorationSet {
 const wordHighlighter = EditorView.decorations.compute(["doc"], wordDeco)
 
 function widgets(positions: number[], sides: number[]): ViewPlugin<any> {
-  let xWidget = new class extends WidgetType<null> {
+  let xWidget = new class extends WidgetType {
     toDOM() { let s = document.createElement("var"); s.textContent = "×"; return s }
-  }(null)
+  }
   let startDeco = Decoration.set(positions.map((p, i) => Decoration.widget({widget: xWidget, side: sides[i]}).range(p)))
   return ViewPlugin.define(() => ({
     decorations: startDeco,

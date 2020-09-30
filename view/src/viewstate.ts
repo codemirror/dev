@@ -58,26 +58,29 @@ export class LineGap {
   }
 
   draw(wrapping: boolean) {
-    return Decoration.replace({widget: new LineGapWidget({size: this.size, vertical: wrapping})}).range(this.from, this.to)
+    return Decoration.replace({widget: new LineGapWidget(this.size, wrapping)}).range(this.from, this.to)
   }
 }
 
-class LineGapWidget extends WidgetType<{size: number, vertical: boolean}> {
+class LineGapWidget extends WidgetType {
+  constructor(readonly size: number,
+              readonly vertical: boolean) { super() }
+
+  eq(other: LineGapWidget) { return other.size == this.size && other.vertical == this.vertical }
+
   toDOM() {
     let elt = document.createElement("div")
-    if (this.value.vertical) {
-      elt.style.height = this.value.size + "px"
+    if (this.vertical) {
+      elt.style.height = this.size + "px"
     } else {
-      elt.style.width = this.value.size + "px"
+      elt.style.width = this.size + "px"
       elt.style.height = "2px"
       elt.style.display = "inline-block"
     }
     return elt
   }
 
-  eq(other: {size: number, vertical: boolean}) { return this.value.size == other.size && this.value.vertical == other.vertical }
-
-  get estimatedHeight() { return this.value.vertical ? this.value.size : -1 }
+  get estimatedHeight() { return this.vertical ? this.size : -1 }
 }
 
 const enum LG { Margin = 10000, HalfMargin = LG.Margin >> 1,  MinViewPort = LG.Margin * 1.5 }
