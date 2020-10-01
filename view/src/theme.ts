@@ -140,6 +140,11 @@ export const baseTheme = buildTheme(baseThemeID, {
     borderLeft: "1.2px solid black",
   },
 
+  $placeholder: {
+    color: "#888",
+    display: "inline-block"
+  },
+
   $button: {
     verticalAlign: "middle",
     color: "inherit",

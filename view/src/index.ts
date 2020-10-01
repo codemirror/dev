@@ -9,6 +9,7 @@ export {KeyBinding, keymap, runScopeHandlers} from "./keymap"
 export {drawSelection} from "./draw-selection"
 export {highlightSpecialChars} from "./special-chars"
 export {indentOnInput} from "./indent-on-input"
+export {placeholder} from "./placeholder"
 export {Rect} from "./dom"
 export {Range} from "@codemirror/next/rangeset"
 
