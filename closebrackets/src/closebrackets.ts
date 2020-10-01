@@ -43,6 +43,7 @@ function config(state: EditorState, pos: number) {
 }
 
 function handleInput(view: EditorView, from: number, to: number, insert: string) {
+  if (view.composing) return false
   let sel = view.state.selection.primary
   if (insert.length > 2 || insert.length == 2 && codePointSize(codePointAt(insert, 0)) == 1 ||
       from != sel.from || to != sel.to) return false
