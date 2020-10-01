@@ -1,0 +1,5 @@
+{
+  "main": "dist/index.js",
+  "types": "src/rust",
+  "type": "module"
+}

@@ -59,6 +59,7 @@
     "./lang-css": "./lang-css/dist/index.js",
     "./lang-html": "./lang-html/dist/index.js",
     "./lang-sql": "./lang-sql/dist/index.js",
+    "./lang-rust": "./lang-rust/dist/index.js",
     "./lang-xml": "./lang-xml/dist/index.js",
     "./theme-one-dark": "./theme-one-dark/dist/index.js"
   },
@@ -72,6 +73,7 @@
     "lezer-java": "^0.11.0",
     "lezer-json": "^0.11.0",
     "lezer-python": "^0.11.0",
+    "lezer-rust": "^0.11.1",
     "lezer-tree": "^0.11.0",
     "lezer-xml": "^0.11.0",
     "style-mod": "^3.0.0",
