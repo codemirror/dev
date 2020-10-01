@@ -85,6 +85,10 @@ export class EditorView {
   /// Returns false when the editor is entirely scrolled out of view
   /// or otherwise hidden.
   get inView() { return this.viewState.inView }
+
+  /// Indicates whether the user is currently composing text via
+  /// [IME](https://developer.mozilla.org/en-US/docs/Mozilla/IME_handling_guide).
+  get composing() { return this.inputState.composing }
   
   private _dispatch: (tr: Transaction) => void
 
