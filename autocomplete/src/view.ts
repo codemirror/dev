@@ -7,14 +7,16 @@ import {cur, CompletionResult, CompletionSource, CompletionContext, applyComplet
 
 const CompletionInteractMargin = 75
 
-export function moveCompletion(dir: string, by?: string) {
+/// Returns a command that moves the completion selection forward or
+/// backward by the given amount.
+export function moveCompletionSelection(forward: boolean, by: "option" | "page" = "option"): Command {
   return (view: EditorView) => {
-    let cState = view.state.field(completionState)
-    if (!cState.open || Date.now() - cState.open.timestamp < CompletionInteractMargin) return false
+    let cState = view.state.field(completionState, false)
+    if (!cState || !cState.open || Date.now() - cState.open.timestamp < CompletionInteractMargin) return false
     let step = 1, tooltip: HTMLElement
     if (by == "page" && (tooltip = view.dom.querySelector(".cm-tooltip-autocomplete") as HTMLElement))
       step = Math.max(2, Math.floor(tooltip.offsetHeight / (tooltip.firstChild as HTMLElement).offsetHeight))
-    let selected = cState.open.selected + step * (dir == "up" ? -1 : 1), {length} = cState.open.options
+    let selected = cState.open.selected + step * (forward ? 1 : -1), {length} = cState.open.options
     if (selected < 0) selected = by == "page" ? 0 : length - 1
     else if (selected >= length) selected = by == "page" ? length - 1 : 0
     view.dispatch({effects: setSelectedEffect.of(selected)})
@@ -22,9 +24,10 @@ export function moveCompletion(dir: string, by?: string) {
   }
 }
 
-export function acceptCompletion(view: EditorView) {
-  let cState = view.state.field(completionState)
-  if (!cState.open || Date.now() - cState.open.timestamp < CompletionInteractMargin) return false
+/// Accept the current completion.
+export const acceptCompletion: Command = (view: EditorView) => {
+  let cState = view.state.field(completionState, false)
+  if (!cState || !cState.open || Date.now() - cState.open.timestamp < CompletionInteractMargin) return false
   applyCompletion(view, cState.open.options[cState.open.selected])
   return true
 }

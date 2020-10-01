@@ -5,13 +5,13 @@ import {Subtree} from "lezer-tree"
 import {CompletionContext, Completion, CompletionSource} from "./completion"
 import {completionState, State} from "./state"
 import {CompletionConfig, completionConfig} from "./config"
-import {completionPlugin, moveCompletion, acceptCompletion, startCompletion, closeCompletion} from "./view"
+import {completionPlugin, moveCompletionSelection, acceptCompletion, startCompletion, closeCompletion} from "./view"
 import {SnippetSpec, snippet} from "./snippet"
 import {baseTheme} from "./theme"
 
 export {snippet, SnippetSpec} from "./snippet"
 export {Completion, CompletionContext, CompletionSource, CompletionResult} from "./completion"
-export {startCompletion, closeCompletion} from "./view"
+export {startCompletion, closeCompletion, acceptCompletion, moveCompletionSelection} from "./view"
 
 /// Returns an extension that enables autocompletion.
 export function autocompletion(config: CompletionConfig = {}): Extension {
@@ -22,10 +22,10 @@ export function autocompletion(config: CompletionConfig = {}): Extension {
     baseTheme,
     tooltips(),
     precedence(keymap([
-      {key: "ArrowDown", run: moveCompletion("down")},
-      {key: "ArrowUp", run: moveCompletion("up")},
-      {key: "PageDown", run: moveCompletion("down", "page")},
-      {key: "PageUp", run: moveCompletion("up", "page")},
+      {key: "ArrowDown", run: moveCompletionSelection(true)},
+      {key: "ArrowUp", run: moveCompletionSelection(false)},
+      {key: "PageDown", run: moveCompletionSelection(true, "page")},
+      {key: "PageUp", run: moveCompletionSelection(false, "page")},
       {key: "Enter", run: acceptCompletion}
     ]), "override")
   ]
