@@ -1,5 +1,5 @@
 import {Text as DocText} from "@codemirror/next/text"
-import {ContentView, DOMPos, coordsInChildren} from "./contentview"
+import {ContentView, DOMPos} from "./contentview"
 import {WidgetType, MarkDecoration} from "./decoration"
 import {Rect, flattenRect, tempRange} from "./dom"
 import {CompositionWidget} from "./docview"
@@ -348,4 +348,15 @@ export function joinInlineInto(parent: ContentView, view: InlineView, open: numb
     view.setParent(parent)
   }
   parent.length += view.length
+}
+
+export function coordsInChildren(view: ContentView & {children: InlineView[]}, pos: number, side: number): Rect | null {
+  for (let off = 0, i = 0; i < view.children.length; i++) {
+    let child = view.children[i], end = off + child.length
+    if (end == off && child.getSide() <= 0) continue
+    if (side <= 0 || end == view.length ? end >= pos : end > pos)
+      return child.coordsAt(pos - off, side)
+    off = end
+  }
+  return ((view.dom!.lastChild || view.dom!) as HTMLElement).getBoundingClientRect()
 }

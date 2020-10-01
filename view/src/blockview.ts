@@ -1,6 +1,6 @@
-import {ContentView, DOMPos, coordsInChildren} from "./contentview"
+import {ContentView, DOMPos} from "./contentview"
 import {DocView} from "./docview"
-import {InlineView, TextView, WidgetView, mergeInlineChildren, inlineDOMAtPos, joinInlineInto} from "./inlineview"
+import {InlineView, TextView, WidgetView, mergeInlineChildren, inlineDOMAtPos, joinInlineInto, coordsInChildren} from "./inlineview"
 import {clientRectsFor, Rect} from "./dom"
 import {LineDecoration, WidgetType, BlockType} from "./decoration"
 import {Attrs, combineAttrs, attrsEq, updateAttrs} from "./attributes"
