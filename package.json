@@ -1,6 +1,6 @@
 {
   "name": "@codemirror/next",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Text/code editor component",
   "scripts": {
     "test": "npm run test-node && node bin/selenium.js --start-server",

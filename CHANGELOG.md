@@ -1,3 +1,47 @@
+## 0.13.0 (2020-10-01)
+
+### Breaking changes
+
+Themes are now specified differently, using plain CSS selectors extended with `$` syntax for targeting theme classes. This should make them more flexible.
+
+The style-mod dependency has been upgraded to 3.0, which is a backward-incompatible upgrade.
+
+The `multipleSelections` extension is no longer supported. You probably want to use `drawSelection` combined with `EditorState.allowMultipleSelections.of(true)`.
+
+`WidgetType` no longer takes a type parameter. Implementations are now themselves responsible for creating instance variables and implementing an appropriate `eq` method.
+
+Drops support for `PluginValue.measure` (which was very broken already in the previous release).
+
+### Bug fixes
+
+The editor no longer loses focus when picking a completion with the mouse.
+
+Fix a bug that caused completion info tooltips to be positioned off-screen.
+
+### New features
+
+There is now an SQL language module.
+
+The autocomplete package now exports an `ifNotIn` helper that can turn off completion sources when the cursor is in a given token type.
+
+There is now a `lang-xml` package with basic XML support.
+
+`ViewUpdate` objects now have a `geometryChanged` getter that tells you whether the geometry of the content changed.
+
+The view module now exports a `drawSelection` function that creates an extension that overrides the native selection drawing.
+
+Scroll handlers registered view `EditorView.domEventHandlers` or view plugins will now be called any time the view or an ancestor of the view is scrolled.
+
+DOM event handlers may now return void, for convenience.
+
+There is now a `lang-rust` package.
+
+The view package now exports a `placeholder` function that can be used to create a placeholder shown when the editor is empty.
+
+The editor view now has a `composing` property indicating whether IME is active.
+
+The autocomplete package now exports `acceptCompletion` and `moveCompletionSelection` commands.
+
 ## 0.12.0 (2020-09-11)
 
 ### Breaking changes
