@@ -59,12 +59,6 @@ export interface PluginValue {
   /// Called when the plugin is no longer going to be used. Should
   /// revert any changes the plugin made to the DOM.
   destroy?(): void
-
-  /// If present, this method will be called when the editor measures
-  /// its layout. It can call
-  /// [`requestMeasure`](#view.EditorView.requestMeasure) when it
-  /// considers it necessary (but shouldn't do anything beyond that).
-  measure?(): void
 }
 
 declare const isFieldProvider: unique symbol
@@ -116,7 +110,7 @@ export interface PluginSpec<V extends PluginValue> {
   /// When called, these will have their `this` bound to the plugin
   /// value.
   eventHandlers?: {
-    [Type in keyof HTMLElementEventMap]?: (this: V, event: HTMLElementEventMap[Type], view: EditorView) => boolean
+    [Type in keyof HTMLElementEventMap]?: (this: V, event: HTMLElementEventMap[Type], view: EditorView) => boolean | void
   },
 
   /// Allow the plugin to provide decorations. When given, this should
@@ -175,7 +169,7 @@ export const pluginDecorations = PluginField.define<DecorationSet>()
 
 export const domEventHandlers = PluginField.define<{
   plugin: PluginValue,
-  handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}
+  handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean | void}
 }>()
 
 export class PluginInstance {
@@ -211,13 +205,6 @@ export class PluginInstance {
     if (this.value.destroy) {
       try { this.value.destroy() }
       catch (e) { logException(view.state, e, "CodeMirror plugin crashed") }
-    }
-  }
-
-  measure(view: EditorView) {
-    if (this.value.measure) {
-      try { this.value.measure() }
-      catch(e) { logException(view.state, e, "CodeMirror plugin crashed") }
     }
   }
 

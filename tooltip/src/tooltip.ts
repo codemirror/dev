@@ -44,14 +44,7 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
       for (let t of this.tooltipViews) if (views.indexOf(t) < 0) t.dom.remove()
       this.tooltips = tooltips
       this.tooltipViews = views
-      this.measure()
-    }
-  }
-
-  measure() {
-    if (this.tooltips.length) {
-      if (this.view.inView || this.inView) this.view.requestMeasure(this.measureReq)
-      this.inView = this.view.inView
+      this.maybeMeasure()
     }
   }
 
@@ -98,6 +91,17 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
       dom.style.left = left + "px"
       if (tView.positioned) tView.positioned()
     }
+  }
+
+  maybeMeasure() {
+    if (this.tooltips.length) {
+      if (this.view.inView || this.inView) this.view.requestMeasure(this.measureReq)
+      this.inView = this.view.inView
+    }
+  }
+}, {
+  eventHandlers: {
+    scroll() { this.maybeMeasure() }
   }
 })
 

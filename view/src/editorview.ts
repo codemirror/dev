@@ -152,7 +152,7 @@ export class EditorView {
     this.viewState = new ViewState(config.state || EditorState.create())
     this.plugins = this.state.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
     this.observer = new DOMObserver(this, (from, to, typeOver) => applyDOMChange(this, from, to, typeOver),
-                                    () => this.measure())
+                                    event => { this.inputState.runScrollHandlers(this, event); this.measure() })
     this.docView = new DocView(this)
 
     this.inputState = new InputState(this)
@@ -263,7 +263,6 @@ export class EditorView {
     for (let i = 0;; i++) {
       this.updateState = UpdateState.Measuring
       let changed = this.viewState.measure(this.docView, i > 0)
-      if (!i) for (let plugin of this.plugins) plugin.measure(this)
       let measuring = this.measureRequests
       if (!changed && !measuring.length && this.viewState.scrollTo == null) break
       this.measureRequests = []
@@ -565,8 +564,13 @@ export class EditorView {
   /// first such function to return true will be assumed to have handled
   /// that event, and no other handlers or built-in behavior will be
   /// activated for it.
+  /// These are registered on the [content
+  /// element](#view.EditorView.contentDOM), except for `scroll`
+  /// handlers, which will be called any time the editor's [scroll
+  /// element](#view.EditorView.scrollDOM) or one of its parent nodes
+  /// is scrolled.
   static domEventHandlers(handlers: {
-    [Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean
+    [Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean | void
   }): Extension {
     return ViewPlugin.define(() => ({}), {eventHandlers: handlers})
   }

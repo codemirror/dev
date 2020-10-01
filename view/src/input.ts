@@ -14,11 +14,12 @@ export class InputState {
   lastKeyTime: number = 0
   lastSelectionOrigin: string | null = null
   lastSelectionTime: number = 0
+  scrollHandlers: ((event: Event) => boolean | void)[] = []
 
   registeredEvents: string[] = []
   customHandlers: readonly {
     plugin: PluginValue,
-    handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean}
+    handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean | void}
   }[] = []
 
   composing = false
@@ -56,9 +57,9 @@ export class InputState {
   ensureHandlers(view: EditorView) {
     let handlers = this.customHandlers = view.pluginField(domEventHandlers)
     for (let set of handlers) {
-      for (let type in set.handlers) if (this.registeredEvents.indexOf(type) < 0) {
+      for (let type in set.handlers) if (this.registeredEvents.indexOf(type) < 0 && type != "scroll") {
         this.registeredEvents.push(type)
-        ;(type != "scroll" ? view.contentDOM : view.scrollDOM).addEventListener(type, (event: Event) => {
+        view.contentDOM.addEventListener(type, (event: Event) => {
           if (!eventBelongsToEditor(view, event)) return
           if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         })
@@ -78,6 +79,16 @@ export class InputState {
       }
     }
     return false
+  }
+
+  runScrollHandlers(view: EditorView, event: Event) {
+    for (let set of this.customHandlers) {
+      let handler = set.handlers.scroll
+      if (handler) {
+        try { handler.call(set.plugin, event, view) }
+        catch (e) { logException(view.state, e) }
+      }
+    }
   }
 
   ignoreDuringComposition(event: Event): boolean {

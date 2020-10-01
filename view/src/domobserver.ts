@@ -36,7 +36,7 @@ export class DOMObserver {
 
   constructor(private view: EditorView,
               private onChange: (from: number, to: number, typeOver: boolean) => void,
-              private onScrollChanged: () => void) {
+              private onScrollChanged: (event: Event) => void) {
     this.dom = view.contentDOM
     this.observer = new MutationObserver(mutations => {
       for (let mut of mutations) this.queue.push(mut)
@@ -82,7 +82,7 @@ export class DOMObserver {
         if (this.parentCheck < 0) this.parentCheck = setTimeout(this.listenForScroll.bind(this), 1000)
         if (entries[entries.length - 1].intersectionRatio > 0 != this.intersecting) {
           this.intersecting = !this.intersecting
-          this.onScrollChanged()
+          this.onScrollChanged(document.createEvent("Event"))
         }
       }, {})
       this.intersection.observe(this.dom)
@@ -90,10 +90,10 @@ export class DOMObserver {
     this.listenForScroll()
   }
 
-  onScroll() {
+  onScroll(e: Event) {
     if (this.intersecting) {
       this.flush()
-      this.onScrollChanged()
+      this.onScrollChanged(e)
     }
   }
 
