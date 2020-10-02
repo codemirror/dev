@@ -38,7 +38,7 @@ export const baseTheme = EditorView.baseTheme({
   "$tooltip.completionInfo": {
     position: "absolute",
     padding: "3px 9px",
-    minWidth: "max-content",
+    width: "max-content",
     maxWidth: MaxInfoWidth + "px",
   },
 
