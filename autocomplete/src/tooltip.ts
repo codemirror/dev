@@ -82,8 +82,9 @@ class CompletionTooltip {
     this.dom = document.createElement("div")
     this.dom.addEventListener("mousedown", (e: MouseEvent) => {
       let index = this.range.from, dom = e.target as HTMLElement | null
+      while (dom && dom != this.list && dom.parentNode != this.list) dom = dom.parentNode as (HTMLElement | null)
       for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-      if (index < options.length) applyCompletion(view, options[index])
+      if (index >= 0 && index < options.length) applyCompletion(view, options[index])
       e.preventDefault()
     })
     this.list = this.dom.appendChild(createListBox(options, cState.id, this.range))
