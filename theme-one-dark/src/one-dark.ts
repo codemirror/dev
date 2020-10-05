@@ -18,7 +18,7 @@ const chalky = "#e5c07b",
   cursor = "#528bff"
 
 const oneDarkTheme = EditorView.theme({
-  $wrap: {
+  $: {
     color: lightWhite,
     backgroundColor: background,
     "& ::selection": {backgroundColor: selection},
