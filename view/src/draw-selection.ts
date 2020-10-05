@@ -150,12 +150,17 @@ const hideNativeSelection = precedence(EditorView.theme(themeSpec), "override")
 
 const selectionClass = themeClass("selectionBackground")
 
+function getBase(view: EditorView) {
+  let rect = view.scrollDOM.getBoundingClientRect()
+  return {left: rect.left - view.scrollDOM.scrollLeft, top: rect.top - view.scrollDOM.scrollTop}
+}
+
 function measureRange(view: EditorView, range: SelectionRange): Piece[] {
   if (range.to <= view.viewport.from || range.from >= view.viewport.to) return []
   let from = Math.max(range.from, view.viewport.from), to = Math.min(range.to, view.viewport.to)
 
   let ltr = view.textDirection == Direction.LTR
-  let content = view.contentDOM, contentRect = content.getBoundingClientRect(), base = view.scrollDOM.getBoundingClientRect()
+  let content = view.contentDOM, contentRect = content.getBoundingClientRect(), base = getBase(view)
   let lineStyle = window.getComputedStyle(content.firstChild as HTMLElement)
   let leftSide = contentRect.left + parseInt(lineStyle.paddingLeft)
   let rightSide = contentRect.right - parseInt(lineStyle.paddingRight)
@@ -232,7 +237,7 @@ const cursorClass = themeClass("cursor.secondary")
 function measureCursor(view: EditorView, cursor: SelectionRange, primary: boolean): Piece | null {
   let pos = view.coordsAtPos(cursor.head, cursor.assoc || 1)
   if (!pos) return null
-  let base = view.scrollDOM.getBoundingClientRect()
+  let base = getBase(view)
   return new Piece(pos.left - base.left, pos.top - base.top, -1, pos.bottom - pos.top,
                    primary ? primaryCursorClass : cursorClass)
 }
