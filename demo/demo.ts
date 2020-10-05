@@ -1,5 +1,6 @@
 import {EditorState, EditorView, basicSetup} from "@codemirror/next/basic-setup"
 import {html} from "@codemirror/next/lang-html"
+import {oneDark} from "@codemirror/next/theme-one-dark"
 
 //import {esLint} from "@codemirror/next/lang-javascript"
 // @ts-ignore
@@ -17,7 +18,8 @@ let state = EditorState.create({doc: `<script>
 </script>
 `, extensions: [
   basicSetup,
-  html()
+  html(),
+  oneDark
 //  linter(esLint(new Linter)),
 //  new StreamSyntax(legacyJS()).extension,
 ]})

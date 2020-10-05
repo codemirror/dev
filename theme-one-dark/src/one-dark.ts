@@ -25,8 +25,9 @@ const oneDarkTheme = EditorView.theme({
     caretColor: cursor
   },
 
-  $cursor: {borderLeftColor: cursor},
-  $selectionBackground: {backgroundColor: selection},
+  // FIXME make the extra specificity stuff unneccesary (#309)
+  "$$focused$dark $cursor": {borderLeftColor: cursor},
+  "$$focused$dark $selectionBackground": {backgroundColor: selection},
 
   $panels: {backgroundColor: background, color: lightWhite},
   "$panels.top": {borderBottom: "2px solid black"},
@@ -34,7 +35,7 @@ const oneDarkTheme = EditorView.theme({
 
   $searchMatch: {
     backgroundColor: "#72a1ff59",
-    border: "1px solid #457dff"
+    outline: "1px solid #457dff"
   },
   "$searchMatch.selected": {
     backgroundColor: "#6199ff2f"
@@ -45,7 +46,7 @@ const oneDarkTheme = EditorView.theme({
 
   "$matchingBracket, $nonmatchingBracket": {
     backgroundColor: "#bad0f847",
-    border: "1px solid #515a6b"
+    outline: "1px solid #515a6b"
   },
 
   $gutters: {
