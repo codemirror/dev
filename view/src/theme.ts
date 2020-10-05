@@ -70,7 +70,8 @@ export const baseTheme = buildTheme(baseThemeID, {
     lineHeight: 1.4,
     height: "100%",
     overflowX: "auto",
-    position: "relative"
+    position: "relative",
+    zIndex: 0
   },
 
   $content: {
