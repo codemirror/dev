@@ -5,16 +5,13 @@ import {selectionCollapsed, getSelection} from "./dom"
 import browser from "./browser"
 import {EditorSelection, Transaction, Annotation, Text} from "@codemirror/next/state"
 
-// FIXME reconsider this kludge (does it break reading dom text with newlines?)
-const LineSep = "\ufdda" // A Unicode 'non-character', used to denote newlines internally
-
 export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
   let change: undefined | {from: number, to: number, insert: Text}, newSel
   let sel = view.state.selection.primary, bounds
   if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
     let {from, to} = bounds
     let selPoints = view.docView.impreciseHead || view.docView.impreciseAnchor ? [] : selectionPoints(view.contentDOM, view.root)
-    let reader = new DOMReader(selPoints)
+    let reader = new DOMReader(selPoints, view.state.lineBreak)
     reader.readRange(bounds.startDOM, bounds.endDOM)
     newSel = selectionFromPoints(selPoints, from)
 
@@ -24,10 +21,10 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       preferredPos = sel.to
       preferredSide = "end"
     }
-    let diff = findDiff(view.state.doc.sliceString(from, to, LineSep), reader.text,
+    let diff = findDiff(view.state.sliceDoc(from, to), reader.text,
                         preferredPos - from, preferredSide)
     if (diff) change = {from: from + diff.from, to: from + diff.toA,
-                        insert: Text.of(reader.text.slice(diff.from, diff.toB).split(LineSep))}
+                        insert: view.state.toText(reader.text.slice(diff.from, diff.toB))}
   } else if (view.hasFocus) {
     let domSel = getSelection(view.root)
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
@@ -68,9 +65,10 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
 
     let tr
     if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3) {
-      let before = sel.from < change.from ? startState.doc.sliceString(sel.from, change.from, LineSep) : ""
-      let after = sel.to > change.to ? startState.doc.sliceString(change.to, sel.to, LineSep) : ""
-      tr = startState.replaceSelection(Text.of((before + change.insert.sliceString(0, undefined, LineSep) + after).split(LineSep)))
+      let before = sel.from < change.from ? startState.sliceDoc(sel.from, change.from) : ""
+      let after = sel.to > change.to ? startState.sliceDoc(change.to, sel.to) : ""
+      tr = startState.replaceSelection(view.state.toText(before + change.insert.sliceString(0, undefined, view.state.lineBreak) +
+                                                         after))
     } else {
       let changes = startState.changes(change)
       tr = {
@@ -119,7 +117,7 @@ function findDiff(a: string, b: string, preferredPos: number, preferredSide: str
 
 class DOMReader {
   text: string = ""
-  constructor(private points: DOMPoint[]) {}
+  constructor(private points: DOMPoint[], private lineSep: string) {}
 
   readRange(start: Node | null, end: Node | null) {
     if (!start) return
@@ -132,7 +130,7 @@ class DOMReader {
       let view = ContentView.get(cur), nextView = ContentView.get(next!)
       if ((view ? view.breakAfter : isBlockElement(cur)) ||
           ((nextView ? nextView.breakAfter : isBlockElement(next!)) && !(cur.nodeName == "BR" && !(cur as any).cmIgnore)))
-        this.text += LineSep
+        this.text += this.lineSep
       cur = next!
     }
     this.findPointBefore(parent, end)
@@ -143,9 +141,9 @@ class DOMReader {
     let view = ContentView.get(node)
     let fromView = view && view.overrideDOMText
     let text: string | undefined
-    if (fromView != null) text = fromView.sliceString(0, undefined, LineSep)
+    if (fromView != null) text = fromView.sliceString(0, undefined, this.lineSep)
     else if (node.nodeType == 3) text = node.nodeValue!
-    else if (node.nodeName == "BR") text = node.nextSibling ? LineSep : ""
+    else if (node.nodeName == "BR") text = node.nextSibling ? this.lineSep : ""
     else if (node.nodeType == 1) this.readRange(node.firstChild, null)
     if (text != null) {
       this.findPointIn(node, text.length)
