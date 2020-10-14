@@ -50,7 +50,7 @@ const oneDarkTheme = EditorView.theme({
 
   $gutters: {
     backgroundColor: background,
-    color: "#495162",
+    color: "#545868",
     border: "none"
   },
   "$gutterElement.lineNumber": {color: "inherit"},
