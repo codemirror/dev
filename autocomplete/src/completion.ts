@@ -41,7 +41,9 @@ export class CompletionContext {
   /// @internal
   abortListeners: (() => void)[] | null = []
 
-  /// @internal
+  /// Create a new completion context. (Mostly useful for testing
+  /// completion sources—in the editor, the extension will create
+  /// these for you.)
   constructor(
     /// The editor state that the completion happens in.
     readonly state: EditorState,
