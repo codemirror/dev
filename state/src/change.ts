@@ -361,7 +361,7 @@ export class ChangeSet extends ChangeDesc {
       } else if (part.length == 1) {
         sections.push(part[0], 0)
       } else {
-        while (inserted.length < i - 1) inserted.push(Text.empty)
+        while (inserted.length < i) inserted.push(Text.empty)
         inserted[i] = Text.of(part[1]!)
         sections.push(part[0], inserted[i].length)
       }
