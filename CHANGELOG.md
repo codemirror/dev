@@ -1,3 +1,13 @@
+## 0.13.1 (2020-10-14)
+
+### Bug fixes
+
+Fix an occasional crash on vertical cursor motion through a scrollable editor.
+
+Fix a bug that caused `Change.fromJSON` to return invalid change objects in some cases.
+
+Fix a bug where the selection and cursor were drawn in the wrong place in a scrolled editor.
+
 ## 0.13.0 (2020-10-01)
 
 ### Breaking changes
