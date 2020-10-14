@@ -159,8 +159,8 @@ class CompletionTooltip {
   positionInfo(pos: {top: number, left: boolean} | null) {
     if (this.info && pos) {
       this.info.style.top = pos.top + "px"
-      this.info.style.right = pos.left ? "100%" : ""
-      this.info.style.left = pos.left ? "" : "100%"
+      this.info.classList.toggle("cm-tooltip-completionInfo-left", pos.left)
+      this.info.classList.toggle("cm-tooltip-completionInfo-right", !pos.left)
     }
   }
 }

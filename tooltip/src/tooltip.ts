@@ -89,6 +89,8 @@ const tooltipPlugin = ViewPlugin.fromClass(class {
         above = !above
       dom.style.top = (above ? pos.top - height : pos.bottom) + "px"
       dom.style.left = left + "px"
+      dom.classList.toggle("cm-tooltip-above", above)
+      dom.classList.toggle("cm-tooltip-below", !above)
       if (tView.positioned) tView.positioned()
     }
   }

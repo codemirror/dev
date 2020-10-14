@@ -42,6 +42,9 @@ export const baseTheme = EditorView.baseTheme({
     maxWidth: MaxInfoWidth + "px",
   },
 
+  "$tooltip.completionInfo.left": { right: "100%" },
+  "$tooltip.completionInfo.right": { left: "100%" },
+
   "$$light $snippetField": {backgroundColor: "#ddd"},
   "$$dark $snippetField": {backgroundColor: "#333"},
   "$snippetFieldPosition": {
