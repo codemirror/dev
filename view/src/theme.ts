@@ -15,17 +15,16 @@ function expandThemeClasses(sel: string) {
   })
 }
 
-export function buildTheme(mainID: string, spec: {[name: string]: StyleSpec}) {
-  let scope = "." + mainID
+export function buildTheme(main: string, spec: {[name: string]: StyleSpec}) {
   return new StyleModule(spec, {
     process(sel) {
       sel = expandThemeClasses(sel)
-      return /\$/.test(sel) ? sel.replace(/\$/, scope) : scope + " " + sel
+      return /\$/.test(sel) ? sel.replace(/\$/, main) : main + " " + sel
     },
     extend(template, sel) {
       template = expandThemeClasses(template)
-      return sel.slice(0, scope.length + 1) == scope + " "
-        ? scope + " " + template.replace(/&/, sel.slice(scope.length + 1))
+      return sel.slice(0, main.length + 1) == main + " "
+        ? main + " " + template.replace(/&/, sel.slice(main.length + 1))
         : template.replace(/&/, sel)
     }
   })
@@ -48,7 +47,7 @@ export function themeClass(selector: string): string {
   return result
 }    
 
-export const baseTheme = buildTheme(baseThemeID, {
+export const baseTheme = buildTheme("." + baseThemeID, {
   $: {
     position: "relative !important",
     boxSizing: "border-box",

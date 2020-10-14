@@ -652,7 +652,7 @@ export class EditorView {
   /// opposed to `$light` when a light theme is active).
   static theme(spec: {[selector: string]: StyleSpec}, options?: {dark?: boolean}): Extension {
     let prefix = StyleModule.newName()
-    let result = [theme.of(prefix), styleModule.of(buildTheme(prefix, spec))]
+    let result = [theme.of(prefix), styleModule.of(buildTheme(`.${baseThemeID}.${prefix}`, spec))]
     if (options && options.dark) result.push(darkTheme.of(true))
     return result
   }
@@ -664,7 +664,7 @@ export class EditorView {
   /// there is a dark or light theme active. For example `"$$dark
   /// $myHighlight"`.
   static baseTheme(spec: {[selector: string]: StyleSpec}): Extension {
-    return precedence(styleModule.of(buildTheme(baseThemeID, spec)), "fallback")
+    return precedence(styleModule.of(buildTheme("." + baseThemeID, spec)), "fallback")
   }
 
   /// An extension that enables line wrapping in the editor.

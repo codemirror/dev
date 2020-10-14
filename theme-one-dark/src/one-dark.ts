@@ -25,9 +25,8 @@ const oneDarkTheme = EditorView.theme({
     caretColor: cursor
   },
 
-  // FIXME make the extra specificity stuff unneccesary (#309)
-  "$$focused$dark $cursor": {borderLeftColor: cursor},
-  "$$focused$dark $selectionBackground": {backgroundColor: selection},
+  "$$focused $cursor": {borderLeftColor: cursor},
+  "$$focused $selectionBackground": {backgroundColor: selection},
 
   $panels: {backgroundColor: background, color: lightWhite},
   "$panels.top": {borderBottom: "2px solid black"},
