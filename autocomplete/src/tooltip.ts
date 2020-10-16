@@ -81,11 +81,13 @@ class CompletionTooltip {
 
     this.dom = document.createElement("div")
     this.dom.addEventListener("mousedown", (e: MouseEvent) => {
-      let index = this.range.from, dom = e.target as HTMLElement | null
-      while (dom && dom != this.list && dom.parentNode != this.list) dom = dom.parentNode as (HTMLElement | null)
-      for (;;) { dom = dom!.previousSibling as (HTMLElement | null); if (!dom) break; index++ }
-      if (index >= 0 && index < options.length) applyCompletion(view, options[index])
-      e.preventDefault()
+      for (let dom = e.target as HTMLElement | null, match; dom && dom != this.dom; dom = dom.parentNode as HTMLElement) {
+        if (dom.nodeName == "LI" && (match = /-(\d+)$/.exec(dom.id)) && +match[1] < options.length) {
+          applyCompletion(view, options[+match[1]])
+          e.preventDefault()
+          return
+        }
+      }
     })
     this.list = this.dom.appendChild(createListBox(options, cState.id, this.range))
     this.list.addEventListener("scroll", () => {
