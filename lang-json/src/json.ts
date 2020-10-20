@@ -4,6 +4,8 @@ import {Extension} from "@codemirror/next/state"
 import {Subtree} from "lezer-tree"
 import {styleTags} from "@codemirror/next/highlight"
 
+export {jsonParseLinter} from "./lint"
+
 export const jsonSyntax = LezerSyntax.define(parser.withProps(
   indentNodeProp.add({
     Object: continuedIndent({except: /^\s*\}/}),
