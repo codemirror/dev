@@ -1,5 +1,5 @@
 import {parser} from "lezer-css"
-import {Subtree} from "lezer-tree"
+import {SyntaxNode} from "lezer-tree"
 import {LezerSyntax, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
 import {styleTags} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
@@ -12,7 +12,7 @@ export const cssSyntax = LezerSyntax.define(parser.withProps(
     Declaration: continuedIndent()
   }),
   foldNodeProp.add({
-    Block(subtree: Subtree) { return {from: subtree.start + 1, to: subtree.end - 1} }
+    Block(subtree: SyntaxNode) { return {from: subtree.from + 1, to: subtree.to - 1} }
   }),
   styleTags({
     "import charset namespace keyframes": "keyword definition",

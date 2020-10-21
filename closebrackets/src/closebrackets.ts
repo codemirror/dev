@@ -161,5 +161,5 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
 
 function nodeStart(state: EditorState, pos: number) {
   let tree = state.tree.resolve(pos + 1)
-  return tree.parent && tree.start == pos
+  return tree.parent && tree.from == pos
 }

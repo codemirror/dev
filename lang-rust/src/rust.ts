@@ -3,21 +3,18 @@ import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codem
 import {styleTags} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
-const statementIndent = continuedIndent()
-
 /// A syntax provider based on the [Lezer Rust
 /// parser](https://github.com/lezer-parser/rust), extended with
 /// highlighting and indentation information.
 export const rustSyntax = LezerSyntax.define(parser.withProps(
-  indentNodeProp.add(type => {
-    if (type.name == "IfExpression") return continuedIndent({except: /^\s*({|else\b)/})
-    if (type.name == "String" || type.name == "BlockComment") return () => -1
-    if (/(Statement|Item|Declaration|Definition|MatchArm|Parameter)$/.test(type.name)) return statementIndent
-    return undefined
+  indentNodeProp.add({
+    IfExpression: continuedIndent({except: /^\s*({|else\b)/}),
+    "String BlockComment": () => -1,
+    "Statement MatchArm": continuedIndent()
   }),
   foldNodeProp.add(type => {
-    if (/(Block|edTokens|List)$/.test(type.name)) return tree => ({from: tree.start + 1, to: tree.end - 1})
-    if (type.name == "BlockComment") return tree => ({from: tree.start + 2, to: tree.end - 2})
+    if (/(Block|edTokens|List)$/.test(type.name)) return tree => ({from: tree.from + 1, to: tree.to - 1})
+    if (type.name == "BlockComment") return tree => ({from: tree.from + 2, to: tree.to - 2})
     return undefined
   }),
   styleTags({

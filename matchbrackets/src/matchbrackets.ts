@@ -1,7 +1,7 @@
 import {combineConfig, EditorState, Facet, StateField, Extension} from "@codemirror/next/state"
 import {EditorView, themeClass} from "@codemirror/next/view"
 import {Decoration, DecorationSet} from "@codemirror/next/view"
-import {Tree, Subtree, NodeType, NodeProp} from "lezer-tree"
+import {Tree, SyntaxNode, NodeType, NodeProp} from "lezer-tree"
 
 interface Config {
   /// Whether the bracket matching should look at the character after
@@ -112,26 +112,23 @@ export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, conf
     return matchPlainBrackets(state, pos, dir, tree, sub.type, maxScanDistance, brackets)
 }
 
-function matchMarkedBrackets(_state: EditorState, _pos: number, dir: -1 | 1, token: Subtree,
+function matchMarkedBrackets(_state: EditorState, _pos: number, dir: -1 | 1, token: SyntaxNode,
                              matching: readonly string[], brackets: string) {
-  let parent = token.parent, firstToken = {from: token.start, to: token.end}
-  let depth = 0
-  return (parent && parent.iterate({
-    from: dir < 0 ? token.start : token.end,
-    to: dir < 0 ? parent.start : parent.end,
-    enter(type, from, to) {
-      if (dir < 0 ? to > token.start : from < token.end) return undefined
-      if (depth == 0 && matching.indexOf(type.name) > -1) {
-        return {start: firstToken, end: {from, to}, matched: true}
-      } else if (matchingNodes(type, dir, brackets)) {
+  let parent = token.parent, firstToken = {from: token.from, to: token.to}
+  let depth = 0, cursor = parent?.cursor
+  if (cursor && (dir < 0 ? cursor.childBefore(token.from) : cursor.childAfter(token.to))) do {
+    if (dir < 0 ? cursor.to <= token.from : cursor.from >= token.to) {
+      if (depth == 0 && matching.indexOf(cursor.type.name) > -1) {
+        return {start: firstToken, end: {from: cursor.from, to: cursor.to}, matched: true}
+      } else if (matchingNodes(cursor.type, dir, brackets)) {
         depth++
-      } else if (matchingNodes(type, -dir as -1 | 1, brackets)) {
+      } else if (matchingNodes(cursor.type, -dir as -1 | 1, brackets)) {
         depth--
-        if (depth == 0) return {start: firstToken, end: {from, to}, matched: false}
+        if (depth == 0) return {start: firstToken, end: {from: cursor.from, to: cursor.to}, matched: false}
       }
-      return false
     }
-  })) || {start: firstToken, matched: false}
+  } while (dir < 0 ? cursor.prevSibling() : cursor.nextSibling())
+  return {start: firstToken, matched: false}
 }
 
 function matchPlainBrackets(state: EditorState, pos: number, dir: number, tree: Tree,

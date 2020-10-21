@@ -1,5 +1,4 @@
 import {configureHTML} from "lezer-html"
-import {Subtree} from "lezer-tree"
 import {cssSyntax} from "@codemirror/next/lang-css"
 import {javascriptSyntax, javascriptSupport} from "@codemirror/next/lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
@@ -29,10 +28,10 @@ export const htmlSyntax = LezerSyntax.define(configureHTML([
     return undefined
   }),
   foldNodeProp.add({
-    Element(subtree: Subtree) {
-      let first = subtree.firstChild, last = subtree.lastChild!
+    Element(node) {
+      let first = node.firstChild, last = node.lastChild!
       if (!first || first.name != "OpenTag") return null
-      return {from: first.end, to: last.name == "CloseTag" ? last.start : subtree.end}
+      return {from: first.to, to: last.name == "CloseTag" ? last.from : node.to}
     }
   }),
   styleTags({

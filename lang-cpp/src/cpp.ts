@@ -3,25 +3,22 @@ import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} 
 import {styleTags} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
-const statementIndent = continuedIndent({except: /^{/})
-
 /// A syntax provider based on the [Lezer C++
 /// parser](https://github.com/lezer-parser/cpp), extended with
 /// highlighting and indentation information.
 export const cppSyntax = LezerSyntax.define(parser.withProps(
-  indentNodeProp.add(type => {
-    if (type.name == "IfStatement") return continuedIndent({except: /^\s*({|else\b)/})
-    if (type.name == "TryStatement") return continuedIndent({except: /^\s*({|catch)\b/})
-    if (type.name == "LabeledStatement") return flatIndent
-    if (type.name == "CaseStatement") return context => context.baseIndent + context.unit
-    if (type.name == "BlockComment") return () => -1
-    if (/(Statement|Declaration)$/.test(type.name)) return statementIndent
-    return undefined
+  indentNodeProp.add({
+    IfStatement: continuedIndent({except: /^\s*({|else\b)/}),
+    TryStatement: continuedIndent({except: /^\s*({|catch)\b/}),
+    LabeledStatement: flatIndent,
+    CaseStatement: context => context.baseIndent + context.unit,
+    BlockComment: () => -1,
+    Statement: continuedIndent({except: /^{/})
   }),
   foldNodeProp.add({
     "DeclarationList CompoundStatement EnumeratorList FieldDeclarationList InitializerList"
-      (tree) { return {from: tree.start + 1, to: tree.end - 1} },
-    BlockComment(tree) { return {from: tree.start + 2, to: tree.end - 2} }
+      (tree) { return {from: tree.from + 1, to: tree.to - 1} },
+    BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
   }),
   styleTags({
     "typedef struct union enum class typename decltype auto template operator friend noexcept namespace using __attribute__ __declspec __based": "keyword definition",

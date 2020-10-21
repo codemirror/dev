@@ -7,13 +7,12 @@ import {tokens, Dialect, tokensFor, SQLKeywords, SQLTypes, dialect} from "./toke
 import {completeFromSchema, completeKeywords} from "./complete"
 
 let parser = plainParser.withProps(
-  indentNodeProp.add(type => {
-    if (type.name == "Statement") return continuedIndent()
-    return undefined
+  indentNodeProp.add({
+    Statement: continuedIndent()
   }),
   foldNodeProp.add({
-    Statement(tree) { return {from: tree.firstChild!.end, to: tree.end} },
-    BlockComment(tree) { return {from: tree.start + 2, to: tree.end - 2} }
+    Statement(tree) { return {from: tree.firstChild!.to, to: tree.to} },
+    BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
   }),
   styleTags({
     Keyword: "keyword",

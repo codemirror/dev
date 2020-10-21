@@ -17,7 +17,7 @@ export const xmlSyntax = LezerSyntax.define(parser.withProps(
     Element(subtree) {
       let first = subtree.firstChild, last = subtree.lastChild!
       if (!first || first.name != "OpenTag") return null
-      return {from: first.end, to: last.name == "CloseTag" ? last.start : subtree.end}
+      return {from: first.to, to: last.name == "CloseTag" ? last.from : subtree.to}
     }
   }),
   styleTags({

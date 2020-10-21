@@ -1,13 +1,12 @@
 import {Completion, CompletionContext, CompletionSource, completeFromList, ifNotIn} from "@codemirror/next/autocomplete"
 import {EditorState} from "@codemirror/next/state"
-import {Subtree} from "lezer"
+import {SyntaxNode} from "lezer"
 import {Type} from "./sql.grammar.terms"
 
-function tokenBefore(tree: Subtree) {
-  for (;;) {
-    tree = tree.resolve(tree.start, -1)
-    if (!tree || !/Comment/.test(tree.name)) return tree
-  }
+function tokenBefore(tree: SyntaxNode) {
+  let cursor = tree.cursor.moveTo(tree.from, -1)
+  while (/Comment/.test(cursor.name)) cursor.moveTo(cursor.from, -1)
+  return cursor.node
 }
 
 function stripQuotes(name: string) {
@@ -25,15 +24,15 @@ function sourceContext(state: EditorState, startPos: number) {
     if (dot && dot.name == ".") {
       let before = tokenBefore(dot)
       if (before && before.name == "Identifier" || before.name == "QuotedIdentifier")
-        parent = stripQuotes(state.sliceDoc(before.start, before.end).toLowerCase())
+        parent = stripQuotes(state.sliceDoc(before.from, before.to).toLowerCase())
     }
     return {parent,
-            from: pos.start,
-            quoted: pos.name == "QuotedIdentifier" ? state.sliceDoc(pos.start, pos.start + 1) : null}
+            from: pos.from,
+            quoted: pos.name == "QuotedIdentifier" ? state.sliceDoc(pos.from, pos.from + 1) : null}
   } else if (pos.name == ".") {
     let before = tokenBefore(pos)
     if (before && before.name == "Identifier" || before.name == "QuotedIdentifier")
-      return {parent: stripQuotes(state.sliceDoc(before.start, before.end).toLowerCase()),
+      return {parent: stripQuotes(state.sliceDoc(before.from, before.to).toLowerCase()),
               from: startPos,
               quoted: null}
   } else {

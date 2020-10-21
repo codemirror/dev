@@ -1,5 +1,5 @@
 import {Parser, InputStream, ParseContext} from "lezer"
-import {Tree, Subtree, ChangedRange} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
         Facet, languageDataProp} from "@codemirror/next/state"
@@ -87,7 +87,7 @@ export class LezerSyntax implements Syntax {
   languageDataFacetAt(state: EditorState, pos: number) {
     if (this.parser.hasNested) {
       let tree = this.getTree(state)
-      let target: Subtree | null = tree.resolve(pos, -1)
+      let target: SyntaxNode | null = tree.resolve(pos, -1)
       while (target) {
         let facet = target.type.prop(languageDataProp)
         if (facet) return facet

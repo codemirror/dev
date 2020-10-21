@@ -3,7 +3,7 @@ import {EditorState, StateCommand, EditorSelection, SelectionRange,
 import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
-import {Subtree, NodeProp} from "lezer-tree"
+import {SyntaxNode, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
   return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
@@ -55,10 +55,10 @@ export const cursorGroupForward: Command = view => cursorByGroup(view, true)
 /// Move the selection one group backward.
 export const cursorGroupBackward: Command = view => cursorByGroup(view, false)
 
-function interestingNode(state: EditorState, node: Subtree, bracketProp: NodeProp<unknown>) {
+function interestingNode(state: EditorState, node: SyntaxNode, bracketProp: NodeProp<unknown>) {
   if (node.type.prop(bracketProp)) return true
-  let len = node.end - node.start
-  return len && (len > 2 || /[^\s,.;:]/.test(state.sliceDoc(node.start, node.end))) || node.firstChild
+  let len = node.to - node.from
+  return len && (len > 2 || /[^\s,.;:]/.test(state.sliceDoc(node.from, node.to))) || node.firstChild
 }
 
 function moveBySyntax(state: EditorState, start: SelectionRange, forward: boolean) {
@@ -70,13 +70,13 @@ function moveBySyntax(state: EditorState, start: SelectionRange, forward: boolea
     let next = forward ? pos.childAfter(at) : pos.childBefore(at)
     if (!next) break
     if (interestingNode(state, next, bracketProp)) pos = next
-    else at = forward ? next.end : next.start
+    else at = forward ? next.to : next.from
   }
   let bracket = pos.type.prop(bracketProp), match, newPos
-  if (bracket && (match = forward ? matchBrackets(state, pos.start, 1) : matchBrackets(state, pos.end, -1)) && match.matched)
+  if (bracket && (match = forward ? matchBrackets(state, pos.from, 1) : matchBrackets(state, pos.to, -1)) && match.matched)
     newPos = forward ? match.end!.to : match.end!.from
   else
-    newPos = forward ? pos.end : pos.start
+    newPos = forward ? pos.to : pos.from
   return EditorSelection.cursor(newPos, forward ? -1 : 1)
 }
 
@@ -270,11 +270,11 @@ export const selectLine: StateCommand = ({state, dispatch}) => {
 export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
   let selection = updateSel(state.selection, range => {
     let context = state.tree.resolve(range.head, 1)
-    while (!((context.start < range.from && context.end >= range.to) ||
-             (context.end > range.to && context.start <= range.from) ||
+    while (!((context.from < range.from && context.to >= range.to) ||
+             (context.to > range.to && context.from <= range.from) ||
              !context.parent?.parent))
       context = context.parent
-    return EditorSelection.range(context.end, context.start)
+    return EditorSelection.range(context.to, context.from)
   })
   dispatch(setSel(state, selection))
   return true
@@ -499,9 +499,9 @@ function isBetweenBrackets(state: EditorState, pos: number): {from: number, to: 
   if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1))) return {from: pos, to: pos}
   let context = state.tree.resolve(pos)
   let before = context.childBefore(pos), after = context.childAfter(pos), closedBy
-  if (before && after && before.end <= pos && after.start >= pos &&
+  if (before && after && before.to <= pos && after.from >= pos &&
       (closedBy = before.type.prop(NodeProp.closedBy)) && closedBy.indexOf(after.name) > -1)
-    return {from: before.end, to: after.start}
+    return {from: before.to, to: after.from}
   return null
 }
 

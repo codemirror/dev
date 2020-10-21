@@ -1,6 +1,6 @@
 import {Completion, CompletionSource} from "@codemirror/next/autocomplete"
 import {EditorState, Text} from "@codemirror/next/state"
-import {Subtree, NodeProp} from "lezer-tree"
+import {SyntaxNode} from "lezer-tree"
 
 /// Describes an element in your XML document schema.
 export type ElementSpec = {
@@ -38,28 +38,23 @@ export type AttrSpec = {
   completion?: Partial<Completion>
 }
 
-function tagName(doc: Text, tag: Subtree | null) {
-  return (tag && tag.iterate({enter: (type, from, to) => {
-    return (type.name == "TagName" || type.name == "MismatchedTagName") ? doc.sliceString(from, to) : undefined
-  }})) || ""
+function tagName(doc: Text, tag: SyntaxNode | null) {
+  let name = tag && tag.getChild("TagName")
+  return name ? doc.sliceString(name.from, name.to) : ""
 }
 
-function elementName(doc: Text, tree: Subtree | null) {
+function elementName(doc: Text, tree: SyntaxNode | null) {
   let tag = tree && tree.firstChild
   return !tag || tag.name != "OpenTag" ? "" : tagName(doc, tag)
 }
 
-function attrName(doc: Text, tag: Subtree | null, pos: number) {
-  return (tag && tag.iterate({
-    enter(type, from, to) {
-      return type.name == "AttributeName" ? doc.sliceString(from, to) : undefined
-    },
-    from: pos,
-    to: tag.start
-  })) || ""
+function attrName(doc: Text, tag: SyntaxNode | null, pos: number) {
+  let attr = tag && tag.getChildren("Attribute").find(a => a.from <= pos && a.to >= pos)
+  let name = attr && attr.getChild("AttributeName")
+  return name ? doc.sliceString(name.from, name.to) : ""
 }
 
-function findParentElement(tree: Subtree | null) {
+function findParentElement(tree: SyntaxNode | null) {
   for (let cur = tree && tree.parent; cur; cur = cur.parent)
     if (cur.name == "Element") return cur
   return null
@@ -68,7 +63,7 @@ function findParentElement(tree: Subtree | null) {
 type Location = {
   type: "openTag" | "closeTag" | "attrValue" | "attrName" | "tag",
   from: number,
-  context: Subtree | null
+  context: SyntaxNode | null
 } | null
 
 function findLocation(state: EditorState, pos: number): Location {
@@ -76,20 +71,20 @@ function findLocation(state: EditorState, pos: number): Location {
   for (let cur = at; !inTag && cur.parent; cur = cur.parent)
     if (cur.name == "OpenTag" || cur.name == "CloseTag" || cur.name == "SelfClosingTag")
       inTag = cur
-  if (inTag && (inTag.end > pos || inTag.lastChild!.type.prop(NodeProp.error))) {
+  if (inTag && (inTag.to > pos || inTag.lastChild!.type.isError)) {
     let elt = inTag.parent!
     if (at.name == "TagName" || at.name == "MismatchedTagName")
       return inTag.name == "CloseTag"
-        ? {type: "closeTag", from: at.start, context: elt}
-        : {type: "openTag", from: at.start, context: findParentElement(elt)}
+        ? {type: "closeTag", from: at.from, context: elt}
+        : {type: "openTag", from: at.from, context: findParentElement(elt)}
     if (at.name == "AttributeName")
-      return {type: "attrName", from: at.start, context: inTag}
+      return {type: "attrName", from: at.from, context: inTag}
     if (at.name == "AttributeValue")
-      return {type: "attrValue", from: at.start, context: inTag}
+      return {type: "attrValue", from: at.from, context: inTag}
     let before = at == inTag || at.name == "Attribute" ? at.childBefore(pos) : at
     if (before?.name == "StartTag")
       return {type: "openTag", from: pos, context: findParentElement(elt)}
-    if (before?.name == "StartCloseTag" && before.end <= pos)
+    if (before?.name == "StartCloseTag" && before.to <= pos)
       return {type: "closeTag", from: pos, context: elt}
     if (before?.name == "Is")
       return {type: "attrValue", from: pos, context: inTag}
@@ -97,7 +92,7 @@ function findLocation(state: EditorState, pos: number): Location {
       return {type: "attrName", from: pos, context: inTag}
     return null
   }
-  while (at.parent && at.end == pos && !at.lastChild?.type.prop(NodeProp.error)) at = at.parent
+  while (at.parent && at.to == pos && !at.lastChild?.type.isError) at = at.parent
   if (at.name == "Element" || at.name == "Text" || at.name == "Document")
     return {type: "tag", from: pos, context: at.name == "Element" ? at : findParentElement(at)}
   return null

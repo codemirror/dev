@@ -1,4 +1,4 @@
-import {NodeProp, Subtree, Tree} from "lezer-tree"
+import {NodeProp, SyntaxNode, Tree} from "lezer-tree"
 import {EditorState, Syntax, IndentContext} from "@codemirror/next/state"
 
 /// A syntax tree node prop used to associate indentation strategies
@@ -16,7 +16,7 @@ export function syntaxIndentation(syntax: Syntax) {
 
 // Compute the indentation for a given position from the syntax tree.
 function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
-  let tree: Subtree | null = ast.resolve(pos)
+  let tree: SyntaxNode | null = ast.resolve(pos)
 
   // Enter previous nodes that end in empty error terms, which means
   // they were broken off by error recovery, so that indentation
@@ -24,12 +24,12 @@ function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
   for (let scan = tree!, scanPos = pos;;) {
     let last = scan.childBefore(scanPos)
     if (!last) break
-    if (last.type.prop(NodeProp.error) && last.start == last.end) {
+    if (last.type.isError && last.from == last.to) {
       tree = scan
-      scanPos = last.start
+      scanPos = last.from
     } else {
       scan = last
-      scanPos = scan.end + 1
+      scanPos = scan.to + 1
     }
   }
 
@@ -44,13 +44,13 @@ function ignoreClosed(cx: TreeIndentContext) {
   return cx.pos == cx.options?.simulateBreak && cx.options?.simulateDoubleBreak
 }
 
-function indentStrategy(tree: Subtree): ((context: TreeIndentContext) => number) | null {
+function indentStrategy(tree: SyntaxNode): ((context: TreeIndentContext) => number) | null {
   let strategy = tree.type.prop(indentNodeProp)
   if (strategy) return strategy
   let first = tree.firstChild, close: readonly string[] | undefined
   if (first && (close = first.type.prop(NodeProp.closedBy))) {
     let last = tree.lastChild, closed = last && close.indexOf(last.name) > -1
-    return cx => delimitedStrategy(cx, true, 1, undefined, closed && !ignoreClosed(cx) ? last!.start : undefined)
+    return cx => delimitedStrategy(cx, true, 1, undefined, closed && !ignoreClosed(cx) ? last!.from : undefined)
   }
   return tree.parent == null ? topIndent : null
 }
@@ -67,7 +67,7 @@ export class TreeIndentContext extends IndentContext {
     readonly pos: number,
     /// The syntax tree node for which the indentation strategy is
     /// registered.
-    readonly node: Subtree) {
+    readonly node: SyntaxNode) {
     super(base.state, base.options)
   }
 
@@ -83,20 +83,20 @@ export class TreeIndentContext extends IndentContext {
   /// so, the line at the start of that node is tried, again skipping
   /// on if it is covered by another such node.
   get baseIndent() {
-    let line = this.state.doc.lineAt(this.node.start)
+    let line = this.state.doc.lineAt(this.node.from)
     // Skip line starts that are covered by a sibling (or cousin, etc)
     for (;;) {
       let atBreak = this.node.resolve(line.from)
-      while (atBreak.parent && atBreak.parent.start == atBreak.start) atBreak = atBreak.parent
+      while (atBreak.parent && atBreak.parent.from == atBreak.from) atBreak = atBreak.parent
       if (isParent(atBreak, this.node)) break
-      line = this.state.doc.lineAt(atBreak.start)
+      line = this.state.doc.lineAt(atBreak.from)
     }
     return this.lineIndent(line)
   }
 }
 
-function isParent(parent: Subtree, of: Subtree) {
-  for (let cur: Subtree | null = of; cur; cur = cur.parent) if (parent == cur) return true
+function isParent(parent: SyntaxNode, of: SyntaxNode) {
+  for (let cur: SyntaxNode | null = of; cur; cur = cur.parent) if (parent == cur) return true
   return false
 }
 
@@ -105,17 +105,17 @@ function isParent(parent: Subtree, of: Subtree) {
 // if so, return the opening token.
 function bracketedAligned(context: TreeIndentContext) {
   let tree = context.node
-  let openToken = tree.childAfter(tree.start), last = tree.lastChild
+  let openToken = tree.childAfter(tree.from), last = tree.lastChild
   if (!openToken) return null
   let sim = context.options?.simulateBreak
-  let openLine = context.state.doc.lineAt(openToken.start)
+  let openLine = context.state.doc.lineAt(openToken.from)
   let lineEnd = sim == null || sim <= openLine.from ? openLine.to : Math.min(openLine.to, sim)
-  for (let pos = openToken.end;;) {
+  for (let pos = openToken.to;;) {
     let next = tree.childAfter(pos)
     if (!next || next == last) return null
-    if (!next.type.prop(NodeProp.skipped))
-      return next.start < lineEnd ? openToken : null
-    pos = next.end
+    if (!next.type.isSkipped)
+      return next.from < lineEnd ? openToken : null
+    pos = next.to
   }
 }
 
@@ -136,7 +136,7 @@ function delimitedStrategy(context: TreeIndentContext, align: boolean, units: nu
   let after = context.textAfter, space = after.match(/^\s*/)![0].length
   let closed = closing && after.slice(space, space + closing.length) == closing || closedAt == context.pos + space
   let aligned = align ? bracketedAligned(context) : null
-  if (aligned) return closed ? context.column(aligned.start) : context.column(aligned.end)
+  if (aligned) return closed ? context.column(aligned.from) : context.column(aligned.to)
   return context.baseIndent + (closed ? 0 : context.unit * units)
 }
 

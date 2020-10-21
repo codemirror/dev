@@ -1,6 +1,6 @@
 import {EditorView} from "@codemirror/next/view"
 import {EditorState} from "@codemirror/next/state"
-import {Subtree} from "lezer-tree"
+import {SyntaxNode} from "lezer-tree"
 import {ActiveResult} from "./state"
 
 /// Objects type used to represent individual completions.
@@ -59,10 +59,10 @@ export class CompletionContext {
   /// Get the extent, content, and (if there is a token) type of the
   /// token before `this.pos`.
   tokenBefore(types: readonly string[]) {
-    let token: Subtree | null = this.state.tree.resolve(this.pos, -1)
+    let token: SyntaxNode | null = this.state.tree.resolve(this.pos, -1)
     while (token && types.indexOf(token.name) < 0) token = token.parent
-    return token ? {from: token.start, to: this.pos,
-                    text: this.state.sliceDoc(token.start, this.pos),
+    return token ? {from: token.from, to: this.pos,
+                    text: this.state.sliceDoc(token.from, this.pos),
                     type: token.type} : null
   }
 

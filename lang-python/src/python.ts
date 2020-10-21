@@ -1,7 +1,6 @@
 import {parser} from "lezer-python"
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
 import {Extension} from "@codemirror/next/state"
-import {Subtree} from "lezer-tree"
 import {styleTags} from "@codemirror/next/highlight"
 
 /// A syntax provider based on the [Lezer Python
@@ -12,9 +11,9 @@ export const pythonSyntax = LezerSyntax.define(parser.withProps(
     Body: continuedIndent()
   }),
   foldNodeProp.add({
-    Body(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} },
-    ArrayExpression(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} },
-    DictionaryExpression(tree: Subtree) { return {from: tree.start + 1, to: tree.end - 1} }
+    Body(tree) { return {from: tree.from + 1, to: tree.to - 1} },
+    ArrayExpression(tree) { return {from: tree.from + 1, to: tree.to - 1} },
+    DictionaryExpression(tree) { return {from: tree.from + 1, to: tree.to - 1} }
   }),
   styleTags({
     "async * ** FormatConversion": "modifier",

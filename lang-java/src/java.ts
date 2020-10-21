@@ -3,28 +3,25 @@ import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} 
 import {styleTags} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
-const statementIndent = continuedIndent({except: /^{/})
-
 /// A syntax provider based on the [Lezer Java
 /// parser](https://github.com/lezer-parser/java), extended with
 /// highlighting and indentation information.
 export const javaSyntax = LezerSyntax.define(parser.withProps(
-  indentNodeProp.add(type => {
-    if (type.name == "IfStatement") return continuedIndent({except: /^\s*({|else\b)/})
-    if (type.name == "TryStatement") return continuedIndent({except: /^\s*({|catch|finally)\b/})
-    if (type.name == "LabeledStatement") return flatIndent
-    if (type.name == "SwitchBlock") return context => {
+  indentNodeProp.add({
+    IfStatement: continuedIndent({except: /^\s*({|else\b)/}),
+    TryStatement: continuedIndent({except: /^\s*({|catch|finally)\b/}),
+    LabeledStatement: flatIndent,
+    SwitchBlock: context => {
       let after = context.textAfter, closed = /^\s*\}/.test(after), isCase = /^\s*(case|default)\b/.test(after)
       return context.baseIndent + (closed ? 0 : isCase ? 1 : 2) * context.unit
-    }
-    if (type.name == "BlockComment") return () => -1
-    if (/(Statement|Declaration)$/.test(type.name)) return statementIndent
-    return undefined
+    },
+    BlockComment: () => -1,
+    Statement: continuedIndent({except: /^{/})
   }),
   foldNodeProp.add({
     "Block SwitchBlock ClassBody ElementValueArrayInitializer ModuleBody EnumBody ConstructorBody InterfaceBody ArrayInitializer"
-      (tree) { return {from: tree.start + 1, to: tree.end - 1} },
-    BlockComment(tree) { return {from: tree.start + 2, to: tree.end - 2} }
+      (tree) { return {from: tree.from + 1, to: tree.to - 1} },
+    BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
   }),
   styleTags({
     null: "null",
