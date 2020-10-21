@@ -123,12 +123,12 @@ export abstract class ContentView {
       let child = this.children[i], end = pos + child.length
       if (pos < from && end > to) return child.domBoundsAround(from, to, pos)
       if (end >= from && fromI == -1) { fromI = i; fromStart = pos }
-      if (end >= to && toI == -1) { toI = i; toEnd = end; break }
+      if (end >= to && end != pos && toI == -1) { toI = i; toEnd = end; break }
       pos = end + child.breakAfter
     }
-    return {from: fromStart, to: toEnd,
+    return {from: fromStart, to: toEnd < 0 ? offset + this.length : toEnd,
             startDOM: (fromI ? this.children[fromI - 1].dom!.nextSibling : null) || this.dom!.firstChild,
-            endDOM: toI < this.children.length - 1 ? this.children[toI].dom!.nextSibling : null}
+            endDOM: toI < this.children.length - 1 && toI >= 0 ? this.children[toI + 1].dom : null}
   }
 
   // FIXME track precise dirty ranges, to avoid full DOM sync on every touched node?
