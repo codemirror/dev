@@ -284,6 +284,7 @@ export class EditorView {
       else updated.flags |= changed
       this.updateState = UpdateState.Updating
       this.updatePlugins(update)
+      this.updateAttrs()
       if (changed) this.docView.update(update)
       for (let i = 0; i < measuring.length; i++) if (measured[i] != BadMeasure) {
         try { measuring[i].write(measured[i], this) }
