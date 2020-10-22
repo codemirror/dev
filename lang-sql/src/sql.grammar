@@ -36,14 +36,14 @@ element {
   Number
   Bool
   Null
-  ParenL[name="("]
-  ParenR[name=")"]
-  BraceL[name="["]
-  BraceR[name="]"]
-  BracketL[name="{"]
-  BracketR[name="}"]
-  Semi[name=";"]
-  Dot[name="."]
+  ParenL[@name="("]
+  ParenR[@name=")"]
+  BraceL[@name="["]
+  BraceR[@name="]"]
+  BracketL[@name="{"]
+  BracketR[@name="}"]
+  Semi[@name=";"]
+  Dot[@name="."]
   Operator
   Punctuation
   SpecialVar
