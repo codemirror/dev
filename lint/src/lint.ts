@@ -430,6 +430,7 @@ class LintPanel implements Panel {
 }
 
 function underline(color: string) {
+  if (typeof btoa != "function") return "none"
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="6" height="3">
     <path d="m0 3 l2 -2 l1 0 l2 2 l1 0" stroke="${color}" fill="none" stroke-width=".7"/>
   </svg>`
