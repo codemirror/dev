@@ -25,7 +25,7 @@ export const xmlSyntax = LezerSyntax.define(parser.withProps(
     Text: "content",
     "StartTag StartCloseTag EndTag SelfCloseEndTag": "angleBracket",
     TagName: "typeName",
-    MismatchedTagName: "typeName invalid",
+    "MismatchedCloseTag/Tagname": "typeName invalid",
     AttributeName: "propertyName",
     UnquotedAttributeValue: "string",
     Is: "operator definition",
