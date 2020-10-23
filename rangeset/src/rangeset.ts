@@ -125,7 +125,7 @@ class Chunk<T extends RangeValue> {
       let val = this.value[i], curFrom = this.from[i] + offset, curTo = this.to[i] + offset, newFrom, newTo
       if (curFrom == curTo) {
         let mapped = changes.mapPos(curFrom, val.startSide, val.mapMode)
-        if (mapped < 0) continue
+        if (mapped == null) continue
         newFrom = newTo = mapped
       } else {
         newFrom = changes.mapPos(curFrom, val.startSide)

@@ -7,11 +7,11 @@ export enum MapMode {
   /// Map a position to a valid new position, even when its context
   /// was deleted.
   Simple,
-  /// Return -1 if deletion happens across the position.
+  /// Return null if deletion happens across the position.
   TrackDel,
-  /// Return -1 if the character _before_ the position is deleted.
+  /// Return null if the character _before_ the position is deleted.
   TrackBefore,
-  /// Return -1 if the character _after_ the position is deleted.
+  /// Return null if the character _after_ the position is deleted.
   TrackAfter
 }
 
@@ -106,6 +106,8 @@ export class ChangeDesc {
   /// `mode` determines whether deletions should be
   /// [reported](#state.MapMode). It defaults to `MapMode.Simple`
   /// (don't report deletions).
+  mapPos(pos: number, assoc?: number): number
+  mapPos(pos: number, assoc: number, mode: MapMode): number | null
   mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) {
     let posA = 0, posB = 0
     for (let i = 0; i < this.sections.length;) {
@@ -117,7 +119,7 @@ export class ChangeDesc {
         if (mode != MapMode.Simple && endA >= pos &&
             (mode == MapMode.TrackDel && posA < pos && endA > pos ||
              mode == MapMode.TrackBefore && posA < pos ||
-             mode == MapMode.TrackAfter && endA > pos)) return -1
+             mode == MapMode.TrackAfter && endA > pos)) return null
         if (endA > pos || endA == pos && assoc < 0 && !len)
           return pos == posA || assoc < 0 ? posB : posB + ins
         posB += ins

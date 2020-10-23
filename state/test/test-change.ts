@@ -130,7 +130,7 @@ describe("ChangeDesc", () => {
   })
 
   describe("mapPos", () => {
-    function map(spec: string, ...cases: [number, number, (number | string)?][]) {
+    function map(spec: string, ...cases: [number, number | null, (number | string)?][]) {
       let set = mk(spec)
       for (let [from, to, opt] of cases) {
         let assoc = typeof opt == "number" ? opt : -1
@@ -144,10 +144,10 @@ describe("ChangeDesc", () => {
 
     it("maps through deletion", () =>
        map("4 4:0 4", [0, 0],
-           [4, 4], [4, 4, "D"], [4, 4, "B"], [4, -1, "A"],
-           [5, 4], [5, -1, "D"], [5, -1, "B"], [5, -1, "A"],
+           [4, 4], [4, 4, "D"], [4, 4, "B"], [4, null, "A"],
+           [5, 4], [5, null, "D"], [5, null, "B"], [5, null, "A"],
            [7, 4],
-           [8, 4], [8, 4, "D"], [8, -1, "B"], [8, 4, "A"],
+           [8, 4], [8, 4, "D"], [8, null, "B"], [8, 4, "A"],
            [9, 5], [12, 8]))
 
     it("maps through multiple insertions", () =>
@@ -164,9 +164,9 @@ describe("ChangeDesc", () => {
 
     it("stays on its own side of replacements", () =>
        map("2 2:2 2",
-           [2, 2, 1], [2, 2, -1], [2, 2, "D"], [2, 2, "B"], [2, -1, "A"],
-           [3, 2, -1], [3, 4, 1], [3, -1, "D"], [3, -1, "B"], [3, -1, "A"],
-           [4, 4, 1], [4, 4, -1], [4, 4, "D"], [4, -1, "B"], [4, 4, "A"]))
+           [2, 2, 1], [2, 2, -1], [2, 2, "D"], [2, 2, "B"], [2, null, "A"],
+           [3, 2, -1], [3, 4, 1], [3, null, "D"], [3, null, "B"], [3, null, "A"],
+           [4, 4, 1], [4, 4, -1], [4, 4, "D"], [4, null, "B"], [4, 4, "A"]))
 
     it("maps through insertions around replacements", () =>
        map("0:1 2:2 0:1",
