@@ -177,39 +177,6 @@ describe("ChangeDesc", () => {
     it("stays in between replacements", () =>
        map("2:2 2:2", [2, 2, -1], [2, 2, 1]))
   })
-
-  describe("mapPosStable", () => {
-    function map(spec: string, ...cases: [number, number, number?][]) {
-      let set = mk(spec)
-      for (let [from, to, assoc] of cases) ist(set.mapPosStable(from, assoc), to)
-    }
-
-    it("maps through replacements", () =>
-       map("4 4:4 4", [0, 0], [1, 1], [4, 4], [4, 8, 1], [6, 4], [6, 8, 1], [8, 4], [8, 8, 1], [9, 9]))
-
-    it("maps through insertions", () =>
-       map("3 0:3 3", [0, 0], [3, 3], [3, 6, 1], [6, 9]))
-
-    it("maps through deletions", () =>
-       map("3 3:0 3", [0, 0], [3, 3], [6, 3]))
-
-    it("maps through separate changes", () =>
-       map("2:1 3 1:2 1", [0, 0], [0, 1, 1], [1, 0], [1, 1, 1], [2, 0], [3, 2], [5, 4], [5, 6, 1], [6, 4], [6, 6, 1], [7, 7]))
-
-    it("maps through a group of changes", () =>
-       map("2 2:1 3:0 1:1 0:3 2", [0, 0], [2, 2], [2, 7, 1], [4, 2], [4, 7, 1], [6, 2], [6, 7, 1], [8, 2], [8, 7, 1], [9, 8]))
-
-    it("is not affected by change order", () => {
-      for (let i = 0; i < 100; i++) {
-        let size = r(20), a = ChangeSet.of(rChanges(size, 10), size), b = ChangeSet.of(rChanges(size, 10), size)
-        let ab = a.composeDesc(b.mapDesc(a)), ba = b.composeDesc(a.mapDesc(b))
-        for (let p = 0; p <= size; p++) {
-          ist(ab.mapPosStable(p), ba.mapPosStable(p))
-          ist(ab.mapPosStable(p, 1), ba.mapPosStable(p, 1))
-        }
-      }
-    })
-  })
 })
 
 describe("ChangeSet", () => {

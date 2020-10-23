@@ -128,30 +128,6 @@ export class ChangeDesc {
     return posB
   }
 
-  /// Map a position in a way that reliably produces the same position
-  /// for a sequence of changes, regardless of the order in which they
-  /// were [mapped](#state.ChangeSet.map) and applied. This will map a
-  /// position to the start (or end) through _all_ adjacent changes
-  /// next to it, and often produces more surprising results than
-  /// [`mapPos`](#state.ChangeDesc.mapPos). But it can be useful in
-  /// cases where it is important that all clients in a collaborative
-  /// setting end up doing the precise same mapping.
-  mapPosStable(pos: number, side = -1) {
-    let posA = 0, posB = 0, lastB = 0
-    for (let i = 0; i < this.sections.length;) {
-      let len = this.sections[i++], ins = this.sections[i++], endA = posA + len
-      if (ins < 0) {
-        if (endA > pos) return posB + Math.max(0, pos - posA)
-        lastB = posB += len
-      } else {
-        if (side <= 0 && endA >= pos) return lastB
-        posB += ins
-      }
-      posA = endA
-    }
-    return posB
-  }
-
   /// Check whether these changes touch a given range. When one of the
   /// changes entirely covers the range, the string `"cover"` is
   /// returned.
