@@ -200,7 +200,7 @@ describe("EditorView drawing", () => {
     cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2
     cm.measure()
     let rect = cm.scrollDOM.getBoundingClientRect()
-    ;({node} = cm.domAtPos(cm.posAtCoords({x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2})))
+    ;({node} = cm.domAtPos(cm.posAtCoords({x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2})!))
     ist(node.nodeValue!.length, cm.state.doc.length, "<")
     ist(node.nodeValue!.indexOf("<"), -1)
     ist(node.nodeValue!.indexOf(">"), -1)

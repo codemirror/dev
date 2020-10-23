@@ -36,7 +36,8 @@ function absoluteColumn(view: EditorView, x: number) {
 }
 
 function getPos(view: EditorView, event: MouseEvent) {
-  let offset = view.posAtCoords({x: event.clientX, y: event.clientY}) // FIXME
+  let offset = view.posAtCoords({x: event.clientX, y: event.clientY})
+  if (offset == null) return null 
   let line = view.state.doc.lineAt(offset), off = offset - line.from
   let col = off > MaxOff ? -1
     : off == line.length ? absoluteColumn(view, event.clientX)
@@ -45,7 +46,8 @@ function getPos(view: EditorView, event: MouseEvent) {
 }
 
 function rectangleSelectionStyle(view: EditorView, event: MouseEvent) {
-  let start = getPos(view, event), startSel = view.state.selection
+  let start = getPos(view, event)!, startSel = view.state.selection
+  if (!start) return null
   return {
     update(update) {
       if (update.docChanged) {
@@ -56,7 +58,9 @@ function rectangleSelectionStyle(view: EditorView, event: MouseEvent) {
       }
     },
     get(event, _extend, multiple) {
-      let cur = getPos(view, event), ranges = rectangleFor(view.state, start, cur)
+      let cur = getPos(view, event)
+      if (!cur) return startSel
+      let ranges = rectangleFor(view.state, start, cur)
       if (!ranges.length) return startSel
       if (multiple) return EditorSelection.create(ranges.concat(startSel.ranges))
       else return EditorSelection.create(ranges)

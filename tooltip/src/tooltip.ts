@@ -195,8 +195,8 @@ class HoverPlugin {
 
     let pos = this.view.contentDOM.contains(lastMove.target as HTMLElement)
       ? this.view.posAtCoords({x: lastMove.clientX, y: lastMove.clientY}) : -1
-    let open = pos < 0 ? null : this.source(this.view, (from, to) => {
-      return from <= pos && to >= pos && (from == to || isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY))
+    let open = pos == null ? null : this.source(this.view, (from, to) => {
+      return from <= pos! && to >= pos! && (from == to || isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY))
     })
     if (open) this.view.dispatch({effects: this.setHover.of(open)})
   }

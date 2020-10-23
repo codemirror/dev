@@ -487,11 +487,9 @@ export class EditorView {
   }
 
   /// Get the document position at the given screen coordinates.
-  /// Returns -1 if no valid position could be found.
-  posAtCoords(coords: {x: number, y: number}): number {
+  /// Returns null if no valid position could be found.
+  posAtCoords(coords: {x: number, y: number}): number | null {
     this.readMeasured()
-    // FIXME return null instead, so you at least get a type error
-    // when you forget the failure case?
     return posAtCoords(this, coords)
   }
 

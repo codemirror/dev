@@ -363,7 +363,7 @@ function findPositionSide(view: EditorView, pos: number, x: number, y: number) {
 
 function queryPos(view: EditorView, event: MouseEvent): {pos: number, bias: 1 | -1} | null {
   let pos = view.posAtCoords({x: event.clientX, y: event.clientY})
-  if (pos < 0) return null
+  if (pos == null) return null
   return {pos, bias: findPositionSide(view, pos, event.clientX, event.clientY)}
 }
 
@@ -426,7 +426,7 @@ handlers.drop = (view, event: DragEvent) => {
 
   let dropPos = view.posAtCoords({x: event.clientX, y: event.clientY})
   let text = event.dataTransfer.getData("Text")
-  if (dropPos < 0 || !text) return
+  if (dropPos == null || !text) return
 
   event.preventDefault()
 

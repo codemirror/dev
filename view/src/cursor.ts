@@ -124,7 +124,7 @@ function domPosInText(node: Text, x: number, y: number): {node: Node, offset: nu
   return {node, offset: 0}
 }
 
-export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bias: -1 | 1 = -1): number {
+export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bias: -1 | 1 = -1): number | null {
   let content = view.contentDOM.getBoundingClientRect(), block
   let halfLine = view.defaultLineHeight / 2
   for (let bounced = false;;) {
@@ -141,9 +141,9 @@ export function posAtCoords(view: EditorView, {x, y}: {x: number, y: number}, bi
   let lineStart = block.from
   // If this is outside of the rendered viewport, we can't determine a position
   if (lineStart < view.viewport.from)
-    return view.viewport.from == 0 ? 0 : -1
+    return view.viewport.from == 0 ? 0 : null
   if (lineStart > view.viewport.to)
-    return view.viewport.to == view.state.doc.length ? view.state.doc.length : -1
+    return view.viewport.to == view.state.doc.length ? view.state.doc.length : null
   // Clip x to the viewport sides
   x = Math.max(content.left + 1, Math.min(content.right - 1, x))
   let root = view.root, element = root.elementFromPoint(x, y)
@@ -177,7 +177,7 @@ export function moveToLineBoundary(view: EditorView, start: SelectionRange, forw
     let editorRect = view.dom.getBoundingClientRect()
     let pos = view.posAtCoords({x: forward == (view.textDirection == Direction.LTR) ? editorRect.right - 1 : editorRect.left + 1,
                                 y: (coords.top + coords.bottom) / 2})
-    if (pos > -1) return EditorSelection.cursor(pos, forward ? -1 : 1)
+    if (pos != null) return EditorSelection.cursor(pos, forward ? -1 : 1)
   }
   let lineView = LineView.find(view.docView, start.head)
   let end = lineView ? (forward ? lineView.posAtEnd : lineView.posAtStart) : (forward ? line.to : line.from)
@@ -227,7 +227,7 @@ export function moveVertically(view: EditorView, start: SelectionRange, forward:
     let dist = distance ?? 5
     for (let startY = dir < 0 ? startCoords.top : startCoords.bottom, extra = 0; extra < 50; extra += 10) {
       let pos = posAtCoords(view, {x: resolvedGoal, y: startY + (dist + extra) * dir}, dir)
-      if (pos < 0) break
+      if (pos == null) break
       if (pos != startPos) return EditorSelection.cursor(pos, undefined, undefined, goal)
     }
   }
