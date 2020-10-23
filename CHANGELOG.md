@@ -1,3 +1,23 @@
+## 0.14.0 (2020-10-23)
+
+### Breaking changes
+
+Lezer and lezer-tree have been upgraded to 0.12, which introduces a few breaking changes.
+
+`ChangeDesc.mapPos` now returns null instead of -1 when reporting a deletion.
+
+`EditorView.posAtCoords` now returns null, rather than -1, when it fails to find a position.
+
+### Bug fixes
+
+Fix an issue where Chrome's shift-enter shortcut confused the editor.
+
+Clicking on the completion list scrollbar no longer selects the first completion.
+
+### New features
+
+The lang-json package now exports a `jsonParseLinter` function that produces a linter based on `JSON.parse`.
+
 ## 0.13.1 (2020-10-14)
 
 ### Bug fixes
