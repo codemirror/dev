@@ -69,12 +69,12 @@ type Location = {
 function findLocation(state: EditorState, pos: number): Location {
   let at = state.tree.resolve(pos, -1), inTag = null
   for (let cur = at; !inTag && cur.parent; cur = cur.parent)
-    if (cur.name == "OpenTag" || cur.name == "CloseTag" || cur.name == "SelfClosingTag")
+    if (cur.name == "OpenTag" || cur.name == "CloseTag" || cur.name == "SelfClosingTag" || cur.name == "MismatchedCloseTag")
       inTag = cur
   if (inTag && (inTag.to > pos || inTag.lastChild!.type.isError)) {
     let elt = inTag.parent!
-    if (at.name == "TagName" || at.name == "MismatchedTagName")
-      return inTag.name == "CloseTag"
+    if (at.name == "TagName")
+      return inTag.name == "CloseTag" || inTag.name == "MismatchedCloseTag"
         ? {type: "closeTag", from: at.from, context: elt}
         : {type: "openTag", from: at.from, context: findParentElement(elt)}
     if (at.name == "AttributeName")
@@ -91,6 +91,8 @@ function findLocation(state: EditorState, pos: number): Location {
     if (before)
       return {type: "attrName", from: pos, context: inTag}
     return null
+  } else if (at.name == "StartCloseTag") {
+    return {type: "closeTag", from: pos, context: at.parent!}
   }
   while (at.parent && at.to == pos && !at.lastChild?.type.isError) at = at.parent
   if (at.name == "Element" || at.name == "Text" || at.name == "Document")
