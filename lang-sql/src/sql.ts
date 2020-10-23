@@ -111,20 +111,31 @@ export type SQLConfig = {
   defaultTable?: string
 }
 
-/// Returns an extension that installs JavaScript support features
+/// Returns an extension that enables keyword completion for the given
+/// SQL dialect.
+export function keywordCompletion(dialect: SQLDialect): Extension {
+  return dialect.syntax.languageData.of({
+    autocomplete: completeKeywords(dialect.dialect.words)
+  })
+}
+
+/// Returns an extension that enables schema-based completion for the
+/// given configuration.
+export function schemaCompletion(config: SQLConfig): Extension {
+  return config.schema ? (config.dialect || StandardSQL).syntax.languageData.of({
+    autocomplete: completeFromSchema(config.schema, config.tables, config.defaultTable)
+  }) : []
+}
+
+/// Returns an extension that installs SQL support features
 /// (completion of keywords, and optionally
 /// [schema-based](#lang-sql.SQLOptions.schema) completion).
 export function sqlSupport(config: SQLConfig): Extension {
-  let dialect = config.dialect || StandardSQL
-  let result = [dialect.syntax.languageData.of({
-    autocomplete: completeKeywords(dialect.dialect.words)
-  })]
-  if (config.schema) result.push(dialect.syntax.languageData.of({
-    autocomplete: completeFromSchema(config.schema, config.tables, config.defaultTable)
-  }))
-  return result
+  return [schemaCompletion(config), keywordCompletion(config.dialect || StandardSQL)]
 }
 
+/// Produces an extension that installs the given SQL dialect syntax,
+/// keyword completion, and, if provided, schema-based completion.
 export function sql(config: SQLConfig): Extension {
   return [config.dialect || StandardSQL, sqlSupport(config)]
 }
