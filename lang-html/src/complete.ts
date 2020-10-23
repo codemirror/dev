@@ -387,7 +387,9 @@ function openTags(doc: Text, tree: SyntaxNode) {
   let open = []
   for (let parent: SyntaxNode | null = tree; parent = findParentElement(parent);) {
     let tagName = elementName(doc, parent)
-    if (tagName && open.indexOf(tagName) < 0) open.push(tagName)
+    if (tagName && parent.lastChild!.name == "CloseTag") break
+    if (tagName && open.indexOf(tagName) < 0)
+      open.push(tagName)
   }
   return open
 }
@@ -455,20 +457,20 @@ function completeAttrValue(state: EditorState, tree: SyntaxNode, from: number, t
 }
 
 export function completeHTML(context: CompletionContext): CompletionResult | null {
-  let {state, pos} = context, around = state.tree.resolve(pos), tree = state.tree.resolve(pos, -1)
-  if (tree.name == "TagName" || tree.name == "MismatchedTagName") {
-    return tree.parent && tree.parent.name == "CloseTag" ? completeCloseTag(state, tree, tree.from, pos)
+  let {state, pos} = context, around = state.tree.resolve(pos), tree = around.resolve(pos, -1)
+  if (tree.name == "TagName") {
+    return tree.parent && /CloseTag$/.test(tree.parent.name) ? completeCloseTag(state, tree, tree.from, pos)
       : completeTag(state, tree, tree.from, pos)
   } else if (tree.name == "StartTag") {
     return completeTag(state, tree, pos, pos)
-  } else if (tree.name == "StartCloseTag") {
+  } else if (tree.name == "StartCloseTag" || tree.name == "IncompleteCloseTag") {
     return completeCloseTag(state, tree, pos, pos)
-  } else if (context.explicit && (around.name == "Element" || around.name == "Text" || around.name == "Document")) {
-    return completeStartTag(state, tree, pos)
   } else if (context.explicit && (tree.name == "OpenTag" || tree.name == "SelfClosingTag") || tree.name == "AttributeName") {
     return completeAttrName(state, tree, tree.name == "AttributeName" ? tree.from : pos, pos)
   } else if (tree.name == "Is" || tree.name == "AttributeValue" || tree.name == "UnquotedAttributeValue") {
     return completeAttrValue(state, tree, tree.name == "Is" ? pos : tree.from, pos)
+  } else if (context.explicit && (around.name == "Element" || around.name == "Text" || around.name == "Document")) {
+    return completeStartTag(state, tree, pos)
   } else {
     return null
   }
