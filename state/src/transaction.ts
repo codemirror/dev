@@ -298,8 +298,8 @@ function resolveTransactionInner(state: EditorState, spec: TransactionSpec, docS
     changes: spec.changes instanceof ChangeSet ? spec.changes
       : ChangeSet.of(spec.changes || [], docSize, state.facet(lineSeparator)),
     selection: sel && (sel instanceof EditorSelection ? sel : EditorSelection.single(sel.anchor, sel.head)),
-    effects: !spec.effects ? none : Array.isArray(spec.effects) ? spec.effects : [spec.effects],
-    annotations: !spec.annotations ? none : Array.isArray(spec.annotations) ? spec.annotations : [spec.annotations],
+    effects: asArray(spec.effects),
+    annotations: asArray(spec.annotations),
     scrollIntoView: !!spec.scrollIntoView,
     reconfigure: reconf
   }
@@ -349,9 +349,13 @@ function filterTransaction(tr: Transaction) {
     let filtered = filters[i](tr)
     if (filtered instanceof Transaction) tr = filtered
     else if (Array.isArray(filtered) && filtered.length == 1 && filtered[0] instanceof Transaction) tr = filtered[0]
-    else tr = resolveTransaction(state, Array.isArray(filtered) ? filtered : [filtered], false)
+    else tr = resolveTransaction(state, asArray(filtered as any), false)
   }
   return tr
 }
 
 const none: readonly any[] = []
+
+export function asArray<T>(value: undefined | T | readonly T[]): readonly T[] {
+  return value == null ? none : Array.isArray(value) ? value : [value]
+}

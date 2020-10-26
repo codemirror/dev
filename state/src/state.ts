@@ -2,7 +2,7 @@ import {Text} from "@codemirror/next/text"
 import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
 import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
-import {Transaction, TransactionSpec, resolveTransaction} from "./transaction"
+import {Transaction, TransactionSpec, resolveTransaction, asArray, StateEffect} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
         changeFilter, transactionFilter, lineSeparator} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
@@ -112,8 +112,8 @@ export class EditorState {
     new EditorState(conf, tr.newDoc, tr.newSelection, tr)
   }
 
-  /// Create a [transaction](#state.Transaction) that replaces every
-  /// selection range with the given content.
+  /// Create a [transaction spec](#state.TransactionSpec) that
+  /// replaces every selection range with the given content.
   replaceSelection(text: string | Text) {
     if (typeof text == "string") text = this.toText(text)
     return this.changeByRange(range => ({changes: {from: range.from, to: range.to, insert: text},
@@ -129,23 +129,30 @@ export class EditorState {
   /// changeset and selection, and return it as a [transaction
   /// spec](#state.TransactionSpec), which can be passed to
   /// [`update`](#state.EditorState.update).
-  changeByRange(f: (range: SelectionRange) => {changes?: ChangeSpec, range: SelectionRange}): {
+  changeByRange(f: (range: SelectionRange) => {range: SelectionRange,
+                                               changes?: ChangeSpec,
+                                               effects?: StateEffect<any> | readonly StateEffect<any>[]}): {
     changes: ChangeSet,
-    selection: EditorSelection
+    selection: EditorSelection,
+    effects: readonly StateEffect<any>[]
   } {
     let sel = this.selection
     let result1 = f(sel.ranges[0])
     let changes = this.changes(result1.changes), ranges = [result1.range]
+    let effects = asArray(result1.effects)
     for (let i = 1; i < sel.ranges.length; i++) {
       let result = f(sel.ranges[i])
       let newChanges = this.changes(result.changes), newMapped = newChanges.map(changes)
       for (let j = 0; j < i; j++) ranges[j] = ranges[j].map(newMapped)
-      ranges.push(result.range.map(changes.mapDesc(newChanges, true)))
+      let mapBy = changes.mapDesc(newChanges, true)
+      ranges.push(result.range.map(mapBy))
       changes = changes.compose(newMapped)
+      effects = StateEffect.mapEffects(effects, newMapped).concat(StateEffect.mapEffects(asArray(result.effects), mapBy))
     }
     return {
       changes,
-      selection: EditorSelection.create(ranges, sel.primaryIndex)
+      selection: EditorSelection.create(ranges, sel.primaryIndex),
+      effects
     }
   }
 

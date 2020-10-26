@@ -25,7 +25,10 @@ export class ChangeDesc {
   // otherwise. So an insertion would be (0, n>0), a deletion (n>0,
   // 0), and a replacement two positive numbers.
   /// @internal
-  constructor(readonly sections: readonly number[]) {}
+  constructor(
+    /// @internal
+    readonly sections: readonly number[]
+  ) {}
 
   /// The length of the document before the change.
   get length() {
