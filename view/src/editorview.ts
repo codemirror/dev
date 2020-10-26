@@ -155,8 +155,12 @@ export class EditorView {
 
     this.viewState = new ViewState(config.state || EditorState.create())
     this.plugins = this.state.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
-    this.observer = new DOMObserver(this, (from, to, typeOver) => applyDOMChange(this, from, to, typeOver),
-                                    event => { this.inputState.runScrollHandlers(this, event); this.measure() })
+    this.observer = new DOMObserver(this, (from, to, typeOver) => {
+      applyDOMChange(this, from, to, typeOver)
+    }, event => {
+      this.inputState.runScrollHandlers(this, event)
+      this.measure()
+    })
     this.docView = new DocView(this)
 
     this.inputState = new InputState(this)
@@ -192,25 +196,27 @@ export class EditorView {
   update(transactions: readonly Transaction[]) {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress")
-    this.updateState = UpdateState.Updating
 
-    let state = this.state
-    for (let tr of transactions) {
-      if (tr.startState != state)
-        throw new RangeError("Trying to update state with a transaction that doesn't start from the previous state.")
-      state = tr.state
-    }
-    let update = new ViewUpdate(this, state, transactions)
-    let scrollTo = transactions.some(tr => tr.scrollIntoView) ? state.selection.primary : null
-    this.viewState.update(update, scrollTo)
-    this.bidiCache = CachedOrder.update(this.bidiCache, update.changes)
-    if (!update.empty) this.updatePlugins(update)
-    let redrawn = this.docView.update(update)
-    if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
-    this.updateAttrs()
-    this.updateState = UpdateState.Idle
+    let redrawn = false, update: ViewUpdate
+    this.updateState = UpdateState.Updating
+    try {
+      let state = this.state
+      for (let tr of transactions) {
+        if (tr.startState != state)
+          throw new RangeError("Trying to update state with a transaction that doesn't start from the previous state.")
+        state = tr.state
+      }
+      update = new ViewUpdate(this, state, transactions)
+      let scrollTo = transactions.some(tr => tr.scrollIntoView) ? state.selection.primary : null
+      this.viewState.update(update, scrollTo)
+      this.bidiCache = CachedOrder.update(this.bidiCache, update.changes)
+      if (!update.empty) this.updatePlugins(update)
+      redrawn = this.docView.update(update)
+      if (this.state.facet(styleModule) != this.styleModules) this.mountStyles()
+      this.updateAttrs()
+    } finally { this.updateState = UpdateState.Idle }
     if (redrawn || scrollTo || this.viewState.mustEnforceCursorAssoc) this.requestMeasure()
-    for (let listener of this.state.facet(updateListener)) listener(update) 
+    for (let listener of this.state.facet(updateListener)) listener(update)
   }
 
   /// Reset the view to the given state. (This will cause the entire
@@ -222,15 +228,16 @@ export class EditorView {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.setState are not allowed while an update is in progress")
     this.updateState = UpdateState.Updating
-    for (let plugin of this.plugins) plugin.destroy(this)
-    this.viewState = new ViewState(newState)
-    this.plugins = newState.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
-    this.docView = new DocView(this)
-    this.inputState.ensureHandlers(this)
-    this.mountStyles()
-    this.updateAttrs()
-    this.bidiCache = []
-    this.updateState = UpdateState.Idle
+    try {
+      for (let plugin of this.plugins) plugin.destroy(this)
+      this.viewState = new ViewState(newState)
+      this.plugins = newState.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
+      this.docView = new DocView(this)
+      this.inputState.ensureHandlers(this)
+      this.mountStyles()
+      this.updateAttrs()
+      this.bidiCache = []
+    } finally { this.updateState = UpdateState.Idle }
     this.requestMeasure()
   }
 
@@ -263,41 +270,42 @@ export class EditorView {
     if (this.measureScheduled > -1) cancelAnimationFrame(this.measureScheduled)
     this.measureScheduled = -1 // Prevent requestMeasure calls from scheduling another animation frame
 
-    let updated = null
-    for (let i = 0;; i++) {
-      this.updateState = UpdateState.Measuring
-      let changed = this.viewState.measure(this.docView, i > 0)
-      let measuring = this.measureRequests
-      if (!changed && !measuring.length && this.viewState.scrollTo == null) break
-      this.measureRequests = []
-      if (i > 5) {
-        console.warn("Viewport failed to stabilize")
-        break
+    let updated: ViewUpdate | null = null
+    try {
+      for (let i = 0;; i++) {
+        this.updateState = UpdateState.Measuring
+        let changed = this.viewState.measure(this.docView, i > 0)
+        let measuring = this.measureRequests
+        if (!changed && !measuring.length && this.viewState.scrollTo == null) break
+        this.measureRequests = []
+        if (i > 5) {
+          console.warn("Viewport failed to stabilize")
+          break
+        }
+        let measured = measuring.map(m => {
+          try { return m.read(this) }
+          catch(e) { logException(this.state, e); return BadMeasure }
+        })
+        let update = new ViewUpdate(this, this.state)
+        update.flags |= changed
+        if (!updated) updated = update
+        else updated.flags |= changed
+        this.updateState = UpdateState.Updating
+        this.updatePlugins(update)
+        this.updateAttrs()
+        if (changed) this.docView.update(update)
+        for (let i = 0; i < measuring.length; i++) if (measured[i] != BadMeasure) {
+          try { measuring[i].write(measured[i], this) }
+          catch(e) { logException(this.state, e) }
+        }
+        if (this.viewState.scrollTo) {
+          this.docView.scrollPosIntoView(this.viewState.scrollTo.head, this.viewState.scrollTo.assoc)
+          this.viewState.scrollTo = null
+        }
+        if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
       }
-      let measured = measuring.map(m => {
-        try { return m.read(this) }
-        catch(e) { logException(this.state, e); return BadMeasure }
-      })
-      let update = new ViewUpdate(this, this.state)
-      update.flags |= changed
-      if (!updated) updated = update
-      else updated.flags |= changed
-      this.updateState = UpdateState.Updating
-      this.updatePlugins(update)
-      this.updateAttrs()
-      if (changed) this.docView.update(update)
-      for (let i = 0; i < measuring.length; i++) if (measured[i] != BadMeasure) {
-        try { measuring[i].write(measured[i], this) }
-        catch(e) { logException(this.state, e) }
-      }
-      if (this.viewState.scrollTo) {
-        this.docView.scrollPosIntoView(this.viewState.scrollTo.head, this.viewState.scrollTo.assoc)
-        this.viewState.scrollTo = null
-      }
-      if (!(changed & UpdateFlag.Viewport) && this.measureRequests.length == 0) break
-    }
+    } finally { this.updateState = UpdateState.Idle }
 
-    this.updateState = UpdateState.Idle
     this.measureScheduled = -1
     if (updated) for (let listener of this.state.facet(updateListener)) listener(updated)
   }
