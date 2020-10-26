@@ -143,7 +143,7 @@ const matchHighlighter = ViewPlugin.fromClass(class {
 })
 
 const defaultTheme = EditorView.baseTheme({
-  "$$light $activeLine": { backgroundColor: "#eff5ff" },
+  "$$light $activeLine": { backgroundColor: "#f3f9ff" },
   "$$dark $activeLine": { backgroundColor: "#223039" },
   "$selectionMatch": { backgroundColor: "#99ff7780" },
   "$searchMatch $selectionMatch": {backgroundColor: "transparent"}

@@ -131,9 +131,12 @@ export const baseTheme = buildTheme("." + baseThemeID, {
 
   $cursor: {
     position: "absolute",
-    borderLeft: "1.2px solid #aaa",
+    borderLeft: "1.2px solid #bbb",
     marginLeft: "-0.6px",
     pointerEvents: "none"
+  },
+  "$$dark $cursor": {
+    borderLeftColor: "#444"
   },
 
   "$$focused $cursor": {
