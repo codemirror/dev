@@ -1,6 +1,6 @@
 import {parser} from "lezer-xml"
 import {continuedIndent, delimitedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 
@@ -21,19 +21,19 @@ export const xmlSyntax = LezerSyntax.define(parser.withProps(
     }
   }),
   styleTags({
-    AttributeValue: "string",
-    Text: "content",
-    "StartTag StartCloseTag EndTag SelfCloseEndTag": "angleBracket",
-    TagName: "typeName",
-    "MismatchedCloseTag/Tagname": "typeName invalid",
-    AttributeName: "propertyName",
-    UnquotedAttributeValue: "string",
-    Is: "operator definition",
-    "EntityReference CharacterReference": "character",
-    Comment: "blockComment",
-    ProcessingInst: "operator meta",
-    DoctypeDecl: "labelName meta",
-    Cdata: "string#3"
+    AttributeValue: t.string,
+    Text: t.content,
+    "StartTag StartCloseTag EndTag SelfCloseEndTag": t.angleBracket,
+    TagName: t.typeName,
+    "MismatchedCloseTag/Tagname": t.typeName + t.invalid,
+    AttributeName: t.propertyName,
+    UnquotedAttributeValue: t.string,
+    Is: t.definitionOperator,
+    "EntityReference CharacterReference": t.character,
+    Comment: t.blockComment,
+    ProcessingInst: t.processingInstruction,
+    DoctypeDecl: t.documentMeta,
+    Cdata: t.special(t.string)
   })
 ), {
   languageData: {

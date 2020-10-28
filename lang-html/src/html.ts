@@ -2,7 +2,7 @@ import {configureHTML} from "lezer-html"
 import {cssSyntax} from "@codemirror/next/lang-css"
 import {javascriptSyntax, javascriptSupport} from "@codemirror/next/lang-javascript"
 import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 import {Extension} from "@codemirror/next/state"
 
@@ -35,18 +35,18 @@ export const htmlSyntax = LezerSyntax.define(configureHTML([
     }
   }),
   styleTags({
-    AttributeValue: "string",
-    "Text RawText": "content",
-    "StartTag StartCloseTag SelfCloserEndTag EndTag SelfCloseEndTag": "angleBracket",
-    TagName: "typeName",
-    "MismatchedCloseTag/TagName": "typeName invalid",
-    AttributeName: "propertyName",
-    UnquotedAttributeValue: "string",
-    Is: "operator definition",
-    "EntityReference CharacterReference": "character",
-    Comment: "blockComment",
-    ProcessingInst: "operator meta",
-    DoctypeDecl: "labelName meta"
+    AttributeValue: t.string,
+    "Text RawText": t.content,
+    "StartTag StartCloseTag SelfCloserEndTag EndTag SelfCloseEndTag": t.angleBracket,
+    TagName: t.typeName,
+    "MismatchedCloseTag/TagName": t.typeName +  t.invalid,
+    AttributeName: t.propertyName,
+    UnquotedAttributeValue: t.string,
+    Is: t.definitionOperator,
+    "EntityReference CharacterReference": t.character,
+    Comment: t.blockComment,
+    ProcessingInst: t.processingInstruction,
+    DoctypeDecl: t.documentMeta
   })
 ), {
   languageData: {

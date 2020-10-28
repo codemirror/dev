@@ -1,7 +1,7 @@
 import {parser} from "lezer-css"
 import {SyntaxNode} from "lezer-tree"
 import {LezerSyntax, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
 /// A syntax provider based on the [Lezer CSS
@@ -15,43 +15,40 @@ export const cssSyntax = LezerSyntax.define(parser.withProps(
     Block(subtree: SyntaxNode) { return {from: subtree.from + 1, to: subtree.to - 1} }
   }),
   styleTags({
-    "import charset namespace keyframes": "keyword definition",
-    "media supports": "keyword control",
-    "from to": "keyword",
-    NamespaceName: "namespace",
-    KeyframeName: "labelName",
-    TagName: "typeName",
-    ClassName: "className",
-    PseudoClassName: "className constant",
-    not: "operatorKeyword",
-    IdName: "labelName",
-    AttributeName: "propertyName",
-    NumberLiteral: "number",
-    PropertyName: "propertyName",
-    KeywordQuery: "keyword",
-    FeatureName: "propertyName",
-    UnaryQueryOp: "operatorKeyword",
-    callee: "keyword",
-    ValueName: "atom",
-    CallTag: "atom",
-    Callee: "variableName",
-    Unit: "unit",
-    "UniversalSelector NestingSelector": "operator definition",
-    AtKeyword: "keyword",
-    MatchOp: "compareOperator",
-    "ChildOp SiblingOp, LogicOp": "logicOperator",
-    BinOp: "arithmeticOperator",
-    Important: "modifier",
-    Comment: "blockComment",
-    ParenthesizedContent: "name#2",
-    ColorLiteral: "color",
-    StringLiteral: "string",
-    ":": "punctuation definition",
-    "PseudoOp #": "derefOperator",
-    "; ,": "separator",
-    "( )": "paren",
-    "[ ]": "squareBracket",
-    "{ }": "brace"
+    "import charset namespace keyframes": t.definitionKeyword,
+    "media supports": t.controlKeyword,
+    "from to": t.keyword,
+    NamespaceName: t.namespace,
+    KeyframeName: t.labelName,
+    TagName: t.typeName,
+    ClassName: t.className,
+    PseudoClassName: t.constant(t.className),
+    not: t.operatorKeyword,
+    IdName: t.labelName,
+    "FeatureName PropertyName AttributeName": t.propertyName,
+    NumberLiteral: t.number,
+    KeywordQuery: t.keyword,
+    UnaryQueryOp: t.operatorKeyword,
+    callee: t.keyword,
+    "CallTag ValueName": t.atom,
+    Callee: t.variableName,
+    Unit: t.unit,
+    "UniversalSelector NestingSelector": t.definitionOperator,
+    AtKeyword: t.keyword,
+    MatchOp: t.compareOperator,
+    "ChildOp SiblingOp, LogicOp": t.logicOperator,
+    BinOp: t.arithmeticOperator,
+    Important: t.modifier,
+    Comment: t.blockComment,
+    ParenthesizedContent: t.special(t.name),
+    ColorLiteral: t.color,
+    StringLiteral: t.string,
+    ":": t.punctuation,
+    "PseudoOp #": t.derefOperator,
+    "; ,": t.separator,
+    "( )": t.paren,
+    "[ ]": t.squareBracket,
+    "{ }": t.brace
   })
 ), {
   languageData: {

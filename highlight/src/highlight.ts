@@ -36,7 +36,7 @@ const tagSets: (readonly number[])[] = []
 export type Tag = string
 
 function read(tag: Tag) {
-  let m = /^⟬\d+⟭$/.exec(tag), val = m ? +m[1] : 1e8
+  let m = /^⟬(\d+)⟭$/.exec(tag), val = m ? +m[1] : 1e8
   if (val >= tagSets.length) throw new RangeError("Invalid tag " + tag)
   return val
 }
@@ -50,7 +50,7 @@ function readSet(tags: string) { return tags.split(/(?=⟬)/).map(read) }
 /// that don't mention this tag will try to fall back to the parent
 /// tag (or grandparent tag, etc).
 export function defineTag(parent?: Tag): Tag {
-  let id = tagSets.length - 1, set = [id]
+  let id = tagSets.length, set = [id]
   if (parent) {
     let id = read(parent)
     set = set.concat(tagSets[id])
@@ -78,7 +78,7 @@ function getModified(orig: number, mods: readonly number[]) {
   if (!mods.length) return orig
   let exists = modified.find(m => m.orig == orig && sameArray(mods, m.mods))
   if (exists) return exists.tag
-  let tag = tagSets.length - 1
+  let tag = tagSets.length
   modified.push({orig, mods, tag})
   let configs = permute(mods), set = []
   for (let parent of tagSets[orig]) for (let config of configs)
@@ -111,7 +111,8 @@ export function defineTagModifier() {
 /// [`Parser.withProps`](https://lezer.codemirror.net/docs/ref#lezer.Parser.withProps).
 ///
 /// The argument object maps node selectors to [highlighting
-/// tags](#highlight.Tag).
+/// tags](#highlight.Tag) or sets of tags (created by concatenating
+/// them with the `+` operator).
 ///
 /// Node selectors may hold one or more (space-separated) node paths.
 /// Such a path can be a [node
@@ -133,6 +134,9 @@ export function defineTagModifier() {
 /// happens for the node's child nodes, and the entire node gets the
 /// given style.
 ///
+/// In this notation, node names that contain `/`, `!`, `*`, or `...`
+/// must be quoted as JSON strings.
+///
 /// For example:
 ///
 /// ```javascript
@@ -147,7 +151,9 @@ export function defineTagModifier() {
 ///     // Add a style to all content inside Italic nodes
 ///     "Italic/...": tags.emphasis,
 ///     // Style InvalidString nodes as both `string` and `invalid`
-///     "InvalidString": tags.string + tags.invalid
+///     "InvalidString": tags.string + tags.invalid,
+///     // Style the node named "/" as punctuation
+///     '"/"': tags.punctuation
 ///   })
 /// )
 /// ```
@@ -186,6 +192,12 @@ const ruleNodeProp = new NodeProp<Rule>()
 /// should be
 /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
 /// style objects that define the CSS for that tag.
+///
+/// The CSS rules created for a highlighter will be emitted in the
+/// order of the spec's properties. That means that for elements that
+/// have multiple tags associated with them, styles defined further
+/// down in the list will have a higher CSS precedence than styles
+/// defined earlier.
 export function highlighter(spec: {[tag: string]: StyleSpec}): Extension {
   let styling = new Styling(spec)
   return [
@@ -237,6 +249,8 @@ export const tags = {
   labelName: t(name),
   /// A namespace [name](#highlight.tags.name).
   namespace: t(name),
+  /// The [name](#highlight.tags.name) of a macro.
+  macroName: t(name),
 
   /// A literal value.
   literal,
@@ -296,6 +310,8 @@ export const tags = {
   compareOperator: t(operator),
   /// [Operator](#highlight.tags.operator) that updates its operand.
   updateOperator: t(operator),
+  /// [Operator](#highlight.tags.operator) that defines something.
+  definitionOperator: t(operator),
   /// Type-related [operator](#highlight.tags.operator).
   typeOperator: t(operator),
   /// Control-flow [operator](#highlight.tags.operator).
@@ -373,8 +389,8 @@ export const tags = {
   processingInstruction: t(meta),
 
   /// [Modifier](#highlight.defineTagModifier) that indicates that a
-  /// given element is being defined. Expected to be used with
-  /// [name](#higlight.tags.name) tags.
+  /// given element is being defined. Expected to be used with the
+  /// various [name](#higlight.tags.name) tags.
   definition: defineTagModifier(),
   /// [Modifier](#highlight.defineTagModifier) that indicates that
   /// something is constant. Mostly expected to be used with

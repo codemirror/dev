@@ -1,7 +1,7 @@
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser as plainParser} from "./sql.grammar"
 import {tokens, Dialect, tokensFor, SQLKeywords, SQLTypes, dialect} from "./tokens"
 import {completeFromSchema, completeKeywords} from "./complete"
@@ -15,23 +15,23 @@ let parser = plainParser.withProps(
     BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
   }),
   styleTags({
-    Keyword: "keyword",
-    Type: "typeName",
-    Builtin: "name standard",
-    Bool: "bool",
-    Null: "null",
-    Number: "number",
-    String: "string",
-    Identifier: "name",
-    QuotedIdentifier: "string#2",
-    SpecialVar: "name#2",
-    LineComment: "lineComment",
-    BlockComment: "lineComment",
-    Operator: "operator",
-    "Semi Punctuation": "punctuation",
-    "( )": "paren",
-    "{ }": "brace",
-    "[ ]": "squareBracket"
+    Keyword: t.keyword,
+    Type: t.typeName,
+    Builtin: t.standard(t.name),
+    Bool: t.bool,
+    Null: t.null,
+    Number: t.number,
+    String: t.string,
+    Identifier: t.name,
+    QuotedIdentifier: t.special(t.string),
+    SpecialVar: t.special(t.name),
+    LineComment: t.lineComment,
+    BlockComment: t.blockComment,
+    Operator: t.operator,
+    "Semi Punctuation": t.punctuation,
+    "( )": t.paren,
+    "{ }": t.brace,
+    "[ ]": t.squareBracket
   })
 )
 

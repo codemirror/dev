@@ -1,7 +1,7 @@
 import {parser} from "lezer-python"
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
 import {Extension} from "@codemirror/next/state"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 
 /// A syntax provider based on the [Lezer Python
 /// parser](https://github.com/lezer-parser/python), extended with
@@ -16,32 +16,32 @@ export const pythonSyntax = LezerSyntax.define(parser.withProps(
     DictionaryExpression(tree) { return {from: tree.from + 1, to: tree.to - 1} }
   }),
   styleTags({
-    "async * ** FormatConversion": "modifier",
-    "for while if elif else try except finally return raise break continue with pass assert await yield": "keyword control",
-    "in not and or is del": "operatorKeyword",
-    "import from def class global nonlocal lambda": "keyword definition",
-    "with as print": "keyword",
-    self: "self",
-    Boolean: "bool",
-    None: "null",
-    VariableName: "variableName",
-    PropertyName: "propertyName",
-    Comment: "lineComment",
-    Number: "number",
-    String: "string",
-    FormatString: "string#2",
-    UpdateOp: "updateOperator",
-    ArithOp: "arithmeticOperator",
-    BitOp: "bitwiseOperator",
-    CompareOp: "compareOperator",
-    AssignOp: "operator definition",
-    Ellipsis: "punctuation",
-    At: "punctuation meta",
-    "( )": "paren",
-    "[ ]": "squareBracket",
-    "{ }": "brace",
-    ".": "derefOperator",
-    ", ;": "separator"
+    "async * ** FormatConversion": t.modifier,
+    "for while if elif else try except finally return raise break continue with pass assert await yield": t.controlKeyword,
+    "in not and or is del": t.operatorKeyword,
+    "import from def class global nonlocal lambda": t.definitionKeyword,
+    "with as print": t.keyword,
+    self: t.self,
+    Boolean: t.bool,
+    None: t.null,
+    VariableName: t.variableName,
+    PropertyName: t.propertyName,
+    Comment: t.lineComment,
+    Number: t.number,
+    String: t.string,
+    FormatString: t.special(t.string),
+    UpdateOp: t.updateOperator,
+    ArithOp: t.arithmeticOperator,
+    BitOp: t.bitwiseOperator,
+    CompareOp: t.compareOperator,
+    AssignOp: t.definitionOperator,
+    Ellipsis: t.punctuation,
+    At: t.meta,
+    "( )": t.paren,
+    "[ ]": t.squareBracket,
+    "{ }": t.brace,
+    ".": t.derefOperator,
+    ", ;": t.separator
   })
 ), {
   languageData: {

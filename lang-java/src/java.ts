@@ -1,6 +1,6 @@
 import {parser} from "lezer-java"
 import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
 /// A syntax provider based on the [Lezer Java
@@ -24,38 +24,38 @@ export const javaSyntax = LezerSyntax.define(parser.withProps(
     BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
   }),
   styleTags({
-    null: "null",
-    instanceof: "operatorKeyword",
-    this: "self",
-    "new super assert open to with void": "keyword",
-    "class interface extends implements module package import enum": "keyword definition",
-    "switch while for if else case default do break continue return try catch finally throw": "keyword control",
+    null: t.null,
+    instanceof: t.operatorKeyword,
+    this: t.self,
+    "new super assert open to with void": t.keyword,
+    "class interface extends implements module package import enum": t.definitionKeyword,
+    "switch while for if else case default do break continue return try catch finally throw": t.controlKeyword,
     ["requires exports opens uses provides public private protected static transitive abstract final " +
-     "strictfp synchronized native transient volatile throws"]: "modifier",
-    IntegerLiteral: "integer",
-    FloatLiteral: "float",
-    StringLiteral: "string",
-    CharacterLiteral: "character",
-    LineComment: "lineComment",
-    BlockComment: "blockComment",
-    BooleanLiteral: "bool",
-    PrimitiveType: "typeName standard",
-    TypeName: "typeName",
-    Identifier: "name",
-    Definition: "variableName definition",
-    ArithOp: "arithmeticOperator",
-    LogicOp: "logicOperator",
-    BitOp: "bitwiseOperator",
-    CompareOp: "compareOperator",
-    AssignOp: "operator definition",
-    UpdateOp: "updateOperator",
-    Asterisk: "punctuation",
-    Label: "labelName",
-    "( )": "paren",
-    "[ ]": "squareBracket",
-    "{ }": "brace",
-    ".": "derefOperator",
-    ", ;": "separator"
+     "strictfp synchronized native transient volatile throws"]: t.modifier,
+    IntegerLiteral: t.integer,
+    FloatLiteral: t.float,
+    StringLiteral: t.string,
+    CharacterLiteral: t.character,
+    LineComment: t.lineComment,
+    BlockComment: t.blockComment,
+    BooleanLiteral: t.bool,
+    PrimitiveType: t.standard(t.typeName),
+    TypeName: t.typeName,
+    Identifier: t.name,
+    Definition: t.definition(t.variableName),
+    ArithOp: t.arithmeticOperator,
+    LogicOp: t.logicOperator,
+    BitOp: t.bitwiseOperator,
+    CompareOp: t.compareOperator,
+    AssignOp: t.definitionOperator,
+    UpdateOp: t.updateOperator,
+    Asterisk: t.punctuation,
+    Label: t.labelName,
+    "( )": t.paren,
+    "[ ]": t.squareBracket,
+    "{ }": t.brace,
+    ".": t.derefOperator,
+    ", ;": t.separator
   })
 ), {
   languageData: {

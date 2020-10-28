@@ -2,7 +2,7 @@ import {parser} from "lezer-json"
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
 import {Extension} from "@codemirror/next/state"
 import {SyntaxNode} from "lezer-tree"
-import {styleTags} from "@codemirror/next/highlight"
+import {styleTags, tags as t} from "@codemirror/next/highlight"
 
 export {jsonParseLinter} from "./lint"
 
@@ -16,14 +16,14 @@ export const jsonSyntax = LezerSyntax.define(parser.withProps(
     Array(subtree: SyntaxNode) { return {from: subtree.from + 1, to: subtree.to - 1} }
   }),
   styleTags({
-    String: "string",
-    Number: "number",
-    "True False": "bool",
-    PropertyName: "propertyName",
-    null: "null",
-    ",": "separator",
-    "[ ]": "squareBracket",
-    "{ }": "brace"
+    String: t.string,
+    Number: t.number,
+    "True False": t.bool,
+    PropertyName: t.propertyName,
+    null: t.null,
+    ",": t.separator,
+    "[ ]": t.squareBracket,
+    "{ }": t.brace
   })
 ), {
   languageData: {
