@@ -4,254 +4,134 @@ import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationS
 import {EditorState, Extension, precedence} from "@codemirror/next/state"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
-/// A tag system defines a set of node (token) tags used for
-/// highlighting. You'll usually want to use the
-/// [default](#highlight.defaultTags) set, but it is possible to
-/// define your own custom system when that doesn't fit your use case.
-export class TagSystem {
-  /// The flags argument given when creating this system.
-  flags: readonly string[]
+// For each tag, this holds the set of tags that match it, in order of
+// specificity. The set always contains the tag itself
+// (`tagSets[i].includes(i)` is true for any defined tag).
+const tagSets: (readonly number[])[] = []
 
-  /// The types argument given when creating this system.
-  types: readonly string[]
+/// Highlighting tags are markers that denote a highlighting category.
+/// They are [associated](#highlight.styleTags) with parts of a syntax
+/// tree by a language mode, and then mapped to an actual CSS style by
+/// a [highlighter](#highlight.highlighter).
+///
+/// CodeMirror uses a mostly-closed set of tags for generic
+/// highlighters, so that the list of things that a theme must style
+/// is clear and bounded (as opposed to traditional open string-based
+/// systems, which make it very hard for highlighting themes to cover
+/// all the styles produced by the various languages).
+///
+/// It _is_ possible to [define](#highlight.defineTag) your own
+/// highlighting tags for system-internal use (where you control both
+/// the language package and the highlighter), but such tags will not
+/// be picked up by other highlighters (though you can derive them
+/// from standard tags to allow the highlighters to fall back to
+/// those).
+///
+/// Tags are represented as strings for practical purposes (so that
+/// they can be used as object property names in
+/// [highlighter](#highlight.highlighter) and so that they can be
+/// concatenated with `+`), but their content should not be treated as
+/// meaningful, and they should _definitely_ not be created in any
+/// other way than [`defineTag`](#highlight.defineTag).
+export type Tag = string
 
-  /// @internal
-  flagMask: number
-  /// @internal
-  typeShift: number
-  /// @internal
-  typeNames: string[] = [""]
-  /// @internal
-  typeIDs: {[name: string]: number} = Object.create(null)
-  /// @internal
-  parents: number[]
-
-  /// @internal
-  prop = new NodeProp<Rule>()
-
-  /// Define a tag system. Each tag identifies a type of syntactic
-  /// element, which can have a single type and any number of flags.
-  /// The `flags` argument should be an array of flag names, and the
-  /// `types` argument an array of type names. Type names may have a
-  /// `"name=parentName"` format to specify that this type is an
-  /// instance of some other type, which means that, if no styling for
-  /// the type itself is provided, it'll fall back to the parent
-  /// type's styling.
-  ///
-  /// You can specify a `subtypes` property to assign a given number
-  /// of sub-types to each type. These are automatically generated
-  /// types with the base type name suffixed with `#1` to `#`_`N`_
-  /// (where _N_ is the number given in the `subtypes` field) that
-  /// have the base type as parent type.
-  constructor(options: {flags: string[], types: string[], subtypes?: number}) {
-    this.flags = options.flags
-    this.types = options.types
-    this.flagMask = Math.pow(2, this.flags.length) - 1
-    this.typeShift = this.flags.length
-    let subtypes = options.subtypes || 0
-    let parentNames: (string | undefined)[] = [undefined]
-    this.typeIDs[""] = 0
-    let typeID = 1
-    for (let type of options.types) {
-      let match = /^([\w\-]+)(?:=([\w-]+))?$/.exec(type)
-      if (!match) throw new RangeError("Invalid type name " + type)
-      let id = typeID++
-      this.typeNames[id] = match[1]
-      this.typeIDs[match[1]] = id
-      parentNames[id] = match[2]
-      for (let i = 0; i < subtypes; i++) {
-        let subID = typeID++, name = match[1] + "#" + (i + 1)
-        this.typeNames[subID] = name
-        this.typeIDs[name] = subID
-        parentNames[subID] = match[1]
-      }
-    }
-    this.parents = parentNames.map(name => {
-      if (name == null) return 0
-      let id = this.typeIDs[name]
-      if (id == null) throw new RangeError(`Unknown parent type '${name}' specified`)
-      return id
-    })
-    if (this.flags.length > 30 || this.typeNames.length > Math.pow(2, 30 - this.flags.length))
-      throw new RangeError("Too many style tag flags to fit in a 30-bit integer")
-  }
-
-  /// @internal
-  get(name: string) {
-    let value = 0
-    for (let part of name.split(" ")) if (part) {
-      let flag = this.flags.indexOf(part)
-      if (flag > -1) {
-        value += 1 << flag
-      } else {
-        let typeID = this.typeIDs[part]
-        if (typeID == null) throw new RangeError(`Unknown tag type '${part}'`)
-        if (value >> this.typeShift) throw new RangeError(`Multiple tag types specified in '${name}'`)
-        value += typeID << this.typeShift
-      }
-    }
-    return value
-  }
-
-  /// @internal
-  getWithMode(name: string) {
-    let mode = name[0] == "+" ? Mode.Inherit : name[0] == "!" ? Mode.Opaque : Mode.Normal
-    return {mode, tag: this.get(mode == Mode.Normal ? name : name.slice(1))}
-  }
-
-  /// Manually add a highlighting tag to a set of node props.
-  addTagProp(name: string, props: {[prop: number]: any} = {}) {
-    let {mode, tag} = this.getWithMode(name)
-    return this.prop.set(props, new Rule(tag, mode, noContext))
-  }
-
-  /// Create a
-  /// [`PropSource`](https://lezer.codemirror.net/docs/ref#tree.PropSource)
-  /// that adds node properties for this system. See
-  /// [`styleTags`](#highlight.styleTags) for documentation of the
-  /// argument object.
-  add(tags: {[selector: string]: string}) {
-    let byName: {[name: string]: Rule} = Object.create(null)
-    for (let prop in tags) {
-      let value = tags[prop]
-      let {mode, tag} = this.getWithMode(value)
-      for (let part of prop.split(" ")) {
-        let stack = part.split("/"), inner = stack[stack.length - 1]
-        let context = stack.length > 1 ? stack.slice(0, stack.length - 1).map(s => s == "*" ? null : s) : noContext
-        let rule = new Rule(tag, mode, context)
-        byName[inner] = rule.sort(byName[inner])
-      }
-    }
-    return this.prop.add(byName)
-  }
-
-  /// Create a highlighter extension for this system, styling the
-  /// given tags using the given CSS objects.
-  highlighter(spec: {[tag: string]: StyleSpec}): Extension {
-    let styling = new Styling(this, spec)
-    return [
-      precedence(ViewPlugin.define<Highlighter>(view => new Highlighter(view, this.prop, styling), {
-        decorations: v => v.decorations
-      }), "fallback"),
-      EditorView.styleModule.of(styling.module)
-    ]
-  }
-
-  /// @internal
-  specificity(tag: number) {
-    let flags = tag & this.flagMask, spec = 0
-    for (let i = 1; i <= this.flags.length; i++)
-      if (flags & (1 << i)) spec++
-    for (let type = tag >> this.typeShift; type; type = this.parents[type])
-      spec += /#/.test(this.typeNames[type]) ? 500 : 1000
-    return spec
-  }
+function read(tag: Tag) {
+  let m = /^⟬\d+⟭$/.exec(tag), val = m ? +m[1] : 1e8
+  if (val >= tagSets.length) throw new RangeError("Invalid tag " + tag)
+  return val
 }
 
-/// The set of highlighting tags used by regular language packages and
-/// themes.
-export const defaultTags = new TagSystem({
-  flags: ["invalid", "meta", "standard",
-          "definition", "constant", "local", "control",
-          "link", "strong", "emphasis", "monospace",
-          "changed", "inserted", "deleted"],
-  subtypes: 7,
-  types: [
-    "comment",
-    "lineComment=comment",
-    "blockComment=comment",
-    "docComment=comment",
-    "name",
-    "variableName=name",
-    "typeName=name",
-    "propertyName=name",
-    "className=name",
-    "labelName=name",
-    "functionName=name",
-    "namespace=name",
-    "literal",
-    "string=literal",
-    "docString=string",
-    "character=string",
-    "number=literal",
-    "integer=number",
-    "float=number",
-    "bool=literal",
-    "regexp=literal",
-    "escape=literal",
-    "color=literal",
-    "content",
-    "heading=content",
-    "list=content",
-    "quote=content",
-    "keyword",
-    "self=keyword",
-    "null=keyword",
-    "atom=keyword",
-    "unit=keyword",
-    "modifier=keyword",
-    "operatorKeyword=keyword",
-    "operator",
-    "derefOperator=operator",
-    "arithmeticOperator=operator",
-    "logicOperator=operator",
-    "bitwiseOperator=operator",
-    "compareOperator=operator",
-    "updateOperator=operator",
-    "typeOperator=operator",
-    "punctuation",
-    "separator=punctuation",
-    "bracket=punctuation",
-    "angleBracket=bracket",
-    "squareBracket=bracket",
-    "paren=bracket",
-    "brace=bracket"
-  ]
-})
+function toTag(id: number) { return `⟬${id}⟭` }
 
-const enum Mode { Opaque, Inherit, Normal }
+function readSet(tags: string) { return tags.split(/(?=⟬)/).map(read) }
 
-const noContext: readonly (string | null)[] = []
+/// Define a new tag. If `parent` is given, the tag is treated as a
+/// sub-tag of that parent, and [highlighters](#highlight.highliter)
+/// that don't mention this tag will try to fall back to the parent
+/// tag (or grandparent tag, etc).
+export function defineTag(parent?: Tag): Tag {
+  let id = tagSets.length - 1, set = [id]
+  if (parent) {
+    let id = read(parent)
+    set = set.concat(tagSets[id])
+  }
+  tagSets.push(set)
+  return toTag(id)
+}
 
-class Rule {
-  constructor(readonly tag: number,
-              readonly mode: Mode,
-              readonly context: readonly (string | null)[],
-              public next?: Rule) {}
+let modifierID = 0
+const modified: {orig: number, mods: readonly number[], tag: number}[] = []
 
-  sort(other: Rule | undefined) {
-    if (!other || other.context.length < this.context.length) {
-      this.next = other
-      return this
-    }
-    other.next = this.sort(other.next)
-    return other
+function sameArray<T>(a: readonly T[], b: readonly T[]) {
+  return a.length == b.length && a.every((x, i) => x == b[i])
+}
+
+function permute<T>(array: readonly T[]): (readonly T[])[] {
+  let result = [array]
+  for (let i = 0; i < array.length; i++) {
+    for (let a of permute(array.slice(0, i).concat(array.slice(i + 1)))) result.push(a)
+  }
+  return result
+}
+
+function getModified(orig: number, mods: readonly number[]) {
+  if (!mods.length) return orig
+  let exists = modified.find(m => m.orig == orig && sameArray(mods, m.mods))
+  if (exists) return exists.tag
+  let tag = tagSets.length - 1
+  modified.push({orig, mods, tag})
+  let configs = permute(mods), set = []
+  for (let parent of tagSets[orig]) for (let config of configs)
+    set.push(getModified(parent, config))
+  tagSets.push(set)
+  return tag
+}
+
+/// Define a tag _modifier_, which is a function that, given a tag,
+/// will return a tag that is a subtag of the original. Applying the
+/// same modifier to a twice tag will return the same value (`m1(t1)
+/// == m1(t1)`) and applying multiple modifiers will, regardless or
+/// order, produce the same tag (`m1(m2(t1)) == m2(m1(t1))`).
+///
+/// When multiple modifiers are applied to a given base tag, each
+/// smaller set of modifiers is registered as a parent, so that for
+/// example `m1(m2(m3(t1)))` is a subtype of `m1(m2(t1))`,
+/// `m1(m3(t1)`, and so on.
+export function defineTagModifier() {
+  let modID = modifierID++
+  return (tag: Tag) => {
+    let id = read(tag)
+    let known = modified.find(m => m.tag == id)
+    if (known && known.mods.indexOf(modID) > -1) return tag
+    return toTag(getModified(known ? known.orig : id, (known ? known.mods : []).concat(modID).sort((a, b) => a - b)))
   }
 }
 
 /// Used to add a set of tags to a language syntax via
 /// [`Parser.withProps`](https://lezer.codemirror.net/docs/ref#lezer.Parser.withProps).
 ///
-/// The argument object maps node selectors to [tag
-/// names](#highlight.TagSystem), optionally prefixed with:
+/// The argument object maps node selectors to [highlighting
+/// tags](#highlight.Tag).
 ///
-///  - `+`, to make the style apply not just to the node itself, but
-///    also to child nodes (which by default replace the styles
-///    assigned by their parent nodes)
+/// Node selectors may hold one or more (space-separated) node paths.
+/// Such a path can be a [node
+/// name](https://lezer.codemirror.net/docs/ref#tree.NodeType.name),
+/// or multiple node names (or `*` wildcards) separated by slash
+/// characters, as in `"Block/Declaration/VariableName"`. Such a path
+/// matches the final node but only if its direct parent nodes are the
+/// other nodes mentioned. A `*` in such a path matches any parent,
+/// but only a single level—wildcards that match multiple parents
+/// aren't supported, both for efficiency reasons and because Lezer
+/// trees make it rather hard to reason about what they would match.)
 ///
-///  - `!` to make a node _opaque_, meaning its child nodes are
-///    ignored for styling purposes.
+/// A path can be ended with `/...` to indicate that the tag assigned
+/// to the node should also apply to all parent nodes, even if they
+/// match their own style (by default, only the innermost style is
+/// used).
 ///
-/// Node selectors can be [node
-/// names](https://lezer.codemirror.net/docs/ref#tree.NodeType.name),
-/// or groups of node names separated by spaces. It is possible to
-/// combine multiple node names with slashes, as in
-/// `"Block/Declaration/VariableName"`, to match the final node but
-/// only if its direct parent nodes are the other nodes mentioned. A
-/// `*` can be used as a wildcard in such a path. (But only matches a
-/// single parent—wildcards that match multiple parents aren't
-/// supported, both for efficiency reasons and because Lezer trees
-/// make it rather hard to reason about what they would match.)
+/// When a path ends in `!`, as in `Attribute!`, no further matching
+/// happens for the node's child nodes, and the entire node gets the
+/// given style.
 ///
 /// For example:
 ///
@@ -259,68 +139,309 @@ class Rule {
 /// parser.withProps(
 ///   styleTags({
 ///     // Style Number and BigNumber nodes
-///     "Number BigNumber": "number",
+///     "Number BigNumber": tags.number,
 ///     // Style Escape nodes whose parent is String
-///     "String/Escape": "escape",
+///     "String/Escape": tags.escape,
 ///     // Style anything inside Attributes nodes
-///     "Attributes": "!meta",
+///     "Attributes!": tags.meta,
 ///     // Add a style to all content inside Italic nodes
-///     "Italic": "+emphasis"
+///     "Italic/...": tags.emphasis,
+///     // Style InvalidString nodes as both `string` and `invalid`
+///     "InvalidString": tags.string + tags.invalid
 ///   })
 /// )
 /// ```
-export const styleTags = (tags: {[selector: string]: string}) => defaultTags.add(tags)
+export function styleTags(tags: {[selector: string]: Tag}) {
+  let byName: {[name: string]: Rule} = Object.create(null)
+  for (let prop in tags) {
+    let tagIDs = readSet(tags[prop])
+    for (let part of prop.split(" ")) if (part) {
+      let pieces: (string | null)[] = [], mode = Mode.Normal
+      for (let pos = 0; pos < part.length;) {
+        let rest = part.slice(pos)
+        if (rest == "/...") { mode = Mode.Inherit; break }
+        if (rest == "!") { mode = Mode.Opaque; break }
+        let m = /^"(?:[^"\\]|\\.)*?"|[^\/!]+/.exec(rest)
+        if (!m) throw new RangeError("Invalid path: " + part)
+        pieces.push(m[0] == "*" ? null : m[0][0] == '"' ? JSON.parse(m[0]) : m[0])
+        pos += m[0].length + 1
+        if (pos <= part.length && part[pos - 1] != "/") throw new RangeError("Invalid path: " + part)
+      }
+      let last = pieces.length - 1, inner = pieces[last]
+      if (!inner) throw new RangeError("Invalid path: " + part)
+      for (let tag of tagIDs) {
+        let rule = new Rule(tag, mode, last > 0 ? pieces.slice(0, last) : null)
+        byName[inner] = rule.sort(byName[inner])
+      }
+    }
+  }
+  return ruleNodeProp.add(byName)
+}
+
+const ruleNodeProp = new NodeProp<Rule>()
 
 /// Create a highlighter theme that adds the given styles to the given
-/// tags. The spec's property names must be [tag
-/// names](#highlight.defaultTags) or comma-separated lists of tag
-/// names. The values should be
+/// tags. The spec's property names must be [tags](#highlight.Tag) or
+/// lists of tags (which can be concatenated with `+`). The values
+/// should be
 /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
 /// style objects that define the CSS for that tag.
-export const highlighter = (spec: {[tag: string]: StyleSpec}) => defaultTags.highlighter(spec)
+export function highlighter(spec: {[tag: string]: StyleSpec}): Extension {
+  let styling = new Styling(spec)
+  return [
+    precedence(ViewPlugin.define<Highlighter>(view => new Highlighter(view, styling), {
+      decorations: v => v.decorations
+    }), "fallback"),
+    EditorView.styleModule.of(styling.module)
+  ]
+}
 
-class StyleRule {
-  constructor(public type: number, public flags: number, public specificity: number, public cls: string) {}
+const t = defineTag
+
+const comment = t(), name = t(),
+  literal = t(), string = t(literal), number = t(literal),
+  content = t(), heading = t(content), keyword = t(), operator = t(),
+  punctuation = t(), bracket = t(punctuation), meta = t()
+
+/// The default set of highlighting [tags](#highlight.defineTag) used
+/// by regular language packages and themes.
+///
+/// Note that it is not obligatory to always attach the most specific
+/// tag possible to an element—if your grammar can't easily
+/// distinguish a certain type of element, it is okay to style it as
+/// its more general variant.
+/// 
+/// For tags that extend some parent tag, the
+/// documentation links to the parent.
+export const tags = {
+  /// A comment.
+  comment,
+  /// A line [comment](#highlight.tags.comment).
+  lineComment: t(comment),
+  /// A block [comment](#highlight.tags.comment).
+  blockComment: t(comment),
+  /// A documentation [comment](#highlight.tags.comment).
+  docComment: t(comment),
+
+  /// Any kind of identifier.
+  name,
+  /// The [name](#highlight.tags.name) of a variable.
+  variableName: t(name),
+  /// A type or tag [name](#highlight.tags.name).
+  typeName: t(name),
+  /// A property, field, or attribute [name](#highlight.tags.name).
+  propertyName: t(name),
+  /// The [name](#highlight.tags.name) of a class.
+  className: t(name),
+  /// A label [name](#highlight.tags.name).
+  labelName: t(name),
+  /// A namespace [name](#highlight.tags.name).
+  namespace: t(name),
+
+  /// A literal value.
+  literal,
+  /// A string [literal](#highlight.tags.literal).
+  string,
+  /// A documentation [string](#highlight.tags.string).
+  docString: t(string),
+  /// A character literal (subtag of [string](#highlight.tags.string)).
+  character: t(string),
+  /// A number [literal](#highlight.tags.literal).
+  number,
+  /// An integer [number](#highlight.tags.number) literal.
+  integer: t(number),
+  /// A floating-point [number](#highlight.tags.number) literal.
+  float: t(number),
+  /// A boolean [literal](#highlight.tags.literal).
+  bool: t(literal),
+  /// Regular expression [literal](#highlight.tags.literal).
+  regexp: t(literal),
+  /// An escape [literal](#highlight.tags.literal), for example a
+  /// backslash escape in a string.
+  escape: t(literal),
+  /// A color [literal](#highlight.tags.literal).
+  color: t(literal),
+
+  /// A language keyword.
+  keyword,
+  /// The [keyword](#highlight.tags.keyword) for the self or this
+  /// object.
+  self: t(keyword),
+  /// The [keyword](#highlight.tags.keyword) for null.
+  null: t(keyword),
+  /// A [keyword](#highlight.tags.keyword) denoting some atomic value.
+  atom: t(keyword),
+  /// A [keyword](#highlight.tags.keyword) that represents a unit.
+  unit: t(keyword),
+  /// A modifier [keyword](#highlight.tags.keyword).
+  modifier: t(keyword),
+  /// A [keyword](#highlight.tags.keyword) that acts as an operator.
+  operatorKeyword: t(keyword),
+  /// A control-flow related [keyword](#highlight.tags.keyword).
+  controlKeyword: t(keyword),
+  /// A [keyword](#highlight.tags.keyword) that defines something.
+  definitionKeyword: t(keyword),
+
+  /// An operator.
+  operator,
+  /// An [operator](#highlight.tags.operator) that defines something.
+  derefOperator: t(operator),
+  /// Arithmetic-related [operator](#highlight.tags.operator).
+  arithmeticOperator: t(operator),
+  /// Logical [operator](#highlight.tags.operator).
+  logicOperator: t(operator),
+  /// Bit [operator](#highlight.tags.operator).
+  bitwiseOperator: t(operator),
+  /// Comparison [operator](#highlight.tags.operator).
+  compareOperator: t(operator),
+  /// [Operator](#highlight.tags.operator) that updates its operand.
+  updateOperator: t(operator),
+  /// Type-related [operator](#highlight.tags.operator).
+  typeOperator: t(operator),
+  /// Control-flow [operator](#highlight.tags.operator).
+  controlOperator: t(operator),
+
+  /// Program or markup punctuation.
+  punctuation,
+  /// [Punctuation](#highlight.tags.punctuation) that separates
+  /// things.
+  separator: t(punctuation),
+  /// Bracket-style [punctuation](#highlight.tags.punctuation).
+  bracket,
+  /// Angle [brackets](#highlight.tags.bracket) (usually `<` and `>`
+  /// tokens).
+  angleBracket: t(bracket),
+  /// Square [brackets](#highlight.tags.bracket) (usually `[` and `]`
+  /// tokens).
+  squareBracket: t(bracket),
+  /// Parentheses (usually `(` and `)` tokens). Subtag of
+  /// [bracket](#highlight.tags.bracket)).
+  paren: t(bracket),
+  /// Braces (usually `{` and `}` tokens). Subtag of
+  /// [bracket](#highlight.tags.bracket)).
+  brace: t(bracket),
+
+  /// Content, for example plain text in XML or markup documents.
+  content,
+  /// [Content](#highlight.tags.content) that represents a heading.
+  heading,
+  /// A level 1 [heading](#highlight.tags.heading).
+  heading1: t(heading),
+  /// A level 2 [heading](#highlight.tags.heading).
+  heading2: t(heading),
+  /// A level 3 [heading](#highlight.tags.heading).
+  heading3: t(heading),
+  /// A level 4 [heading](#highlight.tags.heading).
+  heading4: t(heading),
+  /// A level 5 [heading](#highlight.tags.heading).
+  heading5: t(heading),
+  /// A level 6 [heading](#highlight.tags.heading).
+  heading6: t(heading),
+  /// [Content](#highlight.tags.content) that represents a list or
+  /// list marker.
+  list: t(content),
+  /// [Content](#highlight.tags.content) that represents a quote.
+  quote: t(content),
+  /// [Content](#highlight.tags.content) that is emphasized.
+  emphasis: t(content),
+  /// [Content](#highlight.tags.content) that is styled strong.
+  strong: t(content),
+  /// [Content](#highlight.tags.content) that is styled as code or
+  /// monospace.
+  monospace: t(content),
+
+  /// Inserted content in a change-tracking format.
+  inserted: t(),
+  /// Deleted content.
+  deleted: t(),
+  /// Changed content.
+  changed: t(),
+
+  /// An invalid or unsyntactic element.
+  invalid: t(),
+
+  /// Metadata or meta-instruction.
+  meta,
+  /// [Metadata](#higlight.tags.meta) that applies to the entire
+  /// document.
+  documentMeta: t(meta),
+  /// [Metadata](#higlight.tags.meta) that annotates or adds
+  /// attributes to a given syntactic element.
+  annotation: t(meta),
+  /// Processing instruction or preprocessor directive. Subtag of
+  /// [meta](#highlight.tags.meta)).
+  processingInstruction: t(meta),
+
+  /// [Modifier](#highlight.defineTagModifier) that indicates that a
+  /// given element is being defined. Expected to be used with
+  /// [name](#higlight.tags.name) tags.
+  definition: defineTagModifier(),
+  /// [Modifier](#highlight.defineTagModifier) that indicates that
+  /// something is constant. Mostly expected to be used with
+  /// [variable names](#highlight.tags.variableName).
+  constant: defineTagModifier(),
+  /// [Modifier](#highlight.defineTagModifier) used to indicate that a
+  /// [variable name](#highlight.tags.variableName) is being called or
+  /// being defined as a function.
+  function: defineTagModifier(),
+  /// [Modifier](#highlight.defineTagModifier) that can be applied to
+  /// [names](#highlight.tags.name) to indicate that they belong to
+  /// the standard environment.
+  standard: defineTagModifier(),
+  /// [Modifier](#highlight.defineTagModifier) that indicates a given
+  /// [names](#highlight.tags.name) is local to some scope.
+  local: defineTagModifier(),
+
+  /// A generic variant [modifier](#highlight.defineTagModifier) that
+  /// can be used to tag language-specific alternative variants of
+  /// some common tag. It is recommended for themes to define special
+  /// forms of at least the [string](#highlight.tags.string) and
+  /// [variable name](#highlight.tags.variableName) tags, since those
+  /// come up a lot.
+  special: defineTagModifier()
+}
+
+const enum Mode { Opaque, Inherit, Normal }
+
+class Rule {
+  constructor(readonly tag: number,
+              readonly mode: Mode,
+              readonly context: readonly (string | null)[] | null,
+              public next?: Rule) {}
+
+  sort(other: Rule | undefined) {
+    if (!other || other.depth < this.depth) {
+      this.next = other
+      return this
+    }
+    other.next = this.sort(other.next)
+    return other
+  }
+
+  get depth() { return this.context ? this.context.length : 0 }
 }
 
 class Styling {
   module: StyleModule
-  rules: readonly StyleRule[]
-  cache: {[tag: number]: string} = Object.create(null)
+  map: (string | null)[] = []
 
-  constructor(private tags: TagSystem, spec: {[name: string]: StyleSpec}) {
+  constructor(spec: {[name: string]: StyleSpec}) {
     let modSpec = Object.create(null)
-    let rules: StyleRule[] = []
+    let found: {[id: number]: string | null} = Object.create(null)
     for (let prop in spec) {
       let cls = StyleModule.newName()
       modSpec["." + cls] = spec[prop]
-      for (let part of prop.split(/\s*,\s*/)) {
-        let tag = tags.get(part)
-        rules.push(new StyleRule(tag >> tags.typeShift, tag & tags.flagMask, tags.specificity(tag), cls))
-      }
+      for (let tag of readSet(prop)) found[tag] = cls
     }
-    this.rules = rules.sort((a, b) => b.specificity - a.specificity)
     this.module = new StyleModule(modSpec)
-  }
-
-  match(tag: number) {
-    let known = this.cache[tag]
-    if (known != null) return known
-    let result = ""
-    let type = tag >> this.tags.typeShift, flags = tag & this.tags.flagMask
-    for (;;) {
-      for (let rule of this.rules) {
-        if (rule.type == type && (rule.flags & flags) == rule.flags) {
-          if (result) result += " "
-          result += rule.cls
-          flags &= ~rule.flags
-          if (type) break
-        }
+    for (let i = 0; i < tagSets.length; i++) {
+      let value = null
+      for (let id of tagSets[i]) if (found[id]) {
+        value = found[id]
+        break
       }
-      if (type) type = this.tags.parents[type]
-      else break
+      this.map[i] = value
     }
-    return this.cache[tag] = result
   }
 }
 
@@ -333,9 +454,9 @@ class Highlighter implements PluginValue {
   classStack: string[] = [""]
   inheritStack: string[] = [""]
 
-  constructor(view: EditorView, private prop: NodeProp<Rule>, private styling: Styling) {
+  constructor(view: EditorView, private styling: Styling) {
     this.tree = view.state.tree
-    this.decorations = this.buildDeco(view.visibleRanges, this.tree)
+    this.decorations = this.buildDeco(view.visibleRanges)
   }
 
   update(update: ViewUpdate) {
@@ -346,11 +467,11 @@ class Highlighter implements PluginValue {
       this.decorations = this.decorations.map(update.changes)
     } else if (this.tree != syntax[0].getTree(update.state) || update.viewportChanged) {
       this.tree = syntax[0].getTree(update.state)
-      this.decorations = this.buildDeco(update.view.visibleRanges, this.tree)
+      this.decorations = this.buildDeco(update.view.visibleRanges)
     }
   }
 
-  buildDeco(ranges: readonly {from: number, to: number}[], tree: Tree) {
+  buildDeco(ranges: readonly {from: number, to: number}[]) {
     let builder = new RangeSetBuilder<Decoration>()
     let start: number, curClass: string, depth: number
     function flush(pos: number, style: string) {
@@ -362,26 +483,26 @@ class Highlighter implements PluginValue {
     let {nodeStack, classStack, inheritStack} = this
     for (let {from, to} of ranges) {
       curClass = ""; depth = 0; start = from
-      tree.iterate({
+      this.tree.iterate({
         from, to,
         enter: (type, start) => {
           depth++
           let inheritedClass = inheritStack[depth - 1]
           let cls = inheritedClass
-          let rule = type.prop(this.prop), opaque = false
-          while (rule) {
-            if (!rule.context.length || matchContext(rule.context, nodeStack, depth)) {
-              let style = this.styling.match(rule.tag)
+          let rule = type.prop(ruleNodeProp), opaque = false, matched = -1
+          if (rule) do {
+            if (!rule.context || matchContext(rule.context, nodeStack, depth)) {
+              let style = this.styling.map[rule.tag]
               if (style) {
                 if (cls) cls += " "
                 cls += style
                 if (rule.mode == Mode.Inherit) inheritedClass = cls
                 else if (rule.mode == Mode.Opaque) opaque = true
               }
-              break
+              matched = rule.depth
             }
             rule = rule.next
-          }
+          } while (rule && rule.depth >= matched)
           if (cls != curClass) {
             flush(start, curClass)
             curClass = cls
@@ -420,22 +541,20 @@ function matchContext(context: readonly (null | string)[], stack: readonly strin
 
 /// A default highlighter (works well with light themes).
 export const defaultHighlighter = highlighter({
-  deleted: {textDecoration: "line-through"},
-  inserted: {textDecoration: "underline"},
-  link: {textDecoration: "underline"},
-  strong: {fontWeight: "bold"},
-  emphasis: {fontStyle: "italic"},
-  keyword: {color: "#708"},
-  "atom, bool": {color: "#219"},
-  number: {color: "#164"},
-  string: {color: "#a11"},
-  "regexp, escape, string#2": {color: "#e40"},
-  "variableName definition": {color: "#00f"},
-  typeName: {color: "#085"},
-  className: {color: "#167"},
-  "name#2": {color: "#256"},
-  "propertyName definition": {color: "#00c"},
-  comment: {color: "#940"},
-  meta: {color: "#555"},
-  invalid: {color: "#f00"},
+  [tags.deleted]: {textDecoration: "line-through"},
+  [tags.inserted + tags.heading]: {textDecoration: "underline"},
+  [tags.emphasis]: {fontStyle: "italic"},
+  [tags.keyword]: {color: "#708"},
+  [tags.atom + tags.bool]: {color: "#219"},
+  [tags.number]: {color: "#164"},
+  [tags.string]: {color: "#a11"},
+  [tags.regexp + tags.escape + tags.special(tags.string)]: {color: "#e40"},
+  [tags.definition(tags.variableName)]: {color: "#00f"},
+  [tags.typeName]: {color: "#085"},
+  [tags.className]: {color: "#167"},
+  [tags.special(tags.variableName)]: {color: "#256"},
+  [tags.definition(tags.propertyName)]: {color: "#00c"},
+  [tags.comment]: {color: "#940"},
+  [tags.meta]: {color: "#555"},
+  [tags.invalid]: {color: "#f00"},
 })
