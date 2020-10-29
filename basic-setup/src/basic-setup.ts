@@ -12,7 +12,7 @@ import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
 import {gotoLineKeymap} from "@codemirror/next/goto-line"
 import {highlightActiveLine, highlightSelectionMatches} from "@codemirror/next/highlight-selection"
-import {defaultHighlighter} from "@codemirror/next/highlight"
+import {defaultHighlightStyle} from "@codemirror/next/highlight"
 import {lintKeymap} from "@codemirror/next/lint"
 
 /// This is an extension value that just pulls together a whole lot of
@@ -30,7 +30,7 @@ import {lintKeymap} from "@codemirror/next/lint"
 ///  - [custom selection drawing](#view.drawSelection)
 ///  - [multiple selections](#view.EditorView^allowMultipleSelections)
 ///  - [reindentation on input](#view.indentOnInput)
-///  - [the default highlighter](#highlight.defaultHighlighter)
+///  - [the default highlight style](#highlight.defaultHighlightStyle)
 ///  - [bracket matching](#matchbrackets.bracketMatching)
 ///  - [bracket closing](#closebrackets.closeBrackets)
 ///  - [autocompletion](#autocomplete.autocompletion)
@@ -58,7 +58,7 @@ export const basicSetup: Extension = [
   drawSelection(),
   EditorState.allowMultipleSelections.of(true),
   indentOnInput(),
-  defaultHighlighter,
+  defaultHighlightStyle,
   bracketMatching(),
   closeBrackets(),
   autocompletion(),

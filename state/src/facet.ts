@@ -293,7 +293,7 @@ const Prec = {fallback: 3, default: 2, extend: 1, override: 0}
 /// [`"default"`](#state.Precedence) if there is no such parent. The
 /// final ordering of extensions is determined by first sorting by
 /// precedence and then by order within each precedence.
-export function precedence(extension: Extension, value: Precedence) {
+export function precedence(extension: Extension, value: Precedence): Extension {
   if (!Prec.hasOwnProperty(value as string)) throw new RangeError(`Invalid precedence: ${value}`)
   return new PrecExtension(extension, Prec[value])
 }
@@ -317,7 +317,7 @@ class TaggedExtension {
 /// [replace](#state.TransactionSpec.reconfigure) it with
 /// another extension. A given tag may only occur once within a given
 /// configuration.
-export function tagExtension(tag: string | symbol, extension: Extension) {
+export function tagExtension(tag: string | symbol, extension: Extension): Extension {
   return new TaggedExtension(tag, extension)
 }
 

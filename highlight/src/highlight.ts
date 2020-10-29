@@ -1,7 +1,7 @@
 import {Tree, NodeProp} from "lezer-tree"
 import {StyleSpec, StyleModule} from "style-mod"
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
-import {EditorState, Extension, precedence} from "@codemirror/next/state"
+import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
+import {Extension, precedence, Facet, Syntax} from "@codemirror/next/state"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
 let nextTagID = 0
@@ -9,7 +9,7 @@ let nextTagID = 0
 /// Highlighting tags are markers that denote a highlighting category.
 /// They are [associated](#highlight.styleTags) with parts of a syntax
 /// tree by a language mode, and then mapped to an actual CSS style by
-/// a [highlighter](#highlight.highlighter).
+/// a [highlight style](#highlight.highlightStyle).
 ///
 /// CodeMirror uses a mostly-closed set of tags for generic
 /// highlighters, so that the list of things that a theme must style
@@ -40,9 +40,10 @@ class Tag {
   ) {}
 
   /// Define a new tag. If `parent` is given, the tag is treated as a
-  /// sub-tag of that parent, and [highlighters](#highlight.highlighter)
-  /// that don't mention this tag will try to fall back to the parent
-  /// tag (or grandparent tag, etc).
+  /// sub-tag of that parent, and [highlight
+  /// styles](#highlight.highlightStyle) that don't mention this tag
+  /// will try to fall back to the parent tag (or grandparent tag,
+  /// etc).
   static define(parent?: Tag): Tag {
     if (parent?.base) throw new Error("Can not derive from a modified tag")
     let tag = new Tag([], null, [])
@@ -179,10 +180,14 @@ export function styleTags(spec: {[selector: string]: Tag | readonly Tag[]}) {
 
 const ruleNodeProp = new NodeProp<Rule>()
 
-/// Create a highlighter theme that adds the given styles to the given
-/// tags. The spec's property names must be [tags](#highlight.Tag) or
-/// lists of tags (which can be concatenated with `+`). The values
-/// should be
+const highlightStyleProp = Facet.define<Styling, Styling | null>({
+  combine(stylings) { return stylings.length ? stylings[0] : null }
+})
+
+/// Create a highlighter style that associates the given styles to the
+/// given tags. The spec's property names must be
+/// [tags](#highlight.Tag) or lists of tags (which can be concatenated
+/// with `+`). The values should be
 /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
 /// style objects that define the CSS for that tag.
 ///
@@ -191,14 +196,168 @@ const ruleNodeProp = new NodeProp<Rule>()
 /// have multiple tags associated with them, styles defined further
 /// down in the list will have a higher CSS precedence than styles
 /// defined earlier.
-export function highlighter(spec: readonly {tag: Tag | readonly Tag[], [prop: string]: any}[]): Extension {
-  let styling = new Styling(spec)
+export function highlightStyle(...specs: readonly {tag: Tag | readonly Tag[], [prop: string]: any}[]): Extension {
+  let styling = new Styling(specs)
   return [
-    precedence(ViewPlugin.define<Highlighter>(view => new Highlighter(view, styling), {
-      decorations: v => v.decorations
-    }), "fallback"),
+    highlightStyleProp.of(styling),
     EditorView.styleModule.of(styling.module)
   ]
+}
+
+const enum Mode { Opaque, Inherit, Normal }
+
+class Rule {
+  constructor(readonly tags: readonly Tag[],
+              readonly mode: Mode,
+              readonly context: readonly (string | null)[] | null,
+              public next?: Rule) {}
+
+  sort(other: Rule | undefined) {
+    if (!other || other.depth < this.depth) {
+      this.next = other
+      return this
+    }
+    other.next = this.sort(other.next)
+    return other
+  }
+
+  get depth() { return this.context ? this.context.length : 0 }
+}
+
+class Styling {
+  module: StyleModule
+  map: {[tagID: number]: string | null} = Object.create(null)
+
+  constructor(spec: readonly (StyleSpec & {tag: Tag | readonly Tag[]})[]) {
+    let modSpec = Object.create(null)
+    for (let style of spec) {
+      let cls = StyleModule.newName()
+      modSpec["." + cls] = Object.assign({}, style, {tag: null})
+      let tags = style.tag
+      if (!Array.isArray(tags)) tags = [tags as Tag]
+      for (let tag of tags) this.map[tag.id] = cls
+    }
+    this.module = new StyleModule(modSpec)
+  }
+
+  match(tag: Tag) {
+    for (let t of tag.set) {
+      let match = this.map[t.id]
+      if (match) {
+        if (t != tag) this.map[tag.id] = match
+        return match
+      }
+    }
+    return this.map[tag.id] = null
+  }
+}
+
+export function lezerHighlighter(syntax: Syntax) {
+  return precedence(ViewPlugin.define(view => new LezerHighlighter(view, syntax), {
+    decorations: v => v.decorations
+  }), "fallback")
+}
+
+class LezerHighlighter {
+  // Reused stacks for buildDeco
+  nodeStack: string[] = [""]
+  classStack: string[] = [""]
+  inheritStack: string[] = [""]
+
+  decorations: DecorationSet
+  tree: Tree
+  markCache: {[cls: string]: Decoration} = Object.create(null)
+
+  constructor(view: EditorView, private syntax: Syntax) {
+    this.tree = syntax.getTree(view.state)
+    this.decorations = this.buildDeco(view)
+  }
+
+  update(update: ViewUpdate) {
+    if (this.syntax.parsePos(update.state) < update.view.viewport.to) {
+      this.decorations = this.decorations.map(update.changes)
+    } else {
+      let tree = this.syntax.getTree(update.state)
+      if (tree != this.tree || update.viewportChanged) {
+        this.tree = tree
+        this.decorations = this.buildDeco(update.view)
+      }
+    }
+  }
+
+  buildDeco(view: EditorView) {
+    const style = view.state.facet(highlightStyleProp)
+    if (!style) return Decoration.none
+
+    let builder = new RangeSetBuilder<Decoration>()
+    let start: number, curClass: string, depth: number
+    let flush = (pos: number, style: string) => {
+      if (pos > start && style) {
+        let mark = this.markCache[style] || (this.markCache[style] = Decoration.mark({class: style}))
+        builder.add(start, pos, mark)
+      }
+      start = pos
+    }
+
+    let {nodeStack, classStack, inheritStack} = this
+    for (let {from, to} of view.visibleRanges) {
+      curClass = ""; depth = 0; start = from
+      this.tree.iterate({
+        from, to,
+        enter: (type, start) => {
+          depth++
+          let inheritedClass = inheritStack[depth - 1]
+          let cls = inheritedClass
+          let rule = type.prop(ruleNodeProp), opaque = false
+          while (rule) {
+            if (!rule.context || matchContext(rule.context, nodeStack, depth)) {
+              for (let tag of rule.tags) {
+                let st = style.match(tag)
+                if (st) {
+                  if (cls) cls += " "
+                  cls += st
+                  if (rule.mode == Mode.Inherit) inheritedClass = cls
+                  else if (rule.mode == Mode.Opaque) opaque = true
+                }
+              }
+              break
+            }
+            rule = rule.next
+          }
+          if (cls != curClass) {
+            flush(start, curClass)
+            curClass = cls
+          }
+          if (opaque) {
+            depth--
+            return false
+          }
+          classStack[depth] = cls
+          inheritStack[depth] = inheritedClass
+          nodeStack[depth] = type.name
+          return undefined
+        },
+        leave: (_t, _s, end) => {
+          depth--
+          let backTo = classStack[depth]
+          if (backTo != curClass) {
+            flush(Math.min(to, end), curClass)
+            curClass = backTo
+          }
+        }
+      })
+    }
+    return builder.finish()
+  }
+}  
+
+function matchContext(context: readonly (null | string)[], stack: readonly string[], depth: number) {
+  if (context.length > depth - 1) return false
+  for (let d = depth - 1, i = context.length - 1; i >= 0; i--, d--) {
+    let check = context[i]
+    if (check && check != stack[d]) return false
+  }
+  return true
 }
 
 const t = Tag.define
@@ -421,166 +580,38 @@ export const tags = {
   special: Tag.defineModifier()
 }
 
-const enum Mode { Opaque, Inherit, Normal }
-
-class Rule {
-  constructor(readonly tags: readonly Tag[],
-              readonly mode: Mode,
-              readonly context: readonly (string | null)[] | null,
-              public next?: Rule) {}
-
-  sort(other: Rule | undefined) {
-    if (!other || other.depth < this.depth) {
-      this.next = other
-      return this
-    }
-    other.next = this.sort(other.next)
-    return other
-  }
-
-  get depth() { return this.context ? this.context.length : 0 }
-}
-
-class Styling {
-  module: StyleModule
-  map: {[tagID: number]: string | null} = Object.create(null)
-
-  constructor(spec: readonly (StyleSpec & {tag: Tag | readonly Tag[]})[]) {
-    let modSpec = Object.create(null)
-    for (let style of spec) {
-      let cls = StyleModule.newName()
-      modSpec["." + cls] = Object.assign({}, style, {tag: null})
-      let tags = style.tag
-      if (!Array.isArray(tags)) tags = [tags as Tag]
-      for (let tag of tags) this.map[tag.id] = cls
-    }
-    this.module = new StyleModule(modSpec)
-  }
-
-  match(tag: Tag) {
-    for (let t of tag.set) {
-      let match = this.map[t.id]
-      if (match) {
-        if (t != tag) this.map[tag.id] = match
-        return match
-      }
-    }
-    return this.map[tag.id] = null
-  }
-}
-
-class Highlighter implements PluginValue {
-  tree: Tree
-  decorations: DecorationSet
-
-  // Reused stacks for buildDeco
-  nodeStack: string[] = [""]
-  classStack: string[] = [""]
-  inheritStack: string[] = [""]
-
-  constructor(view: EditorView, private styling: Styling) {
-    this.tree = view.state.tree
-    this.decorations = this.buildDeco(view.visibleRanges)
-  }
-
-  update(update: ViewUpdate) {
-    let syntax = update.state.facet(EditorState.syntax)
-    if (!syntax.length) {
-      this.decorations = Decoration.none
-    } else if (syntax[0].parsePos(update.state) < update.view.viewport.to) {
-      this.decorations = this.decorations.map(update.changes)
-    } else if (this.tree != syntax[0].getTree(update.state) || update.viewportChanged) {
-      this.tree = syntax[0].getTree(update.state)
-      this.decorations = this.buildDeco(update.view.visibleRanges)
-    }
-  }
-
-  buildDeco(ranges: readonly {from: number, to: number}[]) {
-    let builder = new RangeSetBuilder<Decoration>()
-    let start: number, curClass: string, depth: number
-    function flush(pos: number, style: string) {
-      if (pos > start && style)
-        builder.add(start, pos, Decoration.mark({class: style})) // FIXME cache these
-      start = pos
-    }
-
-    let {nodeStack, classStack, inheritStack} = this
-    for (let {from, to} of ranges) {
-      curClass = ""; depth = 0; start = from
-      this.tree.iterate({
-        from, to,
-        enter: (type, start) => {
-          depth++
-          let inheritedClass = inheritStack[depth - 1]
-          let cls = inheritedClass
-          let rule = type.prop(ruleNodeProp), opaque = false
-          while (rule) {
-            if (!rule.context || matchContext(rule.context, nodeStack, depth)) {
-              for (let tag of rule.tags) {
-                let style = this.styling.match(tag)
-                if (style) {
-                  if (cls) cls += " "
-                  cls += style
-                  if (rule.mode == Mode.Inherit) inheritedClass = cls
-                  else if (rule.mode == Mode.Opaque) opaque = true
-                }
-              }
-              break
-            }
-            rule = rule.next
-          }
-          if (cls != curClass) {
-            flush(start, curClass)
-            curClass = cls
-          }
-          if (opaque) {
-            depth--
-            return false
-          }
-          classStack[depth] = cls
-          inheritStack[depth] = inheritedClass
-          nodeStack[depth] = type.name
-          return undefined
-        },
-        leave: (_t, _s, end) => {
-          depth--
-          let backTo = classStack[depth]
-          if (backTo != curClass) {
-            flush(Math.min(to, end), curClass)
-            curClass = backTo
-          }
-        }
-      })
-    }
-    return builder.finish()
-  }
-}
-
-function matchContext(context: readonly (null | string)[], stack: readonly string[], depth: number) {
-  if (context.length > depth - 1) return false
-  for (let d = depth - 1, i = context.length - 1; i >= 0; i--, d--) {
-    let check = context[i]
-    if (check && check != stack[d]) return false
-  }
-  return true
-}
-
-/// A default highlighter (works well with light themes).
-export const defaultHighlighter = highlighter([
-  {tag: tags.deleted, textDecoration: "line-through"},
-  {tag: [tags.inserted, tags.heading, tags.link], textDecoration: "underline"},
-  {tag: tags.emphasis, fontStyle: "italic"},
-  {tag: tags.keyword, color: "#708"},
-  {tag: [tags.atom, tags.bool], color: "#219"},
-  {tag: tags.number, color: "#164"},
-  {tag: tags.string, color: "#a11"},
-  {tag: [tags.regexp, tags.escape, tags.special(tags.string)], color: "#e40"},
-  {tag: tags.definition(tags.variableName), color: "#00f"},
-  {tag: tags.typeName, color: "#085"},
-  {tag: tags.className, color: "#167"},
-  {tag: tags.special(tags.variableName), color: "#256"},
-  {tag: tags.definition(tags.propertyName), color: "#00c"},
-  {tag: tags.comment, color: "#940"},
-  {tag: tags.meta, color: "#555"},
-  {tag: tags.invalid, color: "#f00"}
-])
+/// A default highlight style (works well with light themes).
+export const defaultHighlightStyle: Extension = precedence(highlightStyle(
+  {tag: tags.deleted,
+   textDecoration: "line-through"},
+  {tag: [tags.inserted, tags.heading, tags.link],
+   textDecoration: "underline"},
+  {tag: tags.emphasis,
+   fontStyle: "italic"},
+  {tag: tags.keyword,
+   color: "#708"},
+  {tag: [tags.atom, tags.bool],
+   color: "#219"},
+  {tag: tags.number,
+   color: "#164"},
+  {tag: tags.string,
+   color: "#a11"},
+  {tag: [tags.regexp, tags.escape, tags.special(tags.string)],
+   color: "#e40"},
+  {tag: tags.definition(tags.variableName),
+   color: "#00f"},
+  {tag: tags.typeName,
+   color: "#085"},
+  {tag: tags.className,
+   color: "#167"},
+  {tag: tags.special(tags.variableName),
+   color: "#256"},
+  {tag: tags.definition(tags.propertyName),
+   color: "#00c"},
+  {tag: tags.comment,
+   color: "#940"},
+  {tag: tags.meta,
+   color: "#555"},
+  {tag: tags.invalid,
+   color: "#f00"}
+), "fallback")
