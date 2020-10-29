@@ -39,7 +39,7 @@ export const htmlSyntax = LezerSyntax.define(configureHTML([
     "Text RawText": t.content,
     "StartTag StartCloseTag SelfCloserEndTag EndTag SelfCloseEndTag": t.angleBracket,
     TagName: t.typeName,
-    "MismatchedCloseTag/TagName": t.typeName +  t.invalid,
+    "MismatchedCloseTag/TagName": [t.typeName,  t.invalid],
     AttributeName: t.propertyName,
     UnquotedAttributeValue: t.string,
     Is: t.definitionOperator,

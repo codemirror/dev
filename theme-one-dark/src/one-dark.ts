@@ -1,6 +1,6 @@
 import {EditorView} from "@codemirror/next/view"
 import {Extension} from "@codemirror/next/state"
-import {highlighter} from "@codemirror/next/highlight"
+import {highlighter, tags as t} from "@codemirror/next/highlight"
 
 const chalky = "#e5c07b",
   coral = "#e06c75",
@@ -70,24 +70,24 @@ const oneDarkTheme = EditorView.theme({
   }
 }, {dark: true})
 
-const oneDarkHighlighter = highlighter({
-  invalid: {color: invalid},
-  comment: {color: lightDark},
-  keyword: {color: purple},
-  "name, deleted": {color: coral},
-  "operator, operatorKeyword, regexp": {color: fountainBlue},
-  "string, inserted": {color: green},
-  propertyName: {color: malibu},
-  "color, name constant, name standard": {color: whiskey},
-  "name definition": {color: lightWhite},
-  "typeName, className, number, changed": {color: chalky},
-  "meta": {color: dark},
-  strong: {fontWeight: "bold"},
-  emphasis: {fontStyle: "italic"},
-  link: {color: dark, textDecoration: "underline"},
-  heading: {fontWeight: "bold", color: coral},
-  "atom, bool": { color: whiskey }
-})
+const oneDarkHighlighter = highlighter([
+  {tag: t.comment, color: lightDark},
+  {tag: t.keyword, color: purple},
+  {tag: [t.name, t.deleted], color: coral},
+  {tag: [t.operator, t.operatorKeyword, t.regexp], color: fountainBlue},
+  {tag: [t.string, t.inserted], color: green},
+  {tag: t.propertyName, color: malibu},
+  {tag: [t.color, t.constant(t.name), t.standard(t.name)], color: whiskey},
+  {tag: t.definition(t.name), color: lightWhite},
+  {tag: [t.typeName, t.className, t.number, t.changed], color: chalky},
+  {tag: t.meta, color: dark},
+  {tag: t.strong, fontWeight: "bold"}, // FIXME export a template for this from highlight
+  {tag: t.emphasis, fontStyle: "italic"},
+  {tag: t.link, color: dark, textDecoration: "underline"},
+  {tag: t.heading, fontWeight: "bold", color: coral},
+  {tag: [t.atom, t.bool], color: whiskey },
+  {tag: t.invalid, color: invalid},
+])
 
 /// Extension to enable the One Dark theme.
 export const oneDark: Extension = [oneDarkTheme, oneDarkHighlighter]

@@ -4,10 +4,7 @@ import {EditorView, ViewPlugin, PluginValue, ViewUpdate, Decoration, DecorationS
 import {EditorState, Extension, precedence} from "@codemirror/next/state"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
-// For each tag, this holds the set of tags that match it, in order of
-// specificity. The set always contains the tag itself
-// (`tagSets[i].includes(i)` is true for any defined tag).
-const tagSets: (readonly number[])[] = []
+let nextTagID = 0
 
 /// Highlighting tags are markers that denote a highlighting category.
 /// They are [associated](#highlight.styleTags) with parts of a syntax
@@ -17,50 +14,80 @@ const tagSets: (readonly number[])[] = []
 /// CodeMirror uses a mostly-closed set of tags for generic
 /// highlighters, so that the list of things that a theme must style
 /// is clear and bounded (as opposed to traditional open string-based
-/// systems, which make it very hard for highlighting themes to cover
-/// all the styles produced by the various languages).
+/// systems, which make it hard for highlighting themes to cover all
+/// the tokens produced by the various languages).
 ///
-/// It _is_ possible to [define](#highlight.defineTag) your own
+/// It _is_ possible to [define](#highlight.Tag^define) your own
 /// highlighting tags for system-internal use (where you control both
 /// the language package and the highlighter), but such tags will not
 /// be picked up by other highlighters (though you can derive them
 /// from standard tags to allow the highlighters to fall back to
 /// those).
-///
-/// Tags are represented as strings for practical purposes (so that
-/// they can be used as object property names in
-/// [highlighter](#highlight.highlighter) and so that they can be
-/// concatenated with `+`), but their content should not be treated as
-/// meaningful, and they should _definitely_ not be created in any
-/// other way than [`defineTag`](#highlight.defineTag).
-export type Tag = string
+class Tag {
+  /// @internal
+  id = nextTagID++
 
-function read(tag: Tag) {
-  let m = /^⟬(\d+)⟭$/.exec(tag), val = m ? +m[1] : 1e8
-  if (val >= tagSets.length) throw new RangeError("Invalid tag " + tag)
-  return val
-}
+  /// @internal
+  constructor(
+    /// The set of tags that match this tag, starting with this one
+    /// itself, sorted in order of decreasing specificity. @internal
+    readonly set: Tag[],
+    /// The base unmodified tag that this one is based on, if it's
+    /// modified @internal
+    readonly base: Tag | null,
+    /// The modifiers applied to this.base @internal
+    readonly modified: readonly Modifier[]
+  ) {}
 
-function toTag(id: number) { return `⟬${id}⟭` }
-
-function readSet(tags: string) { return tags.split(/(?=⟬)/).map(read) }
-
-/// Define a new tag. If `parent` is given, the tag is treated as a
-/// sub-tag of that parent, and [highlighters](#highlight.highliter)
-/// that don't mention this tag will try to fall back to the parent
-/// tag (or grandparent tag, etc).
-export function defineTag(parent?: Tag): Tag {
-  let id = tagSets.length, set = [id]
-  if (parent) {
-    let id = read(parent)
-    set = set.concat(tagSets[id])
+  /// Define a new tag. If `parent` is given, the tag is treated as a
+  /// sub-tag of that parent, and [highlighters](#highlight.highlighter)
+  /// that don't mention this tag will try to fall back to the parent
+  /// tag (or grandparent tag, etc).
+  static define(parent?: Tag): Tag {
+    if (parent?.base) throw new Error("Can not derive from a modified tag")
+    let tag = new Tag([], null, [])
+    tag.set.push(tag)
+    if (parent) for (let t of parent.set) tag.set.push(t)
+    return tag
   }
-  tagSets.push(set)
-  return toTag(id)
+
+  /// Define a tag _modifier_, which is a function that, given a tag,
+  /// will return a tag that is a subtag of the original. Applying the
+  /// same modifier to a twice tag will return the same value (`m1(t1)
+  /// == m1(t1)`) and applying multiple modifiers will, regardless or
+  /// order, produce the same tag (`m1(m2(t1)) == m2(m1(t1))`).
+  ///
+  /// When multiple modifiers are applied to a given base tag, each
+  /// smaller set of modifiers is registered as a parent, so that for
+  /// example `m1(m2(m3(t1)))` is a subtype of `m1(m2(t1))`,
+  /// `m1(m3(t1)`, and so on.
+  static defineModifier(): (tag: Tag) => Tag {
+    let mod = new Modifier
+    return (tag: Tag) => {
+      if (tag.modified.indexOf(mod) > -1) return tag
+      return Modifier.get(tag.base || tag, tag.modified.concat(mod).sort((a, b) => a.id - b.id))
+    }
+  }
 }
 
-let modifierID = 0
-const modified: {orig: number, mods: readonly number[], tag: number}[] = []
+let nextModifierID = 0
+
+class Modifier {
+  instances: Tag[] = []
+  id = nextModifierID++
+
+  static get(base: Tag, mods: readonly Modifier[]) {
+    if (!mods.length) return base
+    let exists = mods[0].instances.find(t => t.base == base && sameArray(mods, t.modified))
+    if (exists) return exists
+    let set: Tag[] = [], tag = new Tag(set, base, mods)
+    for (let m of mods) m.instances.push(tag)
+    let configs = permute(mods)
+    for (let parent of base.set) for (let config of configs)
+      set.push(Modifier.get(parent, config))
+    return tag
+  }
+}
 
 function sameArray<T>(a: readonly T[], b: readonly T[]) {
   return a.length == b.length && a.every((x, i) => x == b[i])
@@ -74,45 +101,12 @@ function permute<T>(array: readonly T[]): (readonly T[])[] {
   return result
 }
 
-function getModified(orig: number, mods: readonly number[]) {
-  if (!mods.length) return orig
-  let exists = modified.find(m => m.orig == orig && sameArray(mods, m.mods))
-  if (exists) return exists.tag
-  let tag = tagSets.length
-  modified.push({orig, mods, tag})
-  let configs = permute(mods), set = []
-  for (let parent of tagSets[orig]) for (let config of configs)
-    set.push(getModified(parent, config))
-  tagSets.push(set)
-  return tag
-}
-
-/// Define a tag _modifier_, which is a function that, given a tag,
-/// will return a tag that is a subtag of the original. Applying the
-/// same modifier to a twice tag will return the same value (`m1(t1)
-/// == m1(t1)`) and applying multiple modifiers will, regardless or
-/// order, produce the same tag (`m1(m2(t1)) == m2(m1(t1))`).
-///
-/// When multiple modifiers are applied to a given base tag, each
-/// smaller set of modifiers is registered as a parent, so that for
-/// example `m1(m2(m3(t1)))` is a subtype of `m1(m2(t1))`,
-/// `m1(m3(t1)`, and so on.
-export function defineTagModifier() {
-  let modID = modifierID++
-  return (tag: Tag) => {
-    let id = read(tag)
-    let known = modified.find(m => m.tag == id)
-    if (known && known.mods.indexOf(modID) > -1) return tag
-    return toTag(getModified(known ? known.orig : id, (known ? known.mods : []).concat(modID).sort((a, b) => a - b)))
-  }
-}
-
-/// Used to add a set of tags to a language syntax via
+/// This function is used to add a set of tags to a language syntax
+/// via
 /// [`Parser.withProps`](https://lezer.codemirror.net/docs/ref#lezer.Parser.withProps).
 ///
 /// The argument object maps node selectors to [highlighting
-/// tags](#highlight.Tag) or sets of tags (created by concatenating
-/// them with the `+` operator).
+/// tags](#highlight.Tag) or arrays of tags.
 ///
 /// Node selectors may hold one or more (space-separated) node paths.
 /// Such a path can be a [node
@@ -157,10 +151,11 @@ export function defineTagModifier() {
 ///   })
 /// )
 /// ```
-export function styleTags(tags: {[selector: string]: Tag}) {
+export function styleTags(spec: {[selector: string]: Tag | readonly Tag[]}) {
   let byName: {[name: string]: Rule} = Object.create(null)
-  for (let prop in tags) {
-    let tagIDs = readSet(tags[prop])
+  for (let prop in spec) {
+    let tags = spec[prop]
+    if (!Array.isArray(tags)) tags = [tags as Tag]
     for (let part of prop.split(" ")) if (part) {
       let pieces: (string | null)[] = [], mode = Mode.Normal
       for (let pos = 0; pos < part.length;) {
@@ -175,10 +170,8 @@ export function styleTags(tags: {[selector: string]: Tag}) {
       }
       let last = pieces.length - 1, inner = pieces[last]
       if (!inner) throw new RangeError("Invalid path: " + part)
-      for (let tag of tagIDs) {
-        let rule = new Rule(tag, mode, last > 0 ? pieces.slice(0, last) : null)
-        byName[inner] = rule.sort(byName[inner])
-      }
+      let rule = new Rule(tags, mode, last > 0 ? pieces.slice(0, last) : null)
+      byName[inner] = rule.sort(byName[inner])
     }
   }
   return ruleNodeProp.add(byName)
@@ -198,7 +191,7 @@ const ruleNodeProp = new NodeProp<Rule>()
 /// have multiple tags associated with them, styles defined further
 /// down in the list will have a higher CSS precedence than styles
 /// defined earlier.
-export function highlighter(spec: {[tag: string]: StyleSpec}): Extension {
+export function highlighter(spec: readonly {tag: Tag | readonly Tag[], [prop: string]: any}[]): Extension {
   let styling = new Styling(spec)
   return [
     precedence(ViewPlugin.define<Highlighter>(view => new Highlighter(view, styling), {
@@ -208,23 +201,32 @@ export function highlighter(spec: {[tag: string]: StyleSpec}): Extension {
   ]
 }
 
-const t = defineTag
+const t = Tag.define
 
 const comment = t(), name = t(),
   literal = t(), string = t(literal), number = t(literal),
   content = t(), heading = t(content), keyword = t(), operator = t(),
   punctuation = t(), bracket = t(punctuation), meta = t()
 
-/// The default set of highlighting [tags](#highlight.defineTag) used
+/// The default set of highlighting [tags](#highlight.Tag^define) used
 /// by regular language packages and themes.
+///
+/// This collection is heavily biasted towards programming language,
+/// and necessarily incomplete. A full ontology of syntactic
+/// constructs would fill a stack of books, and be impractical to
+/// write themes for. So try to make do with this set, possibly
+/// encoding more information with flags. If all else fails, [open an
+/// issue](https://github.com/codemirror/codemirror.next) to propose a
+/// new type, or [define](#highlight.Tag^define) a custom tag for your
+/// use case.
 ///
 /// Note that it is not obligatory to always attach the most specific
 /// tag possible to an element—if your grammar can't easily
 /// distinguish a certain type of element, it is okay to style it as
 /// its more general variant.
 /// 
-/// For tags that extend some parent tag, the
-/// documentation links to the parent.
+/// For tags that extend some parent tag, the documentation links to
+/// the parent.
 export const tags = {
   /// A comment.
   comment,
@@ -362,6 +364,8 @@ export const tags = {
   emphasis: t(content),
   /// [Content](#highlight.tags.content) that is styled strong.
   strong: t(content),
+  /// [Content](#highlight.tags.content) that is part of a link.
+  link: t(content),
   /// [Content](#highlight.tags.content) that is styled as code or
   /// monospace.
   monospace: t(content),
@@ -388,39 +392,39 @@ export const tags = {
   /// [meta](#highlight.tags.meta)).
   processingInstruction: t(meta),
 
-  /// [Modifier](#highlight.defineTagModifier) that indicates that a
+  /// [Modifier](#highlight.Tag^defineModifier) that indicates that a
   /// given element is being defined. Expected to be used with the
   /// various [name](#higlight.tags.name) tags.
-  definition: defineTagModifier(),
-  /// [Modifier](#highlight.defineTagModifier) that indicates that
+  definition: Tag.defineModifier(),
+  /// [Modifier](#highlight.Tag^defineModifier) that indicates that
   /// something is constant. Mostly expected to be used with
   /// [variable names](#highlight.tags.variableName).
-  constant: defineTagModifier(),
-  /// [Modifier](#highlight.defineTagModifier) used to indicate that a
+  constant: Tag.defineModifier(),
+  /// [Modifier](#highlight.Tag^defineModifier) used to indicate that a
   /// [variable name](#highlight.tags.variableName) is being called or
   /// being defined as a function.
-  function: defineTagModifier(),
-  /// [Modifier](#highlight.defineTagModifier) that can be applied to
+  function: Tag.defineModifier(),
+  /// [Modifier](#highlight.Tag^defineModifier) that can be applied to
   /// [names](#highlight.tags.name) to indicate that they belong to
   /// the standard environment.
-  standard: defineTagModifier(),
-  /// [Modifier](#highlight.defineTagModifier) that indicates a given
+  standard: Tag.defineModifier(),
+  /// [Modifier](#highlight.Tag^defineModifier) that indicates a given
   /// [names](#highlight.tags.name) is local to some scope.
-  local: defineTagModifier(),
+  local: Tag.defineModifier(),
 
-  /// A generic variant [modifier](#highlight.defineTagModifier) that
+  /// A generic variant [modifier](#highlight.Tag^defineModifier) that
   /// can be used to tag language-specific alternative variants of
   /// some common tag. It is recommended for themes to define special
   /// forms of at least the [string](#highlight.tags.string) and
   /// [variable name](#highlight.tags.variableName) tags, since those
   /// come up a lot.
-  special: defineTagModifier()
+  special: Tag.defineModifier()
 }
 
 const enum Mode { Opaque, Inherit, Normal }
 
 class Rule {
-  constructor(readonly tag: number,
+  constructor(readonly tags: readonly Tag[],
               readonly mode: Mode,
               readonly context: readonly (string | null)[] | null,
               public next?: Rule) {}
@@ -439,25 +443,29 @@ class Rule {
 
 class Styling {
   module: StyleModule
-  map: (string | null)[] = []
+  map: {[tagID: number]: string | null} = Object.create(null)
 
-  constructor(spec: {[name: string]: StyleSpec}) {
+  constructor(spec: readonly (StyleSpec & {tag: Tag | readonly Tag[]})[]) {
     let modSpec = Object.create(null)
-    let found: {[id: number]: string | null} = Object.create(null)
-    for (let prop in spec) {
+    for (let style of spec) {
       let cls = StyleModule.newName()
-      modSpec["." + cls] = spec[prop]
-      for (let tag of readSet(prop)) found[tag] = cls
+      modSpec["." + cls] = Object.assign({}, style, {tag: null})
+      let tags = style.tag
+      if (!Array.isArray(tags)) tags = [tags as Tag]
+      for (let tag of tags) this.map[tag.id] = cls
     }
     this.module = new StyleModule(modSpec)
-    for (let i = 0; i < tagSets.length; i++) {
-      let value = null
-      for (let id of tagSets[i]) if (found[id]) {
-        value = found[id]
-        break
+  }
+
+  match(tag: Tag) {
+    for (let t of tag.set) {
+      let match = this.map[t.id]
+      if (match) {
+        if (t != tag) this.map[tag.id] = match
+        return match
       }
-      this.map[i] = value
     }
+    return this.map[tag.id] = null
   }
 }
 
@@ -505,20 +513,22 @@ class Highlighter implements PluginValue {
           depth++
           let inheritedClass = inheritStack[depth - 1]
           let cls = inheritedClass
-          let rule = type.prop(ruleNodeProp), opaque = false, matched = -1
-          if (rule) do {
+          let rule = type.prop(ruleNodeProp), opaque = false
+          while (rule) {
             if (!rule.context || matchContext(rule.context, nodeStack, depth)) {
-              let style = this.styling.map[rule.tag]
-              if (style) {
-                if (cls) cls += " "
-                cls += style
-                if (rule.mode == Mode.Inherit) inheritedClass = cls
-                else if (rule.mode == Mode.Opaque) opaque = true
+              for (let tag of rule.tags) {
+                let style = this.styling.match(tag)
+                if (style) {
+                  if (cls) cls += " "
+                  cls += style
+                  if (rule.mode == Mode.Inherit) inheritedClass = cls
+                  else if (rule.mode == Mode.Opaque) opaque = true
+                }
               }
-              matched = rule.depth
+              break
             }
             rule = rule.next
-          } while (rule && rule.depth >= matched)
+          }
           if (cls != curClass) {
             flush(start, curClass)
             curClass = cls
@@ -556,21 +566,21 @@ function matchContext(context: readonly (null | string)[], stack: readonly strin
 }
 
 /// A default highlighter (works well with light themes).
-export const defaultHighlighter = highlighter({
-  [tags.deleted]: {textDecoration: "line-through"},
-  [tags.inserted + tags.heading]: {textDecoration: "underline"},
-  [tags.emphasis]: {fontStyle: "italic"},
-  [tags.keyword]: {color: "#708"},
-  [tags.atom + tags.bool]: {color: "#219"},
-  [tags.number]: {color: "#164"},
-  [tags.string]: {color: "#a11"},
-  [tags.regexp + tags.escape + tags.special(tags.string)]: {color: "#e40"},
-  [tags.definition(tags.variableName)]: {color: "#00f"},
-  [tags.typeName]: {color: "#085"},
-  [tags.className]: {color: "#167"},
-  [tags.special(tags.variableName)]: {color: "#256"},
-  [tags.definition(tags.propertyName)]: {color: "#00c"},
-  [tags.comment]: {color: "#940"},
-  [tags.meta]: {color: "#555"},
-  [tags.invalid]: {color: "#f00"},
-})
+export const defaultHighlighter = highlighter([
+  {tag: tags.deleted, textDecoration: "line-through"},
+  {tag: [tags.inserted, tags.heading, tags.link], textDecoration: "underline"},
+  {tag: tags.emphasis, fontStyle: "italic"},
+  {tag: tags.keyword, color: "#708"},
+  {tag: [tags.atom, tags.bool], color: "#219"},
+  {tag: tags.number, color: "#164"},
+  {tag: tags.string, color: "#a11"},
+  {tag: [tags.regexp, tags.escape, tags.special(tags.string)], color: "#e40"},
+  {tag: tags.definition(tags.variableName), color: "#00f"},
+  {tag: tags.typeName, color: "#085"},
+  {tag: tags.className, color: "#167"},
+  {tag: tags.special(tags.variableName), color: "#256"},
+  {tag: tags.definition(tags.propertyName), color: "#00c"},
+  {tag: tags.comment, color: "#940"},
+  {tag: tags.meta, color: "#555"},
+  {tag: tags.invalid, color: "#f00"}
+])
