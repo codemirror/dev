@@ -6,7 +6,7 @@ import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, St
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
-import {lezerHighlighter} from "@codemirror/next/highlight"
+import {treeHighlighter} from "@codemirror/next/highlight"
 
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
@@ -38,7 +38,7 @@ export class LezerSyntax implements Syntax {
       ViewPlugin.define(view => new HighlightWorker(view, this, setSyntax)),
       syntaxIndentation(this),
       syntaxFolding(this),
-      lezerHighlighter(this)
+      treeHighlighter(this)
     ]
   }
 

@@ -23,7 +23,7 @@ let nextTagID = 0
 /// be picked up by other highlighters (though you can derive them
 /// from standard tags to allow the highlighters to fall back to
 /// those).
-class Tag {
+export class Tag {
   /// @internal
   id = nextTagID++
 
@@ -252,13 +252,18 @@ class Styling {
   }
 }
 
-export function lezerHighlighter(syntax: Syntax) {
-  return precedence(ViewPlugin.define(view => new LezerHighlighter(view, syntax), {
+/// Returns an extension that installs a highlighter that uses the
+/// tree produced by the given syntax, along with the current
+/// [highlight style](#highlight.highlightStyle), to style the
+/// document. If no highlight style is active, this plugin won't do
+/// any highlighting.
+export function treeHighlighter(syntax: Syntax) {
+  return precedence(ViewPlugin.define(view => new TreeHighlighter(view, syntax), {
     decorations: v => v.decorations
   }), "fallback")
 }
 
-class LezerHighlighter {
+class TreeHighlighter {
   // Reused stacks for buildDeco
   nodeStack: string[] = [""]
   classStack: string[] = [""]

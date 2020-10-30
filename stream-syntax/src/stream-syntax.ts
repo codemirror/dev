@@ -3,7 +3,7 @@ import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType
         Facet, languageDataProp} from "@codemirror/next/state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "@codemirror/next/view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
-import {defaultTags} from "@codemirror/next/highlight"
+import {Tag, tags, styleTags, treeHighlighter} from "@codemirror/next/highlight"
 
 export {StringStream}
 
@@ -111,7 +111,8 @@ export class StreamSyntax implements Syntax {
       this.field,
       EditorState.indentation.of((context: IndentContext, pos: number) => {
         return context.state.field(this.field).getIndent(this.parser, context.state, pos)
-      })
+      }),
+      treeHighlighter(this)
     ]
   }
 
@@ -281,23 +282,39 @@ const nodeGroup = new NodeGroup(typeArray)
 const warned: string[] = []
 
 function tokenID(tag: string): number {
-  let id = tokenTable[tag]
-  if (id == null) {
-    let props = {}
-    try {
-      props = defaultTags.addTagProp(tag, props)
-    } catch(e) {
-      if (!(e instanceof RangeError)) throw e
-      if (warned.indexOf(tag) < 0) {
-        warned.push(tag)
-        console.warn(`'${tag}' is not a valid style tag`)
-      }
-      return tokenID("")
+  return !tag ? 0 : tokenTable[tag] || (tokenTable[tag] = createTokenType(tag))
+}
+
+function warnForPart(part: string, msg: string) {
+  if (warned.indexOf(part) > -1) return
+  warned.push(part)
+  console.warn(msg)
+}
+
+function createTokenType(tagStr: string) {
+  let tag = null
+  for (let part of tagStr.split(" ")) {
+    let value = (tags as any)[part]
+    if (!value) {
+      warnForPart(part, `Unknown highlighting tag ${part}`)
+    } else if (typeof value == "function") {
+      if (!tag) warnForPart(part, `Modifier ${part} used at start of tag`)
+      else tag = value(tag) as Tag
+    } else {
+      if (tag) warnForPart(part, `Tag ${part} used as modifier`)
+      else tag = value as Tag
     }
-    id = tokenTable[tag] = typeArray.length
-    typeArray.push(new (NodeType as any)(tag ? tag.replace(/ /g, "_") : "_", props, id))
   }
-  return id
+  if (!tag) return 0
+
+  // FIXME hideous abuse of interfaces. NodeType should provide some
+  // way for external code to construct them, and the highlighting
+  // code should probably allow assigning a tag in a cleaner way.
+  let props = {}, type = new (NodeType as any)(tagStr.replace(/ /g, "_"), props, typeArray.length)
+  let [prop, val] = styleTags({[type.name]: tag})(type)!
+  prop.set(props, val)
+  typeArray.push(type)
+  return type.id
 }
 
 function docID(props: readonly [NodeProp<any>, any][]) {
