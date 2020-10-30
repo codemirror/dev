@@ -3,7 +3,7 @@ import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType
         Facet, languageDataProp} from "@codemirror/next/state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "@codemirror/next/view"
 import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
-import {defaultTags, TagSystem} from "@codemirror/next/highlight"
+import {defaultTags} from "@codemirror/next/highlight"
 
 export {StringStream}
 
@@ -33,9 +33,6 @@ export type StreamParser<State> = {
   /// be added to the wrapper node created around syntax 'trees'
   /// created by this syntax.
   docProps?: readonly [NodeProp<any>, any][]
-  /// The highlighting [tag system](#highlight.TagSystem) to use.
-  /// Defaults to [`defaultTags`](#highlight.defaultTags).
-  tagSystem?: TagSystem
 }
 
 class StreamParserInstance<State> {
@@ -46,7 +43,6 @@ class StreamParserInstance<State> {
   copyState: (state: State) => State
   indent: (state: State, textAfter: string, editorState: EditorState) => number
   docType: number
-  tokens: TokenSet
 
   constructor(spec: StreamParser<State>, languageData: Facet<{[name: string]: any}>) {
     this.token = spec.token
@@ -54,8 +50,7 @@ class StreamParserInstance<State> {
     this.startState = spec.startState || (() => (true as any))
     this.copyState = spec.copyState || defaultCopyState
     this.indent = spec.indent || (() => -1)
-    this.tokens = TokenSet.get(spec.tagSystem)
-    this.docType = this.tokens.docID((spec.docProps || []).concat([[languageDataProp, languageData]]))
+    this.docType = docID((spec.docProps || []).concat([[languageDataProp, languageData]]))
   }
 
   readToken(state: State, stream: StringStream, editorState: EditorState) {
@@ -208,7 +203,7 @@ class SyntaxState<ParseState> {
       } else {
         while (!stream.eol()) {
           let type = parser.readToken(state, stream, editorState)
-          if (type) buffer.push(parser.tokens.tokenID(type), offset + stream.start, offset + stream.pos, 4)
+          if (type) buffer.push(tokenID(type), offset + stream.start, offset + stream.pos, 4)
         }
       }
       this.maybeStoreState(parser, line, state)
@@ -217,7 +212,7 @@ class SyntaxState<ParseState> {
       if (Date.now() > sliceEnd) break
     }
     let tree = Tree.build({buffer,
-                           group: parser.tokens.group,
+                           group: nodeGroup,
                            topID: parser.docType}).balance()
     this.updatedTree = this.updatedTree.append(tree).balance()
     this.frontierLine = line
@@ -280,48 +275,36 @@ class HighlightWorker implements PluginValue {
   }
 }
 
-const tokenSets = new Map<TagSystem, TokenSet>()
+const tokenTable: {[name: string]: number} = Object.create(null)
+const typeArray: NodeType[] = [NodeType.none]
+const nodeGroup = new NodeGroup(typeArray)
+const warned: string[] = []
 
-class TokenSet {
-  private table: {[name: string]: number} = Object.create(null)
-  private types: NodeType[] = [NodeType.none]
-  readonly group = new NodeGroup(this.types)
-  private warned: string[] = []
-
-  constructor(readonly system: TagSystem) {}
-
-  tokenID(tag: string): number {
-    let id = this.table[tag]
-    if (id == null) {
-      let props = {}
-      try {
-        props = this.system.addTagProp(tag, props)
-      } catch(e) {
-        if (!(e instanceof RangeError)) throw e
-        if (this.warned.indexOf(tag) < 0) {
-          this.warned.push(tag)
-          console.warn(`'${tag}' is not a valid style tag`)
-        }
-        return this.tokenID("")
+function tokenID(tag: string): number {
+  let id = tokenTable[tag]
+  if (id == null) {
+    let props = {}
+    try {
+      props = defaultTags.addTagProp(tag, props)
+    } catch(e) {
+      if (!(e instanceof RangeError)) throw e
+      if (warned.indexOf(tag) < 0) {
+        warned.push(tag)
+        console.warn(`'${tag}' is not a valid style tag`)
       }
-      id = this.table[tag] = this.types.length
-      this.types.push(new (NodeType as any)(tag ? tag.replace(/ /g, "_") : "_", props, id))
+      return tokenID("")
     }
-    return id
+    id = tokenTable[tag] = typeArray.length
+    typeArray.push(new (NodeType as any)(tag ? tag.replace(/ /g, "_") : "_", props, id))
   }
+  return id
+}
 
-  docID(props: readonly [NodeProp<any>, any][]) {
-    if (props.length == 0) return this.tokenID("")
-    let obj = Object.create(null)
-    for (let [prop, value] of props) prop.set(obj, value)
-    let id = this.types.length
-    this.types.push(new (NodeType as any)("document", obj, id))
-    return id
-  }
-
-  static get(system: TagSystem = defaultTags) {
-    let known = tokenSets.get(system)
-    if (!known) tokenSets.set(system, known = new TokenSet(system))
-    return known
-  }
+function docID(props: readonly [NodeProp<any>, any][]) {
+  if (props.length == 0) return tokenID("")
+  let obj = Object.create(null)
+  for (let [prop, value] of props) prop.set(obj, value)
+  let id = typeArray.length
+  typeArray.push(new (NodeType as any)("document", obj, id))
+  return id
 }
