@@ -17,12 +17,14 @@ highlighter, it will fall back first to styles for that type without
 one or more flags, and then, if that also fails, to its parent types.
 Elements for which no style matches at all are not styled.
 
+@Tag
+
+@tags
+
+@highlightStyle
+
+@defaultHighlightStyle
+
 @styleTags
 
-@highlighter
-
-@defaultHighlighter
-
-@TagSystem
-
-@defaultTags
+@treeHighlighter
