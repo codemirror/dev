@@ -554,5 +554,9 @@ handlers.compositionend = view => {
   view.inputState.compositionEndedAt = Date.now()
   setTimeout(() => {
     if (!view.inputState.composing) forceClearComposition(view)
+    view.dispatch({
+      changes: view.state.changes(),
+      annotations: Transaction.userEvent.of("compositionend")
+    })
   }, 50)
 }
