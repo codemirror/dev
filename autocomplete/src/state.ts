@@ -137,6 +137,8 @@ export class ActiveSource {
       value = value.handleChange(tr)
     else if (tr.selection && value.state != State.Inactive)
       value = new ActiveSource(value.source, State.Inactive, false)
+    else if (event == "compositionend" && value.state != State.Pending)
+      value = new ActiveSource(value.source, State.Pending, false)
 
     for (let effect of tr.effects) {
       if (effect.is(toggleCompletionEffect)) {
