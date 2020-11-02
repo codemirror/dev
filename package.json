@@ -74,7 +74,7 @@
     "lezer-json": "^0.12.0",
     "lezer-python": "^0.12.0",
     "lezer-rust": "^0.12.0",
-    "lezer-tree": "^0.12.0",
+    "lezer-tree": "^0.12.3",
     "lezer-xml": "^0.12.0",
     "style-mod": "^3.0.0",
     "w3c-keyname": "^2.2.4"
