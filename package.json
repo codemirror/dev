@@ -76,7 +76,7 @@
     "lezer-rust": "^0.12.0",
     "lezer-tree": "^0.12.3",
     "lezer-xml": "^0.12.0",
-    "style-mod": "^3.0.0",
+    "style-mod": "^3.1.0",
     "w3c-keyname": "^2.2.4"
   },
   "devDependencies": {
