@@ -6,12 +6,12 @@ class BlockContext {
 
   constructor(readonly type: number,
               readonly indent: number,
-              readonly startPos: number,
+              readonly from: number,
               // FIXME communicate differently? Only needed at start
               readonly contentStart: number) {}
 
   toTree(end: number) {
-    return new Tree(group.types[this.type], this.children, this.positions, end - this.startPos)
+    return new Tree(group.types[this.type], this.children, this.positions, end - this.from)
   }
 }
 
@@ -28,6 +28,7 @@ enum Type {
   ATXHeading,
   SetextHeading,
   HTMLBlock,
+  LinkReference,
   Paragraph,
 
   // Inline
@@ -266,7 +267,39 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     return p.addNode(Type.HTMLBlock, from)
   },
 
-  // FIXME references
+  function linkReference(p, next, start) {
+    if (next != 91 /* '[' */) return false
+    let ref = parseLinkLabel(p.text, start)
+    if (!ref || p.text.charCodeAt(ref.to) != 58 /* ':' */) return false
+    let from = p.pos + start
+    let buf = new Buffer().writeInline(ref, -start).write(Type.LinkMark, ref.to - start, ref.to + 1 - start)
+    let pos = skipSpace(p.text, ref.to + 1), usedLine = p.line
+    if (pos == p.text.length) {
+      p.nextLine()
+      pos = skipSpace(p.text, 0)
+    }
+    if (pos < p.text.length) {
+      let url = parseURL(p.text, pos)
+      if (url) {
+        usedLine = p.line
+        buf.writeInline(url, -pos)
+        pos = skipSpace(p.text, url.to)
+        if (pos == p.text.length) {
+          p.nextLine()
+          pos = skipSpace(p.text, 0)
+        }
+        if (pos < p.text.length) {
+          let title = parseLinkTitle(p.text, pos)
+          if (title) {
+            buf.writeInline(title, -pos)
+            usedLine = p.line
+          }
+        }
+      }
+      if (usedLine == p.line) p.nextLine()
+    }
+    return p.addNode(buf.finish(Type.LinkReference), from)
+  },
 
   function paragraph(p, _next, start) {
     let from = p.pos + start, content = p.text.slice(start)
@@ -383,7 +416,7 @@ class MarkdownParser {
   addNode(block: Type | Tree, from: number, to?: number) {
     if (typeof block == "number") block = new Tree(group.types[block], [], [], (to ?? this.prevLineEnd()) - from)
     this.context.children.push(block)
-    this.context.positions.push(from - this.context.startPos)
+    this.context.positions.push(from - this.context.from)
     return true
   }
 
@@ -391,7 +424,7 @@ class MarkdownParser {
     let cx = this.contextStack.pop()!
     this.context = this.contextStack[this.contextStack.length - 1]
     this.context.children.push(cx.toTree(this.pos))
-    this.context.positions.push(cx.startPos - this.context.startPos)
+    this.context.positions.push(cx.from - this.context.from)
   }
 
   get contextIndent() {
@@ -484,9 +517,12 @@ const InlineTokens: ((cx: InlineContext, next: number, pos: number) => number)[]
     return -1
   },
 
-  function htmlTag(cx, next, start) {
+  function htmlTagOrURL(cx, next, start) {
     if (next != 60 /* '<' */ || start == cx.text.length - 1) return -1
-    let m = /^(?:!--[^]*?-->|![A-Z][^]*?>|\?[^]*?\?>|!\[CDATA\[[^]*?\]\]>|\/[a-z][\w-]*\s*>|[a-z][\w-]*(\s+[a-z:_][\w-.]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*>)/.exec(cx.text.slice(start + 1))
+    let after = cx.text.slice(start + 1)
+    let url = /^[a-z][-\w+.]+:[^\s]+>/i.exec(after)
+    if (url) return cx.append(elt(Type.URL, start, start + 1 + url[0].length))
+    let m = /^(?:!--[^]*?-->|![A-Z][^]*?>|\?[^]*?\?>|!\[CDATA\[[^]*?\]\]>|\/[a-zA-Z][\w-]*\s*>|[a-zA-Z][\w-]*(\s+[a-zA-Z:_][\w-.]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*>)/.exec(after)
     return m ? cx.append(elt(Type.HTMLTag, start, start + 1 + m[0].length)) : -1
   },
 
@@ -513,8 +549,6 @@ const InlineTokens: ((cx: InlineContext, next: number, pos: number) => number)[]
     }
     return -1
   },
-
-  // FIXME urls
 
   function linkOpen(cx, next, start) {
     return next == 91 /* '[' */ ? cx.append(new InlineMarker(Type.Link, start, start + 1, 1)) : -1
@@ -624,7 +658,7 @@ function parseLinkLabel(text: string, start: number) {
   for (let escaped = false, pos = start + 1, end = Math.min(text.length, pos + 999); pos < end; pos++) {
     let ch = text.charCodeAt(pos)
     if (escaped) escaped = false
-    else if (ch == 93 /* ']' */) return elt(Type.LinkLabel, start + 1, pos)
+    else if (ch == 93 /* ']' */) return elt(Type.LinkLabel, start, pos + 1)
     else if (ch == 92 /* '\\' */) escaped = true
   }
   return null
@@ -695,6 +729,6 @@ function parseInline(text: string) {
   return elt(Type.Text, 0, text.length, cx.resolveMarkers(0))
 }
 
-let p = new MarkdownParser("1. Woop *abc* and a [link][ink]\n *too **yay***".split("\n"))
+let p = new MarkdownParser("1. Woop *abc* and a [link][ink]\n *too **yay***\n\nSay <http://url> 'title'".split("\n"))
 while (p.parseBlock()) {}
 console.log("" + p.finish())
