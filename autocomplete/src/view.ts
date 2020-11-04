@@ -1,6 +1,6 @@
 import {EditorView, Command, ViewPlugin, PluginValue, ViewUpdate, logException} from "@codemirror/next/view"
 import {Transaction} from "@codemirror/next/state"
-import {completionState, setSelectedEffect, toggleCompletionEffect, setActiveEffect, State,
+import {completionState, setSelectedEffect, startCompletionEffect, closeCompletionEffect, setActiveEffect, State,
         ActiveSource, ActiveResult} from "./state"
 import {completionConfig} from "./config"
 import {cur, CompletionResult, CompletionSource, CompletionContext, applyCompletion, ensureAnchor} from "./completion"
@@ -36,7 +36,7 @@ export const acceptCompletion: Command = (view: EditorView) => {
 export const startCompletion: Command = (view: EditorView) => {
   let cState = view.state.field(completionState, false)
   if (!cState) return false
-  view.dispatch({effects: toggleCompletionEffect.of(true)})
+  view.dispatch({effects: startCompletionEffect.of(true)})
   return true
 }
 
@@ -44,7 +44,7 @@ export const startCompletion: Command = (view: EditorView) => {
 export const closeCompletion: Command = (view: EditorView) => {
   let cState = view.state.field(completionState, false)
   if (!cState || !cState.active.some(a => a.state != State.Inactive)) return false
-  view.dispatch({effects: toggleCompletionEffect.of(false)})
+  view.dispatch({effects: closeCompletionEffect.of(null)})
   return true
 }
 
@@ -61,10 +61,13 @@ class RunningQuery {
 
 const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000
 
+const enum CompositionState { None, Started, Changed, ChangedAndMoved }
+
 export const completionPlugin = ViewPlugin.fromClass(class implements PluginValue {
   debounceUpdate = -1
   running: RunningQuery[] = []
   debounceAccept = -1
+  composing = CompositionState.None
 
   constructor(readonly view: EditorView) {
     for (let active of view.state.field(completionState).active)
@@ -97,6 +100,13 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
     if (this.debounceUpdate > -1) clearTimeout(this.debounceUpdate)
     this.debounceUpdate = cState.active.some(a => a.state == State.Pending && !this.running.some(q => q.source == a.source))
       ? setTimeout(() => this.startUpdate(), DebounceTime) : -1
+
+    if (this.composing != CompositionState.None) for (let tr of update.transactions) {
+      if (tr.annotation(Transaction.userEvent) == "input")
+        this.composing = CompositionState.Changed
+      else if (this.composing == CompositionState.Changed && tr.selection)
+        this.composing = CompositionState.ChangedAndMoved
+    }
   }
 
   startUpdate() {
@@ -119,7 +129,7 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
         this.scheduleAccept()
       }
     }, err => {
-      this.view.dispatch({effects: toggleCompletionEffect.of(false)})
+      this.view.dispatch({effects: closeCompletionEffect.of(null)})
       logException(this.view.state, err)
     })
   }
@@ -173,4 +183,15 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
 
     if (updated.length) this.view.dispatch({effects: setActiveEffect.of(updated)})
   }
+}, {
+  eventHandlers: {
+    compositionstart(this: {composing: CompositionState}) {
+      this.composing = CompositionState.Started
+    },
+    compositionend(this: {view: EditorView, composing: CompositionState}) {
+      if (this.composing == CompositionState.ChangedAndMoved)
+        this.view.dispatch({effects: startCompletionEffect.of(false)})
+      this.composing = CompositionState.None
+    }
+  } as any // See https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/949
 })

@@ -139,12 +139,12 @@ export class ActiveSource {
       value = new ActiveSource(value.source, State.Inactive, false)
 
     for (let effect of tr.effects) {
-      if (effect.is(toggleCompletionEffect)) {
-        value = effect.value ? new ActiveSource(value.source, State.Pending, true)
-          : new ActiveSource(value.source, State.Inactive, false)
-      } else if (effect.is(setActiveEffect)) {
+      if (effect.is(startCompletionEffect))
+        value = new ActiveSource(value.source, State.Pending, effect.value)
+      else if (effect.is(closeCompletionEffect))
+        value = new ActiveSource(value.source, State.Inactive, false)
+      else if (effect.is(setActiveEffect))
         for (let active of effect.value) if (active.source == value.source) value = active
-      }
     }
     return value
   }
@@ -193,7 +193,8 @@ export class ActiveResult extends ActiveSource {
   }
 }
 
-export const toggleCompletionEffect = StateEffect.define<boolean>()
+export const startCompletionEffect = StateEffect.define<boolean>()
+export const closeCompletionEffect = StateEffect.define<null>()
 export const setActiveEffect = StateEffect.define<readonly ActiveSource[]>({
   map(sources, mapping) { return sources.map(s => s.hasResult() && !mapping.empty ? s.map(mapping) : s) }
 })
