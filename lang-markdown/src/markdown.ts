@@ -49,7 +49,6 @@ export enum Type {
   ListMark,
   LinkMark,
   EmphasisMark,
-  StrongEmphasisMark,
   CodeMark,
   CodeInfo,
   LinkTitle,
@@ -80,26 +79,6 @@ function skipSpace(line: string, i = 0) {
 function skipSpaceBack(line: string, i: number, to: number) {
   while (i > to && space(line.charCodeAt(i - 1))) i--
   return i
-}
-
-let lazy = false
-function skipFor(contexts: readonly BlockContext[], line: string) {
-  lazy = false
-  let pos = 0, cxI = 0
-  scan: for (; pos < line.length; pos++) {
-    let next = line.charCodeAt(pos)
-    if (next == 62 /* '>' */) {
-      for (;;) {
-        if (cxI == contexts.length) break scan
-        if (contexts[cxI++].type == Type.Blockquote) break
-      }
-    } else if (!space(next)) {
-      break
-    }
-  }
-  while (cxI < contexts.length) if (contexts[cxI++].type == Type.Blockquote) lazy = true
-  if (pos < line.length && !lazy && cxI > 1 && countIndent(line, pos) < contexts[cxI - 1].indent) lazy = true
-  return pos
 }
 
 function isFencedCode(p: MarkdownParser, next: number, start: number) {
@@ -155,6 +134,7 @@ const HTMLBlockStyle = [
   [/^<(?:script|pre|style)(?:\s|>|$)/i, /<\/(?:script|pre|style)>/i],
   [/^\s*<!--/, /-->/],
   [/^\s*<\?/, /\?>/],
+  [/^\s*<![A-Z]/, />/],
   [/^\s*<!\[CDATA\[/, /\]\]>/],
   [/^\s*<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>|$)/i, EmptyLine],
   [/^\s*(?:<\/[a-z][\w-]*\s*>|<[a-z][\w-]*(\s+[a-z:_][\w-.]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*>)\s*$/i, EmptyLine]
@@ -194,6 +174,7 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
   function code(p, _next, start, indent) {
     let base = p.contextIndent + 4
     if (indent < base) return false
+    // Rewind to start of necessary indentation
     for (let i = indent; i > base; start--) {
       let ch = p.text.charCodeAt(start - 1)
       if (ch == 32) i--
@@ -201,15 +182,17 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
       else break
     }
     let from = p.pos + start, empty = 0
+    let marks: Element[] = []
     for (; p.nextLine();) {
-      // FIXME style quote characters
-      let skip = skipFor(p.contextStack, p.text)
+      let skip = p.skipBlockMarkup(marks)
       if (skip == p.text.length) empty++
       else if (countIndent(p.text, skip) < base) break
       else empty = 0
     }
     for (let i = 0; i < empty; i++) p.prevLine()
-    return p.addNode(Type.CodeBlock, from)
+    dropMarksAfter(marks, p.pos)
+    return p.addNode(new Buffer().writeElements(marks, -from).finish(Type.CodeBlock, p.prevLineEnd() - from),
+                     from)
   },
 
   function fencedCode(p, next, start) {
@@ -221,9 +204,9 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     if (infoFrom < infoTo) buf.write(Type.CodeInfo, infoFrom - start, infoTo - start)
 
     lines: for (; p.nextLine();) {
-      // FIXME style quote characters
-      let skip = skipFor(p.contextStack, p.text), i = skip
-      if (lazy) break
+      let marks: Element[] = [], skip = p.skipBlockMarkup(marks), i = skip
+      buf.writeElements(marks, -from)
+      if (p.lazy) { dropMarksAfter(marks, p.pos); break }
       while (i < p.text.length && p.text.charCodeAt(i) == next) i++
       if (i - skip < fenceEnd - start) continue
       for (;; i++) {
@@ -279,7 +262,7 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     if (after == endOfSpace || after == start || !space(p.text.charCodeAt(after - 1))) after = p.text.length
     let buf = new Buffer()
       .write(Type.HeaderMark, 0, size - 1)
-      .writeInline(parseInline(p.text.slice(start + size, after)), size)
+      .writeElements(parseInline(p.text.slice(start + size, after)), size)
     if (after < p.text.length) buf.write(Type.HeaderMark, after - start, endOfSpace - start)
     let node = buf.finish(Type.ATXHeading, p.text.length - start)
     p.nextLine()
@@ -290,10 +273,15 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     let type = isHTMLBlock(p, next, start, false)
     if (type < 0) return false
     let from = p.pos + start, end = HTMLBlockStyle[type][1]
-    // FIXME style quote characters
-    while (!end.test(p.text) && p.nextLine()) {}
+    let marks: Element[] = []
+    while (!end.test(p.text) && p.nextLine()) {
+      p.skipBlockMarkup(marks)
+      if (p.lazy) { dropMarksAfter(marks, p.pos); break }
+    }
     if (end != EmptyLine) p.nextLine()
-    return p.addNode(end == CommentEnd ? Type.Comment : Type.HTMLBlock, from)
+    return p.addNode(new Buffer().writeElements(marks, -from)
+                     .finish(end == CommentEnd ? Type.Comment : Type.HTMLBlock, p.prevLineEnd() - from),
+                     from)
   },
 
   function linkReference(p, next, start) {
@@ -301,7 +289,7 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     let ref = parseLinkLabel(p.text, start)
     if (!ref || p.text.charCodeAt(ref.to) != 58 /* ':' */) return false
     let from = p.pos + start
-    let buf = new Buffer().writeInline([ref], -start).write(Type.LinkMark, ref.to - start, ref.to + 1 - start)
+    let buf = new Buffer().writeElements([ref], -start).write(Type.LinkMark, ref.to - start, ref.to + 1 - start)
     let pos = skipSpace(p.text, ref.to + 1), usedLine = p.line
     if (pos == p.text.length) {
       p.nextLine()
@@ -311,7 +299,7 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
       let url = parseURL(p.text, pos)
       if (url) {
         usedLine = p.line
-        buf.writeInline([url], -pos)
+        buf.writeElements([url], -pos)
         pos = skipSpace(p.text, url.to)
         if (pos == p.text.length) {
           p.nextLine()
@@ -320,7 +308,7 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
         if (pos < p.text.length) {
           let title = parseLinkTitle(p.text, pos)
           if (title) {
-            buf.writeInline([title], -pos)
+            buf.writeElements([title], -pos)
             usedLine = p.line
           }
         }
@@ -331,17 +319,16 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
   },
 
   function paragraph(p, _next, start, indent) {
-    let from = p.pos + start, content = p.text.slice(start)
+    let from = p.pos + start, content = p.text.slice(start), marks: Element[] = []
     lines: for (; p.nextLine();) {
-      // FIXME style quote characters
-      let skip = skipFor(p.contextStack, p.text)
+      let skip = p.skipBlockMarkup(marks)
       if (skip == p.text.length && !/  $|\\$/.test(content)) break
       let lineIndent = countIndent(p.text, skip)
       if (lineIndent - indent < 4) {
         let next = p.text.charCodeAt(skip)
-        if (lineIndent >= p.contextIndent && isSetextUnderline(p, next, skip) > -1 && !lazy) {
+        if (lineIndent >= p.contextIndent && isSetextUnderline(p, next, skip) > -1 && !p.lazy) {
           let node = new Buffer()
-            .writeInline(parseInline(content))
+            .writeElements(injectMarks(parseInline(clearMarks(content, marks, from)), marks, from))
             .write(Type.HeaderMark, p.pos - from, p.pos + p.text.length - from)
             .finish(Type.SetextHeading, p.pos + p.text.length - from)
           p.nextLine()
@@ -352,7 +339,9 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
       content += "\n"
       content += p.text
     }
-    let node = new Buffer().writeInline(parseInline(content)).finish(Type.Paragraph, content.length)
+    let node = new Buffer()
+      .writeElements(injectMarks(parseInline(clearMarks(content, marks, from)), marks, from))
+      .finish(Type.Paragraph, content.length)
     return p.addNode(node, from)
   }
 ]
@@ -363,9 +352,10 @@ export class MarkdownParser {
   line = 0
   pos = 0
   text = ""
+  lazy = false
 
   constructor(readonly input: readonly string[]) {
-    this.readLine()
+    this.text = input[0]
   }
 
   parseBlock() {
@@ -389,7 +379,7 @@ export class MarkdownParser {
             indent >= (i == this.contextStack.length - 1 ? cx : this.contextStack[i + 1]).indent ||
             (indent == cx.indent &&
              (cx.type == Type.OrderedList ? isOrderedList : isBulletList)(this, this.text.charCodeAt(start), start) > -1 &&
-             !isHorizontalRule(this, this.text.charCodeAt(start), start))
+             isHorizontalRule(this, this.text.charCodeAt(start), start) < 0)
         } else {
           throw new Error("Unhandled block context " + cx.type)
         }
@@ -425,19 +415,35 @@ export class MarkdownParser {
       return false
     }
     this.pos += this.text.length + 1
-    this.line++
-    this.readLine()
+    this.text = this.input[++this.line]
     return true
   }
 
   prevLine() {
-    this.pos -= this.text.length + (this.line == this.input.length ? 0 : 1)
-    this.line--
-    this.readLine()
+    this.text = this.input[--this.line]
+    this.pos -= this.text.length + (this.line == this.input.length - 1 ? 0 : 1)
   }
 
-  readLine() {
-    this.text = this.input[this.line]
+  skipBlockMarkup(marks: Element[]) {
+    this.lazy = false
+    let pos = 0, cxI = 0
+    scan: for (; pos < this.text.length; pos++) {
+      let next = this.text.charCodeAt(pos)
+      if (next == 62 /* '>' */) {
+        for (;;) {
+          if (cxI == this.contextStack.length) break scan
+          if (this.contextStack[cxI++].type == Type.Blockquote) break
+        }
+        marks.push(elt(Type.QuoteMark, this.pos + pos, this.pos + pos + 1))
+      } else if (!space(next)) {
+        break
+      }
+    }
+    while (cxI < this.contextStack.length)
+      if (this.contextStack[cxI++].type == Type.Blockquote) this.lazy = true
+    if (pos < this.text.length && !this.lazy && cxI > 1 && countIndent(this.text, pos) < this.context.indent)
+      this.lazy = true
+    return pos
   }
 
   prevLineEnd() { return this.line == this.input.length ? this.pos : this.pos - 1 }
@@ -482,7 +488,7 @@ class Buffer {
     return this
   }
 
-  writeInline(elts: readonly Element[], offset = 0) {
+  writeElements(elts: readonly Element[], offset = 0) {
     let write = (elt: Element) => {
       let startOff = this.content.length
       if (elt.children) for (let ch of elt.children) write(ch)
@@ -507,6 +513,13 @@ class Element {
               readonly from: number,
               readonly to: number,
               readonly children: readonly Element[] | null = null) {}
+
+  cut(from: number, to: number): Element | null {
+    if (from >= this.to || to <= this.from) return this
+    if (from <= this.from && to >= this.to) return null
+    return new Element(this.type, Math.max(from, this.from), Math.min(to, this.to),
+                       this.children && this.children.map(c => c.cut(from, to)).filter(c => c) as Element[])
+  }
 }
 
 function elt(type: Type, from: number, to: number, children?: readonly Element[]) {
@@ -732,13 +745,12 @@ class InlineContext {
           let open = this.parts[j]
           if (open instanceof InlineMarker && (open.value & Mark.Open) && this.text.charCodeAt(open.from) == type) {
             let size = Math.min(2, open.to - open.from, close.to - close.from)
-            let marker = size == 2 ? Type.StrongEmphasisMark : Type.EmphasisMark
-            let start = open.to - size, end: number = close.from + size, content = [elt(marker, start, open.to)]
+            let start = open.to - size, end: number = close.from + size, content = [elt(Type.EmphasisMark, start, open.to)]
             for (let k = j + 1; k < i; k++) {
               if (this.parts[k] instanceof Element) content.push(this.parts[k] as Element)
               this.parts[k] = null
             }
-            content.push(elt(marker, close.from, end))
+            content.push(elt(Type.EmphasisMark, close.from, end))
             let element = elt(size == 1 ? Type.Emphasis : Type.StrongEmphasis, open.to - size, close.from + size, content)
             let replFrom = j + 1, replTo = i
             if (!(this.parts[j] = open.from == start ? null : new InlineMarker(open.type, open.from, start, open.value)))
@@ -760,8 +772,6 @@ class InlineContext {
   }
 }
 
-// FIXME handle quote characters in the inline content (probably by
-// accumulating them in advance and passing them in)
 function parseInline(text: string) {
   let cx = new InlineContext(text)
   outer: for (let pos = 0; pos < text.length;) {
@@ -773,4 +783,38 @@ function parseInline(text: string) {
     pos++
   }
   return cx.resolveMarkers(0)
+}
+
+function clearMarks(content: string, marks: Element[], offset: number) {
+  if (!marks.length) return content
+  let result = "", pos = 0
+  for (let m of marks) {
+    let from = m.from - offset, to = m.to - offset
+    result += content.slice(pos, from)
+    for (let i = from; i < to; i++) result += " "
+    pos = to
+  }
+  result += content.slice(pos)
+  return result
+}
+
+function injectMarks(elts: Element[], marks: Element[], offset: number) {
+  let eI = 1, cur: Element | null = elts.length ? elts[0] : null
+  let result = []
+  for (let mark of marks) {
+    let from = mark.from - offset, to = mark.to - offset
+    while (cur && cur.from < to) {
+      if (cur.from < from) result.push(cur.cut(cur.from, from)!)
+      if (cur.to > to) cur = cur.cut(to, cur.to)!
+      else cur = eI < elts.length ? elts[eI++] : null
+    }
+    result.push(elt(mark.type, from, to))
+  }
+  if (cur) result.push(cur)
+  while (eI < elts.length) result.push(elts[eI++])
+  return result
+}
+
+function dropMarksAfter(marks: Element[], pos: number) {
+  while (marks.length && marks[marks.length - 1].to > pos) marks.pop()
 }
