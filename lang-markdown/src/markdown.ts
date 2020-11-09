@@ -181,6 +181,35 @@ const BreakParagraph: ((p: MarkdownParser, next: number, start: number, breaking
   isHTMLBlock
 ]
 
+type SkipResult = {start: number, baseIndent: number, indent: number, depth: number, unmatched: number}
+
+function skipForList(cx: BlockContext, p: MarkdownParser, result: SkipResult) {
+  if (result.start == p.text.length ||
+      (cx != p.context && result.indent >= p.contextStack[result.depth + 1].indent + result.baseIndent)) return true
+  if (result.indent >= result.baseIndent + 4) return false
+  let size = (cx.type == Type.OrderedList ? isOrderedList : isBulletList)(p, p.text.charCodeAt(result.start), result.start, false)
+  return size > 0 &&
+    (cx.type != Type.BulletList || isHorizontalRule(p, p.text.charCodeAt(result.start), result.start) < 0) &&
+    p.text.charCodeAt(result.start + size - 1) == cx.markup
+}
+
+const SkipMarkup: {[type: number]: (cx: BlockContext, p: MarkdownParser, result: SkipResult, marks: Element[]) => boolean} = {
+  [Type.Blockquote](_cx, p, result, marks) {
+    if (p.text.charCodeAt(result.start) != 62 /* '>' */) return false
+    marks.push(elt(Type.QuoteMark, p.pos + result.start, p.pos + result.start + 1))
+    result.start = skipSpace(p.text, result.start + 1)
+    result.baseIndent = result.indent + 2
+    return true
+  },
+  [Type.ListItem](cx, p, result) {
+    if (result.indent < result.baseIndent + cx.indent && result.start < p.text.length) return false
+    result.baseIndent += cx.indent
+    return true
+  },
+  [Type.OrderedList]: skipForList,
+  [Type.BulletList]: skipForList
+}
+
 function getListIndent(text: string, start: number) {
   let indentAfter = countIndent(text, start) + 1
   let indented = countIndent(text, skipSpace(text, start))
@@ -191,7 +220,7 @@ function getListIndent(text: string, start: number) {
 // doesn't apply here, true means it does. When true is returned and
 // `p.line` has been updated, the rule is assumed to have consumed a
 // leaf block. Otherwise, it is assumed to have opened a context.
-const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) => boolean)[] = [
+const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: number) => boolean)[] = [
   function indentedCode(p, _next, start, baseIndent) {
     let indent = countIndent(p.text, start)
     if (indent < baseIndent + 4) return false
@@ -205,10 +234,10 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     let from = p.pos + start, empty = 0
     let marks: Element[] = []
     for (; p.nextLine();) {
-      let {start: skip, baseIndent, unmatched} = p.skipBlockMarkup(marks)
+      let {start: skip, baseIndent, unmatched, indent} = p.skipBlockMarkup(marks)
       if (unmatched) break
       if (skip == p.text.length) empty++
-      else if (countIndent(p.text, skip) < baseIndent + 4) break
+      else if (indent < baseIndent + 4) break
       else empty = 0
     }
     for (let i = 0; i < empty; i++) p.prevLine()
@@ -226,10 +255,10 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
 
     for (; p.nextLine();) {
       let marks: Element[] = []
-      let {start: skip, unmatched, baseIndent} = p.skipBlockMarkup(marks), i = skip
+      let {start: skip, unmatched, baseIndent, indent} = p.skipBlockMarkup(marks), i = skip
       if (unmatched) break
       buf.writeElements(marks, -from)
-      if (countIndent(p.text, skip) - baseIndent < 4)
+      if (indent - baseIndent < 4)
         while (i < p.text.length && p.text.charCodeAt(i) == next) i++
       if (i - skip >= fenceEnd - start && skipSpace(p.text, i) == p.text.length) {
         buf.write(Type.CodeMark, p.pos + skip - from, p.pos + i - from)
@@ -309,10 +338,9 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
     let from = p.pos + start, content = p.text.slice(start), marks: Element[] = []
     let heading = false
     lines: for (; p.nextLine();) {
-      let {start: skip, unmatched, baseIndent} = p.skipBlockMarkup(marks)
+      let {start: skip, unmatched, baseIndent, indent} = p.skipBlockMarkup(marks)
       if (skip == p.text.length) break
-      let lineIndent = countIndent(p.text, skip) - baseIndent
-      if (lineIndent < 4) {
+      if (indent < baseIndent + 4) {
         let next = p.text.charCodeAt(skip)
         if (isSetextUnderline(p, next, skip) > -1 && !unmatched) {
           heading = true
@@ -352,7 +380,13 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, indent: number) 
   }
 ]
 
-const skipBlockResult = {start: 0, baseIndent: 0, unmatched: 0}
+const skipBlockResult: SkipResult = {
+  start: 0,
+  baseIndent: 0,
+  indent: 0,
+  depth: 0,
+  unmatched: 0
+}
 
 export class MarkdownParser {
   context: BlockContext = new BlockContext(Type.Document, 0, 0, 0, 0)
@@ -418,36 +452,20 @@ export class MarkdownParser {
     this.pos -= this.text.length + (this.line == this.input.length - 1 ? 0 : 1)
   }
 
-  skipBlockMarkup(marks: Element[]) {
-    let pos = skipSpace(this.text, 0), indent = countIndent(this.text, pos), i = 1, baseIndent = 0
-    for (; i < this.contextStack.length; i++) {
-      let cx = this.contextStack[i]
-      if (cx.type == Type.Blockquote) {
-        if (this.text.charCodeAt(pos) != 62 /* '>' */) break
-        marks.push(elt(Type.QuoteMark, this.pos + pos, this.pos + pos + 1))
-        pos = skipSpace(this.text, pos + 1)
-        baseIndent = indent + 2
-        indent = countIndent(this.text, pos)
-      } else if (cx.type == Type.ListItem) {
-        if (indent < baseIndent + cx.indent && pos < this.text.length) break
-        baseIndent += cx.indent
-      } else if (cx.type == Type.OrderedList || cx.type == Type.BulletList) {
-        if (pos == this.text.length ||
-            (cx != this.context && indent >= this.contextStack[i + 1].indent + baseIndent)) continue
-        if (indent >= baseIndent + 4) break
-        let size = (cx.type == Type.OrderedList ? isOrderedList : isBulletList)(this, this.text.charCodeAt(pos), pos, false)
-        if (size < 0 ||
-            (cx.type == Type.BulletList && isHorizontalRule(this, this.text.charCodeAt(pos), pos) > 0) ||
-            this.text.charCodeAt(pos + size - 1) != cx.markup)
-          break
-      } else {
-        throw new Error("Unhandled block context " + cx.type)
-      }
+  skipBlockMarkup(marks: Element[]): SkipResult {
+    let result = skipBlockResult
+    let pos = result.start = skipSpace(this.text, 0)
+    result.baseIndent = 0
+    result.depth = 1
+    result.indent = countIndent(this.text, result.start)
+    for (; result.depth < this.contextStack.length; result.depth++) {
+      let cx = this.contextStack[result.depth], handler = SkipMarkup[cx.type]
+      if (!handler) throw new Error("Unhandled block context " + Type[cx.type])
+      if (!handler(cx, this, result, marks)) break
+      if (result.start != pos) result.indent = countIndent(this.text, pos = result.start)
     }
-    skipBlockResult.start = pos
-    skipBlockResult.baseIndent = baseIndent
-    skipBlockResult.unmatched = this.contextStack.length - i
-    return skipBlockResult
+    result.unmatched = this.contextStack.length - result.depth
+    return result
   }
 
   prevLineEnd() { return this.line == this.input.length ? this.pos : this.pos - 1 }
