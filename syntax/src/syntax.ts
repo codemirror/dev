@@ -35,7 +35,7 @@ export class LezerSyntax implements Syntax {
     this.extension = [
       EditorState.syntax.of(this),
       this.field,
-      ViewPlugin.define(view => new HighlightWorker(view, this, setSyntax)),
+      ViewPlugin.define(view => new ParseWorker(view, this, setSyntax)),
       syntaxIndentation(this),
       syntaxFolding(this),
       treeHighlighter(this)
@@ -230,12 +230,7 @@ let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number 
   ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
 let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
 
-// FIXME figure out some way to back off from full re-parses when the
-// document is large—you could waste a lot of battery re-parsing a
-// multi-megabyte document every time you insert a backtick, even if
-// it happens in the background.
-
-class HighlightWorker {
+class ParseWorker {
   working: number = -1
 
   constructor(readonly view: EditorView, 
