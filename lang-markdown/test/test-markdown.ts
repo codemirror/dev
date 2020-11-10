@@ -1,4 +1,5 @@
 import {MarkdownParser, Type, Group} from "@codemirror/next/lang-markdown"
+import {Text} from "@codemirror/next/text"
 import {Tree} from "lezer-tree"
 
 const abbrev: {[abbr: string]: number} = {
@@ -77,7 +78,7 @@ function compareTree(a: Tree, b: Tree) {
 function test(name: string, spec: string) {
   it(name, () => {
     let {tree, doc} = parseSpec(spec, name)
-    let parser = new MarkdownParser(doc.split("\n"))
+    let parser = new MarkdownParser(Text.of(doc.split("\n")).iterLines())
     while (parser.parseBlock()) {}
     compareTree(parser.finish(), tree)
   })

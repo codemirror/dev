@@ -1,5 +1,5 @@
 import {Tree, NodeType, NodeProp, SyntaxNode, NodeGroup} from "lezer-tree"
-import {Text} from "@codemirror/next/text"
+import {Text, TextIterator} from "@codemirror/next/text"
 
 class BlockContext {
   readonly children: Tree[] = []
@@ -219,32 +219,35 @@ function getListIndent(text: string, start: number) {
   return indented >= indentAfter + 4 ? indentAfter : indented
 }
 
+const enum ParseBlock { No, Leaf, Context }
+
 // Rules for parsing blocks. A return value of false means the rule
 // doesn't apply here, true means it does. When true is returned and
 // `p.line` has been updated, the rule is assumed to have consumed a
 // leaf block. Otherwise, it is assumed to have opened a context.
-const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: number) => boolean)[] = [
+const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: number) => ParseBlock)[] = [
   function indentedCode(p, _next, start, baseIndent) {
     let indent = countIndent(p.text, start)
-    if (indent < baseIndent + 4) return false
+    if (indent < baseIndent + 4) return ParseBlock.No
     start = findIndent(p.text, baseIndent + 4)
-    let from = p.pos + start, empty = 0
+    let from = p.pos + start, end = p.pos + p.text.length
     let marks: Element[] = []
     for (; p.nextLine();) {
       let {start: skip, baseIndent, unmatched, indent} = p.skipBlockMarkup(marks)
       if (unmatched) break
-      if (skip == p.text.length) empty++
-      else if (indent < baseIndent + 4) break
-      else empty = 0
+      if (skip != p.text.length) {
+        if (indent < baseIndent + 4) break
+        else end = p.pos + p.text.length
+      }
     }
-    for (let i = 0; i < empty; i++) p.prevLine()
-    dropMarksAfter(marks, p.pos)
-    return p.addNode(new Buffer().writeElements(marks, -from).finish(Type.CodeBlock, p.prevLineEnd() - from), from)
+    dropMarksAfter(marks, end)
+    p.addNode(new Buffer().writeElements(marks, -from).finish(Type.CodeBlock, end - from), from)
+    return ParseBlock.Leaf
   },
 
   function fencedCode(p, next, start) {
     let fenceEnd = isFencedCode(p, next, start)
-    if (fenceEnd < 0) return false
+    if (fenceEnd < 0) return ParseBlock.No
     let from = p.pos + start
     let buf = new Buffer().write(Type.CodeMark, 0, fenceEnd - start)
     let infoFrom = skipSpace(p.text, fenceEnd), infoTo = skipSpaceBack(p.text, p.text.length, infoFrom)
@@ -263,48 +266,53 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: numb
         break
       }
     }
-    return p.addNode(buf.finish(Type.FencedCode, p.prevLineEnd() - from), from)
+    p.addNode(buf.finish(Type.FencedCode, p.prevLineEnd() - from), from)
+    return ParseBlock.Leaf
   },
 
   function blockquote(p, next, start) {
     let size = isBlockquote(p, next, start)
-    if (size < 0) return false
+    if (size < 0) return ParseBlock.No
     p.startContext(Type.Blockquote, start, start + size)
-    return p.addNode(Type.QuoteMark, p.pos + start, p.pos + start + 1)
+    p.addNode(Type.QuoteMark, p.pos + start, p.pos + start + 1)
+    return ParseBlock.Context
   },
 
   function horizontalRule(p, next, start) {
-    if (isHorizontalRule(p, next, start) < 0) return false
+    if (isHorizontalRule(p, next, start) < 0) return ParseBlock.No
     let from = p.pos + start
     p.nextLine()
-    return p.addNode(Type.HorizontalRule, from)
+    p.addNode(Type.HorizontalRule, from)
+    return ParseBlock.Leaf
   },
 
   function bulletList(p, next, start, baseIndent) {
     let size = isBulletList(p, next, start, false)
-    if (size < 0) return false
+    if (size < 0) return ParseBlock.No
     let cxStart = findIndent(p.text, baseIndent)
     if (p.context.type != Type.BulletList)
       p.startContext(Type.BulletList, cxStart, cxStart, p.text.charCodeAt(start))
     p.startContext(Type.ListItem, cxStart, Math.min(p.text.length, start + 2),
                    getListIndent(p.text, start + 1) - baseIndent)
-    return p.addNode(Type.ListMark, p.pos + start, p.pos + start + size)
+    p.addNode(Type.ListMark, p.pos + start, p.pos + start + size)
+    return ParseBlock.Context
   },
 
   function orderedList(p, next, start, baseIndent) {
     let size = isOrderedList(p, next, start, false)
-    if (size < 0) return false
+    if (size < 0) return ParseBlock.No
     let cxStart = findIndent(p.text, baseIndent)
     if (p.context.type != Type.OrderedList)
       p.startContext(Type.OrderedList, cxStart, cxStart, p.text.charCodeAt(start + size - 1))
     p.startContext(Type.ListItem, cxStart, Math.min(p.text.length, start + size + 1),
                    getListIndent(p.text, start + size) - baseIndent)
-    return p.addNode(Type.ListMark, p.pos + start, p.pos + start + size)
+    p.addNode(Type.ListMark, p.pos + start, p.pos + start + size)
+    return ParseBlock.Context
   },
 
   function atxHeading(p, next, start) {
     let size = isAtxHeading(p, next, start)
-    if (size < 0) return false
+    if (size < 0) return ParseBlock.No
     let from = p.pos + start
     let endOfSpace = skipSpaceBack(p.text, p.text.length, start), after = endOfSpace
     while (after > start && p.text.charCodeAt(after - 1) == next) after--
@@ -315,12 +323,13 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: numb
     if (after < p.text.length) buf.write(Type.HeaderMark, after - start, endOfSpace - start)
     let node = buf.finish(Type.ATXHeading, p.text.length - start)
     p.nextLine()
-    return p.addNode(node, from)
+    p.addNode(node, from)
+    return ParseBlock.Leaf
   },
 
   function htmlBlock(p, next, start) {
     let type = isHTMLBlock(p, next, start, false)
-    if (type < 0) return false
+    if (type < 0) return ParseBlock.No
     let from = p.pos + start, end = HTMLBlockStyle[type][1]
     let marks: Element[] = []
     while (!end.test(p.text) && p.nextLine()) {
@@ -328,9 +337,10 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: numb
       if (unmatched) { dropMarksAfter(marks, p.pos); break }
     }
     if (end != EmptyLine) p.nextLine()
-    return p.addNode(new Buffer().writeElements(marks, -from)
-                     .finish(end == CommentEnd ? Type.CommentBlock : Type.HTMLBlock, p.prevLineEnd() - from),
-                     from)
+    p.addNode(new Buffer().writeElements(marks, -from)
+              .finish(end == CommentEnd ? Type.CommentBlock : Type.HTMLBlock, p.prevLineEnd() - from),
+              from)
+    return ParseBlock.Leaf
   },
 
   function paragraph(p, _next, start) {
@@ -357,7 +367,7 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: numb
       let ref = parseLinkReference(content)
       if (!ref) break
       p.addNode(ref, from)
-      if (content.length <= ref.length + 1 && !heading) return true
+      if (content.length <= ref.length + 1 && !heading) return ParseBlock.Leaf
       content = content.slice(ref.length + 1)
       from += ref.length + 1
       while (marks.length && marks[0].to <= from) marks.shift()
@@ -370,12 +380,13 @@ const Blocks: ((p: MarkdownParser, next: number, start: number, baseIndent: numb
         .write(Type.HeaderMark, p.pos - from, p.pos + p.text.length - from)
         .finish(Type.SetextHeading, p.pos + p.text.length - from)
       p.nextLine()
-      return p.addNode(node, from)
+      p.addNode(node, from)
+    } else {
+      p.addNode(new Buffer()
+                .writeElements(inline)
+                .finish(Type.Paragraph, content.length), from)
     }
-    let node = new Buffer()
-      .writeElements(inline)
-      .finish(Type.Paragraph, content.length)
-    return p.addNode(node, from)
+    return ParseBlock.Leaf
   }
 ]
 
@@ -390,12 +401,11 @@ const skipBlockResult: SkipResult = {
 export class MarkdownParser {
   context: BlockContext = new BlockContext(Type.Document, 0, 0, 0)
   contextStack: BlockContext[] = [this.context]
-  line = 0
   pos = 0
   text = ""
 
-  constructor(readonly input: readonly string[]) {
-    this.text = input[0]
+  constructor(readonly input: TextIterator) {
+    this.text = input.next().value
   }
 
   parseBlock() {
@@ -416,12 +426,12 @@ export class MarkdownParser {
       }
     }
 
-    let next = this.text.charCodeAt(start), line = this.line
+    let next = this.text.charCodeAt(start)
     for (;;) {
       for (let type of Blocks) {
         let result = type(this, next, start, baseIndent)
-        if (result) {
-          if (this.line != line) return true // Leaf block consumed
+        if (result == ParseBlock.Leaf) return true
+        if (result == ParseBlock.Context) {
           // Only opened a context, content remains on the line
           baseIndent = countIndent(this.text, this.context.contentStart)
           start = skipSpace(this.text, this.context.contentStart)
@@ -433,22 +443,10 @@ export class MarkdownParser {
   }
 
   nextLine() {
-    if (this.line >= this.input.length - 1) {
-      if (this.line == this.input.length - 1) {
-        this.pos += this.text.length
-        this.line++
-        this.text = ""
-      }
-      return false
-    }
-    this.pos += this.text.length + 1
-    this.text = this.input[++this.line]
-    return true
-  }
-
-  prevLine() {
-    this.text = this.input[--this.line]
-    this.pos -= this.text.length + (this.line == this.input.length - 1 ? 0 : 1)
+    this.input.next()
+    this.pos += this.text.length + (this.input.done ? 0 : 1)
+    this.text = this.input.value
+    return !this.input.done
   }
 
   skipBlockMarkup(marks: Element[]): SkipResult {
@@ -467,19 +465,17 @@ export class MarkdownParser {
     return result
   }
 
-  prevLineEnd() { return this.line == this.input.length ? this.pos : this.pos - 1 }
+  prevLineEnd() { return this.input.done ? this.pos : this.pos - 1 }
 
   startContext(type: Type, start: number, contentStart: number, value = 0) {
     this.context = new BlockContext(type, value, this.pos + start, contentStart)
     this.contextStack.push(this.context)
-    return true
   }
 
   addNode(block: Type | Tree, from: number, to?: number) {
     if (typeof block == "number") block = new Tree(Group.types[block], none, none, (to ?? this.prevLineEnd()) - from)
     this.context.children.push(block)
     this.context.positions.push(from - this.context.from)
-    return true
   }
 
   finishContext() {
@@ -914,7 +910,6 @@ export class Fragment {
               readonly to: number,
               // Open block context nodes at this.from
               readonly context: readonly FragmentContext[]) {}
-
 
   // From/to are the _document_ positions to cut between. `offset` is
   // the additional offset this change adds to the given region.
