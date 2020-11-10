@@ -12,7 +12,7 @@ const abbrev: {[abbr: string]: number} = {
   AH: Type.ATXHeading,
   SH: Type.SetextHeading,
   HB: Type.HTMLBlock,
-  CM: Type.Comment,
+  CMB: Type.CommentBlock,
   LR: Type.LinkReference,
   P: Type.Paragraph,
   Esc: Type.Escape,
@@ -24,6 +24,7 @@ const abbrev: {[abbr: string]: number} = {
   Im: Type.Image,
   C: Type.InlineCode,
   HT: Type.HTMLTag,
+  CM: Type.Comment,
   h: Type.HeaderMark,
   q: Type.QuoteMark,
   l: Type.ListMark,
@@ -104,7 +105,7 @@ describe("Markdown parser", () => {
 `)
 
   test("Tabs (example 4)", `
-  {BL:{LI:{l:-} {P:foo}
+{BL:{LI:  {l:-} {P:foo}
 
 	{P:bar}
 }}`)
@@ -112,11 +113,11 @@ describe("Markdown parser", () => {
   test("Tabs (example 5)", `
 {BL:{LI:{l:-} {P:foo}
 
-	{CB:	bar}
+		{CB:bar}
 }}`)
 
   test("Tabs (example 6)", `
-{Q:{q:>}	{CB:	foo}}
+{Q:{q:>}		{CB:foo}}
 `)
 
   test("Tabs (example 7)", `
@@ -129,7 +130,7 @@ describe("Markdown parser", () => {
 `)
 
   test("Tabs (example 9)", `
- {BL:{LI:{l:-} {P:foo}
+{BL:{LI: {l:-} {P:foo}
    {BL:{LI:{l:-} {P:bar}
 	 {BL:{LI:{l:-} {P:baz}
 }}}}}}`)
@@ -518,7 +519,7 @@ baz}
 `)
 
   test("Indented code blocks (example 78)", `
-  {BL:{LI:{l:-} {P:foo}
+{BL:{LI:  {l:-} {P:foo}
 
     {P:bar}
 }}`)
@@ -965,7 +966,7 @@ foo
 `)
 
   test("HTML blocks (example 146)", `
-{CM:<!-- foo -->*bar*}
+{CMB:<!-- foo -->*bar*}
 {P:{Em:{e:*}baz{e:*}}}
 `)
 
@@ -976,7 +977,7 @@ foo
 `)
 
   test("HTML blocks (example 148)", `
-{CM:<!-- Foo
+{CMB:<!-- Foo
 
 bar
    baz -->}
@@ -1013,7 +1014,7 @@ function matchwo(a,b)
 `)
 
   test("HTML blocks (example 152)", `
-  {CM:<!-- foo -->}
+  {CMB:<!-- foo -->}
 
     {CB:<!-- foo -->}
 `)
@@ -1498,13 +1499,13 @@ with two lines.}
 }}`)
 
   test("List items (example 227)", `
- {BL:{LI:{l:-}    {P:one}
+{BL:{LI: {l:-}    {P:one}
 }}
     {CB: two}
 `)
 
   test("List items (example 228)", `
- {BL:{LI:{l:-}    {P:one}
+{BL:{LI: {l:-}    {P:one}
 
       {P:two}
 }}`)
@@ -1582,7 +1583,7 @@ with two lines.}
 }}`)
 
   test("List items (example 241)", `
-  {OL:{LI:{l:10.}  {P:foo}
+{OL:{LI:  {l:10.}  {P:foo}
 
            {CB:bar}
 }}`)
@@ -1682,7 +1683,7 @@ with two lines.}
 `)
 
   test("List items (example 256)", `
- {OL:{LI:{l:1.}  {P:A paragraph
+{OL:{LI: {l:1.}  {P:A paragraph
      with two lines.}
 
          {CB:indented code}
@@ -1691,7 +1692,7 @@ with two lines.}
 }}`)
 
   test("List items (example 257)", `
-  {OL:{LI:{l:1.}  {P:A paragraph
+{OL:{LI:  {l:1.}  {P:A paragraph
       with two lines.}
 
           {CB:indented code}
@@ -1700,7 +1701,7 @@ with two lines.}
 }}`)
 
   test("List items (example 258)", `
-   {OL:{LI:{l:1.}  {P:A paragraph
+{OL:{LI:   {l:1.}  {P:A paragraph
        with two lines.}
 
            {CB:indented code}
@@ -1718,7 +1719,7 @@ with two lines.}
 `)
 
   test("List items (example 260)", `
-  {OL:{LI:{l:1.}  {P:A paragraph
+{OL:{LI:  {l:1.}  {P:A paragraph
 with two lines.}
 
           {CB:indented code}
@@ -1727,7 +1728,7 @@ with two lines.}
 }}`)
 
   test("List items (example 261)", `
-  {OL:{LI:{l:1.}  {P:A paragraph
+{OL:{LI:  {l:1.}  {P:A paragraph
     with two lines.}
 }}`)
 
@@ -1750,9 +1751,9 @@ continued here.}}}}}
 
   test("List items (example 265)", `
 {BL:{LI:{l:-} {P:foo}}
- {LI:{l:-} {P:bar}}
-  {LI:{l:-} {P:baz}}
-   {LI:{l:-} {P:boo}
+{LI: {l:-} {P:bar}}
+{LI:  {l:-} {P:baz}}
+{LI:   {l:-} {P:boo}
 }}`)
 
   test("List items (example 266)", `
@@ -1762,7 +1763,7 @@ continued here.}}}}}
 
   test("List items (example 267)", `
 {OL:{LI:{l:10)} {P:foo}}}
-   {BL:{LI:{l:-} {P:bar}
+{BL:{LI:   {l:-} {P:bar}
 }}`)
 
   test("List items (example 268)", `
@@ -1830,7 +1831,7 @@ continued here.}}}}}
 {BL:{LI:{l:-} {P:foo}}
 {LI:{l:-} {P:bar}
 }}
-{CM:<!-- -->}
+{CMB:<!-- -->}
 
 {BL:{LI:{l:-} {P:baz}}
 {LI:{l:-} {P:bim}
@@ -1843,41 +1844,41 @@ continued here.}}}}}
 }
 {LI:{l:-}   {P:foo}
 }}
-{CM:<!-- -->}
+{CMB:<!-- -->}
 
     {CB:code}
 `)
 
   test("Lists (example 280)", `
 {BL:{LI:{l:-} {P:a}}
- {LI:{l:-} {P:b}}
-  {LI:{l:-} {P:c}}
-   {LI:{l:-} {P:d}}
-  {LI:{l:-} {P:e}}
- {LI:{l:-} {P:f}}
+{LI: {l:-} {P:b}}
+{LI:  {l:-} {P:c}}
+{LI:   {l:-} {P:d}}
+{LI:  {l:-} {P:e}}
+{LI: {l:-} {P:f}}
 {LI:{l:-} {P:g}
 }}`)
 
   test("Lists (example 281)", `
 {OL:{LI:{l:1.} {P:a}
 }
-  {LI:{l:2.} {P:b}
+{LI:  {l:2.} {P:b}
 }
-   {LI:{l:3.} {P:c}
+{LI:   {l:3.} {P:c}
 }}`)
 
   test("Lists (example 282)", `
 {BL:{LI:{l:-} {P:a}}
- {LI:{l:-} {P:b}}
-  {LI:{l:-} {P:c}}
-   {LI:{l:-} {P:d
+{LI: {l:-} {P:b}}
+{LI:  {l:-} {P:c}}
+{LI:   {l:-} {P:d
     - e}
 }}`)
 
   test("Lists (example 283)", `
 {OL:{LI:{l:1.} {P:a}
 }
-  {LI:{l:2.} {P:b}
+{LI:  {l:2.} {P:b}
 }}
     {CB:3. c}
 `)
