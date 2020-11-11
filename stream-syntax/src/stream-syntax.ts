@@ -2,7 +2,7 @@ import {StringStream, StringStreamCursor} from "./stringstream"
 import {EditorState, StateField, Syntax, Extension, StateEffect, StateEffectType, IndentContext,
         Facet, languageDataProp} from "@codemirror/next/state"
 import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "@codemirror/next/view"
-import {Tree, NodeType, NodeProp, NodeGroup} from "lezer-tree"
+import {Tree, NodeType, NodeProp, NodeSet} from "lezer-tree"
 import {Tag, tags, styleTags, treeHighlighter} from "@codemirror/next/highlight"
 
 export {StringStream}
@@ -213,7 +213,7 @@ class SyntaxState<ParseState> {
       if (Date.now() > sliceEnd) break
     }
     let tree = Tree.build({buffer,
-                           group: nodeGroup,
+                           nodeSet,
                            topID: parser.docType}).balance()
     this.updatedTree = this.updatedTree.append(tree).balance()
     this.frontierLine = line
@@ -278,7 +278,7 @@ class HighlightWorker implements PluginValue {
 
 const tokenTable: {[name: string]: number} = Object.create(null)
 const typeArray: NodeType[] = [NodeType.none]
-const nodeGroup = new NodeGroup(typeArray)
+const nodeSet = new NodeSet(typeArray)
 const warned: string[] = []
 
 function tokenID(tag: string): number {
@@ -307,12 +307,11 @@ function createTokenType(tagStr: string) {
   }
   if (!tag) return 0
 
-  // FIXME hideous abuse of interfaces. NodeType should provide some
-  // way for external code to construct them, and the highlighting
-  // code should probably allow assigning a tag in a cleaner way.
-  let props = {}, type = new (NodeType as any)(tagStr.replace(/ /g, "_"), props, typeArray.length)
-  let [prop, val] = styleTags({[type.name]: tag})(type)!
-  prop.set(props, val)
+  let name = tagStr.replace(/ /g, "_"), type = NodeType.define({
+    id: typeArray.length,
+    name,
+    props: [styleTags({[name]: tag})]
+  })
   typeArray.push(type)
   return type.id
 }
