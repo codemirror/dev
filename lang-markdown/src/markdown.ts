@@ -1,8 +1,8 @@
 import {Tree} from "lezer-tree"
-import {Syntax, StateField, ChangeDesc, Text} from "@codemirror/next/state"
-import {Fragment, Type, MarkdownParser} from "./parser"
+import {StateField, ChangeDesc, Text} from "@codemirror/next/state"
+import {Fragment, MarkdownParser, FragmentCursor} from "./parser"
 
-export {MarkdownParser, Type, Group} from "./parser"
+export {MarkdownParser, Type, nodeSet} from "./parser"
 
 function applyChange(fragments: readonly Fragment[], change: ChangeDesc) {
   let result: Fragment[] = [], i = 1, next = fragments.length ? fragments[0] : null
@@ -57,14 +57,21 @@ class ParserState {
     if (changes.empty) return this
     let fragments = applyChange(this.fragments, changes)
     let tree = parse(doc, fragments, Work.Apply)
-    return new ParserState(tree, addTree(new Fragment(tree, doc, 0, 0, tree.length, []), fragments))
+    return new ParserState(tree, addTree(new Fragment(tree, doc, 0, 0, tree.length), fragments))
   }
 }
 
 function parse(doc: Text, fragments: readonly Fragment[], timeBudget: number) {
-  return Tree.empty
+  let parser = new MarkdownParser(doc.iterLines())
+  let stopAt = Date.now() + timeBudget
+  for (let fCursor = new FragmentCursor(fragments);;) {
+    if (parser.reuseFragment(fCursor)) {}
+    else if (!parser.parseBlock()) break
+    if (Date.now() > stopAt) break
+  }
+  return parser.finish()
 }
 
-class MarkdownSyntax implements Syntax {
-
+export function markdown() {
+  return [syntaxField] // FIXME
 }

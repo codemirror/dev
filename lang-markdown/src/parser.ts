@@ -1,4 +1,4 @@
-import {Tree, NodeType, NodeProp, SyntaxNode, NodeGroup} from "lezer-tree"
+import {Tree, NodeType, NodeProp, SyntaxNode, NodeSet, TreeCursor} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
 
 class BlockContext {
@@ -12,7 +12,7 @@ class BlockContext {
               readonly contentStart: number) {}
 
   toTree(end: number) {
-    return new Tree(Group.types[this.type], this.children, this.positions, end - this.from)
+    return new Tree(nodeSet.types[this.type], this.children, this.positions, end - this.from).balance(2048)
   }
 }
 
@@ -442,6 +442,16 @@ export class MarkdownParser {
     }
   }
 
+  reuseFragment(cursor: FragmentCursor) {
+    if (!cursor.moveTo(this.pos) || !cursor.matches(this)) return false
+    let taken = cursor.takeNodes(this)
+    if (!taken) return false
+    this.input.next(taken - this.text.length)
+    this.pos += taken + (this.input.done ? 0 : 1)
+    this.text = this.input.value
+    return true
+  }
+
   nextLine() {
     this.input.next()
     this.pos += this.text.length + (this.input.done ? 0 : 1)
@@ -473,7 +483,7 @@ export class MarkdownParser {
   }
 
   addNode(block: Type | Tree, from: number, to?: number) {
-    if (typeof block == "number") block = new Tree(Group.types[block], none, none, (to ?? this.prevLineEnd()) - from)
+    if (typeof block == "number") block = new Tree(nodeSet.types[block], none, none, (to ?? this.prevLineEnd()) - from)
     this.context.children.push(block)
     this.context.positions.push(from - this.context.from)
   }
@@ -514,7 +524,7 @@ class Buffer {
   finish(type: Type, length: number) {
     return Tree.build({
       buffer: this.content,
-      group: Group,
+      nodeSet,
       topID: type,
       length
     })
@@ -874,13 +884,14 @@ function dropMarksAfter(marks: Element[], pos: number) {
 
 let nodeTypes = [NodeType.none]
 for (let i = 1, name; name = Type[i]; i++) {
-  let props = {}
-  if (i < Type.Escape)
-    NodeProp.group.set(props, name in SkipMarkup ? ["Block", "BlockContext"] : ["Block", "LeafBlock"])
-  nodeTypes[i] = new (NodeType as any)(name, props, i)
+  nodeTypes[i] = NodeType.define({
+    id: i,
+    name,
+    props: i >= Type.Escape ? [] : [[NodeProp.group, name in SkipMarkup ? ["Block", "BlockContext"] : ["Block", "LeafBlock"]]]
+  })
 }
 
-export const Group = new NodeGroup(nodeTypes)
+export const nodeSet = new NodeSet(nodeTypes)
 
 // Incremental parsing
 
@@ -905,52 +916,95 @@ export class Fragment {
               // document start. I.e. position x the doc aligns with x
               // + this.offset in this.tree.
               readonly offset: number,
-              // Document positions covered by this fragment.
+              // Document positions covered by this fragment. `from`
+              // points to the start of a leaf block, `to` to the end
+              // of one.
               readonly from: number,
-              readonly to: number,
-              // Open block context nodes at this.from
-              readonly context: readonly FragmentContext[]) {}
+              readonly to: number) {}
 
   // From/to are the _document_ positions to cut between. `offset` is
   // the additional offset this change adds to the given region.
   cut(from: number, to: number, offset: number) {
     let from_ = from > this.from ? blockStartAfter(this.tree, from + this.offset) - this.offset : this.from
     let to_ = to < this.to ? blockEndBefore(this.tree, to + this.offset) - this.offset : this.to
-    if (to_ <= from_) return null
-
-    let context = this.context as FragmentContext[]
-    if (from > this.from) {
-      context = []
-      for (let node = this.tree.topNode, i = 0;; i++) {
-        let next = node.childAfter(from + this.offset)
-        while (next && !next.type.is("BlockContext")) next = next.nextSibling
-        if (!next) break
-        context.push(CreateContext[next.name](next, this.doc))
-        node = next
-      }
-    }
-    return new Fragment(this.tree, this.doc, this.offset + offset, from_ + offset, to_ + offset, context)
+    return to_ <= from_ ? null : new Fragment(this.tree, this.doc, this.offset + offset, from_ + offset, to_ + offset)
   }
 }
 
 function listContext(n: SyntaxNode, doc: Text) {
   let markup = n.firstChild!.firstChild!
-  return new FragmentContext(n.type.id, doc.sliceString(markup.to - 1, markup.to).charCodeAt(0))
+  return {type: n.type.id, value: doc.sliceString(markup.to - 1, markup.to).charCodeAt(0)}
 }
 
-const CreateContext: {[name: string]: (n: SyntaxNode, doc: Text) => FragmentContext} = {
+const CreateContext: {[name: string]: (n: SyntaxNode, doc: Text) => {type: number, value: number}} = {
   Blockquote() {
-    return new FragmentContext(Type.Blockquote, 0)
+    return {type: Type.Blockquote, value: 0}
   },
   ListItem(n) {
     let content = n.firstChild!.nextSibling!
-    return new FragmentContext(Type.ListItem, content.from - n.from)
+    return {type: Type.ListItem, value: content.from - n.from} // FIXME adjust for tabs
   },
   BulletList: listContext,
   OrderedList: listContext
 }
 
-class FragmentContext {
-  constructor(readonly type: number,
-              readonly value: number) {}
+export class FragmentCursor {
+  // Index into fragment array
+  i = 0
+  // Active fragment
+  fragment: Fragment | null = null
+  // Cursor into the current fragment, if any. When `moveTo` returns
+  // true, this points at the first block after `pos`.
+  cursor: TreeCursor | null = null
+  // The current block context. Only meaningful when cursor is
+  // non-null
+  context: {type: number, value: number}[] = []
+
+  constructor(readonly fragments: readonly Fragment[]) {
+    if (fragments.length) this.fragment = fragments[this.i++]
+  }
+
+  moveTo(pos: number) {
+    while (this.fragment && this.fragment.to <= pos) {
+      this.fragment = this.i < this.fragments.length ? this.fragments[this.i++] : null
+      this.cursor = null
+      this.context.length = 0
+    }
+    if (!this.fragment || this.fragment.from > pos) return false
+
+    let c = this.cursor || (this.cursor = this.fragment.tree.cursor())
+    let rPos = pos + this.fragment.offset
+    while (c.to <= rPos) {
+      let {type} = c
+      if (!c.parent()) return false
+      if (type.is("BlockContext")) this.context.pop()
+    }
+    for (;;) {
+      if (!c.childAfter(rPos)) return false
+      while (!c.type.is("Block")) if (!c.nextSibling()) return false
+      if (c.from >= rPos) return true
+      if (c.type.is("BlockContext")) this.context.push(CreateContext[c.name](c.node, this.fragment!.doc))
+    }
+  }
+
+  matches(p: MarkdownParser) {
+    if (this.context.length != p.contextStack.length + 1) return false
+    for (let i = 0; i < this.context.length; i++) {
+      let a = this.context[i], b = p.contextStack[i + 1]
+      if (a.type != b.type || a.value != b.value) return false
+    }
+    return true
+  }
+
+  takeNodes(p: MarkdownParser) {
+    let cur = this.cursor!, frag = this.fragment!
+    let start = p.pos, end = start
+    for (;;) {
+      if (cur.to - frag.offset > frag.to) break
+      p.addNode(cur.tree!, cur.from - frag.offset)
+      end = cur.to - frag.offset
+      if (!cur.nextSibling()) break
+    }
+    return end - start
+  }
 }

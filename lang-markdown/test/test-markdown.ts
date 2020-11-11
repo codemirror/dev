@@ -1,4 +1,4 @@
-import {MarkdownParser, Type, Group} from "@codemirror/next/lang-markdown"
+import {MarkdownParser, Type, nodeSet} from "@codemirror/next/lang-markdown"
 import {Text} from "@codemirror/next/text"
 import {Tree} from "lezer-tree"
 
@@ -59,7 +59,7 @@ function parseSpec(spec: string, specName: string) {
     }
   }
   if (stack.length) throw new Error(`Unclosed node in ${specName}`)
-  return {tree: Tree.build({buffer, group: Group, topID: Type.Document, length: doc.length}), doc}
+  return {tree: Tree.build({buffer, nodeSet, topID: Type.Document, length: doc.length}), doc}
 }
 
 function compareTree(a: Tree, b: Tree) {
