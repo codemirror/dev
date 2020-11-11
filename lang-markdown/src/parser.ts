@@ -443,7 +443,8 @@ export class MarkdownParser {
   }
 
   reuseFragment(cursor: FragmentCursor) {
-    if (!cursor.moveTo(this.pos) || !cursor.matches(this)) return false
+    let m = cursor.moveTo(this.pos), match = m && cursor.matches(this)
+    if (!match) return false
     let taken = cursor.takeNodes(this)
     if (!taken) return false
     this.input.next(taken - this.text.length)
@@ -536,13 +537,6 @@ class Element {
               readonly from: number,
               readonly to: number,
               readonly children: readonly Element[] | null = null) {}
-
-  cut(from: number, to: number): Element | null {
-    if (from >= this.to || to <= this.from) return this
-    if (from <= this.from && to >= this.to) return null
-    return new Element(this.type, Math.max(from, this.from), Math.min(to, this.to),
-                       this.children && this.children.map(c => c.cut(from, to)).filter(c => c) as Element[])
-  }
 }
 
 function elt(type: Type, from: number, to: number, children?: readonly Element[]) {
@@ -862,20 +856,18 @@ function clearMarks(content: string, marks: Element[], offset: number) {
 }
 
 function injectMarks(elts: Element[], marks: Element[], offset: number) {
-  let eI = 1, cur: Element | null = elts.length ? elts[0] : null
-  let result = []
+  let eI = 0
   for (let mark of marks) {
-    let from = mark.from - offset, to = mark.to - offset
-    while (cur && cur.from < to) {
-      if (cur.from < from) result.push(cur.cut(cur.from, from)!)
-      if (cur.to > to) cur = cur.cut(to, cur.to)!
-      else cur = eI < elts.length ? elts[eI++] : null
+    let m = elt(mark.type, mark.from - offset, mark.to - offset)
+    while (eI < elts.length && elts[eI].to < m.to) eI++
+    if (eI < elts.length && elts[eI].from < m.from) {
+      let e = elts[eI]
+      elts[eI] = new Element(e.type, e.from, e.to, e.children ? injectMarks(e.children.slice(), [m], 0) : [m])
+    } else {
+      elts.splice(eI++, 0, m)
     }
-    result.push(elt(mark.type, from, to))
   }
-  if (cur) result.push(cur)
-  while (eI < elts.length) result.push(elts[eI++])
-  return result
+  return elts
 }
 
 function dropMarksAfter(marks: Element[], pos: number) {
@@ -887,25 +879,12 @@ for (let i = 1, name; name = Type[i]; i++) {
   nodeTypes[i] = NodeType.define({
     id: i,
     name,
-    props: i >= Type.Escape ? [] : [[NodeProp.group, name in SkipMarkup ? ["Block", "BlockContext"] : ["Block", "LeafBlock"]]]
+    props: i >= Type.Escape ? [] : [[NodeProp.group, i in SkipMarkup ? ["Block", "BlockContext"] : ["Block", "LeafBlock"]]]
   })
 }
-
 export const nodeSet = new NodeSet(nodeTypes)
 
 // Incremental parsing
-
-function blockEndBefore(tree: Tree, pos: number) {
-  for (let cur = tree.cursor(pos); cur.prev();)
-    if (cur.type.is("LeafBlock")) return cur.to
-  return 0
-}
-
-function blockStartAfter(tree: Tree, pos: number) {
-  for (let cur = tree.cursor(pos); cur.next();)
-    if (cur.type.is("LeafBlock")) return cur.from
-  return tree.length
-}
 
 // A piece of parsed content disconnected from the main tree because
 // content in front it changed.
@@ -925,9 +904,10 @@ export class Fragment {
   // From/to are the _document_ positions to cut between. `offset` is
   // the additional offset this change adds to the given region.
   cut(from: number, to: number, offset: number) {
-    let from_ = from > this.from ? blockStartAfter(this.tree, from + this.offset) - this.offset : this.from
-    let to_ = to < this.to ? blockEndBefore(this.tree, to + this.offset) - this.offset : this.to
-    return to_ <= from_ ? null : new Fragment(this.tree, this.doc, this.offset + offset, from_ + offset, to_ + offset)
+    let from_ = Math.max(from, this.from) - offset, to_ = Math.min(to, this.to) - offset
+    if (from_ >= to_) return null
+    if (from_ == this.from && to_ == this.to && !offset) return this
+    return new Fragment(this.tree, this.doc, this.offset + offset, from_, to_)
   }
 }
 
@@ -964,31 +944,37 @@ export class FragmentCursor {
     if (fragments.length) this.fragment = fragments[this.i++]
   }
 
+  nextFragment() {
+    this.fragment = this.i < this.fragments.length ? this.fragments[this.i++] : null
+    this.cursor = null
+    this.context.length = 0
+  }
+
   moveTo(pos: number) {
-    while (this.fragment && this.fragment.to <= pos) {
-      this.fragment = this.i < this.fragments.length ? this.fragments[this.i++] : null
-      this.cursor = null
-      this.context.length = 0
-    }
+    while (this.fragment && this.fragment.to <= pos) this.nextFragment()
     if (!this.fragment || this.fragment.from > pos) return false
 
-    let c = this.cursor || (this.cursor = this.fragment.tree.cursor())
+    let c = this.cursor
+    if (!c) {
+      c = this.cursor = this.fragment.tree.cursor()
+      c.firstChild()
+    }
+
     let rPos = pos + this.fragment.offset
     while (c.to <= rPos) {
-      let {type} = c
       if (!c.parent()) return false
-      if (type.is("BlockContext")) this.context.pop()
+      if (c.type.is("BlockContext")) this.context.pop()
     }
     for (;;) {
-      if (!c.childAfter(rPos)) return false
-      while (!c.type.is("Block")) if (!c.nextSibling()) return false
       if (c.from >= rPos) return true
-      if (c.type.is("BlockContext")) this.context.push(CreateContext[c.name](c.node, this.fragment!.doc))
+      let cx = c.type.is("BlockContext") && c.type.id != Type.Document ? CreateContext[c.name](c.node, this.fragment!.doc) : null
+      if (!c.childAfter(rPos)) return false
+      if (cx) this.context.push(cx)
     }
   }
 
   matches(p: MarkdownParser) {
-    if (this.context.length != p.contextStack.length + 1) return false
+    if (this.context.length != p.contextStack.length - 1) return false
     for (let i = 0; i < this.context.length; i++) {
       let a = this.context[i], b = p.contextStack[i + 1]
       if (a.type != b.type || a.value != b.value) return false
@@ -998,12 +984,24 @@ export class FragmentCursor {
 
   takeNodes(p: MarkdownParser) {
     let cur = this.cursor!, frag = this.fragment!
-    let start = p.pos, end = start
+    let start = p.pos, end = start, blockI = p.context.children.length
     for (;;) {
-      if (cur.to - frag.offset > frag.to) break
+      if (cur.to - frag.offset >= frag.to) {
+        if (cur.type.isAnonymous && cur.firstChild()) continue
+        break
+      }
       p.addNode(cur.tree!, cur.from - frag.offset)
-      end = cur.to - frag.offset
+      // Taken content must always end in a block, because incremental
+      // parsing happens on block boundaries.
+      if (cur.type.is("Block")) {
+        end = cur.to - frag.offset
+        blockI = p.context.children.length
+      }
       if (!cur.nextSibling()) break
+    }
+    while (p.context.children.length > blockI) {
+      p.context.children.pop()
+      p.context.positions.pop()
     }
     return end - start
   }

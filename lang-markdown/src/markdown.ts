@@ -4,20 +4,6 @@ import {Fragment, MarkdownParser, FragmentCursor} from "./parser"
 
 export {MarkdownParser, Type, nodeSet} from "./parser"
 
-function applyChange(fragments: readonly Fragment[], change: ChangeDesc) {
-  let result: Fragment[] = [], i = 1, next = fragments.length ? fragments[0] : null
-  change.iterGaps((fromA, fromB, length) => {
-    let toA = fromA + length
-    while (next && next.from < toA) {
-      let cut = fragments[i].cut(fromA, toA, fromB - fromA)
-      if (cut) result.push(cut)
-      if (next.to > toA) break
-      next = i < fragments.length ? fragments[i++] : null
-    }
-  })
-  return result
-}
-
 function addTree(tree: Fragment, fragments: readonly Fragment[]) {
   let result = [tree]
   for (let f of fragments) {
@@ -31,9 +17,9 @@ function addTree(tree: Fragment, fragments: readonly Fragment[]) {
   return result
 }
 
-const syntaxField = StateField.define<ParserState>({
-  create(s) { return new ParserState(Tree.empty, []).update(new ChangeDesc([0, s.doc.length]), s.doc) },
-  update(value, tr) { return value.update(tr.changes, tr.state.doc) }
+const syntaxField = StateField.define<ParseState>({
+  create(s) { return new ParseState(Tree.empty, []).parse(s.doc, Work.Apply) },
+  update(value, tr) { return value.applyChanges(tr.changes, tr.startState.doc).parse(tr.newDoc, Work.Apply) }
 })
 
 const enum Work {
@@ -49,27 +35,37 @@ const enum Work {
   MaxPos = 5e6
 }
 
-class ParserState {
+export class ParseState {
   constructor(readonly tree: Tree,
               readonly fragments: readonly Fragment[]) {}
 
-  update(changes: ChangeDesc, doc: Text) {
-    if (changes.empty) return this
-    let fragments = applyChange(this.fragments, changes)
-    let tree = parse(doc, fragments, Work.Apply)
-    return new ParserState(tree, addTree(new Fragment(tree, doc, 0, 0, tree.length), fragments))
+  applyChanges(change: ChangeDesc, oldDoc: Text) {
+    if (change.empty) return this
+    let fragments: Fragment[] = [], i = 1, next = this.fragments.length ? this.fragments[0] : null
+    change.iterGaps((fromA, fromB, length) => {
+      let toA = fromA + length, off = fromA - fromB
+      // Drop a full line at the start and end of the region
+      if (toA < change.length) toA = oldDoc.lineAt(toA - 1).from - 1
+      if (fromA > 0) fromA = oldDoc.lineAt(fromA + 1).to + 1
+      if (toA - fromA > 32) while (next && next.from < toA) {
+        let cut = next.cut(fromA, toA, off)
+        if (cut) fragments.push(cut)
+        if (next.to > toA) break
+        next = i < this.fragments.length ? this.fragments[i++] : null
+      }
+    })
+    return new ParseState(Tree.empty, fragments)
   }
-}
 
-function parse(doc: Text, fragments: readonly Fragment[], timeBudget: number) {
-  let parser = new MarkdownParser(doc.iterLines())
-  let stopAt = Date.now() + timeBudget
-  for (let fCursor = new FragmentCursor(fragments);;) {
-    if (parser.reuseFragment(fCursor)) {}
-    else if (!parser.parseBlock()) break
-    if (Date.now() > stopAt) break
+  parse(doc: Text, timeBudget: number) {
+    let parser = new MarkdownParser(doc.iterLines())
+    let stopAt = Date.now() + timeBudget
+    let fCursor = new FragmentCursor(this.fragments)
+    while ((parser.reuseFragment(fCursor) || parser.parseBlock()) &&
+           Date.now() < stopAt) {}
+    let tree = parser.finish()
+    return new ParseState(tree, addTree(new Fragment(tree, doc, 0, 0, tree.length), this.fragments))
   }
-  return parser.finish()
 }
 
 export function markdown() {

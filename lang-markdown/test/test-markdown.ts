@@ -1,6 +1,7 @@
 import {MarkdownParser, Type, nodeSet} from "@codemirror/next/lang-markdown"
 import {Text} from "@codemirror/next/text"
 import {Tree} from "lezer-tree"
+import {compareTree} from "./compare-tree.js"
 
 const abbrev: {[abbr: string]: number} = {
   CB: Type.CodeBlock,
@@ -60,19 +61,6 @@ function parseSpec(spec: string, specName: string) {
   }
   if (stack.length) throw new Error(`Unclosed node in ${specName}`)
   return {tree: Tree.build({buffer, nodeSet, topID: Type.Document, length: doc.length}), doc}
-}
-
-function compareTree(a: Tree, b: Tree) {
-  let curA = a.cursor(), curB = b.cursor()
-  for (;;) {
-    let mismatch = null, next
-    if (curA.type != curB.type) mismatch = `Node type mismatch (${curA.name} vs ${curB.name})`
-    else if (curA.from != curB.from) mismatch = `Start pos mismatch for ${curA.name}: ${curA.from} vs ${curB.from}`
-    else if (curA.to != curB.to) mismatch = `End pos mismatch for ${curA.name}: ${curA.to} vs ${curB.to}`
-    else if ((next = curA.next()) != curB.next()) mismatch = `Tree size mismatch`
-    if (mismatch) throw new Error(`${mismatch}\n  ${a}\n  ${b}`)
-    if (!next) break
-  }
 }
 
 function test(name: string, spec: string) {
