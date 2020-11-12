@@ -46,9 +46,12 @@ function update(doc: Text, state: ParseState, changes: ChangeSpec) {
 }
 
 function overlap(a: Tree, b: Tree) {
-  let inA = new Set<Tree>(), shared = 0
+  let inA = new Set<Tree>(), shared = 0, sharingTo = 0
   for (let cur = a.cursor(); cur.next();) if (cur.tree) inA.add(cur.tree)
-  for (let cur = b.cursor(); cur.next();) if (cur.tree && cur.type.is("Block")) shared += cur.to - cur.from
+  for (let cur = b.cursor(); cur.next();) if (cur.tree && inA.has(cur.tree) && cur.type.is("Block") && cur.from >= sharingTo) {
+    shared += cur.to - cur.from
+    sharingTo = cur.to
+  }
   return Math.round(shared * 100 / b.length)
 }
 
@@ -118,11 +121,44 @@ describe("Markdown incremental parsing", () => {
     }
   })
 
-  it("can handle huge documents", () => {
+  it("can handle large documents", () => {
     let doc = Text.empty
     for (let i = 0; i < 50; i++) doc = doc.append(doc1)
     let state = parse(doc)
     let {state: newState} = update(doc, state, {from: doc.length >> 1, insert: "a\n\nb"})
-    ist(overlap(state.tree, newState.tree), 98, ">")
+    ist(overlap(state.tree, newState.tree), 90, ">")
+  })
+
+  it("properly re-parses a continued indented code block", () => {
+    let doc = Text.of(`
+One paragraph to create a bit of string length here
+
+    Code
+    Block
+
+
+
+Another paragraph that is long enough to create a fragment
+`.split("\n"))
+    let start = parse(doc)
+    let {state: newState, doc: newDoc} = update(doc, start, {from: 76, insert: "    "})
+    compareTree(newState.tree, parse(newDoc).tree)
+  })
+
+  it("properly re-parses a continued list", () => {
+    let doc = Text.of(`
+One paragraph to create a bit of string length here
+
+ * List
+
+
+
+More content
+
+Another paragraph that is long enough to create a fragment
+`.split("\n"))
+    let start = parse(doc)
+    let {state: newState, doc: newDoc} = update(doc, start, {from: 65, insert: " * "})
+    compareTree(newState.tree, parse(newDoc).tree)
   })
 })

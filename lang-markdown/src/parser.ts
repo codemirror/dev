@@ -992,8 +992,10 @@ export class FragmentCursor {
       }
       p.addNode(cur.tree!, cur.from - frag.offset)
       // Taken content must always end in a block, because incremental
-      // parsing happens on block boundaries.
-      if (cur.type.is("Block")) {
+      // parsing happens on block boundaries. Never stop directly
+      // after an indented code block, since those can continue after
+      // any number of blank lines.
+      if (cur.type.is("Block") && cur.type.id != Type.CodeBlock) {
         end = cur.to - frag.offset
         blockI = p.context.children.length
       }
