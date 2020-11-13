@@ -1,5 +1,5 @@
 import {Parser, InputStream, ParseContext} from "lezer"
-import {Tree, SyntaxNode, ChangedRange} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
         Facet, languageDataProp} from "@codemirror/next/state"
@@ -29,7 +29,7 @@ export class LezerSyntax implements Syntax {
   ) {
     let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
-      create: state => SyntaxState.advance(Tree.empty, this, state.doc),
+      create: state => SyntaxState.advance(undefined, this, state.doc),
       update: (value, tr) => value.apply(tr, this, setSyntax)
     })
     this.extension = [
@@ -159,11 +159,10 @@ function work(parse: ParseContext, time: number, upto: number = Work.MaxPos) {
   }
 }
 
-function takeTree(parse: ParseContext, base: Tree) {
+function takeTree(parse: ParseContext, fragments: readonly TreeFragment[] | undefined) {
   let parsed = parse.forceFinish()
-  let cache = parsed.applyChanges([{fromA: parse.pos, toA: parsed.length, fromB: parse.pos, toB: parsed.length}])
-    .append(base.applyChanges([{fromA: 0, toA: parse.pos, fromB: 0, toB: parse.pos}]))
-  return {parsed, cache}
+  let newFragments = TreeFragment.addTree(parsed, fragments, true)
+  return {parsed, fragments: newFragments}
 }
 
 class SyntaxState {
@@ -179,23 +178,19 @@ class SyntaxState {
     readonly tree: Tree,
     // The point upto which the document has been parsed.
     public upto: number,
-    // The tree that can be used as cache for further incremental
-    // parsing. May differ from tree/updatedTree if a parse is broken
-    // off halfway—in that case, this one will have nodes that touch
-    // the break-off point dropped/decomposed so that they don't get
-    // incorrectly reused. The other properties will have those nodes,
-    // since they may be useful for code consuming the tree.
-    public cache: Tree
+    // The tree fragments that can be used for further incremental
+    // parsing.
+    public fragments: readonly TreeFragment[]
   ) {
     this.updatedTree = tree
   }
 
-  static advance(cache: Tree, syntax: LezerSyntax, doc: Text) {
-    let parse = syntax.parser.startParse(new DocStream(doc), {cache, dialect: syntax.dialect})
+  static advance(fragments: readonly TreeFragment[] | undefined, syntax: LezerSyntax, doc: Text) {
+    let parse = syntax.parser.startParse(new DocStream(doc), {fragments, dialect: syntax.dialect})
     let done = work(parse, Work.Apply)
-    if (done) return new SyntaxState(done, doc.length, done)
-    let result = takeTree(parse, cache)
-    return new SyntaxState(result.parsed, parse.pos, result.cache)
+    if (done) return new SyntaxState(done, doc.length, TreeFragment.addTree(done))
+    let result = takeTree(parse, fragments)
+    return new SyntaxState(result.parsed, parse.pos, result.fragments)
   }
 
   apply(tr: Transaction, syntax: LezerSyntax, effect: StateEffectType<SyntaxState>) {
@@ -204,17 +199,17 @@ class SyntaxState {
     let ranges: ChangedRange[] = []
     tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
     return SyntaxState.advance(
-      (this.parse ? takeTree(this.parse, this.updatedTree).cache : this.cache).applyChanges(ranges),
+      TreeFragment.applyChanges((this.parse ? takeTree(this.parse, this.fragments) : this).fragments, ranges),
       syntax, tr.state.doc)
   }
 
   startParse(syntax: LezerSyntax, doc: Text) {
-    this.parse = syntax.parser.startParse(new DocStream(doc), {cache: this.cache, dialect: syntax.dialect})
+    this.parse = syntax.parser.startParse(new DocStream(doc), {fragments: this.fragments, dialect: syntax.dialect})
   }
 
   stopParse(tree?: Tree | null, upto?: number) {
-    if (!tree) ({parsed: tree, cache: this.cache} = takeTree(this.parse!, this.updatedTree))
-    else this.cache = tree
+    if (!tree) ({parsed: tree, fragments: this.fragments} = takeTree(this.parse!, this.fragments))
+    else this.fragments = TreeFragment.addTree(tree)
     this.updatedTree = tree
     this.upto = upto ?? this.parse!.pos
     this.parse = null
@@ -260,7 +255,7 @@ class ParseWorker {
     if (done || field.parse!.badness > .8) {
       let tree = field.stopParse(done, state.doc.length)
       this.view.dispatch({
-        effects: this.setSyntax.of(new SyntaxState(tree, state.doc.length, field.cache))
+        effects: this.setSyntax.of(new SyntaxState(tree, state.doc.length, field.fragments))
       })
     } else {
       this.scheduleWork()
