@@ -161,4 +161,19 @@ Another paragraph that is long enough to create a fragment
     let {state: newState, doc: newDoc} = update(doc, start, {from: 65, insert: " * "})
     compareTree(newState.tree, parse(newDoc).tree)
   })
+
+  it("can recover from incremental parses that stop in the middle of a list", () => {
+    let doc = Text.of(`
+1. I am a list item with ***some* emphasized
+   content inside** and the parser hopefully stops
+   parsing after me.
+
+2. Oh no the list continues.
+`.split("\n"))
+    let start = new ParseState(Tree.empty, []).parse(doc, -10)
+    ist(start.tree.length, doc.length, "<")
+    let {state} = update(doc, start, [])
+    console.log(state.tree + "")
+    ist(state.tree.topNode.lastChild!.from, 1)
+  })
 })
