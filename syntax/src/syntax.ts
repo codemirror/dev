@@ -149,7 +149,7 @@ const enum Work {
   MaxPos = 5e6
 }
 
-class ParseState {
+export class ParseState {
   private parse: ParseContext | null = null
 
   /// @internal
@@ -175,15 +175,15 @@ class ParseState {
         this.tree = done
         return true
       } else if (upto != null && this.parse.pos >= upto) {
-        this.stop()
+        this.takeTree()
         return true
       }
       if (Date.now() > endTime) return false
     }
   }
   
-  stop() {
-    if (this.parse) {
+  takeTree() {
+    if (this.parse && this.parse.pos > this.tree.length) {
       this.tree = this.parse.forceFinish()
       this.fragments = TreeFragment.addTree(this.tree, this.fragments, true)
     }
@@ -191,7 +191,7 @@ class ParseState {
 
   changes(changes: ChangeDesc, newDoc: Text) {
     let {fragments, tree} = this
-    this.stop()
+    this.takeTree()
     if (!changes.empty) {
       let ranges: ChangedRange[] = []
       changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
@@ -212,8 +212,8 @@ class SyntaxState {
   readonly tree: Tree
 
   constructor(
-    // A mutable parse state that is used to not throw away work done
-    // during the lifetime of a state when moving to the next state.
+    // A mutable parse state that is used to preserve work done during
+    // the lifetime of a state when moving to the next state.
     readonly parse: ParseState
   ) {
     this.tree = parse.tree
