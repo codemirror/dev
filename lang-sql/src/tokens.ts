@@ -1,4 +1,4 @@
-import {ExternalTokenizer, InputStream} from "lezer"
+import {ExternalTokenizer, Input} from "lezer"
 import {whitespace, LineComment, BlockComment, String, Number, Bool, Null,
         ParenL, ParenR, BraceL, BraceR, BracketL, BracketR, Semi, Dot,
         Operator, Punctuation, SpecialVar, Identifier, QuotedIdentifier,
@@ -46,7 +46,7 @@ function isHexDigit(ch: number) {
   return ch >= Ch._0 && ch <= Ch._9 || ch >= Ch.a && ch <= Ch.f || ch >= Ch.A && ch <= Ch.F
 }
 
-function readLiteral(input: InputStream, pos: number, endQuote: number, backslashEscapes: boolean) {
+function readLiteral(input: Input, pos: number, endQuote: number, backslashEscapes: boolean) {
   for (let escaped = false;;) {
     let next = input.get(pos++)
     if (next < 0) return pos - 1
@@ -55,7 +55,7 @@ function readLiteral(input: InputStream, pos: number, endQuote: number, backslas
   }
 }
 
-function readWord(input: InputStream, pos: number) {
+function readWord(input: Input, pos: number) {
   for (;; pos++) {
     let next = input.get(pos)
     if (next != Ch.Underscore && !isAlpha(next)) break
@@ -63,14 +63,14 @@ function readWord(input: InputStream, pos: number) {
   return pos
 }
 
-function readWordOrQuoted(input: InputStream, pos: number) {
+function readWordOrQuoted(input: Input, pos: number) {
   let next = input.get(pos)
   if (next == Ch.SingleQuote || next == Ch.DoubleQuote || next == Ch.Backtick)
     return readLiteral(input, pos + 1, next, false)
   return readWord(input, pos)
 }
 
-function readNumber(input: InputStream, pos: number, sawDot: boolean) {
+function readNumber(input: Input, pos: number, sawDot: boolean) {
   let next
   for (;; pos++) {
     next = input.get(pos)
@@ -92,7 +92,7 @@ function readNumber(input: InputStream, pos: number, sawDot: boolean) {
   return pos
 }
 
-function eol(input: InputStream, pos: number) {
+function eol(input: Input, pos: number) {
   for (;; pos++) {
     let next = input.get(pos)
     if (next < 0 || next == Ch.Newline) return pos
