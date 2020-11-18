@@ -1,8 +1,8 @@
-import {Parser, InputStream, ParseContext} from "lezer"
+import {Parser, ParseOptions, Input, ParseContext} from "lezer"
 import {Tree, SyntaxNode, ChangedRange, TreeFragment} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
-        Facet, languageDataProp} from "@codemirror/next/state"
+        Facet, languageDataProp, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
@@ -29,8 +29,15 @@ export class LezerSyntax implements Syntax {
   ) {
     let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
-      create: state => SyntaxState.advance(undefined, this, state.doc),
-      update: (value, tr) => value.apply(tr, this, setSyntax)
+      create(state) {
+        let parseState = ParseState.create(parser, state.doc, dialect.length ? {dialect} : undefined)
+        parseState.work(Work.Apply)
+        return new SyntaxState(parseState)
+      },
+      update(value, tr) {
+        for (let e of tr.effects) if (e.is(setSyntax)) return e.value
+        return value.apply(tr)
+      }
     })
     this.extension = [
       EditorState.syntax.of(this),
@@ -70,20 +77,12 @@ export class LezerSyntax implements Syntax {
   }
 
   parsePos(state: EditorState) {
-    return state.field(this.field).upto
+    return state.field(this.field).tree.length
   }
 
   ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
-    let field = state.field(this.field)
-    if (field.upto >= upto) return field.updatedTree
-    if (!field.parse) field.startParse(this, state.doc)
-
-    if (field.parse!.pos < upto) {
-      let done = work(field.parse!, timeout, upto)
-      if (done) return field.stopParse(done, state.doc.length)
-    }
-
-    return field.parse!.pos < upto ? null : field.stopParse()
+    let parse = state.field(this.field).parse
+    return parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
   }
 
   languageDataFacetAt(state: EditorState, pos: number) {
@@ -100,7 +99,7 @@ export class LezerSyntax implements Syntax {
   }
 }
 
-class DocStream implements InputStream {
+class DocInput implements Input {
   cursor: TextIterator
   cursorPos = 0
   string = ""
@@ -133,7 +132,7 @@ class DocStream implements InputStream {
   }
 
   clip(at: number) {
-    return new DocStream(this.doc, at)
+    return new DocInput(this.doc, at)
   }
 }
 
@@ -150,70 +149,81 @@ const enum Work {
   MaxPos = 5e6
 }
 
-function work(parse: ParseContext, time: number, upto: number = Work.MaxPos) {
-  let endTime = Date.now() + time
-  for (;;) {
-    let done = parse.advance()
-    if (done) return done
-    if (parse.pos > upto || Date.now() > endTime) return null
-  }
-}
+class ParseState {
+  private parse: ParseContext | null = null
 
-function takeTree(parse: ParseContext, fragments: readonly TreeFragment[] | undefined) {
-  let parsed = parse.forceFinish()
-  let newFragments = TreeFragment.addTree(parsed, fragments, true)
-  return {parsed, fragments: newFragments}
+  /// @internal
+  constructor(
+    private parser: Parser,
+    private doc: Text,
+    private fragments: readonly TreeFragment[] = [],
+    public tree: Tree,
+    private options?: ParseOptions
+  ) {}
+
+  work(time: number, upto?: number) {
+    if (upto == null ? this.tree.length == this.doc.length : this.tree.length >= upto)
+      return true
+    if (!this.parse)
+      this.parse = this.parser.startParse(new DocInput(this.doc), Object.assign({fragments: this.fragments}, this.options))
+    let endTime = Date.now() + time
+    for (;;) {
+      let done = this.parse.advance()
+      if (done) {
+        this.fragments = TreeFragment.addTree(done)
+        this.parse = null
+        this.tree = done
+        return true
+      } else if (upto != null && this.parse.pos >= upto) {
+        this.stop()
+        return true
+      }
+      if (Date.now() > endTime) return false
+    }
+  }
+  
+  stop() {
+    if (this.parse) {
+      this.tree = this.parse.forceFinish()
+      this.fragments = TreeFragment.addTree(this.tree, this.fragments, true)
+    }
+  }
+
+  changes(changes: ChangeDesc, newDoc: Text) {
+    let {fragments, tree} = this
+    this.stop()
+    if (!changes.empty) {
+      let ranges: ChangedRange[] = []
+      changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
+      fragments = TreeFragment.applyChanges(fragments, ranges)
+      tree = Tree.empty
+    }
+    return new ParseState(this.parser, newDoc, fragments, tree, this.options)
+  }
+
+  static create(parser: Parser, doc: Text, options?: ParseOptions) {
+    return new ParseState(parser, doc, [], Tree.empty, options)
+  }
 }
 
 class SyntaxState {
-  // The furthest version of the syntax tree. Starts in sync with
-  // this.tree, may be updated by the parsing process.
-  public updatedTree: Tree
-  // In-progress parse, if any
-  public parse: ParseContext | null = null
+  // The current tree. Immutable, because directly accessible from
+  // the editor state.
+  readonly tree: Tree
 
   constructor(
-    // The current tree. Immutable, because directly accessible from
-    // the editor state.
-    readonly tree: Tree,
-    // The point upto which the document has been parsed.
-    public upto: number,
-    // The tree fragments that can be used for further incremental
-    // parsing.
-    public fragments: readonly TreeFragment[]
+    // A mutable parse state that is used to not throw away work done
+    // during the lifetime of a state when moving to the next state.
+    readonly parse: ParseState
   ) {
-    this.updatedTree = tree
+    this.tree = parse.tree
   }
 
-  static advance(fragments: readonly TreeFragment[] | undefined, syntax: LezerSyntax, doc: Text) {
-    let parse = syntax.parser.startParse(new DocStream(doc), {fragments, dialect: syntax.dialect})
-    let done = work(parse, Work.Apply)
-    if (done) return new SyntaxState(done, doc.length, TreeFragment.addTree(done))
-    let result = takeTree(parse, fragments)
-    return new SyntaxState(result.parsed, parse.pos, result.fragments)
-  }
-
-  apply(tr: Transaction, syntax: LezerSyntax, effect: StateEffectType<SyntaxState>) {
-    for (let e of tr.effects) if (e.is(effect)) return e.value
+  apply(tr: Transaction) {
     if (!tr.docChanged) return this
-    let ranges: ChangedRange[] = []
-    tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
-    return SyntaxState.advance(
-      TreeFragment.applyChanges((this.parse ? takeTree(this.parse, this.fragments) : this).fragments, ranges),
-      syntax, tr.state.doc)
-  }
-
-  startParse(syntax: LezerSyntax, doc: Text) {
-    this.parse = syntax.parser.startParse(new DocStream(doc), {fragments: this.fragments, dialect: syntax.dialect})
-  }
-
-  stopParse(tree?: Tree | null, upto?: number) {
-    if (!tree) ({parsed: tree, fragments: this.fragments} = takeTree(this.parse!, this.fragments))
-    else this.fragments = TreeFragment.addTree(tree)
-    this.updatedTree = tree
-    this.upto = upto ?? this.parse!.pos
-    this.parse = null
-    return tree
+    let newState = this.parse.changes(tr.changes, tr.newDoc)
+    newState.work(Work.Apply)
+    return new SyntaxState(newState)
   }
 }
 
@@ -242,24 +252,19 @@ class ParseWorker {
   scheduleWork() {
     if (this.working > -1) return
     let {state} = this.view, field = state.field(this.syntax.field)
-    if (field.upto >= state.doc.length) return
+    if (field.tree.length >= state.doc.length) return
     this.working = requestIdle(this.work, {timeout: Work.Pause})
   }
 
   work(deadline?: Deadline) {
     this.working = -1
     let {state} = this.view, field = state.field(this.syntax.field)
-    if (field.upto >= state.doc.length) return
-    if (!field.parse) field.startParse(this.syntax, state.doc)
-    let done = work(field.parse!, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    if (done || field.parse!.badness > .8) {
-      let tree = field.stopParse(done, state.doc.length)
-      this.view.dispatch({
-        effects: this.setSyntax.of(new SyntaxState(tree, state.doc.length, field.fragments))
-      })
-    } else {
+    if (field.tree.length >= state.doc.length) return
+    field.parse.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    if (field.parse.tree.length >= state.doc.length)
+      this.view.dispatch({effects: this.setSyntax.of(new SyntaxState(field.parse))})
+    else
       this.scheduleWork()
-    }
   }
 
   destroy() {
