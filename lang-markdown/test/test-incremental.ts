@@ -42,7 +42,7 @@ function tree1() { return state1().tree }
 function update(doc: Text, state: ParseState, changes: ChangeSpec) {
   let changeSet = EditorState.create({doc}).changes(changes)
   let newDoc = changeSet.apply(doc)
-  return {doc: newDoc, state: state.applyChanges(changeSet, doc).parse(newDoc, 1e9)}
+  return {doc: newDoc, state: state.applyChanges(changeSet, 2).parse(newDoc, 1e9)}
 }
 
 function overlap(a: Tree, b: Tree) {
@@ -57,20 +57,20 @@ function overlap(a: Tree, b: Tree) {
 
 function testChange(change: ChangeSpec, reuse = 10) {
   let {state, doc} = update(doc1, state1(), change)
-  ist(overlap(state.tree, tree1()), reuse, ">")
   compareTree(state.tree, parse(doc).tree)
+  ist(overlap(state.tree, tree1()), reuse, ">")
 }
 
 describe("Markdown incremental parsing", () => {
   it("can produce the proper tree", () => {
     // Replace 'three' with 'bears'
-    let {state} = update(doc1, state1(), {from: 23, to: 28, insert: "bears"})
+    let {state} = update(doc1, state1(), {from: 24, to: 29, insert: "bears"})
     compareTree(state.tree, tree1())
   })
 
   it("reuses nodes from the previous parse", () => {
     // Replace 'three' with 'bears'
-    let {state} = update(doc1, state1(), {from: 23, to: 28, insert: "bears"})
+    let {state} = update(doc1, state1(), {from: 24, to: 29, insert: "bears"})
     ist(overlap(state1().tree, state.tree), 80, ">")
   })
 
@@ -92,7 +92,7 @@ describe("Markdown incremental parsing", () => {
   it("can deal with multiple changes applied separately", () => {
     let tr1 = EditorState.create({doc: doc1}).update({changes: {from: 190, to: 191}})
     let tr2 = tr1.state.update({changes: {from: 30, insert: "hi\n\nyou"}})
-    let state = state1().applyChanges(tr1.changes, doc1).applyChanges(tr2.changes, tr1.newDoc).parse(tr2.newDoc, 1e9)
+    let state = state1().applyChanges(tr1.changes, 2).applyChanges(tr2.changes, 2).parse(tr2.newDoc, 1e9)
     compareTree(state.tree, parse(tr2.newDoc).tree)
   })
 
@@ -173,7 +173,6 @@ Another paragraph that is long enough to create a fragment
     let start = new ParseState(Tree.empty, []).parse(doc, -10)
     ist(start.tree.length, doc.length, "<")
     let {state} = update(doc, start, [])
-    console.log(state.tree + "")
     ist(state.tree.topNode.lastChild!.from, 1)
   })
 })

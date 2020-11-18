@@ -1,18 +1,24 @@
-import {Tree, NodeType, NodeProp, SyntaxNode, NodeSet, TreeCursor} from "lezer-tree"
-import {Text, TextIterator} from "@codemirror/next/text"
+import {Tree, TreeBuffer, NodeType, NodeProp, TreeFragment, NodeSet, TreeCursor} from "lezer-tree"
+import {TextIterator, Text} from "@codemirror/next/text"
 
 class BlockContext {
   readonly children: Tree[] = []
   readonly positions: number[] = []
+  readonly hash: number
 
   constructor(readonly type: number,
               // Used for indentation in list items, markup character in lists
               readonly value: number,
               readonly from: number,
-              readonly contentStart: number) {}
+              readonly contentStart: number,
+              parentHash: number) {
+    this.hash = (parentHash + (parentHash << 8) + type + (value << 4)) | 0
+  }
 
   toTree(end: number) {
-    return new Tree(nodeSet.types[this.type], this.children, this.positions, end - this.from).balance(2048)
+    let tree = new Tree(nodeSet.types[this.type], this.children, this.positions, end - this.from).balance(2048)
+    stampContext(tree.children, this.hash)
+    return tree
   }
 }
 
@@ -399,7 +405,7 @@ const skipBlockResult: SkipResult = {
 }
 
 export class MarkdownParser {
-  context: BlockContext = new BlockContext(Type.Document, 0, 0, 0)
+  context: BlockContext = new BlockContext(Type.Document, 0, 0, 0, 0)
   contextStack: BlockContext[] = [this.context]
   pos = 0
   text = ""
@@ -443,7 +449,7 @@ export class MarkdownParser {
   }
 
   reuseFragment(cursor: FragmentCursor) {
-    let m = cursor.moveTo(this.pos), match = m && cursor.matches(this)
+    let m = cursor.moveTo(this.pos), match = m && cursor.matches(this.context.hash)
     if (!match) return false
     let taken = cursor.takeNodes(this)
     if (!taken) return false
@@ -479,7 +485,7 @@ export class MarkdownParser {
   prevLineEnd() { return this.input.done ? this.pos : this.pos - 1 }
 
   startContext(type: Type, start: number, contentStart: number, value = 0) {
-    this.context = new BlockContext(type, value, this.pos + start, contentStart)
+    this.context = new BlockContext(type, value, this.pos + start, contentStart, this.context.hash)
     this.contextStack.push(this.context)
   }
 
@@ -884,75 +890,41 @@ for (let i = 1, name; name = Type[i]; i++) {
 }
 export const nodeSet = new NodeSet(nodeTypes)
 
-// Incremental parsing
+const ContextHash = new WeakMap<Tree | TreeBuffer, number>()
 
-// A piece of parsed content disconnected from the main tree because
-// content in front it changed.
-export class Fragment {
-  constructor(readonly tree: Tree,
-              readonly doc: Text,
-              // Offset between the tree start and the _current_
-              // document start. I.e. position x the doc aligns with x
-              // + this.offset in this.tree.
-              readonly offset: number,
-              // Document positions covered by this fragment. `from`
-              // points to the start of a leaf block, `to` to the end
-              // of one.
-              readonly from: number,
-              readonly to: number) {}
-
-  // From/to are the _document_ positions to cut between. `offset` is
-  // the additional offset this change adds to the given region.
-  cut(from: number, to: number, offset: number) {
-    let from_ = Math.max(from, this.from) - offset, to_ = Math.min(to, this.to) - offset
-    if (from_ >= to_) return null
-    if (from_ == this.from && to_ == this.to && !offset) return this
-    return new Fragment(this.tree, this.doc, this.offset + offset, from_, to_)
+function stampContext(nodes: readonly (Tree | TreeBuffer)[], hash: number) {
+  for (let n of nodes) {
+    ContextHash.set(n, hash)
+    if (n instanceof Tree && n.type.isAnonymous) stampContext(n.children, hash)
   }
-}
-
-function listContext(n: SyntaxNode, doc: Text) {
-  let markup = n.firstChild!.firstChild!
-  return {type: n.type.id, value: doc.sliceString(markup.to - 1, markup.to).charCodeAt(0)}
-}
-
-const CreateContext: {[name: string]: (n: SyntaxNode, doc: Text) => {type: number, value: number}} = {
-  Blockquote() {
-    return {type: Type.Blockquote, value: 0}
-  },
-  ListItem(n) {
-    let content = n.firstChild!.nextSibling!
-    return {type: Type.ListItem, value: content.from - n.from} // FIXME adjust for tabs
-  },
-  BulletList: listContext,
-  OrderedList: listContext
 }
 
 export class FragmentCursor {
   // Index into fragment array
   i = 0
   // Active fragment
-  fragment: Fragment | null = null
+  fragment: TreeFragment | null = null
+  fragmentEnd = -1
   // Cursor into the current fragment, if any. When `moveTo` returns
   // true, this points at the first block after `pos`.
   cursor: TreeCursor | null = null
-  // The current block context. Only meaningful when cursor is
-  // non-null
-  context: {type: number, value: number}[] = []
 
-  constructor(readonly fragments: readonly Fragment[]) {
+  constructor(readonly fragments: readonly TreeFragment[], readonly doc: Text) {
     if (fragments.length) this.fragment = fragments[this.i++]
   }
 
   nextFragment() {
     this.fragment = this.i < this.fragments.length ? this.fragments[this.i++] : null
     this.cursor = null
-    this.context.length = 0
+    this.fragmentEnd = -1
   }
 
+  // FIXME don't use nodes that don't have a line between them and the fragment boundaries
   moveTo(pos: number) {
     while (this.fragment && this.fragment.to <= pos) this.nextFragment()
-    if (!this.fragment || this.fragment.from > pos) return false
+    if (!this.fragment || this.fragment.from > (pos ? pos - 1 : 0)) return false
+    if (this.fragmentEnd < 0)
+      this.fragmentEnd = Math.max(0, this.doc.lineAt(this.fragment.to).from - 1)
 
     let c = this.cursor
     if (!c) {
@@ -961,42 +933,33 @@ export class FragmentCursor {
     }
 
     let rPos = pos + this.fragment.offset
-    while (c.to <= rPos) {
-      if (!c.parent()) return false
-      if (c.type.is("BlockContext")) this.context.pop()
-    }
+    while (c.to <= rPos) if (!c.parent()) return false
     for (;;) {
       if (c.from >= rPos) return true
-      let cx = c.type.is("BlockContext") && c.type.id != Type.Document ? CreateContext[c.name](c.node, this.fragment!.doc) : null
       if (!c.childAfter(rPos)) return false
-      if (cx) this.context.push(cx)
     }
   }
 
-  matches(p: MarkdownParser) {
-    if (this.context.length != p.contextStack.length - 1) return false
-    for (let i = 0; i < this.context.length; i++) {
-      let a = this.context[i], b = p.contextStack[i + 1]
-      if (a.type != b.type || a.value != b.value) return false
-    }
-    return true
+  matches(hash: number) {
+    let tree = this.cursor!.tree
+    return tree && ContextHash.get(tree) == hash
   }
 
   takeNodes(p: MarkdownParser) {
-    let cur = this.cursor!, frag = this.fragment!
+    let cur = this.cursor!, off = this.fragment!.offset
     let start = p.pos, end = start, blockI = p.context.children.length
     for (;;) {
-      if (cur.to - frag.offset >= frag.to) {
+      if (cur.to - off >= this.fragmentEnd) {
         if (cur.type.isAnonymous && cur.firstChild()) continue
         break
       }
-      p.addNode(cur.tree!, cur.from - frag.offset)
+      p.addNode(cur.tree!, cur.from - off)
       // Taken content must always end in a block, because incremental
       // parsing happens on block boundaries. Never stop directly
       // after an indented code block, since those can continue after
       // any number of blank lines.
       if (cur.type.is("Block") && cur.type.id != Type.CodeBlock) {
-        end = cur.to - frag.offset
+        end = cur.to - off
         blockI = p.context.children.length
       }
       if (!cur.nextSibling()) break

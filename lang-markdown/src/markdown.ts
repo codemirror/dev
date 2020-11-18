@@ -1,25 +1,12 @@
-import {Tree} from "lezer-tree"
-import {StateField, ChangeDesc, Text} from "@codemirror/next/state"
-import {Fragment, MarkdownParser, FragmentCursor} from "./parser"
+import {Tree, TreeFragment, ChangedRange} from "lezer-tree"
+import {StateField, Text, ChangeDesc} from "@codemirror/next/state"
+import {MarkdownParser, FragmentCursor} from "./parser"
 
 export {MarkdownParser, Type, nodeSet} from "./parser"
 
-function addTree(tree: Fragment, fragments: readonly Fragment[]) {
-  let result = [tree]
-  for (let f of fragments) {
-    if (f.from >= tree.to) {
-      result.push(f)
-    } else if (f.to > tree.to) {
-      let part = f.cut(tree.to, f.to, 0)
-      if (part) result.push(part)
-    }
-  }
-  return result
-}
-
 const syntaxField = StateField.define<ParseState>({
   create(s) { return new ParseState(Tree.empty, []).parse(s.doc, Work.Apply) },
-  update(value, tr) { return value.applyChanges(tr.changes, tr.startState.doc).parse(tr.newDoc, Work.Apply) }
+  update(value, tr) { return value.applyChanges(tr.changes).parse(tr.newDoc, Work.Apply) }
 })
 
 const enum Work {
@@ -37,34 +24,24 @@ const enum Work {
 
 export class ParseState {
   constructor(readonly tree: Tree,
-              readonly fragments: readonly Fragment[]) {}
-
-  applyChanges(change: ChangeDesc, oldDoc: Text) {
-    if (change.empty) return this
-    let fragments: Fragment[] = [], i = 1, next = this.fragments.length ? this.fragments[0] : null
-    change.iterGaps((fromA, fromB, length) => {
-      let toA = fromA + length, off = fromA - fromB
-      // Drop a full line at the start and end of the region
-      if (toA < change.length) toA = oldDoc.lineAt(toA - 1).from - 1
-      if (fromA > 0) fromA = oldDoc.lineAt(fromA + 1).to + 1
-      if (toA - fromA > 32) while (next && next.from < toA) {
-        let cut = next.cut(fromA, toA, off)
-        if (cut) fragments.push(cut)
-        if (next.to > toA) break
-        next = i < this.fragments.length ? this.fragments[i++] : null
-      }
-    })
-    return new ParseState(Tree.empty, fragments)
-  }
+              readonly fragments: readonly TreeFragment[]) {}
 
   parse(doc: Text, timeBudget: number) {
+    // FIXME don't do anything when already done
     let parser = new MarkdownParser(doc.iterLines())
     let stopAt = Date.now() + timeBudget
-    let fCursor = new FragmentCursor(this.fragments)
+    let fCursor = new FragmentCursor(this.fragments, doc)
     while ((parser.reuseFragment(fCursor) || parser.parseBlock()) &&
            Date.now() < stopAt) {}
     let tree = parser.finish()
-    return new ParseState(tree, addTree(new Fragment(tree, doc, 0, 0, tree.length), this.fragments))
+    return new ParseState(tree, TreeFragment.addTree(tree, this.fragments))
+  }
+
+  applyChanges(changes: ChangeDesc, margin?: number) {
+    if (changes.empty) return this
+    let ranges: ChangedRange[] = []
+    changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
+    return new ParseState(Tree.empty, TreeFragment.applyChanges(this.fragments, ranges, margin))
   }
 }
 
