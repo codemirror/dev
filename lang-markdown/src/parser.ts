@@ -1,5 +1,6 @@
 import {Tree, TreeBuffer, NodeType, NodeProp, TreeFragment, NodeSet, TreeCursor} from "lezer-tree"
-import {TextIterator, Text} from "@codemirror/next/text"
+import {Input} from "lezer"
+import {Text} from "@codemirror/next/text"
 
 class BlockContext {
   readonly children: Tree[] = []
@@ -407,11 +408,11 @@ const skipBlockResult: SkipResult = {
 export class MarkdownParser {
   context: BlockContext = new BlockContext(Type.Document, 0, 0, 0, 0)
   contextStack: BlockContext[] = [this.context]
-  pos = 0
   text = ""
+  atEnd = false
 
-  constructor(readonly input: TextIterator) {
-    this.text = input.next().value
+  constructor(readonly input: Input, public pos = 0) {
+    this.text = input.lineAfter(pos)
   }
 
   parseBlock() {
@@ -453,17 +454,28 @@ export class MarkdownParser {
     if (!match) return false
     let taken = cursor.takeNodes(this)
     if (!taken) return false
-    this.input.next(taken - this.text.length)
-    this.pos += taken + (this.input.done ? 0 : 1)
-    this.text = this.input.value
+    this.pos += taken
+    if (this.pos < this.input.length) {
+      this.pos++
+      this.text = this.input.lineAfter(this.pos)
+    } else {
+      this.atEnd = true
+      this.text = ""
+    }
     return true
   }
 
   nextLine() {
-    this.input.next()
-    this.pos += this.text.length + (this.input.done ? 0 : 1)
-    this.text = this.input.value
-    return !this.input.done
+    this.pos += this.text.length
+    if (this.pos >= this.input.length) {
+      this.atEnd = true
+      this.text = ""
+      return false
+    } else {
+      this.pos++
+      this.text = this.input.lineAfter(this.pos)
+      return true
+    }
   }
 
   skipBlockMarkup(marks: Element[]): SkipResult {
@@ -482,7 +494,7 @@ export class MarkdownParser {
     return result
   }
 
-  prevLineEnd() { return this.input.done ? this.pos : this.pos - 1 }
+  prevLineEnd() { return this.atEnd ? this.pos : this.pos - 1 }
 
   startContext(type: Type, start: number, contentStart: number, value = 0) {
     this.context = new BlockContext(type, value, this.pos + start, contentStart, this.context.hash)

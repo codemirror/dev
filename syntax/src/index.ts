@@ -1,4 +1,5 @@
-export {LezerSyntax} from "./syntax"
+// FIXME move DocInput somewhere and document it
+export {LezerSyntax, DocInput} from "./syntax"
 
 export {TreeIndentContext, indentNodeProp,
         delimitedIndent, continuedIndent, flatIndent} from "./indent"

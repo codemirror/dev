@@ -1,4 +1,5 @@
 import {MarkdownParser, Type, nodeSet} from "@codemirror/next/lang-markdown"
+import {DocInput} from "@codemirror/next/syntax"
 import {Text} from "@codemirror/next/text"
 import {Tree} from "lezer-tree"
 import {compareTree} from "./compare-tree.js"
@@ -66,7 +67,7 @@ function parseSpec(spec: string, specName: string) {
 function test(name: string, spec: string) {
   it(name, () => {
     let {tree, doc} = parseSpec(spec, name)
-    let parser = new MarkdownParser(Text.of(doc.split("\n")).iterLines())
+    let parser = new MarkdownParser(new DocInput(Text.of(doc.split("\n"))))
     while (parser.parseBlock()) {}
     compareTree(parser.finish(), tree)
   })

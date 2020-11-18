@@ -1,5 +1,6 @@
 import {Tree, TreeFragment, ChangedRange} from "lezer-tree"
 import {StateField, Text, ChangeDesc} from "@codemirror/next/state"
+import {DocInput} from "@codemirror/next/syntax"
 import {MarkdownParser, FragmentCursor} from "./parser"
 
 export {MarkdownParser, Type, nodeSet} from "./parser"
@@ -28,7 +29,7 @@ export class ParseState {
 
   parse(doc: Text, timeBudget: number) {
     // FIXME don't do anything when already done
-    let parser = new MarkdownParser(doc.iterLines())
+    let parser = new MarkdownParser(new DocInput(doc))
     let stopAt = Date.now() + timeBudget
     let fCursor = new FragmentCursor(this.fragments, doc)
     while ((parser.reuseFragment(fCursor) || parser.parseBlock()) &&
