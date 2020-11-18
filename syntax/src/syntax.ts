@@ -99,28 +99,51 @@ export class LezerSyntax implements Syntax {
   }
 }
 
-class DocInput implements Input {
+export class DocInput implements Input {
   cursor: TextIterator
   cursorPos = 0
   string = ""
+  prevString = ""
 
   constructor(readonly doc: Text, readonly length: number = doc.length) {
     this.cursor = doc.iter()
   }
 
+  private syncTo(pos: number) {
+    if (pos < this.cursorPos) { // Reset the cursor if we have to go back
+      this.cursor = this.doc.iter()
+      this.cursorPos = 0
+    }
+    this.prevString = pos == this.cursorPos ? this.string : ""
+    this.string = this.cursor.next(pos - this.cursorPos).value
+    this.cursorPos = pos + this.string.length
+    return this.cursorPos - this.string.length
+  }
+
   get(pos: number) {
     if (pos >= this.length) return -1
     let stringStart = this.cursorPos - this.string.length
-    if (pos < stringStart || pos >= this.cursorPos) {
-      if (pos < this.cursorPos) { // Reset the cursor if we have to go back
-        this.cursor = this.doc.iter()
-        this.cursorPos = 0
-      }
-      this.string = this.cursor.next(pos - this.cursorPos).value
-      this.cursorPos = pos + this.string.length
-      stringStart = this.cursorPos - this.string.length
-    }
+    if (pos < stringStart && pos >= stringStart - this.prevString.length)
+      return this.prevString.charCodeAt(pos - (stringStart - this.prevString.length))
+    if (pos < stringStart || pos >= this.cursorPos) stringStart = this.syncTo(pos)
     return this.string.charCodeAt(pos - stringStart)
+  }
+
+  lineAfter(pos: number) {
+    if (pos >= this.length || pos < 0) return ""
+    let stringStart = this.cursorPos - this.string.length
+    if (pos < stringStart || pos >= this.cursorPos) stringStart = this.syncTo(pos)
+    let off = pos - stringStart, result = ""
+    while (!this.cursor.lineBreak) {
+      result += off ? this.string.slice(off) : this.string
+      if (this.cursorPos >= this.length) {
+        if (this.cursorPos > this.length) result = result.slice(0, result.length - (this.cursorPos - this.length))
+        break
+      }
+      this.syncTo(this.cursorPos)
+      off = 0
+    }
+    return result
   }
 
   read(from: number, to: number) {
