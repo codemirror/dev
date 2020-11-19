@@ -1,9 +1,7 @@
 import {Tree, TreeFragment, ChangedRange} from "lezer-tree"
 import {StateField, Text, ChangeDesc} from "@codemirror/next/state"
 import {DocInput} from "@codemirror/next/syntax"
-import {MarkdownParser} from "./parser"
-
-export {MarkdownParser, Type} from "./parser"
+import {MarkdownParser} from "lezer-markdown"
 
 const syntaxField = StateField.define<ParseState>({
   create(s) { return new ParseState(Tree.empty, []).parse(s.doc, Work.Apply) },
