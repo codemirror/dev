@@ -1,25 +1,30 @@
 import {Tree, TreeBuffer, NodeType, NodeProp, TreeFragment, NodeSet, TreeCursor} from "lezer-tree"
-import {Input} from "lezer"
-import {Text} from "@codemirror/next/text"
+import {Input, IncrementalParser} from "lezer"
 
 class BlockContext {
-  readonly children: Tree[] = []
-  readonly positions: number[] = []
-  readonly hash: number
+  static create(type: number, value: number, from: number, contentStart: number, parentHash: number) {
+    let hash = (parentHash + (parentHash << 8) + type + (value << 4)) | 0
+    return new BlockContext(type, value, from, contentStart, hash, [], [])
+  }
 
   constructor(readonly type: number,
               // Used for indentation in list items, markup character in lists
               readonly value: number,
               readonly from: number,
               readonly contentStart: number,
-              parentHash: number) {
-    this.hash = (parentHash + (parentHash << 8) + type + (value << 4)) | 0
-  }
+              readonly hash: number,
+              readonly children: Tree[],
+              readonly positions: number[]) {}
 
   toTree(end: number) {
     let tree = new Tree(nodeSet.types[this.type], this.children, this.positions, end - this.from).balance(2048)
     stampContext(tree.children, this.hash)
     return tree
+  }
+
+  copy() {
+    return new BlockContext(this.type, this.value, this.from, this.contentStart, this.hash,
+                            this.children.slice(), this.positions.slice())
   }
 }
 
@@ -64,6 +69,46 @@ export enum Type {
   LinkTitle,
   LinkLabel
 }
+
+type SkipResult = {start: number, baseIndent: number, indent: number, depth: number, unmatched: number}
+
+function skipForList(cx: BlockContext, p: MarkdownParser, result: SkipResult) {
+  if (result.start == p.text.length ||
+      (cx != p.context && result.indent >= p.contextStack[result.depth + 1].value + result.baseIndent)) return true
+  if (result.indent >= result.baseIndent + 4) return false
+  let size = (cx.type == Type.OrderedList ? isOrderedList : isBulletList)(p, p.text.charCodeAt(result.start), result.start, false)
+  return size > 0 &&
+    (cx.type != Type.BulletList || isHorizontalRule(p, p.text.charCodeAt(result.start), result.start) < 0) &&
+    p.text.charCodeAt(result.start + size - 1) == cx.value
+}
+
+const SkipMarkup: {[type: number]: (cx: BlockContext, p: MarkdownParser, result: SkipResult, marks: Element[]) => boolean} = {
+  [Type.Blockquote](_cx, p, result, marks) {
+    if (p.text.charCodeAt(result.start) != 62 /* '>' */) return false
+    marks.push(elt(Type.QuoteMark, p.pos + result.start, p.pos + result.start + 1))
+    result.start = skipSpace(p.text, result.start + 1)
+    result.baseIndent = result.indent + 2
+    return true
+  },
+  [Type.ListItem](cx, p, result) {
+    if (result.indent < result.baseIndent + cx.value && result.start < p.text.length) return false
+    result.baseIndent += cx.value
+    return true
+  },
+  [Type.OrderedList]: skipForList,
+  [Type.BulletList]: skipForList,
+  [Type.Document]() { return true }
+}
+
+let nodeTypes = [NodeType.none]
+for (let i = 1, name; name = Type[i]; i++) {
+  nodeTypes[i] = NodeType.define({
+    id: i,
+    name,
+    props: i >= Type.Escape ? [] : [[NodeProp.group, i in SkipMarkup ? ["Block", "BlockContext"] : ["Block", "LeafBlock"]]]
+  })
+}
+const nodeSet = new NodeSet(nodeTypes)
 
 function space(ch: number) { return ch == 32 || ch == 9 || ch == 10 || ch == 13 }
 
@@ -189,36 +234,6 @@ const BreakParagraph: ((p: MarkdownParser, next: number, start: number, breaking
   isHorizontalRule,
   isHTMLBlock
 ]
-
-type SkipResult = {start: number, baseIndent: number, indent: number, depth: number, unmatched: number}
-
-function skipForList(cx: BlockContext, p: MarkdownParser, result: SkipResult) {
-  if (result.start == p.text.length ||
-      (cx != p.context && result.indent >= p.contextStack[result.depth + 1].value + result.baseIndent)) return true
-  if (result.indent >= result.baseIndent + 4) return false
-  let size = (cx.type == Type.OrderedList ? isOrderedList : isBulletList)(p, p.text.charCodeAt(result.start), result.start, false)
-  return size > 0 &&
-    (cx.type != Type.BulletList || isHorizontalRule(p, p.text.charCodeAt(result.start), result.start) < 0) &&
-    p.text.charCodeAt(result.start + size - 1) == cx.value
-}
-
-const SkipMarkup: {[type: number]: (cx: BlockContext, p: MarkdownParser, result: SkipResult, marks: Element[]) => boolean} = {
-  [Type.Blockquote](_cx, p, result, marks) {
-    if (p.text.charCodeAt(result.start) != 62 /* '>' */) return false
-    marks.push(elt(Type.QuoteMark, p.pos + result.start, p.pos + result.start + 1))
-    result.start = skipSpace(p.text, result.start + 1)
-    result.baseIndent = result.indent + 2
-    return true
-  },
-  [Type.ListItem](cx, p, result) {
-    if (result.indent < result.baseIndent + cx.value && result.start < p.text.length) return false
-    result.baseIndent += cx.value
-    return true
-  },
-  [Type.OrderedList]: skipForList,
-  [Type.BulletList]: skipForList,
-  [Type.Document]() { return true }
-}
 
 function getListIndent(text: string, start: number) {
   let indentAfter = countIndent(text, start) + 1
@@ -405,17 +420,43 @@ const skipBlockResult: SkipResult = {
   unmatched: 0
 }
 
-export class MarkdownParser {
-  context: BlockContext = new BlockContext(Type.Document, 0, 0, 0, 0)
-  contextStack: BlockContext[] = [this.context]
-  text = ""
-  atEnd = false
+type Config = {
+  /// The position at which to start parsing. Defaults to 0.
+  startPos?: number,
+  /// A set of tree fragments (aligned with the input) to use for
+  /// incremental parsing.
+  fragments?: readonly TreeFragment[]
+}
 
-  constructor(readonly input: Input, public pos = 0) {
-    this.text = input.lineAfter(pos)
+export class MarkdownParser implements IncrementalParser {
+  /// @internal
+  context: BlockContext = BlockContext.create(Type.Document, 0, 0, 0, 0)
+  /// @internal
+  contextStack: BlockContext[] = [this.context]
+  /// @internal
+  text = ""
+  private atEnd = false
+  private fragments: FragmentCursor | null
+
+  pos: number
+
+  /// Create a Markdown parser.
+  constructor(readonly input: Input, config: Config = {}) {
+    this.pos = config.startPos || 0
+    this.fragments = config.fragments ? new FragmentCursor(config.fragments, input) : null
+    this.text = input.lineAfter(this.pos)
   }
 
-  parseBlock() {
+  /// Move the parser forward. Will either use a chunk of content from
+  /// the given fragments, or parse one leaf block. Returns the
+  /// finished tree when the entire document has been parsed.
+  advance() {
+    if (this.fragments && this.reuseFragment(this.fragments)) return null
+    if (this.parseBlock()) return this.finish()
+    return null
+  }
+
+  private parseBlock() {
     let start, baseIndent
     for (;;) {
       let markers: Element[] = []
@@ -449,7 +490,7 @@ export class MarkdownParser {
     }
   }
 
-  reuseFragment(cursor: FragmentCursor) {
+  private reuseFragment(cursor: FragmentCursor) {
     let m = cursor.moveTo(this.pos), match = m && cursor.matches(this.context.hash)
     if (!match) return false
     let taken = cursor.takeNodes(this)
@@ -465,6 +506,7 @@ export class MarkdownParser {
     return true
   }
 
+  /// @internal
   nextLine() {
     this.pos += this.text.length
     if (this.pos >= this.input.length) {
@@ -478,6 +520,7 @@ export class MarkdownParser {
     }
   }
 
+  /// @internal
   skipBlockMarkup(marks: Element[]): SkipResult {
     let result = skipBlockResult
     let pos = result.start = skipSpace(this.text, 0)
@@ -494,30 +537,48 @@ export class MarkdownParser {
     return result
   }
 
+  /// @internal
   prevLineEnd() { return this.atEnd ? this.pos : this.pos - 1 }
 
+  /// @internal
   startContext(type: Type, start: number, contentStart: number, value = 0) {
-    this.context = new BlockContext(type, value, this.pos + start, contentStart, this.context.hash)
+    this.context = BlockContext.create(type, value, this.pos + start, contentStart, this.context.hash)
     this.contextStack.push(this.context)
   }
 
+  /// @internal
   addNode(block: Type | Tree, from: number, to?: number) {
     if (typeof block == "number") block = new Tree(nodeSet.types[block], none, none, (to ?? this.prevLineEnd()) - from)
     this.context.children.push(block)
     this.context.positions.push(from - this.context.from)
   }
 
+  /// @internal
   finishContext() {
-    let cx = this.contextStack.pop()!
-    this.context = this.contextStack[this.contextStack.length - 1]
-    this.context.children.push(cx.toTree(this.prevLineEnd()))
-    this.context.positions.push(cx.from - this.context.from)
+    this.context = finishContext(this.contextStack, this.prevLineEnd())
   }
 
-  finish() {
+  private finish() {
     while (this.contextStack.length > 1) this.finishContext()
     return this.context.toTree(this.pos)
   }
+
+  forceFinish() {
+    let cx = this.contextStack.map(cx => cx.copy())
+    while (cx.length > 1) finishContext(cx, this.prevLineEnd())
+    return cx[0].toTree(this.pos)
+  }
+
+  /// The set of node types used in the output.
+  static nodeSet = nodeSet
+}
+
+function finishContext(stack: BlockContext[], pos: number): BlockContext {
+  let next = stack.pop()!
+  let top = stack[stack.length - 1]
+  top.children.push(next.toTree(pos))
+  top.positions.push(next.from - top.from)
+  return top
 }
 
 const none: readonly any[] = []
@@ -892,16 +953,6 @@ function dropMarksAfter(marks: Element[], pos: number) {
   while (marks.length && marks[marks.length - 1].to > pos) marks.pop()
 }
 
-let nodeTypes = [NodeType.none]
-for (let i = 1, name; name = Type[i]; i++) {
-  nodeTypes[i] = NodeType.define({
-    id: i,
-    name,
-    props: i >= Type.Escape ? [] : [[NodeProp.group, i in SkipMarkup ? ["Block", "BlockContext"] : ["Block", "LeafBlock"]]]
-  })
-}
-export const nodeSet = new NodeSet(nodeTypes)
-
 const ContextHash = new WeakMap<Tree | TreeBuffer, number>()
 
 function stampContext(nodes: readonly (Tree | TreeBuffer)[], hash: number) {
@@ -911,7 +962,7 @@ function stampContext(nodes: readonly (Tree | TreeBuffer)[], hash: number) {
   }
 }
 
-export class FragmentCursor {
+class FragmentCursor {
   // Index into fragment array
   i = 0
   // Active fragment
@@ -921,7 +972,7 @@ export class FragmentCursor {
   // true, this points at the first block after `pos`.
   cursor: TreeCursor | null = null
 
-  constructor(readonly fragments: readonly TreeFragment[], readonly doc: Text) {
+  constructor(readonly fragments: readonly TreeFragment[], readonly input: Input) {
     if (fragments.length) this.fragment = fragments[this.i++]
   }
 
@@ -931,12 +982,14 @@ export class FragmentCursor {
     this.fragmentEnd = -1
   }
 
-  // FIXME don't use nodes that don't have a line between them and the fragment boundaries
   moveTo(pos: number) {
     while (this.fragment && this.fragment.to <= pos) this.nextFragment()
     if (!this.fragment || this.fragment.from > (pos ? pos - 1 : 0)) return false
-    if (this.fragmentEnd < 0)
-      this.fragmentEnd = Math.max(0, this.doc.lineAt(this.fragment.to).from - 1)
+    if (this.fragmentEnd < 0) {
+      let end = 0
+      while (end > 0 && this.input.get(end - 1) != 10) end--
+      this.fragmentEnd = end ? end - 1 : 0
+    }
 
     let c = this.cursor
     if (!c) {

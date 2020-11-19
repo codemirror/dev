@@ -1,9 +1,9 @@
 import {Tree, TreeFragment, ChangedRange} from "lezer-tree"
 import {StateField, Text, ChangeDesc} from "@codemirror/next/state"
 import {DocInput} from "@codemirror/next/syntax"
-import {MarkdownParser, FragmentCursor} from "./parser"
+import {MarkdownParser} from "./parser"
 
-export {MarkdownParser, Type, nodeSet} from "./parser"
+export {MarkdownParser, Type} from "./parser"
 
 const syntaxField = StateField.define<ParseState>({
   create(s) { return new ParseState(Tree.empty, []).parse(s.doc, Work.Apply) },
@@ -29,13 +29,16 @@ export class ParseState {
 
   parse(doc: Text, timeBudget: number) {
     // FIXME don't do anything when already done
-    let parser = new MarkdownParser(new DocInput(doc))
+    let parser = new MarkdownParser(new DocInput(doc), {fragments: this.fragments})
     let stopAt = Date.now() + timeBudget
-    let fCursor = new FragmentCursor(this.fragments, doc)
-    while ((parser.reuseFragment(fCursor) || parser.parseBlock()) &&
-           Date.now() < stopAt) {}
-    let tree = parser.finish()
-    return new ParseState(tree, TreeFragment.addTree(tree, this.fragments))
+    for (;;) {
+      let result = parser.advance()
+      if (result) return new ParseState(result, TreeFragment.addTree(result))
+      if (Date.now() >= stopAt) {
+        let tree = parser.forceFinish()
+        return new ParseState(tree, TreeFragment.addTree(tree, this.fragments))
+      }
+    }
   }
 
   applyChanges(changes: ChangeDesc, margin?: number) {
