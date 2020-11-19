@@ -16,7 +16,7 @@ export const pythonSyntax = LezerSyntax.define(parser.withProps(
     DictionaryExpression(tree) { return {from: tree.from + 1, to: tree.to - 1} }
   }),
   styleTags({
-    "async * ** FormatConversion": t.modifier,
+    "async '*' '**' FormatConversion": t.modifier,
     "for while if elif else try except finally return raise break continue with pass assert await yield": t.controlKeyword,
     "in not and or is del": t.operatorKeyword,
     "import from def class global nonlocal lambda": t.definitionKeyword,
