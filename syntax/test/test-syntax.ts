@@ -15,7 +15,7 @@ for (let l0 = lines.length, i = l0; i < 5000; i++) lines[i] = lines[i % l0]
 let doc = Text.of(lines)
 
 function pState(doc: Text) {
-  return new ParseState(parser, doc, [], Tree.empty)
+  return new ParseState((input, startPos, fragments) => parser.startParse(input, {startPos, fragments}), doc, [], Tree.empty)
 }
 
 describe("ParseState", () => {

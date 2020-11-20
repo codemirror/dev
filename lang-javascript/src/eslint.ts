@@ -2,7 +2,6 @@ import {Diagnostic} from "@codemirror/next/lint"
 import {Text, EditorState} from "@codemirror/next/state"
 import {EditorView} from "@codemirror/next/view"
 import {javascriptSyntax} from "./javascript"
-import {LezerSyntax} from "@codemirror/next/syntax"
 
 /// Connects an [ESLint](https://eslint.org/) linter to CodeMirror's
 /// [lint](#lint) integration. `eslint` should be an instance of the
@@ -37,12 +36,12 @@ export function esLint(eslint: any, config?: any) {
   return (view: EditorView) => {
     let [syntax] = view.state.facet(EditorState.syntax)
     if (syntax == javascriptSyntax) return range(view.state)
-    if (!syntax || !(syntax instanceof LezerSyntax && syntax.parser.hasNested)) return []
+    if (!syntax) return []
     let found: Diagnostic[] = []
     // FIXME move to async parsing?
     syntax.getTree(view.state).iterate({
       enter(type, start, end) {
-        if (type == javascriptSyntax.parser.topType) {
+        if (type.isTop && javascriptSyntax.nodeSet.types[type.id] == type) {
           for (let d of range(view.state, start, end)) found.push(d)
           return false
         }

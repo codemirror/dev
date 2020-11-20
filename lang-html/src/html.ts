@@ -10,45 +10,47 @@ import {Extension} from "@codemirror/next/state"
 /// parser](https://github.com/lezer-parser/html), wired up with the
 /// JavaScript and CSS parsers to parse the content of `<script>` and
 /// `<style>` tags.
-export const htmlSyntax = LezerSyntax.define(configureHTML([
-  {tag: "script",
-   attrs(attrs) {
-     return !attrs.type || /^(?:text|application)\/(?:x-)?(?:java|ecma)script$|^module$|^$/i.test(attrs.type)
-   },
-   parser: javascriptSyntax.parser},
-  {tag: "style",
-   attrs(attrs) {
-     return (!attrs.lang || attrs.lang == "css") && (!attrs.type || /^(text\/)?(x-)?(stylesheet|css)$/i.test(attrs.type))
-   },
-   parser: cssSyntax.parser}
-]).withProps(
-  indentNodeProp.add(type => {
-    if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
-    if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
-    return undefined
-  }),
-  foldNodeProp.add({
-    Element(node) {
-      let first = node.firstChild, last = node.lastChild!
-      if (!first || first.name != "OpenTag") return null
-      return {from: first.to, to: last.name == "CloseTag" ? last.from : node.to}
-    }
-  }),
-  styleTags({
-    AttributeValue: t.string,
-    "Text RawText": t.content,
-    "StartTag StartCloseTag SelfCloserEndTag EndTag SelfCloseEndTag": t.angleBracket,
-    TagName: t.typeName,
-    "MismatchedCloseTag/TagName": [t.typeName,  t.invalid],
-    AttributeName: t.propertyName,
-    UnquotedAttributeValue: t.string,
-    Is: t.definitionOperator,
-    "EntityReference CharacterReference": t.character,
-    Comment: t.blockComment,
-    ProcessingInst: t.processingInstruction,
-    DoctypeDecl: t.documentMeta
-  })
-), {
+export const htmlSyntax = LezerSyntax.fromLezer({
+  parser: configureHTML([
+    {tag: "script",
+     attrs(attrs) {
+       return !attrs.type || /^(?:text|application)\/(?:x-)?(?:java|ecma)script$|^module$|^$/i.test(attrs.type)
+     },
+     parser: javascriptSyntax.parser},
+    {tag: "style",
+     attrs(attrs) {
+       return (!attrs.lang || attrs.lang == "css") && (!attrs.type || /^(text\/)?(x-)?(stylesheet|css)$/i.test(attrs.type))
+     },
+     parser: cssSyntax.parser}
+  ]),
+  props: [
+    indentNodeProp.add(type => {
+      if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
+      if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
+      return undefined
+    }),
+    foldNodeProp.add({
+      Element(node) {
+        let first = node.firstChild, last = node.lastChild!
+        if (!first || first.name != "OpenTag") return null
+        return {from: first.to, to: last.name == "CloseTag" ? last.from : node.to}
+      }
+    }),
+    styleTags({
+      AttributeValue: t.string,
+      "Text RawText": t.content,
+      "StartTag StartCloseTag SelfCloserEndTag EndTag SelfCloseEndTag": t.angleBracket,
+      TagName: t.typeName,
+      "MismatchedCloseTag/TagName": [t.typeName,  t.invalid],
+      AttributeName: t.propertyName,
+      UnquotedAttributeValue: t.string,
+      Is: t.definitionOperator,
+      "EntityReference CharacterReference": t.character,
+      Comment: t.blockComment,
+      ProcessingInst: t.processingInstruction,
+      DoctypeDecl: t.documentMeta
+    })
+  ],
   languageData: {
     commentTokens: {block: {open: "<!--", close: "-->"}},
     indentOnInput: /^\s*<\/$/

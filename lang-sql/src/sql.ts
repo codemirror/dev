@@ -2,11 +2,11 @@ import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codem
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {parser as plainParser} from "./sql.grammar"
+import {parser} from "./sql.grammar"
 import {tokens, Dialect, tokensFor, SQLKeywords, SQLTypes, dialect} from "./tokens"
 import {completeFromSchema, completeKeywords} from "./complete"
 
-let parser = plainParser.withProps(
+let props = [
   indentNodeProp.add({
     Statement: continuedIndent()
   }),
@@ -33,7 +33,7 @@ let parser = plainParser.withProps(
     "{ }": t.brace,
     "[ ]": t.squareBracket
   })
-)
+]
 
 type SQLDialectSpec = {
   /// A space-separated list of keywords for the dialect.
@@ -83,7 +83,9 @@ export class SQLDialect {
   /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
     let d = dialect(spec, spec.keywords, spec.types, spec.builtin)
-    let syntax = LezerSyntax.define(parser.withTokenizer(tokens, tokensFor(d)), {
+    let syntax = LezerSyntax.fromLezer({
+      parser: parser.withTokenizer(tokens, tokensFor(d)),
+      props,
       languageData: {
         commentTokens: {line: "--", block: {open: "/*", close: "*/"}},
         closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}

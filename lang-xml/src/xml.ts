@@ -7,35 +7,37 @@ import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 /// A syntax provider based on the [Lezer XML
 /// parser](https://github.com/lezer-parser/xml), extended with
 /// highlighting and indentation information.
-export const xmlSyntax = LezerSyntax.define(parser.withProps(
-  indentNodeProp.add(type => {
-    if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
-    if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
-    return undefined
-  }),
-  foldNodeProp.add({
-    Element(subtree) {
-      let first = subtree.firstChild, last = subtree.lastChild!
-      if (!first || first.name != "OpenTag") return null
-      return {from: first.to, to: last.name == "CloseTag" ? last.from : subtree.to}
-    }
-  }),
-  styleTags({
-    AttributeValue: t.string,
-    Text: t.content,
-    "StartTag StartCloseTag EndTag SelfCloseEndTag": t.angleBracket,
-    TagName: t.typeName,
-    "MismatchedCloseTag/Tagname": [t.typeName, t.invalid],
-    AttributeName: t.propertyName,
-    UnquotedAttributeValue: t.string,
-    Is: t.definitionOperator,
-    "EntityReference CharacterReference": t.character,
-    Comment: t.blockComment,
-    ProcessingInst: t.processingInstruction,
-    DoctypeDecl: t.documentMeta,
-    Cdata: t.special(t.string)
-  })
-), {
+export const xmlSyntax = LezerSyntax.fromLezer({
+  parser,
+  props: [
+    indentNodeProp.add(type => {
+      if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
+      if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
+      return undefined
+    }),
+    foldNodeProp.add({
+      Element(subtree) {
+        let first = subtree.firstChild, last = subtree.lastChild!
+        if (!first || first.name != "OpenTag") return null
+        return {from: first.to, to: last.name == "CloseTag" ? last.from : subtree.to}
+      }
+    }),
+    styleTags({
+      AttributeValue: t.string,
+      Text: t.content,
+      "StartTag StartCloseTag EndTag SelfCloseEndTag": t.angleBracket,
+      TagName: t.typeName,
+      "MismatchedCloseTag/Tagname": [t.typeName, t.invalid],
+      AttributeName: t.propertyName,
+      UnquotedAttributeValue: t.string,
+      Is: t.definitionOperator,
+      "EntityReference CharacterReference": t.character,
+      Comment: t.blockComment,
+      ProcessingInst: t.processingInstruction,
+      DoctypeDecl: t.documentMeta,
+      Cdata: t.special(t.string)
+    })
+  ],
   languageData: {
     commentTokens: {block: {open: "<!--", close: "-->"}},
     indentOnInput: /^\s*<\/$/

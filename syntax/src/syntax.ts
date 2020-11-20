@@ -1,37 +1,48 @@
-import {Parser, ParseOptions, Input, ParseContext} from "lezer"
-import {Tree, SyntaxNode, ChangedRange, TreeFragment} from "lezer-tree"
+import {IncrementalParser, Input, Parser, ParseOptions} from "lezer"
+import {Tree, SyntaxNode, NodePropSource, NodeSet, ChangedRange, TreeFragment} from "lezer-tree"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
         Facet, languageDataProp, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
+import {treeHighlighter} from "@codemirror/next/highlight"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
-import {treeHighlighter} from "@codemirror/next/highlight"
+
+export type ParserSource = (input: Input, pos: number, fragments?: readonly TreeFragment[]) => IncrementalParser
+
+function defLanguageData(nodeSet: NodeSet, languageData: {[name: string]: any} | undefined) {
+  let data = Facet.define<{[name: string]: any}>({
+    combine: languageData ? values => values.concat(languageData!) : undefined
+  })
+  return {data, nodeSet: nodeSet.extend(languageDataProp.add(type => type.isTop ? data : undefined))}
+}  
 
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
-export class LezerSyntax implements Syntax {
+export class LezerSyntax implements Syntax { // FIXME rename/check docs
   /// @internal
   readonly field: StateField<SyntaxState>
 
   /// The extension value to install this provider.
   readonly extension: Extension
 
-  /// @internal
-  constructor(
-    /// The Lezer parser used by this syntax.
-    readonly parser: Parser,
-    /// The dialect enabled for the parser.
-    readonly dialect: string,
+  private constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
-    readonly languageData: Facet<{[name: string]: any}>
+    readonly languageData: Facet<{[name: string]: any}>,
+    /// The node types used by this syntax.
+    readonly nodeSet: NodeSet,
+    /// The parser constructor for this syntax. Can be useful when
+    /// using it as a [nested parser](#lezer.NestedParserSpec).
+    readonly parser: ParserSource,
+    private nested: boolean,
+    private lezer: Parser | null
   ) {
     let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
       create(state) {
-        let parseState = ParseState.create(parser, state.doc, dialect.length ? {dialect} : undefined)
-        parseState.work(Work.Apply)
+        let parseState = new ParseState(parser, state.doc, [], Tree.empty)
+        if (!parseState.work(Work.Apply)) parseState.takeTree()
         return new SyntaxState(parseState)
       },
       update(value, tr) {
@@ -49,27 +60,67 @@ export class LezerSyntax implements Syntax {
     ]
   }
 
-  /// Create a syntax instance for the given parser. You'll usually
-  /// want to use the
-  /// [`withProps`](https://lezer.codemirror.net/docs/ref/#lezer.Parser.withProps)
-  /// method to register CodeMirror-specific syntax node props in the
-  /// parser, before passing it to this constructor.
-  static define(parser: Parser, config: {
-    /// When [language data](#state.EditorState.languageDataAt) is
-    /// given, it will be included in the syntax object's extension.
-    languageData?: {[name: string]: any},
-    /// The dialect of the grammar to use, if any.
-    dialect?: string
-  } = {}) {
-    let languageData = Facet.define<{[name: string]: any}>({
-      combine: config.languageData ? values => values.concat(config.languageData!) : undefined
-    })
-    return new LezerSyntax(parser.withProps(languageDataProp.add({[parser.topType.name]: languageData})),
-                           config.dialect || "", languageData)
+  /// Define a syntax object. When basing it on a Lezer syntax, you'll
+  /// want to use [`fromLezer`](#syntax.LezerSyntax^fromLezer) instead.
+  static define(spec: {
+    /// The node set to associate the language data with. Note that
+    /// this must have the [top](#lezer-tree.NodeType.isTop) flag set
+    /// on nodes that will be used as the tree root.
+    nodeSet: NodeSet,
+    /// A function that, given the updated node set, returns the
+    /// function that will be used to create a parser instance.
+    construct: (nodeSet: NodeSet) => ParserSource,
+    /// Whether this parser can nest other languages. Used to optimize
+    /// [`languageData`](#state.EditorState.languageDataAt) in cases
+    /// where there is only one language in the document. Defaults to
+    /// false.
+    nested?: boolean,
+    /// [Language data](#state.EditorState.languageDataAt)
+    /// to register for this language.
+    languageData?: {[name: string]: any}
+  }) {
+    let {data, nodeSet} = defLanguageData(spec.nodeSet, spec.languageData)
+    return new LezerSyntax(data, nodeSet, spec.construct(nodeSet), !!spec.nested, null)
   }
 
-  withDialect(dialect: string) {
-    return new LezerSyntax(this.parser, dialect, this.languageData)
+  /// Create a syntax instance for the given Lezer parser.
+  static fromLezer(spec: {
+    /// A [Lezer](https://lezer.codemirror.net) parser object to
+    /// define a syntax for.
+    parser: Parser,
+    /// Props to add to the parser's node set. This is usually where
+    /// you specify [highlighting](#highlight.styleTags),
+    /// [indentation](#syntax.indentNodeProp), and similar metadata.
+    props?: readonly NodePropSource[],
+    /// Additional options, such as the top node or dialect, to pass
+    /// to the parser.
+    options?: ParseOptions,
+    /// [Language data](#state.EditorState.languageDataAt) to register
+    /// for this language.
+    languageData?: {[name: string]: any}
+  }) {
+    let {parser, options} = spec
+    let {data, nodeSet} = defLanguageData(spec.props ? parser.nodeSet.extend(...spec.props) : parser.nodeSet, spec.languageData)
+    return new LezerSyntax(data, nodeSet, (input, startPos, fragments) => parser.startParse(input, {...options, startPos, fragments, nodeSet}),
+                           parser.hasNested, parser)
+  }
+
+  /// Reconfigure the syntax by providing a new parser source or, if
+  /// this was defined with `fromLezer`, a new set of parse options.
+  /// But keep the language data the same. This is useful when
+  /// defining dialects for a custom parser. With a Lezer parser,
+  /// you'll probably want to use
+  /// [`reconfigureLezer`](#syntax.LezerParser.reconfigureLezer)
+  /// instead.
+  reconfigure(conf: ParseOptions | ((nodeSet: NodeSet) => ParserSource)) {
+    if (typeof conf == "function")
+      return new LezerSyntax(this.languageData, this.nodeSet, conf(this.nodeSet), this.nested, this.lezer)
+    let {lezer} = this
+    if (!lezer)
+      throw new Error("Can't call reconfigure with an options object on a non-Lezer language")
+    return new LezerSyntax(this.languageData, this.nodeSet,
+                           (input, startPos, fragments) => lezer!.startParse(input, {...conf, startPos, fragments, nodeSet: this.nodeSet}),
+                           this.nested, lezer)
   }
 
   getTree(state: EditorState) {
@@ -86,7 +137,7 @@ export class LezerSyntax implements Syntax {
   }
 
   languageDataFacetAt(state: EditorState, pos: number) {
-    if (this.parser.hasNested) {
+    if (this.nested) {
       let tree = this.getTree(state)
       let target: SyntaxNode | null = tree.resolve(pos, -1)
       while (target) {
@@ -123,9 +174,11 @@ export class DocInput implements Input {
   get(pos: number) {
     if (pos >= this.length) return -1
     let stringStart = this.cursorPos - this.string.length
-    if (pos < stringStart && pos >= stringStart - this.prevString.length)
-      return this.prevString.charCodeAt(pos - (stringStart - this.prevString.length))
-    if (pos < stringStart || pos >= this.cursorPos) stringStart = this.syncTo(pos)
+    if (pos < stringStart || pos >= this.cursorPos) {
+      if (pos < stringStart && pos >= stringStart - this.prevString.length)
+        return this.prevString.charCodeAt(pos - (stringStart - this.prevString.length))
+      stringStart = this.syncTo(pos)
+    }
     return this.string.charCodeAt(pos - stringStart)
   }
 
@@ -173,22 +226,22 @@ const enum Work {
 }
 
 export class ParseState {
-  private parse: ParseContext | null = null
+  private parse: IncrementalParser | null = null
 
   /// @internal
   constructor(
-    private parser: Parser,
+    private parser: ParserSource,
     private doc: Text,
     private fragments: readonly TreeFragment[] = [],
-    public tree: Tree,
-    private options?: ParseOptions
+    public tree: Tree
   ) {}
 
+  // FIXME do something with badness again
   work(time: number, upto?: number) {
-    if (upto == null ? this.tree.length == this.doc.length : this.tree.length >= upto)
+    if (this.tree != Tree.empty && (upto == null ? this.tree.length == this.doc.length : this.tree.length >= upto))
       return true
     if (!this.parse)
-      this.parse = this.parser.startParse(new DocInput(this.doc), Object.assign({fragments: this.fragments}, this.options))
+      this.parse = this.parser(new DocInput(this.doc), 0, this.fragments)
     let endTime = Date.now() + time
     for (;;) {
       let done = this.parse.advance()
@@ -221,11 +274,7 @@ export class ParseState {
       fragments = TreeFragment.applyChanges(fragments, ranges)
       tree = Tree.empty
     }
-    return new ParseState(this.parser, newDoc, fragments, tree, this.options)
-  }
-
-  static create(parser: Parser, doc: Text, options?: ParseOptions) {
-    return new ParseState(parser, doc, [], Tree.empty, options)
+    return new ParseState(this.parser, newDoc, fragments, tree)
   }
 }
 
