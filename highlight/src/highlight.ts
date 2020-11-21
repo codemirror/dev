@@ -158,16 +158,18 @@ export function styleTags(spec: {[selector: string]: Tag | readonly Tag[]}) {
     let tags = spec[prop]
     if (!Array.isArray(tags)) tags = [tags as Tag]
     for (let part of prop.split(" ")) if (part) {
-      let pieces: (string | null)[] = [], mode = Mode.Normal
-      for (let pos = 0; pos < part.length;) {
-        let rest = part.slice(pos)
-        if (rest == "/...") { mode = Mode.Inherit; break }
-        if (rest == "!") { mode = Mode.Opaque; break }
+      let pieces: (string | null)[] = [], mode = Mode.Normal, rest = part
+      for (let pos = 0;;) {
+        if (rest == "..." && pos > 0 && pos + 3 == part.length) { mode = Mode.Inherit; break }
         let m = /^"(?:[^"\\]|\\.)*?"|[^\/!]+/.exec(rest)
         if (!m) throw new RangeError("Invalid path: " + part)
         pieces.push(m[0] == "*" ? null : m[0][0] == '"' ? JSON.parse(m[0]) : m[0])
-        pos += m[0].length + 1
-        if (pos <= part.length && part[pos - 1] != "/") throw new RangeError("Invalid path: " + part)
+        pos += m[0].length
+        if (pos == part.length) break
+        let next = part[pos++]
+        if (pos == part.length && next == "!") { mode = Mode.Opaque; break }
+        if (next != "/") throw new RangeError("Invalid path: " + part)
+        rest = part.slice(pos)
       }
       let last = pieces.length - 1, inner = pieces[last]
       if (!inner) throw new RangeError("Invalid path: " + part)
@@ -441,6 +443,8 @@ export const tags = {
   escape: t(literal),
   /// A color [literal](#highlight.tags.literal).
   color: t(literal),
+  /// A URL [literal](#highlight.tags.literal).
+  url: t(literal),
 
   /// A language keyword.
   keyword,
@@ -589,13 +593,16 @@ export const tags = {
 export const defaultHighlightStyle: Extension = precedence(highlightStyle(
   {tag: tags.deleted,
    textDecoration: "line-through"},
-  {tag: [tags.inserted, tags.heading, tags.link],
+  {tag: [tags.inserted, tags.link],
    textDecoration: "underline"},
+  {tag: tags.heading,
+   textDecoration: "underline",
+   fontWeight: "bold"},
   {tag: tags.emphasis,
    fontStyle: "italic"},
   {tag: tags.keyword,
    color: "#708"},
-  {tag: [tags.atom, tags.bool],
+  {tag: [tags.atom, tags.bool, tags.url],
    color: "#219"},
   {tag: tags.number,
    color: "#164"},
