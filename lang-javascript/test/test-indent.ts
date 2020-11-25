@@ -1,15 +1,7 @@
 import ist from "ist"
 import {EditorState} from "@codemirror/next/state"
-import {indentation, IndentContext} from "@codemirror/next/language"
+import {getIndentation} from "@codemirror/next/language"
 import {javascriptSyntax} from "@codemirror/next/lang-javascript"
-
-function getIndent(state: EditorState, pos: number): number {
-  for (let f of state.facet(indentation)) {
-    let result = f(new IndentContext(state), pos)
-    if (result > -1) return result
-  }
-  return -1
-}
 
 function check(code: string) {
   return () => {
@@ -17,7 +9,7 @@ function check(code: string) {
     let state = EditorState.create({doc: code, extensions: [javascriptSyntax]})
     for (let pos = 0, lines = code.split("\n"), i = 0; i < lines.length; i++) {
       let line = lines[i], indent = /^\s*/.exec(line)![0].length
-      ist(`${getIndent(state, pos)} (${i + 1})`, `${indent} (${i + 1})`)
+      ist(`${getIndentation(state, pos)} (${i + 1})`, `${indent} (${i + 1})`)
       pos += line.length + 1
     }
   }

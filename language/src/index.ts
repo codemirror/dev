@@ -1,6 +1,6 @@
 export {Language, syntaxTree} from "./language"
 
-export {IndentContext, getIndentUnit, indentString, indentOnInput, indentation, indentUnit,
+export {IndentContext, getIndentUnit, indentString, indentOnInput, indentService, getIndentation, indentUnit,
         TreeIndentContext, indentNodeProp, delimitedIndent, continuedIndent, flatIndent} from "./indent"
 
 export {foldService, foldNodeProp, foldable} from "./fold"

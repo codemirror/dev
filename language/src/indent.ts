@@ -1,11 +1,11 @@
 import {NodeProp, SyntaxNode, Tree} from "lezer-tree"
 import {EditorState, Extension, Transaction, Facet} from "@codemirror/next/state"
 import {Line, countColumn} from "@codemirror/next/text"
-import {Language} from "./language"
 
-/// Facet that defines a way to query for automatic indentation
-/// depth at the start of a given line.
-export const indentation = Facet.define<(context: IndentContext, pos: number) => number>()
+/// Facet that defines a way to provide a function that computes the
+/// appropriate indentation depth at the start of a given line, or
+/// `null` to indicate no appropriate indentation could be determined.
+export const indentService = Facet.define<(context: IndentContext, pos: number) => number | null>()
 
 /// Facet for overriding the unit by which indentation happens.
 /// Should be a string consisting either entirely of spaces or
@@ -39,7 +39,23 @@ export function indentString(state: EditorState, cols: number) {
   }
   for (let i = 0; i < cols; i++) result += " "
   return result
-}    
+}
+
+/// Get the indentation at the given position. Will first consult any
+/// [indent services](#language.indentService) that are registered,
+/// and if none of those return an indentation, this will check the
+/// syntax tree for the [indent node prop](#language.indentNodeProp)
+/// and use that if found. Returns a number when an indentation could
+/// be determined, and null otherwise.
+export function getIndentation(context: IndentContext | EditorState, pos: number): number | null {
+  if (context instanceof EditorState) context = new IndentContext(context)
+  for (let service of context.state.facet(indentService)) {
+    let result = service(context, pos)
+    if (result != null) return result
+  }
+  let tree = context.state.tree
+  return tree ? syntaxIndentation(context, tree, pos) : null
+}
 
 /// Indentation contexts are used when calling
 /// [`EditorState.indentation`](#state.EditorState^indentation). They
@@ -116,19 +132,12 @@ export class IndentContext {
 
 /// A syntax tree node prop used to associate indentation strategies
 /// with node types. Such a strategy is a function from an indentation
-/// context to a number. That number may be -1, to indicate that no
-/// definitive indentation can be determined, or a column number to
-/// which the given line should be indented.
+/// context to a column number or null, where null indicates that no
+/// definitive indentation can be determined.
 export const indentNodeProp = new NodeProp<(context: TreeIndentContext) => number>()
 
-export function syntaxIndentation(language: Language) {
-  return indentation.of((cx: IndentContext, pos: number) => {
-    return computeIndentation(cx, language.getTree(cx.state), pos)
-  })
-}
-
 // Compute the indentation for a given position from the syntax tree.
-function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
+function syntaxIndentation(cx: IndentContext, ast: Tree, pos: number) {
   let tree: SyntaxNode | null = ast.resolve(pos)
 
   // Enter previous nodes that end in empty error terms, which means
@@ -150,7 +159,7 @@ function computeIndentation(cx: IndentContext, ast: Tree, pos: number) {
     let strategy = indentStrategy(tree)
     if (strategy) return strategy(new TreeIndentContext(cx, pos, tree))
   }
-  return -1
+  return null
 }
 
 function ignoreClosed(cx: TreeIndentContext) {
@@ -297,8 +306,8 @@ export function indentOnInput(): Extension {
       let line = state.doc.lineAt(head)
       if (line.from == last) continue
       last = line.from
-      let indent = Math.max(...state.facet(indentation).map(f => f(new IndentContext(state), line.from)))
-      if (indent < 0) continue
+      let indent = getIndentation(state, line.from)
+      if (indent == null) continue
       let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, DontIndentBeyond)))![0]
       let norm = indentString(state, indent)
       if (cur != norm)

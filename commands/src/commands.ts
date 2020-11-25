@@ -3,7 +3,7 @@ import {EditorState, StateCommand, EditorSelection, SelectionRange,
 import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
-import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString, indentation} from "@codemirror/next/language"
+import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString, getIndentation} from "@codemirror/next/language"
 import {SyntaxNode, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -482,14 +482,6 @@ export const deleteLine: Command = view => {
   return true
 }
 
-function getIndentation(cx: IndentContext, pos: number): number {
-  for (let f of cx.state.facet(indentation)) {
-    let result = f(cx, pos)
-    if (result > -1) return result
-  }
-  return -1
-}
-
 /// Replace the selection with a newline.
 export const insertNewline: StateCommand = ({state, dispatch}) => {
   dispatch(state.update(state.replaceSelection(state.lineBreak), {scrollIntoView: true}))
@@ -516,7 +508,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let explode = from == to && isBetweenBrackets(state, from)
     let cx = new IndentContext(state, {simulateBreak: from, simulateDoubleBreak: !!explode})
     let indent = getIndentation(cx, from)
-    if (indent < 0) indent = /^\s*/.exec(state.doc.lineAt(from).slice(0, 50))![0].length
+    if (indent == null) indent = /^\s*/.exec(state.doc.lineAt(from).slice(0, 50))![0].length
 
     let line = state.doc.lineAt(from)
     while (to < line.to && /\s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
@@ -560,7 +552,7 @@ export const indentSelection: StateCommand = ({state, dispatch}) => {
   }})
   let changes = changeBySelectedLine(state, (line, changes, range) => {
     let indent = getIndentation(context, line.from)
-    if (indent < 0) return
+    if (indent == null) return
     let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, 200)))![0]
     let norm = indentString(state, indent)
     if (cur != norm || range.from < line.from + cur.length) {
