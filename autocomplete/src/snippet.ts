@@ -1,6 +1,7 @@
 import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} from "@codemirror/next/view"
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
         Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
+import {indentUnit} from "@codemirror/next/syntax"
 import {baseTheme} from "./theme"
 import {Completion} from "./completion"
 
@@ -29,7 +30,7 @@ class Snippet {
     for (let line of this.lines) {
       if (text.length) {
         let indent = baseIndent, tabs = /^\t*/.exec(line)![0].length
-        for (let i = 0; i < tabs; i++) indent += state.facet(EditorState.indentUnit)
+        for (let i = 0; i < tabs; i++) indent += state.facet(indentUnit)
         lineStart.push(pos + indent.length - tabs)
         line = indent + line.slice(tabs)
       }

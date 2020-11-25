@@ -1,7 +1,7 @@
 import {parser, configureNesting} from "lezer-html"
 import {cssSyntax} from "@codemirror/next/lang-css"
 import {javascriptSyntax, javascriptSupport} from "@codemirror/next/lang-javascript"
-import {LezerSyntax, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
+import {Language, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 import {Extension} from "@codemirror/next/state"
@@ -10,7 +10,7 @@ import {Extension} from "@codemirror/next/state"
 /// parser](https://github.com/lezer-parser/html), wired up with the
 /// JavaScript and CSS parsers to parse the content of `<script>` and
 /// `<style>` tags.
-export const htmlSyntax = LezerSyntax.define({
+export const htmlSyntax = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add(type => {
@@ -61,7 +61,7 @@ export const htmlSyntax = LezerSyntax.define({
 
 /// HTML tag completion. Opens and closes tags and attributes in a
 /// context-aware way.
-export const htmlCompletion = htmlSyntax.languageData.of({autocomplete: completeHTML})
+export const htmlCompletion = htmlSyntax.data.of({autocomplete: completeHTML})
 
 /// An extension that installs HTML-related functionality
 /// ([`htmlCompletion`](#lang-html.htmlCompletion) and

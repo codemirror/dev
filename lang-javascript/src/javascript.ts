@@ -1,6 +1,6 @@
 import {parser} from "lezer-javascript"
 import {Parser} from "lezer"
-import {LezerSyntax, flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/syntax"
+import {Language, flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/syntax"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeSnippets} from "@codemirror/next/autocomplete"
 import {Extension} from "@codemirror/next/state"
@@ -9,7 +9,7 @@ import {snippets} from "./snippets"
 /// A syntax provider based on the [Lezer JavaScript
 /// parser](https://github.com/lezer-parser/javascript), extended with
 /// highlighting and indentation information.
-export const javascriptSyntax = LezerSyntax.define({
+export const javascriptSyntax = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -89,10 +89,10 @@ export const javascriptSyntax = LezerSyntax.define({
 /// Returns an extension that installs JavaScript support features
 /// (completion of [snippets](#lang-javascript.snippets)).
 export function javascriptSupport(): Extension {
-  return javascriptSyntax.languageData.of({autocomplete: completeSnippets(snippets)})
+  return javascriptSyntax.data.of({autocomplete: completeSnippets(snippets)})
 }
 
-const dialects: {[dialect: string]: LezerSyntax<Parser>} = {"": javascriptSyntax}
+const dialects: {[dialect: string]: Language<Parser>} = {"": javascriptSyntax}
 function getDialect(dialect: string) {
   return dialects[dialect] || (dialects[dialect] = javascriptSyntax.reconfigure(javascriptSyntax.parser.configure({dialect})))
 }

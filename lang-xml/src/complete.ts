@@ -1,5 +1,6 @@
 import {Completion, CompletionSource} from "@codemirror/next/autocomplete"
 import {EditorState, Text} from "@codemirror/next/state"
+import {syntaxTree} from "@codemirror/next/syntax"
 import {SyntaxNode} from "lezer-tree"
 
 /// Describes an element in your XML document schema.
@@ -67,7 +68,7 @@ type Location = {
 } | null
 
 function findLocation(state: EditorState, pos: number): Location {
-  let at = state.tree.resolve(pos, -1), inTag = null
+  let at = syntaxTree(state).resolve(pos, -1), inTag = null
   for (let cur = at; !inTag && cur.parent; cur = cur.parent)
     if (cur.name == "OpenTag" || cur.name == "CloseTag" || cur.name == "SelfClosingTag" || cur.name == "MismatchedCloseTag")
       inTag = cur

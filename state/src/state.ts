@@ -1,10 +1,9 @@
 import {Text} from "@codemirror/next/text"
 import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
-import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionSpec, resolveTransaction, asArray, StateEffect} from "./transaction"
-import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
-        changeFilter, transactionFilter, transactionExtender, lineSeparator} from "./extension"
+import {allowMultipleSelections, changeFilter, transactionFilter, transactionExtender,
+        lineSeparator, language, globalLanguageData} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 import {CharCategory, makeCategorizer} from "./charcategory"
 
@@ -227,10 +226,6 @@ export class EditorState {
   /// secondary selections visible to the user.
   static allowMultipleSelections = allowMultipleSelections
 
-  /// Facet that defines a way to query for automatic indentation
-  /// depth at the start of a given line.
-  static indentation = Facet.define<(context: IndentContext, pos: number) => number>()
-
   /// Configures the tab size to use in this state. The first
   /// (highest-precedence) value of the facet is used. If no value is
   /// given, this defaults to 4.
@@ -255,39 +250,6 @@ export class EditorState {
   /// string for this state.
   get lineBreak() { return this.facet(EditorState.lineSeparator) || "\n" }
 
-  /// Facet for overriding the unit by which indentation happens.
-  /// Should be a string consisting either entirely of spaces or
-  /// entirely of tabs. When not set, this defaults to 2 spaces.
-  static indentUnit = Facet.define<string, string>({
-    combine: values => {
-      if (!values.length) return "  "
-      if (!/^(?: +|\t+)$/.test(values[0])) throw new Error("Invalid indent unit: " + JSON.stringify(values[0]))
-      return values[0]
-    }
-  })
-
-  /// The _column width_ of an indent unit in the document. Determined
-  /// by the [`indentUnit`](#state.EditorState^indentUnit) facet, and
-  /// [`tabSize`](#state.EditorState^tabSize) when that contains tabs.
-  get indentUnit() {
-    let unit = this.facet(EditorState.indentUnit)
-    return unit.charCodeAt(0) == 9 ? this.tabSize * unit.length : unit.length
-  }
-
-  /// Create an indentation string that covers columns 0 to `cols`.
-  /// Will use tabs for as much of the columns as possible when the
-  /// [`indentUnit`](#state.EditorState^indentUnit) facet contains
-  /// tabs.
-  indentString(cols: number) {
-    let result = ""
-    if (this.facet(EditorState.indentUnit).charCodeAt(0) == 9) while (cols >= this.tabSize) {
-      result += "\t"
-      cols -= this.tabSize
-    }
-    for (let i = 0; i < cols; i++) result += " "
-    return result
-  }    
-
   /// Registers translation phrases. The
   /// [`phrase`](#state.EditorState.phrase) method will look through
   /// all objects registered with this facet to find translations for
@@ -303,8 +265,38 @@ export class EditorState {
     return phrase
   }
 
-  /// Facet that registers a parsing service for the state.
-  static syntax = Facet.define<Syntax>()
+  /// Facet used to associate languages with an editor state.
+  static language = language
+
+  /// Get the syntax tree for this state, which is the current
+  /// (possibly incomplete) parse tree of the
+  /// [language](#language.Language) with the highest precedence, or
+  /// null if there is no language available.
+  get tree() {
+    let lang = this.facet(EditorState.language)
+    return lang.length ? lang[0].getTree(this) : null
+  }
+
+  /// A facet used to register [language data](#state.EditorState.languageDataAt)
+  /// that should apply throughout the document, regardless of language.
+  static globalLanguageData = globalLanguageData
+
+  /// Find the values for a given language data field, either provided
+  /// by the [language](#state.EditorState^Language) or through the
+  /// [`globalLanguageData`](#state.EditorState^globalLanguageData)
+  /// facet, for the language active at the given position. Values
+  /// provided by the facet, in precedence order, will appear before
+  /// those provided by the syntax.
+  languageDataAt<T>(name: string, pos: number): readonly T[] {
+    let values: T[] = []
+    let lang = this.facet(language)
+    for (let i = lang.length ? 0 : 1; i < 2; i++) {
+      let source = this.facet(i ? globalLanguageData : lang[0].languageDataFacetAt(this, pos))
+      for (let obj of source) if (Object.prototype.hasOwnProperty.call(obj, name))
+        values.push(obj[name])
+    }
+    return values
+  }
 
   /// Return a function that can categorize strings (expected to
   /// represent a single [grapheme cluster](#text.nextClusterBreak))
@@ -318,43 +310,6 @@ export class EditorState {
   charCategorizer(at: number): (char: string) => CharCategory {
     return makeCategorizer(this.languageDataAt<string>("wordChars", at).join(""))
   }
-
-  /// Get the syntax tree for this state, which is the current
-  /// (possibly incomplete) parse tree of the [syntax](#state.Syntax)
-  /// with the highest precedence, or the empty tree if there is no
-  /// syntax available.
-  get tree() {
-    let syntax = this.facet(EditorState.syntax)
-    return syntax.length ? syntax[0].getTree(this) : Tree.empty
-  }
-
-  /// A facet used to register [language
-  /// data](#state.EditorState.languageDataAt) that should apply
-  /// throughout the document, regardless of language.
-  static globalLanguageData = globalLanguageData
-
-  /// Find the values for a given language data field, either provided
-  /// by the [syntax](#syntax.LezerSyntax.languageData) or through the
-  /// [`globalLanguageData`](#state.EditorState^globalLanguageData) facet,
-  /// for the [language](#state.Syntax.languageDataFacetAt) at the
-  /// given position. Values provided by the facet, in precedence
-  /// order, will appear before those provided by the syntax.
-  languageDataAt<T>(name: string, pos: number): readonly T[] {
-    let values: T[] = []
-    let syntax = this.facet(EditorState.syntax)
-    for (let i = syntax.length ? 0 : 1; i < 2; i++) {
-      let source = this.facet(i ? globalLanguageData : syntax[0].languageDataFacetAt(this, pos))
-      for (let obj of source) if (Object.prototype.hasOwnProperty.call(obj, name))
-        values.push(obj[name])
-    }
-    return values
-  }
-
-  /// A facet that registers a code folding service. When called with
-  /// the extent of a line, such a function should return a range
-  /// object when a foldable that starts on that line (but continues
-  /// beyond it), if one can be found.
-  static foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 
   /// Facet used to register change filters, which are called for each
   /// transaction (unless explicitly

@@ -1,5 +1,6 @@
 import {Completion, CompletionContext, CompletionSource, completeFromList, ifNotIn} from "@codemirror/next/autocomplete"
 import {EditorState} from "@codemirror/next/state"
+import {syntaxTree} from "@codemirror/next/syntax"
 import {SyntaxNode} from "lezer"
 import {Type} from "./sql.grammar.terms"
 
@@ -15,7 +16,7 @@ function stripQuotes(name: string) {
 }
 
 function sourceContext(state: EditorState, startPos: number) {
-  let pos = state.tree.resolve(startPos, -1)
+  let pos = syntaxTree(state).resolve(startPos, -1)
   let empty = false
   if (pos.name == "Identifier" || pos.name == "QuotedIdentifier") {
     empty = false

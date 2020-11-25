@@ -1,9 +1,10 @@
 import ist from "ist"
-import {EditorState, IndentContext} from "@codemirror/next/state"
+import {EditorState} from "@codemirror/next/state"
+import {indentation, IndentContext} from "@codemirror/next/syntax"
 import {javascriptSyntax} from "@codemirror/next/lang-javascript"
 
 function getIndent(state: EditorState, pos: number): number {
-  for (let f of state.facet(EditorState.indentation)) {
+  for (let f of state.facet(indentation)) {
     let result = f(new IndentContext(state), pos)
     if (result > -1) return result
   }

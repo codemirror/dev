@@ -1,6 +1,7 @@
 import {combineConfig, EditorState, StateEffect, ChangeDesc, Facet,
         StateField, Extension} from "@codemirror/next/state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass, KeyBinding} from "@codemirror/next/view"
+import {foldable} from "@codemirror/next/syntax"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
 
 type Range = {from: number, to: number}
@@ -66,7 +67,7 @@ function foldExists(folded: DecorationSet, from: number, to: number) {
 }
 
 function getFoldable(state: EditorState, from: number, to: number) {
-  return state.facet(EditorState.foldable).reduce<Range | null>((value, f) => value || f(state, from, to), null)
+  return state.facet(foldable).reduce<Range | null>((value, f) => value || f(state, from, to), null)
 }
 
 function maybeEnable(state: EditorState) {

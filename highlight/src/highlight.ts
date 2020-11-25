@@ -1,7 +1,8 @@
 import {Tree, NodeProp} from "lezer-tree"
 import {StyleSpec, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
-import {Extension, precedence, Facet, Syntax} from "@codemirror/next/state"
+import {Extension, precedence, Facet} from "@codemirror/next/state"
+import {Language} from "@codemirror/next/syntax"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
 let nextTagID = 0
@@ -104,7 +105,7 @@ function permute<T>(array: readonly T[]): (readonly T[])[] {
 
 /// This function is used to add a set of tags to a language syntax
 /// via
-/// [`Parser.withProps`](https://lezer.codemirror.net/docs/ref#lezer.Parser.withProps).
+/// [`Parser.configure`](https://lezer.codemirror.net/docs/ref#lezer.Parser.configure).
 ///
 /// The argument object maps node selectors to [highlighting
 /// tags](#highlight.Tag) or arrays of tags.
@@ -255,12 +256,12 @@ class Styling {
 }
 
 /// Returns an extension that installs a highlighter that uses the
-/// tree produced by the given syntax, along with the current
+/// tree produced by the given language, along with the current
 /// [highlight style](#highlight.highlightStyle), to style the
 /// document. If no highlight style is active, this plugin won't do
 /// any highlighting.
-export function treeHighlighter(syntax: Syntax) {
-  return precedence(ViewPlugin.define(view => new TreeHighlighter(view, syntax), {
+export function treeHighlighter(language: Language) {
+  return precedence(ViewPlugin.define(view => new TreeHighlighter(view, language), {
     decorations: v => v.decorations
   }), "fallback")
 }
@@ -275,16 +276,16 @@ class TreeHighlighter {
   tree: Tree
   markCache: {[cls: string]: Decoration} = Object.create(null)
 
-  constructor(view: EditorView, private syntax: Syntax) {
-    this.tree = syntax.getTree(view.state)
+  constructor(view: EditorView, private language: Language) {
+    this.tree = language.getTree(view.state)
     this.decorations = this.buildDeco(view)
   }
 
   update(update: ViewUpdate) {
-    if (this.syntax.parsePos(update.state) < update.view.viewport.to) {
+    if (this.language.parsePos(update.state) < update.view.viewport.to) {
       this.decorations = this.decorations.map(update.changes)
     } else {
-      let tree = this.syntax.getTree(update.state)
+      let tree = this.language.getTree(update.state)
       if (tree != this.tree || update.viewportChanged) {
         this.tree = tree
         this.decorations = this.buildDeco(update.view)

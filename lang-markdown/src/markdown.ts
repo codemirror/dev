@@ -1,10 +1,10 @@
 import {Extension} from "@codemirror/next/state"
-import {LezerSyntax} from "@codemirror/next/syntax"
+import {Language} from "@codemirror/next/syntax"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser} from "lezer-markdown"
 import {htmlSyntax} from "@codemirror/next/lang-html"
 
-export const markdownSyntax = LezerSyntax.define({
+export const markdownSyntax = Language.define({
   parser: parser.configure({
     props: [
       styleTags({

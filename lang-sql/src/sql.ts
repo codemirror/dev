@@ -1,4 +1,4 @@
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
 import {Parser} from "lezer"
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
@@ -77,7 +77,7 @@ export class SQLDialect {
     /// @internal
     readonly dialect: Dialect,
     /// The syntax for this dialect.
-    readonly syntax: LezerSyntax<Parser>
+    readonly syntax: Language<Parser>
   ) {}
 
   /// Returns the syntax for this dialect as an extension.
@@ -86,7 +86,7 @@ export class SQLDialect {
   /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
     let d = dialect(spec, spec.keywords, spec.types, spec.builtin)
-    let syntax = LezerSyntax.define({
+    let syntax = Language.define({
       parser: parser.configure({
         tokenizers: [{from: tokens, to: tokensFor(d)}]
       }),
@@ -120,7 +120,7 @@ export type SQLConfig = {
 /// Returns an extension that enables keyword completion for the given
 /// SQL dialect.
 export function keywordCompletion(dialect: SQLDialect): Extension {
-  return dialect.syntax.languageData.of({
+  return dialect.syntax.data.of({
     autocomplete: completeKeywords(dialect.dialect.words)
   })
 }
@@ -128,7 +128,7 @@ export function keywordCompletion(dialect: SQLDialect): Extension {
 /// Returns an extension that enables schema-based completion for the
 /// given configuration.
 export function schemaCompletion(config: SQLConfig): Extension {
-  return config.schema ? (config.dialect || StandardSQL).syntax.languageData.of({
+  return config.schema ? (config.dialect || StandardSQL).syntax.data.of({
     autocomplete: completeFromSchema(config.schema, config.tables, config.defaultTable)
   }) : []
 }

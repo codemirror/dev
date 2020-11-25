@@ -1,5 +1,5 @@
 import {parser} from "lezer-xml"
-import {continuedIndent, delimitedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {continuedIndent, delimitedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
@@ -7,7 +7,7 @@ import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 /// A syntax provider based on the [Lezer XML
 /// parser](https://github.com/lezer-parser/xml), extended with
 /// highlighting and indentation information.
-export const xmlSyntax = LezerSyntax.define({
+export const xmlSyntax = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add(type => {
@@ -56,7 +56,7 @@ export type XMLConfig = {
 
 /// Return an extension that installs XML support functionality.
 export function xmlSupport(conf: XMLConfig = {}): Extension {
-  return xmlSyntax.languageData.of({
+  return xmlSyntax.data.of({
     autocomplete: completeFromSchema(conf.elements || [], conf.attributes || [])
   })
 }

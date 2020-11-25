@@ -1,12 +1,12 @@
 import {parser} from "lezer-cpp"
-import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
 /// A syntax provider based on the [Lezer C++
 /// parser](https://github.com/lezer-parser/cpp), extended with
 /// highlighting and indentation information.
-export const cppSyntax = LezerSyntax.define({
+export const cppSyntax = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({

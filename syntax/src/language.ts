@@ -1,10 +1,10 @@
-import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodePropSource} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, NodePropSource} from "lezer-tree"
 // NOTE: This package should only use _types_ from "lezer", to avoid
 // pulling in that dependency when no actual Lezer-based parser is used.
 import {Input, IncrementalParser, IncrementalParse} from "lezer"
 import {Text, TextIterator} from "@codemirror/next/text"
-import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
-        Facet, languageDataProp, ChangeDesc} from "@codemirror/next/state"
+import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffectType,
+        Facet, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 import {syntaxIndentation} from "./indent"
@@ -16,10 +16,14 @@ function addLanguageData<P extends ConfigurableParser>(parser: P, data: Facet<{[
   return parser.configure({props: [languageDataProp.add(type => type.isTop ? data : undefined)]}) as P
 }
 
-/// A [syntax provider](#state.Syntax) based on a
-/// [Lezer](https://lezer.codemirror.net) parser.
-// FIXME rename/check docs
-export class LezerSyntax<P extends IncrementalParser> implements Syntax {
+// Node prop stored on a grammar's top node to indicate the facet used
+// to store language data related to that language.
+const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
+
+/// A language object manages parsing and per-language
+/// [metadata](#state.EditorState.languageDataAt). Parse data is
+/// managed as a [Lezer](https://lezer.codemirror.net) tree.
+export class Language<P extends IncrementalParser = IncrementalParser> {
   /// @internal
   readonly field: StateField<SyntaxState>
 
@@ -29,7 +33,7 @@ export class LezerSyntax<P extends IncrementalParser> implements Syntax {
   private constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
-    readonly languageData: Facet<{[name: string]: any}>,
+    readonly data: Facet<{[name: string]: any}>,
     /// The parser (with language data prop attached). Can be useful
     /// when using this as a [nested parser](#lezer.NestedParserSpec).
     readonly parser: P,
@@ -48,9 +52,11 @@ export class LezerSyntax<P extends IncrementalParser> implements Syntax {
       }
     })
     this.extension = [
-      EditorState.syntax.of(this),
+      EditorState.language.of(this),
       this.field,
       ViewPlugin.define(view => new ParseWorker(view, this, setSyntax)),
+      // FIXME try to find a way to include indentation and folding on
+      // demand, preferable one that allows tree-shaking
       syntaxIndentation(this),
       syntaxFolding(this),
       treeHighlighter(this)
@@ -71,20 +77,20 @@ export class LezerSyntax<P extends IncrementalParser> implements Syntax {
     /// [Language data](#state.EditorState.languageDataAt)
     /// to register for this language.
     languageData?: {[name: string]: any}
-  }): LezerSyntax<P> {
+  }): Language<P> {
     let {languageData, parser} = spec
     let data = Facet.define<{[name: string]: any}>({
       combine: languageData ? values => values.concat(languageData!) : undefined
     })
     let nested = spec.nested ?? !!(parser as any).hasNested
-    return new LezerSyntax(data, addLanguageData(parser, data), nested)
+    return new Language(data, addLanguageData(parser, data), nested)
   }
 
   /// Reconfigure the syntax by providing a new parser, but keeping
   /// the language data the same. This is useful when
   /// defining dialects for a custom parser.
-  reconfigure(parser: P): LezerSyntax<P> {
-    return new LezerSyntax(this.languageData, addLanguageData(parser, this.languageData), this.nested)
+  reconfigure(parser: P): Language<P> {
+    return new Language(this.data, addLanguageData(parser, this.data), this.nested)
   }
 
   getTree(state: EditorState) {
@@ -110,10 +116,20 @@ export class LezerSyntax<P extends IncrementalParser> implements Syntax {
         target = target.parent
       }
     }
-    return this.languageData
+    return this.data
   }
 }
 
+/// Get the syntax tree for a state, which is the current (possibly
+/// incomplete) parse tree of the [language](#language.Language) with
+/// the highest precedence, or the empty tree if there is no language
+/// available.
+export function syntaxTree(state: EditorState) {
+  let lang = state.facet(EditorState.language)
+  return lang.length ? lang[0].getTree(state) : Tree.empty
+}
+
+// FIXME document
 export class DocInput implements Input {
   cursor: TextIterator
   cursorPos = 0
@@ -275,7 +291,7 @@ class ParseWorker {
   working: number = -1
 
   constructor(readonly view: EditorView, 
-              readonly syntax: LezerSyntax<ConfigurableParser>,
+              readonly syntax: Language<ConfigurableParser>,
               readonly setSyntax: StateEffectType<SyntaxState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()

@@ -1,6 +1,6 @@
 import ist from "ist"
-import {__test} from "@codemirror/next/syntax"
-import {ChangeSet, Text} from "@codemirror/next/state"
+import {__test, getIndentUnit, indentString, indentUnit} from "@codemirror/next/syntax"
+import {EditorState, ChangeSet, Text} from "@codemirror/next/state"
 import {parser} from "lezer-javascript"
 import {Tree} from "lezer-tree"
 
@@ -40,5 +40,19 @@ describe("ParseState", () => {
     ist(state.work(50))
     ist(state.tree.length, newDoc.length)
     ist(state.tree.toString().slice(0, 31), "Script(VariableDeclaration(let,")
+  })
+})
+
+describe("indentation", () => {
+  it("tracks indent units", () => {
+    let s0 = EditorState.create({})
+    ist(getIndentUnit(s0), 2)
+    ist(indentString(s0, 4), "    ")
+    let s1 = EditorState.create({extensions: indentUnit.of("   ")})
+    ist(getIndentUnit(s1), 3)
+    ist(indentString(s1, 4), "    ")
+    let s2 = EditorState.create({extensions: [indentUnit.of("\t"), EditorState.tabSize.of(8)]})
+    ist(getIndentUnit(s2), 8)
+    ist(indentString(s2, 16), "\t\t")
   })
 })

@@ -1,5 +1,6 @@
 import {tooltips} from "@codemirror/next/tooltip"
 import {precedence, Extension, EditorState} from "@codemirror/next/state"
+import {syntaxTree} from "@codemirror/next/syntax"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 import {SyntaxNode} from "lezer-tree"
 import {CompletionContext, Completion, CompletionSource} from "./completion"
@@ -74,7 +75,7 @@ export function completeFromList(list: readonly (string | Completion)[]): Comple
 /// cursor is in a syntax node with one of the given names.
 export function ifNotIn(nodes: readonly string[], source: CompletionSource) {
   return (context: CompletionContext) => {
-    for (let pos: SyntaxNode | null = context.state.tree.resolve(context.pos, -1); pos; pos = pos.parent)
+    for (let pos: SyntaxNode | null = syntaxTree(context.state).resolve(context.pos, -1); pos; pos = pos.parent)
       if (nodes.indexOf(pos.name) > -1) return null
     return source(context)
   }

@@ -1,5 +1,6 @@
 import {EditorView} from "@codemirror/next/view"
 import {EditorState} from "@codemirror/next/state"
+import {syntaxTree} from "@codemirror/next/syntax"
 import {SyntaxNode} from "lezer-tree"
 import {ActiveResult} from "./state"
 
@@ -59,7 +60,7 @@ export class CompletionContext {
   /// Get the extent, content, and (if there is a token) type of the
   /// token before `this.pos`.
   tokenBefore(types: readonly string[]) {
-    let token: SyntaxNode | null = this.state.tree.resolve(this.pos, -1)
+    let token: SyntaxNode | null = syntaxTree(this.state).resolve(this.pos, -1)
     while (token && types.indexOf(token.name) < 0) token = token.parent
     return token ? {from: token.from, to: this.pos,
                     text: this.state.sliceDoc(token.from, this.pos),

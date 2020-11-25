@@ -1,4 +1,5 @@
 import {EditorState, Text} from "@codemirror/next/state"
+import {syntaxTree} from "@codemirror/next/syntax"
 import {CompletionContext, CompletionResult} from "@codemirror/next/autocomplete"
 import {SyntaxNode} from "lezer-tree"
 
@@ -457,7 +458,7 @@ function completeAttrValue(state: EditorState, tree: SyntaxNode, from: number, t
 }
 
 export function completeHTML(context: CompletionContext): CompletionResult | null {
-  let {state, pos} = context, around = state.tree.resolve(pos), tree = around.resolve(pos, -1)
+  let {state, pos} = context, around = syntaxTree(state).resolve(pos), tree = around.resolve(pos, -1)
   if (tree.name == "TagName") {
     return tree.parent && /CloseTag$/.test(tree.parent.name) ? completeCloseTag(state, tree, tree.from, pos)
       : completeTag(state, tree, tree.from, pos)

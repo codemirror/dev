@@ -1,12 +1,12 @@
 import {parser} from "lezer-python"
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
 import {Extension} from "@codemirror/next/state"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 
 /// A syntax provider based on the [Lezer Python
 /// parser](https://github.com/lezer-parser/python), extended with
 /// highlighting and indentation information.
-export const pythonSyntax = LezerSyntax.define({
+export const pythonSyntax = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({

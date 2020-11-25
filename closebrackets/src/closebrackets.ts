@@ -1,12 +1,12 @@
 import {EditorView, KeyBinding} from "@codemirror/next/view"
-import {EditorState, EditorSelection, Transaction, CharCategory, Extension,
-        StateCommand, StateField, StateEffect, MapMode} from "@codemirror/next/state"
+import {EditorState, EditorSelection, Transaction, Extension,
+        StateCommand, StateField, StateEffect, MapMode, CharCategory} from "@codemirror/next/state"
 import {RangeSet, RangeValue} from "@codemirror/next/rangeset"
-import {Text} from "@codemirror/next/text"
-import {codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
+import {Text, codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
+import {syntaxTree} from "@codemirror/next/syntax"
 
 /// Configures bracket closing behavior for a syntax (via
-/// [language data](#state.languageDataAt)) using the `"closeBrackets"`
+/// [language data](#state.EditorState.languageDataAt)) using the `"closeBrackets"`
 /// identifier.
 export interface CloseBracketConfig {
   /// The opening brackets to close. Defaults to `["(", "[", "{", "'",
@@ -217,6 +217,6 @@ function handleSame(state: EditorState, token: string, allowTriple: boolean) {
 }
 
 function nodeStart(state: EditorState, pos: number) {
-  let tree = state.tree.resolve(pos + 1)
+  let tree = syntaxTree(state).resolve(pos + 1)
   return tree.parent && tree.from == pos
 }

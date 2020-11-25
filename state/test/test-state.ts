@@ -105,18 +105,6 @@ describe("EditorState", () => {
     ist(state3.facet(facet).join(), "2,1")
   })
 
-  it("tracks indent units", () => {
-    let s0 = EditorState.create({})
-    ist(s0.indentUnit, 2)
-    ist(s0.indentString(4), "    ")
-    let s1 = EditorState.create({extensions: EditorState.indentUnit.of("   ")})
-    ist(s1.indentUnit, 3)
-    ist(s1.indentString(4), "    ")
-    let s2 = EditorState.create({extensions: [EditorState.indentUnit.of("\t"), EditorState.tabSize.of(8)]})
-    ist(s2.indentUnit, 8)
-    ist(s2.indentString(16), "\t\t")
-  })
-
   describe("changeByRange", () => {
     it("can make simple changes", () => {
       let state = EditorState.create({doc: "hi"})

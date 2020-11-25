@@ -458,7 +458,7 @@ export class EditorView {
   }
 
   /// Move a cursor position across the next group of either
-  /// [letters](#state.EditorState.charCategorizer) or non-letter
+  /// [letters](#language.charCategorizer) or non-letter
   /// non-whitespace characters.
   moveByGroup(start: SelectionRange, forward: boolean) {
     return moveByChar(this, start, forward, initial => byGroup(this, start.head, initial))

@@ -1,8 +1,9 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange,
-        IndentContext, ChangeSpec, CharCategory, Transaction} from "@codemirror/next/state"
+        ChangeSpec, Transaction, CharCategory} from "@codemirror/next/state"
 import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
+import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString, indentation} from "@codemirror/next/syntax"
 import {SyntaxNode, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -62,7 +63,7 @@ function interestingNode(state: EditorState, node: SyntaxNode, bracketProp: Node
 }
 
 function moveBySyntax(state: EditorState, start: SelectionRange, forward: boolean) {
-  let pos = state.tree.resolve(start.head)
+  let pos = syntaxTree(state).resolve(start.head)
   let bracketProp = forward ? NodeProp.closedBy : NodeProp.openedBy
   // Scan forward through child nodes to see if there's an interesting
   // node ahead.
@@ -269,7 +270,7 @@ export const selectLine: StateCommand = ({state, dispatch}) => {
 /// syntax tree.
 export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
   let selection = updateSel(state.selection, range => {
-    let context = state.tree.resolve(range.head, 1)
+    let context = syntaxTree(state).resolve(range.head, 1)
     while (!((context.from < range.from && context.to >= range.to) ||
              (context.to > range.to && context.from <= range.from) ||
              !context.parent?.parent))
@@ -312,7 +313,7 @@ const deleteByChar = (view: EditorView, forward: boolean, codePoint: boolean) =>
   if (!forward && pos > line.from && pos < line.from + 200 &&
       !/[^ \t]/.test(before = line.slice(0, pos - line.from))) {
     if (before[before.length - 1] == "\t") return pos - 1
-    let col = countColumn(before, 0, state.tabSize), drop = col % state.indentUnit || state.indentUnit
+    let col = countColumn(before, 0, state.tabSize), drop = col % getIndentUnit(state) || getIndentUnit(state)
     for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) pos--
     return pos
   }
@@ -482,7 +483,7 @@ export const deleteLine: Command = view => {
 }
 
 function getIndentation(cx: IndentContext, pos: number): number {
-  for (let f of cx.state.facet(EditorState.indentation)) {
+  for (let f of cx.state.facet(indentation)) {
     let result = f(cx, pos)
     if (result > -1) return result
   }
@@ -497,7 +498,7 @@ export const insertNewline: StateCommand = ({state, dispatch}) => {
 
 function isBetweenBrackets(state: EditorState, pos: number): {from: number, to: number} | null {
   if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1))) return {from: pos, to: pos}
-  let context = state.tree.resolve(pos)
+  let context = syntaxTree(state).resolve(pos)
   let before = context.childBefore(pos), after = context.childAfter(pos), closedBy
   if (before && after && before.to <= pos && after.from >= pos &&
       (closedBy = before.type.prop(NodeProp.closedBy)) && closedBy.indexOf(after.name) > -1)
@@ -521,8 +522,8 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     while (to < line.to && /\s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
     if (explode) ({from, to} = explode)
     else if (from > line.from && from < line.from + 100 && !/\S/.test(line.slice(0, from))) from = line.from
-    let insert = ["", state.indentString(indent)]
-    if (explode) insert.push(state.indentString(cx.lineIndent(line)))
+    let insert = ["", indentString(state, indent)]
+    if (explode) insert.push(indentString(state, cx.lineIndent(line)))
     return {changes: {from, to, insert: Text.of(insert)},
             range: EditorSelection.cursor(from + 1 + indent)}
   })
@@ -561,7 +562,7 @@ export const indentSelection: StateCommand = ({state, dispatch}) => {
     let indent = getIndentation(context, line.from)
     if (indent < 0) return
     let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, 200)))![0]
-    let norm = state.indentString(indent)
+    let norm = indentString(state, indent)
     if (cur != norm || range.from < line.from + cur.length) {
       updated[line.from] = indent
       changes.push({from: line.from, to: line.from + cur.length, insert: norm})
@@ -575,7 +576,7 @@ export const indentSelection: StateCommand = ({state, dispatch}) => {
 /// selected lines.
 export const indentMore: StateCommand = ({state, dispatch}) => {
   dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
-    changes.push({from: line.from, insert: state.facet(EditorState.indentUnit)})
+    changes.push({from: line.from, insert: state.facet(indentUnit)})
   })))
   return true
 }
@@ -587,7 +588,8 @@ export const indentLess: StateCommand = ({state, dispatch}) => {
     let lineStart = line.slice(0, Math.min(line.length, 200))
     let space = /^\s*/.exec(lineStart)![0]
     if (!space) return
-    let col = countColumn(space, 0, state.tabSize), insert = state.indentString(Math.max(0, col - state.indentUnit)), keep = 0
+    let col = countColumn(space, 0, state.tabSize), keep = 0
+    let insert = indentString(state, Math.max(0, col - getIndentUnit(state)))
     while (keep < space.length && keep < insert.length && space.charCodeAt(keep) == insert.charCodeAt(keep)) keep++
     changes.push({from: line.from + keep, to: line.from + space.length, insert: insert.slice(keep)})
   })))

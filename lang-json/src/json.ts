@@ -1,12 +1,12 @@
 import {parser} from "lezer-json"
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
 import {Extension} from "@codemirror/next/state"
 import {SyntaxNode} from "lezer-tree"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 
 export {jsonParseLinter} from "./lint"
 
-export const jsonSyntax = LezerSyntax.define({
+export const jsonSyntax = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({

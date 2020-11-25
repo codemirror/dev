@@ -1,4 +1,5 @@
 import {combineConfig, EditorState, Facet, StateField, Extension} from "@codemirror/next/state"
+import {syntaxTree} from "@codemirror/next/syntax"
 import {EditorView, themeClass} from "@codemirror/next/view"
 import {Decoration, DecorationSet} from "@codemirror/next/view"
 import {Tree, SyntaxNode, NodeType, NodeProp} from "lezer-tree"
@@ -105,7 +106,7 @@ export interface MatchResult {
 /// bracket was found at `pos`, or a match result otherwise.
 export function matchBrackets(state: EditorState, pos: number, dir: -1 | 1, config: Config = {}): MatchResult | null {
   let maxScanDistance = config.maxScanDistance || DefaultScanDist, brackets = config.brackets || DefaultBrackets
-  let tree = state.tree, sub = tree.resolve(pos, dir), matches
+  let tree = syntaxTree(state), sub = tree.resolve(pos, dir), matches
   if (matches = matchingNodes(sub.type, dir, brackets))
     return matchMarkedBrackets(state, pos, dir, sub, matches, brackets)
   else

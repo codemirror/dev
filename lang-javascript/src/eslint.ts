@@ -34,12 +34,12 @@ export function esLint(eslint: any, config?: any) {
   }
 
   return (view: EditorView) => {
-    let [syntax] = view.state.facet(EditorState.syntax)
-    if (syntax == javascriptSyntax) return range(view.state)
-    if (!syntax) return []
+    let [lang] = view.state.facet(EditorState.language)
+    if (lang == javascriptSyntax) return range(view.state)
+    if (!lang) return []
     let found: Diagnostic[] = []
     // FIXME move to async parsing?
-    syntax.getTree(view.state).iterate({
+    lang.getTree(view.state).iterate({
       enter(type, start, end) {
         if (type.isTop && javascriptSyntax.parser.nodeSet.types[type.id] == type) {
           for (let d of range(view.state, start, end)) found.push(d)
