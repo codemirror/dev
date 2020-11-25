@@ -1,5 +1,5 @@
 import {Extension} from "@codemirror/next/state"
-import {Language} from "@codemirror/next/syntax"
+import {Language} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser} from "lezer-markdown"
 import {htmlSyntax} from "@codemirror/next/lang-html"

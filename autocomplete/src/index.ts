@@ -1,6 +1,6 @@
 import {tooltips} from "@codemirror/next/tooltip"
 import {precedence, Extension, EditorState} from "@codemirror/next/state"
-import {syntaxTree} from "@codemirror/next/syntax"
+import {syntaxTree} from "@codemirror/next/language"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 import {SyntaxNode} from "lezer-tree"
 import {CompletionContext, Completion, CompletionSource} from "./completion"

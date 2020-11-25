@@ -1,7 +1,7 @@
 import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} from "@codemirror/next/view"
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
         Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
-import {indentUnit} from "@codemirror/next/syntax"
+import {indentUnit} from "@codemirror/next/language"
 import {baseTheme} from "./theme"
 import {Completion} from "./completion"
 

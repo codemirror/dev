@@ -1,5 +1,5 @@
 import ist from "ist"
-import {__test, getIndentUnit, indentString, indentUnit} from "@codemirror/next/syntax"
+import {__test, getIndentUnit, indentString, indentUnit} from "@codemirror/next/language"
 import {EditorState, ChangeSet, Text} from "@codemirror/next/state"
 import {parser} from "lezer-javascript"
 import {Tree} from "lezer-tree"

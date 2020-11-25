@@ -1,7 +1,7 @@
 import {combineConfig, EditorState, StateEffect, ChangeDesc, Facet,
         StateField, Extension} from "@codemirror/next/state"
 import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass, KeyBinding} from "@codemirror/next/view"
-import {foldable} from "@codemirror/next/syntax"
+import {foldable} from "@codemirror/next/language"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
 
 type Range = {from: number, to: number}

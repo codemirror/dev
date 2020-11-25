@@ -1,4 +1,4 @@
-import {Language} from "@codemirror/next/syntax"
+import {Language} from "@codemirror/next/language"
 import {EditorState} from "./state"
 import {Transaction, TransactionSpec} from "./transaction"
 import {Facet} from "./facet"

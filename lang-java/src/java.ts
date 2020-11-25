@@ -1,5 +1,5 @@
 import {parser} from "lezer-java"
-import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
+import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 

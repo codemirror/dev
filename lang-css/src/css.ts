@@ -1,6 +1,6 @@
 import {parser} from "lezer-css"
 import {SyntaxNode} from "lezer-tree"
-import {Language, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
+import {Language, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 

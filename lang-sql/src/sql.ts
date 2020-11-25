@@ -1,4 +1,4 @@
-import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
+import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/language"
 import {Parser} from "lezer"
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"

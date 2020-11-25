@@ -1,7 +1,7 @@
 import {parser, configureNesting} from "lezer-html"
 import {cssSyntax} from "@codemirror/next/lang-css"
 import {javascriptSyntax, javascriptSupport} from "@codemirror/next/lang-javascript"
-import {Language, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/syntax"
+import {Language, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 import {Extension} from "@codemirror/next/state"

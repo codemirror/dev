@@ -3,7 +3,7 @@ import {EditorState, StateCommand, EditorSelection, SelectionRange,
 import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
-import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString, indentation} from "@codemirror/next/syntax"
+import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString, indentation} from "@codemirror/next/language"
 import {SyntaxNode, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {

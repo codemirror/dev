@@ -2,7 +2,7 @@ import {keymap, highlightSpecialChars, drawSelection} from "@codemirror/next/vie
 import {Extension, EditorState} from "@codemirror/next/state"
 import {history, historyKeymap} from "@codemirror/next/history"
 import {foldGutter, foldKeymap} from "@codemirror/next/fold"
-import {indentOnInput} from "@codemirror/next/syntax"
+import {indentOnInput} from "@codemirror/next/language"
 import {lineNumbers} from "@codemirror/next/gutter"
 import {defaultKeymap} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"

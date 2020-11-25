@@ -1,5 +1,5 @@
 import {parser} from "lezer-python"
-import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/syntax"
+import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/language"
 import {Extension} from "@codemirror/next/state"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 

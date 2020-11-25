@@ -1,5 +1,5 @@
 import {EditorState, Text} from "@codemirror/next/state"
-import {syntaxTree} from "@codemirror/next/syntax"
+import {syntaxTree} from "@codemirror/next/language"
 import {CompletionContext, CompletionResult} from "@codemirror/next/autocomplete"
 import {SyntaxNode} from "lezer-tree"
 

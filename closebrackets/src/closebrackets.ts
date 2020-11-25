@@ -3,7 +3,7 @@ import {EditorState, EditorSelection, Transaction, Extension,
         StateCommand, StateField, StateEffect, MapMode, CharCategory} from "@codemirror/next/state"
 import {RangeSet, RangeValue} from "@codemirror/next/rangeset"
 import {Text, codePointAt, fromCodePoint, codePointSize} from "@codemirror/next/text"
-import {syntaxTree} from "@codemirror/next/syntax"
+import {syntaxTree} from "@codemirror/next/language"
 
 /// Configures bracket closing behavior for a syntax (via
 /// [language data](#state.EditorState.languageDataAt)) using the `"closeBrackets"`

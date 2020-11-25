@@ -1,6 +1,6 @@
 import {parser} from "lezer-javascript"
 import {Parser} from "lezer"
-import {Language, flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/syntax"
+import {Language, flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeSnippets} from "@codemirror/next/autocomplete"
 import {Extension} from "@codemirror/next/state"

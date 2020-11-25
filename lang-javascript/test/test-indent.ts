@@ -1,6 +1,6 @@
 import ist from "ist"
 import {EditorState} from "@codemirror/next/state"
-import {indentation, IndentContext} from "@codemirror/next/syntax"
+import {indentation, IndentContext} from "@codemirror/next/language"
 import {javascriptSyntax} from "@codemirror/next/lang-javascript"
 
 function getIndent(state: EditorState, pos: number): number {
