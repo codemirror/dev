@@ -1,39 +1,42 @@
 import {continuedIndent, indentNodeProp, foldNodeProp, LezerSyntax} from "@codemirror/next/syntax"
+import {Parser} from "lezer"
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {parser} from "./sql.grammar"
+import {parser as baseParser} from "./sql.grammar"
 import {tokens, Dialect, tokensFor, SQLKeywords, SQLTypes, dialect} from "./tokens"
 import {completeFromSchema, completeKeywords} from "./complete"
 
-let props = [
-  indentNodeProp.add({
-    Statement: continuedIndent()
-  }),
-  foldNodeProp.add({
-    Statement(tree) { return {from: tree.firstChild!.to, to: tree.to} },
-    BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
-  }),
-  styleTags({
-    Keyword: t.keyword,
-    Type: t.typeName,
-    Builtin: t.standard(t.name),
-    Bool: t.bool,
-    Null: t.null,
-    Number: t.number,
-    String: t.string,
-    Identifier: t.name,
-    QuotedIdentifier: t.special(t.string),
-    SpecialVar: t.special(t.name),
-    LineComment: t.lineComment,
-    BlockComment: t.blockComment,
-    Operator: t.operator,
-    "Semi Punctuation": t.punctuation,
-    "( )": t.paren,
-    "{ }": t.brace,
-    "[ ]": t.squareBracket
-  })
-]
+let parser = baseParser.configure({
+  props: [
+    indentNodeProp.add({
+      Statement: continuedIndent()
+    }),
+    foldNodeProp.add({
+      Statement(tree) { return {from: tree.firstChild!.to, to: tree.to} },
+      BlockComment(tree) { return {from: tree.from + 2, to: tree.to - 2} }
+    }),
+    styleTags({
+      Keyword: t.keyword,
+      Type: t.typeName,
+      Builtin: t.standard(t.name),
+      Bool: t.bool,
+      Null: t.null,
+      Number: t.number,
+      String: t.string,
+      Identifier: t.name,
+      QuotedIdentifier: t.special(t.string),
+      SpecialVar: t.special(t.name),
+      LineComment: t.lineComment,
+      BlockComment: t.blockComment,
+      Operator: t.operator,
+      "Semi Punctuation": t.punctuation,
+      "( )": t.paren,
+      "{ }": t.brace,
+      "[ ]": t.squareBracket
+    })
+  ]
+})
 
 type SQLDialectSpec = {
   /// A space-separated list of keywords for the dialect.
@@ -74,7 +77,7 @@ export class SQLDialect {
     /// @internal
     readonly dialect: Dialect,
     /// The syntax for this dialect.
-    readonly syntax: LezerSyntax
+    readonly syntax: LezerSyntax<Parser>
   ) {}
 
   /// Returns the syntax for this dialect as an extension.
@@ -83,9 +86,10 @@ export class SQLDialect {
   /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
     let d = dialect(spec, spec.keywords, spec.types, spec.builtin)
-    let syntax = LezerSyntax.fromLezer({
-      parser: parser.withTokenizer(tokens, tokensFor(d)),
-      props,
+    let syntax = LezerSyntax.define({
+      parser: parser.configure({
+        tokenizers: [{from: tokens, to: tokensFor(d)}]
+      }),
       languageData: {
         commentTokens: {line: "--", block: {open: "/*", close: "*/"}},
         closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}

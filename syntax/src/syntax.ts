@@ -1,5 +1,7 @@
-import {IncrementalParser, Input, Parser, ParseOptions} from "lezer"
-import {Tree, SyntaxNode, NodePropSource, NodeSet, ChangedRange, TreeFragment} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodePropSource} from "lezer-tree"
+// NOTE: This package should only use _types_ from "lezer", to avoid
+// pulling in that dependency when no actual Lezer-based parser is used.
+import {Input, IncrementalParser, IncrementalParse} from "lezer"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Syntax, Extension, StateEffect, StateEffectType,
         Facet, languageDataProp, ChangeDesc} from "@codemirror/next/state"
@@ -8,18 +10,16 @@ import {treeHighlighter} from "@codemirror/next/highlight"
 import {syntaxIndentation} from "./indent"
 import {syntaxFolding} from "./fold"
 
-export type ParserSource = (input: Input, pos: number, fragments?: readonly TreeFragment[]) => IncrementalParser
+type ConfigurableParser = IncrementalParser<{props: readonly NodePropSource[]}>
 
-function defLanguageData(nodeSet: NodeSet, languageData: {[name: string]: any} | undefined) {
-  let data = Facet.define<{[name: string]: any}>({
-    combine: languageData ? values => values.concat(languageData!) : undefined
-  })
-  return {data, nodeSet: nodeSet.extend(languageDataProp.add(type => type.isTop ? data : undefined))}
-}  
+function addLanguageData<P extends ConfigurableParser>(parser: P, data: Facet<{[name: string]: any}>): P {
+  return parser.configure({props: [languageDataProp.add(type => type.isTop ? data : undefined)]}) as P
+}
 
 /// A [syntax provider](#state.Syntax) based on a
 /// [Lezer](https://lezer.codemirror.net) parser.
-export class LezerSyntax implements Syntax { // FIXME rename/check docs
+// FIXME rename/check docs
+export class LezerSyntax<P extends IncrementalParser> implements Syntax {
   /// @internal
   readonly field: StateField<SyntaxState>
 
@@ -30,13 +30,10 @@ export class LezerSyntax implements Syntax { // FIXME rename/check docs
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
     readonly languageData: Facet<{[name: string]: any}>,
-    /// The node types used by this syntax.
-    readonly nodeSet: NodeSet,
-    /// The parser constructor for this syntax. Can be useful when
-    /// using it as a [nested parser](#lezer.NestedParserSpec).
-    readonly parser: ParserSource,
-    private nested: boolean,
-    private lezer: Parser | null
+    /// The parser (with language data prop attached). Can be useful
+    /// when using this as a [nested parser](#lezer.NestedParserSpec).
+    readonly parser: P,
+    private nested: boolean
   ) {
     let setSyntax = StateEffect.define<SyntaxState>()
     this.field = StateField.define<SyntaxState>({
@@ -62,65 +59,32 @@ export class LezerSyntax implements Syntax { // FIXME rename/check docs
 
   /// Define a syntax object. When basing it on a Lezer syntax, you'll
   /// want to use [`fromLezer`](#syntax.LezerSyntax^fromLezer) instead.
-  static define(spec: {
-    /// The node set to associate the language data with. Note that
-    /// this must have the [top](#lezer-tree.NodeType.isTop) flag set
-    /// on nodes that will be used as the tree root.
-    nodeSet: NodeSet,
-    /// A function that, given the updated node set, returns the
-    /// function that will be used to create a parser instance.
-    construct: (nodeSet: NodeSet) => ParserSource,
+  static define<P extends ConfigurableParser>(spec: {
+    /// The parser to use.
+    parser: P,
     /// Whether this parser can nest other languages. Used to optimize
     /// [`languageData`](#state.EditorState.languageDataAt) in cases
     /// where there is only one language in the document. Defaults to
-    /// false.
+    /// false. When `parser` is a Lezer parser, this option is
+    /// automatically taken from its `hasNested` property.
     nested?: boolean,
     /// [Language data](#state.EditorState.languageDataAt)
     /// to register for this language.
     languageData?: {[name: string]: any}
-  }) {
-    let {data, nodeSet} = defLanguageData(spec.nodeSet, spec.languageData)
-    return new LezerSyntax(data, nodeSet, spec.construct(nodeSet), !!spec.nested, null)
+  }): LezerSyntax<P> {
+    let {languageData, parser} = spec
+    let data = Facet.define<{[name: string]: any}>({
+      combine: languageData ? values => values.concat(languageData!) : undefined
+    })
+    let nested = spec.nested ?? !!(parser as any).hasNested
+    return new LezerSyntax(data, addLanguageData(parser, data), nested)
   }
 
-  /// Create a syntax instance for the given Lezer parser.
-  static fromLezer(spec: {
-    /// A [Lezer](https://lezer.codemirror.net) parser object to
-    /// define a syntax for.
-    parser: Parser,
-    /// Props to add to the parser's node set. This is usually where
-    /// you specify [highlighting](#highlight.styleTags),
-    /// [indentation](#syntax.indentNodeProp), and similar metadata.
-    props?: readonly NodePropSource[],
-    /// Additional options, such as the top node or dialect, to pass
-    /// to the parser.
-    options?: ParseOptions,
-    /// [Language data](#state.EditorState.languageDataAt) to register
-    /// for this language.
-    languageData?: {[name: string]: any}
-  }) {
-    let {parser, options} = spec
-    let {data, nodeSet} = defLanguageData(spec.props ? parser.nodeSet.extend(...spec.props) : parser.nodeSet, spec.languageData)
-    return new LezerSyntax(data, nodeSet, (input, startPos, fragments) => parser.startParse(input, {...options, startPos, fragments, nodeSet}),
-                           parser.hasNested, parser)
-  }
-
-  /// Reconfigure the syntax by providing a new parser source or, if
-  /// this was defined with `fromLezer`, a new set of parse options.
-  /// But keep the language data the same. This is useful when
-  /// defining dialects for a custom parser. With a Lezer parser,
-  /// you'll probably want to use
-  /// [`reconfigureLezer`](#syntax.LezerParser.reconfigureLezer)
-  /// instead.
-  reconfigure(conf: ParseOptions | ((nodeSet: NodeSet) => ParserSource)) {
-    if (typeof conf == "function")
-      return new LezerSyntax(this.languageData, this.nodeSet, conf(this.nodeSet), this.nested, this.lezer)
-    let {lezer} = this
-    if (!lezer)
-      throw new Error("Can't call reconfigure with an options object on a non-Lezer language")
-    return new LezerSyntax(this.languageData, this.nodeSet,
-                           (input, startPos, fragments) => lezer!.startParse(input, {...conf, startPos, fragments, nodeSet: this.nodeSet}),
-                           this.nested, lezer)
+  /// Reconfigure the syntax by providing a new parser, but keeping
+  /// the language data the same. This is useful when
+  /// defining dialects for a custom parser.
+  reconfigure(parser: P): LezerSyntax<P> {
+    return new LezerSyntax(this.languageData, addLanguageData(parser, this.languageData), this.nested)
   }
 
   getTree(state: EditorState) {
@@ -226,11 +190,11 @@ const enum Work {
 }
 
 export class ParseState {
-  private parse: IncrementalParser | null = null
+  private parse: IncrementalParse | null = null
 
   /// @internal
   constructor(
-    private parser: ParserSource,
+    private parser: IncrementalParser,
     private doc: Text,
     private fragments: readonly TreeFragment[] = [],
     public tree: Tree
@@ -241,7 +205,7 @@ export class ParseState {
     if (this.tree != Tree.empty && (upto == null ? this.tree.length == this.doc.length : this.tree.length >= upto))
       return true
     if (!this.parse)
-      this.parse = this.parser(new DocInput(this.doc), 0, this.fragments)
+      this.parse = this.parser.startParse(new DocInput(this.doc), {fragments: this.fragments})
     let endTime = Date.now() + time
     for (;;) {
       let done = this.parse.advance()
@@ -311,7 +275,7 @@ class ParseWorker {
   working: number = -1
 
   constructor(readonly view: EditorView, 
-              readonly syntax: LezerSyntax,
+              readonly syntax: LezerSyntax<ConfigurableParser>,
               readonly setSyntax: StateEffectType<SyntaxState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()

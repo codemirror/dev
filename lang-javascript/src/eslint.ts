@@ -41,7 +41,7 @@ export function esLint(eslint: any, config?: any) {
     // FIXME move to async parsing?
     syntax.getTree(view.state).iterate({
       enter(type, start, end) {
-        if (type.isTop && javascriptSyntax.nodeSet.types[type.id] == type) {
+        if (type.isTop && javascriptSyntax.parser.nodeSet.types[type.id] == type) {
           for (let d of range(view.state, start, end)) found.push(d)
           return false
         }
