@@ -66,10 +66,6 @@ function foldExists(folded: DecorationSet, from: number, to: number) {
   return found
 }
 
-function getFoldable(state: EditorState, from: number, to: number) {
-  return state.facet(foldable).reduce<Range | null>((value, f) => value || f(state, from, to), null)
-}
-
 function maybeEnable(state: EditorState) {
   return state.field(foldState, false) ? undefined : {append: codeFolding()}
 }
@@ -77,7 +73,7 @@ function maybeEnable(state: EditorState) {
 /// Fold the lines that are selected, if possible.
 export const foldCode: Command = view => {
   for (let line of selectedLines(view)) {
-    let range = getFoldable(view.state, line.from, line.to)
+    let range = foldable(view.state, line.from, line.to)
     if (range) {
       view.dispatch({effects: foldEffect.of(range),
                      reconfigure: maybeEnable(view.state)})
@@ -103,7 +99,7 @@ export const unfoldCode: Command = view => {
 export const foldAll: Command = view => {
   let {state} = view, effects = []
   for (let pos = 0; pos < state.doc.length;) {
-    let line = view.visualLineAt(pos), range = getFoldable(state, line.from, line.to)
+    let line = view.visualLineAt(pos), range = foldable(state, line.from, line.to)
     if (range) effects.push(foldEffect.of(range))
     pos = (range ? view.visualLineAt(range.to) : line).to + 1
   }
@@ -224,7 +220,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
         // don't change anything relevant
         let folded = foldInside(view.state, line.from, line.to)
         if (folded) return canUnfold
-        if (getFoldable(view.state, line.from, line.to)) return canFold
+        if (foldable(view.state, line.from, line.to)) return canFold
         return null
       },
       initialSpacer() {
@@ -237,7 +233,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
             view.dispatch({effects: unfoldEffect.of(folded)})
             return true
           }
-          let range = getFoldable(view.state, line.from, line.to)
+          let range = foldable(view.state, line.from, line.to)
           if (range) {
             view.dispatch({effects: foldEffect.of(range)})
             return true

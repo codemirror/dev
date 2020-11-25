@@ -3,7 +3,7 @@ export {Language, syntaxTree} from "./language"
 export {IndentContext, getIndentUnit, indentString, indentOnInput, indentation, indentUnit,
         TreeIndentContext, indentNodeProp, delimitedIndent, continuedIndent, flatIndent} from "./indent"
 
-export {foldable, foldNodeProp} from "./fold"
+export {foldService, foldNodeProp, foldable} from "./fold"
 
 import {ParseState} from "./language"
 

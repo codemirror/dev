@@ -8,7 +8,6 @@ import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffec
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 import {syntaxIndentation} from "./indent"
-import {syntaxFolding} from "./fold"
 
 type ConfigurableParser = IncrementalParser<{props: readonly NodePropSource[]}>
 
@@ -58,7 +57,6 @@ export class Language<P extends IncrementalParser = IncrementalParser> {
       // FIXME try to find a way to include indentation and folding on
       // demand, preferable one that allows tree-shaking
       syntaxIndentation(this),
-      syntaxFolding(this),
       treeHighlighter(this)
     ]
   }
