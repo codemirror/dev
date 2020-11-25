@@ -1,11 +1,9 @@
 export {Language, syntaxTree} from "./language"
 
-export {foldable, indentation, indentUnit} from "./facets"
-
-export {IndentContext, getIndentUnit, indentString, indentOnInput,
+export {IndentContext, getIndentUnit, indentString, indentOnInput, indentation, indentUnit,
         TreeIndentContext, indentNodeProp, delimitedIndent, continuedIndent, flatIndent} from "./indent"
 
-export {foldNodeProp} from "./fold"
+export {foldable, foldNodeProp} from "./fold"
 
 import {ParseState} from "./language"
 

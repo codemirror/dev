@@ -1,8 +1,22 @@
 import {NodeProp, SyntaxNode, Tree} from "lezer-tree"
-import {EditorState, Extension, Transaction} from "@codemirror/next/state"
+import {EditorState, Extension, Transaction, Facet} from "@codemirror/next/state"
 import {Line, countColumn} from "@codemirror/next/text"
-import {indentUnit, indentation} from "./facets"
 import {Language} from "./language"
+
+/// Facet that defines a way to query for automatic indentation
+/// depth at the start of a given line.
+export const indentation = Facet.define<(context: IndentContext, pos: number) => number>()
+
+/// Facet for overriding the unit by which indentation happens.
+/// Should be a string consisting either entirely of spaces or
+/// entirely of tabs. When not set, this defaults to 2 spaces.
+export const indentUnit = Facet.define<string, string>({
+  combine: values => {
+    if (!values.length) return "  "
+    if (!/^(?: +|\t+)$/.test(values[0])) throw new Error("Invalid indent unit: " + JSON.stringify(values[0]))
+    return values[0]
+  }
+})
 
 /// Return the _column width_ of an indent unit in the state.
 /// Determined by the [`indentUnit`](#state.EditorState^indentUnit)

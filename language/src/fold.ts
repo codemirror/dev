@@ -1,7 +1,12 @@
 import {NodeProp, SyntaxNode} from "lezer-tree"
-import {EditorState} from "@codemirror/next/state"
+import {EditorState, Facet} from "@codemirror/next/state"
 import {Language} from "./language"
-import {foldable} from "./facets"
+
+/// A facet that registers a code folding service. When called with
+/// the extent of a line, such a function should return a range
+/// object when a foldable that starts on that line (but continues
+/// beyond it), if one can be found.
+export const foldable = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 
 /// This node prop is used to associate folding information with node
 /// types. Given a syntax node, it should check whether that tree is
