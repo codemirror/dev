@@ -8,7 +8,9 @@ import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffec
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 
-type ConfigurableParser = IncrementalParser<{props: readonly NodePropSource[]}>
+type ConfigurableParser = IncrementalParser & {
+  configure(config: {props: readonly NodePropSource[]}): IncrementalParser
+}
 
 function addLanguageData<P extends ConfigurableParser>(parser: P, data: Facet<{[name: string]: any}>): P {
   return parser.configure({props: [languageDataProp.add(type => type.isTop ? data : undefined)]}) as P
@@ -59,7 +61,11 @@ export class Language<P extends IncrementalParser = IncrementalParser> {
 
   /// Define a language from a parser.
   static define<P extends ConfigurableParser>(spec: {
-    /// The parser to use.
+    /// The parser to use. Must conform to the
+    /// [`IncrementalParser`](#lezer.IncrementalParser) interface, and
+    /// allow reconfiguring its [node props](#lezer-tree.NodeProps) so
+    /// that the language can attach its language data to the top node
+    /// type(s).
     parser: P,
     /// Whether this parser can nest other languages. Used to optimize
     /// [`languageData`](#state.EditorState.languageDataAt) in cases
@@ -83,7 +89,7 @@ export class Language<P extends IncrementalParser = IncrementalParser> {
   /// the language data the same. This is useful when defining
   /// dialects for a custom parser.
   reconfigure(parser: P): Language<P> {
-    return new Language(this.data, addLanguageData(parser, this.data), this.nested)
+    return new Language(this.data, addLanguageData(parser as any, this.data), this.nested)
   }
 
   getTree(state: EditorState) {
@@ -287,7 +293,7 @@ class ParseWorker {
   working: number = -1
 
   constructor(readonly view: EditorView, 
-              readonly language: Language<ConfigurableParser>,
+              readonly language: Language,
               readonly setState: StateEffectType<LanguageState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
