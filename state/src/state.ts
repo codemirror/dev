@@ -286,7 +286,7 @@ export class EditorState {
   /// [`globalLanguageData`](#state.EditorState^globalLanguageData)
   /// facet, for the language active at the given position. Values
   /// provided by the facet, in precedence order, will appear before
-  /// those provided by the syntax.
+  /// those provided by the language.
   languageDataAt<T>(name: string, pos: number): readonly T[] {
     let values: T[] = []
     let lang = this.facet(language)

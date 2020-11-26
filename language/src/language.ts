@@ -23,7 +23,7 @@ const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
 /// managed as a [Lezer](https://lezer.codemirror.net) tree.
 export class Language<P extends IncrementalParser = IncrementalParser> {
   /// @internal
-  readonly field: StateField<SyntaxState>
+  readonly field: StateField<LanguageState>
 
   /// The extension value to install this provider.
   readonly extension: Extension
@@ -37,28 +37,27 @@ export class Language<P extends IncrementalParser = IncrementalParser> {
     readonly parser: P,
     private nested: boolean
   ) {
-    let setSyntax = StateEffect.define<SyntaxState>()
-    this.field = StateField.define<SyntaxState>({
+    let setState = StateEffect.define<LanguageState>()
+    this.field = StateField.define<LanguageState>({
       create(state) {
         let parseState = new ParseState(parser, state.doc, [], Tree.empty)
         if (!parseState.work(Work.Apply)) parseState.takeTree()
-        return new SyntaxState(parseState)
+        return new LanguageState(parseState)
       },
       update(value, tr) {
-        for (let e of tr.effects) if (e.is(setSyntax)) return e.value
+        for (let e of tr.effects) if (e.is(setState)) return e.value
         return value.apply(tr)
       }
     })
     this.extension = [
       EditorState.language.of(this),
       this.field,
-      ViewPlugin.define(view => new ParseWorker(view, this, setSyntax)),
+      ViewPlugin.define(view => new ParseWorker(view, this, setState)),
       treeHighlighter(this)
     ]
   }
 
-  /// Define a syntax object. When basing it on a Lezer syntax, you'll
-  /// want to use [`fromLezer`](#syntax.LezerSyntax^fromLezer) instead.
+  /// Define a language from a parser.
   static define<P extends ConfigurableParser>(spec: {
     /// The parser to use.
     parser: P,
@@ -80,9 +79,9 @@ export class Language<P extends IncrementalParser = IncrementalParser> {
     return new Language(data, addLanguageData(parser, data), nested)
   }
 
-  /// Reconfigure the syntax by providing a new parser, but keeping
-  /// the language data the same. This is useful when
-  /// defining dialects for a custom parser.
+  /// Reconfigure the language by providing a new parser, but keeping
+  /// the language data the same. This is useful when defining
+  /// dialects for a custom parser.
   reconfigure(parser: P): Language<P> {
     return new Language(this.data, addLanguageData(parser, this.data), this.nested)
   }
@@ -251,7 +250,7 @@ export class ParseState {
   }
 }
 
-class SyntaxState {
+class LanguageState {
   // The current tree. Immutable, because directly accessible from
   // the editor state.
   readonly tree: Tree
@@ -268,7 +267,7 @@ class SyntaxState {
     if (!tr.docChanged) return this
     let newState = this.parse.changes(tr.changes, tr.newDoc)
     newState.work(Work.Apply)
-    return new SyntaxState(newState)
+    return new LanguageState(newState)
   }
 }
 
@@ -288,8 +287,8 @@ class ParseWorker {
   working: number = -1
 
   constructor(readonly view: EditorView, 
-              readonly syntax: Language<ConfigurableParser>,
-              readonly setSyntax: StateEffectType<SyntaxState>) {
+              readonly language: Language<ConfigurableParser>,
+              readonly setState: StateEffectType<LanguageState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
   }
@@ -300,18 +299,18 @@ class ParseWorker {
 
   scheduleWork() {
     if (this.working > -1) return
-    let {state} = this.view, field = state.field(this.syntax.field)
+    let {state} = this.view, field = state.field(this.language.field)
     if (field.tree.length >= state.doc.length) return
     this.working = requestIdle(this.work, {timeout: Work.Pause})
   }
 
   work(deadline?: Deadline) {
     this.working = -1
-    let {state} = this.view, field = state.field(this.syntax.field)
+    let {state} = this.view, field = state.field(this.language.field)
     if (field.tree.length >= state.doc.length) return
     field.parse.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (field.parse.tree.length >= state.doc.length)
-      this.view.dispatch({effects: this.setSyntax.of(new SyntaxState(field.parse))})
+      this.view.dispatch({effects: this.setState.of(new LanguageState(field.parse))})
     else
       this.scheduleWork()
   }

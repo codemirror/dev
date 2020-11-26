@@ -6,7 +6,7 @@ import {Extension} from "@codemirror/next/state"
 /// A syntax provider based on the [Lezer Rust
 /// parser](https://github.com/lezer-parser/rust), extended with
 /// highlighting and indentation information.
-export const rustSyntax = Language.define({
+export const rustLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -65,7 +65,7 @@ export const rustSyntax = Language.define({
   }
 })
 
-/// Returns an extension that installs the Rust syntax.
+/// Returns an extension that installs the Rust language.
 export function rust(): Extension {
-  return rustSyntax
+  return rustLanguage
 }

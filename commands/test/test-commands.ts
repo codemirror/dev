@@ -1,6 +1,6 @@
 import {EditorState, EditorSelection, StateCommand, Extension} from "@codemirror/next/state"
 import {indentMore, indentLess, indentSelection, insertNewlineAndIndent} from "@codemirror/next/commands"
-import {javascriptSyntax} from "@codemirror/next/lang-javascript"
+import {javascriptLanguage} from "@codemirror/next/lang-javascript"
 import ist from "ist"
 
 function mkState(doc: string, extensions: Extension = []) {
@@ -76,7 +76,7 @@ describe("commands", () => {
 
   describe("indentSelection", () => {
     function test(from: string, to: string) {
-      ist(stateStr(cmd(mkState(from, javascriptSyntax), indentSelection)), to)
+      ist(stateStr(cmd(mkState(from, javascriptLanguage), indentSelection)), to)
     }
 
     it("auto-indents the current line", () =>
@@ -94,7 +94,7 @@ describe("commands", () => {
 
   describe("insertNewlineAndIndent", () => {
     function test(from: string, to: string) {
-      ist(stateStr(cmd(mkState(from, javascriptSyntax), insertNewlineAndIndent)), to)
+      ist(stateStr(cmd(mkState(from, javascriptLanguage), insertNewlineAndIndent)), to)
     }
 
     it("indents the new line", () =>

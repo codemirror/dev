@@ -76,17 +76,17 @@ export class SQLDialect {
   constructor(
     /// @internal
     readonly dialect: Dialect,
-    /// The syntax for this dialect.
-    readonly syntax: Language<Parser>
+    /// The language for this dialect.
+    readonly language: Language<Parser>
   ) {}
 
-  /// Returns the syntax for this dialect as an extension.
-  get extension() { return this.syntax.extension }
+  /// Returns the language for this dialect as an extension.
+  get extension() { return this.language.extension }
 
   /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
     let d = dialect(spec, spec.keywords, spec.types, spec.builtin)
-    let syntax = Language.define({
+    let language = Language.define({
       parser: parser.configure({
         tokenizers: [{from: tokens, to: tokensFor(d)}]
       }),
@@ -95,7 +95,7 @@ export class SQLDialect {
         closeBrackets: {brackets: ["(", "[", "{", "'", '"', "`"]}
       }
     })
-    return new SQLDialect(d, syntax)
+    return new SQLDialect(d, language)
   }
 }
 
@@ -120,7 +120,7 @@ export type SQLConfig = {
 /// Returns an extension that enables keyword completion for the given
 /// SQL dialect.
 export function keywordCompletion(dialect: SQLDialect): Extension {
-  return dialect.syntax.data.of({
+  return dialect.language.data.of({
     autocomplete: completeKeywords(dialect.dialect.words)
   })
 }
@@ -128,7 +128,7 @@ export function keywordCompletion(dialect: SQLDialect): Extension {
 /// Returns an extension that enables schema-based completion for the
 /// given configuration.
 export function schemaCompletion(config: SQLConfig): Extension {
-  return config.schema ? (config.dialect || StandardSQL).syntax.data.of({
+  return config.schema ? (config.dialect || StandardSQL).language.data.of({
     autocomplete: completeFromSchema(config.schema, config.tables, config.defaultTable)
   }) : []
 }
@@ -140,7 +140,7 @@ export function sqlSupport(config: SQLConfig): Extension {
   return [schemaCompletion(config), keywordCompletion(config.dialect || StandardSQL)]
 }
 
-/// Produces an extension that installs the given SQL dialect syntax,
+/// Produces an extension that installs the given SQL dialect,
 /// keyword completion, and, if provided, schema-based completion.
 export function sql(config: SQLConfig): Extension {
   return [config.dialect || StandardSQL, sqlSupport(config)]

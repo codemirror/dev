@@ -3,10 +3,10 @@ import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, Language} fro
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
-/// A syntax provider based on the [Lezer C++
+/// A language provider based on the [Lezer C++
 /// parser](https://github.com/lezer-parser/cpp), extended with
 /// highlighting and indentation information.
-export const cppSyntax = Language.define({
+export const cppLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -69,8 +69,8 @@ export const cppSyntax = Language.define({
   }
 })
 
-/// Returns an extension that installs the C++ syntax and
+/// Returns an extension that installs the C++ language and
 /// support features.
 export function cpp(): Extension {
-  return [cppSyntax]
+  return [cppLanguage]
 }

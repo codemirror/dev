@@ -3,10 +3,10 @@ import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirr
 import {Extension} from "@codemirror/next/state"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 
-/// A syntax provider based on the [Lezer Python
+/// A language provider based on the [Lezer Python
 /// parser](https://github.com/lezer-parser/python), extended with
 /// highlighting and indentation information.
-export const pythonSyntax = Language.define({
+export const pythonLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -54,7 +54,7 @@ export const pythonSyntax = Language.define({
   }
 })
 
-/// Returns an extension that installs the Python syntax provider.
+/// Returns an extension that installs the Python language.
 export function python(): Extension {
-  return pythonSyntax
+  return pythonLanguage
 }

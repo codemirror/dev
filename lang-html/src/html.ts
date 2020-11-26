@@ -1,16 +1,16 @@
 import {parser, configureNesting} from "lezer-html"
-import {cssSyntax} from "@codemirror/next/lang-css"
-import {javascriptSyntax, javascriptSupport} from "@codemirror/next/lang-javascript"
+import {cssLanguage} from "@codemirror/next/lang-css"
+import {javascriptLanguage, javascriptSupport} from "@codemirror/next/lang-javascript"
 import {Language, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 import {Extension} from "@codemirror/next/state"
 
-/// A syntax provider based on the [Lezer HTML
+/// A language provider based on the [Lezer HTML
 /// parser](https://github.com/lezer-parser/html), wired up with the
 /// JavaScript and CSS parsers to parse the content of `<script>` and
 /// `<style>` tags.
-export const htmlSyntax = Language.define({
+export const htmlLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add(type => {
@@ -45,12 +45,12 @@ export const htmlSyntax = Language.define({
        attrs(attrs) {
          return !attrs.type || /^(?:text|application)\/(?:x-)?(?:java|ecma)script$|^module$|^$/i.test(attrs.type)
        },
-       parser: javascriptSyntax.parser},
+       parser: javascriptLanguage.parser},
       {tag: "style",
        attrs(attrs) {
          return (!attrs.lang || attrs.lang == "css") && (!attrs.type || /^(text\/)?(x-)?(stylesheet|css)$/i.test(attrs.type))
        },
-       parser: cssSyntax.parser}
+       parser: cssLanguage.parser}
     ])
   }),
   languageData: {
@@ -61,7 +61,7 @@ export const htmlSyntax = Language.define({
 
 /// HTML tag completion. Opens and closes tags and attributes in a
 /// context-aware way.
-export const htmlCompletion = htmlSyntax.data.of({autocomplete: completeHTML})
+export const htmlCompletion = htmlLanguage.data.of({autocomplete: completeHTML})
 
 /// An extension that installs HTML-related functionality
 /// ([`htmlCompletion`](#lang-html.htmlCompletion) and
@@ -69,6 +69,6 @@ export const htmlCompletion = htmlSyntax.data.of({autocomplete: completeHTML})
 export function htmlSupport(): Extension { return [htmlCompletion, javascriptSupport()] }
 
 /// Returns an extension that installs the HTML
-/// [syntax](#lang-html.htmlSyntax) and
+/// [language](#lang-html.htmlLanguage) and
 /// [support](#lang-html.htmlSupport).
-export function html(): Extension { return [htmlSyntax, htmlSupport()] }
+export function html(): Extension { return [htmlLanguage, htmlSupport()] }

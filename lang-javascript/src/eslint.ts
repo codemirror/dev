@@ -1,7 +1,7 @@
 import {Diagnostic} from "@codemirror/next/lint"
 import {Text, EditorState} from "@codemirror/next/state"
 import {EditorView} from "@codemirror/next/view"
-import {javascriptSyntax} from "./javascript"
+import {javascriptLanguage} from "./javascript"
 
 /// Connects an [ESLint](https://eslint.org/) linter to CodeMirror's
 /// [lint](#lint) integration. `eslint` should be an instance of the
@@ -35,13 +35,13 @@ export function esLint(eslint: any, config?: any) {
 
   return (view: EditorView) => {
     let [lang] = view.state.facet(EditorState.language)
-    if (lang == javascriptSyntax) return range(view.state)
+    if (lang == javascriptLanguage) return range(view.state)
     if (!lang) return []
     let found: Diagnostic[] = []
     // FIXME move to async parsing?
     lang.getTree(view.state).iterate({
       enter(type, start, end) {
-        if (type.isTop && javascriptSyntax.parser.nodeSet.types[type.id] == type) {
+        if (type.isTop && javascriptLanguage.parser.nodeSet.types[type.id] == type) {
           for (let d of range(view.state, start, end)) found.push(d)
           return false
         }

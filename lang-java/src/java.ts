@@ -3,10 +3,10 @@ import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, Language} fro
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
-/// A syntax provider based on the [Lezer Java
+/// A language provider based on the [Lezer Java
 /// parser](https://github.com/lezer-parser/java), extended with
 /// highlighting and indentation information.
-export const javaSyntax = Language.define({
+export const javaLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -67,8 +67,8 @@ export const javaSyntax = Language.define({
   }
 })
 
-/// Returns an extension that installs the Java syntax and
+/// Returns an extension that installs the Java language and
 /// support features.
 export function java(): Extension {
-  return [javaSyntax]
+  return [javaLanguage]
 }

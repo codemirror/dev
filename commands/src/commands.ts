@@ -266,7 +266,7 @@ export const selectLine: StateCommand = ({state, dispatch}) => {
 
 /// Select the next syntactic construct that is larger than the
 /// selection. Note that this will only work insofar as the language
-/// [syntaxes](#state.EditorState^syntax) you use builds up a full
+/// [provider](#state.EditorState^language) you use builds up a full
 /// syntax tree.
 export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
   let selection = updateSel(state.selection, range => {

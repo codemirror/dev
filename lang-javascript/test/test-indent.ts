@@ -1,12 +1,12 @@
 import ist from "ist"
 import {EditorState} from "@codemirror/next/state"
 import {getIndentation} from "@codemirror/next/language"
-import {javascriptSyntax} from "@codemirror/next/lang-javascript"
+import {javascriptLanguage} from "@codemirror/next/lang-javascript"
 
 function check(code: string) {
   return () => {
     code = /^\n*([^]*)/.exec(code)![1]
-    let state = EditorState.create({doc: code, extensions: [javascriptSyntax]})
+    let state = EditorState.create({doc: code, extensions: [javascriptLanguage]})
     for (let pos = 0, lines = code.split("\n"), i = 0; i < lines.length; i++) {
       let line = lines[i], indent = /^\s*/.exec(line)![0].length
       ist(`${getIndentation(state, pos)} (${i + 1})`, `${indent} (${i + 1})`)

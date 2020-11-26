@@ -4,10 +4,10 @@ import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 
-/// A syntax provider based on the [Lezer XML
+/// A language provider based on the [Lezer XML
 /// parser](https://github.com/lezer-parser/xml), extended with
 /// highlighting and indentation information.
-export const xmlSyntax = Language.define({
+export const xmlLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add(type => {
@@ -56,13 +56,13 @@ export type XMLConfig = {
 
 /// Return an extension that installs XML support functionality.
 export function xmlSupport(conf: XMLConfig = {}): Extension {
-  return xmlSyntax.data.of({
+  return xmlLanguage.data.of({
     autocomplete: completeFromSchema(conf.elements || [], conf.attributes || [])
   })
 }
 
-/// Returns an extension that installs the XML syntax and
+/// Returns an extension that installs the XML language and
 /// support features.
 export function xml(conf?: XMLConfig): Extension {
-  return [xmlSyntax, xmlSupport(conf)]
+  return [xmlLanguage, xmlSupport(conf)]
 }

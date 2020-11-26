@@ -1,14 +1,14 @@
 import ist from "ist"
 import {EditorState} from "@codemirror/next/state"
-import {javascriptSyntax} from "@codemirror/next/lang-javascript"
+import {javascriptLanguage} from "@codemirror/next/lang-javascript"
 import {Tree} from "lezer"
 
 function s(doc: string) {
-  return EditorState.create({doc, extensions: [javascriptSyntax.extension]})
+  return EditorState.create({doc, extensions: [javascriptLanguage.extension]})
 }
 
 function tr(state: EditorState) {
-  return javascriptSyntax.ensureTree(state, state.doc.length, 1e9)!
+  return javascriptLanguage.ensureTree(state, state.doc.length, 1e9)!
 }
 
 describe("javascript syntax queries", () => {

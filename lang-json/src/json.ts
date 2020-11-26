@@ -6,7 +6,8 @@ import {styleTags, tags as t} from "@codemirror/next/highlight"
 
 export {jsonParseLinter} from "./lint"
 
-export const jsonSyntax = Language.define({
+/// A language provider that provides JSON parsing.
+export const jsonLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -35,7 +36,7 @@ export const jsonSyntax = Language.define({
   }
 })
 
-/// Returns an extension that installs the JSON syntax provider.
+/// Returns an extension that installs the JSON language.
 export function json(): Extension {
-  return jsonSyntax
+  return jsonLanguage
 }

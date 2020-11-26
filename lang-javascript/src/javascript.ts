@@ -6,10 +6,10 @@ import {completeSnippets} from "@codemirror/next/autocomplete"
 import {Extension} from "@codemirror/next/state"
 import {snippets} from "./snippets"
 
-/// A syntax provider based on the [Lezer JavaScript
+/// A language provider based on the [Lezer JavaScript
 /// parser](https://github.com/lezer-parser/javascript), extended with
 /// highlighting and indentation information.
-export const javascriptSyntax = Language.define({
+export const javascriptLanguage = Language.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({
@@ -89,15 +89,15 @@ export const javascriptSyntax = Language.define({
 /// Returns an extension that installs JavaScript support features
 /// (completion of [snippets](#lang-javascript.snippets)).
 export function javascriptSupport(): Extension {
-  return javascriptSyntax.data.of({autocomplete: completeSnippets(snippets)})
+  return javascriptLanguage.data.of({autocomplete: completeSnippets(snippets)})
 }
 
-const dialects: {[dialect: string]: Language<Parser>} = {"": javascriptSyntax}
+const dialects: {[dialect: string]: Language<Parser>} = {"": javascriptLanguage}
 function getDialect(dialect: string) {
-  return dialects[dialect] || (dialects[dialect] = javascriptSyntax.reconfigure(javascriptSyntax.parser.configure({dialect})))
+  return dialects[dialect] || (dialects[dialect] = javascriptLanguage.reconfigure(javascriptLanguage.parser.configure({dialect})))
 }
 
-/// Returns an extension that installs the JavaScript syntax and
+/// Returns an extension that installs the JavaScript language and
 /// support features.
 export function javascript(config: {jsx?: boolean, typescript?: boolean} = {}): Extension {
   let dialect = (config.jsx ? ["jsx"] : []).concat(config.typescript ? ["ts"] : []).join(" ")

@@ -2,9 +2,10 @@ import {Extension} from "@codemirror/next/state"
 import {Language} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser} from "lezer-markdown"
-import {htmlSyntax} from "@codemirror/next/lang-html"
+import {htmlLanguage} from "@codemirror/next/lang-html"
 
-export const markdownSyntax = Language.define({
+/// Language support for Markdown/CommonMark.
+export const markdownLanguage = Language.define({
   parser: parser.configure({
     props: [
       styleTags({
@@ -24,13 +25,14 @@ export const markdownSyntax = Language.define({
         LinkTitle: t.string
       })
     ],
-    htmlParser: htmlSyntax.parser.configure({dialect: "noMatch"})
+    htmlParser: htmlLanguage.parser.configure({dialect: "noMatch"})
   }),
   languageData: {
     commentTokens: {block: {open: "<!--", close: "-->"}}
   }
 })
 
+/// Returns an extension that installs the Markdown language.
 export function markdown(): Extension {
-  return markdownSyntax
+  return markdownLanguage
 }
