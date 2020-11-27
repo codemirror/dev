@@ -1,8 +1,7 @@
-import {StringStream, StringStreamCursor} from "./stringstream"
-import {EditorState, StateField, Extension, StateEffect, StateEffectType, IndentContext, Facet} from "@codemirror/next/state"
-import {EditorView, ViewPlugin, PluginValue, ViewUpdate} from "@codemirror/next/view"
-import {Tree, NodeType, NodeProp, NodeSet} from "lezer-tree"
-import {Tag, tags, styleTags, treeHighlighter} from "@codemirror/next/highlight"
+import {StringStream} from "./stringstream"
+import {Tree, TreeFragment, NodeType, NodeProp, NodeSet} from "lezer-tree"
+import {IncrementalParser, IncrementalParse, Input} from "lezer"
+import {Tag, tags, styleTags} from "@codemirror/next/highlight"
 
 export {StringStream}
 
@@ -10,23 +9,23 @@ export {StringStream}
 /// emitting tokens as it goes over it. It keeps a mutable (but
 /// copyable) object with state, in which it can store information
 /// about the current context.
-export type StreamParser<State> = {
+export type StreamParserSpec<State> = {
   /// Read one token, advancing the stream past it, and returning a
   /// string with the token's style. It is okay to return an empty
   /// token, but only if that updates the state so that the next call
   /// will return a token again.
-  token(stream: StringStream, state: State, editorState: EditorState): string | null
+  token(stream: StringStream, state: State): string | null
   /// This notifies the parser of a blank line in the input. It can
   /// update its state here if it needs to.
-  blankLine?(state: State, editorState: EditorState): void
+  blankLine?(state: State): void
   /// Produce a start state for the parser.
-  startState?(editorState: EditorState): State
+  startState?(): State
   /// Copy a given state. By default, a shallow object copy is done
   /// which also copies arrays held at the top level of the object.
   copyState?(state: State): State
   /// Compute automatic indentation for the line that starts with the
   /// given state and text.
-  indent?(state: State, textAfter: string, editorState: EditorState): number
+  indent?(state: State, textAfter: string): number | null
   /// Syntax [node
   /// props](https://lezer.codemirror.net/docs/ref#tree.NodeProp) to
   /// be added to the wrapper node created around syntax 'trees'
@@ -34,31 +33,14 @@ export type StreamParser<State> = {
   docProps?: readonly [NodeProp<any>, any][]
 }
 
-class StreamParserInstance<State> {
-  token: (stream: StringStream, state: State, editorState: EditorState) => string | null
-  blankLine: (state: State, editorState: EditorState) => void
-  // FIXME maybe support passing something from the parent when nesting
-  startState: (es: EditorState) => State
-  copyState: (state: State) => State
-  indent: (state: State, textAfter: string, editorState: EditorState) => number
-  docType: number
-
-  constructor(spec: StreamParser<State>, languageData: Facet<{[name: string]: any}>) {
-    this.token = spec.token
-    this.blankLine = spec.blankLine || (() => {})
-    this.startState = spec.startState || (() => (true as any))
-    this.copyState = spec.copyState || defaultCopyState
-    this.indent = spec.indent || (() => -1)
-    this.docType = docID((spec.docProps || []).concat([[languageDataProp, languageData]]))
-  }
-
-  readToken(state: State, stream: StringStream, editorState: EditorState) {
-    stream.start = stream.pos
-    for (let i = 0; i < 10; i++) {
-      let result = this.token(stream, state, editorState)
-      if (stream.pos > stream.start) return result
-    }
-    throw new Error("Stream parser failed to advance stream.")
+function fullSpec<State>(spec: StreamParserSpec<State>): Required<StreamParserSpec<State>> {
+  return {
+    token: spec.token,
+    blankLine: spec.blankLine || (() => {}),
+    startState: spec.startState || (() => (true as any)),
+    copyState: spec.copyState || defaultCopyState,
+    indent: spec.indent || (() => null),
+    docProps: spec.docProps || []
   }
 }
 
@@ -72,154 +54,8 @@ function defaultCopyState<State>(state: State) {
   return newState
 }
 
-/// A syntax provider that uses a stream parser.
-export class StreamSyntax implements Syntax {
-  private field: StateField<SyntaxState<any>>
-  /// The extension that installs this syntax provider.
-  public extension: Extension
-  private parser: StreamParserInstance<any>
-  public languageData: Facet<{[name: string]: any}>
-
-  /// Create a stream syntax.
-  constructor(parser: StreamParser<any>) {
-    this.languageData = Facet.define<{[name: string]: any}>()
-    let parserInst = this.parser = new StreamParserInstance(parser, this.languageData)
-    let setSyntax = StateEffect.define<SyntaxState<any>>()
-    this.field = StateField.define<SyntaxState<any>>({
-      create(state) {
-        let start = new SyntaxState(Tree.empty, [parserInst.startState(state)], 1, 0, null)
-        start.advanceFrontier(parserInst, state, Work.Apply)
-        start.tree = start.updatedTree
-        return start
-      },
-      update(value, tr) {
-        for (let effect of tr.effects) if (effect.is(setSyntax)) return effect.value
-        if (!tr.docChanged) return value
-        let changeStart = -1
-        tr.changes.iterChangedRanges(from => changeStart = changeStart < 0 ? from : changeStart)
-        let {from, number} = tr.state.doc.lineAt(changeStart)
-        let newValue = number >= value.frontierLine ? value.copy() : value.cut(number, from)
-        newValue.advanceFrontier(parserInst, tr.state, Work.Apply)
-        newValue.tree = newValue.updatedTree
-        return newValue
-      }
-    })
-    this.extension = [
-      EditorState.syntax.of(this),
-      ViewPlugin.define(view => new HighlightWorker(view, this.parser, this.field, setSyntax)),
-      this.field,
-      EditorState.indentation.of((context: IndentContext, pos: number) => {
-        return context.state.field(this.field).getIndent(this.parser, context.state, pos)
-      }),
-      treeHighlighter(this)
-    ]
-  }
-
-  getTree(state: EditorState) {
-    return state.field(this.field).tree
-  }
-
-  parsePos(state: EditorState) {
-    return state.field(this.field).frontierPos
-  }
-
-  ensureTree(state: EditorState, upto: number, timeout = 100) {
-    let field = state.field(this.field)
-    if (field.frontierPos < upto)
-      field.advanceFrontier(this.parser, state, timeout, upto)
-    return field.frontierPos < upto ? null : field.updatedTree
-  }
-
-  // FIXME allow modes to extend this?
-  languageDataFacetAt() { return this.languageData }
-}
-
-const CacheStepShift = 6, CacheStep = 1 << CacheStepShift
-
-const MaxRecomputeDistance = 20e3
-
-const enum Work { Apply = 25, MinSlice = 50, Slice = 100, Pause = 200 }
-
-class SyntaxState<ParseState> {
-  working = -1
-  updatedTree: Tree
-
-  constructor(public tree: Tree,
-              // Slot 0 stores the start state (line 1), slot 1 the
-              // state at the start of line 65, etc, so lineNo ==
-              // (index * CACHE_STEP) + 1
-              public cache: ParseState[],
-              public frontierLine: number,
-              public frontierPos: number,
-              public frontierState: ParseState | null) {
-    this.updatedTree = tree
-  }
-
-  copy() {
-    return new SyntaxState(this.updatedTree, this.cache.slice(), this.frontierLine, this.frontierPos, this.frontierState)
-  }
-
-  cut(line: number, pos: number) {
-    return new SyntaxState(this.updatedTree.cut(pos), this.cache.slice(0, (line >> CacheStepShift) + 1), line, pos, null)
-  }
-
-  maybeStoreState(parser: StreamParserInstance<ParseState>, lineBefore: number, state: ParseState) {
-    if (lineBefore % CacheStep == 0)
-      this.cache[(lineBefore - 1) >> CacheStepShift] = parser.copyState(state)
-  }
-
-  findState(parser: StreamParserInstance<ParseState>, editorState: EditorState, line: number) {
-    let cacheIndex = Math.min(this.cache.length - 1, (line - 1) >> CacheStepShift)
-    let cachedLine = (cacheIndex << CacheStepShift) + 1
-    let startPos = editorState.doc.line(cachedLine).from
-    if (line - cachedLine > CacheStep && editorState.doc.line(line).from - startPos > MaxRecomputeDistance)
-      return null
-    let state = parser.copyState(this.cache[cacheIndex])
-    let cursor = new StringStreamCursor(editorState.doc, startPos, editorState.tabSize)
-    for (let l = cachedLine; l < line; l++) {
-      let stream = cursor.next()
-      if (stream.eol()) {
-        parser.blankLine(state, editorState)
-      } else {
-        while (!stream.eol()) parser.readToken(state, stream, editorState)
-      }
-      this.maybeStoreState(parser, l, state)
-    }
-    return state
-  }
-
-  advanceFrontier(parser: StreamParserInstance<ParseState>, editorState: EditorState, timeout: number,
-                  upto: number = editorState.doc.length) {
-    if (this.frontierPos >= editorState.doc.length) return
-    let sliceEnd = Date.now() + timeout
-    let state = this.frontierState || this.findState(parser, editorState, this.frontierLine)!
-    let cursor = new StringStreamCursor(editorState.doc, this.frontierPos, editorState.tabSize)
-    let buffer: number[] = []
-    let line = this.frontierLine, pos = this.frontierPos
-    while (pos < upto) {
-      let stream = cursor.next(), offset = cursor.offset
-      if (stream.eol()) {
-        parser.blankLine(state, editorState)
-      } else {
-        while (!stream.eol()) {
-          let type = parser.readToken(state, stream, editorState)
-          if (type) buffer.push(tokenID(type), offset + stream.start, offset + stream.pos, 4)
-        }
-      }
-      this.maybeStoreState(parser, line, state)
-      line++
-      pos += stream.string.length + 1
-      if (Date.now() > sliceEnd) break
-    }
-    let tree = Tree.build({buffer,
-                           nodeSet,
-                           topID: parser.docType}).balance()
-    this.updatedTree = this.updatedTree.append(tree).balance()
-    this.frontierLine = line
-    this.frontierPos = pos
-    this.frontierState = state
-  }
-
+// FIXME somehow smuggle the indentation service into the config
+/*
   getIndent(parser: StreamParserInstance<ParseState>, state: EditorState, pos: number) {
     let line = state.doc.lineAt(pos)
     let parseState = this.findState(parser, state, line.number)
@@ -227,54 +63,138 @@ class SyntaxState<ParseState> {
     let text = line.slice(pos - line.from, Math.min(line.to, pos + 100) - line.from)
     return parser.indent(parseState, /^\s*(.*)/.exec(text)![1], state)
   }
-}
+*/
 
-type Deadline = {timeRemaining(): number, didTimeout: boolean}
-type IdleCallback = (deadline?: Deadline) => void
+// FIXME limit parse distance, stop at end of viewport
+// const MaxRecomputeDistance = 20e3
 
-let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number =
-  typeof window != "undefined" && (window as any).requestIdleCallback ||
-  ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
-let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
+export class StreamParser<State> implements IncrementalParser {
+  /// @internal
+  spec: Required<StreamParserSpec<State>>
+  /// @internal
+  docType: number
+  /// @internal
+  stateAfter = new WeakMap<Tree, State>() // FIXME store lookahead distance
 
-class HighlightWorker implements PluginValue {
-  working: number = -1
-
-  constructor(readonly view: EditorView,
-              readonly parser: StreamParserInstance<any>,
-              readonly field: StateField<SyntaxState<any>>,
-              readonly setSyntax: StateEffectType<SyntaxState<any>>) {
-    this.work = this.work.bind(this)
-    this.scheduleWork()
+  constructor(spec: StreamParserSpec<State>) {
+    this.spec = fullSpec(spec)
+    this.docType = docID(this.spec.docProps)
   }
 
-  update(update: ViewUpdate) {
-    if (update.docChanged) this.scheduleWork()
-  }
-
-  scheduleWork() {
-    if (this.working > -1) return
-    let {state} = this.view, field = state.field(this.field)
-    if (field.frontierPos >= state.doc.length) return
-    this.working = requestIdle(this.work, {timeout: Work.Pause})
-  }
-
-  work(deadline?: Deadline) {
-    this.working = -1
-    let {state} = this.view, field = state.field(this.field)
-    if (field.frontierPos >= state.doc.length) return
-    // Advance to the end of the viewport, and no further, by default
-    let end = this.view.viewport.to
-    field.advanceFrontier(this.parser, state, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice, end)
-    if (field.frontierPos < end) this.scheduleWork()
-    else this.view.dispatch({effects: this.setSyntax.of(field.copy())})
-  }
-
-  destroy() {
-    if (this.working >= 0) cancelIdle(this.working)
+  startParse(input: Input, options?: {fragments?: readonly TreeFragment[], startPos?: number}): IncrementalParse {
+    return new Parse(this, input, options?.startPos || 0, options?.fragments)
   }
 }
 
+function findStart<State>(parser: StreamParser<State>, fragments: readonly TreeFragment[] | undefined, startPos: number) {
+  if (fragments) for (let f of fragments) if (f.from <= startPos && f.to > startPos) {
+    let find = (tree: Tree, off: number): {state: State, tree: Tree} | null => {
+      let state = parser.stateAfter.get(tree)
+      if (state) return {state, tree}
+      for (let i = tree.children.length - 1; i >= 0; i--) {
+        let child = tree.children[i], pos, found
+        if (child instanceof Tree && (pos = tree.positions[i] + off) >= f.from &&
+            pos + child.length <= f.to && (found = find(child, pos))) {
+          if (off < startPos) return found
+          return {
+            state: found.state,
+            tree: new Tree(tree.type, tree.children.slice(0, i).concat(found.tree),
+                           tree.positions.slice(0, i + 1), pos + found.tree.length - off)
+          }
+        }
+      }
+      return null
+    }
+    let found = find(f.tree, f.offset)
+    if (found) return found
+  }
+  return {state: parser.spec.startState(), tree: Tree.empty}
+}
+
+const enum Chunk { Size = 2048 }
+
+class Parse<State> {
+  state: State
+  pos: number
+  chunks: Tree[] = []
+  chunkPos: number[] = []
+  chunkStart: number
+  chunk: number[] = []
+
+  constructor(readonly parser: StreamParser<State>,
+              readonly input: Input,
+              readonly startPos: number,
+              fragments?: readonly TreeFragment[]) {
+    let {state, tree} = findStart(parser, fragments, startPos)
+    this.state = state
+    this.pos = this.chunkStart = startPos + tree.length
+    if (tree.length) {
+      this.chunks.push(tree)
+      this.chunkPos.push(startPos)
+    }
+  }
+
+  advance() {
+    let end = Math.min(this.input.length, this.chunkStart + Chunk.Size)
+    while (this.pos < end) this.parseLine()
+    if (this.chunkStart < this.pos) this.finishChunk()
+    if (this.pos == this.input.length) return this.finish()
+    return null
+  }
+
+  parseLine() {
+    let line = this.input.lineAfter(this.pos), {spec} = this.parser
+    let stream = new StringStream(line, 4 /* FIXME how do we get tabSize? what if it changes? Ughhh */)
+    if (stream.eol()) {
+      spec.blankLine(this.state)
+    } else {
+      while (!stream.eol()) {
+        let token = readToken(spec.token, stream, this.state)
+        if (token)
+          this.chunk.push(tokenID(token), this.pos + stream.start, this.pos + stream.pos, 4)
+      }
+    }
+    this.pos += line.length
+    if (this.pos < this.input.length) this.pos++
+  }
+
+  finishChunk() {
+    let tree = Tree.build({
+      buffer: this.chunk,
+      start: this.chunkStart,
+      length: this.pos - this.chunkStart,
+      nodeSet,
+      topID: 0,
+      maxBufferLength: Chunk.Size
+    })
+    this.parser.stateAfter.set(tree, this.parser.spec.copyState(this.state))
+    this.chunks.push(tree)
+    this.chunkPos.push(this.chunkStart)
+    this.chunk = []
+    this.chunkStart = this.pos
+  }
+
+  finish() {
+    return new Tree(typeArray[this.parser.docType], this.chunks, this.chunkPos, this.startPos - this.pos).balance()
+  }
+
+  forceFinish() {
+    return this.finish()
+  }
+}
+
+function readToken<State>(token: (stream: StringStream, state: State) => string | null,
+                          stream: StringStream,
+                          state: State) {
+  stream.start = stream.pos
+  for (let i = 0; i < 10; i++) {
+    let result = token(stream, state)
+    if (stream.pos > stream.start) return result
+  }
+  throw new Error("Stream parser failed to advance stream.")
+}
+
+// FIXME move to returning tag objects
 const tokenTable: {[name: string]: number} = Object.create(null)
 const typeArray: NodeType[] = [NodeType.none]
 const nodeSet = new NodeSet(typeArray)

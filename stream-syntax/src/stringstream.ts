@@ -1,4 +1,4 @@
-import {Text, TextIterator, countColumn} from "@codemirror/next/text"
+import {countColumn} from "@codemirror/next/text"
 
 // Counts the column offset in a string, taking tabs into account.
 // Used mostly to find indentation.
@@ -122,24 +122,5 @@ export class StringStream {
     this.lineStart += n
     try { return inner() }
     finally { this.lineStart -= n }
-  }
-}
-
-export class StringStreamCursor {
-  private curLineEnd: number
-  private readonly iter: TextIterator
-
-  constructor(text: Text, public offset: number, readonly tabSize: number = 4) {
-    this.iter = text.iterLines(offset)
-    this.curLineEnd = this.offset - 1
-  }
-
-  next() {
-    let {value, done} = this.iter.next()
-    if (done) throw new RangeError("Reached end of document")
-    const res = new StringStream(value, this.tabSize)
-    this.offset = this.curLineEnd + 1
-    this.curLineEnd += value.length + 1
-    return res
   }
 }

@@ -384,10 +384,15 @@ export const deleteToLineEnd: Command = view => deleteBy(view, pos => {
 /// document.
 export const deleteTrailingWhitespace: StateCommand = ({state, dispatch}) => {
   let changes = []
-  for (let pos = 0, iter = state.doc.iterLines(); !iter.next().done;) {
-    let trailing = iter.value.search(/\s+$/)
-    if (trailing > -1) changes.push({from: pos + trailing, to: pos + iter.value.length})
-    pos += iter.value.length + 1
+  for (let pos = 0, prev = "", iter = state.doc.iter(); !iter.next().done;) {
+    if (iter.lineBreak) {
+      let trailing = prev.search(/\s+$/)
+      if (trailing > -1) changes.push({from: pos - (prev.length - trailing), to: pos})
+      prev = ""
+    } else {
+      prev = iter.value
+    }
+    pos += iter.value.length
   }
   if (!changes.length) return false
   dispatch(state.update({changes}))

@@ -1,5 +1,5 @@
 import {EditorState, EditorSelection, StateCommand, Extension} from "@codemirror/next/state"
-import {indentMore, indentLess, indentSelection, insertNewlineAndIndent} from "@codemirror/next/commands"
+import {indentMore, indentLess, indentSelection, insertNewlineAndIndent, deleteTrailingWhitespace} from "@codemirror/next/commands"
 import {javascriptLanguage} from "@codemirror/next/lang-javascript"
 import ist from "ist"
 
@@ -117,5 +117,20 @@ describe("commands", () => {
 
     it("can explode brackets with whitespace", () =>
        test("foo( | )", "foo(\n  |\n)"))
+  })
+
+  describe("deleteTrailingWhitespace", () => {
+    function test(from: string, to: string) {
+      ist(cmd(mkState(from), deleteTrailingWhitespace).doc.toString(), to)
+    }
+
+    it("deletes trailing whitespace", () =>
+      test("foo   ", "foo"))
+
+    it("checks multiple lines", () =>
+      test("one\ntwo \nthree   \n   ", "one\ntwo\nthree\n"))
+
+    it("can handle empty lines", () =>
+      test("one  \n\ntwo ", "one\n\ntwo"))
   })
 })

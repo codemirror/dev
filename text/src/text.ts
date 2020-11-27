@@ -569,8 +569,6 @@ class LineCursor implements TextIterator {
   get lineBreak() { return false }
 }
 
-// FIXME rename start/end to from/to for consistency with other types?
-
 /// This type describes a line in the document. It is created
 /// on-demand when lines are [queried](#text.Text.lineAt).
 export class Line {
