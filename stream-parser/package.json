@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/stream-syntax",
+  "types": "src/stream-parser",
   "type": "module"
 }

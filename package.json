@@ -45,7 +45,7 @@
     "./goto-line": "./goto-line/dist/index.js",
     "./lint": "./lint/dist/index.js",
     "./highlight": "./highlight/dist/index.js",
-    "./stream-syntax": "./stream-syntax/dist/index.js",
+    "./stream-parser": "./stream-parser/dist/index.js",
     "./autocomplete": "./autocomplete/dist/index.js",
     "./comment": "./comment/dist/index.js",
     "./rectangular-selection": "./rectangular-selection/dist/index.js",
