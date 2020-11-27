@@ -1,12 +1,12 @@
 import {parser} from "lezer-rust"
-import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/language"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 
 /// A syntax provider based on the [Lezer Rust
 /// parser](https://github.com/lezer-parser/rust), extended with
 /// highlighting and indentation information.
-export const rustLanguage = Language.define({
+export const rustLanguage = LezerLanguage.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({

@@ -1,5 +1,4 @@
-import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/language"
-import {Parser} from "lezer"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
@@ -77,7 +76,7 @@ export class SQLDialect {
     /// @internal
     readonly dialect: Dialect,
     /// The language for this dialect.
-    readonly language: Language<Parser>
+    readonly language: LezerLanguage
   ) {}
 
   /// Returns the language for this dialect as an extension.
@@ -86,7 +85,7 @@ export class SQLDialect {
   /// Define a new dialect.
   static define(spec: SQLDialectSpec) {
     let d = dialect(spec, spec.keywords, spec.types, spec.builtin)
-    let language = Language.define({
+    let language = LezerLanguage.define({
       parser: parser.configure({
         tokenizers: [{from: tokens, to: tokensFor(d)}]
       }),

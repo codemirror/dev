@@ -282,7 +282,7 @@ class TreeHighlighter {
   }
 
   update(update: ViewUpdate) {
-    if (this.language.parsePos(update.state) < update.view.viewport.to) {
+    if (this.language.getTree(update.state).length < update.view.viewport.to) {
       this.decorations = this.decorations.map(update.changes)
     } else {
       let tree = this.language.getTree(update.state)

@@ -1,5 +1,5 @@
 import {parser} from "lezer-json"
-import {continuedIndent, indentNodeProp, foldNodeProp, Language} from "@codemirror/next/language"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
 import {Extension} from "@codemirror/next/state"
 import {SyntaxNode} from "lezer-tree"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
@@ -7,7 +7,7 @@ import {styleTags, tags as t} from "@codemirror/next/highlight"
 export {jsonParseLinter} from "./lint"
 
 /// A language provider that provides JSON parsing.
-export const jsonLanguage = Language.define({
+export const jsonLanguage = LezerLanguage.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add({

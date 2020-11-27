@@ -1,7 +1,7 @@
 import {parser, configureNesting} from "lezer-html"
 import {cssLanguage} from "@codemirror/next/lang-css"
 import {javascriptLanguage, javascriptSupport} from "@codemirror/next/lang-javascript"
-import {Language, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
+import {LezerLanguage, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 import {Extension} from "@codemirror/next/state"
@@ -10,7 +10,7 @@ import {Extension} from "@codemirror/next/state"
 /// parser](https://github.com/lezer-parser/html), wired up with the
 /// JavaScript and CSS parsers to parse the content of `<script>` and
 /// `<style>` tags.
-export const htmlLanguage = Language.define({
+export const htmlLanguage = LezerLanguage.define({
   parser: parser.configure({
     props: [
       indentNodeProp.add(type => {

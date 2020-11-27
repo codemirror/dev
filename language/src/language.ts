@@ -1,43 +1,45 @@
-import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, NodePropSource} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp} from "lezer-tree"
 // NOTE: This package should only use _types_ from "lezer", to avoid
 // pulling in that dependency when no actual Lezer-based parser is used.
-import {Input, IncrementalParser, IncrementalParse} from "lezer"
+import {Input, IncrementalParser, IncrementalParse, Parser} from "lezer"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffectType,
         Facet, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 
-type ConfigurableParser = IncrementalParser & {
-  configure(config: {props: readonly NodePropSource[]}): IncrementalParser
-}
-
-function addLanguageData<P extends ConfigurableParser>(parser: P, data: Facet<{[name: string]: any}>): P {
-  return parser.configure({props: [languageDataProp.add(type => type.isTop ? data : undefined)]}) as P
-}
-
 // Node prop stored on a grammar's top node to indicate the facet used
 // to store language data related to that language.
 const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
 
+export function defineLanguageProp(baseData?: {[name: string]: any}) {
+  return Facet.define<{[name: string]: any}>({
+    combine: baseData ? values => values.concat(baseData!) : undefined
+  })
+}
+
 /// A language object manages parsing and per-language
 /// [metadata](#state.EditorState.languageDataAt). Parse data is
-/// managed as a [Lezer](https://lezer.codemirror.net) tree.
-export class Language<P extends IncrementalParser = IncrementalParser> {
-  /// @internal
-  readonly field: StateField<LanguageState>
+/// managed as a [Lezer](https://lezer.codemirror.net) tree. You'll
+/// want to subclass this class for custom parsers, or use the
+/// [`LezerLanguage`](#language.LezerLanguage) or
+/// [`StreamLanguage`](#stream-parser.StreamLanguage) abstractions for
+/// [Lezer](https://lezer.codemirror.net/) or stream parsers.
+export class Language {
+  private field: StateField<LanguageState>
 
   /// The extension value to install this provider.
   readonly extension: Extension
 
-  private constructor(
+  protected constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
     readonly data: Facet<{[name: string]: any}>,
-    /// The parser (with language data prop attached). Can be useful
+    /// The parser (with [language data
+    /// prop](#language.defineLanguageProp) attached). Can be useful
     /// when using this as a [nested parser](#lezer.NestedParserSpec).
-    readonly parser: P,
-    private nested: boolean
+    readonly parser: IncrementalParser,
+    extraExtensions: Extension[] = []
   ) {
     let setState = StateEffect.define<LanguageState>()
     this.field = StateField.define<LanguageState>({
@@ -54,68 +56,67 @@ export class Language<P extends IncrementalParser = IncrementalParser> {
     this.extension = [
       EditorState.language.of(this),
       this.field,
-      ViewPlugin.define(view => new ParseWorker(view, this, setState)),
+      ViewPlugin.define(view => new ParseWorker(view, this.field, setState)),
       treeHighlighter(this)
-    ]
+    ].concat(extraExtensions)
   }
 
-  /// Define a language from a parser.
-  static define<P extends ConfigurableParser>(spec: {
-    /// The parser to use. Must conform to the
-    /// [`IncrementalParser`](#lezer.IncrementalParser) interface, and
-    /// allow reconfiguring its [node props](#lezer-tree.NodeProps) so
-    /// that the language can attach its language data to the top node
-    /// type(s).
-    parser: P,
-    /// Whether this parser can nest other languages. Used to optimize
-    /// [`languageData`](#state.EditorState.languageDataAt) in cases
-    /// where there is only one language in the document. Defaults to
-    /// false. When `parser` is a Lezer parser, this option is
-    /// automatically taken from its `hasNested` property.
-    nested?: boolean,
-    /// [Language data](#state.EditorState.languageDataAt)
-    /// to register for this language.
-    languageData?: {[name: string]: any}
-  }): Language<P> {
-    let {languageData, parser} = spec
-    let data = Facet.define<{[name: string]: any}>({
-      combine: languageData ? values => values.concat(languageData!) : undefined
-    })
-    let nested = spec.nested ?? !!(parser as any).hasNested
-    return new Language(data, addLanguageData(parser, data), nested)
-  }
-
-  /// Reconfigure the language by providing a new parser, but keeping
-  /// the language data the same. This is useful when defining
-  /// dialects for a custom parser.
-  reconfigure(parser: P): Language<P> {
-    return new Language(this.data, addLanguageData(parser as any, this.data), this.nested)
-  }
-
+  /// Retrieve the parser tree for a given state.
   getTree(state: EditorState) {
     return state.field(this.field).tree
   }
 
-  parsePos(state: EditorState) {
-    return state.field(this.field).tree.length
-  }
-
+  /// Try to get a parse tree that spans at least up to `upto`. The
+  /// method will do at most `timeout` milliseconds of work to parse
+  /// up to that point if the tree isn't already available.
   ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
     let parse = state.field(this.field).parse
     return parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
   }
 
+  /// Find the facet associated with the language at the given position.
+  // FIXME simplify by always getting language data from a facet?
   languageDataFacetAt(state: EditorState, pos: number) {
-    if (this.nested) {
-      let tree = this.getTree(state)
-      let target: SyntaxNode | null = tree.resolve(pos, -1)
-      while (target) {
-        let facet = target.type.prop(languageDataProp)
-        if (facet) return facet
-        target = target.parent
-      }
+    let tree = this.getTree(state)
+    let target: SyntaxNode | null = tree.resolve(pos, -1)
+    while (target) {
+      let facet = target.type.prop(languageDataProp)
+      if (facet) return facet
+      target = target.parent
     }
     return this.data
+  }
+}
+
+/// A subclass of `Language` for use with [Lezer](#lezer.Parser)
+/// parsers.
+export class LezerLanguage extends Language {
+  parser!: Parser
+
+  /// Define a language from a parser.
+  static define(spec: {
+    /// The parser to use. Should already have added editor-relevant
+    /// node props (and optionally things like dialect and top rule)
+    /// configured.
+    parser: Parser,
+    /// [Language data](#state.EditorState.languageDataAt)
+    /// to register for this language.
+    languageData?: {[name: string]: any}
+  }) {
+    let data = defineLanguageProp(spec.languageData)
+    return new LezerLanguage(data, spec.parser.configure({
+      props: [languageDataProp.add(type => type.isTop ? data : undefined)]
+    }))
+  }
+
+  /// Create a new instance of this language with a reconfigured
+  /// version of its parser.
+  configure(options: Parameters<Parser["configure"]>[0]): LezerLanguage {
+    return new LezerLanguage(this.data, this.parser.configure(options))
+  }
+
+  languageDataFacetAt(state: EditorState, pos: number) {
+    return this.parser.hasNested ? super.languageDataFacetAt(state, pos) : this.data
   }
 }
 
@@ -128,6 +129,7 @@ export function syntaxTree(state: EditorState) {
   return lang.length ? lang[0].getTree(state) : Tree.empty
 }
 
+// Lezer-style Input object for a Text document.
 class DocInput implements Input {
   cursor: TextIterator
   cursorPos = 0
@@ -293,7 +295,7 @@ class ParseWorker {
   working: number = -1
 
   constructor(readonly view: EditorView, 
-              readonly language: Language,
+              readonly field: StateField<LanguageState>,
               readonly setState: StateEffectType<LanguageState>) {
     this.work = this.work.bind(this)
     this.scheduleWork()
@@ -305,14 +307,14 @@ class ParseWorker {
 
   scheduleWork() {
     if (this.working > -1) return
-    let {state} = this.view, field = state.field(this.language.field)
+    let {state} = this.view, field = state.field(this.field)
     if (field.tree.length >= state.doc.length) return
     this.working = requestIdle(this.work, {timeout: Work.Pause})
   }
 
   work(deadline?: Deadline) {
     this.working = -1
-    let {state} = this.view, field = state.field(this.language.field)
+    let {state} = this.view, field = state.field(this.field)
     if (field.tree.length >= state.doc.length) return
     field.parse.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (field.parse.tree.length >= state.doc.length)
