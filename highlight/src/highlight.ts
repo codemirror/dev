@@ -601,6 +601,8 @@ export const defaultHighlightStyle: Extension = precedence(highlightStyle(
    fontWeight: "bold"},
   {tag: tags.emphasis,
    fontStyle: "italic"},
+  {tag: tags.strong,
+   fontWeight: "bold"},
   {tag: tags.keyword,
    color: "#708"},
   {tag: [tags.atom, tags.bool, tags.url],

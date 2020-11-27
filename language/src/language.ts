@@ -8,15 +8,17 @@ import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffec
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 
-// Node prop stored on a grammar's top node to indicate the facet used
-// to store language data related to that language.
-const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
+/// Node prop stored on a grammar's top node to indicate the facet used
+/// to store language data related to that language.
+export const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
 
-/// Helper function define a prop to be added to the top syntax
-/// node(s) for a language, to identify which language data should be
-/// associated with the language. You probably only need this when
-/// subclassing [`Language`](#language.Language).
-export function defineLanguageProp(baseData?: {[name: string]: any}) {
+/// Helper function to define a facet (to be added to the top syntax
+/// node(s) for a language via
+/// [`languageDataProp`](#language.languageDataProp)), that will be
+/// used to associate language data with the language. You
+/// probably only need this when subclassing
+/// [`Language`](#language.Language).
+export function defineLanguageFacet(baseData?: {[name: string]: any}) {
   return Facet.define<{[name: string]: any}>({
     combine: baseData ? values => values.concat(baseData!) : undefined
   })
@@ -107,7 +109,7 @@ export class LezerLanguage extends Language {
     /// to register for this language.
     languageData?: {[name: string]: any}
   }) {
-    let data = defineLanguageProp(spec.languageData)
+    let data = defineLanguageFacet(spec.languageData)
     return new LezerLanguage(data, spec.parser.configure({
       props: [languageDataProp.add(type => type.isTop ? data : undefined)]
     }))

@@ -1,7 +1,7 @@
 import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode} from "lezer-tree"
 import {IncrementalParse, IncrementalParser, Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
-import {Language, defineLanguageProp, IndentContext, indentService} from "@codemirror/next/language"
+import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService} from "@codemirror/next/language"
 import {StringStream} from "./stringstream"
 
 export {StringStream}
@@ -71,7 +71,7 @@ export class StreamLanguage<State> extends Language {
   stateAfter: WeakMap<Tree, State>
 
   private constructor(parser: StreamParser<State>) {
-    let data = defineLanguageProp(parser.languageData)
+    let data = defineLanguageFacet(parser.languageData)
     let p = fullParser(parser)
     // FIXME add facet for indentation
     let wrap: IncrementalParser = {
@@ -79,7 +79,7 @@ export class StreamLanguage<State> extends Language {
     }
     super(data, wrap, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
     this.streamParser = p
-    this.docType = docID(p.docProps)
+    this.docType = docID(p.docProps.concat([[languageDataProp, data]]))
     this.stateAfter = new WeakMap // FIXME store lookahead distance
   }
 
@@ -232,7 +232,6 @@ function readToken<State>(token: (stream: StringStream, state: State) => string 
   throw new Error("Stream parser failed to advance stream.")
 }
 
-// FIXME move to returning tag objects
 const tokenTable: {[name: string]: number} = Object.create(null)
 const typeArray: NodeType[] = [NodeType.none]
 const nodeSet = new NodeSet(typeArray)
