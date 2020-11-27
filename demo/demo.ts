@@ -6,7 +6,7 @@ import {html} from "@codemirror/next/lang-html"
 //import Linter from "eslint4b-prebuilt"
 //import {linter} from "@codemirror/next/lint"
 
-//import {StreamSyntax} from "@codemirror/next/stream-syntax"
+//import {StreamLanguage} from "@codemirror/next/stream-syntax"
 //import legacyJS from "@codemirror/next/legacy-modes/src/javascript"
 
 let state = EditorState.create({doc: `<script>
@@ -21,7 +21,7 @@ let state = EditorState.create({doc: `<script>
   html(),
   EditorView.lineWrapping
 //  linter(esLint(new Linter)),
-//  new StreamSyntax(legacyJS()).extension,
+//  StreamLanguage.define(legacyJS()),
 ]})
 
 ;(window as any).view = new EditorView({state, parent: document.querySelector("#editor")!})

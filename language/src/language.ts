@@ -12,6 +12,10 @@ import {treeHighlighter} from "@codemirror/next/highlight"
 // to store language data related to that language.
 const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
 
+/// Helper function define a prop to be added to the top syntax
+/// node(s) for a language, to identify which language data should be
+/// associated with the language. You probably only need this when
+/// subclassing [`Language`](#language.Language).
 export function defineLanguageProp(baseData?: {[name: string]: any}) {
   return Facet.define<{[name: string]: any}>({
     combine: baseData ? values => values.concat(baseData!) : undefined

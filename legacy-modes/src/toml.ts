@@ -1,4 +1,4 @@
-import {StreamSyntax, StringStream} from "@codemirror/next/stream-syntax"
+import {StreamLanguage, StringStream} from "@codemirror/next/stream-syntax"
 
 class ParseState {
   constructor(public inString = false,
@@ -9,7 +9,7 @@ class ParseState {
   copy() { return new ParseState(this.inString, this.stringType, this.lhs, this.inArray) }
 }
 
-export default new StreamSyntax({
+export default StreamLanguage.define({
   token(stream: StringStream, state: ParseState) {
     //check for state changes
     if (!state.inString && ((stream.peek() == '"') || (stream.peek() == "'"))) {

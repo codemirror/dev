@@ -1,12 +1,12 @@
 export default function(config) {
   let lang = config && config.lang || "js"
   return {
-    startState(es) {
+    startState() {
       return {
         tokenize: tokenBase,
         lastType: "sof",
         cc: [],
-        lexical: new JSLexical(-es.indentUnit, 0, "block", false),
+        lexical: new JSLexical(-1, 0, "block", false),
         localVars: null,
         context: null,
         indented: 0
@@ -24,11 +24,11 @@ export default function(config) {
       var style = state.tokenize(stream, state);
       if (type == "comment") return style;
       state.lastType = type == "operator" && (content == "++" || content == "--") ? "incdec" : type;
-      return parseJS(state, style, type, content, stream, this.lang);
+      return parseJS(state, style, type, content, stream, lang);
     },
 
-    indent(state, textAfter, es) {
-      if (state.tokenize == tokenComment) return -1;
+    indent(state, textAfter, cx) {
+      if (state.tokenize == tokenComment) return null;
       if (state.tokenize != tokenBase) return 0;
       var firstChar = textAfter && textAfter.charAt(0), lexical = state.lexical, top
       // Kludge to prevent 'maybeelse' from blocking lexical scope pops
@@ -46,15 +46,16 @@ export default function(config) {
         lexical = lexical.prev;
       var type = lexical.type, closing = firstChar == type;
 
-      if (type == "vardef") return lexical.indented + (state.lastType == "operator" || state.lastType == "," ? lexical.info + 1 : 0);
-      else if (type == "form" && firstChar == "{") return lexical.indented;
-      else if (type == "form") return lexical.indented + es.indentUnit;
+      let indent = lexical.indented < 0 ? -cx.unit : lexical.indented
+      if (type == "vardef") return indent + (state.lastType == "operator" || state.lastType == "," ? lexical.info + 1 : 0);
+      else if (type == "form" && firstChar == "{") return indent;
+      else if (type == "form") return indent + cx.unit;
       else if (type == "stat")
-        return lexical.indented + (isContinuedStatement(state, textAfter) ? es.indentUnit : 0);
+        return indent + (isContinuedStatement(state, textAfter) ? cx.unit : 0);
       else if (lexical.info == "switch" && !closing)
-        return lexical.indented + (/^(?:case|default)\b/.test(textAfter) ? es.indentUnit : 2 * es.indentUnit);
+        return indent + (/^(?:case|default)\b/.test(textAfter) ? cx.unit : 2 * cx.unit);
       else if (lexical.align) return lexical.column + (closing ? 0 : 1);
-      else return lexical.indented + (closing ? 0 : es.indentUnit);
+      else return indent + (closing ? 0 : cx.unit);
     },
 
     name: lang == "ts" ? "typescript" : lang == "json" ? "json" : "javascript",
