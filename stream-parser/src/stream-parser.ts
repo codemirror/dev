@@ -73,14 +73,13 @@ export class StreamLanguage<State> extends Language {
   private constructor(parser: StreamParser<State>) {
     let data = defineLanguageFacet(parser.languageData)
     let p = fullParser(parser)
-    // FIXME add facet for indentation
     let wrap: IncrementalParser = {
       startParse: (input, options) => new Parse(this, input, options?.startPos || 0, options?.fragments)
     }
     super(data, wrap, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
     this.streamParser = p
     this.docType = docID(p.docProps.concat([[languageDataProp, data]]))
-    this.stateAfter = new WeakMap // FIXME store lookahead distance
+    this.stateAfter = new WeakMap
   }
 
   static define<State>(spec: StreamParser<State>) { return new StreamLanguage(spec) }
