@@ -1,7 +1,7 @@
-import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, Input, IncrementalParse, StartParse} from "lezer-tree"
 // NOTE: This package should only use _types_ from "lezer", to avoid
 // pulling in that dependency when no actual Lezer-based parser is used.
-import {Input, IncrementalParser, IncrementalParse, Parser} from "lezer"
+import {Parser, ParserConfig} from "lezer"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffectType,
         Facet, ChangeDesc} from "@codemirror/next/state"
@@ -44,13 +44,13 @@ export class Language {
     /// The parser (with [language data
     /// prop](#language.defineLanguageProp) attached). Can be useful
     /// when using this as a [nested parser](#lezer.NestedParserSpec).
-    readonly parser: IncrementalParser,
+    readonly parser: {startParse: StartParse},
     extraExtensions: Extension[] = []
   ) {
     let setState = StateEffect.define<LanguageState>()
     this.field = StateField.define<LanguageState>({
       create(state) {
-        let parseState = new ParseState(parser, state.doc, [], Tree.empty)
+        let parseState = new ParseState(parser, state, [], Tree.empty)
         if (!parseState.work(Work.Apply)) parseState.takeTree()
         return new LanguageState(parseState)
       },
@@ -94,10 +94,20 @@ export class Language {
   }
 }
 
+
+export class ParseContext {
+  constructor(readonly state: EditorState,
+              readonly fragments: readonly TreeFragment[],
+              readonly viewport: {from: number, to: number} | null) {}
+}
+
 /// A subclass of `Language` for use with [Lezer](#lezer.Parser)
 /// parsers.
 export class LezerLanguage extends Language {
-  parser!: Parser
+  private constructor(data: Facet<{[name: string]: any}>,
+                      readonly parser: Parser) {
+    super(data, parser)
+  }
 
   /// Define a language from a parser.
   static define(spec: {
@@ -117,7 +127,7 @@ export class LezerLanguage extends Language {
 
   /// Create a new instance of this language with a reconfigured
   /// version of its parser.
-  configure(options: Parameters<Parser["configure"]>[0]): LezerLanguage {
+  configure(options: ParserConfig): LezerLanguage {
     return new LezerLanguage(this.data, this.parser.configure(options))
   }
 
@@ -216,18 +226,18 @@ export class ParseState {
 
   /// @internal
   constructor(
-    private parser: IncrementalParser,
-    private doc: Text,
+    private parser: {startParse: StartParse},
+    private state: EditorState,
     private fragments: readonly TreeFragment[] = [],
     public tree: Tree
   ) {}
 
   // FIXME do something with badness again
   work(time: number, upto?: number) {
-    if (this.tree != Tree.empty && (upto == null ? this.tree.length == this.doc.length : this.tree.length >= upto))
+    if (this.tree != Tree.empty && (upto == null ? this.tree.length == this.state.doc.length : this.tree.length >= upto))
       return true
     if (!this.parse)
-      this.parse = this.parser.startParse(new DocInput(this.doc), {fragments: this.fragments})
+      this.parse = this.parser.startParse(new DocInput(this.state.doc), 0, new ParseContext(this.state, this.fragments, null))
     let endTime = Date.now() + time
     for (;;) {
       let done = this.parse.advance()
@@ -251,7 +261,7 @@ export class ParseState {
     }
   }
 
-  changes(changes: ChangeDesc, newDoc: Text) {
+  changes(changes: ChangeDesc, newState: EditorState) {
     let {fragments, tree} = this
     this.takeTree()
     if (!changes.empty) {
@@ -260,7 +270,7 @@ export class ParseState {
       fragments = TreeFragment.applyChanges(fragments, ranges)
       tree = Tree.empty
     }
-    return new ParseState(this.parser, newDoc, fragments, tree)
+    return new ParseState(this.parser, newState, fragments, tree)
   }
 }
 
@@ -279,7 +289,7 @@ class LanguageState {
 
   apply(tr: Transaction) {
     if (!tr.docChanged) return this
-    let newState = this.parse.changes(tr.changes, tr.newDoc)
+    let newState = this.parse.changes(tr.changes, tr.state)
     newState.work(Work.Apply)
     return new LanguageState(newState)
   }

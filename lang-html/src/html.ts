@@ -45,7 +45,7 @@ export const htmlLanguage = LezerLanguage.define({
        attrs(attrs) {
          return !attrs.type || /^(?:text|application)\/(?:x-)?(?:java|ecma)script$|^module$|^$/i.test(attrs.type)
        },
-       parser: javascriptLanguage.parser},
+       parser: javascriptLanguage.parser}, // FIXME make it so that you can directly pass a Language, somehow
       {tag: "style",
        attrs(attrs) {
          return (!attrs.lang || attrs.lang == "css") && (!attrs.type || /^(text\/)?(x-)?(stylesheet|css)$/i.test(attrs.type))

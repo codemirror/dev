@@ -1,5 +1,5 @@
-import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode} from "lezer-tree"
-import {IncrementalParse, IncrementalParser, Input} from "lezer"
+import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, StartParse, ParseContext, SyntaxNode, IncrementalParse} from "lezer-tree"
+import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
 import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService} from "@codemirror/next/language"
 import {StringStream} from "./stringstream"
@@ -73,10 +73,8 @@ export class StreamLanguage<State> extends Language {
   private constructor(parser: StreamParser<State>) {
     let data = defineLanguageFacet(parser.languageData)
     let p = fullParser(parser)
-    let wrap: IncrementalParser = {
-      startParse: (input, options) => new Parse(this, input, options?.startPos || 0, options?.fragments)
-    }
-    super(data, wrap, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
+    let startParse: StartParse = (input, startPos = 0, context) => new Parse(this, input, startPos, context)
+    super(data, {startParse}, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
     this.streamParser = p
     this.docType = docID(p.docProps.concat([[languageDataProp, data]]))
     this.stateAfter = new WeakMap
@@ -161,8 +159,8 @@ class Parse<State> implements IncrementalParse {
   constructor(readonly lang: StreamLanguage<State>,
               readonly input: Input,
               readonly startPos: number,
-              fragments?: readonly TreeFragment[]) {
-    let {state, tree} = findStartInFragments(lang, fragments, startPos)
+              readonly context?: ParseContext) {
+    let {state, tree} = findStartInFragments(lang, context?.fragments, startPos)
     this.state = state
     this.pos = this.chunkStart = startPos + tree.length
     if (tree.length) {

@@ -15,7 +15,7 @@ for (let l0 = lines.length, i = l0; i < 5000; i++) lines[i] = lines[i % l0]
 let doc = Text.of(lines)
 
 function pState(doc: Text) {
-  return new ParseState(parser, doc, [], Tree.empty)
+  return new ParseState(parser, EditorState.create({doc}), [], Tree.empty)
 }
 
 describe("ParseState", () => {
@@ -36,7 +36,7 @@ describe("ParseState", () => {
     ist(state.tree.length, doc.length)
     let change = ChangeSet.of({from: 0, to: 5, insert: "let"}, doc.length)
     let newDoc = change.apply(doc)
-    state = state.changes(change, newDoc)
+    state = state.changes(change, EditorState.create({doc: newDoc}))
     ist(state.work(50))
     ist(state.tree.length, newDoc.length)
     ist(state.tree.toString().slice(0, 31), "Script(VariableDeclaration(let,")
