@@ -59,18 +59,21 @@ export class DOMObserver {
         this.flushSoon()
       }
 
-    this.onSelectionChange = () => {
+    this.onSelectionChange = (event: Event) => {
       if (this.view.root.activeElement != this.dom) return
+      let sel = getSelection(this.view.root)
+      let context = sel.anchorNode && this.view.docView.nearest(sel.anchorNode)
+      if (context && context.ignoreEvent(event)) return
+
       // Deletions on IE11 fire their events in the wrong order, giving
       // us a selection change event before the DOM changes are
       // reported.
-      if (browser.ie && browser.ie_version <= 11 && !this.view.state.selection.primary.empty) {
-        let sel = getSelection(this.view.root)
-        // Selection.isCollapsed isn't reliable on IE
-        if (sel.focusNode && isEquivalentPosition(sel.focusNode, sel.focusOffset, sel.anchorNode, sel.anchorOffset))
-          return this.flushSoon()
-      }
-      this.flush()
+      // (Selection.isCollapsed isn't reliable on IE)
+      if (browser.ie && browser.ie_version <= 11 && !this.view.state.selection.primary.empty &&
+          sel.focusNode && isEquivalentPosition(sel.focusNode, sel.focusOffset, sel.anchorNode, sel.anchorOffset))
+        this.flushSoon()
+      else
+        this.flush()
     }
 
     this.start()
