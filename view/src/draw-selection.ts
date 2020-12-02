@@ -141,11 +141,12 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
 })
 
 const themeSpec = {
-  $content: {
-    "& ::selection": {backgroundColor: "transparent !important"}
+  $line: {
+    "& ::selection": {backgroundColor: "transparent !important"},
+    "&::selection": {backgroundColor: "transparent !important"}
   }
 }
-if (CanHidePrimary) (themeSpec as any).$content.caretColor = "transparent !important"
+if (CanHidePrimary) (themeSpec as any).$line.caretColor = "transparent !important"
 const hideNativeSelection = precedence(EditorView.theme(themeSpec), "override")
 
 const selectionClass = themeClass("selectionBackground")
