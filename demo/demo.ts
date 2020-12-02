@@ -13,11 +13,13 @@ let state = EditorState.create({doc: `<script>
   const {readFile} = require("fs");
   readFile("package.json", "utf8", (err, data) => {
     console.log(data);
+    "${"aba baba ".repeat(100)}"
   });
 </script>
 `, extensions: [
   basicSetup,
-  html()
+  html(),
+  EditorView.lineWrapping
 //  linter(esLint(new Linter)),
 //  new StreamSyntax(legacyJS()).extension,
 ]})

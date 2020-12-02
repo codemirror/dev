@@ -141,8 +141,9 @@ function textCoords(text: Node, pos: number, side: number, length: number): Rect
   let range = tempRange()
   range.setEnd(text, to)
   range.setStart(text, from)
-  let rect = range.getBoundingClientRect()
-  return flatten ? flattenRect(rect, flatten < 0) : rect
+  let rects = range.getClientRects(), rect = rects[(flatten ? flatten < 0 : side >= 0) ? 0 : rects.length - 1]
+  if (browser.safari && !flatten && rect.width == 0) rect = Array.prototype.find.call(rects, r => r.width) || rect
+  return flatten ? flattenRect(rect!, flatten < 0) : rect!
 }
 
 // Also used for collapsed ranges that don't have a placeholder widget!
