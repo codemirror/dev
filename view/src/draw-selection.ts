@@ -155,6 +155,12 @@ function getBase(view: EditorView) {
   return {left: rect.left - view.scrollDOM.scrollLeft, top: rect.top - view.scrollDOM.scrollTop}
 }
 
+function wrappedLine(view: EditorView, pos: number, inside: {from: number, to: number}) {
+  let range = EditorSelection.cursor(pos)
+  return {from: Math.max(inside.from, view.moveToLineBoundary(range, false, true).from),
+          to: Math.min(inside.to, view.moveToLineBoundary(range, true, true).from)}
+}
+
 function measureRange(view: EditorView, range: SelectionRange): Piece[] {
   if (range.to <= view.viewport.from || range.from >= view.viewport.to) return []
   let from = Math.max(range.from, view.viewport.from), to = Math.min(range.to, view.viewport.to)
@@ -165,7 +171,12 @@ function measureRange(view: EditorView, range: SelectionRange): Piece[] {
   let leftSide = contentRect.left + parseInt(lineStyle.paddingLeft)
   let rightSide = contentRect.right - parseInt(lineStyle.paddingRight)
 
-  let visualStart = view.visualLineAt(from), visualEnd = view.visualLineAt(to)
+  let visualStart: {from: number, to: number} = view.visualLineAt(from)
+  let visualEnd: {from: number, to: number} = view.visualLineAt(to)
+  if (view.lineWrapping) {
+    visualStart = wrappedLine(view, from, visualStart)
+    visualEnd = wrappedLine(view, to, visualEnd)
+  }
   if (visualStart.from == visualEnd.from) {
     return pieces(drawForLine(range.from, range.to))
   } else {
