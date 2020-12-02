@@ -1,7 +1,7 @@
 import {ChangeSet, ChangeDesc, ChangeSpec} from "./change"
 import {EditorState} from "./state"
 import {EditorSelection, checkSelection} from "./selection"
-import {changeFilter, transactionFilter, lineSeparator} from "./extension"
+import {changeFilter, transactionFilter, transactionExtender, lineSeparator} from "./extension"
 import {Extension} from "./facet"
 import {Text} from "@codemirror/next/text"
 
@@ -314,7 +314,7 @@ export function resolveTransaction(state: EditorState, specs: readonly Transacti
     s = mergeTransaction(s, resolveTransactionInner(state, specs[i], seq ? s.changes.newLength : state.doc.length), seq)
   }
   let tr = new Transaction(state, s.changes, s.selection, s.effects, s.annotations, s.reconfigure, s.scrollIntoView)
-  return filter ? filterTransaction(tr) : tr
+  return extendTransaction(filter ? filterTransaction(tr) : tr)
 }
 
 // Finish a transaction by applying filters if necessary.
@@ -352,6 +352,17 @@ function filterTransaction(tr: Transaction) {
     else tr = resolveTransaction(state, asArray(filtered as any), false)
   }
   return tr
+}
+
+function extendTransaction(tr: Transaction) {
+  let state = tr.startState, extenders = state.facet(transactionExtender), spec: ResolvedSpec = tr
+  for (let i = extenders.length - 1; i >= 0; i--) {
+    let extension = extenders[i](tr)
+    if (extension && Object.keys(extension).length)
+      spec = mergeTransaction(tr, resolveTransactionInner(state, extension, tr.changes.newLength), true)
+  }
+  return spec == tr ? tr : new Transaction(state, tr.changes, tr.selection, spec.effects, spec.annotations,
+                                           spec.reconfigure, spec.scrollIntoView)
 }
 
 const none: readonly any[] = []

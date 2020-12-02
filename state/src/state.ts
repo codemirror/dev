@@ -4,7 +4,7 @@ import {Tree} from "lezer-tree"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionSpec, resolveTransaction, asArray, StateEffect} from "./transaction"
 import {Syntax, IndentContext, allowMultipleSelections, globalLanguageData,
-        changeFilter, transactionFilter, lineSeparator} from "./extension"
+        changeFilter, transactionFilter, transactionExtender, lineSeparator} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 import {CharCategory, makeCategorizer} from "./charcategory"
 
@@ -387,4 +387,18 @@ export class EditorState {
   /// modifying transaction is likely to break something or degrade
   /// the user experience.)
   static transactionFilter = transactionFilter
+
+  /// This is a more limited form of
+  /// [`transactionFilter`](#state.EditorState^transactionFilter),
+  /// which can only add
+  /// [annotations](#state.TransactionSpec.annotations),
+  /// [effects](#state.TransactionSpec.effects), and
+  /// [configuration](#state.TransactionSpec.reconfigure) info. _But_,
+  /// this type of filter runs even the transaction has disabled
+  /// regular [filtering](#state.TransactionSpec.filter), making it
+  /// suitable for effects that don't need to touch the changes or
+  /// selection, but do want to process every transaction.
+  ///
+  /// Extenders run _after_ filters, when both are applied.
+  static transactionExtender = transactionExtender
 }

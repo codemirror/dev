@@ -23,6 +23,9 @@ export const changeFilter = Facet.define<(tr: Transaction) => boolean | readonly
 
 export const transactionFilter = Facet.define<(tr: Transaction) => TransactionSpec | readonly TransactionSpec[]>()
 
+export const transactionExtender =
+  Facet.define<(tr: Transaction) => Pick<TransactionSpec, "effects" | "annotations" | "reconfigure">>()
+
 /// A node prop stored on a grammar's top node to indicate the facet
 /// used to store [language data](#state.EditorState.languageDataAt)
 /// related to that language.

@@ -202,4 +202,17 @@ describe("EditorState", () => {
       ist(state.update({changes: {from: 3, insert: ","}}).state.doc.toString(), "one, two!")
     })
   })
+
+  describe("transactionExtender", () => {
+    it("can add annotations", () => {
+      let ann = Annotation.define<number>()
+      let state = EditorState.create({
+        extensions: EditorState.transactionExtender.of(() => ({annotations: ann.of(100)}))
+      })
+      let tr = state.update({changes: {from: 0, insert: "!"}})
+      ist(tr.annotation(ann), 100)
+      let trNoFilter = state.update({changes: {from: 0, insert: "!"}, filter: false})
+      ist(trNoFilter.annotation(ann), 100)
+    })
+  })
 })
