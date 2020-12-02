@@ -123,7 +123,7 @@ class FacetProvider<Input> {
     for (let dep of this.dependencies) {
       if (dep == "doc") depDoc = true
       else if (dep == "selection") depSel = true
-      else if ((addresses[dep.id] & 1) == 0) depAddrs.push(addresses[dep.id])
+      else if (((addresses[dep.id] ?? 1) & 1) == 0) depAddrs.push(addresses[dep.id])
     }
 
     return (state: EditorState, tr: Transaction | null) => {
@@ -333,7 +333,7 @@ export class Configuration {
               readonly dynamicSlots: DynamicSlot[],
               readonly address: {[id: number]: number},
               readonly staticValues: readonly any[]) {
-    while (this.statusTemplate.length < staticValues.length)
+    while (this.statusTemplate.length < dynamicSlots.length)
       this.statusTemplate.push(SlotStatus.Uninitialized)
   }
 

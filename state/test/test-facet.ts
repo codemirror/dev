@@ -5,7 +5,7 @@ function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
 }
 
-let num = Facet.define<number>(), str = Facet.define<string>()
+let num = Facet.define<number>(), str = Facet.define<string>(), bool = Facet.define<boolean>()
 
 describe("EditorState facets", () => {
   it("allows querying of facets", () => {
@@ -55,6 +55,12 @@ describe("EditorState facets", () => {
     let array = st.facet(num)
     ist(array.join(), "1,5")
     ist(st.update({}).state.facet(num), array)
+  })
+
+  it("can handle dependencies on facets that aren't present in the state", () => {
+    let st = mk(num.compute([str], s => s.facet(str).join().length),
+                str.compute([bool], s => s.facet(bool).toString()))
+    ist(st.update({}).state.facet(num).join(), "0")
   })
 
   it("can specify a dependency on the document", () => {
