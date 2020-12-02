@@ -540,7 +540,7 @@ export class EditorView {
 
   /// Check whether the editor has focus.
   get hasFocus(): boolean {
-    return this.root.activeElement == this.contentDOM
+    return document.hasFocus() && this.root.activeElement == this.contentDOM
   }
 
   /// Put focus on the editor.
