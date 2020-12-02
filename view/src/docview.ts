@@ -292,7 +292,8 @@ export class DocView extends ContentView {
   coordsAt(pos: number, side: number): Rect | null {
     for (let off = this.length, i = this.children.length - 1;; i--) {
       let child = this.children[i], start = off - child.breakAfter - child.length
-      if (pos >= start && child.type != BlockType.WidgetAfter) return child.coordsAt(pos - start, side)
+      if (pos > start || pos == start && (child.type == BlockType.Text || !i || this.children[i - 1].breakAfter))
+        return child.coordsAt(pos - start, side)
       off = start
     }
   }
