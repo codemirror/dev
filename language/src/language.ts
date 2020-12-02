@@ -37,17 +37,20 @@ export class Language {
   /// The extension value to install this provider.
   readonly extension: Extension
 
+  /// The parser (with [language data
+  /// prop](#language.defineLanguageProp) attached). Can be useful
+  /// when using this as a [nested parser](#lezer.NestedParserSpec).
+  parser: {startParse: StartParse}
+
   protected constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
     readonly data: Facet<{[name: string]: any}>,
-    /// The parser (with [language data
-    /// prop](#language.defineLanguageProp) attached). Can be useful
-    /// when using this as a [nested parser](#lezer.NestedParserSpec).
-    readonly parser: {startParse: StartParse},
+    parser: {startParse(input: Input, pos?: number, context?: ParseContext): IncrementalParse},
     extraExtensions: Extension[] = []
   ) {
     let setState = StateEffect.define<LanguageState>()
+    this.parser = parser as {startParse: StartParse}
     this.field = StateField.define<LanguageState>({
       create(state) {
         let parseState = new ParseState(parser, state, [], Tree.empty)
@@ -226,7 +229,7 @@ export class ParseState {
 
   /// @internal
   constructor(
-    private parser: {startParse: StartParse},
+    private parser: {startParse(input: Input, pos?: number, context?: ParseContext): IncrementalParse},
     private state: EditorState,
     private fragments: readonly TreeFragment[] = [],
     public tree: Tree

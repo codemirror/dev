@@ -1,4 +1,4 @@
-export {Language, LezerLanguage, defineLanguageFacet, syntaxTree, languageDataProp} from "./language"
+export {Language, LezerLanguage, defineLanguageFacet, syntaxTree, languageDataProp, ParseContext} from "./language"
 
 export {IndentContext, getIndentUnit, indentString, indentOnInput, indentService, getIndentation, indentUnit,
         TreeIndentContext, indentNodeProp, delimitedIndent, continuedIndent, flatIndent} from "./indent"

@@ -1,7 +1,7 @@
-import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, StartParse, ParseContext, SyntaxNode, IncrementalParse} from "lezer-tree"
+import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, IncrementalParse} from "lezer-tree"
 import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
-import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService} from "@codemirror/next/language"
+import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService, ParseContext} from "@codemirror/next/language"
 import {StringStream} from "./stringstream"
 
 export {StringStream}
@@ -73,7 +73,7 @@ export class StreamLanguage<State> extends Language {
   private constructor(parser: StreamParser<State>) {
     let data = defineLanguageFacet(parser.languageData)
     let p = fullParser(parser)
-    let startParse: StartParse = (input, startPos = 0, context) => new Parse(this, input, startPos, context)
+    let startParse = (input: Input, startPos = 0, context?: ParseContext) => new Parse(this, input, startPos, context)
     super(data, {startParse}, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
     this.streamParser = p
     this.docType = docID(p.docProps.concat([[languageDataProp, data]]))
@@ -179,7 +179,7 @@ class Parse<State> implements IncrementalParse {
 
   parseLine() {
     let line = this.input.lineAfter(this.pos), {streamParser} = this.lang
-    let stream = new StringStream(line, 4 /* FIXME how do we get tabSize? what if it changes? Ughhh */)
+    let stream = new StringStream(line, this.context ? this.context.state.tabSize : 4)
     if (stream.eol()) {
       streamParser.blankLine(this.state)
     } else {
