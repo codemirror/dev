@@ -198,4 +198,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
     }
     return false
   }
+
+  ignoreMutation(): boolean { return true }
+  ignoreEvent(event: Event): boolean { return this.widget.ignoreEvent(event) }
 }
