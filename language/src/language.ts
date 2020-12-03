@@ -1,4 +1,5 @@
-import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, Input, IncrementalParse, StartParse} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, Input, IncrementalParse,
+        StartParse, ParseContext} from "lezer-tree"
 // NOTE: This package should only use _types_ from "lezer", to avoid
 // pulling in that dependency when no actual Lezer-based parser is used.
 import {Parser, ParserConfig} from "lezer"
@@ -46,14 +47,14 @@ export class Language {
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
     readonly data: Facet<{[name: string]: any}>,
-    parser: {startParse(input: Input, pos?: number, context?: ParseContext): IncrementalParse},
+    parser: {startParse(input: Input, pos: number, context: EditorParseContext): IncrementalParse},
     extraExtensions: Extension[] = []
   ) {
     let setState = StateEffect.define<LanguageState>()
     this.parser = parser as {startParse: StartParse}
     this.field = StateField.define<LanguageState>({
       create(state) {
-        let parseState = new ParseState(parser, state, [], Tree.empty)
+        let parseState = new EditorParseContext(parser, state, [], Tree.empty, {from: 0, to: state.doc.length}, [])
         if (!parseState.work(Work.Apply)) parseState.takeTree()
         return new LanguageState(parseState)
       },
@@ -79,7 +80,7 @@ export class Language {
   /// method will do at most `timeout` milliseconds of work to parse
   /// up to that point if the tree isn't already available.
   ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
-    let parse = state.field(this.field).parse
+    let parse = state.field(this.field).context
     return parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
   }
 
@@ -95,13 +96,6 @@ export class Language {
     }
     return this.data
   }
-}
-
-
-export class ParseContext {
-  constructor(readonly state: EditorState,
-              readonly fragments: readonly TreeFragment[],
-              readonly viewport: {from: number, to: number} | null) {}
 }
 
 /// A subclass of `Language` for use with [Lezer](#lezer.Parser)
@@ -224,23 +218,39 @@ const enum Work {
   MaxPos = 5e6
 }
 
-export class ParseState {
+/// A parse context provided to parsers working on the editor content.
+export class EditorParseContext implements ParseContext {
   private parse: IncrementalParse | null = null
+  /// @internal
+  skippedUntil: {from: number, to: number, until: Promise<unknown>}[] = []
 
   /// @internal
   constructor(
     private parser: {startParse(input: Input, pos?: number, context?: ParseContext): IncrementalParse},
-    private state: EditorState,
-    private fragments: readonly TreeFragment[] = [],
-    public tree: Tree
+    /// The current editor state.
+    readonly state: EditorState,
+    /// Tree fragments that can be reused by new parses.
+    public fragments: readonly TreeFragment[] = [],
+    /// @internal
+    public tree: Tree,
+    /// The current editor viewport, or some approximation thereof.
+    /// Intended to be used for opportunistically avoiding work (in
+    /// which case
+    /// [`skipUntilInView`](#language.EditorParseContext.skipUntilInView)
+    /// should be called to make sure the parser is restarted when the
+    /// skipped region becomes visible).
+    public viewport: {from: number, to: number},
+    /// @internal
+    public skipped: {from: number, to: number}[]
   ) {}
 
+  /// @internal
   // FIXME do something with badness again
   work(time: number, upto?: number) {
     if (this.tree != Tree.empty && (upto == null ? this.tree.length == this.state.doc.length : this.tree.length >= upto))
       return true
     if (!this.parse)
-      this.parse = this.parser.startParse(new DocInput(this.state.doc), 0, new ParseContext(this.state, this.fragments, null))
+      this.parse = this.parser.startParse(new DocInput(this.state.doc), 0, this)
     let endTime = Date.now() + time
     for (;;) {
       let done = this.parse.advance()
@@ -257,6 +267,7 @@ export class ParseState {
     }
   }
   
+  /// @internal
   takeTree() {
     if (this.parse && this.parse.pos > this.tree.length) {
       this.tree = this.parse.forceFinish()
@@ -264,16 +275,60 @@ export class ParseState {
     }
   }
 
+  /// @internal
   changes(changes: ChangeDesc, newState: EditorState) {
-    let {fragments, tree} = this
+    let {fragments, tree, viewport, skipped} = this
     this.takeTree()
     if (!changes.empty) {
       let ranges: ChangedRange[] = []
       changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
       fragments = TreeFragment.applyChanges(fragments, ranges)
       tree = Tree.empty
+      viewport = {from: changes.mapPos(viewport.from, -1), to: changes.mapPos(viewport.to, 1)}
+      if (this.skipped.length) {
+        skipped = []
+        for (let r of this.skipped) {
+          let from = changes.mapPos(r.from, 1), to = changes.mapPos(r.to, -1)
+          if (from < to) skipped.push({from, to})
+        }
+      }
     }
-    return new ParseState(this.parser, newState, fragments, tree)
+    return new EditorParseContext(this.parser, newState, fragments, tree, viewport, skipped)
+  }
+
+  /// @internal
+  updateViewport(viewport: {from: number, to: number}) {
+    this.viewport = viewport
+    let startLen = this.skipped.length
+    for (let i = 0; i < this.skipped.length; i++) {
+      let {from, to} = this.skipped[i]
+      if (from < viewport.to && to > viewport.from) {
+        this.cutFragments(from, to)
+        this.skipped.splice(i--, 1)
+      }
+    }
+    return this.skipped.length < startLen
+  }
+
+  /// @internal
+  cutFragments(from: number, to: number) {
+    this.fragments = TreeFragment.applyChanges(this.fragments, [{fromA: from, toA: to, fromB: from, toB: to}])
+  }
+
+  /// @internal
+  reset() {
+    if (this.parse) {
+      this.takeTree()
+      this.parse = null
+    }
+  }
+
+  skipUntilInView(from: number, to: number) {
+    this.skipped.push({from, to})
+  }
+
+  skipUntil(from: number, to: number, until: Promise<any>) {
+    this.skippedUntil.push({from, to, until})
   }
 }
 
@@ -285,14 +340,14 @@ class LanguageState {
   constructor(
     // A mutable parse state that is used to preserve work done during
     // the lifetime of a state when moving to the next state.
-    readonly parse: ParseState
+    readonly context: EditorParseContext
   ) {
-    this.tree = parse.tree
+    this.tree = context.tree
   }
 
   apply(tr: Transaction) {
     if (!tr.docChanged) return this
-    let newState = this.parse.changes(tr.changes, tr.state)
+    let newState = this.context.changes(tr.changes, tr.state)
     newState.work(Work.Apply)
     return new LanguageState(newState)
   }
@@ -322,6 +377,12 @@ class ParseWorker {
 
   update(update: ViewUpdate) {
     if (update.docChanged) this.scheduleWork()
+    let cx = this.view.state.field(this.field).context
+    if (update.viewportChanged && cx.updateViewport(update.view.viewport)) {
+      cx.reset()
+      this.scheduleWork()
+    }
+    this.takeSkipped(cx)
   }
 
   scheduleWork() {
@@ -335,11 +396,27 @@ class ParseWorker {
     this.working = -1
     let {state} = this.view, field = state.field(this.field)
     if (field.tree.length >= state.doc.length) return
-    field.parse.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
-    if (field.parse.tree.length >= state.doc.length)
-      this.view.dispatch({effects: this.setState.of(new LanguageState(field.parse))})
-    else
+    field.context.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    if (field.context.tree.length >= state.doc.length) {
+      this.view.dispatch({effects: this.setState.of(new LanguageState(field.context))})
+      this.takeSkipped(field.context)
+    } else {
       this.scheduleWork()
+    }
+  }
+
+  takeSkipped(context: EditorParseContext) {
+    while (context.skippedUntil.length) {
+      let {from, to, until} = context.skippedUntil.pop()!
+      until.then(() => {
+        let field = this.view.state.field(this.field, false)
+        if (field && field.context == context) {
+          context.cutFragments(from, to)
+          context.reset()
+          this.scheduleWork()
+        }
+      })
+    }
   }
 
   destroy() {

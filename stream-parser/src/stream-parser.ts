@@ -1,7 +1,8 @@
 import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, IncrementalParse} from "lezer-tree"
 import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
-import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService, ParseContext} from "@codemirror/next/language"
+import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService,
+        EditorParseContext} from "@codemirror/next/language"
 import {StringStream} from "./stringstream"
 
 export {StringStream}
@@ -59,9 +60,6 @@ function defaultCopyState<State>(state: State) {
   return newState
 }
 
-// FIXME limit parse distance, stop at end of viewport
-// const MaxRecomputeDistance = 20e3
-
 export class StreamLanguage<State> extends Language {
   /// @internal
   streamParser: Required<StreamParser<State>>
@@ -73,7 +71,7 @@ export class StreamLanguage<State> extends Language {
   private constructor(parser: StreamParser<State>) {
     let data = defineLanguageFacet(parser.languageData)
     let p = fullParser(parser)
-    let startParse = (input: Input, startPos = 0, context?: ParseContext) => new Parse(this, input, startPos, context)
+    let startParse = (input: Input, startPos: number, context: EditorParseContext) => new Parse(this, input, startPos, context)
     super(data, {startParse}, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
     this.streamParser = p
     this.docType = docID(p.docProps.concat([[languageDataProp, data]]))
@@ -134,8 +132,8 @@ function cutTree(lang: StreamLanguage<unknown>, tree: Tree, from: number, to: nu
   return null
 }
 
-function findStartInFragments<State>(lang: StreamLanguage<State>, fragments: readonly TreeFragment[] | undefined, startPos: number) {
-  if (fragments) for (let f of fragments) {
+function findStartInFragments<State>(lang: StreamLanguage<State>, fragments: readonly TreeFragment[], startPos: number) {
+  for (let f of fragments) {
     let found = f.from <= startPos && f.to > startPos && findState(lang, f.tree, -f.offset, startPos, 1e9), tree
     if (found && (tree = cutTree(lang, f.tree, startPos + f.offset, found.pos + f.offset, false)))
       return {state: found.state, tree}
@@ -145,7 +143,8 @@ function findStartInFragments<State>(lang: StreamLanguage<State>, fragments: rea
 
 const enum C {
   ChunkSize = 2048,
-  MaxIndentScanDist = 10000
+  MaxDistanceBeforeViewport = 1e5,
+  MaxIndentScanDist = 1e4
 }
 
 class Parse<State> implements IncrementalParse {
@@ -159,22 +158,28 @@ class Parse<State> implements IncrementalParse {
   constructor(readonly lang: StreamLanguage<State>,
               readonly input: Input,
               readonly startPos: number,
-              readonly context?: ParseContext) {
-    let {state, tree} = findStartInFragments(lang, context?.fragments, startPos)
+              readonly context: EditorParseContext) {
+    let {state, tree} = findStartInFragments(lang, context.fragments, startPos)
     this.state = state
     this.pos = this.chunkStart = startPos + tree.length
     if (tree.length) {
       this.chunks.push(tree)
       this.chunkPos.push(startPos)
     }
+    if (this.pos < context.viewport.from - C.MaxDistanceBeforeViewport) {
+      this.state = this.lang.streamParser.startState()
+      context.skipUntilInView(this.pos, context.viewport.from)
+      this.pos = context.viewport.from
+    }
   }
 
   advance() {
-    let end = Math.min(this.input.length, this.chunkStart + C.ChunkSize)
+    let end = Math.min(this.context.viewport.to, this.chunkStart + C.ChunkSize)
     while (this.pos < end) this.parseLine()
     if (this.chunkStart < this.pos) this.finishChunk()
-    if (this.pos == this.input.length) return this.finish()
-    return null
+    if (this.pos < this.context.viewport.to) return null
+    this.context.skipUntilInView(this.pos, this.input.length)
+    return this.finish()
   }
 
   parseLine() {
