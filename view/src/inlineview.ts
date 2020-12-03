@@ -205,13 +205,13 @@ export class WidgetView extends InlineView {
 
   domBoundsAround() { return null }
 
-  coordsAt(pos: number, _side: number): Rect | null {
+  coordsAt(pos: number, side: number): Rect | null {
     let rects = this.dom!.getClientRects(), rect: Rect | null = null
     for (let i = pos > 0 ? rects.length - 1 : 0;; i += (pos > 0 ? -1 : 1)) {
       rect = rects[i]
       if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) break
     }
-    return rect
+    return (pos == 0 && side > 0 || pos == this.length && side <= 0) ? rect : flattenRect(rect, pos == 0)
   }
 }
 
