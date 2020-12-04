@@ -83,10 +83,8 @@
   },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
-    "chromedriver": "^85.0.0",
     "eslint4b-prebuilt": "^6.7.1",
     "esmoduleserve": "^0.1.2",
-    "geckodriver": "^1.19.1",
     "ist": "^1.1.6",
     "lezer-generator": "^0.13.0",
     "mocha": "^7.1.1",
