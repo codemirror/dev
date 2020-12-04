@@ -8,6 +8,9 @@ import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffec
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 
+/// The facet used to associate a language with an editor state.
+export const language = Facet.define<Language>()
+
 /// Node prop stored on a grammar's top node to indicate the facet used
 /// to store language data related to that language.
 export const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
@@ -49,6 +52,12 @@ export class Language {
     parser: {startParse(input: Input, pos: number, context: EditorParseContext): PartialParse},
     extraExtensions: Extension[] = []
   ) {
+    // Kludge to define EditorState.tree as a debugging helper,
+    // without the EditorState package actually knowing about
+    // languages and lezer trees.
+    if (!EditorState.prototype.hasOwnProperty("tree"))
+      Object.defineProperty(EditorState.prototype, "tree", {get() { return syntaxTree(this) }})
+
     let setState = StateEffect.define<LanguageState>()
     this.parser = parser as {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
     this.field = StateField.define<LanguageState>({
@@ -63,7 +72,7 @@ export class Language {
       }
     })
     this.extension = [
-      EditorState.language.of(this),
+      language.of(this),
       this.field,
       ViewPlugin.define(view => new ParseWorker(view, this.field, setState)),
       treeHighlighter(this),
@@ -137,7 +146,7 @@ export class LezerLanguage extends Language {
 /// the highest precedence, or the empty tree if there is no language
 /// available.
 export function syntaxTree(state: EditorState) {
-  let lang = state.facet(EditorState.language)
+  let lang = state.facet(language)
   return lang.length ? lang[0].getTree(state) : Tree.empty
 }
 

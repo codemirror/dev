@@ -3,7 +3,7 @@ import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionSpec, resolveTransaction, asArray, StateEffect} from "./transaction"
 import {allowMultipleSelections, changeFilter, transactionFilter, transactionExtender,
-        lineSeparator, language, languageData} from "./extension"
+        lineSeparator, languageData} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 import {CharCategory, makeCategorizer} from "./charcategory"
 
@@ -263,18 +263,6 @@ export class EditorState {
     for (let map of this.facet(EditorState.phrases))
       if (Object.prototype.hasOwnProperty.call(map, phrase)) return map[phrase]
     return phrase
-  }
-
-  /// Facet used to associate languages with an editor state.
-  static language = language
-
-  /// Get the syntax tree for this state, which is the current
-  /// (possibly incomplete) parse tree of the
-  /// [language](#language.Language) with the highest precedence, or
-  /// null if there is no language available.
-  get tree() {
-    let lang = this.facet(EditorState.language)
-    return lang.length ? lang[0].getTree(this) : null
   }
 
   /// A facet used to register [language

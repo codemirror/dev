@@ -1,5 +1,6 @@
 import {NodeProp, SyntaxNode} from "lezer-tree"
 import {EditorState, Facet} from "@codemirror/next/state"
+import {syntaxTree} from "./language"
 
 /// A facet that registers a code folding service. When called with
 /// the extent of a line, such a function should return a range
@@ -13,9 +14,9 @@ export const foldService = Facet.define<(state: EditorState, lineStart: number, 
 export const foldNodeProp = new NodeProp<(node: SyntaxNode, state: EditorState) => ({from: number, to: number} | null)>()
 
 function syntaxFolding(state: EditorState, start: number, end: number) {
-  let lang = state.facet(EditorState.language)
-  if (lang.length == 0) return null
-  let inner = lang[0].getTree(state).resolve(end)
+  let tree = syntaxTree(state)
+  if (tree.length == 0) return null
+  let inner = tree.resolve(end)
   let found: null | {from: number, to: number} = null
   for (let cur: SyntaxNode | null = inner; cur; cur = cur.parent) {
     if (cur.to <= end || cur.from > end) continue

@@ -1,11 +1,8 @@
-import {Language} from "@codemirror/next/language"
 import {EditorState} from "./state"
 import {Transaction, TransactionSpec} from "./transaction"
 import {Facet} from "./facet"
 
 export const languageData = Facet.define<(state: EditorState, pos: number) => readonly {[name: string]: any}[]>()
-
-export const language = Facet.define<Language>()
 
 /// Subtype of [`Command`](#view.Command) that doesn't require access
 /// to the actual editor view. Mostly useful to define commands that

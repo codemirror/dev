@@ -1,6 +1,7 @@
 import {Diagnostic} from "@codemirror/next/lint"
 import {Text, EditorState} from "@codemirror/next/state"
 import {EditorView} from "@codemirror/next/view"
+import {language} from "@codemirror/next/language"
 import {javascriptLanguage} from "./javascript"
 
 /// Connects an [ESLint](https://eslint.org/) linter to CodeMirror's
@@ -34,7 +35,7 @@ export function esLint(eslint: any, config?: any) {
   }
 
   return (view: EditorView) => {
-    let [lang] = view.state.facet(EditorState.language)
+    let [lang] = view.state.facet(language)
     if (lang == javascriptLanguage) return range(view.state)
     if (!lang) return []
     let found: Diagnostic[] = []

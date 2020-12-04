@@ -3,7 +3,8 @@ import {EditorState, StateCommand, EditorSelection, SelectionRange,
 import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
-import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString, getIndentation} from "@codemirror/next/language"
+import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString,
+        getIndentation} from "@codemirror/next/language"
 import {SyntaxNode, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
@@ -266,7 +267,7 @@ export const selectLine: StateCommand = ({state, dispatch}) => {
 
 /// Select the next syntactic construct that is larger than the
 /// selection. Note that this will only work insofar as the language
-/// [provider](#state.EditorState^language) you use builds up a full
+/// [provider](#language.language) you use builds up a full
 /// syntax tree.
 export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
   let selection = updateSel(state.selection, range => {

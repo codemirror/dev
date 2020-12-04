@@ -1,6 +1,7 @@
 import {NodeProp, SyntaxNode, Tree} from "lezer-tree"
 import {EditorState, Extension, Transaction, Facet} from "@codemirror/next/state"
 import {Line, countColumn} from "@codemirror/next/text"
+import {syntaxTree} from "./language"
 
 /// Facet that defines a way to provide a function that computes the
 /// appropriate indentation depth at the start of a given line, or
@@ -53,7 +54,7 @@ export function getIndentation(context: IndentContext | EditorState, pos: number
     let result = service(context, pos)
     if (result != null) return result
   }
-  let tree = context.state.tree
+  let tree = syntaxTree(context.state)
   return tree ? syntaxIndentation(context, tree, pos) : null
 }
 
