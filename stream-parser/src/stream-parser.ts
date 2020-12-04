@@ -1,4 +1,4 @@
-import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, IncrementalParse} from "lezer-tree"
+import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, PartialParse} from "lezer-tree"
 import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
 import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService,
@@ -147,7 +147,7 @@ const enum C {
   MaxIndentScanDist = 1e4
 }
 
-class Parse<State> implements IncrementalParse {
+class Parse<State> implements PartialParse {
   state: State
   pos: number
   chunks: Tree[] = []

@@ -1,5 +1,4 @@
-import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, Input, IncrementalParse,
-        StartParse, ParseContext} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, Input, PartialParse, ParseContext} from "lezer-tree"
 // NOTE: This package should only use _types_ from "lezer", to avoid
 // pulling in that dependency when no actual Lezer-based parser is used.
 import {Parser, ParserConfig} from "lezer"
@@ -41,17 +40,17 @@ export class Language {
   /// The parser (with [language data
   /// prop](#language.defineLanguageProp) attached). Can be useful
   /// when using this as a [nested parser](#lezer.NestedParserSpec).
-  parser: {startParse: StartParse}
+  parser: {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
 
   protected constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
     readonly data: Facet<{[name: string]: any}>,
-    parser: {startParse(input: Input, pos: number, context: EditorParseContext): IncrementalParse},
+    parser: {startParse(input: Input, pos: number, context: EditorParseContext): PartialParse},
     extraExtensions: Extension[] = []
   ) {
     let setState = StateEffect.define<LanguageState>()
-    this.parser = parser as {startParse: StartParse}
+    this.parser = parser as {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
     this.field = StateField.define<LanguageState>({
       create(state) {
         let parseState = new EditorParseContext(parser, state, [], Tree.empty, {from: 0, to: state.doc.length}, [])
@@ -220,13 +219,13 @@ const enum Work {
 
 /// A parse context provided to parsers working on the editor content.
 export class EditorParseContext implements ParseContext {
-  private parse: IncrementalParse | null = null
+  private parse: PartialParse | null = null
   /// @internal
   skippedUntil: {from: number, to: number, until: Promise<unknown>}[] = []
 
   /// @internal
   constructor(
-    private parser: {startParse(input: Input, pos?: number, context?: ParseContext): IncrementalParse},
+    private parser: {startParse(input: Input, pos?: number, context?: ParseContext): PartialParse},
     /// The current editor state.
     readonly state: EditorState,
     /// Tree fragments that can be reused by new parses.
