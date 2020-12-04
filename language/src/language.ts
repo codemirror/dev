@@ -66,7 +66,8 @@ export class Language {
       EditorState.language.of(this),
       this.field,
       ViewPlugin.define(view => new ParseWorker(view, this.field, setState)),
-      treeHighlighter(this)
+      treeHighlighter(this),
+      EditorState.languageData.of((state, pos) => state.facet(this.languageDataFacetAt(state, pos)))
     ].concat(extraExtensions)
   }
 
@@ -83,8 +84,7 @@ export class Language {
     return parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
   }
 
-  /// Find the facet associated with the language at the given position.
-  // FIXME simplify by always getting language data from a facet?
+  /// @internal
   languageDataFacetAt(state: EditorState, pos: number) {
     let tree = this.getTree(state)
     let target: SyntaxNode | null = tree.resolve(pos, -1)

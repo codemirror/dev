@@ -3,7 +3,7 @@ import {EditorState} from "./state"
 import {Transaction, TransactionSpec} from "./transaction"
 import {Facet} from "./facet"
 
-export const globalLanguageData = Facet.define<{[name: string]: any}>()
+export const languageData = Facet.define<(state: EditorState, pos: number) => readonly {[name: string]: any}[]>()
 
 export const language = Facet.define<Language>()
 

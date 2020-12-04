@@ -37,7 +37,7 @@ describe("comment", () => {
       doc,
       selection: EditorSelection.create(ranges),
       extensions: [EditorState.allowMultipleSelections.of(true),
-                   EditorState.globalLanguageData.of({commentTokens: config})].concat(extensions)
+                   EditorState.languageData.of(() => [{commentTokens: config}])].concat(extensions)
     })
   }
 

@@ -3,7 +3,7 @@ import {ChangeSet, ChangeSpec, DefaultSplit} from "./change"
 import {EditorSelection, SelectionRange, checkSelection} from "./selection"
 import {Transaction, TransactionSpec, resolveTransaction, asArray, StateEffect} from "./transaction"
 import {allowMultipleSelections, changeFilter, transactionFilter, transactionExtender,
-        lineSeparator, language, globalLanguageData} from "./extension"
+        lineSeparator, language, languageData} from "./extension"
 import {Configuration, Facet, Extension, StateField, SlotStatus, ensureAddr, getAddr} from "./facet"
 import {CharCategory, makeCategorizer} from "./charcategory"
 
@@ -277,23 +277,19 @@ export class EditorState {
     return lang.length ? lang[0].getTree(this) : null
   }
 
-  /// A facet used to register [language data](#state.EditorState.languageDataAt)
-  /// that should apply throughout the document, regardless of language.
-  static globalLanguageData = globalLanguageData
+  /// A facet used to register [language
+  /// data](#state.EditorState.languageDataAt) providers.
+  static languageData = languageData
 
-  /// Find the values for a given language data field, either provided
-  /// by the [language](#state.EditorState^Language) or through the
-  /// [`globalLanguageData`](#state.EditorState^globalLanguageData)
-  /// facet, for the language active at the given position. Values
-  /// provided by the facet, in precedence order, will appear before
-  /// those provided by the language.
+  /// Find the values for a given language data field, provided by the
+  /// the [`languageData`](#state.EditorState^languageData) facet.
   languageDataAt<T>(name: string, pos: number): readonly T[] {
     let values: T[] = []
-    let lang = this.facet(language)
-    for (let i = lang.length ? 0 : 1; i < 2; i++) {
-      let source = this.facet(i ? globalLanguageData : lang[0].languageDataFacetAt(this, pos))
-      for (let obj of source) if (Object.prototype.hasOwnProperty.call(obj, name))
-        values.push(obj[name])
+    for (let provider of this.facet(languageData)) {
+      for (let result of provider(this, pos)) {
+        if (Object.prototype.hasOwnProperty.call(result, name))
+          values.push(result[name])
+      }
     }
     return values
   }
