@@ -1,3 +1,59 @@
+## 0.15.0 (2020-12-04)
+
+### Breaking changes
+
+The highlighting system no longer has the concept of a tag system—rather, all tags now exist in the same space.
+
+Highlighting tags are now represented by objects (with the default tag system under `tags` in the highlight package) rather than strings.
+
+Highlighting styles are now registered separately from the actual highlighter plugin. Syntax addons take care of registering the highlighter. Styles are defined with the `highlightStyle` function.
+
+The `syntax` package no longer exists. Its responsibilities have been taken over by the `language` package.
+
+Language and syntax-related functionality that used to live in the `state` package (the syntax provider type, props like `indentation` and `foldable`) has been moved to the `language` package.
+
+The `stream-syntax` package has been renamed to `stream-parser`, and its interface has been changed to make use of the abstractions provided by the `language` package.
+
+Providing language data now works differently (the `globalLanguageData` facet is gone, replaced by a more general `languageData` facet).
+
+`EditorState.tree` has been replaced by the `syntaxTree` function from the `language` package (since the state package no longer knows about Lezer types).
+
+The `...Syntax` exports from language packages have all been renamed to `...Language` for consistency with the library's terminology.
+
+### Bug fixes
+
+`closeBrackets` will no longer type-over brackets that it did not itself insert.
+
+Selection drawing in wrapped lines is no longer entirely broken.
+
+Fix an issue where autocompletion wouldn't trigger when an IME composition moved the selection before ending.
+
+Fix a bug where the facet dependency tracking got confused when a dynamic facet depended on another facet that didn't exist in the state.
+
+Querying the coordinates (and thus drawing the cursor) before a block widget no longer crashes.
+
+Fix double-height cursor on line wrap points in Safari.
+
+Actually call `ignoreEvent` methods on block widgets.
+
+Prevent `drawSelection` from also hiding the native selection in block widgets.
+
+A text cursor created with `Text.iterLines` now actually respects the skip parameter.
+
+### New Features
+
+The `language` package now provides most language and parsing related infrastructure. Unlike the old `syntax` package, it is parse-technique-agnostic. Some of the interfaces that used to live in `state`, such as the facets and types involved in indentation and folding, have also moved there.
+
+The function passed to `changeByRange` may now also return effects for each range.
+
+The new `State.transactionExtender` facet allows you to register functions that add annotations, effects, or reconfiguration to transactions even when they have disabled regular transaction filters.
+
+The new `lang-markdown` package provides Markdown highlighting.
+
+The `foldable` function exported from the language package provides an easy way to check whether a given line is foldable.
+
+The `getIndentation` utility from the language package should now be used to compute automatic indentation for a line. It returns null, as opposed to -1, to indicate that it has no indentation for a given line.
+
 ## 0.14.0 (2020-10-23)
 
 ### Breaking changes
