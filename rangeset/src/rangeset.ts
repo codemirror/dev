@@ -323,7 +323,7 @@ export class RangeSet<T extends RangeValue> {
   /// Iterate over a group of range sets at the same time, notifying
   /// the iterator about the ranges covering every given piece of
   /// content. Returns the open count (see
-  /// [`SpanIterator.range`](#rangeset.SpanIterator.range)) at the end
+  /// [`SpanIterator.span`](#rangeset.SpanIterator.span)) at the end
   /// of the iteration.
   static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
                                      iterator: SpanIterator<T>): number {

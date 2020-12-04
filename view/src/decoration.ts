@@ -164,7 +164,7 @@ export abstract class Decoration extends RangeValue {
   /// DOM elements to be created. Nesting order is determined by
   /// precedence of the [facet](#view.EditorView^decorations) or
   /// (below the facet-provided decorations) [view
-  /// plugin](#view.ViewPlugin.decorations). Such elements are broken
+  /// plugin](#view.PluginSpec.decorations). Such elements are broken
   /// on line boundaries and on the boundaries of higher-precedence
   /// decorations.
   static mark(spec: MarkDecorationSpec): Decoration {

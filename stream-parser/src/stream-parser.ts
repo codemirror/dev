@@ -60,6 +60,8 @@ function defaultCopyState<State>(state: State) {
   return newState
 }
 
+/// A [language](#language.Language) class based on a streaming
+/// parser.
 export class StreamLanguage<State> extends Language {
   /// @internal
   streamParser: Required<StreamParser<State>>

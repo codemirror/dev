@@ -41,8 +41,9 @@ export class Language {
   readonly extension: Extension
 
   /// The parser (with [language data
-  /// prop](#language.defineLanguageProp) attached). Can be useful
-  /// when using this as a [nested parser](#lezer.NestedParserSpec).
+  /// facet](#language.defineLanguageFacet) attached). Can be useful
+  /// when using this as a [nested
+  /// parser](https://lezer.codemirror.net/docs/ref#lezer.NestedParserSpec).
   parser: {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
 
   protected constructor(
@@ -106,7 +107,8 @@ export class Language {
   }
 }
 
-/// A subclass of `Language` for use with [Lezer](#lezer.Parser)
+/// A subclass of `Language` for use with
+/// [Lezer](https://lezer.codemirror.net/docs/ref#lezer.Parser)
 /// parsers.
 export class LezerLanguage extends Language {
   private constructor(data: Facet<{[name: string]: any}>,

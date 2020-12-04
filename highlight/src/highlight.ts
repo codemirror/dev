@@ -551,10 +551,10 @@ export const tags = {
 
   /// Metadata or meta-instruction.
   meta,
-  /// [Metadata](#higlight.tags.meta) that applies to the entire
+  /// [Metadata](#highlight.tags.meta) that applies to the entire
   /// document.
   documentMeta: t(meta),
-  /// [Metadata](#higlight.tags.meta) that annotates or adds
+  /// [Metadata](#highlight.tags.meta) that annotates or adds
   /// attributes to a given syntactic element.
   annotation: t(meta),
   /// Processing instruction or preprocessor directive. Subtag of
@@ -563,7 +563,7 @@ export const tags = {
 
   /// [Modifier](#highlight.Tag^defineModifier) that indicates that a
   /// given element is being defined. Expected to be used with the
-  /// various [name](#higlight.tags.name) tags.
+  /// various [name](#highlight.tags.name) tags.
   definition: Tag.defineModifier(),
   /// [Modifier](#highlight.Tag^defineModifier) that indicates that
   /// something is constant. Mostly expected to be used with

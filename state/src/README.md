@@ -2,10 +2,9 @@ In its most basic form, the editor state is made up of a current <a
 href="#state.EditorState.doc">document</a> and a <a
 href="#state.EditorState.selection">selection</a>. Because there are a
 lot of extra pieces that an editor might need to keep in its state
-(such as an <a href="#history">undo history</a> or <a
-href="#state.Syntax">syntax tree</a>), it is possible for extensions
-to add additional <a href="#state.StateField">fields</a> to the state
-object.
+(such as an [undo history](#history) or [syntax
+tree](#language.syntaxTree)), it is possible for extensions to add
+additional [fields](#state.StateField) to the state object.
 
 @EditorStateConfig
 
@@ -74,12 +73,6 @@ extensions for the editor state.
 @Precedence
 
 @tagExtension
-
-@Syntax
-
-@IndentContext
-
-@languageDataProp
 
 ### Utilities
 

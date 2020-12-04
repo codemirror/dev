@@ -1,10 +1,40 @@
-@LezerSyntax
+@Language
+
+@language
+
+@EditorParseContext
+
+@LezerLanguage
+
+@syntaxTree
+
+### Language metadata
+
+@foldService
 
 @foldNodeProp
 
-### Indentation
+@foldable
+
+@indentService
+
+@getIndentation
 
 @indentNodeProp
+
+@indentUnit
+
+@getIndentUnit
+
+@indentString
+
+@defineLanguageFacet
+
+@languageDataProp
+
+### Indentation
+
+@IndentContext
 
 @TreeIndentContext
 
@@ -13,3 +43,5 @@
 @continuedIndent
 
 @flatIndent
+
+@indentOnInput

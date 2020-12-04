@@ -1,5 +1,5 @@
+@StreamLanguage
+
 @StreamParser
 
 @StringStream
-
-@StreamSyntax

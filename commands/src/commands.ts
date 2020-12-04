@@ -549,8 +549,8 @@ function changeBySelectedLine(state: EditorState, f: (line: Line, changes: Chang
   })
 }
 
-/// Auto-indent the selected lines. This uses the [indentation
-/// facet](#state.EditorState^indentation) as source for auto-indent
+/// Auto-indent the selected lines. This uses the [indentation service
+/// facet](#language.indentService) as source for auto-indent
 /// information.
 export const indentSelection: StateCommand = ({state, dispatch}) => {
   let updated: {[lineStart: number]: number} = Object.create(null)
@@ -572,8 +572,8 @@ export const indentSelection: StateCommand = ({state, dispatch}) => {
   return true
 }
 
-/// Add a [unit](#state.EditorState^indentUnit) of indentation to all
-/// selected lines.
+/// Add a [unit](#language.indentUnit) of indentation to all selected
+/// lines.
 export const indentMore: StateCommand = ({state, dispatch}) => {
   dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
     changes.push({from: line.from, insert: state.facet(indentUnit)})
@@ -581,8 +581,8 @@ export const indentMore: StateCommand = ({state, dispatch}) => {
   return true
 }
 
-/// Remove a [unit](#state.EditorState^indentUnit) of indentation from
-/// all selected lines.
+/// Remove a [unit](#language.indentUnit) of indentation from all
+/// selected lines.
 export const indentLess: StateCommand = ({state, dispatch}) => {
   dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
     let lineStart = line.slice(0, Math.min(line.length, 200))

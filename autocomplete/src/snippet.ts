@@ -132,8 +132,8 @@ function fieldSelection(ranges: readonly FieldRange[], field: number) {
 /// When the snippet is activated by calling the returned function,
 /// the code is inserted at the given position. Newlines in the
 /// template are indented by the indentation of the start line, plus
-/// one [indent unit](#state.EditorState^indentUnit) per tab character
-/// after the newline.
+/// one [indent unit](#language.indentUnit) per tab character after
+/// the newline.
 ///
 /// On activation, (all instances of) the first field are selected.
 /// The user can move between fields with Tab and Shift-Tab as long as

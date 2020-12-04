@@ -134,7 +134,7 @@ export function schemaCompletion(config: SQLConfig): Extension {
 
 /// Returns an extension that installs SQL support features
 /// (completion of keywords, and optionally
-/// [schema-based](#lang-sql.SQLOptions.schema) completion).
+/// [schema-based](#lang-sql.SQLConfig.schema) completion).
 export function sqlSupport(config: SQLConfig): Extension {
   return [schemaCompletion(config), keywordCompletion(config.dialect || StandardSQL)]
 }

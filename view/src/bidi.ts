@@ -49,11 +49,30 @@ function charType(ch: number) {
 
 const BidiRE = /[\u0590-\u05f4\u0600-\u06ff\u0700-\u08ac]/
 
+/// Represents a contiguous range of text that has a single direction
+/// (as in left-to-right or right-to-left).
 export class BidiSpan {
-  constructor(readonly from: number, readonly to: number, readonly level: number) {}
-  get dir() { return this.level % 2 ? RTL : LTR }
+  /// @internal
+  constructor(
+    /// The start of the span (relative to the start of the line).
+    readonly from: number,
+    /// The end of the span.
+    readonly to: number,
+    /// The ["bidi
+    /// level"](https://unicode.org/reports/tr9/#Basic_Display_Algorithm)
+    /// of the span (in this context, 0 means
+    /// left-to-right, 1 means right-to-left, 2 means left-to-right
+    /// number inside right-to-left text).
+    readonly level: number
+  ) {}
+
+  /// The direction of this span.
+  get dir(): Direction { return this.level % 2 ? RTL : LTR }
+
+  /// @internal
   side(end: boolean, dir: Direction) { return (this.dir == dir) == end ? this.to : this.from }
 
+  /// @internal
   static find(order: readonly BidiSpan[], index: number, level: number, assoc: number) {
     let maybe = -1
     for (let i = 0; i < order.length; i++) {

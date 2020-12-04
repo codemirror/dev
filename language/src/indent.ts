@@ -20,7 +20,7 @@ export const indentUnit = Facet.define<string, string>({
 })
 
 /// Return the _column width_ of an indent unit in the state.
-/// Determined by the [`indentUnit`](#state.EditorState^indentUnit)
+/// Determined by the [`indentUnit`](#language.indentUnit)
 /// facet, and [`tabSize`](#state.EditorState^tabSize) when that
 /// contains tabs.
 export function getIndentUnit(state: EditorState) {
@@ -30,7 +30,7 @@ export function getIndentUnit(state: EditorState) {
 
 /// Create an indentation string that covers columns 0 to `cols`.
 /// Will use tabs for as much of the columns as possible when the
-/// [`indentUnit`](#state.EditorState^indentUnit) facet contains
+/// [`indentUnit`](#language.indentUnit) facet contains
 /// tabs.
 export function indentString(state: EditorState, cols: number) {
   let result = "", ts = state.tabSize
@@ -58,11 +58,10 @@ export function getIndentation(context: IndentContext | EditorState, pos: number
   return tree ? syntaxIndentation(context, tree, pos) : null
 }
 
-/// Indentation contexts are used when calling
-/// [`EditorState.indentation`](#state.EditorState^indentation). They
-/// provide helper utilities useful in indentation logic, and can
-/// selectively override the indentation reported for some
-/// lines.
+/// Indentation contexts are used when calling [indentation
+/// services](#language.indentService). They provide helper utilities
+/// useful in indentation logic, and can selectively override the
+/// indentation reported for some lines.
 export class IndentContext {
   /// The indent unit (number of columns per indentation level).
   unit: number

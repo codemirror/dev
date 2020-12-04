@@ -39,7 +39,7 @@ component that displays the editor state and allows text input.
 
 @highlightSpecialChars
 
-@indentOnInput
+@placeholder
 
 ### Key bindings
 
