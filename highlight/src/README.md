@@ -16,7 +16,9 @@ style](#highlight.highlightStyle).
 
 @tags
 
-@highlightStyle
+@HighlightStyle
+
+@highlightTree
 
 @defaultHighlightStyle
 

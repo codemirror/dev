@@ -1,6 +1,6 @@
 import {EditorView} from "@codemirror/next/view"
 import {Extension} from "@codemirror/next/state"
-import {highlightStyle, tags as t} from "@codemirror/next/highlight"
+import {HighlightStyle, tags as t} from "@codemirror/next/highlight"
 
 const chalky = "#e5c07b",
   coral = "#e06c75",
@@ -17,7 +17,8 @@ const chalky = "#e5c07b",
   selection = "#405948",
   cursor = "#528bff"
 
-const oneDarkTheme = EditorView.theme({
+/// The editor theme styles for One Dark.
+export const oneDarkTheme = EditorView.theme({
   $: {
     color: lightWhite,
     backgroundColor: background,
@@ -70,7 +71,8 @@ const oneDarkTheme = EditorView.theme({
   }
 }, {dark: true})
 
-const oneDarkHighlighter = highlightStyle(
+/// The highlighting style for code in the One Dark theme.
+export const oneDarkHighlightStyle = HighlightStyle.define(
   {tag: t.comment,
    color: lightDark},
   {tag: t.keyword,
@@ -107,5 +109,6 @@ const oneDarkHighlighter = highlightStyle(
    color: invalid},
 )
 
-/// Extension to enable the One Dark theme.
-export const oneDark: Extension = [oneDarkTheme, oneDarkHighlighter]
+/// Extension to enable the One Dark theme (both the editor theme and
+/// the highlight style).
+export const oneDark: Extension = [oneDarkTheme, oneDarkHighlightStyle]

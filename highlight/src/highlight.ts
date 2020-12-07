@@ -183,29 +183,9 @@ export function styleTags(spec: {[selector: string]: Tag | readonly Tag[]}) {
 
 const ruleNodeProp = new NodeProp<Rule>()
 
-const highlightStyleProp = Facet.define<Styling, Styling | null>({
+const highlightStyleProp = Facet.define<HighlightStyle, HighlightStyle | null>({
   combine(stylings) { return stylings.length ? stylings[0] : null }
 })
-
-/// Create a highlighter style that associates the given styles to the
-/// given tags. The spec's property names must be
-/// [tags](#highlight.Tag) or lists of tags (which can be concatenated
-/// with `+`). The values should be
-/// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
-/// style objects that define the CSS for that tag.
-///
-/// The CSS rules created for a highlighter will be emitted in the
-/// order of the spec's properties. That means that for elements that
-/// have multiple tags associated with them, styles defined further
-/// down in the list will have a higher CSS precedence than styles
-/// defined earlier.
-export function highlightStyle(...specs: readonly {tag: Tag | readonly Tag[], [prop: string]: any}[]): Extension {
-  let styling = new Styling(specs)
-  return [
-    highlightStyleProp.of(styling),
-    EditorView.styleModule.of(styling.module)
-  ]
-}
 
 const enum Mode { Opaque, Inherit, Normal }
 
@@ -227,11 +207,16 @@ class Rule {
   get depth() { return this.context ? this.context.length : 0 }
 }
 
-class Styling {
-  module: StyleModule
-  map: {[tagID: number]: string | null} = Object.create(null)
+export class HighlightStyle {
+  /// Extension that registers this style with an editor.
+  readonly extension: Extension
 
-  constructor(spec: readonly (StyleSpec & {tag: Tag | readonly Tag[]})[]) {
+  /// A style module holding the CSS rules for this highlight style. If you use 
+  readonly module: StyleModule
+
+  private map: {[tagID: number]: string | null} = Object.create(null)
+
+  private constructor(spec: readonly (StyleSpec & {tag: Tag | readonly Tag[]})[]) {
     let modSpec = Object.create(null)
     for (let style of spec) {
       let cls = StyleModule.newName()
@@ -241,8 +226,14 @@ class Styling {
       for (let tag of tags) this.map[tag.id] = cls
     }
     this.module = new StyleModule(modSpec)
+    this.match = this.match.bind(this)
+    this.extension = [
+      highlightStyleProp.of(this),
+      EditorView.styleModule.of(this.module)
+    ]
   }
 
+  /// Returns the CSS class associated with the given tag, if any.
   match(tag: Tag) {
     for (let t of tag.set) {
       let match = this.map[t.id]
@@ -253,6 +244,42 @@ class Styling {
     }
     return this.map[tag.id] = null
   }
+
+  /// Create a highlighter style that associates the given styles to the
+  /// given tags. The spec's property names must be
+  /// [tags](#highlight.Tag) or lists of tags (which can be concatenated
+  /// with `+`). The values should be
+  /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
+  /// style objects that define the CSS for that tag.
+  ///
+  /// The CSS rules created for a highlighter will be emitted in the
+  /// order of the spec's properties. That means that for elements that
+  /// have multiple tags associated with them, styles defined further
+  /// down in the list will have a higher CSS precedence than styles
+  /// defined earlier.
+  static define(...specs: readonly {tag: Tag | readonly Tag[], [prop: string]: any}[]) {
+    return new HighlightStyle(specs)
+  }
+}
+
+
+/// Given a string of code and a language, parse the code in that
+/// language and run the tree highlighter over the resulting syntax
+/// tree. For each differently-styled range, call `emit` with the
+/// extend of the range and the CSS classes (as a space-separated
+/// string) that apply to it. `emit` will be called with an empty
+/// string for unstyled ranges.
+export function highlightTree(
+  tree: Tree,
+  /// Get the CSS classes used to style a given [tag](#highlight.Tag),
+  /// or `null` if it isn't styled.
+  getStyle: (tag: Tag) => string | null,
+  /// Assign styling to a region of the text. Will only be in order of
+  /// position for any ranges where more than zero classes apply.
+  /// `classes` is a space separated string of CSS classes.
+  putStyle: (from: number, to: number, classes: string) => void
+) {
+  highlightTreeRange(tree, 0, tree.length, getStyle, putStyle)
 }
 
 /// Returns an extension that installs a highlighter that uses the
@@ -267,11 +294,6 @@ export function treeHighlighter(language: Language) {
 }
 
 class TreeHighlighter {
-  // Reused stacks for buildDeco
-  nodeStack: string[] = [""]
-  classStack: string[] = [""]
-  inheritStack: string[] = [""]
-
   decorations: DecorationSet
   tree: Tree
   markCache: {[cls: string]: Decoration} = Object.create(null)
@@ -298,66 +320,71 @@ class TreeHighlighter {
     if (!style) return Decoration.none
 
     let builder = new RangeSetBuilder<Decoration>()
-    let start: number, curClass: string, depth: number
-    let flush = (pos: number, style: string) => {
-      if (pos > start && style) {
-        let mark = this.markCache[style] || (this.markCache[style] = Decoration.mark({class: style}))
-        builder.add(start, pos, mark)
-      }
-      start = pos
-    }
-
-    let {nodeStack, classStack, inheritStack} = this
     for (let {from, to} of view.visibleRanges) {
-      curClass = ""; depth = 0; start = from
-      this.tree.iterate({
-        from, to,
-        enter: (type, start) => {
-          depth++
-          let inheritedClass = inheritStack[depth - 1]
-          let cls = inheritedClass
-          let rule = type.prop(ruleNodeProp), opaque = false
-          while (rule) {
-            if (!rule.context || matchContext(rule.context, nodeStack, depth)) {
-              for (let tag of rule.tags) {
-                let st = style.match(tag)
-                if (st) {
-                  if (cls) cls += " "
-                  cls += st
-                  if (rule.mode == Mode.Inherit) inheritedClass = cls
-                  else if (rule.mode == Mode.Opaque) opaque = true
-                }
-              }
-              break
-            }
-            rule = rule.next
-          }
-          if (cls != curClass) {
-            flush(start, curClass)
-            curClass = cls
-          }
-          if (opaque) {
-            depth--
-            return false
-          }
-          classStack[depth] = cls
-          inheritStack[depth] = inheritedClass
-          nodeStack[depth] = type.name
-          return undefined
-        },
-        leave: (_t, _s, end) => {
-          depth--
-          let backTo = classStack[depth]
-          if (backTo != curClass) {
-            flush(Math.min(to, end), curClass)
-            curClass = backTo
-          }
-        }
+      highlightTreeRange(this.tree, from, to, style.match, (from, to, style) => {
+        builder.add(from, to, this.markCache[style] || (this.markCache[style] = Decoration.mark({class: style})))
       })
     }
     return builder.finish()
   }
-}  
+}
+
+// Reused stacks for highlightTreeRange
+const nodeStack = [""], classStack = [""], inheritStack = [""]
+
+function highlightTreeRange(tree: Tree, from: number, to: number,
+                       style: (tag: Tag) => string | null,
+                       span: (from: number, to: number, cls: string) => void) {
+  let spanStart = from, spanClass = "", depth = 0
+
+  tree.iterate({
+    from, to,
+    enter: (type, start) => {
+      depth++
+      let inheritedClass = inheritStack[depth - 1]
+      let cls = inheritedClass
+      let rule = type.prop(ruleNodeProp), opaque = false
+      while (rule) {
+        if (!rule.context || matchContext(rule.context, nodeStack, depth)) {
+          for (let tag of rule.tags) {
+            let st = style(tag)
+            if (st) {
+              if (cls) cls += " "
+              cls += st
+              if (rule.mode == Mode.Inherit) inheritedClass = cls
+              else if (rule.mode == Mode.Opaque) opaque = true
+            }
+          }
+          break
+        }
+        rule = rule.next
+      }
+      if (cls != spanClass) {
+        if (start > spanStart && spanClass) span(spanStart, start, spanClass)
+        spanStart = start
+        spanClass = cls
+      }
+      if (opaque) {
+        depth--
+        return false
+      }
+      classStack[depth] = cls
+      inheritStack[depth] = inheritedClass
+      nodeStack[depth] = type.name
+      return undefined
+    },
+    leave: (_t, _s, end) => {
+      depth--
+      let backTo = classStack[depth]
+      if (backTo != spanClass) {
+        let pos = Math.min(to, end)
+        if (pos > spanStart && spanClass) span(spanStart, pos, spanClass)
+        spanStart = pos
+        spanClass = backTo
+      }
+    }
+  })
+}
 
 function matchContext(context: readonly (null | string)[], stack: readonly string[], depth: number) {
   if (context.length > depth - 1) return false
@@ -591,7 +618,7 @@ export const tags = {
 }
 
 /// A default highlight style (works well with light themes).
-export const defaultHighlightStyle: Extension = precedence(highlightStyle(
+export const defaultHighlightStyle = HighlightStyle.define(
   {tag: tags.deleted,
    textDecoration: "line-through"},
   {tag: [tags.inserted, tags.link],
@@ -629,4 +656,4 @@ export const defaultHighlightStyle: Extension = precedence(highlightStyle(
    color: "#555"},
   {tag: tags.invalid,
    color: "#f00"}
-), "fallback")
+)
