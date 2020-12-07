@@ -24,4 +24,4 @@ export const changeFilter = Facet.define<(tr: Transaction) => boolean | readonly
 export const transactionFilter = Facet.define<(tr: Transaction) => TransactionSpec | readonly TransactionSpec[]>()
 
 export const transactionExtender =
-  Facet.define<(tr: Transaction) => Pick<TransactionSpec, "effects" | "annotations" | "reconfigure">>()
+  Facet.define<(tr: Transaction) => Pick<TransactionSpec, "effects" | "annotations" | "reconfigure"> | null>()
