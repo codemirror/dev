@@ -243,7 +243,7 @@ const enum Work {
 export class EditorParseContext implements ParseContext {
   private parse: PartialParse | null = null
   /// @internal
-  skippedUntil: {from: number, to: number, until: Promise<unknown>}[] = []
+  skippedTemp: {from: number, to: number}[] = []
 
   /// @internal
   constructor(
@@ -276,7 +276,7 @@ export class EditorParseContext implements ParseContext {
     for (;;) {
       let done = this.parse.advance()
       if (done) {
-        this.fragments = TreeFragment.addTree(done)
+        this.fragments = this.withoutTempSkipped(TreeFragment.addTree(done))
         this.parse = null
         this.tree = done
         return true
@@ -292,7 +292,7 @@ export class EditorParseContext implements ParseContext {
   takeTree() {
     if (this.parse && this.parse.pos > this.tree.length) {
       this.tree = this.parse.forceFinish()
-      this.fragments = TreeFragment.addTree(this.tree, this.fragments, true)
+      this.fragments = this.withoutTempSkipped(TreeFragment.addTree(this.tree, this.fragments, true))
     }
   }
 
@@ -303,7 +303,7 @@ export class EditorParseContext implements ParseContext {
     if (!changes.empty) {
       let ranges: ChangedRange[] = []
       changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
-      fragments = TreeFragment.applyChanges(fragments, ranges)
+      fragments = this.withoutTempSkipped(TreeFragment.applyChanges(fragments, ranges))
       tree = Tree.empty
       viewport = {from: changes.mapPos(viewport.from, -1), to: changes.mapPos(viewport.to, 1)}
       if (this.skipped.length) {
@@ -318,22 +318,27 @@ export class EditorParseContext implements ParseContext {
   }
 
   /// @internal
+  withoutTempSkipped(fragments: readonly TreeFragment[]) {
+    for (;;) {
+      let r = this.skippedTemp.pop()
+      if (!r) break
+      fragments = cutFragments(fragments, r.from, r.to)
+    }
+    return fragments
+  }
+
+  /// @internal
   updateViewport(viewport: {from: number, to: number}) {
     this.viewport = viewport
     let startLen = this.skipped.length
     for (let i = 0; i < this.skipped.length; i++) {
       let {from, to} = this.skipped[i]
       if (from < viewport.to && to > viewport.from) {
-        this.cutFragments(from, to)
+        this.fragments = cutFragments(this.fragments, from, to)
         this.skipped.splice(i--, 1)
       }
     }
     return this.skipped.length < startLen
-  }
-
-  /// @internal
-  cutFragments(from: number, to: number) {
-    this.fragments = TreeFragment.applyChanges(this.fragments, [{fromA: from, toA: to, fromB: from, toB: to}])
   }
 
   /// @internal
@@ -344,13 +349,23 @@ export class EditorParseContext implements ParseContext {
     }
   }
 
+  /// Notify the parse scheduler that the given region was skipped
+  /// because it wasn't in view, and the parse should be restarted
+  /// when it comes into view.
   skipUntilInView(from: number, to: number) {
     this.skipped.push({from, to})
   }
 
-  skipUntil(from: number, to: number, until: Promise<any>) {
-    this.skippedUntil.push({from, to, until})
+  /// Notify the parse scheduler that the given region was skipped in
+  /// this parse, and the tree nodes produced for it shouldn't be
+  /// reused on the next parse.
+  skipTemporarily(from: number, to: number) {
+    this.skippedTemp.push({from, to})
   }
+}
+
+function cutFragments(fragments: readonly TreeFragment[], from: number, to: number) {
+  return TreeFragment.applyChanges(fragments, [{fromA: from, toA: to, fromB: from, toB: to}])
 }
 
 class LanguageState {
@@ -403,7 +418,6 @@ class ParseWorker {
       cx.reset()
       this.scheduleWork()
     }
-    this.takeSkipped(cx)
   }
 
   scheduleWork() {
@@ -420,23 +434,8 @@ class ParseWorker {
     field.context.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     if (field.context.tree.length >= state.doc.length) {
       this.view.dispatch({effects: this.setState.of(new LanguageState(field.context))})
-      this.takeSkipped(field.context)
     } else {
       this.scheduleWork()
-    }
-  }
-
-  takeSkipped(context: EditorParseContext) {
-    while (context.skippedUntil.length) {
-      let {from, to, until} = context.skippedUntil.pop()!
-      until.then(() => {
-        let field = this.view.state.field(this.field, false)
-        if (field && field.context == context) {
-          context.cutFragments(from, to)
-          context.reset()
-          this.scheduleWork()
-        }
-      })
     }
   }
 
