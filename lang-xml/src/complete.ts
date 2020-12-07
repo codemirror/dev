@@ -10,6 +10,9 @@ export type ElementSpec = {
   /// Allowed children in this element. When not given, all elements
   /// are allowed inside it.
   children?: readonly string[],
+  /// When given, allows users to complete the given content strings
+  /// as plain text when at the start of the element.
+  textContent?: readonly string[],
   /// Whether this element may appear at the top of the document.
   top?: boolean,
   /// Allowed attributes in this element. Strings refer to attributes
@@ -108,6 +111,7 @@ class Element {
   closeCompletion: Completion
   closeNameCompletion: Completion
   children: Element[] = []
+  text: Completion[]
 
   constructor(spec: ElementSpec,
               readonly attrs: readonly Completion[],
@@ -117,6 +121,7 @@ class Element {
     this.openCompletion = {...this.completion, label: "<" + this.name}
     this.closeCompletion = {...this.completion, label: "</" + this.name + ">", boost: 2}
     this.closeNameCompletion = {...this.completion, label: this.name + ">"}
+    this.text = spec.textContent ? spec.textContent.map(s => ({label: s, type: "text"})) : []
   }
 }
 
@@ -217,9 +222,15 @@ export function completeFromSchema(eltSpecs: readonly ElementSpec[], attrSpecs: 
       let closing = [], last = context && context.lastChild
       if (parentName && (!last || last.name != "CloseTag" || tagName(doc, last) != parentName))
         closing.push(parent ? parent.closeCompletion : {label: "</" + parentName + ">", type: "type", boost: 2})
+      let options = closing.concat((parent?.children || (context ? allElements : topElements)).map(e => e.openCompletion))
+      if (context && parent?.text.length) {
+        let openTag = context.firstChild!
+        if (openTag.to > cx.pos - 20 && !/\S/.test(cx.state.sliceDoc(openTag.to, cx.pos)))
+          options = options.concat(parent.text)
+      }
       return {
         from,
-        options: closing.concat((parent?.children || (context ? allElements : topElements)).map(e => e.openCompletion)),
+        options,
         span: /^<\/?[:\-\.\w\u00b7-\uffff]*$/
       }
     } else {

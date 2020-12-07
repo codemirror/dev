@@ -98,4 +98,16 @@ describe("XML completion", () => {
     ist(get("<d|", schema1)!.options[0].type, "keyword")
     ist(get("<doc attr|", schema1)!.options.filter(c => c.label == "attr3")[0].type, "keyword")
   })
+
+  it("completes the top element", () => {
+    ist(str(get("|", schema1)), "<doc")
+  })
+
+  it("completes pre-provided text", () => {
+    let schema = {
+      elements: [{name: "top", textContent: ["true", "false"], children: []}]
+    }
+    ist(str(get("<top>|", schema)), "</top>, false, true")
+    ist(str(get("<top>a|</top>", schema)), "")
+  })
 })
