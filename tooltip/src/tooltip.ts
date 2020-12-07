@@ -197,9 +197,13 @@ class HoverPlugin {
     let pos = this.view.contentDOM.contains(lastMove.target as HTMLElement)
       ? this.view.posAtCoords(coords) : null
     if (pos == null) return
-    let dom = this.view.domAtPos(pos)
-    let side = coordsOnChar(dom, -1, coords) ? -1 : coordsOnChar(dom, 1, coords) ? 1 : 0
-    let open = side ? this.source(this.view, pos, side as -1 | 1) : null
+    let posCoords = this.view.coordsAtPos(pos)
+    if (posCoords == null || coords.y < posCoords.top || coords.y > posCoords.bottom ||
+        coords.x < posCoords.left - this.view.defaultCharacterWidth ||
+        coords.x > posCoords.right + this.view.defaultCharacterWidth) return
+    let bidi = this.view.bidiSpans(this.view.state.doc.lineAt(pos)).find(s => s.from <= pos! && s.to >= pos!)
+    let rtl = bidi && bidi.dir == Direction.RTL ? -1 : 1
+    let open = this.source(this.view, pos, (coords.x < posCoords.left ? -rtl : rtl) as -1 | 1)
     if (open) this.view.dispatch({effects: this.setHover.of(open)})
   }
 
@@ -239,33 +243,13 @@ function isInTooltip(elt: HTMLElement) {
   return false
 }
 
-function coordsOnChar({node, offset}: {node: Node, offset: number}, side: -1 | 1, {x, y}: {x: number, y: number}) {
-  let cur: Node | null = node
-  while (cur.nodeType == 1) {
-    if ((cur as HTMLElement).contentEditable == "false") return false
-    cur = cur.childNodes[offset + (side < 0 ? -1 : 0)]
-    if (!cur) return false
-    offset = side > 0 ? 0 : cur.nodeType == 3 ? cur.nodeValue!.length : cur.childNodes.length
-  }
-  if (cur.nodeType != 3 || (side < 0 ? !offset : offset == cur.nodeValue!.length)) return false
-  let range = document.createRange()
-  range.setEnd(cur, side < 0 ? offset : offset + 1)
-  range.setStart(cur, side < 0 ? offset - 1 : offset)
-  let rects = range.getClientRects(), match = false
-  for (let i = 0; i < rects.length; i++) {
-    let rect = rects[i]
-    if (rect.left <= x && rect.right >= x && rect.top <= y && rect.bottom >= y) match = true
-  }
-  range.detach()
-  return match
-}
-
 function isOverRange(view: EditorView, from: number, to: number, x: number, y: number, margin: number) {
   let range = document.createRange()
   let fromDOM = view.domAtPos(from), toDOM = view.domAtPos(to)
   range.setEnd(toDOM.node, toDOM.offset)
   range.setStart(fromDOM.node, fromDOM.offset)
   let rects = range.getClientRects()
+  range.detach()
   for (let i = 0; i < rects.length; i++) {
     let rect = rects[i]
     let dist = Math.max(rect.top - y, y - rect.bottom, rect.left - x, x - rect.right)
@@ -277,10 +261,10 @@ function isOverRange(view: EditorView, from: number, to: number, x: number, y: n
 /// Enable a hover tooltip, which shows up when the pointer hovers
 /// over ranges of text. The callback is called when the mouse overs
 /// over the document text. It should, if there is a tooltip
-/// associated with position `pos` (optionally also checking the side,
-/// which is -1 when the pointer is on the character before the
-/// position, and 1 when on the character after the position), return
-/// the tooltip description.
+/// associated with position `pos` return the tooltip description. The
+/// `side` argument indicates on which side of the position the
+/// pointer is—it will be -1 if the pointer is before
+/// the position, 1 if after the position.
 export function hoverTooltip(
   source: (view: EditorView, pos: number, side: -1 | 1) => Tooltip | null,
   options: {hideOnChange?: boolean} = {}
