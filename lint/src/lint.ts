@@ -128,14 +128,15 @@ const lintState = StateField.define<LintState>({
 
 const activeMark = Decoration.mark({class: themeClass("lintRange.active")})
 
-function lintTooltip(view: EditorView, check: (from: number, to: number) => boolean) {
+function lintTooltip(view: EditorView, pos: number, side: -1 | 1) {
   let {diagnostics} = view.state.field(lintState)
   let found: Diagnostic[] = [], stackStart = 2e8, stackEnd = 0
-  diagnostics.between(0, view.state.doc.length, (start, end, {spec}) => {
-    if (check(start, end)) {
+  diagnostics.between(pos, pos, (from, to, {spec}) => {
+    if (pos >= from && pos <= to &&
+        (from == to || ((pos > from || side > 0) && (pos < to || side < 0)))) {
       found.push(spec.diagnostic)
-      stackStart = Math.min(start, stackStart)
-      stackEnd = Math.max(end, stackEnd)
+      stackStart = Math.min(from, stackStart)
+      stackEnd = Math.max(to, stackEnd)
     }
   })
   if (!found.length) return null

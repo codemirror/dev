@@ -171,7 +171,7 @@ class HoverPlugin {
   mouseInside = false
 
   constructor(readonly view: EditorView,
-              readonly source: (view: EditorView, check: (from: number, to: number) => boolean) => Tooltip | null,
+              readonly source: (view: EditorView, pos: number, side: -1 | 1) => Tooltip | null,
               readonly field: StateField<Tooltip | null>,
               readonly setHover: StateEffectType<Tooltip | null>) {
     this.checkHover = this.checkHover.bind(this)
@@ -193,11 +193,13 @@ class HoverPlugin {
       return
     }
 
+    let coords = {x: lastMove.clientX, y: lastMove.clientY}
     let pos = this.view.contentDOM.contains(lastMove.target as HTMLElement)
-      ? this.view.posAtCoords({x: lastMove.clientX, y: lastMove.clientY}) : -1
-    let open = pos == null ? null : this.source(this.view, (from, to) => {
-      return from <= pos! && to >= pos! && (from == to || isOverRange(this.view, from, to, lastMove.clientX, lastMove.clientY))
-    })
+      ? this.view.posAtCoords(coords) : null
+    if (pos == null) return
+    let dom = this.view.domAtPos(pos)
+    let side = coordsOnChar(dom, -1, coords) ? -1 : coordsOnChar(dom, 1, coords) ? 1 : 0
+    let open = side ? this.source(this.view, pos, side as -1 | 1) : null
     if (open) this.view.dispatch({effects: this.setHover.of(open)})
   }
 
@@ -237,7 +239,28 @@ function isInTooltip(elt: HTMLElement) {
   return false
 }
 
-function isOverRange(view: EditorView, from: number, to: number, x: number, y: number, margin = 0) {
+function coordsOnChar({node, offset}: {node: Node, offset: number}, side: -1 | 1, {x, y}: {x: number, y: number}) {
+  let cur: Node | null = node
+  while (cur.nodeType == 1) {
+    if ((cur as HTMLElement).contentEditable == "false") return false
+    cur = cur.childNodes[offset + (side < 0 ? -1 : 0)]
+    if (!cur) return false
+    offset = side > 0 ? 0 : cur.nodeType == 3 ? cur.nodeValue!.length : cur.childNodes.length
+  }
+  if (cur.nodeType != 3 || (side < 0 ? !offset : offset == cur.nodeValue!.length)) return false
+  let range = document.createRange()
+  range.setEnd(cur, side < 0 ? offset : offset + 1)
+  range.setStart(cur, side < 0 ? offset - 1 : offset)
+  let rects = range.getClientRects(), match = false
+  for (let i = 0; i < rects.length; i++) {
+    let rect = rects[i]
+    if (rect.left <= x && rect.right >= x && rect.top <= y && rect.bottom >= y) match = true
+  }
+  range.detach()
+  return match
+}
+
+function isOverRange(view: EditorView, from: number, to: number, x: number, y: number, margin: number) {
   let range = document.createRange()
   let fromDOM = view.domAtPos(from), toDOM = view.domAtPos(to)
   range.setEnd(toDOM.node, toDOM.offset)
@@ -252,11 +275,14 @@ function isOverRange(view: EditorView, from: number, to: number, x: number, y: n
 }
 
 /// Enable a hover tooltip, which shows up when the pointer hovers
-/// over ranges of text. The callback should, for each hoverable
-/// range, call its `check` argument to see if that range is being
-/// hovered over, and return a tooltip description when it is.
+/// over ranges of text. The callback is called when the mouse overs
+/// over the document text. It should, if there is a tooltip
+/// associated with position `pos` (optionally also checking the side,
+/// which is -1 when the pointer is on the character before the
+/// position, and 1 when on the character after the position), return
+/// the tooltip description.
 export function hoverTooltip(
-  source: (view: EditorView, check: (from: number, to: number) => boolean) => Tooltip | null,
+  source: (view: EditorView, pos: number, side: -1 | 1) => Tooltip | null,
   options: {hideOnChange?: boolean} = {}
 ): Extension {
   const setHover = StateEffect.define<Tooltip | null>()
