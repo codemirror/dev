@@ -124,6 +124,10 @@ const handleKeyEvents = EditorView.domEventHandlers({
 /// in separate maps), the bound commands all get a chance to handle
 /// the key stroke, in order of precedence, until one of them returns
 /// true.
+///
+/// `platform` indicates the platform that the keymap should be
+/// specialized for. It defaults to the user's platform as determined
+/// via `navigator.platform`.
 export function keymap(bindings: readonly KeyBinding[], platform?: "mac" | "win" | "linux") {
   return [handleKeyEvents, keymaps.of(buildKeymap(bindings, platform))]
 }
