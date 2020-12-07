@@ -105,6 +105,17 @@ export class Language {
     }
     return this.data
   }
+
+  /// Use this language to parse the given string into a tree.
+  parseString(code: string) {
+    let doc = Text.of(code.split("\n"))
+    let parse = this.parser.startParse(new DocInput(doc), 0,
+                                       new EditorParseContext(this.parser, EditorState.create({doc}), [],
+                                                              Tree.empty, {from: 0, to: code.length}, []))
+    let tree
+    while (!(tree = parse.advance())) {}
+    return tree
+  }
 }
 
 /// A subclass of `Language` for use with
