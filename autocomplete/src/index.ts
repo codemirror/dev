@@ -7,10 +7,9 @@ import {CompletionContext, Completion, CompletionSource} from "./completion"
 import {completionState, State} from "./state"
 import {CompletionConfig, completionConfig} from "./config"
 import {completionPlugin, moveCompletionSelection, acceptCompletion, startCompletion, closeCompletion} from "./view"
-import {SnippetSpec, snippet} from "./snippet"
 import {baseTheme} from "./theme"
 
-export {snippet, SnippetSpec} from "./snippet"
+export {snippet, snippetCompletion} from "./snippet"
 export {Completion, CompletionContext, CompletionSource, CompletionResult} from "./completion"
 export {startCompletion, closeCompletion, acceptCompletion, moveCompletionSelection} from "./view"
 
@@ -79,11 +78,6 @@ export function ifNotIn(nodes: readonly string[], source: CompletionSource) {
       if (nodes.indexOf(pos.name) > -1) return null
     return source(context)
   }
-}
-
-/// Create a completion source from an array of snippet specs.
-export function completeSnippets(snippets: readonly SnippetSpec[]): CompletionSource {
-  return completeFromList(snippets.map(s => Object.assign({}, s, {apply: snippet(s.snippet)})))
 }
 
 /// Get the current completion status. When completions are available,

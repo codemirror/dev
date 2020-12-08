@@ -183,10 +183,9 @@ const snippetKeymap = precedence(keymap([
   {key: "Escape", run: clearSnippet}
 ]), "override")
 
-/// Languages can export arrays of snippets using this format.
-/// [`completeSnippets`](#autocomplete.completeSnippets) can be used
-/// to turn them into a completion source.
-export interface SnippetSpec extends Completion {
-  /// The [snippet template](#autocomplete.snippet) to use.
-  snippet: string
+/// Create a completion from a snippet. Returns an object with the
+/// properties from `completion`, plus an `apply` function that
+/// applies the snippet.
+export function snippetCompletion(template: string, completion: Completion): Completion {
+  return {...completion, apply: snippet(template)}
 }

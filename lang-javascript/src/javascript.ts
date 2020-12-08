@@ -1,7 +1,7 @@
 import {parser} from "lezer-javascript"
 import {LezerLanguage, flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {completeSnippets} from "@codemirror/next/autocomplete"
+import {completeFromList, ifNotIn} from "@codemirror/next/autocomplete"
 import {Extension} from "@codemirror/next/state"
 import {snippets} from "./snippets"
 
@@ -90,7 +90,9 @@ export const javascriptLanguage = LezerLanguage.define({
 /// Returns an extension that installs JavaScript support features
 /// (completion of [snippets](#lang-javascript.snippets)).
 export function javascriptSupport(): Extension {
-  return javascriptLanguage.data.of({autocomplete: completeSnippets(snippets)})
+  return javascriptLanguage.data.of({
+    autocomplete: ifNotIn(["LineComment", "BlockComment", "String"], completeFromList(snippets))
+  })
 }
 
 const dialects: {[dialect: string]: LezerLanguage} = {"": javascriptLanguage}
