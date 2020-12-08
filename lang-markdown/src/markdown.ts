@@ -1,5 +1,5 @@
 import {Extension} from "@codemirror/next/state"
-import {Language, defineLanguageFacet, languageDataProp, foldNodeProp} from "@codemirror/next/language"
+import {Language, defineLanguageFacet, languageDataProp, foldNodeProp, indentNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser} from "lezer-markdown"
 import {htmlLanguage} from "@codemirror/next/lang-html"
@@ -31,6 +31,9 @@ export const markdownLanguage = new class extends Language {
         foldNodeProp.add(type => {
           if (!type.is("Block") || type.is("Document")) return undefined
           return (tree, state) => ({from: state.doc.lineAt(tree.from).to, to: tree.to})
+        }),
+        indentNodeProp.add({
+          Document: () => null
         }),
         languageDataProp.add({
           Document: data

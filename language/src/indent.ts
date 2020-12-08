@@ -134,7 +134,7 @@ export class IndentContext {
 /// with node types. Such a strategy is a function from an indentation
 /// context to a column number or null, where null indicates that no
 /// definitive indentation can be determined.
-export const indentNodeProp = new NodeProp<(context: TreeIndentContext) => number>()
+export const indentNodeProp = new NodeProp<(context: TreeIndentContext) => number | null>()
 
 // Compute the indentation for a given position from the syntax tree.
 function syntaxIndentation(cx: IndentContext, ast: Tree, pos: number) {
@@ -166,7 +166,7 @@ function ignoreClosed(cx: TreeIndentContext) {
   return cx.pos == cx.options?.simulateBreak && cx.options?.simulateDoubleBreak
 }
 
-function indentStrategy(tree: SyntaxNode): ((context: TreeIndentContext) => number) | null {
+function indentStrategy(tree: SyntaxNode): ((context: TreeIndentContext) => number | null) | null {
   let strategy = tree.type.prop(indentNodeProp)
   if (strategy) return strategy
   let first = tree.firstChild, close: readonly string[] | undefined
