@@ -75,7 +75,9 @@ export class Language {
     this.extension = [
       language.of(this),
       this.field,
-      ViewPlugin.define(view => new ParseWorker(view, this.field, setState)),
+      ViewPlugin.define(view => new ParseWorker(view, this.field, setState), {
+        eventHandlers: {focus() { this.scheduleWork() }}
+      }),
       treeHighlighter(this),
       EditorState.languageData.of((state, pos) => state.facet(this.languageDataFacetAt(state, pos)))
     ].concat(extraExtensions)
@@ -234,9 +236,17 @@ const enum Work {
   // Amount of work time to perform in pseudo-thread when idle callbacks aren't supported
   Slice = 100,
   // Maximum pause (timeout) for the pseudo-thread
-  Pause = 200,
-  // Don't parse beyond this point unless explicitly requested to with `ensureTree`.
-  MaxPos = 5e6
+  Pause = 500,
+  // Parse time budgets are assigned per chunk—the parser can run for
+  // ChunkBudget milliseconds at most during ChunkTime milliseconds.
+  // After that, no further background parsing is scheduled until the
+  // next chunk in which the editor is active.
+  ChunkBudget = 3000,
+  ChunkTime = 30000,
+  // For every change the editor receives while focused, it gets a
+  // small bonus to its parsing budget (as a way to allow active
+  // editors to continue doing work).
+  ChangeBonus = 100
 }
 
 /// A parse context provided to parsers working on the editor content.
@@ -266,7 +276,6 @@ export class EditorParseContext implements ParseContext {
   ) {}
 
   /// @internal
-  // FIXME do something with badness again
   work(time: number, upto?: number) {
     if (this.tree != Tree.empty && (upto == null ? this.tree.length == this.state.doc.length : this.tree.length >= upto))
       return true
@@ -383,9 +392,14 @@ class LanguageState {
 
   apply(tr: Transaction) {
     if (!tr.docChanged) return this
-    let newState = this.context.changes(tr.changes, tr.state)
-    newState.work(Work.Apply)
-    return new LanguageState(newState)
+    let newCx = this.context.changes(tr.changes, tr.state)
+    // If the previous parse wasn't done, go forward only up to its
+    // end position or the end of the viewport, to avoid slowing down
+    // state updates with parse work beyond the viewport.
+    let upto = this.context.tree.length == tr.startState.doc.length ? undefined
+      : Math.max(tr.changes.mapPos(this.context.tree.length), newCx.viewport.to)
+    if (!newCx.work(Work.Apply, upto)) newCx.takeTree()
+    return new LanguageState(newCx)
   }
 }
 
@@ -397,12 +411,12 @@ let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number 
   ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
 let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
 
-// FIXME figure out some way to back off from full re-parses when the
-// document is large—you could waste a lot of battery re-parsing a
-// multi-megabyte document every time you insert a backtick, even if
-// it happens in the background.
 class ParseWorker {
   working: number = -1
+  // End of the current time chunk
+  chunkEnd = -1
+  // Milliseconds of budget left for this chunk
+  chunkBudget = -1
 
   constructor(readonly view: EditorView, 
               readonly field: StateField<LanguageState>,
@@ -412,7 +426,10 @@ class ParseWorker {
   }
 
   update(update: ViewUpdate) {
-    if (update.docChanged) this.scheduleWork()
+    if (update.docChanged) {
+      if (this.view.hasFocus) this.chunkBudget += Work.ChangeBonus
+      this.scheduleWork()
+    }
     let cx = this.view.state.field(this.field).context
     if (update.viewportChanged && cx.updateViewport(update.view.viewport)) {
       cx.reset()
@@ -429,9 +446,22 @@ class ParseWorker {
 
   work(deadline?: Deadline) {
     this.working = -1
+
+    let now = Date.now()
+    if (this.chunkEnd < now) {
+      if (this.view.hasFocus) { // Start a new chunk
+        this.chunkEnd = now + Work.ChunkTime
+        this.chunkBudget = Work.ChunkBudget
+      } else if (this.chunkBudget <= 0) { // No more budget
+        return
+      }
+    }
+
     let {state} = this.view, field = state.field(this.field)
     if (field.tree.length >= state.doc.length) return
-    field.context.work(deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    let time = Math.min(this.chunkBudget, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
+    field.context.work(time)
+    this.chunkBudget -= Date.now() - now
     if (field.context.tree.length >= state.doc.length) {
       this.view.dispatch({effects: this.setState.of(new LanguageState(field.context))})
     } else {
