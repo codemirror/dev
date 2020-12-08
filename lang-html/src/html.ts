@@ -1,7 +1,7 @@
 import {parser, configureNesting} from "lezer-html"
 import {cssLanguage} from "@codemirror/next/lang-css"
 import {javascriptLanguage, javascriptSupport} from "@codemirror/next/lang-javascript"
-import {LezerLanguage, delimitedIndent, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
+import {LezerLanguage, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
 import {Extension} from "@codemirror/next/state"
@@ -13,10 +13,14 @@ import {Extension} from "@codemirror/next/state"
 export const htmlLanguage = LezerLanguage.define({
   parser: parser.configure({
     props: [
-      indentNodeProp.add(type => {
-        if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
-        if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
-        return undefined
+      indentNodeProp.add({
+        Element(context) {
+          let closed = /^\s*<\//.test(context.textAfter)
+          return context.lineIndent(context.state.doc.lineAt(context.node.from)) + (closed ? 0 : context.unit)
+        },
+        "OpenTag CloseTag SelfClosingTag"(context) {
+          return context.column(context.node.from) + context.unit
+        }
       }),
       foldNodeProp.add({
         Element(node) {

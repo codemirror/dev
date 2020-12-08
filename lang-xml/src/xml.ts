@@ -1,5 +1,5 @@
 import {parser} from "lezer-xml"
-import {continuedIndent, delimitedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
+import {indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
@@ -10,10 +10,14 @@ import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 export const xmlLanguage = LezerLanguage.define({
   parser: parser.configure({
     props: [
-      indentNodeProp.add(type => {
-        if (type.name == "Element") return delimitedIndent({closing: "</", align: false})
-        if (type.name == "OpenTag" || type.name == "CloseTag" || type.name == "SelfClosingTag") return continuedIndent()
-        return undefined
+      indentNodeProp.add({
+        Element(context) {
+          let closed = /^\s*<\//.test(context.textAfter)
+          return context.lineIndent(context.state.doc.lineAt(context.node.from)) + (closed ? 0 : context.unit)
+        },
+        "OpenTag CloseTag SelfClosingTag"(context) {
+          return context.column(context.node.from) + context.unit
+        }
       }),
       foldNodeProp.add({
         Element(subtree) {
