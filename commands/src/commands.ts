@@ -525,7 +525,7 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let insert = ["", indentString(state, indent)]
     if (explode) insert.push(indentString(state, cx.lineIndent(line)))
     return {changes: {from, to, insert: Text.of(insert)},
-            range: EditorSelection.cursor(from + 1 + indent)}
+            range: EditorSelection.cursor(from + 1 + insert[1].length)}
   })
   dispatch(state.update(changes, {scrollIntoView: true}))
   return true
