@@ -105,6 +105,8 @@ export class StreamLanguage<State> extends Language {
     let text = cx.state.doc.lineAt(pos).slice(0, 100)
     return this.streamParser.indent(state, /^\s*(.*)/.exec(text)![1], cx)
   }
+
+  get allowsNesting() { return false }
 }
 
 function findState<State>(

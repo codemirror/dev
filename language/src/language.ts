@@ -79,7 +79,7 @@ export class Language {
         eventHandlers: {focus() { this.scheduleWork() }}
       }),
       treeHighlighter(this),
-      EditorState.languageData.of((state, pos) => state.facet(this.languageDataFacetAt(state, pos)))
+      EditorState.languageData.of((state, pos) => state.facet(languageDataFacetAt(this, state, pos)))
     ].concat(extraExtensions)
   }
 
@@ -96,17 +96,35 @@ export class Language {
     return parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
   }
 
-  /// @internal
-  languageDataFacetAt(state: EditorState, pos: number) {
-    let tree = this.getTree(state)
-    let target: SyntaxNode | null = tree.resolve(pos, -1)
-    while (target) {
-      let facet = target.type.prop(languageDataProp)
-      if (facet) return facet
-      target = target.parent
-    }
-    return this.data
+  /// Query whether this language is active at the given position.
+  isActiveAt(state: EditorState, pos: number) {
+    let lang = state.facet(language)
+    return lang.length > 0 && languageDataFacetAt(lang[0], state, pos) == this.data
   }
+
+  /// Find the document regions that were parsed using this language.
+  /// The returned regions will _include_ any nested languages rooted
+  /// in this language, if applicable.
+  findRegions(state: EditorState) {
+    let lang = state.facet(language)
+    if (lang.length && lang[0].data == this.data) return [{from: 0, to: state.doc.length}]
+    if (!lang.length || !lang[0].allowsNesting) return []
+    let result: {from: number, to: number}[] = []
+    lang[0].getTree(state).iterate({
+      enter: (type, from, to) => {
+        if (type.isTop && type.prop(languageDataProp) == this.data) {
+          result.push({from, to})
+          return false
+        }
+        return undefined
+      }
+    })
+    return result
+  }
+
+  /// Indicates whether this language allows nested languages. The
+  /// default implementation returns true.
+  get allowsNesting() { return true }
 
   /// Use this language to parse the given string into a tree.
   parseString(code: string) {
@@ -118,6 +136,18 @@ export class Language {
     while (!(tree = parse.advance())) {}
     return tree
   }
+}
+
+function languageDataFacetAt(topLang: Language, state: EditorState, pos: number) {
+  if (!topLang.allowsNesting) return topLang.data
+  let tree = topLang.getTree(state)
+  let target: SyntaxNode | null = tree.resolve(pos, -1)
+  while (target) {
+    let facet = target.type.prop(languageDataProp)
+    if (facet) return facet
+    target = target.parent
+  }
+  return topLang.data
 }
 
 /// A subclass of `Language` for use with
@@ -151,9 +181,7 @@ export class LezerLanguage extends Language {
     return new LezerLanguage(this.data, this.parser.configure(options))
   }
 
-  languageDataFacetAt(state: EditorState, pos: number) {
-    return this.parser.hasNested ? super.languageDataFacetAt(state, pos) : this.data
-  }
+  get allowsNesting() { return this.parser.hasNested }
 }
 
 /// Get the syntax tree for a state, which is the current (possibly

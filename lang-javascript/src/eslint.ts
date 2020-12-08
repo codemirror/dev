@@ -1,7 +1,6 @@
 import {Diagnostic} from "@codemirror/next/lint"
-import {Text, EditorState} from "@codemirror/next/state"
+import {Text} from "@codemirror/next/state"
 import {EditorView} from "@codemirror/next/view"
-import {language} from "@codemirror/next/language"
 import {javascriptLanguage} from "./javascript"
 
 /// Connects an [ESLint](https://eslint.org/) linter to CodeMirror's
@@ -28,27 +27,13 @@ export function esLint(eslint: any, config?: any) {
     })
   }
 
-  function range(state: EditorState, from: number = 0, to: number = state.doc.length) {
-    let fromLine = state.doc.lineAt(from), offset = {line: fromLine.number - 1, col: from - fromLine.from, pos: from}
-    return eslint.verify(state.sliceDoc(from, to), config)
-      .map((val: any) => translateDiagnostic(val, state.doc, offset))
-  }
-
   return (view: EditorView) => {
-    let [lang] = view.state.facet(language)
-    if (lang == javascriptLanguage) return range(view.state)
-    if (!lang) return []
-    let found: Diagnostic[] = []
-    // FIXME move to async parsing?
-    lang.getTree(view.state).iterate({
-      enter(type, start, end) {
-        if (type.isTop && javascriptLanguage.parser.nodeSet.types[type.id] == type) {
-          for (let d of range(view.state, start, end)) found.push(d)
-          return false
-        }
-        return undefined
-      }
-    })
+    let {state} = view, found: Diagnostic[] = []
+    for (let {from, to} of javascriptLanguage.findRegions(state)) {
+      let fromLine = state.doc.lineAt(from), offset = {line: fromLine.number - 1, col: from - fromLine.from, pos: from}
+      for (let d of eslint.verify(state.sliceDoc(from, to), config))
+        found.push(translateDiagnostic(d, state.doc, offset))
+    }
     return found
   }
 }
