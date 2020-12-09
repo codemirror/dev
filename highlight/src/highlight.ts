@@ -653,7 +653,7 @@ export const defaultHighlightStyle = HighlightStyle.define(
   {tag: tags.comment,
    color: "#940"},
   {tag: tags.meta,
-   color: "#555"},
+   color: "#7a757a"},
   {tag: tags.invalid,
    color: "#f00"}
 )

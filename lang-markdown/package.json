@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/markdown",
+  "types": "src/index",
   "type": "module"
 }

@@ -1,4 +1,3 @@
-import {Extension} from "@codemirror/next/state"
 import {Language, defineLanguageFacet, languageDataProp, foldNodeProp, indentNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser} from "lezer-markdown"
@@ -43,8 +42,3 @@ export const markdownLanguage = new class extends Language {
     }))
   }
 } as Language
-
-/// Returns an extension that installs the Markdown language.
-export function markdown(): Extension {
-  return markdownLanguage
-}
