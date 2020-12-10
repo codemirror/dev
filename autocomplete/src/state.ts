@@ -1,7 +1,7 @@
 import {EditorView} from "@codemirror/next/view"
 import {Transaction, StateField, StateEffect, EditorState, ChangeDesc} from "@codemirror/next/state"
 import {Tooltip, showTooltip} from "@codemirror/next/tooltip"
-import {Option, CompletionSource, CompletionResult, cur} from "./completion"
+import {Option, CompletionSource, CompletionResult, cur, asSource, Completion} from "./completion"
 import {FuzzyMatcher} from "./filter"
 import {completionTooltip} from "./tooltip"
 import {CompletionConfig, completionConfig} from "./config"
@@ -72,7 +72,8 @@ export class CompletionState {
 
   update(tr: Transaction) {
     let {state} = tr, conf = state.facet(completionConfig)
-    let sources = conf.override || state.languageDataAt<CompletionSource>("autocomplete", cur(state))
+    let sources = conf.override ||
+      state.languageDataAt<CompletionSource | readonly (string | Completion)[]>("autocomplete", cur(state)).map(asSource)
     let active: readonly ActiveSource[] = sources.map(source => {
       let value = this.active.find(s => s.source == source) || new ActiveSource(source, State.Inactive, false)
       return value.update(tr, conf)

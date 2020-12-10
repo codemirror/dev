@@ -89,6 +89,46 @@ export class CompletionContext {
   }
 }
 
+function toSet(chars: {[ch: string]: true}) {
+  let flat = Object.keys(chars).join("")
+  let words = /\w/.test(flat)
+  if (words) flat = flat.replace(/\w/g, "")
+  return `[${words ? "\\w" : ""}${flat.replace(/[^\w\s]/g, "\\$&")}]`
+}
+
+function prefixMatch(options: readonly Completion[]) {
+  let first = Object.create(null), rest = Object.create(null)
+  for (let {label} of options) {
+    first[label[0]] = true
+    for (let i = 1; i < label.length; i++) rest[label[i]] = true
+  }
+  let source = toSet(first) + toSet(rest) + "*$"
+  return [new RegExp("^" + source), new RegExp(source)]
+}
+
+/// Given a a fixed array of options, return an autocompleter that
+/// compares those options to the current
+/// [token](#autocomplete.CompletionContext.tokenBefore) and returns
+/// the matching ones.
+export function completeFromList(list: readonly (string | Completion)[]): CompletionSource {
+  let options = list.map(o => typeof o == "string" ? {label: o} : o) as Completion[]
+  let [span, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options)
+  return (context: CompletionContext) => {
+    let token = context.matchBefore(match)
+    return token || context.explicit ? {from: token ? token.from : context.pos, options, span} : null
+  }
+}
+
+/// Wrap the given completion source so that it will not fire when the
+/// cursor is in a syntax node with one of the given names.
+export function ifNotIn(nodes: readonly string[], source: CompletionSource) {
+  return (context: CompletionContext) => {
+    for (let pos: SyntaxNode | null = syntaxTree(context.state).resolve(context.pos, -1); pos; pos = pos.parent)
+      if (nodes.indexOf(pos.name) > -1) return null
+    return source(context)
+  }
+}
+
 /// The function signature for a completion source. Such a function
 /// may return its [result](#autocomplete.CompletionResult)
 /// synchronously or as a promise. Returning null indicates no
@@ -143,4 +183,13 @@ export function applyCompletion(view: EditorView, option: Option) {
   } else {
     apply(view, option.completion, result.from, result.to)
   }
+}
+
+const SourceCache = new WeakMap<readonly (string | Completion)[], CompletionSource>()
+
+export function asSource(source: CompletionSource | readonly (string | Completion)[]): CompletionSource {
+  if (!Array.isArray(source)) return source as CompletionSource
+  let known = SourceCache.get(source)
+  if (!known) SourceCache.set(source, known = completeFromList(source))
+  return known
 }
