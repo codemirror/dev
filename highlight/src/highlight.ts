@@ -551,6 +551,8 @@ export const tags = {
   heading5: t(heading),
   /// A level 6 [heading](#highlight.tags.heading).
   heading6: t(heading),
+  /// A prose separator (such as a horizontal rule).
+  contentSeparator: t(content),
   /// [Content](#highlight.tags.content) that represents a list or
   /// list marker.
   list: t(content),
@@ -596,9 +598,10 @@ export const tags = {
   /// something is constant. Mostly expected to be used with
   /// [variable names](#highlight.tags.variableName).
   constant: Tag.defineModifier(),
-  /// [Modifier](#highlight.Tag^defineModifier) used to indicate that a
-  /// [variable name](#highlight.tags.variableName) is being called or
-  /// being defined as a function.
+  /// [Modifier](#highlight.Tag^defineModifier) used to indicate that
+  /// a [variable](#highlight.tags.variableName) or [property
+  /// name](#highlight.tags.propertyName) is being called or defined
+  /// as a function.
   function: Tag.defineModifier(),
   /// [Modifier](#highlight.Tag^defineModifier) that can be applied to
   /// [names](#highlight.tags.name) to indicate that they belong to
@@ -632,7 +635,7 @@ export const defaultHighlightStyle = HighlightStyle.define(
    fontWeight: "bold"},
   {tag: tags.keyword,
    color: "#708"},
-  {tag: [tags.atom, tags.bool, tags.url],
+  {tag: [tags.atom, tags.bool, tags.url, tags.contentSeparator],
    color: "#219"},
   {tag: tags.number,
    color: "#164"},

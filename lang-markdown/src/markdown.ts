@@ -13,7 +13,7 @@ export const markdownLanguage = new class extends Language {
       props: [
         styleTags({
           "Blockquote/...": t.quote,
-          HorizontalRule: t.atom,
+          HorizontalRule: t.contentSeparator,
           "ATXHeading/... SetextHeading/...": t.heading,
           "Comment CommentBlock": t.comment,
           Escape: t.escape,

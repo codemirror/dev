@@ -501,3 +501,68 @@ class ParseWorker {
     if (this.working >= 0) cancelIdle(this.working)
   }
 }
+
+/// Language descriptions are used to store metadata about languages
+/// and to dynamically load them. Their main role is finding the
+/// appropriate language for a filename or dynamically loading nested
+/// parsers.
+export class LanguageDescription {
+  /// If the language has been loaded, this will hold its value.
+  language: Language | undefined = undefined
+  /// If the language has been loaded _and_ it provides support
+  /// extensions, they will be available here.
+  support: Extension | undefined = undefined
+
+  private loading: Promise<LanguageDescription> | null = null
+
+  private constructor(
+    /// The name of this mode.
+    readonly name: string,
+    /// File extensions associated with this language.
+    readonly extensions: readonly string[],
+    /// Optional filename pattern that should be associated with this
+    /// language.
+    readonly filename: RegExp | undefined,
+    private loadFunc: () => Promise<{language: Language, support?: Extension}>
+  ) {}
+
+  /// Start loading the the language. Will return a promise that
+  /// resolves to this object itself when the language successfully
+  /// loads.
+  load(): Promise<LanguageDescription> {
+    return this.loading || (this.loading = this.loadFunc().then(result => {
+      this.language = result.language
+      this.support = result.support
+      return this
+    }, err => {
+      this.loading = null
+      throw err
+    }))
+  }
+
+  /// Create a language description.
+  static of(spec: {
+    /// The language's name.
+    name: string,
+    /// An optional array of extensions associated with this language.
+    extensions?: readonly string[],
+    /// An optional filename pattern associated with this language.
+    filename?: RegExp,
+    /// A function that will asynchronously load the language.
+    load: () => Promise<{language: Language, support?: Extension}>
+  }) {
+    return new LanguageDescription(spec.name, spec.extensions || [], spec.filename, spec.load)
+  }
+
+  /// Look for a language in the given array of descriptions that
+  /// matches the filename. Will first match
+  /// [`filename`](#language.LanguageDescription.filename) patterns,
+  /// and then [extensions](#language.LanguageDescription.extensions),
+  /// and return the first language that matches.
+  static matchFilename(descs: readonly LanguageDescription[], filename: string) {
+    for (let d of descs) if (d.filename && d.filename.test(filename)) return d
+    let ext = /\.([^.]+)$/.exec(filename)
+    if (ext) for (let d of descs) if (d.extensions.indexOf(ext[1]) > -1) return d
+    return null
+  }
+}

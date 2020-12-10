@@ -1,5 +1,5 @@
 import {StreamParser} from "@codemirror/next/stream-parser"
-
-declare const javascript: (options?: any) => StreamParser<any>
-
-export default javascript
+export declare const javaScript: StreamParser<unknown>
+export declare const json: StreamParser<unknown>
+export declare const jsonld: StreamParser<unknown>
+export declare const typeScript: StreamParser<unknown>

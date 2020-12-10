@@ -2,7 +2,8 @@ import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, PartialPars
 import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
 import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService,
-        EditorParseContext} from "@codemirror/next/language"
+        EditorParseContext, getIndentUnit} from "@codemirror/next/language"
+import {EditorState} from "@codemirror/next/state"
 import {StringStream} from "./stringstream"
 
 export {StringStream}
@@ -19,9 +20,9 @@ export type StreamParser<State> = {
   token(stream: StringStream, state: State): string | null
   /// This notifies the parser of a blank line in the input. It can
   /// update its state here if it needs to.
-  blankLine?(state: State): void
+  blankLine?(state: State, indentUnit: number): void
   /// Produce a start state for the parser.
-  startState?(): State
+  startState?(indentUnit: number): State
   /// Copy a given state. By default, a shallow object copy is done
   /// which also copies arrays held at the top level of the object.
   copyState?(state: State): State
@@ -88,16 +89,16 @@ export class StreamLanguage<State> extends Language {
     if (!at) return null
     let start = findState(this, tree, 0, at.from, pos), statePos, state
     if (start) { state = start.state; statePos = start.pos + 1 }
-    else { state = this.streamParser.startState() ; statePos = 0 }
+    else { state = this.streamParser.startState(cx.unit) ; statePos = 0 }
     if (pos - statePos > C.MaxIndentScanDist) return null
     while (statePos < pos) {
       let line = cx.state.doc.lineAt(statePos), end = Math.min(pos, line.to)
       if (line.length) {
-        let stream = new StringStream(line.slice(), cx.state.tabSize)
+        let stream = new StringStream(line.slice(), cx.state.tabSize, cx.unit)
         while (stream.pos < end - line.from)
           readToken(this.streamParser.token, stream, state)
       } else {
-        this.streamParser.blankLine(state)
+        this.streamParser.blankLine(state, cx.unit)
       }
       if (end == pos) break
       statePos = line.to + 1
@@ -136,13 +137,14 @@ function cutTree(lang: StreamLanguage<unknown>, tree: Tree, from: number, to: nu
   return null
 }
 
-function findStartInFragments<State>(lang: StreamLanguage<State>, fragments: readonly TreeFragment[], startPos: number) {
+function findStartInFragments<State>(lang: StreamLanguage<State>, fragments: readonly TreeFragment[],
+                                     startPos: number, state: EditorState) {
   for (let f of fragments) {
     let found = f.from <= startPos && f.to > startPos && findState(lang, f.tree, -f.offset, startPos, 1e9), tree
     if (found && (tree = cutTree(lang, f.tree, startPos + f.offset, found.pos + f.offset, false)))
       return {state: found.state, tree}
   }
-  return {state: lang.streamParser.startState(), tree: Tree.empty}
+  return {state: lang.streamParser.startState(getIndentUnit(state)), tree: Tree.empty}
 }
 
 const enum C {
@@ -163,7 +165,7 @@ class Parse<State> implements PartialParse {
               readonly input: Input,
               readonly startPos: number,
               readonly context: EditorParseContext) {
-    let {state, tree} = findStartInFragments(lang, context.fragments, startPos)
+    let {state, tree} = findStartInFragments(lang, context.fragments, startPos, context.state)
     this.state = state
     this.pos = this.chunkStart = startPos + tree.length
     if (tree.length) {
@@ -171,7 +173,7 @@ class Parse<State> implements PartialParse {
       this.chunkPos.push(startPos)
     }
     if (this.pos < context.viewport.from - C.MaxDistanceBeforeViewport) {
-      this.state = this.lang.streamParser.startState()
+      this.state = this.lang.streamParser.startState(getIndentUnit(context.state))
       context.skipUntilInView(this.pos, context.viewport.from)
       this.pos = context.viewport.from
     }
@@ -188,9 +190,9 @@ class Parse<State> implements PartialParse {
 
   parseLine() {
     let line = this.input.lineAfter(this.pos), {streamParser} = this.lang
-    let stream = new StringStream(line, this.context ? this.context.state.tabSize : 4)
+    let stream = new StringStream(line, this.context ? this.context.state.tabSize : 4, getIndentUnit(this.context.state))
     if (stream.eol()) {
-      streamParser.blankLine(this.state)
+      streamParser.blankLine(this.state, stream.indentUnit)
     } else {
       while (!stream.eol()) {
         let token = readToken(streamParser.token, stream, this.state)
@@ -228,8 +230,7 @@ class Parse<State> implements PartialParse {
 }
 
 function readToken<State>(token: (stream: StringStream, state: State) => string | null,
-                          stream: StringStream,
-                          state: State) {
+                          stream: StringStream, state: State) {
   stream.start = stream.pos
   for (let i = 0; i < 10; i++) {
     let result = token(stream, state)
@@ -246,6 +247,19 @@ const warned: string[] = []
 function tokenID(tag: string): number {
   return !tag ? 0 : tokenTable[tag] || (tokenTable[tag] = createTokenType(tag))
 }
+
+for (let [legacyName, name] of [
+  ["variable", "variableName"],
+  ["def", "variableName.definition"],
+  ["tag", "typeName"],
+  ["attribute", "propertyName"],
+  ["type", "typeName"],
+  ["builtin", "variableName.standard"],
+  ["qualifier", "modifier"],
+  ["error", "invalid"],
+  ["header", "heading"],
+  ["property", "propertyName"]
+]) tokenTable[legacyName] = tokenID(name)
 
 function warnForPart(part: string, msg: string) {
   if (warned.indexOf(part) > -1) return

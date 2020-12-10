@@ -10,8 +10,6 @@ function countCol(string: string, end: number | null, tabSize: number, startInde
   return countColumn(string.slice(startIndex, end), startValue, tabSize)
 }
 
-// STRING STREAM
-
 /// Encapsulates a single line of input. Given to stream syntax code,
 /// which uses it to tokenize the content.
 export class StringStream {
@@ -19,7 +17,6 @@ export class StringStream {
   pos: number = 0
   /// The start position of the current token.
   start: number = 0
-  private lineStart: number = 0
   private lastColumnPos: number = 0
   private lastColumnValue: number = 0
 
@@ -27,15 +24,16 @@ export class StringStream {
   constructor(
     /// The line.
     public string: string,
-    /// Current tab size.
-    public tabSize: number
+    private tabSize: number,
+    /// The current indent unit size.
+    public indentUnit: number
   ) {}
 
   /// True if we are at the end of the line.
   eol(): boolean {return this.pos >= this.string.length}
 
   /// True if we are at the start of the line.
-  sol(): boolean {return this.pos == this.lineStart}
+  sol(): boolean {return this.pos == 0}
 
   /// Get the next code unit after the current position, or undefined
   /// if we're at the end of the line.
@@ -93,13 +91,12 @@ export class StringStream {
       this.lastColumnValue = countCol(this.string, this.start, this.tabSize, this.lastColumnPos, this.lastColumnValue)
       this.lastColumnPos = this.start
     }
-    return this.lastColumnValue - (this.lineStart ? countCol(this.string, this.lineStart, this.tabSize) : 0)
+    return this.lastColumnValue
   }
 
   /// Get the indentation column of the current line.
   indentation() {
-    return countCol(this.string, null, this.tabSize) -
-      (this.lineStart ? countCol(this.string, this.lineStart, this.tabSize) : 0)
+    return countCol(this.string, null, this.tabSize)
   }
 
   /// Match the input against the given string or regular expression
