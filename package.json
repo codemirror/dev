@@ -36,6 +36,7 @@
     "./gutter": "./gutter/dist/index.js",
     "./rangeset": "./rangeset/dist/index.js",
     "./language": "./language/dist/index.js",
+    "./language-desc": "./language-desc/dist/index.js",
     "./fold": "./fold/dist/index.js",
     "./matchbrackets": "./matchbrackets/dist/index.js",
     "./closebrackets": "./closebrackets/dist/index.js",
@@ -84,7 +85,7 @@
   "devDependencies": {
     "@types/mocha": "^5.2.0",
     "eslint4b-prebuilt": "^6.7.1",
-    "esmoduleserve": "^0.1.2",
+    "esmoduleserve": "^0.2.0",
     "ist": "^1.1.6",
     "lezer-generator": "^0.13.0",
     "mocha": "^7.1.1",

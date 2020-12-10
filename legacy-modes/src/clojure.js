@@ -269,4 +269,3 @@ export const clojure = {
     autocomplete: [].concat(atoms, specialForms, coreSymbols)
   }
 };
-

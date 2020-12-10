@@ -518,6 +518,8 @@ export class LanguageDescription {
   private constructor(
     /// The name of this mode.
     readonly name: string,
+    /// Alternative names for the mode (lowercased, includes `this.name`).
+    readonly alias: readonly string[],
     /// File extensions associated with this language.
     readonly extensions: readonly string[],
     /// Optional filename pattern that should be associated with this
@@ -544,6 +546,8 @@ export class LanguageDescription {
   static of(spec: {
     /// The language's name.
     name: string,
+    /// An optional array of alternative names.
+    alias?: readonly string[],
     /// An optional array of extensions associated with this language.
     extensions?: readonly string[],
     /// An optional filename pattern associated with this language.
@@ -551,7 +555,8 @@ export class LanguageDescription {
     /// A function that will asynchronously load the language.
     load: () => Promise<{language: Language, support?: Extension}>
   }) {
-    return new LanguageDescription(spec.name, spec.extensions || [], spec.filename, spec.load)
+    return new LanguageDescription(spec.name, (spec.alias || []).concat(spec.name).map(s => s.toLowerCase()),
+                                   spec.extensions || [], spec.filename, spec.load)
   }
 
   /// Look for a language in the given array of descriptions that
@@ -563,6 +568,22 @@ export class LanguageDescription {
     for (let d of descs) if (d.filename && d.filename.test(filename)) return d
     let ext = /\.([^.]+)$/.exec(filename)
     if (ext) for (let d of descs) if (d.extensions.indexOf(ext[1]) > -1) return d
+    return null
+  }
+
+  /// Look for a language whose name or alias matches the the given
+  /// name (case-insensitively). If `fuzzy` istrue, and no direct
+  /// matchs is found, this'll also search for a language whose name
+  /// or alias occurs in the string (for names shorter than three
+  /// characters, only when surrounded by non-word characters).
+  static matchLanguageName(descs: readonly LanguageDescription[], name: string, fuzzy = true) {
+    name = name.toLowerCase()
+    for (let d of descs) if (d.alias.some(a => a == name)) return d
+    if (fuzzy) for (let d of descs) for (let a of d.alias) {
+      let found = name.indexOf(a)
+      if (found > -1 && (a.length > 2 || !/\w/.test(name[found - 1]) && !/\w/.test(name[found + a.length])))
+        return d
+    }
     return null
   }
 }

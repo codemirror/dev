@@ -9,7 +9,7 @@ function mkParser(lang) {
   }
 }
 
-export const msgen = mkParser({
+export const mscgen = mkParser({
   "keywords" : ["msc"],
   "options" : ["hscale", "width", "arcgradient", "wordwraparcs"],
   "constants" : ["true", "false", "on", "off"],
