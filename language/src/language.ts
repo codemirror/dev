@@ -274,7 +274,7 @@ const enum Work {
   // For every change the editor receives while focused, it gets a
   // small bonus to its parsing budget (as a way to allow active
   // editors to continue doing work).
-  ChangeBonus = 100
+  ChangeBonus = 50
 }
 
 /// A parse context provided to parsers working on the editor content.
@@ -476,14 +476,11 @@ class ParseWorker {
     this.working = -1
 
     let now = Date.now()
-    if (this.chunkEnd < now) {
-      if (this.view.hasFocus) { // Start a new chunk
-        this.chunkEnd = now + Work.ChunkTime
-        this.chunkBudget = Work.ChunkBudget
-      } else if (this.chunkBudget <= 0) { // No more budget
-        return
-      }
+    if (this.chunkEnd < now && this.view.hasFocus) { // Start a new chunk
+      this.chunkEnd = now + Work.ChunkTime
+      this.chunkBudget = Work.ChunkBudget
     }
+    if (this.chunkBudget <= 0) return // No more budget
 
     let {state} = this.view, field = state.field(this.field)
     if (field.tree.length >= state.doc.length) return
