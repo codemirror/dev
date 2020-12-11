@@ -1,6 +1,6 @@
 # CodeMirror 6 prototype
 
-[![Build Status](https://travis-ci.org/codemirror/codemirror.next.svg)](https://travis-ci.org/codemirror/codemirror.next)
+[![Build Status](https://github.com/codemirror/codemirror.next/workflows/main/badge.svg)](https://github.com/codemirror/codemirror.next/actions)
 [![NPM version](https://img.shields.io/npm/v/@codemirror/next.svg)](https://www.npmjs.org/package/@codemirror/next)
 
 This is the prototype of the next version of [CodeMirror](https://codemirror.net), a complete rewrite.
