@@ -1,13 +1,252 @@
-import {Language, LanguageDescription} from "@codemirror/next/language"
+import {Language} from "@codemirror/next/language"
+import {Extension} from "@codemirror/next/state"
 import {StreamParser} from "@codemirror/next/stream-parser"
+
+/// Language descriptions are used to store metadata about languages
+/// and to dynamically load them. Their main role is finding the
+/// appropriate language for a filename or dynamically loading nested
+/// parsers.
+export class LanguageDescription {
+  /// If the language has been loaded, this will hold its value.
+  language: Language | undefined = undefined
+  /// If the language has been loaded _and_ it provides support
+  /// extensions, they will be available here.
+  support: Extension | undefined = undefined
+
+  private loading: Promise<LanguageDescription> | null = null
+
+  private constructor(
+    /// The name of this mode.
+    readonly name: string,
+    /// Alternative names for the mode (lowercased, includes `this.name`).
+    readonly alias: readonly string[],
+    /// File extensions associated with this language.
+    readonly extensions: readonly string[],
+    /// Optional filename pattern that should be associated with this
+    /// language.
+    readonly filename: RegExp | undefined,
+    private loadFunc: () => Promise<{language: Language, support?: Extension}>
+  ) {}
+
+  /// Start loading the the language. Will return a promise that
+  /// resolves to this object itself when the language successfully
+  /// loads.
+  load(): Promise<LanguageDescription> {
+    return this.loading || (this.loading = this.loadFunc().then(result => {
+      this.language = result.language
+      this.support = result.support
+      return this
+    }, err => {
+      this.loading = null
+      throw err
+    }))
+  }
+
+  /// Create a language description.
+  static of(spec: {
+    /// The language's name.
+    name: string,
+    /// An optional array of alternative names.
+    alias?: readonly string[],
+    /// An optional array of extensions associated with this language.
+    extensions?: readonly string[],
+    /// An optional filename pattern associated with this language.
+    filename?: RegExp,
+    /// A function that will asynchronously load the language.
+    load: () => Promise<{language: Language, support?: Extension}>
+  }) {
+    return new LanguageDescription(spec.name, (spec.alias || []).concat(spec.name).map(s => s.toLowerCase()),
+                                   spec.extensions || [], spec.filename, spec.load)
+  }
+
+  /// Look for a language in the given array of descriptions that
+  /// matches the filename. Will first match
+  /// [`filename`](#language.LanguageDescription.filename) patterns,
+  /// and then [extensions](#language.LanguageDescription.extensions),
+  /// and return the first language that matches.
+  static matchFilename(descs: readonly LanguageDescription[], filename: string) {
+    for (let d of descs) if (d.filename && d.filename.test(filename)) return d
+    let ext = /\.([^.]+)$/.exec(filename)
+    if (ext) for (let d of descs) if (d.extensions.indexOf(ext[1]) > -1) return d
+    return null
+  }
+
+  /// Look for a language whose name or alias matches the the given
+  /// name (case-insensitively). If `fuzzy` istrue, and no direct
+  /// matchs is found, this'll also search for a language whose name
+  /// or alias occurs in the string (for names shorter than three
+  /// characters, only when surrounded by non-word characters).
+  static matchLanguageName(descs: readonly LanguageDescription[], name: string, fuzzy = true) {
+    name = name.toLowerCase()
+    for (let d of descs) if (d.alias.some(a => a == name)) return d
+    if (fuzzy) for (let d of descs) for (let a of d.alias) {
+      let found = name.indexOf(a)
+      if (found > -1 && (a.length > 2 || !/\w/.test(name[found - 1]) && !/\w/.test(name[found + a.length])))
+        return d
+    }
+    return null
+  }
+}
 
 function legacy(parser: StreamParser<unknown>): Promise<{language: Language}> {
   return import("@codemirror/next/stream-parser").then(m => ({language: m.StreamLanguage.define(parser)}))
 }
 
-// FIXME add modern modes, drop references to legacy versions of those
+function sql(dialectName: keyof typeof import("@codemirror/next/lang-sql")) {
+  return import("@codemirror/next/lang-sql").then(m => {
+    let dialect = (m as any)[dialectName]
+    return {language: dialect.language, support: m.sqlSupport({dialect})}
+  })
+}
 
+/// An array of language descriptions for known language packages.
 export const languages = [
+  // New-style language modes
+
+  LanguageDescription.of({
+    name: "C",
+    extensions: ["c","h","ino"],
+    load() {
+      return import("@codemirror/next/lang-cpp").then(m => ({language: m.cppLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "C++",
+    alias: ["cpp"],
+    extensions: ["cpp","c++","cc","cxx","hpp","h++","hh","hxx"],
+    load() {
+      return import("@codemirror/next/lang-cpp").then(m => ({language: m.cppLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "CQL",
+    alias: ["cassandra"],
+    extensions: ["cql"],
+    load() { return sql("Cassandra") }
+  }),
+  LanguageDescription.of({
+    name: "CSS",
+    extensions: ["css"],
+    load() {
+      return import("@codemirror/next/lang-css").then(m => ({language: m.cssLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "HTML",
+    alias: ["xhtml"],
+    extensions: ["html", "htm", "handlebars", "hbs"],
+    load() {
+      return import("@codemirror/next/lang-html").then(m => ({language: m.htmlLanguage, support: m.htmlSupport()}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "Java",
+    extensions: ["java"],
+    load() {
+      return import("@codemirror/next/lang-java").then(m => ({language: m.javaLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "JavaScript",
+    alias: ["ecmascript","js","node"],
+    extensions: ["js", "mjs", "cjs"],
+    load() {
+      return import("@codemirror/next/lang-javascript").then(m => ({language: m.javascriptLanguage, support: m.javascriptSupport()}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "JSON",
+    alias: ["json5"],
+    extensions: ["json","map"],
+    load() {
+      return import("@codemirror/next/lang-json").then(m => ({language: m.jsonLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "JSX",
+    extensions: ["jsx"],
+    load() {
+      return import("@codemirror/next/lang-javascript").then(m => ({language: m.jsxLanguage, support: m.javascriptSupport()}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "MariaDB SQL",
+    load() { return sql("MariaSQL") }
+  }),
+  LanguageDescription.of({
+    name: "Markdown",
+    extensions: ["md", "markdown", "mkd"],
+    load() {
+      return import("@codemirror/next/lang-markdown").then(m => ({language: m.markdownLanguage, support: m.markdownSupport()}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "MS SQL",
+    load() { return sql("MSSQL") }
+  }),
+  LanguageDescription.of({
+    name: "MySQL",
+    load() { return sql("MySQL") }
+  }),
+  LanguageDescription.of({
+    name: "PLSQL",
+    extensions: ["pls"],
+    load() { return sql("PLSQL") }
+  }),
+  LanguageDescription.of({
+    name: "PostgreSQL",
+    load() { return sql("PostgreSQL") }
+  }),
+  LanguageDescription.of({
+    name: "Python",
+    extensions: ["BUILD","bzl","py","pyw"],
+    filename: /^(BUCK|BUILD)$/,
+    load() {
+      return import("@codemirror/next/lang-python").then(m => ({language: m.pythonLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "Rust",
+    extensions: ["rs"],
+    load() {
+      return import("@codemirror/next/lang-rust").then(m => ({language: m.rustLanguage}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "SQL",
+    extensions: ["sql"],
+    load() { return sql("StandardSQL") }
+  }),
+  LanguageDescription.of({
+    name: "SQLite",
+    load() { return sql("SQLite") }
+  }),
+  LanguageDescription.of({
+    name: "TSX",
+    extensions: ["tsx"],
+    load() {
+      return import("@codemirror/next/lang-javascript").then(m => ({language: m.tsxLanguage, support: m.javascriptSupport()}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "TypeScript",
+    alias: ["ts"],
+    extensions: ["ts"],
+    load() {
+      return import("@codemirror/next/lang-javascript").then(m => ({language: m.typescriptLanguage, support: m.javascriptSupport()}))
+    }
+  }),
+  LanguageDescription.of({
+    name: "XML",
+    alias: ["rss","wsdl","xsd"],
+    extensions: ["xml","xsl","xsd","svg"],
+    load() {
+      return import("@codemirror/next/lang-xml").then(m => ({language: m.xmlLanguage, support: m.xmlSupport()}))
+    }
+  }),
+
+  // Legacy modes ported from CodeMirror 5
+
   LanguageDescription.of({
     name: "APL",
     extensions: ["dyalog","apl"],
@@ -42,21 +281,6 @@ export const languages = [
     extensions: ["b","bf"],
     load() {
       return import("@codemirror/next/legacy-modes/src/brainfuck").then(m => legacy(m.brainfuck))
-    }
-  }),
-  LanguageDescription.of({
-    name: "C",
-    extensions: ["c","h","ino"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.c))
-    }
-  }),
-  LanguageDescription.of({
-    name: "C++",
-    alias: ["cpp"],
-    extensions: ["cpp","c++","cc","cxx","hpp","h++","hh","hxx"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.cpp))
     }
   }),
   LanguageDescription.of({
@@ -138,20 +362,6 @@ export const languages = [
     extensions: ["cr"],
     load() {
       return import("@codemirror/next/legacy-modes/src/crystal").then(m => legacy(m.crystal))
-    }
-  }),
-  LanguageDescription.of({
-    name: "CSS",
-    extensions: ["css"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/css").then(m => legacy(m.css))
-    }
-  }),
-  LanguageDescription.of({
-    name: "CQL",
-    extensions: ["cql"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.cassandra))
     }
   }),
   LanguageDescription.of({
@@ -342,29 +552,6 @@ export const languages = [
     }
   }),
   LanguageDescription.of({
-    name: "Java",
-    extensions: ["java"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.java))
-    }
-  }),
-  LanguageDescription.of({
-    name: "JavaScript",
-    alias: ["ecmascript","js","node"],
-    extensions: ["js"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/javascript").then(m => legacy(m.javaScript))
-    }
-  }),
-  LanguageDescription.of({
-    name: "JSON",
-    alias: ["json5"],
-    extensions: ["json","map"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/javascript").then(m => legacy(m.json))
-    }
-  }),
-  LanguageDescription.of({
     name: "JSON-LD",
     alias: ["jsonld"],
     extensions: ["jsonld"],
@@ -422,12 +609,6 @@ export const languages = [
     }
   }),
   LanguageDescription.of({
-    name: "MariaDB SQL",
-    load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.mariaDB))
-    }
-  }),
-  LanguageDescription.of({
     name: "Mathematica",
     extensions: ["m","nb","wl","wls"],
     load() {
@@ -449,22 +630,10 @@ export const languages = [
     }
   }),
   LanguageDescription.of({
-    name: "MS SQL",
-    load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.msSQL))
-    }
-  }),
-  LanguageDescription.of({
     name: "mbox",
     extensions: ["mbox"],
     load() {
       return import("@codemirror/next/legacy-modes/src/mbox").then(m => legacy(m.mbox))
-    }
-  }),
-  LanguageDescription.of({
-    name: "MySQL",
-    load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.mySQL))
     }
   }),
   LanguageDescription.of({
@@ -547,19 +716,6 @@ export const languages = [
     }
   }),
   LanguageDescription.of({
-    name: "PLSQL",
-    extensions: ["pls"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.plSQL))
-    }
-  }),
-  LanguageDescription.of({
-    name: "PostgreSQL",
-    load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.pgSQL))
-    }
-  }),
-  LanguageDescription.of({
     name: "PowerShell",
     extensions: ["ps1","psd1","psm1"],
     load() {
@@ -579,14 +735,6 @@ export const languages = [
     extensions: ["proto"],
     load() {
       return import("@codemirror/next/legacy-modes/src/protobuf").then(m => legacy(m.protobuf))
-    }
-  }),
-  LanguageDescription.of({
-    name: "Python",
-    extensions: ["BUILD","bzl","py","pyw"],
-    filename: /^(BUCK|BUILD)$/,
-    load() {
-      return import("@codemirror/next/legacy-modes/src/python").then(m => legacy(m.python))
     }
   }),
   LanguageDescription.of({
@@ -630,13 +778,6 @@ export const languages = [
     extensions: ["rb"],
     load() {
       return import("@codemirror/next/legacy-modes/src/ruby").then(m => legacy(m.ruby))
-    }
-  }),
-  LanguageDescription.of({
-    name: "Rust",
-    extensions: ["rs"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/rust").then(m => legacy(m.rust))
     }
   }),
   LanguageDescription.of({
@@ -835,14 +976,6 @@ export const languages = [
     }
   }),
   LanguageDescription.of({
-    name: "TypeScript",
-    alias: ["ts"],
-    extensions: ["ts"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/javascript").then(m => legacy(m.typeScript))
-    }
-  }),
-  LanguageDescription.of({
     name: "Web IDL",
     extensions: ["webidl"],
     load() {
@@ -882,14 +1015,6 @@ export const languages = [
     extensions: ["vhd","vhdl"],
     load() {
       return import("@codemirror/next/legacy-modes/src/vhdl").then(m => legacy(m.vhdl))
-    }
-  }),
-  LanguageDescription.of({
-    name: "XML",
-    alias: ["rss","wsdl","xsd"],
-    extensions: ["xml","xsl","xsd","svg"],
-    load() {
-      return import("@codemirror/next/legacy-modes/src/xml").then(m => legacy(m.xml))
     }
   }),
   LanguageDescription.of({

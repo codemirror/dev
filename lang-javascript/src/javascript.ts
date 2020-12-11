@@ -88,6 +88,15 @@ export const javascriptLanguage = LezerLanguage.define({
   }
 })
 
+/// A language provider for TypeScript.
+export const typescriptLanguage = javascriptLanguage.configure({dialect: "ts"})
+
+/// Language provider for JSX.
+export const jsxLanguage = javascriptLanguage.configure({dialect: "jsx"})
+
+/// Language provider for JSX + TypeScript.
+export const tsxLanguage = javascriptLanguage.configure({dialect: "jsx ts"})
+
 /// Returns an extension that installs JavaScript support features
 /// (completion of [snippets](#lang-javascript.snippets)).
 export function javascriptSupport(): Extension {
@@ -96,14 +105,10 @@ export function javascriptSupport(): Extension {
   })
 }
 
-const dialects: {[dialect: string]: LezerLanguage} = {"": javascriptLanguage}
-function getDialect(dialect: string) {
-  return dialects[dialect] || (dialects[dialect] = javascriptLanguage.configure({dialect}))
-}
-
 /// Returns an extension that installs the JavaScript language and
 /// support features.
 export function javascript(config: {jsx?: boolean, typescript?: boolean} = {}): Extension {
-  let dialect = (config.jsx ? ["jsx"] : []).concat(config.typescript ? ["ts"] : []).join(" ")
-  return [getDialect(dialect), javascriptSupport()]
+  let lang = config.jsx ? (config.typescript ? tsxLanguage : jsxLanguage)
+    : config.typescript ? typescriptLanguage : javascriptLanguage
+  return [lang, javascriptSupport()]
 }
