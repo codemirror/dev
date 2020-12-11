@@ -128,7 +128,7 @@ export const languages = [
     name: "CSS",
     extensions: ["css"],
     load() {
-      return import("@codemirror/next/lang-css").then(m => ({language: m.cssLanguage}))
+      return import("@codemirror/next/lang-css").then(m => ({language: m.cssLanguage, support: m.cssSupport()}))
     }
   }),
   LanguageDescription.of({
