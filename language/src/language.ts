@@ -46,7 +46,10 @@ export class Language {
   /// parser](https://lezer.codemirror.net/docs/ref#lezer.NestedParserSpec).
   parser: {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
 
-  protected constructor(
+  /// Construct a language object. You usually don't need to invoke
+  /// this directly. But when you do, make sure you use
+  /// `defineLanguageFacet` to create the first argument.
+  constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
     readonly data: Facet<{[name: string]: any}>,
@@ -280,8 +283,6 @@ const enum Work {
 /// A parse context provided to parsers working on the editor content.
 export class EditorParseContext implements ParseContext {
   private parse: PartialParse | null = null
-  /// @internal
-  skippedTemp: {from: number, to: number}[] = []
 
   /// @internal
   constructor(
@@ -313,7 +314,7 @@ export class EditorParseContext implements ParseContext {
     for (;;) {
       let done = this.parse.advance()
       if (done) {
-        this.fragments = this.withoutTempSkipped(TreeFragment.addTree(done))
+        this.fragments = TreeFragment.addTree(done)
         this.parse = null
         this.tree = done
         return true
@@ -329,7 +330,7 @@ export class EditorParseContext implements ParseContext {
   takeTree() {
     if (this.parse && this.parse.pos > this.tree.length) {
       this.tree = this.parse.forceFinish()
-      this.fragments = this.withoutTempSkipped(TreeFragment.addTree(this.tree, this.fragments, true))
+      this.fragments = TreeFragment.addTree(this.tree, this.fragments, true)
     }
   }
 
@@ -340,7 +341,7 @@ export class EditorParseContext implements ParseContext {
     if (!changes.empty) {
       let ranges: ChangedRange[] = []
       changes.iterChangedRanges((fromA, toA, fromB, toB) => ranges.push({fromA, toA, fromB, toB}))
-      fragments = this.withoutTempSkipped(TreeFragment.applyChanges(fragments, ranges))
+      fragments = TreeFragment.applyChanges(fragments, ranges)
       tree = Tree.empty
       viewport = {from: changes.mapPos(viewport.from, -1), to: changes.mapPos(viewport.to, 1)}
       if (this.skipped.length) {
@@ -352,16 +353,6 @@ export class EditorParseContext implements ParseContext {
       }
     }
     return new EditorParseContext(this.parser, newState, fragments, tree, viewport, skipped)
-  }
-
-  /// @internal
-  withoutTempSkipped(fragments: readonly TreeFragment[]) {
-    for (;;) {
-      let r = this.skippedTemp.pop()
-      if (!r) break
-      fragments = cutFragments(fragments, r.from, r.to)
-    }
-    return fragments
   }
 
   /// @internal
@@ -391,13 +382,6 @@ export class EditorParseContext implements ParseContext {
   /// when it comes into view.
   skipUntilInView(from: number, to: number) {
     this.skipped.push({from, to})
-  }
-
-  /// Notify the parse scheduler that the given region was skipped in
-  /// this parse, and the tree nodes produced for it shouldn't be
-  /// reused on the next parse.
-  skipTemporarily(from: number, to: number) {
-    this.skippedTemp.push({from, to})
   }
 }
 
@@ -496,5 +480,91 @@ class ParseWorker {
 
   destroy() {
     if (this.working >= 0) cancelIdle(this.working)
+  }
+}
+
+/// Language descriptions are used to store metadata about languages
+/// and to dynamically load them. Their main role is finding the
+/// appropriate language for a filename or dynamically loading nested
+/// parsers.
+export class LanguageDescription {
+  /// If the language has been loaded, this will hold its value.
+  language: Language | undefined = undefined
+  /// If the language has been loaded _and_ it provides support
+  /// extensions, they will be available here.
+  support: Extension | undefined = undefined
+
+  private loading: Promise<LanguageDescription> | null = null
+
+  private constructor(
+    /// The name of this mode.
+    readonly name: string,
+    /// Alternative names for the mode (lowercased, includes `this.name`).
+    readonly alias: readonly string[],
+    /// File extensions associated with this language.
+    readonly extensions: readonly string[],
+    /// Optional filename pattern that should be associated with this
+    /// language.
+    readonly filename: RegExp | undefined,
+    private loadFunc: () => Promise<{language: Language, support?: Extension}>
+  ) {}
+
+  /// Start loading the the language. Will return a promise that
+  /// resolves to this object itself when the language successfully
+  /// loads.
+  load(): Promise<LanguageDescription> {
+    return this.loading || (this.loading = this.loadFunc().then(result => {
+      this.language = result.language
+      this.support = result.support
+      return this
+    }, err => {
+      this.loading = null
+      throw err
+    }))
+  }
+
+  /// Create a language description.
+  static of(spec: {
+    /// The language's name.
+    name: string,
+    /// An optional array of alternative names.
+    alias?: readonly string[],
+    /// An optional array of extensions associated with this language.
+    extensions?: readonly string[],
+    /// An optional filename pattern associated with this language.
+    filename?: RegExp,
+    /// A function that will asynchronously load the language.
+    load: () => Promise<{language: Language, support?: Extension}>
+  }) {
+    return new LanguageDescription(spec.name, (spec.alias || []).concat(spec.name).map(s => s.toLowerCase()),
+                                   spec.extensions || [], spec.filename, spec.load)
+  }
+
+  /// Look for a language in the given array of descriptions that
+  /// matches the filename. Will first match
+  /// [`filename`](#language.LanguageDescription.filename) patterns,
+  /// and then [extensions](#language.LanguageDescription.extensions),
+  /// and return the first language that matches.
+  static matchFilename(descs: readonly LanguageDescription[], filename: string) {
+    for (let d of descs) if (d.filename && d.filename.test(filename)) return d
+    let ext = /\.([^.]+)$/.exec(filename)
+    if (ext) for (let d of descs) if (d.extensions.indexOf(ext[1]) > -1) return d
+    return null
+  }
+
+  /// Look for a language whose name or alias matches the the given
+  /// name (case-insensitively). If `fuzzy` istrue, and no direct
+  /// matchs is found, this'll also search for a language whose name
+  /// or alias occurs in the string (for names shorter than three
+  /// characters, only when surrounded by non-word characters).
+  static matchLanguageName(descs: readonly LanguageDescription[], name: string, fuzzy = true) {
+    name = name.toLowerCase()
+    for (let d of descs) if (d.alias.some(a => a == name)) return d
+    if (fuzzy) for (let d of descs) for (let a of d.alias) {
+      let found = name.indexOf(a)
+      if (found > -1 && (a.length > 2 || !/\w/.test(name[found - 1]) && !/\w/.test(name[found + a.length])))
+        return d
+    }
+    return null
   }
 }
