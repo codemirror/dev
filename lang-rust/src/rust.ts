@@ -40,7 +40,7 @@ export const rustLanguage = LezerLanguage.define({
         TypeIdentifier: t.typeName,
         "MacroInvocation/Identifier MacroInvocation/ScopedIdentifier/Identifier": t.macroName,
         "MacroInvocation/TypeIdentifier MacroInvocation/ScopedIdentifier/TypeIdentifier": t.macroName,
-        "!": t.macroName,
+        "\"!\"": t.macroName,
         UpdateOp: t.updateOperator,
         LineComment: t.lineComment,
         BlockComment: t.blockComment,
