@@ -29,7 +29,7 @@ describe("EditorParseContext", () => {
       console.warn("Machine too fast for the incremental parsing test, skipping")
       return
     }
-    ist(Date.now() - t0, 15, "<")
+    ist(Date.now() - t0, 25, "<")
     ist(cx.work(1e8))
     ist(cx.tree.length, doc.length)
     let change = ChangeSet.of({from: 0, to: 5, insert: "let"}, doc.length)
