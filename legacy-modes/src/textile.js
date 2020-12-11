@@ -64,11 +64,11 @@ function handlePhraseModifier(stream, state, ch) {
   if (ch === "(") {
     var spec = stream.match(/^(r|tm|c)\)/);
     if (spec)
-      return tokenStylesWith(state, TOKEN_STYLES.specialChar);
+      return TOKEN_STYLES.specialChar
   }
 
   if (ch === "<" && stream.match(/(\w+)[^>]+>[^<]+<\/\1>/))
-    return tokenStylesWith(state, TOKEN_STYLES.html);
+    return TOKEN_STYLES.html
 
   if (ch === "?" && stream.eat("?"))
     return togglePhraseModifier(stream, state, "cite", /\?\?/, 2);
@@ -149,17 +149,6 @@ function textileDisabled(state) {
       return TOKEN_STYLES.notextile + (type ? (" " + TOKEN_STYLES[type]) : "");
     return null;
   }
-}
-
-function tokenStylesWith(state, extraStyles) {
-  var disabled = textileDisabled(state);
-  if (disabled) return disabled;
-
-  var type = tokenStyles(state);
-  if (extraStyles)
-    return type ? (type + " " + extraStyles) : extraStyles;
-  else
-    return type;
 }
 
 function activeStyles(state) {
@@ -342,7 +331,7 @@ var Modes = {
     state.mode = Modes.layoutLength;
 
     if (stream.match(RE("attributes")))
-      return tokenStylesWith(state, TOKEN_STYLES.attributes);
+      return TOKEN_STYLES.attributes
     else
       return tokenStyles(state);
   },
@@ -374,14 +363,14 @@ var Modes = {
     state.mode = Modes.text;
     if (stream.match(RE("link"))) {
       stream.match(/\S+/);
-      return tokenStylesWith(state, TOKEN_STYLES.link);
+      return TOKEN_STYLES.link
     }
     return tokenStyles(state);
   },
 
-  linkDefinition: function(stream, state) {
+  linkDefinition: function(stream) {
     stream.skipToEnd();
-    return tokenStylesWith(state, TOKEN_STYLES.linkDefinition);
+    return TOKEN_STYLES.linkDefinition
   },
 
   definitionList: function(stream, state) {
@@ -397,9 +386,9 @@ var Modes = {
     return tokenStyles(state);
   },
 
-  html: function(stream, state) {
+  html: function(stream) {
     stream.skipToEnd();
-    return tokenStylesWith(state, TOKEN_STYLES.html);
+    return TOKEN_STYLES.html
   },
 
   table: function(stream, state) {
@@ -421,7 +410,7 @@ var Modes = {
     state.mode = Modes.tableText;
 
     if (stream.match(RE("tableCellAttributes")))
-      return tokenStylesWith(state, TOKEN_STYLES.attributes);
+      return TOKEN_STYLES.attributes
     else
       return tokenStyles(state);
   },

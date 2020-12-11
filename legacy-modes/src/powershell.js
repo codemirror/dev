@@ -140,7 +140,7 @@ var grammar = {
   operator: operators,
   builtin: builtins,
   punctuation: punctuation,
-  identifier: identifiers
+  variable: identifiers
 };
 
 // tokenizers

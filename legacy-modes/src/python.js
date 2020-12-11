@@ -349,7 +349,7 @@ export function mkPython(parserConf) {
 
       if (stream.eol() && state.lambda)
         state.lambda = false;
-      return addErr ? style + " " + ERRORCLASS : style;
+      return addErr ? ERRORCLASS : style;
     },
 
     indent: function(state, textAfter, cx) {

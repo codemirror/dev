@@ -14,9 +14,15 @@ export {StringStream}
 /// about the current context.
 export type StreamParser<State> = {
   /// Read one token, advancing the stream past it, and returning a
-  /// string with the token's style. It is okay to return an empty
-  /// token, but only if that updates the state so that the next call
-  /// will return a token again.
+  /// string indicating the token's style tag—either the name of one
+  /// of the tags in [`tags`](#highlight.tags), or such a name
+  /// suffixed by one or more tag
+  /// [modifier](#highlight.Tag^defineModifier) names, separated by
+  /// spaces. For example `"keyword"` or "`variableName.constant"`.
+  ///
+  /// It is okay to return a zero-length token, but only if that
+  /// updates the state so that the next call will return a non-empty
+  /// token again.
   token(stream: StringStream, state: State): string | null
   /// This notifies the parser of a blank line in the input. It can
   /// update its state here if it needs to.
@@ -250,6 +256,8 @@ function tokenID(tag: string): number {
 
 for (let [legacyName, name] of [
   ["variable", "variableName"],
+  ["variable-2", "variableName.special"],
+  ["string-2", "string.special"],
   ["def", "variableName.definition"],
   ["tag", "typeName"],
   ["attribute", "propertyName"],
@@ -269,7 +277,7 @@ function warnForPart(part: string, msg: string) {
 
 function createTokenType(tagStr: string) {
   let tag = null
-  for (let part of tagStr.split(" ")) {
+  for (let part of tagStr.split(".")) {
     let value = (tags as any)[part]
     if (!value) {
       warnForPart(part, `Unknown highlighting tag ${part}`)

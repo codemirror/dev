@@ -30,7 +30,7 @@ export const toml = {
           stream.match(/^.[^\\\"\']*/);
         }
       }
-      return state.lhs ? "property string" : "string"; // Token style
+      return state.lhs ? "property" : "string"; // Token style
     } else if (state.inArray && stream.peek() === ']') {
       stream.next();
       state.inArray--;

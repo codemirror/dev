@@ -15,11 +15,11 @@ function tokenBase(stream,state){
       return state.tokenize=tokenBase,"builtin";
   }
   if(/\s/.test(c))
-    return stream.peek()=="/"?(stream.skipToEnd(),"comment"):"whitespace";
+    return stream.peek()=="/"?(stream.skipToEnd(),"comment"):"null";
   if(c=='"')
     return(state.tokenize=tokenString)(stream,state);
   if(c=='`')
-    return stream.eatWhile(/[A-Za-z\d_:\/.]/),"symbol";
+    return stream.eatWhile(/[A-Za-z\d_:\/.]/),"macroName";
   if(("."==c&&/\d/.test(stream.peek()))||/\d/.test(c)){
     var t=null;
     stream.backUp(1);

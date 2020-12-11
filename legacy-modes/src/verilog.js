@@ -413,24 +413,8 @@ var tlvIndentUnit = 3;
 var tlvTrackStatements = false;
 var tlvIdentMatch = /^([~!@#\$%\^&\*-\+=\?\/\\\|'"<>]+)([\d\w_]*)/;  // Matches an identifiere.
 // Note that ':' is excluded, because of it's use in [:].
-var tlvFirstLevelIndentMatch = /^[! ]  /;
 var tlvLineIndentationMatch = /^[! ] */;
 var tlvCommentMatch = /^\/[\/\*]/;
-
-
-// Returns a style specific to the scope at the given indentation column.
-// Type is one of: "indent", "scope-ident", "before-scope-ident".
-function tlvScopeStyle(state, indentation, type) {
-  // Begin scope.
-  var depth = indentation / tlvIndentUnit;  // TODO: Pass this in instead.
-  return "tlv-" + state.tlvIndentationStyle[depth] + "-" + type;
-}
-
-// Return true if the next thing in the stream is an identifier with a mnemonic.
-function tlvIdentNext(stream) {
-  var match;
-  return (match = stream.match(tlvIdentMatch, false)) && match[2].length > 0;
-}
 
 export const tlv = mkVerilog({
   hooks: {
@@ -527,24 +511,6 @@ export const tlv = mkVerilog({
 
         var match;
         if (style !== undefined) {
-          // Region line.
-          style += " " + tlvScopeStyle(state, 0, "scope-ident")
-        } else if (((stream.pos / tlvIndentUnit) < state.tlvIndentationStyle.length) &&
-                   (match = stream.match(stream.sol() ? tlvFirstLevelIndentMatch : /^   /))) {
-          // Indentation
-          style = // make this style distinct from the previous one to prevent
-            // codemirror from combining spans
-          "tlv-indent-" + (((stream.pos % 2) == 0) ? "even" : "odd") +
-            // and style it
-          " " + tlvScopeStyle(state, stream.pos - tlvIndentUnit, "indent");
-          // Style the line prefix character.
-          if (match[0].charAt(0) == "!") {
-            style += " tlv-alert-line-prefix";
-          }
-          // Place a class before a scope identifier.
-          if (tlvIdentNext(stream)) {
-            style += " " + tlvScopeStyle(state, stream.pos, "before-scope-ident");
-          }
         } else if (state.tlvInBlockComment) {
           // In a block comment.
           if (stream.match(/^.*?\*\//)) {
@@ -577,35 +543,27 @@ export const tlv = mkVerilog({
               // has mnemonic or we're at the end of the line (maybe it hasn't been typed yet)
             (mnemonic.length > 0 || stream.eol())) {
             style = tlvIdentifierStyle[prefix];
-            if (stream.column() == state.indented) {
-              // Begin scope.
-              style += " " + tlvScopeStyle(state, stream.column(), "scope-ident")
-            }
           } else {
             // Just swallow one character and try again.
             // This enables subsequent identifier match with preceding symbol character, which
             //   is legal within a statement.  (Eg, !$reset).  It also enables detection of
             //   comment start with preceding symbols.
             stream.backUp(stream.current().length - 1);
-            style = "tlv-default";
           }
         } else if (stream.match(/^\t+/)) {
           // Highlight tabs, which are illegal.
-          style = "tlv-tab";
+          style = "invalid";
         } else if (stream.match(/^[\[\]{}\(\);\:]+/)) {
           // [:], (), {}, ;.
           style = "meta";
         } else if (match = stream.match(/^[mM]4([\+_])?[\w\d_]*/)) {
           // m4 pre proc
-          style = (match[1] == "+") ? "tlv-m4-plus" : "tlv-m4";
+          style = (match[1] == "+") ? "keyword.special" : "keyword";
         } else if (stream.match(/^ +/)){
           // Skip over spaces.
           if (stream.eol()) {
             // Trailing spaces.
             style = "error";
-          } else {
-            // Non-trailing spaces.
-            style = "tlv-default";
           }
         } else if (stream.match(/^[\w\d_]+/)) {
           // alpha-numeric token.
@@ -613,15 +571,11 @@ export const tlv = mkVerilog({
         } else {
           // Eat the next char w/ no formatting.
           stream.next();
-          style = "tlv-default";
-        }
-        if (beginStatement) {
-          style += " tlv-statement";
         }
       } else {
         if (stream.match(/^[mM]4([\w\d_]*)/)) {
           // m4 pre proc
-          style = "tlv-m4";
+          style = "keyword";
         }
       }
       return style;

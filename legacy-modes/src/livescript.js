@@ -38,7 +38,7 @@ var stringfill = {
 var Rules = {
   start: [
     {
-      token: 'comment.doc',
+      token: 'docComment',
       regex: '/\\*',
       next: 'comment'
     }, {
@@ -48,46 +48,46 @@ var Rules = {
       token: 'keyword',
       regex: '(?:t(?:h(?:is|row|en)|ry|ypeof!?)|c(?:on(?:tinue|st)|a(?:se|tch)|lass)|i(?:n(?:stanceof)?|mp(?:ort(?:\\s+all)?|lements)|[fs])|d(?:e(?:fault|lete|bugger)|o)|f(?:or(?:\\s+own)?|inally|unction)|s(?:uper|witch)|e(?:lse|x(?:tends|port)|val)|a(?:nd|rguments)|n(?:ew|ot)|un(?:less|til)|w(?:hile|ith)|o[fr]|return|break|let|var|loop)' + keywordend
     }, {
-      token: 'constant.language',
+      token: 'atom',
       regex: '(?:true|false|yes|no|on|off|null|void|undefined)' + keywordend
     }, {
-      token: 'invalid.illegal',
+      token: 'invalid',
       regex: '(?:p(?:ackage|r(?:ivate|otected)|ublic)|i(?:mplements|nterface)|enum|static|yield)' + keywordend
     }, {
-      token: 'language.support.class',
+      token: 'className.standard',
       regex: '(?:R(?:e(?:gExp|ferenceError)|angeError)|S(?:tring|yntaxError)|E(?:rror|valError)|Array|Boolean|Date|Function|Number|Object|TypeError|URIError)' + keywordend
     }, {
-      token: 'language.support.function',
+      token: 'variableName.function.standard',
       regex: '(?:is(?:NaN|Finite)|parse(?:Int|Float)|Math|JSON|(?:en|de)codeURI(?:Component)?)' + keywordend
     }, {
-      token: 'variable.language',
+      token: 'variableName.standard',
       regex: '(?:t(?:hat|il|o)|f(?:rom|allthrough)|it|by|e)' + keywordend
     }, {
-      token: 'identifier',
+      token: 'variableName',
       regex: identifier + '\\s*:(?![:=])'
     }, {
-      token: 'variable',
+      token: 'variableName',
       regex: identifier
     }, {
-      token: 'keyword.operator',
+      token: 'operatorKeyword',
       regex: '(?:\\.{3}|\\s+\\?)'
     }, {
-      token: 'keyword.variable',
+      token: 'keyword',
       regex: '(?:@+|::|\\.\\.)',
       next: 'key'
     }, {
-      token: 'keyword.operator',
+      token: 'operatorKeyword',
       regex: '\\.\\s*',
       next: 'key'
     }, {
       token: 'string',
       regex: '\\\\\\S[^\\s,;)}\\]]*'
     }, {
-      token: 'string.doc',
+      token: 'docString',
       regex: '\'\'\'',
       next: 'qdoc'
     }, {
-      token: 'string.doc',
+      token: 'docString',
       regex: '"""',
       next: 'qqdoc'
     }, {
@@ -107,68 +107,68 @@ var Rules = {
       regex: '<\\[',
       next: 'words'
     }, {
-      token: 'string.regex',
+      token: 'regexp',
       regex: '//',
       next: 'heregex'
     }, {
-      token: 'string.regex',
+      token: 'regexp',
       regex: '\\/(?:[^[\\/\\n\\\\]*(?:(?:\\\\.|\\[[^\\]\\n\\\\]*(?:\\\\.[^\\]\\n\\\\]*)*\\])[^[\\/\\n\\\\]*)*)\\/[gimy$]{0,4}',
       next: 'key'
     }, {
-      token: 'constant.numeric',
+      token: 'number',
       regex: '(?:0x[\\da-fA-F][\\da-fA-F_]*|(?:[2-9]|[12]\\d|3[0-6])r[\\da-zA-Z][\\da-zA-Z_]*|(?:\\d[\\d_]*(?:\\.\\d[\\d_]*)?|\\.\\d[\\d_]*)(?:e[+-]?\\d[\\d_]*)?[\\w$]*)'
     }, {
-      token: 'lparen',
+      token: 'paren',
       regex: '[({[]'
     }, {
-      token: 'rparen',
+      token: 'paren',
       regex: '[)}\\]]',
       next: 'key'
     }, {
-      token: 'keyword.operator',
+      token: 'operatorKeyword',
       regex: '\\S+'
     }, {
-      token: 'text',
+      token: 'content',
       regex: '\\s+'
     }
   ],
   heregex: [
     {
-      token: 'string.regex',
+      token: 'regexp',
       regex: '.*?//[gimy$?]{0,4}',
       next: 'start'
     }, {
-      token: 'string.regex',
+      token: 'regexp',
       regex: '\\s*#{'
     }, {
-      token: 'comment.regex',
+      token: 'comment',
       regex: '\\s+(?:#.*)?'
     }, {
-      token: 'string.regex',
+      token: 'regexp',
       regex: '\\S+'
     }
   ],
   key: [
     {
-      token: 'keyword.operator',
+      token: 'operatorKeyword',
       regex: '[.?@!]+'
     }, {
-      token: 'identifier',
+      token: 'variableName',
       regex: identifier,
       next: 'start'
     }, {
-      token: 'text',
+      token: 'content',
       regex: '',
       next: 'start'
     }
   ],
   comment: [
     {
-      token: 'comment.doc',
+      token: 'docComment',
       regex: '.*?\\*/',
       next: 'start'
     }, {
-      token: 'comment.doc',
+      token: 'docComment',
       regex: '.+'
     }
   ],

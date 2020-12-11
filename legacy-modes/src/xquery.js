@@ -186,7 +186,7 @@ function tokenBase(stream, state) {
 
     // if we think it's a function call but not yet known,
     // set style to variable for now for lack of something better
-    if(mightBeFunction && !known) known = {type: "function_call", style: "variable def"};
+    if(mightBeFunction && !known) known = {type: "function_call", style: "def"};
 
     // if the previous word was element, attribute, axis specifier, this word should be the name of that
     if(isInXmlConstructor(state)) {

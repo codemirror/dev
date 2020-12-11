@@ -47,7 +47,7 @@ export const ebnf = {
           stream.match(/^.[^\\\"\']*/);
         }
       }
-      return state.lhs ? "property string" : "string"; // Token style
+      return state.lhs ? "property" : "string"; // Token style
 
     case stateType.comment:
       while (state.stack[0] === stateType.comment && !stream.eol()) {
