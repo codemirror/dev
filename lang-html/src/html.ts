@@ -1,5 +1,5 @@
 import {parser, configureNesting} from "lezer-html"
-import {cssLanguage} from "@codemirror/next/lang-css"
+import {cssLanguage, cssSupport} from "@codemirror/next/lang-css"
 import {javascriptLanguage, javascriptSupport} from "@codemirror/next/lang-javascript"
 import {LezerLanguage, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
@@ -70,7 +70,7 @@ export const htmlCompletion = htmlLanguage.data.of({autocomplete: completeHTML})
 /// An extension that installs HTML-related functionality
 /// ([`htmlCompletion`](#lang-html.htmlCompletion) and
 /// [`javascriptSupport`](#lang-javascript.javascriptSupport)).
-export function htmlSupport(): Extension { return [htmlCompletion, javascriptSupport()] }
+export function htmlSupport(): Extension { return [htmlCompletion, javascriptSupport(), cssSupport()] }
 
 /// Returns an extension that installs the HTML
 /// [language](#lang-html.htmlLanguage) and
