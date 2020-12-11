@@ -18,7 +18,7 @@ export default {
   gecko_version: gecko ? +(/Firefox\/(\d+)/.exec(nav.userAgent) || [0, 0])[1] : 0,
   chrome: !!chrome,
   chrome_version: chrome ? +chrome[1] : 0,
-  ios: !ie && /AppleWebKit/.test(nav.userAgent) && /Mobile\/\w+/.test(nav.userAgent),
+  ios: !ie && /AppleWebKit/.test(nav.userAgent) && (/Mobile\/\w+/.test(nav.userAgent) || nav.maxTouchPoints > 2),
   android: /Android\b/.test(nav.userAgent),
   webkit,
   safari: /Apple Computer/.test(nav.vendor),
