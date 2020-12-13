@@ -63,7 +63,9 @@
     "./lang-rust": "./lang-rust/dist/index.js",
     "./lang-xml": "./lang-xml/dist/index.js",
     "./lang-markdown": "./lang-markdown/dist/index.js",
-    "./theme-one-dark": "./theme-one-dark/dist/index.js"
+    "./theme-one-dark": "./theme-one-dark/dist/index.js",
+    "./package.json": "./package.json",
+    "./": "./"
   },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
