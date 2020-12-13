@@ -1,6 +1,6 @@
 import {parser} from "lezer-css"
 import {SyntaxNode} from "lezer-tree"
-import {LezerLanguage, continuedIndent, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
+import {LezerLanguage, continuedIndent, indentNodeProp, foldNodeProp, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {Extension} from "@codemirror/next/state"
 import {completeCSS} from "./complete"
@@ -64,12 +64,7 @@ export const cssLanguage = LezerLanguage.define({
 /// CSS property and value keyword completion.
 export const cssCompletion: Extension = cssLanguage.data.of({autocomplete: completeCSS})
 
-/// Provides support functionality for CSS ([completion](#lang-css.cssCompletion)).
-export function cssSupport(): Extension {
-  return cssCompletion
-}
-
-/// Returns an extension that installs the CSS language.
-export function css(): Extension {
-  return [cssLanguage, cssSupport()]
+/// Language support for CSS.
+export function css() {
+  return new LanguageSupport(cssLanguage, cssCompletion)
 }

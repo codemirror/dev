@@ -1,7 +1,6 @@
 import {parser} from "lezer-rust"
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {Extension} from "@codemirror/next/state"
 
 /// A syntax provider based on the [Lezer Rust
 /// parser](https://github.com/lezer-parser/rust), extended with
@@ -67,7 +66,7 @@ export const rustLanguage = LezerLanguage.define({
   }
 })
 
-/// Returns an extension that installs the Rust language.
-export function rust(): Extension {
-  return rustLanguage
+/// Rust language support
+export function rust() {
+  return new LanguageSupport(rustLanguage)
 }

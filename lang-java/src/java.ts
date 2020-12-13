@@ -1,7 +1,6 @@
 import {parser} from "lezer-java"
-import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
+import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {Extension} from "@codemirror/next/state"
 
 /// A language provider based on the [Lezer Java
 /// parser](https://github.com/lezer-parser/java), extended with
@@ -68,8 +67,7 @@ export const javaLanguage = LezerLanguage.define({
   }
 })
 
-/// Returns an extension that installs the Java language and
-/// support features.
-export function java(): Extension {
-  return [javaLanguage]
+/// Java language support.
+export function java() {
+  return new LanguageSupport(javaLanguage)
 }

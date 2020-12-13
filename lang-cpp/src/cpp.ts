@@ -1,7 +1,7 @@
 import {parser} from "lezer-cpp"
-import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
+import {flatIndent, continuedIndent, indentNodeProp, foldNodeProp,
+        LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {Extension} from "@codemirror/next/state"
 
 /// A language provider based on the [Lezer C++
 /// parser](https://github.com/lezer-parser/cpp), extended with
@@ -72,8 +72,7 @@ export const cppLanguage = LezerLanguage.define({
   }
 })
 
-/// Returns an extension that installs the C++ language and
-/// support features.
-export function cpp(): Extension {
-  return [cppLanguage]
+/// Language support for C++.
+export function cpp() {
+  return new LanguageSupport(cppLanguage)
 }

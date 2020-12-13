@@ -1,4 +1,4 @@
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {Extension} from "@codemirror/next/state"
 import {Completion} from "@codemirror/next/autocomplete"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
@@ -132,17 +132,12 @@ export function schemaCompletion(config: SQLConfig): Extension {
   }) : []
 }
 
-/// Returns an extension that installs SQL support features
-/// (completion of keywords, and optionally
-/// [schema-based](#lang-sql.SQLConfig.schema) completion).
-export function sqlSupport(config: SQLConfig): Extension {
-  return [schemaCompletion(config), keywordCompletion(config.dialect || StandardSQL)]
-}
-
-/// Produces an extension that installs the given SQL dialect,
-/// keyword completion, and, if provided, schema-based completion.
-export function sql(config: SQLConfig): Extension {
-  return [config.dialect || StandardSQL, sqlSupport(config)]
+/// SQL language support for the given SQL dialect, with keyword
+/// completion, and, if provided, schema-based completion as extra
+/// extensions.
+export function sql(config: SQLConfig) {
+  let lang = config.dialect || StandardSQL
+  return new LanguageSupport(lang.language, [schemaCompletion(config), keywordCompletion(lang)])
 }
 
 /// The standard SQL dialect.

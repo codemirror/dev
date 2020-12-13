@@ -41,16 +41,16 @@ const parser = baseParser.configure({
 /// Language support for Markdown/CommonMark.
 export const markdownLanguage = new Language(data, parser)
 
-/// Create an instance of the Markdown language that will, for code
-/// blocks, try to find a language that matches the block's info
-/// string in `languages` or, if none if found, use `defaultLanguage`
-/// to parse the block.
+// Create an instance of the Markdown language that will, for code
+// blocks, try to find a language that matches the block's info
+// string in `languages` or, if none if found, use `defaultLanguage`
+// to parse the block.
 export function markdownWithCodeLanguages(languages: readonly LanguageDescription[], defaultLanguage?: Language) {
   return new Language(data, parser.configure({
     codeParser(info: string) {
       let found = info && LanguageDescription.matchLanguageName(languages, info, true)
       if (!found) return defaultLanguage ? defaultLanguage.parser : null
-      if (found.language) return found.language.parser
+      if (found.support) return found.support.language.parser
       found.load()
       return null
     }

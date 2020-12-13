@@ -1,8 +1,8 @@
 import {parser} from "lezer-javascript"
-import {LezerLanguage, flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/language"
+import {LezerLanguage, LanguageSupport,
+        flatIndent, continuedIndent, indentNodeProp, foldNodeProp, delimitedIndent} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeFromList, ifNotIn} from "@codemirror/next/autocomplete"
-import {Extension} from "@codemirror/next/state"
 import {snippets} from "./snippets"
 
 /// A language provider based on the [Lezer JavaScript
@@ -97,18 +97,12 @@ export const jsxLanguage = javascriptLanguage.configure({dialect: "jsx"})
 /// Language provider for JSX + TypeScript.
 export const tsxLanguage = javascriptLanguage.configure({dialect: "jsx ts"})
 
-/// Returns an extension that installs JavaScript support features
-/// (completion of [snippets](#lang-javascript.snippets)).
-export function javascriptSupport(): Extension {
-  return javascriptLanguage.data.of({
-    autocomplete: ifNotIn(["LineComment", "BlockComment", "String"], completeFromList(snippets))
-  })
-}
-
-/// Returns an extension that installs the JavaScript language and
-/// support features.
-export function javascript(config: {jsx?: boolean, typescript?: boolean} = {}): Extension {
+/// JavaScript support. Includes [snippet](#lang-javascript.snippets)
+/// completion.
+export function javascript(config: {jsx?: boolean, typescript?: boolean} = {}) {
   let lang = config.jsx ? (config.typescript ? tsxLanguage : jsxLanguage)
     : config.typescript ? typescriptLanguage : javascriptLanguage
-  return [lang, javascriptSupport()]
+  return new LanguageSupport(lang, javascriptLanguage.data.of({
+    autocomplete: ifNotIn(["LineComment", "BlockComment", "String"], completeFromList(snippets))
+  }))
 }

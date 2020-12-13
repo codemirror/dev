@@ -483,18 +483,37 @@ class ParseWorker {
   }
 }
 
+/// This class bundles a [language object](#language.Language) with an
+/// optional set of supporting extensions. Language packages are
+/// encouraged to export a function that optionally takes a
+/// configuration object and returns a `LanguageSupport` instance, as
+/// the main way for client code to use the package.
+export class LanguageSupport {
+  /// An extension including both the language and its support
+  /// extensions. (Allowing the object to be used as an extension
+  /// value itself.)
+  extension: Extension
+
+  /// Create a support object.
+  constructor(
+    /// The language object.
+    readonly language: Language,
+    /// An optional set of supporting extensions.
+    readonly support: Extension = []
+  ) {
+    this.extension = [language, support]
+  }
+}
+
 /// Language descriptions are used to store metadata about languages
 /// and to dynamically load them. Their main role is finding the
 /// appropriate language for a filename or dynamically loading nested
 /// parsers.
 export class LanguageDescription {
   /// If the language has been loaded, this will hold its value.
-  language: Language | undefined = undefined
-  /// If the language has been loaded _and_ it provides support
-  /// extensions, they will be available here.
-  support: Extension | undefined = undefined
+  support: LanguageSupport | undefined = undefined
 
-  private loading: Promise<LanguageDescription> | null = null
+  private loading: Promise<LanguageSupport> | null = null
 
   private constructor(
     /// The name of this mode.
@@ -506,21 +525,17 @@ export class LanguageDescription {
     /// Optional filename pattern that should be associated with this
     /// language.
     readonly filename: RegExp | undefined,
-    private loadFunc: () => Promise<{language: Language, support?: Extension}>
+    private loadFunc: () => Promise<LanguageSupport>
   ) {}
 
   /// Start loading the the language. Will return a promise that
-  /// resolves to this object itself when the language successfully
-  /// loads.
-  load(): Promise<LanguageDescription> {
-    return this.loading || (this.loading = this.loadFunc().then(result => {
-      this.language = result.language
-      this.support = result.support
-      return this
-    }, err => {
-      this.loading = null
-      throw err
-    }))
+  /// resolves to a [`LanguageSupport`](#language.LanguageSupport)
+  /// object when the language successfully loads.
+  load(): Promise<LanguageSupport> {
+    return this.loading || (this.loading = this.loadFunc().then(
+      support => this.support = support,
+      err => { this.loading = null; throw err }
+    ))
   }
 
   /// Create a language description.
@@ -534,7 +549,7 @@ export class LanguageDescription {
     /// An optional filename pattern associated with this language.
     filename?: RegExp,
     /// A function that will asynchronously load the language.
-    load: () => Promise<{language: Language, support?: Extension}>
+    load: () => Promise<LanguageSupport>
   }) {
     return new LanguageDescription(spec.name, (spec.alias || []).concat(spec.name).map(s => s.toLowerCase()),
                                    spec.extensions || [], spec.filename, spec.load)

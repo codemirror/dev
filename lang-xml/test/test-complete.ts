@@ -1,9 +1,9 @@
 import {EditorState} from "@codemirror/next/state"
 import {CompletionContext, CompletionResult, CompletionSource} from "@codemirror/next/autocomplete"
-import {xml, XMLConfig} from "@codemirror/next/lang-xml"
+import {xml} from "@codemirror/next/lang-xml"
 import ist from "ist"
 
-function get(doc: string, config?: XMLConfig, explicit = true) {
+function get(doc: string, config?: Parameters<typeof xml>[0], explicit = true) {
   let cur = doc.indexOf("|")
   doc = doc.slice(0, cur) + doc.slice(cur + 1)
   let state = EditorState.create({doc, selection: {anchor: cur}, extensions: [xml(config)]})

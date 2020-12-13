@@ -1,6 +1,5 @@
 import {parser} from "lezer-json"
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
-import {Extension} from "@codemirror/next/state"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {SyntaxNode} from "lezer-tree"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 
@@ -36,7 +35,7 @@ export const jsonLanguage = LezerLanguage.define({
   }
 })
 
-/// Returns an extension that installs the JSON language.
-export function json(): Extension {
-  return jsonLanguage
+/// JSON language support.
+export function json() {
+  return new LanguageSupport(jsonLanguage)
 }

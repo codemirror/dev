@@ -1,15 +1,12 @@
-import {Language, LanguageDescription} from "@codemirror/next/language"
+import {LanguageSupport, LanguageDescription} from "@codemirror/next/language"
 import {StreamParser} from "@codemirror/next/stream-parser"
 
-function legacy(parser: StreamParser<unknown>): Promise<{language: Language}> {
-  return import("@codemirror/next/stream-parser").then(m => ({language: m.StreamLanguage.define(parser)}))
+function legacy(parser: StreamParser<unknown>): Promise<LanguageSupport> {
+  return import("@codemirror/next/stream-parser").then(m => new LanguageSupport(m.StreamLanguage.define(parser)))
 }
 
 function sql(dialectName: keyof typeof import("@codemirror/next/lang-sql")) {
-  return import("@codemirror/next/lang-sql").then(m => {
-    let dialect = (m as any)[dialectName]
-    return {language: dialect.language, support: m.sqlSupport({dialect})}
-  })
+  return import("@codemirror/next/lang-sql").then(m => m.sql({dialect: (m as any)[dialectName]}))
 }
 
 /// An array of language descriptions for known language packages.
@@ -20,7 +17,7 @@ export const languages = [
     name: "C",
     extensions: ["c","h","ino"],
     load() {
-      return import("@codemirror/next/lang-cpp").then(m => ({language: m.cppLanguage}))
+      return import("@codemirror/next/lang-cpp").then(m => m.cpp())
     }
   }),
   LanguageDescription.of({
@@ -28,7 +25,7 @@ export const languages = [
     alias: ["cpp"],
     extensions: ["cpp","c++","cc","cxx","hpp","h++","hh","hxx"],
     load() {
-      return import("@codemirror/next/lang-cpp").then(m => ({language: m.cppLanguage}))
+      return import("@codemirror/next/lang-cpp").then(m => m.cpp())
     }
   }),
   LanguageDescription.of({
@@ -41,7 +38,7 @@ export const languages = [
     name: "CSS",
     extensions: ["css"],
     load() {
-      return import("@codemirror/next/lang-css").then(m => ({language: m.cssLanguage, support: m.cssSupport()}))
+      return import("@codemirror/next/lang-css").then(m => m.css())
     }
   }),
   LanguageDescription.of({
@@ -49,14 +46,14 @@ export const languages = [
     alias: ["xhtml"],
     extensions: ["html", "htm", "handlebars", "hbs"],
     load() {
-      return import("@codemirror/next/lang-html").then(m => ({language: m.htmlLanguage, support: m.htmlSupport()}))
+      return import("@codemirror/next/lang-html").then(m => m.html())
     }
   }),
   LanguageDescription.of({
     name: "Java",
     extensions: ["java"],
     load() {
-      return import("@codemirror/next/lang-java").then(m => ({language: m.javaLanguage}))
+      return import("@codemirror/next/lang-java").then(m => m.java())
     }
   }),
   LanguageDescription.of({
@@ -64,7 +61,7 @@ export const languages = [
     alias: ["ecmascript","js","node"],
     extensions: ["js", "mjs", "cjs"],
     load() {
-      return import("@codemirror/next/lang-javascript").then(m => ({language: m.javascriptLanguage, support: m.javascriptSupport()}))
+      return import("@codemirror/next/lang-javascript").then(m => m.javascript())
     }
   }),
   LanguageDescription.of({
@@ -72,14 +69,14 @@ export const languages = [
     alias: ["json5"],
     extensions: ["json","map"],
     load() {
-      return import("@codemirror/next/lang-json").then(m => ({language: m.jsonLanguage}))
+      return import("@codemirror/next/lang-json").then(m => m.json())
     }
   }),
   LanguageDescription.of({
     name: "JSX",
     extensions: ["jsx"],
     load() {
-      return import("@codemirror/next/lang-javascript").then(m => ({language: m.jsxLanguage, support: m.javascriptSupport()}))
+      return import("@codemirror/next/lang-javascript").then(m => m.javascript({jsx: true}))
     }
   }),
   LanguageDescription.of({
@@ -90,7 +87,7 @@ export const languages = [
     name: "Markdown",
     extensions: ["md", "markdown", "mkd"],
     load() {
-      return import("@codemirror/next/lang-markdown").then(m => ({language: m.markdownLanguage, support: m.markdownSupport()}))
+      return import("@codemirror/next/lang-markdown").then(m => m.markdown())
     }
   }),
   LanguageDescription.of({
@@ -115,14 +112,14 @@ export const languages = [
     extensions: ["BUILD","bzl","py","pyw"],
     filename: /^(BUCK|BUILD)$/,
     load() {
-      return import("@codemirror/next/lang-python").then(m => ({language: m.pythonLanguage}))
+      return import("@codemirror/next/lang-python").then(m => m.python())
     }
   }),
   LanguageDescription.of({
     name: "Rust",
     extensions: ["rs"],
     load() {
-      return import("@codemirror/next/lang-rust").then(m => ({language: m.rustLanguage}))
+      return import("@codemirror/next/lang-rust").then(m => m.rust())
     }
   }),
   LanguageDescription.of({
@@ -138,7 +135,7 @@ export const languages = [
     name: "TSX",
     extensions: ["tsx"],
     load() {
-      return import("@codemirror/next/lang-javascript").then(m => ({language: m.tsxLanguage, support: m.javascriptSupport()}))
+      return import("@codemirror/next/lang-javascript").then(m => m.javascript({jsx: true, typescript: true}))
     }
   }),
   LanguageDescription.of({
@@ -146,7 +143,7 @@ export const languages = [
     alias: ["ts"],
     extensions: ["ts"],
     load() {
-      return import("@codemirror/next/lang-javascript").then(m => ({language: m.typescriptLanguage, support: m.javascriptSupport()}))
+      return import("@codemirror/next/lang-javascript").then(m => m.javascript({typescript: true}))
     }
   }),
   LanguageDescription.of({
@@ -154,7 +151,7 @@ export const languages = [
     alias: ["rss","wsdl","xsd"],
     extensions: ["xml","xsl","xsd","svg"],
     load() {
-      return import("@codemirror/next/lang-xml").then(m => ({language: m.xmlLanguage, support: m.xmlSupport()}))
+      return import("@codemirror/next/lang-xml").then(m => m.xml())
     }
   }),
 

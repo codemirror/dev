@@ -1,10 +1,9 @@
 import {parser, configureNesting} from "lezer-html"
-import {cssLanguage, cssSupport} from "@codemirror/next/lang-css"
-import {javascriptLanguage, javascriptSupport} from "@codemirror/next/lang-javascript"
-import {LezerLanguage, indentNodeProp, foldNodeProp} from "@codemirror/next/language"
+import {cssLanguage, css} from "@codemirror/next/lang-css"
+import {javascriptLanguage, javascript} from "@codemirror/next/lang-javascript"
+import {LezerLanguage, indentNodeProp, foldNodeProp, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {completeHTML} from "./complete"
-import {Extension} from "@codemirror/next/state"
 
 /// A language provider based on the [Lezer HTML
 /// parser](https://github.com/lezer-parser/html), wired up with the
@@ -67,12 +66,9 @@ export const htmlLanguage = LezerLanguage.define({
 /// context-aware way.
 export const htmlCompletion = htmlLanguage.data.of({autocomplete: completeHTML})
 
-/// An extension that installs HTML-related functionality
-/// ([`htmlCompletion`](#lang-html.htmlCompletion) and
-/// [`javascriptSupport`](#lang-javascript.javascriptSupport)).
-export function htmlSupport(): Extension { return [htmlCompletion, javascriptSupport(), cssSupport()] }
-
-/// Returns an extension that installs the HTML
-/// [language](#lang-html.htmlLanguage) and
-/// [support](#lang-html.htmlSupport).
-export function html(): Extension { return [htmlLanguage, htmlSupport()] }
+/// Language support for HTML, including
+/// [`htmlCompletion`](#lang-html.htmlCompletion) and JavaScript and
+/// CSS support extensions.
+export function html() {
+  return new LanguageSupport(htmlLanguage, [htmlCompletion, javascript().support, css().support])
+}

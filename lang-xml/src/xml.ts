@@ -1,7 +1,6 @@
 import {parser} from "lezer-xml"
-import {indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
+import {indentNodeProp, foldNodeProp, LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
-import {Extension} from "@codemirror/next/state"
 import {ElementSpec, AttrSpec, completeFromSchema} from "./complete"
 
 /// A language provider based on the [Lezer XML
@@ -49,8 +48,7 @@ export const xmlLanguage = LezerLanguage.define({
   }
 })
 
-/// Used to configure the XML extension.
-export type XMLConfig = {
+type XMLConfig = {
   /// Provide a schema to create completions from.
   elements?: readonly ElementSpec[],
   /// Supporting attribute descriptions for the schema specified in
@@ -58,15 +56,10 @@ export type XMLConfig = {
   attributes?: readonly AttrSpec[]
 }
 
-/// Return an extension that installs XML support functionality.
-export function xmlSupport(conf: XMLConfig = {}): Extension {
-  return xmlLanguage.data.of({
+/// XML language support. Includes schema-based autocompletion when
+/// configured.
+export function xml(conf: XMLConfig = {}) {
+  return new LanguageSupport(xmlLanguage, xmlLanguage.data.of({
     autocomplete: completeFromSchema(conf.elements || [], conf.attributes || [])
-  })
-}
-
-/// Returns an extension that installs the XML language and
-/// support features.
-export function xml(conf?: XMLConfig): Extension {
-  return [xmlLanguage, xmlSupport(conf)]
+  }))
 }

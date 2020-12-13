@@ -1,6 +1,5 @@
 import {parser} from "lezer-python"
-import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage} from "@codemirror/next/language"
-import {Extension} from "@codemirror/next/state"
+import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage, LanguageSupport} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 
 /// A language provider based on the [Lezer Python
@@ -56,7 +55,7 @@ export const pythonLanguage = LezerLanguage.define({
   }
 })
 
-/// Returns an extension that installs the Python language.
-export function python(): Extension {
-  return pythonLanguage
+/// Python language support.
+export function python() {
+  return new LanguageSupport(pythonLanguage)
 }
