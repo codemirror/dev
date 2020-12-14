@@ -131,16 +131,17 @@ export const baseTheme = buildTheme("." + baseThemeID, {
 
   $cursor: {
     position: "absolute",
-    borderLeft: "1.2px solid #bbb",
+    borderLeft: "1.2px solid black",
     marginLeft: "-0.6px",
-    pointerEvents: "none"
+    pointerEvents: "none",
+    display: "none"
   },
   "$$dark $cursor": {
     borderLeftColor: "#444"
   },
 
   "$$focused $cursor": {
-    borderLeft: "1.2px solid black",
+    display: "block"
   },
 
   $placeholder: {
