@@ -10,6 +10,7 @@ import {baseTheme} from "./theme"
 export {snippet, snippetCompletion, nextSnippetField, prevSnippetField, clearSnippet, snippetKeymap} from "./snippet"
 export {Completion, CompletionContext, CompletionSource, CompletionResult, completeFromList, ifNotIn} from "./completion"
 export {startCompletion, closeCompletion, acceptCompletion, moveCompletionSelection} from "./view"
+export {completeAnyWord} from "./word"
 
 /// Returns an extension that enables autocompletion.
 export function autocompletion(config: CompletionConfig = {}): Extension {
