@@ -19,7 +19,13 @@ type FacetConfig<Input, Output> = {
   /// value when no inputs changed. Defaults to comparing with `===`.
   compareInput?: (a: Input, b: Input) => boolean,
   /// Static facets can not contain dynamic inputs.
-  static?: boolean
+  static?: boolean,
+  /// If given, these extension(s) will be added to any state where
+  /// this facet is provided. (Note that, while a facet's default
+  /// value can be read from a state even if the facet wasn't present
+  /// in the state at all, these extensions won't be added in that
+  /// situation.)
+  enables?: Extension
 }
 
 /// A facet is a value that is assicated with a state and can be
@@ -43,7 +49,9 @@ export class Facet<Input, Output = readonly Input[]> {
     readonly compareInput: (a: Input, b: Input) => boolean,
     /// @internal
     readonly compare: (a: Output, b: Output) => boolean,
-    private isStatic: boolean
+    private isStatic: boolean,
+    /// @internal
+    readonly extensions: Extension | undefined
   ) {
     this.default = combine([])
   }
@@ -53,7 +61,8 @@ export class Facet<Input, Output = readonly Input[]> {
     return new Facet<Input, Output>(config.combine || ((a: any) => a) as any,
                                     config.compareInput || ((a, b) => a === b),
                                     config.compare || (!config.combine ? sameArray as any : (a, b) => a === b),
-                                    !!config.static)
+                                    !!config.static,
+                                    config.enables)
   }
 
   /// Returns an extension that adds the given value for this facet.
@@ -417,6 +426,7 @@ function flatten(extension: Extension, replacements: ExtensionMap) {
     } else {
       result[prec].push(ext as any)
       if (ext instanceof StateField) inner(ext.facets, prec)
+      else if (ext instanceof FacetProvider && ext.facet.extensions) inner(ext.facet.extensions, prec)
     }
   }
   inner(extension, Prec.default)

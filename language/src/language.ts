@@ -8,11 +8,6 @@ import {EditorState, StateField, Transaction, Extension, StateEffect, Facet, Cha
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 
-/// The facet used to associate a language with an editor state.
-export const language = Facet.define<Language, Language | null>({
-  combine(languages) { return languages.length ? languages[0] : null }
-})
-
 /// Node prop stored on a grammar's top node to indicate the facet used
 /// to store language data related to that language.
 export const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
@@ -65,9 +60,6 @@ export class Language {
     this.parser = parser as {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
     this.extension = [
       language.of(this),
-      Language.state,
-      parseWorker,
-      treeHighlighter,
       EditorState.languageData.of((state, pos) => state.facet(languageDataFacetAt(state, pos)!))
     ].concat(extraExtensions)
   }
@@ -113,7 +105,7 @@ export class Language {
   }
 
   /// @internal
-  static state = StateField.define<LanguageState>({
+  static state: StateField<LanguageState> = StateField.define({
     create(state) {
       let parseState = new EditorParseContext(state.facet(language)!.parser, state, [],
                                               Tree.empty, {from: 0, to: state.doc.length}, [])
@@ -505,6 +497,12 @@ const parseWorker = ViewPlugin.fromClass(class ParseWorker {
   }
 }, {
   eventHandlers: {focus() { this.scheduleWork() }}
+})
+
+/// The facet used to associate a language with an editor state.
+export const language = Facet.define<Language, Language | null>({
+  combine(languages) { return languages.length ? languages[0] : null },
+  enables: [Language.state, parseWorker, treeHighlighter]
 })
 
 /// This class bundles a [language object](#language.Language) with an
