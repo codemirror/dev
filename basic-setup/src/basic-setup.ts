@@ -66,7 +66,7 @@ export const basicSetup: Extension = [
   rectangularSelection(),
   highlightActiveLine(),
   highlightSelectionMatches(),
-  keymap([
+  keymap.of([
     ...closeBracketsKeymap,
     ...defaultKeymap,
     ...searchKeymap,

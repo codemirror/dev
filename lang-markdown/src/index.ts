@@ -28,5 +28,5 @@ export function markdown(config: {
   let {codeLanguages, defaultCodeLanguage} = config
   let language = codeLanguages || defaultCodeLanguage ? markdownWithCodeLanguages(codeLanguages || [], defaultCodeLanguage)
     : markdownLanguage
-  return new LanguageSupport(language, precedence(keymap(markdownKeymap), "extend"))
+  return new LanguageSupport(language, precedence(keymap.of(markdownKeymap), "extend"))
 }

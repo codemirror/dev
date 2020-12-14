@@ -1,6 +1,6 @@
-import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap} from "@codemirror/next/view"
+import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap, KeyBinding} from "@codemirror/next/view"
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
-        Transaction, TransactionSpec, Text, StateCommand, precedence} from "@codemirror/next/state"
+        Transaction, TransactionSpec, Text, StateCommand, precedence, Facet} from "@codemirror/next/state"
 import {indentUnit} from "@codemirror/next/language"
 import {baseTheme} from "./theme"
 import {Completion} from "./completion"
@@ -152,7 +152,7 @@ export function snippet(template: string) {
     if (ranges.length > 1) {
       spec.effects = setActive.of(new ActiveSnippet(ranges, 0))
       if (editor.state.field(snippetState, false) === undefined)
-        spec.reconfigure = {append: [snippetState, snippetKeymap, baseTheme]}
+        spec.reconfigure = {append: [snippetState, addSnippetKeymap, baseTheme]}
     }
     editor.dispatch(editor.state.update(spec))
   }
@@ -171,17 +171,35 @@ function moveField(dir: 1 | -1): StateCommand {
   }
 }
 
-const clearSnippet: StateCommand = ({state, dispatch}) => {
+/// A command that clears the active snippet, if any.
+export const clearSnippet: StateCommand = ({state, dispatch}) => {
   let active = state.field(snippetState, false)
   if (!active) return false
   dispatch(state.update({effects: setActive.of(null)}))
   return true
 }
 
-const snippetKeymap = precedence(keymap([
-  {key: "Tab", run: moveField(1), shift: moveField(-1)},
+/// Move to the next snippet field, if available.
+export const nextSnippetField = moveField(1)
+
+/// Move to the previous snippet field, if available.
+export const prevSnippetField = moveField(-1)
+
+const defaultSnippetKeymap = [
+  {key: "Tab", run: nextSnippetField, shift: prevSnippetField},
   {key: "Escape", run: clearSnippet}
-]), "override")
+]
+
+/// A facet that can be used to configure the key bindings used by
+/// snippets. The default binds Tab to
+/// [`nextSnippetField`](#autocomplete.nextSnippetField), Shift-Tab to
+/// [`prevSnippetField`](#autocomplete.prevSnippetField), and Escape
+/// to [`clearSnippet`](#autocomplete.clearSnippet).
+export const snippetKeymap = Facet.define<readonly KeyBinding[], readonly KeyBinding[]>({
+  combine(maps) { return maps.length ? maps[0] : defaultSnippetKeymap }
+})
+
+const addSnippetKeymap = precedence(keymap.compute([snippetKeymap], state => state.facet(snippetKeymap)), "override")
 
 /// Create a completion from a snippet. Returns an object with the
 /// properties from `completion`, plus an `apply` function that

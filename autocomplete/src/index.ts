@@ -7,7 +7,7 @@ import {CompletionConfig, completionConfig} from "./config"
 import {completionPlugin, moveCompletionSelection, acceptCompletion, startCompletion, closeCompletion} from "./view"
 import {baseTheme} from "./theme"
 
-export {snippet, snippetCompletion} from "./snippet"
+export {snippet, snippetCompletion, nextSnippetField, prevSnippetField, clearSnippet, snippetKeymap} from "./snippet"
 export {Completion, CompletionContext, CompletionSource, CompletionResult, completeFromList, ifNotIn} from "./completion"
 export {startCompletion, closeCompletion, acceptCompletion, moveCompletionSelection} from "./view"
 
@@ -19,7 +19,7 @@ export function autocompletion(config: CompletionConfig = {}): Extension {
     completionPlugin,
     baseTheme,
     tooltips(),
-    precedence(keymap([
+    precedence(keymap.of([
       {key: "ArrowDown", run: moveCompletionSelection(true)},
       {key: "ArrowUp", run: moveCompletionSelection(false)},
       {key: "PageDown", run: moveCompletionSelection(true, "page")},

@@ -106,37 +106,29 @@ type Binding = {preventDefault: boolean, commands: Command[]}
 
 type Keymap = {[scope: string]: {[key: string]: Binding}}
 
-const keymaps = Facet.define<Keymap>()
-
 const handleKeyEvents = EditorView.domEventHandlers({
   keydown(event, view) {
-    return runHandlers(view.state.facet(keymaps), event, view, "editor")
+    return runHandlers(view.state.facet(keymap), event, view, "editor")
   }
 })
 
-/// Create a view extension that registers a keymap.
+/// Facet used for registering keymaps.
 ///
-/// You can add multiple keymap extensions to an editor. Their
-/// priorities determine their precedence (the ones specified early or
-/// with high priority get checked first). When a handler has returned
-/// `true` for a given key, no further handlers are called.
-///
-/// When a key is bound multiple times (either in a single keymap or
-/// in separate maps), the bound commands all get a chance to handle
-/// the key stroke, in order of precedence, until one of them returns
-/// true.
-///
-/// `platform` indicates the platform that the keymap should be
-/// specialized for. It defaults to the user's platform as determined
-/// via `navigator.platform`.
-export function keymap(bindings: readonly KeyBinding[], platform?: "mac" | "win" | "linux") {
-  return [handleKeyEvents, keymaps.of(buildKeymap(bindings, platform))]
-}
+/// You can add multiple keymaps to an editor. Their priorities
+/// determine their precedence (the ones specified early or with high
+/// priority get checked first). When a handler has returned `true`
+/// for a given key, no further handlers are called.
+export const keymap = Facet.define<readonly KeyBinding[], Keymap>({
+  combine(bindings: readonly (readonly KeyBinding[])[]) {
+    return buildKeymap(bindings.length ? bindings.reduce((a, b) => a.concat(b)) : [])
+  },
+  enables: handleKeyEvents
+})
 
 /// Run the key handlers registered for a given scope. Returns true if
 /// any of them handled the event.
 export function runScopeHandlers(view: EditorView, event: KeyboardEvent, scope: string) {
-  return runHandlers(view.state.facet(keymaps), event, view, scope)
+  return runHandlers(view.state.facet(keymap), event, view, scope)
 }
 
 let storedPrefix: {view: EditorView, prefix: string, scope: string} | null = null
@@ -188,7 +180,7 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
   return bound
 }
 
-function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: EditorView, scope: string): boolean {
+function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope: string): boolean {
   let name = keyName(event), isChar = name.length == 1 && name != " "
   let prefix = "", fallthrough = false
   if (storedPrefix && storedPrefix.view == view && storedPrefix.scope == scope) {
@@ -205,12 +197,11 @@ function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: Editor
     return false
   }
 
-  for (let map of maps) {
-    let scopeObj = map[scope], baseName
-    if (!scopeObj) continue
+  let scopeObj = map[scope], baseName
+  if (scopeObj) {
     if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)])) return true
     if (isChar && (event.shiftKey || event.altKey || event.metaKey) &&
-        (baseName = base[event.keyCode]) && baseName != name) {
+      (baseName = base[event.keyCode]) && baseName != name) {
       if (runFor(scopeObj[prefix + modifiers(baseName, event, true)])) return true
     } else if (isChar && event.shiftKey) {
       if (runFor(scopeObj[prefix + modifiers(name, event, true)])) return true
