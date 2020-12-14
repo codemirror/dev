@@ -304,25 +304,8 @@ function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
   return a == b || !!(a && b && a.compare(b))
 }
 
-const MinRangeGap = 4
-
-export function addRange(from: number, to: number, ranges: number[]) {
+export function addRange(from: number, to: number, ranges: number[], margin = 0) {
   let last = ranges.length - 1
-  if (last >= 0 && ranges[last] + MinRangeGap > from) ranges[last] = Math.max(ranges[last], to)
+  if (last >= 0 && ranges[last] + margin > from) ranges[last] = Math.max(ranges[last], to)
   else ranges.push(from, to)
-}
-
-export function joinRanges(a: number[], b: number[]): number[] {
-  if (a.length == 0) return b
-  if (b.length == 0) return a
-  let result: number[] = []
-  for (let iA = 0, iB = 0;;) {
-    if (iA < a.length && (iB == b.length || a[iA] < b[iB]))
-      addRange(a[iA++], a[iA++], result)
-    else if (iB < b.length)
-      addRange(b[iB++], b[iB++], result)
-    else
-      break
-  }
-  return result
 }

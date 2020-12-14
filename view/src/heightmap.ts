@@ -622,7 +622,7 @@ class DecorationComparator {
   compareRange() {}
 
   comparePoint(from: number, to: number, a: Decoration | null, b: Decoration | null) {
-    if (from < to || a && a.heightRelevant || b && b.heightRelevant) addRange(from, to, this.changes)
+    if (from < to || a && a.heightRelevant || b && b.heightRelevant) addRange(from, to, this.changes, 5)
   }
 
   get minPointSize() { return 0 }
