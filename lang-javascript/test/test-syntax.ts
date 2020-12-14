@@ -1,6 +1,7 @@
 import ist from "ist"
 import {EditorState} from "@codemirror/next/state"
 import {javascriptLanguage} from "@codemirror/next/lang-javascript"
+import {ensureSyntaxTree} from "@codemirror/next/language"
 import {Tree} from "lezer"
 
 function s(doc: string) {
@@ -8,7 +9,7 @@ function s(doc: string) {
 }
 
 function tr(state: EditorState) {
-  return javascriptLanguage.ensureTree(state, state.doc.length, 1e9)!
+  return ensureSyntaxTree(state, state.doc.length, 1e9)!
 }
 
 describe("javascript syntax queries", () => {

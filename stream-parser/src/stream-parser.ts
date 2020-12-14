@@ -2,7 +2,7 @@ import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, PartialPars
 import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
 import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService,
-        EditorParseContext, getIndentUnit} from "@codemirror/next/language"
+        EditorParseContext, getIndentUnit, syntaxTree} from "@codemirror/next/language"
 import {EditorState} from "@codemirror/next/state"
 import {StringStream} from "./stringstream"
 
@@ -90,7 +90,7 @@ export class StreamLanguage<State> extends Language {
   static define<State>(spec: StreamParser<State>) { return new StreamLanguage(spec) }
 
   private getIndent(cx: IndentContext, pos: number) {
-    let tree = this.getTree(cx.state), at: SyntaxNode | null = tree.resolve(pos)
+    let tree = syntaxTree(cx.state), at: SyntaxNode | null = tree.resolve(pos)
     while (at && at.type != typeArray[this.docType]) at = at.parent
     if (!at) return null
     let start = findState(this, tree, 0, at.from, pos), statePos, state

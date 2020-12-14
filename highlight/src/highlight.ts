@@ -2,7 +2,7 @@ import {Tree, NodeProp} from "lezer-tree"
 import {StyleSpec, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
 import {Extension, precedence, Facet} from "@codemirror/next/state"
-import {Language} from "@codemirror/next/language"
+import {syntaxTree} from "@codemirror/next/language"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
 let nextTagID = 0
@@ -282,36 +282,31 @@ export function highlightTree(
   highlightTreeRange(tree, 0, tree.length, getStyle, putStyle)
 }
 
-/// Returns an extension that installs a highlighter that uses the
-/// tree produced by the given language, along with the current
-/// [highlight style](#highlight.highlightStyle), to style the
-/// document. If no highlight style is active, this plugin won't do
-/// any highlighting.
-export function treeHighlighter(language: Language) {
-  return precedence(ViewPlugin.define(view => new TreeHighlighter(view, language), {
-    decorations: v => v.decorations
-  }), "fallback")
-}
+/// An extension that installs a highlighter that uses the syntax
+/// tree, along with the current [highlight
+/// style](#highlight.highlightStyle), to style the document. If no
+/// highlight style is active, this plugin won't do any highlighting.
+export const treeHighlighter = precedence(ViewPlugin.define(view => new TreeHighlighter(view), {
+  decorations: v => v.decorations
+}), "fallback")
 
 class TreeHighlighter {
   decorations: DecorationSet
   tree: Tree
   markCache: {[cls: string]: Decoration} = Object.create(null)
 
-  constructor(view: EditorView, private language: Language) {
-    this.tree = language.getTree(view.state)
+  constructor(view: EditorView) {
+    this.tree = syntaxTree(view.state)
     this.decorations = this.buildDeco(view)
   }
 
   update(update: ViewUpdate) {
-    if (this.language.getTree(update.state).length < update.view.viewport.to) {
+    let tree = syntaxTree(update.state)
+    if (tree.length < update.view.viewport.to) {
       this.decorations = this.decorations.map(update.changes)
-    } else {
-      let tree = this.language.getTree(update.state)
-      if (tree != this.tree || update.viewportChanged) {
-        this.tree = tree
-        this.decorations = this.buildDeco(update.view)
-      }
+    } else if (tree != this.tree || update.viewportChanged) {
+      this.tree = tree
+      this.decorations = this.buildDeco(update.view)
     }
   }
 

@@ -4,13 +4,14 @@ import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, NodeType,
 // pulling in that dependency when no actual Lezer-based parser is used.
 import {Parser, ParserConfig} from "lezer"
 import {Text, TextIterator} from "@codemirror/next/text"
-import {EditorState, StateField, Transaction, Extension, StateEffect, StateEffectType,
-        Facet, ChangeDesc} from "@codemirror/next/state"
+import {EditorState, StateField, Transaction, Extension, StateEffect, Facet, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 import {treeHighlighter} from "@codemirror/next/highlight"
 
 /// The facet used to associate a language with an editor state.
-export const language = Facet.define<Language>()
+export const language = Facet.define<Language, Language | null>({
+  combine(languages) { return languages.length ? languages[0] : null }
+})
 
 /// Node prop stored on a grammar's top node to indicate the facet used
 /// to store language data related to that language.
@@ -36,8 +37,6 @@ export function defineLanguageFacet(baseData?: {[name: string]: any}) {
 /// [`StreamLanguage`](#stream-parser.StreamLanguage) abstractions for
 /// [Lezer](https://lezer.codemirror.net/) or stream parsers.
 export class Language {
-  private field: StateField<LanguageState>
-
   /// The extension value to install this provider.
   readonly extension: Extension
 
@@ -63,47 +62,19 @@ export class Language {
     if (!EditorState.prototype.hasOwnProperty("tree"))
       Object.defineProperty(EditorState.prototype, "tree", {get() { return syntaxTree(this) }})
 
-    let setState = StateEffect.define<LanguageState>()
     this.parser = parser as {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
-    this.field = StateField.define<LanguageState>({
-      create(state) {
-        let parseState = new EditorParseContext(parser, state, [], Tree.empty, {from: 0, to: state.doc.length}, [])
-        if (!parseState.work(Work.Apply)) parseState.takeTree()
-        return new LanguageState(parseState)
-      },
-      update(value, tr) {
-        for (let e of tr.effects) if (e.is(setState)) return e.value
-        return value.apply(tr)
-      }
-    })
     this.extension = [
       language.of(this),
-      this.field,
-      ViewPlugin.define(view => new ParseWorker(view, this.field, setState), {
-        eventHandlers: {focus() { this.scheduleWork() }}
-      }),
-      treeHighlighter(this),
-      EditorState.languageData.of((state, pos) => state.facet(languageDataFacetAt(this, state, pos)))
+      Language.state,
+      parseWorker,
+      treeHighlighter,
+      EditorState.languageData.of((state, pos) => state.facet(languageDataFacetAt(state, pos)!))
     ].concat(extraExtensions)
-  }
-
-  /// Retrieve the parser tree for a given state.
-  getTree(state: EditorState) {
-    return state.field(this.field).tree
-  }
-
-  /// Try to get a parse tree that spans at least up to `upto`. The
-  /// method will do at most `timeout` milliseconds of work to parse
-  /// up to that point if the tree isn't already available.
-  ensureTree(state: EditorState, upto: number, timeout = 100): Tree | null {
-    let parse = state.field(this.field).context
-    return parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
   }
 
   /// Query whether this language is active at the given position.
   isActiveAt(state: EditorState, pos: number) {
-    let lang = state.facet(language)
-    return lang.length > 0 && languageDataFacetAt(lang[0], state, pos) == this.data
+    return languageDataFacetAt(state, pos) == this.data
   }
 
   /// Find the document regions that were parsed using this language.
@@ -111,10 +82,10 @@ export class Language {
   /// in this language, if applicable.
   findRegions(state: EditorState) {
     let lang = state.facet(language)
-    if (lang.length && lang[0].data == this.data) return [{from: 0, to: state.doc.length}]
-    if (!lang.length || !lang[0].allowsNesting) return []
+    if (lang?.data == this.data) return [{from: 0, to: state.doc.length}]
+    if (!lang || !lang.allowsNesting) return []
     let result: {from: number, to: number}[] = []
-    lang[0].getTree(state).iterate({
+    syntaxTree(state).iterate({
       enter: (type, from, to) => {
         if (type.isTop && type.prop(languageDataProp) == this.data) {
           result.push({from, to})
@@ -140,11 +111,30 @@ export class Language {
     while (!(tree = parse.advance())) {}
     return tree
   }
+
+  /// @internal
+  static state = StateField.define<LanguageState>({
+    create(state) {
+      let parseState = new EditorParseContext(state.facet(language)!.parser, state, [],
+                                              Tree.empty, {from: 0, to: state.doc.length}, [])
+      if (!parseState.work(Work.Apply)) parseState.takeTree()
+      return new LanguageState(parseState)
+    },
+    update(value, tr) {
+      for (let e of tr.effects) if (e.is(Language.setState)) return e.value
+      return value.apply(tr)
+    }
+  })
+
+  /// @internal
+  static setState = StateEffect.define<LanguageState>()
 }
 
-function languageDataFacetAt(topLang: Language, state: EditorState, pos: number) {
+function languageDataFacetAt(state: EditorState, pos: number) {
+  let topLang = state.facet(language)
+  if (!topLang) return null
   if (!topLang.allowsNesting) return topLang.data
-  let tree = topLang.getTree(state)
+  let tree = syntaxTree(state)
   let target: SyntaxNode | null = tree.resolve(pos, -1)
   while (target) {
     let facet = target.type.prop(languageDataProp)
@@ -192,9 +182,17 @@ export class LezerLanguage extends Language {
 /// incomplete) parse tree of the [language](#language.Language) with
 /// the highest precedence, or the empty tree if there is no language
 /// available.
-export function syntaxTree(state: EditorState) {
-  let lang = state.facet(language)
-  return lang.length ? lang[0].getTree(state) : Tree.empty
+export function syntaxTree(state: EditorState): Tree {
+  let field = state.field(Language.state, false)
+  return field ? field.tree : Tree.empty
+}
+
+/// Try to get a parse tree that spans at least up to `upto`. The
+/// method will do at most `timeout` milliseconds of work to parse
+/// up to that point if the tree isn't already available.
+export function ensureSyntaxTree(state: EditorState, upto: number, timeout = 100): Tree | null {
+  let parse = state.field(Language.state, false)?.context
+  return !parse ? null : parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
 }
 
 // Lezer-style Input object for a Text document.
@@ -289,7 +287,7 @@ export class EditorParseContext implements ParseContext {
 
   /// @internal
   constructor(
-    private parser: {startParse(input: Input, pos?: number, context?: ParseContext): PartialParse},
+    private parser: {startParse(input: Input, pos: number, context: ParseContext): PartialParse},
     /// The current editor state.
     readonly state: EditorState,
     /// Tree fragments that can be reused by new parses.
@@ -449,16 +447,14 @@ let requestIdle: (callback: IdleCallback, options: {timeout: number}) => number 
   ((callback: IdleCallback, {timeout}: {timeout: number}) => setTimeout(callback, timeout))
 let cancelIdle: (id: number) => void = typeof window != "undefined" && (window as any).cancelIdleCallback || clearTimeout
 
-class ParseWorker {
+const parseWorker = ViewPlugin.fromClass(class ParseWorker {
   working: number = -1
   // End of the current time chunk
   chunkEnd = -1
   // Milliseconds of budget left for this chunk
   chunkBudget = -1
 
-  constructor(readonly view: EditorView, 
-              readonly field: StateField<LanguageState>,
-              readonly setState: StateEffectType<LanguageState>) {
+  constructor(readonly view: EditorView) {
     this.work = this.work.bind(this)
     this.scheduleWork()
   }
@@ -468,7 +464,7 @@ class ParseWorker {
       if (this.view.hasFocus) this.chunkBudget += Work.ChangeBonus
       this.scheduleWork()
     }
-    let cx = this.view.state.field(this.field).context
+    let cx = this.view.state.field(Language.state).context
     if (update.viewportChanged && cx.updateViewport(update.view.viewport)) {
       cx.reset()
       this.scheduleWork()
@@ -477,7 +473,7 @@ class ParseWorker {
 
   scheduleWork() {
     if (this.working > -1) return
-    let {state} = this.view, field = state.field(this.field)
+    let {state} = this.view, field = state.field(Language.state)
     if (field.tree.length >= state.doc.length) return
     this.working = requestIdle(this.work, {timeout: Work.Pause})
   }
@@ -492,13 +488,13 @@ class ParseWorker {
     }
     if (this.chunkBudget <= 0) return // No more budget
 
-    let {state} = this.view, field = state.field(this.field)
+    let {state} = this.view, field = state.field(Language.state)
     if (field.tree.length >= state.doc.length) return
     let time = Math.min(this.chunkBudget, deadline ? Math.max(Work.MinSlice, deadline.timeRemaining()) : Work.Slice)
     field.context.work(time)
     this.chunkBudget -= Date.now() - now
     if (field.context.tree.length >= state.doc.length) {
-      this.view.dispatch({effects: this.setState.of(new LanguageState(field.context))})
+      this.view.dispatch({effects: Language.setState.of(new LanguageState(field.context))})
     } else {
       this.scheduleWork()
     }
@@ -507,7 +503,9 @@ class ParseWorker {
   destroy() {
     if (this.working >= 0) cancelIdle(this.working)
   }
-}
+}, {
+  eventHandlers: {focus() { this.scheduleWork() }}
+})
 
 /// This class bundles a [language object](#language.Language) with an
 /// optional set of supporting extensions. Language packages are

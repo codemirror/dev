@@ -1,7 +1,7 @@
 import ist from "ist"
 import {StreamLanguage} from "@codemirror/next/stream-parser"
 import {EditorState} from "@codemirror/next/state"
-import {syntaxTree, getIndentation} from "@codemirror/next/language"
+import {syntaxTree, getIndentation, Language} from "@codemirror/next/language"
 
 let startStates = 0, keywords = ["if", "else", "return"]
 
@@ -56,9 +56,11 @@ describe("StreamLanguage", () => {
     ist(getIndentation(state, 1000), 100)
   })
 
-  // Kludge to set the parser context viewport
+  // Fragile kludge to set the parser context viewport without
+  // actually having access to the relevant field
   function setViewport(state: EditorState, from: number, to: number) {
-    ;(state.field((language as any).field) as any).context.updateViewport({from, to})
+    let field = (Language as any).state
+    ;(state.field(field) as any).context.updateViewport({from, to})
   }
 
   it("will make up a state when the viewport is far away from the frontier", () => {
