@@ -187,14 +187,16 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
   return bound
 }
 
+const modifierCodes = [16, 17, 18, 20, 91, 92, 224, 225]
+
 function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: EditorView, scope: string): boolean {
   let name = keyName(event), isChar = name.length == 1 && name != " "
-  let prefix = ""
+  let prefix = "", fallthrough = false
   if (storedPrefix && storedPrefix.view == view && storedPrefix.scope == scope) {
     prefix = storedPrefix.prefix + " "
-    storedPrefix = null
+    if (fallthrough = modifierCodes.indexOf(event.keyCode) < 0)
+      storedPrefix = null
   }
-  let fallthrough = !!prefix
 
   let runFor = (binding: Binding | undefined) => {
     if (binding) {
