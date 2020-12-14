@@ -1,5 +1,6 @@
 import {EditorView} from "./editorview"
 import {Command} from "./extension"
+import {modifierCodes} from "./input"
 import {base, keyName} from "w3c-keyname"
 import {Facet} from "@codemirror/next/state"
 
@@ -186,8 +187,6 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
   }
   return bound
 }
-
-const modifierCodes = [16, 17, 18, 20, 91, 92, 224, 225]
 
 function runHandlers(maps: readonly Keymap[], event: KeyboardEvent, view: EditorView, scope: string): boolean {
   let name = keyName(event), isChar = name.length == 1 && name != " "

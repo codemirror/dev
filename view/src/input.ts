@@ -14,6 +14,7 @@ export class InputState {
   lastKeyTime: number = 0
   lastSelectionOrigin: string | null = null
   lastSelectionTime: number = 0
+  lastEscPress: number = 0
   scrollHandlers: ((event: Event) => boolean | void)[] = []
 
   registeredEvents: string[] = []
@@ -38,7 +39,8 @@ export class InputState {
     for (let type in handlers) {
       let handler = handlers[type]
       view.contentDOM.addEventListener(type, (event: Event) => {
-        if (!eventBelongsToEditor(view, event) || this.ignoreDuringComposition(event)) return
+        if (!eventBelongsToEditor(view, event) || this.ignoreDuringComposition(event) ||
+            type == "keydown" && this.screenKeyEvent(view, event as KeyboardEvent)) return
         if (this.mustFlushObserver(event)) view.observer.forceFlush()
         if (this.runCustomHandlers(type, view, event)) event.preventDefault()
         else handler(view, event)
@@ -107,6 +109,13 @@ export class InputState {
     return false
   }
 
+  screenKeyEvent(view: EditorView, event: KeyboardEvent) {
+    let protectedTab = event.keyCode == 9 && Date.now() < this.lastEscPress + 2000
+    if (event.keyCode == 27) this.lastEscPress = Date.now()
+    else if (modifierCodes.indexOf(event.keyCode) < 0) this.lastEscPress = 0
+    return protectedTab
+  }
+
   mustFlushObserver(event: Event) {
     return event.type == "keydown" || event.type == "compositionend"
   }
@@ -125,6 +134,9 @@ export class InputState {
     if (this.mouseSelection) this.mouseSelection.destroy()
   }
 }
+
+// Key codes for modifier keys
+export const modifierCodes = [16, 17, 18, 20, 91, 92, 224, 225]
 
 /// Interface that objects registered with
 /// [`EditorView.mouseSelectionStyle`](#view.EditorView^mouseSelectionStyle)
