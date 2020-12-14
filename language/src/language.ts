@@ -1,4 +1,5 @@
-import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, Input, PartialParse, ParseContext} from "lezer-tree"
+import {Tree, SyntaxNode, ChangedRange, TreeFragment, NodeProp, NodeType,
+        Input, PartialParse, ParseContext} from "lezer-tree"
 // NOTE: This package should only use _types_ from "lezer", to avoid
 // pulling in that dependency when no actual Lezer-based parser is used.
 import {Parser, ParserConfig} from "lezer"
@@ -283,6 +284,8 @@ const enum Work {
 /// A parse context provided to parsers working on the editor content.
 export class EditorParseContext implements ParseContext {
   private parse: PartialParse | null = null
+  /// @internal
+  tempSkipped: {from: number, to: number}[] = []
 
   /// @internal
   constructor(
@@ -314,7 +317,7 @@ export class EditorParseContext implements ParseContext {
     for (;;) {
       let done = this.parse.advance()
       if (done) {
-        this.fragments = TreeFragment.addTree(done)
+        this.fragments = this.withoutTempSkipped(TreeFragment.addTree(done))
         this.parse = null
         this.tree = done
         return true
@@ -330,8 +333,14 @@ export class EditorParseContext implements ParseContext {
   takeTree() {
     if (this.parse && this.parse.pos > this.tree.length) {
       this.tree = this.parse.forceFinish()
-      this.fragments = TreeFragment.addTree(this.tree, this.fragments, true)
+      this.fragments = this.withoutTempSkipped(TreeFragment.addTree(this.tree, this.fragments, true))
     }
+  }
+
+  private withoutTempSkipped(fragments: readonly TreeFragment[]) {
+    for (let r; r = this.tempSkipped.pop();)
+      fragments = cutFragments(fragments, r.from, r.to)
+    return fragments
   }
 
   /// @internal
@@ -382,6 +391,23 @@ export class EditorParseContext implements ParseContext {
   /// when it comes into view.
   skipUntilInView(from: number, to: number) {
     this.skipped.push({from, to})
+  }
+
+  /// A parser intended to be used as placeholder when asynchronously
+  /// loading a nested parser. It'll skip its input and mark it as
+  /// not-really-parsed, so that the next update will parse it again.
+  static skippingParser = {
+    startParse(input: Input, startPos: number, context: ParseContext): PartialParse {
+      return {
+        pos: startPos,
+        advance() {
+          ;(context as EditorParseContext).tempSkipped.push({from: startPos, to: input.length})
+          this.pos = input.length
+          return new Tree(NodeType.none, [], [], input.length - startPos)
+        },
+        forceFinish() { return this.advance() as Tree }
+      }
+    }
   }
 }
 

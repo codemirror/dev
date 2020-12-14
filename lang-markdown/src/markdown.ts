@@ -1,5 +1,5 @@
 import {Language, defineLanguageFacet, languageDataProp, foldNodeProp, indentNodeProp,
-        LanguageDescription} from "@codemirror/next/language"
+        LanguageDescription, EditorParseContext} from "@codemirror/next/language"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 import {parser as baseParser} from "lezer-markdown"
 import {htmlLanguage} from "@codemirror/next/lang-html"
@@ -52,7 +52,7 @@ export function markdownWithCodeLanguages(languages: readonly LanguageDescriptio
       if (!found) return defaultLanguage ? defaultLanguage.parser : null
       if (found.support) return found.support.language.parser
       found.load()
-      return null
+      return EditorParseContext.skippingParser
     }
   }))
 }
