@@ -132,7 +132,7 @@ const activeMark = Decoration.mark({class: themeClass("lintRange.active")})
 function lintTooltip(view: EditorView, pos: number, side: -1 | 1) {
   let {diagnostics} = view.state.field(lintState)
   let found: Diagnostic[] = [], stackStart = 2e8, stackEnd = 0
-  diagnostics.between(pos, pos, (from, to, {spec}) => {
+  diagnostics.between(pos - (side < 0 ? 1 : 0), pos + (side > 0 ? 1 : 0), (from, to, {spec}) => {
     if (pos >= from && pos <= to &&
         (from == to || ((pos > from || side > 0) && (pos < to || side < 0)))) {
       found.push(spec.diagnostic)
@@ -152,7 +152,6 @@ function lintTooltip(view: EditorView, pos: number, side: -1 | 1) {
     }
   }
 }
-
 
 /// Command to open and focus the lint panel.
 export const openLintPanel: Command = (view: EditorView) => {
@@ -289,9 +288,9 @@ class LintPanel implements Panel {
       if (event.keyCode == 27) { // Escape
         closeLintPanel(this.view)
         this.view.focus()
-      } else if (event.keyCode == 38) { // ArrowUp
+      } else if (event.keyCode == 38 || event.keyCode == 33) { // ArrowUp, PageUp
         this.moveSelection((this.selectedIndex - 1 + this.items.length) % this.items.length)
-      } else if (event.keyCode == 40) { // ArrowDown
+      } else if (event.keyCode == 40 || event.keyCode == 34) { // ArrowDown, PageDown
         this.moveSelection((this.selectedIndex + 1) % this.items.length)
       } else if (event.keyCode == 36) { // Home
         this.moveSelection(0)
@@ -299,7 +298,7 @@ class LintPanel implements Panel {
         this.moveSelection(this.items.length - 1)
       } else if (event.keyCode == 13) {
         this.view.focus()
-      } else { // FIXME PageDown/PageUp
+      } else {
         return
       }
       event.preventDefault()
