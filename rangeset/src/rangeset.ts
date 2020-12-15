@@ -78,14 +78,16 @@ export interface SpanIterator<T extends RangeValue> {
   minPointSize?: number
 }
 
-      // The maximum amount of ranges to store in a single chunk
-const ChunkSize = 250,
-      // Chunks with points of this size are never skipped during
-      // compare, since moving past those points is likely to speed
-      // up, rather than slow down, the comparison.
-      BigPointSize = 500,
-      // A large (fixnum) value to use for max/min values.
-      Far = 1e9
+const enum C {
+  // The maximum amount of ranges to store in a single chunk
+  ChunkSize = 250,
+  // Chunks with points of this size are never skipped during
+  // compare, since moving past those points is likely to speed
+  // up, rather than slow down, the comparison.
+  BigPointSize = 500,
+  // A large (fixnum) value to use for max/min values.
+  Far = 1e9
+}
 
 class Chunk<T extends RangeValue> {
   constructor(readonly from: readonly number[],
@@ -101,7 +103,7 @@ class Chunk<T extends RangeValue> {
 
   // With side == -1, return the first index where to >= pos. When
   // side == 1, the first index where from > pos.
-  findIndex(pos: number, end: -1 | 1, side = end * Far, startAt = 0) {
+  findIndex(pos: number, end: -1 | 1, side = end * C.Far, startAt = 0) {
     if (pos <= 0) return startAt
     let arr = end < 0 ? this.to : this.from
     for (let lo = startAt, hi = arr.length;;) {
@@ -216,13 +218,19 @@ export class RangeSet<T extends RangeValue> {
 
   /// Update the range set, optionally adding new ranges or filtering
   /// out existing ones.
-  update(updateSpec: RangeSetUpdate<T>): RangeSet<T> {
-    let {add = [], sort = false, filter, filterFrom = 0, filterTo = this.length} = updateSpec
+  ///
+  /// (The extra type parameter is just there as a kludge to work
+  /// around TypeScript variance issues that prevented `RangeSet<X>`
+  /// from being a subtype of `RangeSet<Y>` when `X` is a subtype of
+  /// `Y`.)
+  update<U extends T>(updateSpec: RangeSetUpdate<U>): RangeSet<T> {
+    let {add = [], sort = false, filterFrom = 0, filterTo = this.length} = updateSpec
+    let filter = updateSpec.filter as undefined | ((from: number, to: number, value: T) => boolean)
     if (add.length == 0 && !filter) return this
     if (sort) add.slice().sort(cmpRange)
     if (this == RangeSet.empty) return add.length ? RangeSet.of(add) : this
 
-    let cur = new LayerCursor(this, null, -1).goto(0), i = 0, spill = []
+    let cur = new LayerCursor(this, null, -1).goto(0), i = 0, spill: Range<T>[] = []
     let builder = new RangeSetBuilder<T>()
     while (cur.value || i < add.length) {
       if (i < add.length && (cur.from - add[i].from || cur.startSide - add[i].value.startSide) >= 0) {
@@ -243,7 +251,7 @@ export class RangeSet<T extends RangeValue> {
     }
 
     return builder.finishInner(this.nextLayer == RangeSet.empty && !spill.length ? RangeSet.empty
-                               : this.nextLayer.update({add: spill, filter, filterFrom, filterTo}))
+                               : this.nextLayer.update<T>({add: spill, filter, filterFrom, filterTo}))
   }
 
   /// Map this range set through a set of changes, return the new set.
@@ -307,9 +315,9 @@ export class RangeSet<T extends RangeValue> {
     comparator: RangeComparator<T>
   ) {
     let minPoint = comparator.minPointSize ?? -1
-    let a = oldSets.filter(set => set.maxPoint >= BigPointSize ||
+    let a = oldSets.filter(set => set.maxPoint >= C.BigPointSize ||
                            set != RangeSet.empty && newSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
-    let b = newSets.filter(set => set.maxPoint >= BigPointSize ||
+    let b = newSets.filter(set => set.maxPoint >= C.BigPointSize ||
                            set != RangeSet.empty && oldSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
     let sharedChunks = findSharedChunks(a, b)
 
@@ -372,8 +380,8 @@ export class RangeSetBuilder<T extends RangeValue> {
   private chunkPos: number[] = []
   private chunkStart = -1
   private last: T | null = null
-  private lastFrom = -Far
-  private lastTo = -Far
+  private lastFrom = -C.Far
+  private lastTo = -C.Far
   private from: number[] = []
   private to: number[] = []
   private value: T[] = []
@@ -406,7 +414,7 @@ export class RangeSetBuilder<T extends RangeValue> {
     if (diff <= 0 && (from - this.lastFrom || value.startSide - this.last!.startSide) < 0)
       throw new Error("Ranges must be added sorted by `from` position and `startSide`")
     if (diff < 0) return false
-    if (this.from.length == ChunkSize) this.finishChunk(true)
+    if (this.from.length == C.ChunkSize) this.finishChunk(true)
     if (this.chunkStart < 0) this.chunkStart = from
     this.from.push(from - this.chunkStart)
     this.to.push(to - this.chunkStart)
@@ -450,7 +458,7 @@ export class RangeSetBuilder<T extends RangeValue> {
 function findSharedChunks(a: readonly RangeSet<any>[], b: readonly RangeSet<any>[]) {
   let inA = new Map<Chunk<any>, number>()
   for (let set of a) for (let i = 0; i < set.chunk.length; i++)
-    if (set.chunk[i].maxPoint < BigPointSize) inA.set(set.chunk[i], set.chunkPos[i])
+    if (set.chunk[i].maxPoint < C.BigPointSize) inA.set(set.chunk[i], set.chunkPos[i])
   let shared = new Set<Chunk<any>>()
   for (let set of b) for (let i = 0; i < set.chunk.length; i++)
     if (inA.get(set.chunk[i]) == set.chunkPos[i])
@@ -474,7 +482,7 @@ class LayerCursor<T extends RangeValue> {
   get startSide() { return this.value ? this.value.startSide : 0 }
   get endSide() { return this.value ? this.value.endSide : 0 }
 
-  goto(pos: number, side: number = -Far) {
+  goto(pos: number, side: number = -C.Far) {
     this.chunkIndex = this.rangeIndex = 0
     this.gotoInner(pos, side, false)
     return this
@@ -503,7 +511,7 @@ class LayerCursor<T extends RangeValue> {
   next() {
     for (;;) {
       if (this.chunkIndex == this.layer.chunk.length) {
-        this.from = this.to = Far
+        this.from = this.to = C.Far
         this.value = null
         break
       } else {
@@ -561,7 +569,7 @@ class HeapCursor<T extends RangeValue> {
 
   get startSide() { return this.value ? this.value.startSide : 0 }
 
-  goto(pos: number, side: number = -Far) {
+  goto(pos: number, side: number = -C.Far) {
     for (let cur of this.heap) cur.goto(pos, side)
     for (let i = this.heap.length >> 1; i >= 0; i--) heapBubble(this.heap, i)
     this.next()
@@ -576,7 +584,7 @@ class HeapCursor<T extends RangeValue> {
 
   next() {
     if (this.heap.length == 0) {
-      this.from = this.to = Far
+      this.from = this.to = C.Far
       this.value = null
       this.rank = -1
     } else {
@@ -620,7 +628,7 @@ class SpanCursor<T extends RangeValue> {
   pointFrom = 0
   pointRank = 0
 
-  to = -Far
+  to = -C.Far
   endSide = 0
   openStart = -1
 
@@ -630,7 +638,7 @@ class SpanCursor<T extends RangeValue> {
     this.cursor = HeapCursor.from(sets, skip, minPoint)
   }
 
-  goto(pos: number, side: number = -Far) {
+  goto(pos: number, side: number = -C.Far) {
     this.cursor.goto(pos, side)
     this.active.length = this.activeTo.length = this.activeRank.length = 0
     this.minActive = -1
@@ -681,7 +689,7 @@ class SpanCursor<T extends RangeValue> {
         this.removeActive(a)
         if (trackOpen) remove(trackOpen, a)
       } else if (!this.cursor.value) {
-        this.to = this.endSide = Far
+        this.to = this.endSide = C.Far
         break
       } else if (this.cursor.from > from) {
         this.to = this.cursor.from
@@ -771,7 +779,7 @@ function insert<T>(array: T[], index: number, value: T) {
 }
 
 function findMinIndex(value: RangeValue[], array: number[]) {
-  let found = -1, foundPos = Far
+  let found = -1, foundPos = C.Far
   for (let i = 0; i < array.length; i++)
     if ((array[i] - foundPos || value[i].endSide - value[found].endSide) < 0) {
     found = i
