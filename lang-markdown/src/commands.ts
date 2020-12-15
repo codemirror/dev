@@ -18,18 +18,17 @@ function gatherMarkup(node: SyntaxNode, line: string, doc: Text) {
   for (let i = nodes.length - 1; i >= 0; i--) {
     let node = nodes[i], match
     if (node.name == "Blockquote" && (match = /^\s*> ?/.exec(line.slice(pos)))) {
-      markup.push({from: pos, string: match[0], match, node})
+      markup.push({from: pos, string: match[0], node})
       pos += match[0].length
     } else if (node.name == "ListItem" && node.parent!.name == "OrderedList" &&
-               (match = /^(\s*)(\d+)([.)])(\s*)/.exec(nodeStart(node, doc)))) {
-      // FIXME drop unneeded groups in regexps
-      let len = match[4].length >= 4 ? match[0].length - match[4].length + 1 : match[0].length
-      markup.push({from: pos, string: line.slice(pos, pos + len).replace(/\S/g, " "), match, node})
+               (match = /^\s*\d+([.)])\s*/.exec(nodeStart(node, doc)))) {
+      let len = match[1].length >= 4 ? match[0].length - match[1].length + 1 : match[0].length
+      markup.push({from: pos, string: line.slice(pos, pos + len).replace(/\S/g, " "), node})
       pos += len
     } else if (node.name == "ListItem" && node.parent!.name == "BulletList" &&
-               (match = /^(\s*)([-+*]) (\s*)/.exec(nodeStart(node, doc)))) {
-      let len = match[3].length >= 4 ? match[0].length - match[3].length : match[0].length
-      markup.push({from: pos, string: line.slice(pos, pos + len).replace(/\S/g, " "), match, node})
+               (match = /^\s*[-+*] (\s*)/.exec(nodeStart(node, doc)))) {
+      let len = match[1].length >= 4 ? match[0].length - match[1].length : match[0].length
+      markup.push({from: pos, string: line.slice(pos, pos + len).replace(/\S/g, " "), node})
       pos += len
     }
   }
@@ -81,7 +80,7 @@ export const insertNewlineContinueMarkup: StateCommand = ({state, dispatch}) => 
           if (from < range.from && inner.node.parent!.from == inner.node.from) { // First item
             inner.string = ""
           } else {
-            inner.string = inner.match[0].slice(0, inner.string.length)
+            inner.string = lineText.slice(inner.from, inner.from + inner.string.length)
             if (inner.node.parent!.name == "OrderedList" && from == range.from) {
               inner.string = inner.string.replace(/\d+/, m => (+m + 1) as any)
               renumberList(inner.node, state.doc, changes)
