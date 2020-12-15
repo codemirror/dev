@@ -14,7 +14,7 @@ class Pkg {
 
 const packageFile = path.join(root, "package.json"), packageJSON = JSON.parse(fs.readFileSync(packageFile, "utf8"))
 const packages = [], packageNames = Object.create(null)
-for (let exp of Object.keys(packageJSON.exports)) {
+for (let exp of Object.keys(packageJSON.exports)) if (exp != "./package.json") {
   let pkg = new Pkg(/\.\/(.*)/.exec(exp)[1])
   packages.push(pkg)
   packageNames[pkg.name] = pkg
