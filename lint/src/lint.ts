@@ -148,7 +148,7 @@ function lintTooltip(view: EditorView, pos: number, side: -1 | 1) {
     above: view.state.doc.lineAt(stackStart).to < stackEnd,
     style: "lint",
     create() {
-      return {dom: elt("ul", found.map(d => renderDiagnostic(view, d)))}
+      return {dom: elt("ul", found.map(d => renderDiagnostic(view, d, false)))}
     }
   }
 }
@@ -239,21 +239,41 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
   })
 }
 
-function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
+function assignKeys(actions: readonly Action[] | undefined) {
+  let assigned: string[] = []
+  if (actions) actions: for (let {name} of actions) {
+    for (let i = 0; i < name.length; i++) {
+      let ch = name[i]
+      if (/[a-zA-Z]/.test(ch) && !assigned.some(c => c.toLowerCase() == ch.toLowerCase())) {
+        assigned.push(ch)
+        continue actions
+      }
+    }
+    assigned.push("")
+  }
+  return assigned
+}
+
+function renderDiagnostic(view: EditorView, diagnostic: Diagnostic, inPanel: boolean) {
+  let keys = inPanel ? assignKeys(diagnostic.actions) : []
   return elt(
     "li", {class: themeClass("diagnostic." + diagnostic.severity)},
     elt("span", {class: themeClass("diagnosticText")}, diagnostic.message),
-    diagnostic.actions?.map(action => {
+    diagnostic.actions?.map((action, i) => {
       let click = (e: Event) => {
         e.preventDefault()
         let found = findDiagnostic(view.state.field(lintState).diagnostics, diagnostic)
         if (found) action.apply(view, found.from, found.to)
       }
+      let {name} = action, keyIndex = keys[i] ? name.indexOf(keys[i]) : -1
+      let nameElt = keyIndex < 0 ? name : [name.slice(0, keyIndex),
+                                           elt("u", name.slice(keyIndex, keyIndex + 1)),
+                                           name.slice(keyIndex + 1)]
       return elt("button", {
         class: themeClass("diagnosticAction"),
         onclick: click,
         onmousedown: click
-      }, action.name)
+      }, nameElt)
     }),
     diagnostic.source && elt("div", {class: themeClass("diagnosticSource")}, diagnostic.source))
 }
@@ -273,7 +293,7 @@ class PanelItem {
   dom: HTMLElement
 
   constructor(view: EditorView, readonly diagnostic: Diagnostic) {
-    this.dom = renderDiagnostic(view, diagnostic)
+    this.dom = renderDiagnostic(view, diagnostic, true)
     this.dom.setAttribute("role", "option")
   }
 }
@@ -296,8 +316,14 @@ class LintPanel implements Panel {
         this.moveSelection(0)
       } else if (event.keyCode == 35) { // End
         this.moveSelection(this.items.length - 1)
-      } else if (event.keyCode == 13) {
+      } else if (event.keyCode == 13) { // Enter
         this.view.focus()
+      } else if (event.keyCode >= 65 && event.keyCode <= 90 && this.items.length) { // A-Z
+        let {diagnostic} = this.items[this.selectedIndex], keys = assignKeys(diagnostic.actions)
+        for (let i = 0; i < keys.length; i++) if (keys[i].toUpperCase().charCodeAt(0) == event.keyCode) {
+          let found = findDiagnostic(this.view.state.field(lintState).diagnostics, diagnostic)
+          if (found) diagnostic.actions![i].apply(view, found.from, found.to)
+        }
       } else {
         return
       }
@@ -405,11 +431,10 @@ class LintPanel implements Panel {
     if (!this.list.firstChild) this.list.appendChild(renderDiagnostic(this.view, {
       severity: "info",
       message: this.view.state.phrase("No diagnostics")
-    } as Diagnostic))
+    } as Diagnostic, true))
   }
 
   moveSelection(selectedIndex: number) {
-    // FIXME make actions accessible
     if (this.items.length == 0) return
     let field = this.view.state.field(lintState)
     let selection = findDiagnostic(field.diagnostics, this.items[selectedIndex].diagnostic)
@@ -496,7 +521,8 @@ const baseTheme = EditorView.baseTheme({
       maxHeight: "100px",
       overflowY: "auto",
       "& [aria-selected]": {
-        backgroundColor: "#ddd"
+        backgroundColor: "#ddd",
+        "& u": { textDecoration: "underline" }
       },
       "&:focus [aria-selected]": {
         background_fallback: "#bdf",
@@ -504,6 +530,7 @@ const baseTheme = EditorView.baseTheme({
         color_fallback: "white",
         color: "HighlightText"
       },
+      "& u": { textDecoration: "none" },
       padding: 0,
       margin: 0
     },
