@@ -3,6 +3,7 @@ import {EditorView, ViewPlugin, Decoration, DecorationSet,
 import {StateEffect, StateField, Extension, TransactionSpec, EditorState} from "@codemirror/next/state"
 import {hoverTooltip} from "@codemirror/next/tooltip"
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
+import elt from "crelt"
 
 /// Describes a problem or hint for a piece of code.
 export interface Diagnostic {
@@ -147,9 +148,7 @@ function lintTooltip(view: EditorView, pos: number, side: -1 | 1) {
     above: view.state.doc.lineAt(stackStart).to < stackEnd,
     style: "lint",
     create() {
-      let dom = document.createElement("ul")
-      for (let d of found) dom.appendChild(renderDiagnostic(view, d))
-      return {dom}
+      return {dom: elt("ul", found.map(d => renderDiagnostic(view, d)))}
     }
   }
 }
@@ -242,21 +241,22 @@ export function linter(source: (view: EditorView) => readonly Diagnostic[] | Pro
 }
 
 function renderDiagnostic(view: EditorView, diagnostic: Diagnostic) {
-  let dom = document.createElement("li")
-  dom.textContent = diagnostic.message
-  dom.className = themeClass("diagnostic." + diagnostic.severity)
-  if (diagnostic.actions) for (let action of diagnostic.actions) {
-    let button = dom.appendChild(document.createElement("button"))
-    button.className = themeClass("diagnosticAction")
-    button.textContent = action.name
-    button.onclick = button.onmousedown = e => {
-      e.preventDefault()
-      let found = findDiagnostic(view.state.field(lintState).diagnostics, diagnostic)
-      if (found) action.apply(view, found.from, found.to)
-    }
-  }
-  // FIXME render source?
-  return dom
+  return elt(
+    "li", {class: themeClass("diagnostic." + diagnostic.severity)},
+    elt("span", {class: themeClass("diagnosticText")}, diagnostic.message),
+    diagnostic.actions?.map(action => {
+      let click = (e: Event) => {
+        e.preventDefault()
+        let found = findDiagnostic(view.state.field(lintState).diagnostics, diagnostic)
+        if (found) action.apply(view, found.from, found.to)
+      }
+      return elt("button", {
+        class: themeClass("diagnosticAction"),
+        onclick: click,
+        onmousedown: click
+      }, action.name)
+    }),
+    diagnostic.source && elt("div", {class: themeClass("diagnosticSource")}, diagnostic.source))
 }
 
 class DiagnosticWidget extends WidgetType {
@@ -265,9 +265,7 @@ class DiagnosticWidget extends WidgetType {
   eq(other: DiagnosticWidget) { return other.diagnostic == this.diagnostic }
 
   toDOM() {
-    let elt = document.createElement("span")
-    elt.className = themeClass("lintPoint." + this.diagnostic.severity)
-    return elt
+    return elt("span", {class: themeClass("lintPoint." + this.diagnostic.severity)})
   }
 }
 
@@ -287,45 +285,44 @@ class LintPanel implements Panel {
   list: HTMLElement
 
   constructor(readonly view: EditorView) {
-    this.dom = document.createElement("div")
-    this.list = this.dom.appendChild(document.createElement("ul"))
-    this.list.tabIndex = 0
-    this.list.setAttribute("role", "listbox")
-    this.list.setAttribute("aria-label", this.view.state.phrase("Diagnostics"))
-    this.list.addEventListener("keydown", event => {
+    let onkeydown = (event: KeyboardEvent) => {
       if (event.keyCode == 27) { // Escape
-        event.preventDefault()
         closeLintPanel(this.view)
         this.view.focus()
       } else if (event.keyCode == 38) { // ArrowUp
-        event.preventDefault()
         this.moveSelection((this.selectedIndex - 1 + this.items.length) % this.items.length)
       } else if (event.keyCode == 40) { // ArrowDown
-        event.preventDefault()
         this.moveSelection((this.selectedIndex + 1) % this.items.length)
       } else if (event.keyCode == 36) { // Home
-        event.preventDefault()
         this.moveSelection(0)
       } else if (event.keyCode == 35) { // End
-        event.preventDefault()
         this.moveSelection(this.items.length - 1)
       } else if (event.keyCode == 13) {
-        event.preventDefault()
         this.view.focus()
-      } // FIXME PageDown/PageUp
-    })
-    this.list.addEventListener("click", event => {
+      } else { // FIXME PageDown/PageUp
+        return
+      }
+      event.preventDefault()
+    }
+    let onclick = (event: MouseEvent) => {
       for (let i = 0; i < this.items.length; i++) {
         if (this.items[i].dom.contains(event.target as HTMLElement))
           this.moveSelection(i)
       }
-    })
-    let close = this.dom.appendChild(document.createElement("button"))
-    close.setAttribute("name", "close")
-    close.setAttribute("aria-label", this.view.state.phrase("close"))
-    close.textContent = "×"
-    close.addEventListener("click", () => closeLintPanel(this.view))
+    }
 
+    this.list = elt("ul", {
+      tabIndex: 0,
+      role: "listbox",
+      "aria-label": this.view.state.phrase("Diagnostics"),
+      onkeydown,
+      onclick
+    })
+    this.dom = elt("div", this.list, elt("button", {
+      name: "close",
+      "aria-label": this.view.state.phrase("close"),
+      onclick: () => closeLintPanel(this.view)
+    }, "×"))
     this.update()
   }
 
@@ -456,6 +453,11 @@ const baseTheme = EditorView.baseTheme({
     color: "white",
     borderRadius: "3px",
     marginLeft: "8px"
+  },
+
+  $diagnosticSource: {
+    fontSize: "70%",
+    opacity: .7
   },
 
   $lintRange: {
