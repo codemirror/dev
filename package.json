@@ -68,6 +68,7 @@
   },
   "license": "(MIT OR GPL-3.0)",
   "dependencies": {
+    "crelt": "^1.0.5",
     "lezer": "^0.13.0",
     "lezer-cpp": "^0.13.0",
     "lezer-css": "^0.13.0",

@@ -4,6 +4,7 @@ import {StateField, StateEffect, EditorSelection, SelectionRange, StateCommand, 
 import {panels, Panel, showPanel, getPanel} from "@codemirror/next/panel"
 import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
+import elt from "crelt"
 import {SearchCursor} from "./cursor"
 export {SearchCursor}
 
@@ -247,18 +248,6 @@ export const searchKeymap: readonly KeyBinding[] = [
   {key: "Escape", run: closeSearchPanel, scope: "editor search-panel"},
   {key: "Mod-Shift-l", run: selectSelectionMatches}
 ]
-
-function elt(name: string, props: null | {[prop: string]: any} = null, children: (Node | string)[] = []) {
-  let e = document.createElement(name)
-  if (props) for (let prop in props) {
-    let value = props[prop]
-    if (typeof value == "string") e.setAttribute(prop, value)
-    else (e as any)[prop] = value
-  }
-  for (let child of children)
-    e.appendChild(typeof child == "string" ? document.createTextNode(child) : child)
-  return e
-}
 
 // FIXME sync when search state changes independently
 function buildPanel(conf: {
