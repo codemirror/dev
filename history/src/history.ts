@@ -1,6 +1,6 @@
 import {combineConfig, EditorState, Transaction, StateField, StateCommand, StateEffect,
         Facet, Annotation, Extension, ChangeSet, ChangeDesc, EditorSelection} from "@codemirror/next/state"
-import {KeyBinding} from "@codemirror/next/view"
+import {KeyBinding, EditorView} from "@codemirror/next/view"
 
 const enum BranchName { Done, Undone }
 
@@ -75,10 +75,16 @@ const historyField = StateField.define({
 
 /// Create a history extension with the given configuration.
 export function history(config: HistoryConfig = {}): Extension {
-  // FIXME register beforeinput handler
   return [
     historyField,
-    historyConfig.of(config)
+    historyConfig.of(config),
+    EditorView.domEventHandlers({
+      beforeinput(e, view) {
+        if (e.inputType == "historyUndo") return undo(view)
+        if (e.inputType == "historyRedo") return redo(view)
+        return false
+      }
+    })
   ]
 }
 
