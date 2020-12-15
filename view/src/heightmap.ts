@@ -306,7 +306,7 @@ class HeightMapGap extends HeightMap {
 
   forEachLine(from: number, to: number, doc: Text, top: number, offset: number, f: (line: BlockInfo) => void) {
     let {firstLine, lineHeight} = this.lines(doc, offset)
-    for (let pos = from; pos < to;) {
+    for (let pos = Math.max(from, offset), end = Math.min(offset + this.length, to); pos <= end;) {
       let line = doc.lineAt(pos)
       if (pos == from) top += lineHeight * (line.number - firstLine)
       f(new BlockInfo(line.from, line.length, top, top += lineHeight, BlockType.Text))
