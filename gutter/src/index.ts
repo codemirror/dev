@@ -1,6 +1,6 @@
 import {EditorView, ViewPlugin, PluginField, ViewUpdate, BlockType, BlockInfo, themeClass, Direction} from "@codemirror/next/view"
 import {Range, RangeValue, RangeSet, RangeCursor} from "@codemirror/next/rangeset"
-import {combineConfig, MapMode, Facet, Extension, EditorState} from "@codemirror/next/state"
+import {combineConfig, MapMode, Facet, Extension} from "@codemirror/next/state"
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this
@@ -40,9 +40,9 @@ interface GutterConfig {
   renderEmptyElements?: boolean
   /// Retrieve a set of markers to use in this gutter from the
   /// current editor state.
-  markers?: (state: EditorState) => (RangeSet<GutterMarker> | readonly RangeSet<GutterMarker>[])
+  markers?: (view: EditorView) => (RangeSet<GutterMarker> | readonly RangeSet<GutterMarker>[])
   /// Can be used to optionally add a single marker to every line.
-  lineMarker?: (view: EditorView, line: BlockInfo, markers: readonly GutterMarker[]) => GutterMarker | null
+  lineMarker?: (view: EditorView, line: BlockInfo, otherMarkers: readonly GutterMarker[]) => GutterMarker | null
   /// Use a spacer element that gives the gutter its base width.
   initialSpacer?: null | ((view: EditorView) => GutterMarker)
   /// Update the spacer element when the view is updated.
@@ -267,7 +267,7 @@ class SingleGutterView {
         if (config.domEventHandlers[prop](view, line, event)) event.preventDefault()
       })
     }
-    this.markers = config.markers(view.state)
+    this.markers = config.markers(view)
     if (config.initialSpacer) {
       this.spacer = new GutterElement(view, 0, 0, [config.initialSpacer(view)], this.elementClass)
       this.dom.appendChild(this.spacer.dom)
@@ -277,7 +277,7 @@ class SingleGutterView {
 
   update(update: ViewUpdate) {
     let prevMarkers = this.markers
-    this.markers = this.config.markers(update.state)
+    this.markers = this.config.markers(update.view)
     if (this.spacer && this.config.updateSpacer) {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
       if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)
@@ -362,7 +362,7 @@ class NumberMarker extends GutterMarker {
 
 const lineNumberGutter = gutter({
   style: "lineNumber",
-  markers(state: EditorState) { return state.facet(lineNumberMarkers) },
+  markers(view: EditorView) { return view.state.facet(lineNumberMarkers) },
   lineMarker(view, line, others) {
     if (others.length) return null
     // FIXME try to make the line number queries cheaper?
