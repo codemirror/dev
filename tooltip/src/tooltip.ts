@@ -168,14 +168,11 @@ const HoverTime = 750, HoverMaxDist = 10
 class HoverPlugin {
   lastMouseMove: MouseEvent | null = null
   hoverTimeout = -1
-  mouseInside = false
-
   constructor(readonly view: EditorView,
               readonly source: (view: EditorView, pos: number, side: -1 | 1) => Tooltip | null,
               readonly field: StateField<Tooltip | null>,
               readonly setHover: StateEffectType<Tooltip | null>) {
     this.checkHover = this.checkHover.bind(this)
-    view.dom.addEventListener("mouseenter", this.mouseenter = this.mouseenter.bind(this))
     view.dom.addEventListener("mouseleave", this.mouseleave = this.mouseleave.bind(this))
     view.dom.addEventListener("mousemove", this.mousemove = this.mousemove.bind(this))
   }
@@ -186,7 +183,7 @@ class HoverPlugin {
 
   checkHover() {
     this.hoverTimeout = -1
-    if (!this.mouseInside || this.active) return
+    if (this.active) return
     let now = Date.now(), lastMove = this.lastMouseMove!
     if (now - lastMove.timeStamp < HoverTime) {
       this.hoverTimeout = setTimeout(this.checkHover, HoverTime - (now - lastMove.timeStamp))
@@ -219,19 +216,15 @@ class HoverPlugin {
     }
   }
 
-  mouseenter() {
-    this.mouseInside = true
-  }
-
   mouseleave() {
-    this.mouseInside = false
+    clearTimeout(this.hoverTimeout)
+    this.hoverTimeout = -1
     if (this.active)
       this.view.dispatch({effects: this.setHover.of(null)})
   }
 
   destroy() {
     clearTimeout(this.hoverTimeout)
-    this.view.dom.removeEventListener("mouseenter", this.mouseenter)
     this.view.dom.removeEventListener("mouseleave", this.mouseleave)
     this.view.dom.removeEventListener("mousemove", this.mousemove)
   }
