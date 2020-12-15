@@ -18,15 +18,9 @@ export function autocompletion(config: CompletionConfig = {}): Extension {
     completionState,
     completionConfig.of(config),
     completionPlugin,
+    completionKeymapExt,
     baseTheme,
-    tooltips(),
-    precedence(keymap.of([
-      {key: "ArrowDown", run: moveCompletionSelection(true)},
-      {key: "ArrowUp", run: moveCompletionSelection(false)},
-      {key: "PageDown", run: moveCompletionSelection(true, "page")},
-      {key: "PageUp", run: moveCompletionSelection(false, "page")},
-      {key: "Enter", run: acceptCompletion}
-    ]), "override")
+    tooltips()
   ]
 }
 
@@ -34,10 +28,23 @@ export function autocompletion(config: CompletionConfig = {}): Extension {
 ///
 ///  - Ctrl-Space (Cmd-Space on macOS): [`startCompletion`](#autocomplete.startCompletion)
 ///  - Escape: [`closeCompletion`](#autocomplete.closeCompletion)
+///  - ArrowDown: [`moveCompletionSelection`](#autocomplete.moveCompletionSelection)`(true)`
+///  - ArrowUp: [`moveCompletionSelection`](#autocomplete.moveCompletionSelection)`(false)`
+///  - PageDown: [`moveCompletionSelection`](#autocomplete.moveCompletionSelection)`(true, "page")`
+///  - PageDown: [`moveCompletionSelection`](#autocomplete.moveCompletionSelection)`(true, "page")`
+///  - Enter: [`acceptCompletion`](#autocomplete.acceptCompletion)
 export const completionKeymap: readonly KeyBinding[] = [
   {key: "Mod-Space", run: startCompletion},
-  {key: "Escape", run: closeCompletion}
+  {key: "Escape", run: closeCompletion},
+  {key: "ArrowDown", run: moveCompletionSelection(true)},
+  {key: "ArrowUp", run: moveCompletionSelection(false)},
+  {key: "PageDown", run: moveCompletionSelection(true, "page")},
+  {key: "PageUp", run: moveCompletionSelection(false, "page")},
+  {key: "Enter", run: acceptCompletion}
 ]
+
+const completionKeymapExt = precedence(keymap.computeN([completionConfig], state => 
+  state.facet(completionConfig).defaultKeymap ? [completionKeymap] : []), "override")
 
 /// Get the current completion status. When completions are available,
 /// this will return `"active"`. When completions are pending (in the
