@@ -435,7 +435,7 @@ export class EditorView {
 
   /// Iterate over the height information of the lines in the
   /// viewport.
-  viewportLines(f: (height: BlockInfo) => void, editorTop?: number) {
+  viewportLines(f: (line: BlockInfo) => void, editorTop?: number) {
     let {from, to} = this.viewport
     this.viewState.forEachLine(from, to, f, ensureTop(editorTop, this.contentDOM))
   }

@@ -1,18 +1,20 @@
 import {combineConfig, EditorState, StateEffect, ChangeDesc, Facet,
         StateField, Extension} from "@codemirror/next/state"
-import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass, KeyBinding} from "@codemirror/next/view"
+import {EditorView, BlockInfo, Command, Decoration, DecorationSet, WidgetType, themeClass,
+        KeyBinding, ViewPlugin, ViewUpdate} from "@codemirror/next/view"
 import {foldable} from "@codemirror/next/language"
 import {gutter, GutterMarker} from "@codemirror/next/gutter"
+import {Range, RangeSet} from "@codemirror/next/rangeset"
 
-type Range = {from: number, to: number}
+type DocRange = {from: number, to: number}
 
-function mapRange(range: Range, mapping: ChangeDesc) {
+function mapRange(range: DocRange, mapping: ChangeDesc) {
   let from = mapping.mapPos(range.from, 1), to = mapping.mapPos(range.to, -1)
   return from >= to ? undefined : {from, to}
 }
 
-const foldEffect = StateEffect.define<Range>({map: mapRange})
-const unfoldEffect = StateEffect.define<Range>({map: mapRange})
+const foldEffect = StateEffect.define<DocRange>({map: mapRange})
+const unfoldEffect = StateEffect.define<DocRange>({map: mapRange})
 
 function selectedLines(view: EditorView) {
   let lines: BlockInfo[] = []
@@ -207,22 +209,53 @@ class FoldMarker extends GutterMarker {
 }
 
 /// Create an extension that registers a fold gutter, which shows a
-/// fold status indicator before lines which can be clicked to fold or
-/// unfold the line.
+/// fold status indicator before lines, which can be clicked to fold
+/// or unfold the line.
 export function foldGutter(config: FoldGutterConfig = {}): Extension {
   let fullConfig = {...foldGutterDefaults, ...config}
   let canFold = new FoldMarker(fullConfig, true), canUnfold = new FoldMarker(fullConfig, false)
+
+  let markers = ViewPlugin.fromClass(class {
+    markers: RangeSet<FoldMarker>
+    from: number
+    constructor(view: EditorView) {
+      this.from = view.viewport.from
+      this.markers = RangeSet.of(this.buildMarkers(view))
+    }
+    update(update: ViewUpdate) {
+      let firstChange = -1
+      update.changes.iterChangedRanges(from => { if (firstChange < 0) firstChange = from })
+      let foldChange = update.prevState.field(foldState, false) != update.state.field(foldState, false)
+      if (!foldChange && update.docChanged && update.view.viewport.from == this.from && firstChange > this.from) {
+        let start = update.view.visualLineAt(firstChange).from
+        this.markers = this.markers.update({
+          filter: () => false,
+          filterFrom: start,
+          add: this.buildMarkers(update.view, start)
+        })
+      } else if (foldChange || update.docChanged || update.viewportChanged) {
+        this.from = update.view.viewport.from
+        this.markers = RangeSet.of(this.buildMarkers(update.view))
+      }
+    }
+    buildMarkers(view: EditorView, from = 0) {
+      let ranges: Range<FoldMarker>[] = []
+      view.viewportLines(line => {
+        if (line.from >= from) {
+          let mark = foldInside(view.state, line.from, line.to) ? canUnfold
+            : foldable(view.state, line.from, line.to) ? canFold : null
+          if (mark) ranges.push(mark.range(line.from))
+        }
+      })
+      return ranges
+    }
+  })
+
   return [
+    markers,
     gutter({
       style: "foldGutter",
-      lineMarker(view, line) {
-        // FIXME optimize this. At least don't run it for updates that
-        // don't change anything relevant
-        let folded = foldInside(view.state, line.from, line.to)
-        if (folded) return canUnfold
-        if (foldable(view.state, line.from, line.to)) return canFold
-        return null
-      },
+      markers(view) { return view.plugin(markers)?.markers || RangeSet.empty },
       initialSpacer() {
         return new FoldMarker(fullConfig, false)
       },

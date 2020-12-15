@@ -183,8 +183,6 @@ describe("autocomplete", () => {
       await sync(options, "okay one")
     })
 
-    // FIXME test span-less results restarting in corner cases
-
     run.test("calls sources again when necessary", {sources: [tagged(true)]}, async (view, sync) => {
       type(view, "t")
       await sync(options, "tag1")
