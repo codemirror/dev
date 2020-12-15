@@ -580,9 +580,7 @@ export class EditorView {
   /// handlers, which will be called any time the editor's [scroll
   /// element](#view.EditorView.scrollDOM) or one of its parent nodes
   /// is scrolled.
-  static domEventHandlers(handlers: {
-    [Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean | void
-  }): Extension {
+  static domEventHandlers(handlers: DOMEventHandlers): Extension {
     return ViewPlugin.define(() => ({}), {eventHandlers: handlers})
   }
 
@@ -684,6 +682,19 @@ export class EditorView {
   /// Facet that provides editor DOM attributes for the editor's
   /// outer element.
   static editorAttributes = editorAttributes
+}
+
+interface EventMap extends HTMLElementEventMap {
+  [other: string]: any
+}
+
+/// Event handlers are specified with objects like this.For event
+/// types known by TypeScript, this will infer the event argument type
+/// to hold the appropriate event object type. For unknown events, it
+/// is inferred to any, and should be explicitly set if you want type
+/// checking.
+export type DOMEventHandlers<This = any> = {
+  [event in keyof EventMap]?: (this: This, event: EventMap[event], view: EditorView) => boolean | void
 }
 
 // Maximum line length for which we compute accurate bidi info

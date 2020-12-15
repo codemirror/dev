@@ -1,7 +1,7 @@
 import {EditorState, Transaction, ChangeSet, Facet, Extension} from "@codemirror/next/state"
 import {StyleModule} from "style-mod"
 import {DecorationSet} from "./decoration"
-import {EditorView} from "./editorview"
+import {EditorView, DOMEventHandlers} from "./editorview"
 import {Attrs, combineAttrs} from "./attributes"
 import {Rect} from "./dom"
 import {MakeSelectionStyle} from "./input"
@@ -109,9 +109,7 @@ export interface PluginSpec<V extends PluginValue> {
   /// handlers](#view.EditorView^domEventHandlers) for the plugin.
   /// When called, these will have their `this` bound to the plugin
   /// value.
-  eventHandlers?: {
-    [Type in keyof HTMLElementEventMap]?: (this: V, event: HTMLElementEventMap[Type], view: EditorView) => boolean | void
-  },
+  eventHandlers?: DOMEventHandlers<V>,
 
   /// Allow the plugin to provide decorations. When given, this should
   /// contain one or more functions that take the plugin value and
@@ -169,7 +167,7 @@ export const pluginDecorations = PluginField.define<DecorationSet>()
 
 export const domEventHandlers = PluginField.define<{
   plugin: PluginValue,
-  handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean | void}
+  handlers: DOMEventHandlers
 }>()
 
 export class PluginInstance {

@@ -13,6 +13,8 @@ component that displays the editor state and allows text input.
 
 @BidiSpan
 
+@DOMEventHandlers
+
 @Rect
 
 ### Extending the View

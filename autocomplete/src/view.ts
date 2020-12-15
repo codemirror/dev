@@ -193,5 +193,5 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
         this.view.dispatch({effects: startCompletionEffect.of(false)})
       this.composing = CompositionState.None
     }
-  } as any // See https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/949
+  }
 })

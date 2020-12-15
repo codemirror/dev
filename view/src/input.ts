@@ -1,5 +1,5 @@
 import {EditorSelection, EditorState, SelectionRange, Transaction} from "@codemirror/next/state"
-import {EditorView} from "./editorview"
+import {EditorView, DOMEventHandlers} from "./editorview"
 import {ContentView} from "./contentview"
 import {LineView} from "./blockview"
 import {domEventHandlers, ViewUpdate, PluginValue, clickAddsSelectionRange, dragMovesSelection as dragBehavior,
@@ -20,7 +20,7 @@ export class InputState {
   registeredEvents: string[] = []
   customHandlers: readonly {
     plugin: PluginValue,
-    handlers: {[Type in keyof HTMLElementEventMap]?: (event: HTMLElementEventMap[Type], view: EditorView) => boolean | void}
+    handlers: DOMEventHandlers
   }[] = []
 
   composing = false
@@ -71,10 +71,10 @@ export class InputState {
 
   runCustomHandlers(type: string, view: EditorView, event: Event): boolean {
     for (let set of this.customHandlers) {
-      let handler = set.handlers[type as keyof HTMLElementEventMap] as any
+      let handler = set.handlers[type]
       if (handler) {
         try {
-          if (handler.call(set.plugin, event, view) || event.defaultPrevented) return true
+          if (handler.call(set.plugin, event as any, view) || event.defaultPrevented) return true
         } catch (e) {
           logException(view.state, e)
         }
