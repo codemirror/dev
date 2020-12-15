@@ -76,7 +76,7 @@ function moveBySyntax(state: EditorState, start: SelectionRange, forward: boolea
   }
   let bracket = pos.type.prop(bracketProp), match, newPos
   if (bracket && (match = forward ? matchBrackets(state, pos.from, 1) : matchBrackets(state, pos.to, -1)) && match.matched)
-    newPos = forward ? match.end!.to : match.end!.from
+    newPos = forward ? match.other!.to : match.other!.from
   else
     newPos = forward ? pos.to : pos.from
   return EditorSelection.cursor(newPos, forward ? -1 : 1)
@@ -136,9 +136,9 @@ function toMatchingBracket(state: EditorState, dispatch: (tr: Transaction) => vo
       || matchBrackets(state, range.head, 1)
       || (range.head > 0 && matchBrackets(state, range.head - 1, 1))
       || (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1))
-    if (!matching || !matching.end) return range
+    if (!matching || !matching.other) return range
     found = true
-    let head = matching.start.from == range.head ? matching.end.to : matching.end.from
+    let head = matching.start.from == range.head ? matching.other.to : matching.other.from
     return extend ? EditorSelection.range(range.anchor, head) : EditorSelection.cursor(head)
   })
   if (!found) return false
