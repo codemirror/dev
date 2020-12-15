@@ -167,13 +167,22 @@ export function tokensFor(d: Dialect) {
     } else if (next == Ch.Dash && next2 == Ch.Dash &&
                (!d.spaceAfterDashes || input.get(pos + 1) == Ch.Space)) {
       token.accept(LineComment, eol(input, pos + 1))
-    } else if (next == Ch.Slash && next2 == Ch.Star) { // FIXME nesting
+    } else if (next == Ch.Slash && next2 == Ch.Star) {
       pos++
-      for (let star = false;;) {
+      for (let prev = -1, depth = 1;;) {
         let next = input.get(pos++)
-        if (next < 0) { pos--; break }
-        if (star && next == Ch.Slash) break
-        star = next == Ch.Star
+        if (next < 0) {
+          pos--
+          break
+        } else if (prev == Ch.Star && next == Ch.Slash) {
+          depth--
+          if (!depth) break
+          next = -1
+        } else if (prev == Ch.Slash && next == Ch.Star) {
+          depth++
+          next = -1
+        }
+        prev = next
       }
       token.accept(BlockComment, pos)
     } else if ((next == Ch.e || next == Ch.E) && next2 == Ch.SingleQuote) {

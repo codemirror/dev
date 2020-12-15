@@ -135,7 +135,7 @@ export function schemaCompletion(config: SQLConfig): Extension {
 /// SQL language support for the given SQL dialect, with keyword
 /// completion, and, if provided, schema-based completion as extra
 /// extensions.
-export function sql(config: SQLConfig) {
+export function sql(config: SQLConfig = {}) {
   let lang = config.dialect || StandardSQL
   return new LanguageSupport(lang.language, [schemaCompletion(config), keywordCompletion(lang)])
 }
