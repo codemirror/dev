@@ -200,6 +200,14 @@ describe("Text", () => {
     }
   })
 
+  it("caches line objects", () => {
+    let line100 = doc0.line(100)
+    ist(doc0.line(100), line100)
+    ist(doc0.lineAt(line100.from), line100)
+    ist(doc0.lineAt(line100.to), line100)
+    ist(doc0.lineAt(line100.to - 1), line100)
+  })
+
   it("can delete a range at the start of a child node", () => {
     ist(doc0.replace(0, 100, Text.of(["x"])).toString(), "x" + text0.slice(100))
   })

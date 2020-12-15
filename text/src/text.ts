@@ -41,19 +41,13 @@ export abstract class Text implements Iterable<string> {
   lineAt(pos: number): Line {
     if (pos < 0 || pos > this.length)
       throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
-    for (let line of lineCache) {
-      if (line.doc == this && line.from <= pos && line.to >= pos) return line
-    }
-    return cacheLine(this.lineInner(pos, false, 1, 0).finish(this))
+    return getCachedLine(this, pos, false) || cacheLine(this.lineInner(pos, false, 1, 0).finish(this))
   }
 
   /// Get the description for the given (1-based) line number.
   line(n: number): Line {
     if (n < 1 || n > this.lines) throw new RangeError(`Invalid line number ${n} in ${this.lines}-line document`)
-    for (let line of lineCache) {
-      if (line.doc == this && line.number == n) return line
-    }
-    return cacheLine(this.lineInner(n, true, 1, 0).finish(this))
+    return getCachedLine(this, n, true) || cacheLine(this.lineInner(n, true, 1, 0).finish(this))
   }
 
   /// @internal
@@ -145,10 +139,38 @@ export abstract class Text implements Iterable<string> {
 if (typeof Symbol != "undefined")
   Text.prototype[Symbol.iterator] = function() { return this.iter() }
 
-let lineCache: Line[] = [], lineCachePos = -1, lineCacheSize = 10
+let lineCache: WeakMap<Text, Line[]> = new WeakMap
+
+function searchCache(cache: Line[], pos: number, isLine: boolean): Line | number {
+  for (let lo = 0, hi = cache.length;;) {
+    let mid = (lo + hi) >> 1, line = cache[mid], above
+    if (isLine) {
+      if (line.number == pos) return line
+      above = line.number > pos
+    } else {
+      if (line.from <= pos && line.to >= pos) return line
+      above = line.from > pos
+    }
+    if (above) lo = mid + 1
+    else hi = mid
+    if (lo == hi) return lo
+  }
+}
 
 function cacheLine(line: Line): Line {
-  return lineCache[lineCachePos = (lineCachePos + 1) % lineCacheSize] = line
+  let cache = lineCache.get(line.doc), index = 0
+  if (cache) index = searchCache(cache, line.number, true) as number // Assume line is not in cache
+  else lineCache.set(line.doc, cache = [])
+  if (index < cache.length - 100) cache.length = index
+  else for (let j = cache.length; j > index; j--) cache[j] = cache[j - 1]
+  return cache[index] = line
+}
+
+function getCachedLine(doc: Text, pos: number, isLine: boolean) {
+  let cache = lineCache.get(doc)
+  if (!cache) return null
+  let found = searchCache(cache, pos, isLine)
+  return typeof found == "number" ? null : found
 }
 
 // Leaves store an array of strings. There are always line breaks

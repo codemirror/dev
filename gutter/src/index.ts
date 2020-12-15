@@ -365,7 +365,6 @@ const lineNumberGutter = gutter({
   markers(view: EditorView) { return view.state.facet(lineNumberMarkers) },
   lineMarker(view, line, others) {
     if (others.length) return null
-    // FIXME try to make the line number queries cheaper?
     return new NumberMarker(view.state.doc.lineAt(line.from).number)
   },
   initialSpacer(view: EditorView) {
