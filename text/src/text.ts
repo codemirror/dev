@@ -655,27 +655,19 @@ export class Line {
 
 class LineContent {
   cursor: null | TextIterator = null
-  strings: string[] | null = null
+  string: string = ""
 
   constructor(private doc: Text, private start: number) {}
 
-  // FIXME quadratic complexity (somewhat) when iterating long lines in small pieces
   slice(from: number, to: number) {
     if (!this.cursor) {
       this.cursor = this.doc.iter()
-      this.strings = [this.cursor.next(this.start).value]
+      this.string = this.cursor.next(this.start).value
     }
-    for (let result = "", pos = 0, i = 0;; i++) {
-      if (i == this.strings!.length) {
-        let next = this.cursor!.next().value
-        if (!next) return result
-        this.strings!.push(next)
-      }
-      let string = this.strings![i], start = pos
-      pos += string.length
-      if (pos <= from) continue
-      result += string.slice(Math.max(0, from - start), Math.min(string.length, to - start))
-      if (pos >= to) return result
+    while (this.string.length < to && !(this.cursor.done || this.cursor.lineBreak)) {
+      this.cursor.next()
+      if (!this.cursor.lineBreak) this.string += this.cursor.value
     }
+    return this.string.slice(from, to)
   }
 }
