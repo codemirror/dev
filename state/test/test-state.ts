@@ -66,6 +66,28 @@ describe("EditorState", () => {
     ist(newState.field(field2), 10)
   })
 
+  it("allows fields to have an initializer", () => {
+    let field = StateField.define<number>({create: () => 0, update: val => val + 1})
+    let state = EditorState.create({extensions: field.init(() => 10)})
+    ist(state.field(field), 10)
+    ist(state.update({}).state.field(field), 11)
+  })
+
+  it("can be serialized to JSON", () => {
+    let field = StateField.define<{n: number}>({
+      create() { return {n: 0} },
+      update({n}) { return {n: n + 1} },
+      toJSON(v) { return {number: v.n} },
+      fromJSON(j) { return {n: j.number} }
+    })
+    let fields = {f: field}
+    let state = EditorState.create({extensions: field}).update({}).state
+    let json = state.toJSON(fields)
+    ist(JSON.stringify(json.f), '{"number":1}')
+    let state2 = EditorState.fromJSON(json, {}, fields)
+    ist(JSON.stringify(state2.field(field)), '{"n":1}')
+  })
+
   it("can preserve fields across reconfiguration", () => {
     let field = StateField.define({create: () => 0, update: val => val + 1})
     let start = EditorState.create({extensions: [field]}).update({}).state

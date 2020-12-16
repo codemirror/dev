@@ -210,12 +210,23 @@ type StateFieldSpec<Value> = {
   /// [`nFrom`](#state.Facet.nFrom) methods to provide a getter
   /// function.
   provide?: readonly (Facet<Value, any> | ((field: StateField<Value>) => Extension))[]
+
+  /// A function used to serialize this field's content to JSON. Only
+  /// necessary when this field is included in the argument to
+  /// [`EditorState.toJSON`](#state.EditorState.toJSON).
+  toJSON?: (value: Value, state: EditorState) => any
+
+  /// A function that deserializes the JSON representation of this
+  /// field's content.
+  fromJSON?: (json: any, state: EditorState) => Value
 }
 
 function maybeIndex(state: EditorState, id: number) {
   let found = state.config.address[id]
   return found == null ? null : found >> 1
 }
+
+const initField = Facet.define<{field: StateField<unknown>, create: (state: EditorState) => unknown}>({static: true})
 
 /// Fields can store additional information in an editor state, and
 /// keep it in sync with the rest of the state.
@@ -227,13 +238,16 @@ export class StateField<Value> {
     private updateF: (value: Value, tr: Transaction) => Value,
     private compareF: (a: Value, b: Value) => boolean,
     /// @internal
-    readonly facets: readonly Extension[]
+    readonly facets: readonly Extension[],
+    /// @internal
+    readonly spec: StateFieldSpec<Value>
   ) {}
 
   /// Define a state field.
   static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
     let facets: Extension[] = []
-    let field = new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b), facets)
+    let field = new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b),
+                                      facets, config)
     if (config.provide) for (let p of config.provide) {
       if (p instanceof Facet) facets.push(p.compute([field], state => state.field(field)))
       else facets.push(p(field))
@@ -241,18 +255,23 @@ export class StateField<Value> {
     return field
   }
 
+  private create(state: EditorState) {
+    let init = state.facet(initField).find(i => i.field == this)
+    return (init?.create || this.createF)(state)
+  }
+
   /// @internal
   slot(addresses: {[id: number]: number}) {
     let idx = addresses[this.id] >> 1
     return (state: EditorState, tr: Transaction | null) => {
       if (!tr) {
-        state.values[idx] = this.createF(state)
+        state.values[idx] = this.create(state)
         return SlotStatus.Changed
       }
       let oldVal, changed = 0
       if (tr.reconfigure) {
         let oldIdx = maybeIndex(tr.startState, this.id)
-        oldVal = oldIdx == null ? this.createF(tr.startState) : tr.startState.values[oldIdx]
+        oldVal = oldIdx == null ? this.create(tr.startState) : tr.startState.values[oldIdx]
         changed = SlotStatus.Changed
       } else {
         oldVal = tr.startState.values[idx]
@@ -262,6 +281,13 @@ export class StateField<Value> {
       if (changed) state.values[idx] = value
       return changed
     }
+  }
+
+  /// Returns an extension that enables this field and overrides the
+  /// way it is initialized. Can be useful when you need to provide a
+  /// non-default starting value for the field.
+  init(create: (state: EditorState) => Value) {
+    return [this, initField.of({field: this as any, create})]
   }
 
   /// State field instances can be used as

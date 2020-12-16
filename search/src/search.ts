@@ -249,7 +249,6 @@ export const searchKeymap: readonly KeyBinding[] = [
   {key: "Mod-Shift-l", run: selectSelectionMatches}
 ]
 
-// FIXME sync when search state changes independently
 function buildPanel(conf: {
   view: EditorView,
   query: Query,

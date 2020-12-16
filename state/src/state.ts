@@ -183,23 +183,37 @@ export class EditorState {
     return getAddr(this, addr)
   }
 
-  /// Convert this state to a JSON-serializable object.
-  toJSON(): any {
-    // FIXME plugin state serialization
-    return {
+  /// Convert this state to a JSON-serializable object. When custom
+  /// fields should be serialized, you can pass them in as an object
+  /// mapping property names (in the resulting object, which should
+  /// not use `doc` or `selection`) to fields.
+  toJSON(fields?: {[prop: string]: StateField<any>}): any {
+    let result: any = {
       doc: this.sliceDoc(),
       selection: this.selection.toJSON()
     }
+    if (fields) for (let prop in fields)
+      result[prop] = fields[prop].spec.toJSON!(this.field(fields[prop]), this)
+    return result
   }
 
-  /// Deserialize a state from its JSON representation.
-  static fromJSON(json: any, config: EditorStateConfig = {}): EditorState {
+  /// Deserialize a state from its JSON representation. When custom
+  /// fields should be deserialized, pass the same object you passed
+  /// to [`toJSON`](#state.EditorState.toJSON) when serializing as
+  /// third argument.
+  static fromJSON(json: any, config: EditorStateConfig = {}, fields?: {[prop: string]: StateField<any>}): EditorState {
     if (!json || typeof json.doc != "string")
       throw new RangeError("Invalid JSON representation for EditorState")
+    let fieldInit = []
+    if (fields) for (let prop in fields) {
+      let field = fields[prop], value = json[prop]
+      fieldInit.push(field.init(state => field.spec.fromJSON!(value, state)))
+    }
+
     return EditorState.create({
       doc: json.doc,
       selection: EditorSelection.fromJSON(json.selection),
-      extensions: config.extensions
+      extensions: config.extensions ? fieldInit.concat([config.extensions]) : fieldInit
     })
   }
 
