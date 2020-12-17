@@ -1,4 +1,4 @@
-import {nextClusterBreak} from "./char"
+import {findClusterBreak} from "./char"
 
 /// Count the column position at the given offset into the string,
 /// taking extending characters and tab size into account.
@@ -9,7 +9,7 @@ export function countColumn(string: string, n: number, tabSize: number): number 
       i++
     } else {
       n++
-      i = nextClusterBreak(string, i)
+      i = findClusterBreak(string, i)
     }
   }
   return n
@@ -21,7 +21,7 @@ export function findColumn(string: string, n: number, col: number, tabSize: numb
   for (let i = 0; i < string.length;) {
     if (n >= col) return {offset: i, leftOver: 0}
     n += string.charCodeAt(i) == 9 ? tabSize - (n % tabSize) : 1
-    i = nextClusterBreak(string, i)
+    i = findClusterBreak(string, i)
   }
   return {offset: string.length, leftOver: col - n}
 }

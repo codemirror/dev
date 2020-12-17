@@ -1,6 +1,6 @@
 import {EditorState, StateCommand, EditorSelection, SelectionRange,
         ChangeSpec, Transaction, CharCategory} from "@codemirror/next/state"
-import {Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
+import {findClusterBreak, Text, Line, countColumn, codePointAt, codePointSize} from "@codemirror/next/text"
 import {EditorView, Command, Direction, KeyBinding} from "@codemirror/next/view"
 import {matchBrackets} from "@codemirror/next/matchbrackets"
 import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString,
@@ -325,7 +325,7 @@ const deleteByChar = (view: EditorView, forward: boolean, codePoint: boolean) =>
     let size = next ? codePointSize(codePointAt(next, 0)) : 1
     target = forward ? Math.min(state.doc.length, pos + size) : Math.max(0, pos - size)
   } else {
-    target = line.findClusterBreak(pos - line.from, forward) + line.from
+    target = findClusterBreak(line.text, pos - line.from, forward) + line.from
   }
   if (target == pos && line.number != (forward ? state.doc.lines : 1))
     target += forward ? 1 : -1
@@ -355,7 +355,7 @@ const deleteByGroup = (view: EditorView, forward: boolean) => deleteBy(view, pos
       next = forward ? line.from : line.to
       nextChar = "\n"
     } else {
-      next = line.findClusterBreak(pos - line.from, forward) + line.from
+      next = findClusterBreak(line.text, pos - line.from, forward) + line.from
       nextChar = line.text.slice(Math.min(pos, next) - line.from, Math.max(pos, next) - line.from)
     }
     let nextCat = categorize(nextChar)
@@ -418,8 +418,8 @@ export const transposeChars: StateCommand = ({state, dispatch}) => {
   let changes = state.changeByRange(range => {
     if (!range.empty || range.from == 0 || range.from == state.doc.length) return {range}
     let pos = range.from, line = state.doc.lineAt(pos)
-    let from = pos == line.from ? pos - 1 : line.findClusterBreak(pos - line.from, false) + line.from
-    let to = pos == line.to ? pos + 1 : line.findClusterBreak(pos - line.from, true) + line.from
+    let from = pos == line.from ? pos - 1 : findClusterBreak(line.text, pos - line.from, false) + line.from
+    let to = pos == line.to ? pos + 1 : findClusterBreak(line.text, pos - line.from, true) + line.from
     return {changes: {from, to, insert: state.doc.slice(pos, to).append(state.doc.slice(from, pos))},
             range: EditorSelection.cursor(to)}
   })

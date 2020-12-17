@@ -1,4 +1,4 @@
-import {Line} from "@codemirror/next/text"
+import {Line, findClusterBreak} from "@codemirror/next/text"
 import {EditorSelection, SelectionRange} from "@codemirror/next/state"
 
 /// Used to indicate [text direction](#view.EditorView.textDirection).
@@ -225,7 +225,7 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
     startIndex = span.side(!forward, dir)
   }
   let indexForward = forward == (span.dir == dir)
-  let nextIndex = line.findClusterBreak(startIndex, indexForward)
+  let nextIndex = findClusterBreak(line.text, startIndex, indexForward)
   movedOver = line.text.slice(Math.min(startIndex, nextIndex), Math.max(startIndex, nextIndex))
 
   if (nextIndex != span.side(forward, dir))

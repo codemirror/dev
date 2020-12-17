@@ -1,5 +1,5 @@
 import {EditorState, EditorSelection, SelectionRange, CharCategory} from "@codemirror/next/state"
-import {findColumn, countColumn} from "@codemirror/next/text"
+import {findColumn, countColumn, findClusterBreak} from "@codemirror/next/text"
 import {EditorView} from "./editorview"
 import {BlockType} from "./decoration"
 import {WidgetView} from "./inlineview"
@@ -20,16 +20,16 @@ export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   if (linePos == 0) bias = 1
   else if (linePos == line.length) bias = -1
   let from = linePos, to = linePos
-  if (bias < 0) from = line.findClusterBreak(linePos, false)
-  else to = line.findClusterBreak(linePos, true)
+  if (bias < 0) from = findClusterBreak(line.text, linePos, false)
+  else to = findClusterBreak(line.text, linePos)
   let cat = categorize(line.text.slice(from, to))
   while (from > 0) {
-    let prev = line.findClusterBreak(from, false)
+    let prev = findClusterBreak(line.text, from, false)
     if (categorize(line.text.slice(prev, from)) != cat) break
     from = prev
   }
   while (to < line.length) {
-    let next = line.findClusterBreak(to, true)
+    let next = findClusterBreak(line.text, to)
     if (categorize(line.text.slice(to, next)) != cat) break
     to = next
   }

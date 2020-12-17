@@ -1,5 +1,3 @@
-import {nextClusterBreak, prevClusterBreak} from "./char"
-
 const enum Tree {
   // The branch factor (both in leaf and branch nodes)
   Branch = 32,
@@ -118,7 +116,7 @@ export abstract class Text implements Iterable<string> {
 
   /// The empty text.
   static empty: Text
-} // FIXME add doc-wide cluster break finding?
+}
 
 if (typeof Symbol != "undefined")
   Text.prototype[Symbol.iterator] = function() { return this.iter() }
@@ -493,14 +491,4 @@ export class Line {
 
   /// The length of the line (not including any line break after it).
   get length() { return this.to - this.from }
-
-  /// Find the next (or previous if `forward` is false) grapheme
-  /// cluster break from the given start position (as an offset inside
-  /// the line, not the document). Will return a position greater than
-  /// (or less than if `forward` is false) `start` unless there is no
-  /// such index in the string.
-  findClusterBreak(start: number, forward: boolean) {
-    if (start < 0 || start > this.length) throw new RangeError("Invalid position given to Line.findClusterBreak")
-    return (forward ? nextClusterBreak : prevClusterBreak)(this.text, start)
-  }
 }

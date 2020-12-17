@@ -1,7 +1,7 @@
-import {nextClusterBreak, countColumn, findColumn} from "@codemirror/next/text"
+import {findClusterBreak, countColumn, findColumn} from "@codemirror/next/text"
 import ist from "ist"
 
-describe("nextClusterBreak", () => {
+describe("findClusterBreak", () => {
   function test(spec: string) {
     it(spec, () => {
       let breaks = [], next: number
@@ -11,7 +11,7 @@ describe("nextClusterBreak", () => {
       }
       let found = []
       for (let i = 0;;) {
-        let next = nextClusterBreak(spec, i)
+        let next = findClusterBreak(spec, i)
         if (next == spec.length) break
         found.push(i = next)
       }

@@ -20,10 +20,16 @@ function isRegionalIndicator(code: number) {
 
 const ZWJ = 0x200d
 
-/// Returns a grapheme cluster end _after_ (not equal to) `pos`, if
-/// possible. Moves across surrogate pairs, extending characters,
-/// characters joined with zero-width joiners, and flag emoji.
-export function nextClusterBreak(str: string, pos: number) {
+/// Returns a next grapheme cluster break _after_ (not equal to)
+/// `pos`, if `forward` is true, or before otherwise. Returns `pos`
+/// itself if no further cluster break is available in the string.
+/// Moves across surrogate pairs, extending characters, characters
+/// joined with zero-width joiners, and flag emoji.
+export function findClusterBreak(str: string, pos: number, forward = true) {
+  return (forward ? nextClusterBreak : prevClusterBreak)(str, pos)
+}
+
+function nextClusterBreak(str: string, pos: number) {
   if (pos == str.length) return pos
   // If pos is in the middle of a surrogate pair, move to its start
   if (pos && surrogateLow(str.charCodeAt(pos)) && surrogateHigh(str.charCodeAt(pos - 1))) pos--
@@ -46,8 +52,7 @@ export function nextClusterBreak(str: string, pos: number) {
   return pos
 }
 
-/// Returns a grapheme cluster end _before_ `pos`, if possible.
-export function prevClusterBreak(str: string, pos: number) {
+function prevClusterBreak(str: string, pos: number) {
   while (pos > 0) {
     let found = nextClusterBreak(str, pos - 2)
     if (found < pos) return found

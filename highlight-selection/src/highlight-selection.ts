@@ -1,5 +1,6 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, ViewUpdate, themeClass} from "@codemirror/next/view"
 import {Facet, combineConfig, Text, Extension, CharCategory} from "@codemirror/next/state"
+import {findClusterBreak} from "@codemirror/next/text"
 import {SearchCursor} from "@codemirror/next/search"
 
 /// Mark lines that have a cursor on them with the \`$activeLine\`
@@ -79,12 +80,12 @@ function wordAt(doc: Text, pos: number, check: (ch: string) => CharCategory) {
   let line = doc.lineAt(pos)
   let from = pos - line.from, to = pos - line.from
   while (from > 0) {
-    let prev = line.findClusterBreak(from, false)
+    let prev = findClusterBreak(line.text, from, false)
     if (check(line.text.slice(prev, from)) != CharCategory.Word) break
     from = prev
   }
   while (to < line.length) {
-    let next = line.findClusterBreak(to, true)
+    let next = findClusterBreak(line.text, to)
     if (check(line.text.slice(to, next)) != CharCategory.Word) break
     to = next
   }
