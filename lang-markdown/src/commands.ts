@@ -4,8 +4,7 @@ import {SyntaxNode} from "lezer-tree"
 import {markdownLanguage} from "./markdown"
 
 function nodeStart(node: SyntaxNode, doc: Text) {
-  let line = doc.lineAt(node.from), off = node.from - line.from
-  return line.slice(off, off + 100)
+  return doc.sliceString(node.from, node.from + 50)
 }
 
 function gatherMarkup(node: SyntaxNode, line: string, doc: Text) {
@@ -66,21 +65,21 @@ export const insertNewlineContinueMarkup: StateCommand = ({state, dispatch}) => 
   let tree = syntaxTree(state)
   let dont = null, changes = state.changeByRange(range => {
     if (range.empty && markdownLanguage.isActiveAt(state, range.from)) {
-      let line = state.doc.lineAt(range.from), lineText = line.slice(0, 100)
-      let markup = gatherMarkup(tree.resolve(range.from, -1), lineText, state.doc)
+      let line = state.doc.lineAt(range.from)
+      let markup = gatherMarkup(tree.resolve(range.from, -1), line.text, state.doc)
       let from = range.from, changes: ChangeSpec[] = []
       if (markup.length) {
         let inner = markup[markup.length - 1], innerEnd = inner.from + inner.string.length
-        if (range.from - line.from >= innerEnd && !/\S/.test(lineText.slice(innerEnd, range.from - line.from))) {
+        if (range.from - line.from >= innerEnd && !/\S/.test(line.text.slice(innerEnd, range.from - line.from))) {
           let start = /List/.test(inner.node.name) ? inner.from : innerEnd
-          while (start > 0 && /\s/.test(lineText[start - 1])) start--
+          while (start > 0 && /\s/.test(line.text[start - 1])) start--
           from = line.from + start
         }
         if (inner.node.name == "ListItem") {
           if (from < range.from && inner.node.parent!.from == inner.node.from) { // First item
             inner.string = ""
           } else {
-            inner.string = lineText.slice(inner.from, inner.from + inner.string.length)
+            inner.string = line.text.slice(inner.from, inner.from + inner.string.length)
             if (inner.node.parent!.name == "OrderedList" && from == range.from) {
               inner.string = inner.string.replace(/\d+/, m => (+m + 1) as any)
               renumberList(inner.node, state.doc, changes)
@@ -112,17 +111,17 @@ export const deleteMarkupBackward: StateCommand = ({state, dispatch}) => {
   let tree = syntaxTree(state)
   let dont = null, changes = state.changeByRange(range => {
     if (range.empty && markdownLanguage.isActiveAt(state, range.from)) {
-      let line = state.doc.lineAt(range.from), lineText = line.slice(0, 100)
-      let markup = gatherMarkup(tree.resolve(range.from, -1), lineText, state.doc)
+      let line = state.doc.lineAt(range.from)
+      let markup = gatherMarkup(tree.resolve(range.from, -1), line.text, state.doc)
       if (markup.length) {
         let inner = markup[markup.length - 1], innerEnd = inner.from + inner.string.length
-        if (range.from > innerEnd + line.from && !/\S/.test(lineText.slice(innerEnd, range.from - line.from)))
+        if (range.from > innerEnd + line.from && !/\S/.test(line.text.slice(innerEnd, range.from - line.from)))
           return {range: EditorSelection.cursor(innerEnd + line.from),
                   changes: {from: innerEnd + line.from, to: range.from}}
         if (range.from - line.from == innerEnd) {
           let start = line.from + inner.from
           if (inner.node.name == "ListItem" && inner.node.parent!.from < inner.node.from &&
-              /\S/.test(lineText.slice(inner.from, innerEnd)))
+              /\S/.test(line.text.slice(inner.from, innerEnd)))
             return {range, changes: {from: start, to: start + inner.string.length, insert: inner.string}}
           return {range: EditorSelection.cursor(start), changes: {from: start, to: range.from}}
         }

@@ -72,7 +72,7 @@ export class CompletionContext {
   matchBefore(expr: RegExp) {
     let line = this.state.doc.lineAt(this.pos)
     let start = Math.max(line.from, this.pos - 250)
-    let str = line.slice(start - line.from, this.pos - line.from)
+    let str = line.text.slice(start - line.from, this.pos - line.from)
     let found = str.search(ensureAnchor(expr, false))
     return found < 0 ? null : {from: start + found, to: this.pos, text: str.slice(found)}
   }

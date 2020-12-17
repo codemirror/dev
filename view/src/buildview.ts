@@ -4,6 +4,8 @@ import {BlockView, LineView, BlockWidgetView} from "./blockview"
 import {InlineView, WidgetView, TextView, MarkView} from "./inlineview"
 import {Text, TextIterator} from "@codemirror/next/text"
 
+const enum T { Chunk = 512 }
+
 export class ContentBuilder implements SpanIterator<Decoration> {
   content: BlockView[] = []
   curLine: LineView | null = null
@@ -66,10 +68,11 @@ export class ContentBuilder implements SpanIterator<Decoration> {
           this.textOff = 0
         }
       }
-      let take = Math.min(this.text.length - this.textOff, length)
+      let take = Math.min(this.text.length - this.textOff, length, T.Chunk)
       this.getLine().append(this.wrapMarks(new TextView(this.text.slice(this.textOff, this.textOff + take)), active), openStart)
-      length -= take
       this.textOff += take
+      length -= take
+      openStart = 0
     }
   }
 

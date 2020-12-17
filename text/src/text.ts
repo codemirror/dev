@@ -1,14 +1,13 @@
 import {nextClusterBreak, prevClusterBreak} from "./char"
 
 const enum Tree {
-  // The base size of a leaf node
-  BaseLeaf = 512,
-  // The max size of a leaf node
-  MaxLeaf = Tree.BaseLeaf * 2,
-  // The desired amount of branches per node, as an exponent of 2 (so 3
-  // means 8 branches)
-  BranchShift = 3
+  // The branch factor (both in leaf and branch nodes)
+  Branch = 32,
+  // The branch factor as an exponent of 2
+  BranchShift = 5
 }
+
+const enum O { From = 1, To = 2 }
 
 /// A text iterator iterates over a sequence of strings.
 export interface TextIterator extends Iterator<string> {
@@ -41,37 +40,36 @@ export abstract class Text implements Iterable<string> {
   lineAt(pos: number): Line {
     if (pos < 0 || pos > this.length)
       throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`)
-    return getCachedLine(this, pos, false) || cacheLine(this.lineInner(pos, false, 1, 0).finish(this))
+    return this.lineInner(pos, false, 1, 0)
   }
 
   /// Get the description for the given (1-based) line number.
   line(n: number): Line {
     if (n < 1 || n > this.lines) throw new RangeError(`Invalid line number ${n} in ${this.lines}-line document`)
-    return getCachedLine(this, n, true) || cacheLine(this.lineInner(n, true, 1, 0).finish(this))
+    return this.lineInner(n, true, 1, 0)
   }
 
   /// @internal
   abstract lineInner(target: number, isLine: boolean, line: number, offset: number): Line
 
-  /// Replace a range of the text with the given lines. `text` should
-  /// have a length of at least one.
+  /// Replace a range of the text with the given content.
   replace(from: number, to: number, text: Text): Text {
     let parts: Text[] = []
-    this.decompose(0, from, parts)
-    parts.push(text)
-    this.decompose(to, this.length, parts)
+    if (from) this.decompose(0, from, parts, O.To)
+    if (text.length) text.decompose(0, text.length, parts, (from ? O.From : 0) | (to < this.length ? O.To : 0))
+    if (to < this.length) this.decompose(to, this.length, parts, parts.length ? O.From : 0)
     return TextNode.from(parts, this.length - (to - from) + text.length)
   }
 
   /// Append another document to this one.
-  append(text: Text): Text {
-    return this.length == 0 ? text : text.length == 0 ? this : TextNode.from([this, text], this.length + text.length)
+  append(other: Text) {
+    return this.replace(this.length, this.length, other)
   }
 
   /// Retrieve the text between the given points.
   slice(from: number, to: number = this.length): Text {
     let parts: Text[] = []
-    this.decompose(from, to, parts)
+    this.decompose(from, to, parts, 0)
     return TextNode.from(parts, to - from)
   }
 
@@ -94,20 +92,8 @@ export abstract class Text implements Iterable<string> {
   /// iterator will run in reverse.
   iterRange(from: number, to: number = this.length): TextIterator { return new PartialTextCursor(this, from, to) }
 
-  /// Iterate over lines in the text, starting at position (_not_ line
-  /// number) `from`. An iterator returned by this combines all text
-  /// on a line into a single string (which may be expensive for very
-  /// long lines), and skips line breaks (its
-  /// [`lineBreak`](#text.TextIterator.lineBreak) property is always
-  /// false).
-  iterLines(from: number = 0): TextIterator { return new LineCursor(this, from) }
-
   /// @internal
-  abstract decompose(from: number, to: number, target: Text[]): void
-  /// @internal
-  abstract lastLineLength(): number
-  /// @internal
-  abstract firstLineLength(): number
+  abstract decompose(from: number, to: number, target: Text[], open: O): void
 
   /// @internal
   toString() { return this.sliceString(0) }
@@ -116,8 +102,7 @@ export abstract class Text implements Iterable<string> {
   /// deserialized again via [`Text.of`](#text.Text^of).
   toJSON() {
     let lines: string[] = []
-    for (let iter = this.iterLines(); !iter.next().done;)
-      lines.push(iter.value)
+    this.flatten(lines)
     return lines
   }
 
@@ -128,50 +113,15 @@ export abstract class Text implements Iterable<string> {
   static of(text: readonly string[]): Text {
     if (text.length == 0) throw new RangeError("A document must have at least one line")
     if (text.length == 1 && !text[0] && Text.empty) return Text.empty
-    let length = textLength(text)
-    return length < Tree.MaxLeaf ? new TextLeaf(text, length) : TextNode.from(TextLeaf.split(text, []), length)
+    return text.length <= Tree.Branch ? new TextLeaf(text) : TextNode.from(TextLeaf.split(text, []))
   }
 
   /// The empty text.
   static empty: Text
-}
+} // FIXME add doc-wide cluster break finding?
 
 if (typeof Symbol != "undefined")
   Text.prototype[Symbol.iterator] = function() { return this.iter() }
-
-let lineCache: WeakMap<Text, Line[]> = new WeakMap
-
-function searchCache(cache: Line[], pos: number, isLine: boolean): Line | number {
-  for (let lo = 0, hi = cache.length;;) {
-    let mid = (lo + hi) >> 1, line = cache[mid], above
-    if (isLine) {
-      if (line.number == pos) return line
-      above = line.number > pos
-    } else {
-      if (line.from <= pos && line.to >= pos) return line
-      above = line.from > pos
-    }
-    if (above) lo = mid + 1
-    else hi = mid
-    if (lo == hi) return lo
-  }
-}
-
-function cacheLine(line: Line): Line {
-  let cache = lineCache.get(line.doc), index = 0
-  if (cache) index = searchCache(cache, line.number, true) as number // Assume line is not in cache
-  else lineCache.set(line.doc, cache = [])
-  if (index < cache.length - 100) cache.length = index
-  else for (let j = cache.length; j > index; j--) cache[j] = cache[j - 1]
-  return cache[index] = line
-}
-
-function getCachedLine(doc: Text, pos: number, isLine: boolean) {
-  let cache = lineCache.get(doc)
-  if (!cache) return null
-  let found = searchCache(cache, pos, isLine)
-  return typeof found == "number" ? null : found
-}
 
 // Leaves store an array of strings. There are always line breaks
 // between these strings (though not between adjacent Text nodes).
@@ -197,18 +147,29 @@ class TextLeaf extends Text {
     }
   }
 
-  decompose(from: number, to: number, target: Text[]) {
-    target.push(new TextLeaf(sliceText(this.text, from, to), Math.min(to, this.length) - Math.max(0, from)))
+  decompose(from: number, to: number, target: Text[], open: O) {
+    let text = from <= 0 && to >= this.length ? this
+      : new TextLeaf(sliceText(this.text, from, to), Math.min(to, this.length) - Math.max(0, from))
+    if (open & O.From) {
+      let prev = target.pop() as TextLeaf
+      let joined = appendText(text.text, prev.text.slice(), 0, text.length)
+      if (joined.length <= Tree.Branch) {
+        target.push(new TextLeaf(joined, prev.length + text.length))
+      } else {
+        let mid = joined.length >> 1
+        target.push(new TextLeaf(joined.slice(0, mid)), new TextLeaf(joined.slice(mid)))
+      }
+    } else {
+      target.push(text)
+    }
   }
 
-  lastLineLength(): number { return this.text[this.text.length - 1].length }
-
-  firstLineLength(): number { return this.text[0].length }
-
   replace(from: number, to: number, text: Text): Text {
+    if (!(text instanceof TextLeaf)) return super.replace(from, to, text)
+    let lines = appendText(this.text, appendText(text.text, sliceText(this.text, 0, from)), to)
     let newLen = this.length + text.length - (to - from)
-    if (newLen >= Tree.MaxLeaf || !(text instanceof TextLeaf)) return super.replace(from, to, text)
-    return new TextLeaf(appendText(this.text, appendText(text.text, sliceText(this.text, 0, from)), to), newLen)
+    if (lines.length <= Tree.Branch) return new TextLeaf(lines, newLen)
+    return TextNode.from(TextLeaf.split(lines, []), newLen)
   }
 
   sliceString(from: number, to = this.length, lineSep = "\n") {
@@ -225,133 +186,87 @@ class TextLeaf extends Text {
   }
 
   flatten(target: string[]) {
-    target[target.length - 1] += this.text[0]
-    for (let i = 1; i < this.text.length; i++) target.push(this.text[i])
+    for (let line of this.text) target.push(line)
   }
 
   static split(text: readonly string[], target: Text[]): Text[] {
-    let part = [], length = -1
+    let part = [], len = -1
     for (let line of text) {
-      for (;;) {
-        let newLength = length + line.length + 1
-        if (newLength < Tree.BaseLeaf) {
-          length = newLength
-          part.push(line)
-          break
-        }
-        let cut = Tree.BaseLeaf - length - 1, after = line.charCodeAt(cut)
-        if (after >= 0xdc00 && after < 0xe000) cut++
-        part.push(line.slice(0, cut))
-        target.push(new TextLeaf(part, Tree.BaseLeaf))
-        line = line.slice(cut)
-        length = -1
+      part.push(line)
+      len += line.length + 1
+      if (part.length == Tree.Branch) {
+        target.push(new TextLeaf(part, len))
         part = []
+        len = -1
       }
     }
-    if (length != -1) target.push(new TextLeaf(part, length))
+    if (len > -1) target.push(new TextLeaf(part, len))
     return target
   }
 }
 
 // Nodes provide the tree structure of the `Text` type. They store a
-// number of other nodes or leaves, taking care to balance itself on
-// changes.
+// number of other nodes or leaves, taking care to balance themselves
+// on changes.
 class TextNode extends Text {
-  readonly lines: number;
+  readonly lines = 0
 
   constructor(readonly children: readonly Text[], readonly length: number) {
     super()
-    this.lines = 1
-    for (let child of children) this.lines += child.lines - 1
+    for (let child of children) this.lines += child.lines
   }
 
   lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
     for (let i = 0;; i++) {
       let child = this.children[i], end = offset + child.length, endLine = line + child.lines - 1
-      if ((isLine ? endLine : end) >= target) {
-        let inner = child.lineInner(target, isLine, line, offset), add
-        if (inner.from == offset && (add = this.lineLengthTo(i))) {
-          ;(inner as any).from -= add
-          ;(inner as any).content = null
-        }
-        if (inner.to == end && (add = this.lineLengthFrom(i + 1))) {
-          ;(inner as any).to += add
-          ;(inner as any).content = null
-        }
-        return inner
-      }
-      offset = end
-      line = endLine
+      if ((isLine ? endLine : end) >= target)
+        return child.lineInner(target, isLine, line, offset)
+      offset = end + 1
+      line = endLine + 1
     }
   }
 
-  decompose(from: number, to: number, target: Text[]) {
-    for (let i = 0, pos = 0; pos < to && i < this.children.length; i++) {
+  decompose(from: number, to: number, target: Text[], open: O) {
+    for (let i = 0, pos = 0; pos <= to && i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
-      if (from < end && to > pos) {
-        if (pos >= from && end <= to) target.push(child)
-        else child.decompose(from - pos, to - pos, target)
+      if (from <= end && to >= pos) {
+        let childOpen = open & ((pos <= from ? O.From : 0) | (end >= to ? O.To : 0))
+        if (pos >= from && end <= to && !childOpen) target.push(child)
+        else child.decompose(from - pos, to - pos, target, childOpen)
       }
-      pos = end
+      pos = end + 1
     }
   }
-
-  private lineLengthTo(to: number): number {
-    let length = 0
-    for (let i = to - 1; i >= 0; i--) {
-      let child = this.children[i]
-      if (child.lines > 1) return length + child.lastLineLength()
-      length += child.length
-    }
-    return length
-  }
-
-  lastLineLength(): number { return this.lineLengthTo(this.children.length) }
-
-  private lineLengthFrom(from: number): number {
-    let length = 0
-    for (let i = from; i < this.children.length; i++) {
-      let child = this.children[i]
-      if (child.lines > 1) return length + child.firstLineLength()
-      length += child.length
-    }
-    return length
-  }
-
-  firstLineLength(): number { return this.lineLengthFrom(0) }
 
   replace(from: number, to: number, text: Text): Text {
-    // Looks like a small change, try to optimize
-    if (text.length < Tree.BaseLeaf && to - from < Tree.BaseLeaf) {
-      let lengthDiff = text.length - (to - from)
-      for (let i = 0, pos = 0; i < this.children.length; i++) {
-        let child = this.children[i], end = pos + child.length
-        // Fast path: if the change only affects one child and the
-        // child's size remains in the acceptable range, only update
-        // that child
-        if (from >= pos && to <= end &&
-            child.length + lengthDiff < (this.length + lengthDiff) >> (Tree.BranchShift - 1) &&
-            child.length + lengthDiff > 0) {
+    if (text.lines < this.lines) for (let i = 0, pos = 0; i < this.children.length; i++) {
+      let child = this.children[i], end = pos + child.length
+      // Fast path: if the change only affects one child and the
+      // child's size remains in the acceptable range, only update
+      // that child
+      if (from >= pos && to <= end) {
+        let updated = child.replace(from - pos, to - pos, text), totalLines
+        if (updated.lines == child.lines ||
+            updated.lines < ((totalLines = this.lines - child.lines + updated.lines) >> Tree.BranchShift - 1) &&
+            updated.lines > (totalLines >> (Tree.BranchShift + 1))) {
           let copy = this.children.slice()
-          copy[i] = child.replace(from - pos, to - pos, text)
-          return new TextNode(copy, this.length + lengthDiff)
+          copy[i] = updated
+          return new TextNode(copy, this.length - (to - from) + text.length)
         }
-        pos = end
+        return super.replace(pos, end, updated)
       }
+      pos = end + 1
     }
     return super.replace(from, to, text)
   }
 
   sliceString(from: number, to = this.length, lineSep = "\n") {
     let result = ""
-    for (let i = 0, pos = 0; pos < to && i < this.children.length; i++) {
+    for (let i = 0, pos = 0; i < this.children.length && pos <= to; i++) {
       let child = this.children[i], end = pos + child.length
-      if (from < end && to > pos) {
-        let part = child.sliceString(from - pos, to - pos, lineSep)
-        if (from >= pos && to <= end) return part
-        result += part
-      }
-      pos = end
+      if (pos > from && i) result += lineSep
+      if (from < end && to > pos) result += child.sliceString(from - pos, to - pos, lineSep)
+      pos = end + 1
     }
     return result
   }
@@ -360,40 +275,41 @@ class TextNode extends Text {
     for (let child of this.children) child.flatten(target)
   }
 
-  static from(children: Text[], length: number): Text {
-    if (!children.every(ch => ch instanceof Text)) throw new Error("NOP")
-    if (length < Tree.MaxLeaf) {
-      let text = [""]
-      for (let child of children) child.flatten(text)
-      return new TextLeaf(text, length)
+  static from(children: Text[], length: number = children.reduce((l, ch) => l + ch.length + 1, -1)): Text {
+    let lines = 0
+    for (let ch of children) lines += ch.lines
+    if (lines < Tree.Branch) {
+      let flat: string[] = []
+      for (let ch of children) ch.flatten(flat)
+      return new TextLeaf(flat, length)
     }
-
-    let chunkLength = Math.max(Tree.BaseLeaf, length >> Tree.BranchShift), maxLength = chunkLength << 1, minLength = chunkLength >> 1
-    let chunked: Text[] = [], currentLength = 0, currentChunk: Text[] = []
+    let chunk = Math.max(Tree.Branch, (lines >> Tree.BranchShift) + 1), maxChunk = chunk << 1, minChunk = chunk >> 1
+    let chunked: Text[] = [], currentLines = 0, currentLen = -1, currentChunk: Text[] = []
     function add(child: Text) {
-      let childLength = child.length, last
-      if (!childLength) return
-      if (childLength > maxLength && child instanceof TextNode) {
+      let last
+      if (child.lines > maxChunk && child instanceof TextNode) {
         for (let node of child.children) add(node)
-      } else if (childLength > minLength && (currentLength > minLength || currentLength == 0)) {
+      } else if (child.lines > minChunk && (currentLines > minChunk || !currentLines)) {
         flush()
         chunked.push(child)
-      } else if (child instanceof TextLeaf && currentLength > 0 &&
+      } else if (child instanceof TextLeaf && currentLines &&
                  (last = currentChunk[currentChunk.length - 1]) instanceof TextLeaf &&
-                 child.length + last.length <= Tree.BaseLeaf) {
-        currentLength += childLength
-        currentChunk[currentChunk.length - 1] = new TextLeaf(appendText(child.text, last.text.slice()), child.length + last.length)
+                 child.lines + last.lines <= Tree.Branch) {
+        currentLines += child.lines
+        currentLen += child.length + 1
+        currentChunk[currentChunk.length - 1] = new TextLeaf(last.text.concat(child.text), last.length + 1 + child.length)
       } else {
-        if (currentLength + childLength > chunkLength) flush()
-        currentLength += childLength
+        if (currentLines + child.lines > chunk) flush()
+        currentLines += child.lines
+        currentLen += child.length + 1
         currentChunk.push(child)
       }
     }
     function flush() {
-      if (currentLength == 0) return
-      chunked.push(currentChunk.length == 1 ? currentChunk[0] : TextNode.from(currentChunk, currentLength))
-      currentLength = 0
-      currentChunk.length = 0
+      if (currentLines == 0) return
+      chunked.push(currentChunk.length == 1 ? currentChunk[0] : TextNode.from(currentChunk, currentLen))
+      currentLen = -1
+      currentLines = currentChunk.length = 0
     }
 
     for (let child of children) add(child)
@@ -479,41 +395,36 @@ class RawTextCursor implements TextIterator {
         this.lineBreak = false
         return this
       }
-      let top = this.nodes[last]
-      let offset = this.offsets[last]
-      if (top instanceof TextLeaf) {
+      let top = this.nodes[last], offset = this.offsets[last]
+      let size = top instanceof TextLeaf ? top.text.length : top.children!.length
+      if (offset == (this.dir > 0 ? size : 0)) {
+        this.nodes.pop()
+        this.offsets.pop()
+      } else if (!this.lineBreak && offset != (this.dir > 0 ? 0 : size)) {
         // Internal offset with lineBreak == false means we have to
         // count the line break at this position
-        if (offset != (this.dir > 0 ? 0 : top.text.length) && !this.lineBreak) {
-          this.lineBreak = true
-          if (skip == 0) {
-            this.value = "\n"
-            return this
-          }
-          skip--
-          continue
+        this.lineBreak = true
+        if (skip == 0) {
+          this.value = "\n"
+          return this
         }
-        // Otherwise, move to the next string
+        skip--
+      } else if (top instanceof TextLeaf) {
+        // Move to the next string
         let next = top.text[offset - (this.dir < 0 ? 1 : 0)]
         this.offsets[last] = (offset += this.dir)
-        if (offset == (this.dir > 0 ? top.text.length : 0)) {
-          this.nodes.pop()
-          this.offsets.pop()
-        }
         this.lineBreak = false
         if (next.length > Math.max(0, skip)) {
           this.value = skip == 0 ? next : this.dir > 0 ? next.slice(skip) : next.slice(0, next.length - skip)
           return this
         }
         skip -= next.length
-      } else if (offset == (this.dir > 0 ? top.children!.length : 0)) {
-        this.nodes.pop()
-        this.offsets.pop()
       } else {
-        let next = top.children![this.dir > 0 ? offset : offset - 1], len = next.length
+        let next = top.children![this.dir > 0 ? offset : offset - 1]
         this.offsets[last] = offset + this.dir
-        if (skip > len) {
-          skip -= len
+        this.lineBreak = false
+        if (skip > next.length) {
+          skip -= next.length
         } else {
           this.nodes.push(next)
           this.offsets.push(this.dir > 0 ? 0 : next instanceof TextLeaf ? next.text.length : next.children!.length)
@@ -561,36 +472,6 @@ class PartialTextCursor implements TextIterator {
   get done() { return this.limit < 0 }
 }
 
-class LineCursor implements TextIterator {
-  cursor: TextIterator
-  skip: number
-  value = ""
-  done = false
-
-  constructor(text: Text, from = 0) {
-    this.cursor = text.iter()
-    this.skip = from
-  }
-
-  next(skip: number = 0): this {
-    if (this.cursor.done) {
-      this.done = true
-      this.value = ""
-      return this
-    }
-    skip += this.skip
-    this.skip = 0
-    for (this.value = "";;) {
-      let {value, lineBreak, done} = this.cursor.next(skip)
-      skip = 0
-      if (done || lineBreak) return this
-      this.value += value
-    }
-  }
-
-  get lineBreak() { return false }
-}
-
 /// This type describes a line in the document. It is created
 /// on-demand when lines are [queried](#text.Text.lineAt).
 export class Line {
@@ -606,33 +487,12 @@ export class Line {
     readonly to: number,
     /// This line's line number (1-based).
     readonly number: number,
-    /// @internal
-    public content: string | null | LineContent
+    /// The line's content.
+    readonly text: string
   ) {}
 
   /// The length of the line (not including any line break after it).
   get length() { return this.to - this.from }
-
-  /// Retrieve a part of the content of this line. This is a method,
-  /// rather than, say, a string property, to avoid concatenating long
-  /// lines whenever they are accessed. Try to write your code, if it
-  /// is going to be doing a lot of line-reading, to read only the
-  /// parts it needs.
-  slice(from: number = 0, to: number = this.length) {
-    if (from == to) return ""
-    if (typeof this.content == "string")
-      return this.content.slice(from, to)
-    if (!this.content) this.content = new LineContent(this.doc, this.from)
-    let result = this.content.slice(from, to)
-    if (from == 0 && to == this.length) this.content = result
-    return result
-  }
-
-  /// @internal
-  finish(text: Text): this {
-    this.doc = text
-    return this
-  }
 
   /// Find the next (or previous if `forward` is false) grapheme
   /// cluster break from the given start position (as an offset inside
@@ -641,33 +501,6 @@ export class Line {
   /// such index in the string.
   findClusterBreak(start: number, forward: boolean) {
     if (start < 0 || start > this.length) throw new RangeError("Invalid position given to Line.findClusterBreak")
-    let contextStart, context
-    if (this.content == "string") {
-      contextStart = this.from
-      context = this.content
-    } else {
-      contextStart = Math.max(0, start - 256)
-      context = this.slice(contextStart, Math.min(this.length, contextStart + 512))
-    }
-    return (forward ? nextClusterBreak : prevClusterBreak)(context, start - contextStart) + contextStart
-  }
-}
-
-class LineContent {
-  cursor: null | TextIterator = null
-  string: string = ""
-
-  constructor(private doc: Text, private start: number) {}
-
-  slice(from: number, to: number) {
-    if (!this.cursor) {
-      this.cursor = this.doc.iter()
-      this.string = this.cursor.next(this.start).value
-    }
-    while (this.string.length < to && !(this.cursor.done || this.cursor.lineBreak)) {
-      this.cursor.next()
-      if (!this.cursor.lineBreak) this.string += this.cursor.value
-    }
-    return this.string.slice(from, to)
+    return (forward ? nextClusterBreak : prevClusterBreak)(this.text, start)
   }
 }

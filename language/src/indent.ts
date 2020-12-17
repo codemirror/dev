@@ -116,13 +116,12 @@ export class IndentContext {
       let overriden = override(line.from)
       if (overriden > -1) return overriden
     }
-    let text = line.slice(0, Math.min(100, line.length))
-    return this.countColumn(text, text.search(/\S/))
+    return this.countColumn(line.text, line.text.search(/\S/))
   }
 
   /// Find the column for the given position.
   column(pos: number) {
-    let line = this.state.doc.lineAt(pos), text = line.slice(0, pos - line.from)
+    let line = this.state.doc.lineAt(pos), text = line.text.slice(0, pos - line.from)
     let result = this.countColumn(text, pos - line.from)
     let override = this.options?.overrideIndentation ? this.options.overrideIndentation(line.from) : -1
     if (override > -1) result += override - this.countColumn(text, text.search(/\S/))
@@ -308,7 +307,7 @@ export function indentOnInput(): Extension {
       last = line.from
       let indent = getIndentation(state, line.from)
       if (indent == null) continue
-      let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, DontIndentBeyond)))![0]
+      let cur = /^\s*/.exec(line.text)![0]
       let norm = indentString(state, indent)
       if (cur != norm)
         changes.push({from: line.from, to: line.from + cur.length, insert: norm})

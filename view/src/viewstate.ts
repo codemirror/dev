@@ -204,8 +204,11 @@ export class ViewState {
     if (oracle.heightChanged) result |= UpdateFlag.Height
     if (!this.viewportIsAppropriate(this.viewport, bias) ||
         this.scrollTo && (this.scrollTo.head < this.viewport.from || this.scrollTo.head > this.viewport.to)) {
-      this.viewport = this.getViewport(bias, this.scrollTo)
-      result |= UpdateFlag.Viewport
+      let newVP = this.getViewport(bias, this.scrollTo)
+      if (newVP.from != this.viewport.from || newVP.to != this.viewport.to) {
+        this.viewport = newVP
+        result |= UpdateFlag.Viewport
+      }
     }
     if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.MinViewPort)
       result |= this.updateLineGaps(this.ensureLineGaps(refresh ? [] : this.lineGaps))

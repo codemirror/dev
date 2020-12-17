@@ -100,7 +100,7 @@ export class StreamLanguage<State> extends Language {
     while (statePos < pos) {
       let line = cx.state.doc.lineAt(statePos), end = Math.min(pos, line.to)
       if (line.length) {
-        let stream = new StringStream(line.slice(), cx.state.tabSize, cx.unit)
+        let stream = new StringStream(line.text, cx.state.tabSize, cx.unit)
         while (stream.pos < end - line.from)
           readToken(this.streamParser.token, stream, state)
       } else {
@@ -109,7 +109,7 @@ export class StreamLanguage<State> extends Language {
       if (end == pos) break
       statePos = line.to + 1
     }
-    let text = cx.state.doc.lineAt(pos).slice(0, 100)
+    let {text} = cx.state.doc.lineAt(pos)
     return this.streamParser.indent(state, /^\s*(.*)/.exec(text)![1], cx)
   }
 

@@ -533,7 +533,7 @@ export class EditorView {
     if (line.length > MaxBidiLine) return trivialOrder(line.length)
     let dir = this.textDirection
     for (let entry of this.bidiCache) if (entry.from == line.from && entry.dir == dir) return entry.order
-    let order = computeOrder(line.slice(), this.textDirection)
+    let order = computeOrder(line.text, this.textDirection)
     this.bidiCache.push(new CachedOrder(line.from, line.to, dir, order))
     return order
   }

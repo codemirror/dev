@@ -193,22 +193,23 @@ describe("EditorView drawing", () => {
   })
 
   it("hides parts of long lines that are vertically out of view", () => {
-    let cm = tempEditor("<" + "long line ".repeat(4e3) + ">", [], {scroll: 100, wrapping: true})
-    let {node} = cm.domAtPos(1)
-    ist(node.nodeValue!.length, cm.state.doc.length, "<")
-    ist(node.nodeValue!.indexOf("<"), -1, ">")
-    cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2
+    let cm = tempEditor("<" + "long line ".repeat(10e3) + ">", [], {scroll: 100, wrapping: true})
     cm.measure()
-    let rect = cm.scrollDOM.getBoundingClientRect()
-    ;({node} = cm.domAtPos(cm.posAtCoords({x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2})!))
-    ist(node.nodeValue!.length, cm.state.doc.length, "<")
-    ist(node.nodeValue!.indexOf("<"), -1)
-    ist(node.nodeValue!.indexOf(">"), -1)
+    let text = cm.contentDOM.textContent!
+    ist(text.length, cm.state.doc.length, "<")
+    ist(text.indexOf("<"), -1, ">")
+    cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2 + 100
+    cm.dispatch({selection: {anchor: cm.state.doc.length >> 1}})
+    cm.measure()
+    text = cm.contentDOM.textContent!
+    ist(text.length, cm.state.doc.length, "<")
+    ist(text.indexOf("<"), -1)
+    ist(text.indexOf(">"), -1)
     cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight
     cm.measure()
-    ;({node} = cm.domAtPos(cm.state.doc.length - 1))
-    ist(node.nodeValue!.length, cm.state.doc.length, "<")
-    ist(node.nodeValue!.indexOf(">"), -1, ">")
+    text = cm.contentDOM.textContent!
+    ist(text.length, cm.state.doc.length, "<")
+    ist(text.indexOf(">"), -1, ">")
   })
 
   it("properly attaches styles in shadow roots", () => {

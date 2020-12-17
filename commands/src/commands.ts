@@ -312,7 +312,7 @@ function deleteBy(view: EditorView, by: (start: number) => number) {
 const deleteByChar = (view: EditorView, forward: boolean, codePoint: boolean) => deleteBy(view, pos => {
   let {state} = view, line = state.doc.lineAt(pos), before
   if (!forward && pos > line.from && pos < line.from + 200 &&
-      !/[^ \t]/.test(before = line.slice(0, pos - line.from))) {
+      !/[^ \t]/.test(before = line.text.slice(0, pos - line.from))) {
     if (before[before.length - 1] == "\t") return pos - 1
     let col = countColumn(before, 0, state.tabSize), drop = col % getIndentUnit(state) || getIndentUnit(state)
     for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++) pos--
@@ -320,8 +320,8 @@ const deleteByChar = (view: EditorView, forward: boolean, codePoint: boolean) =>
   }
   let target
   if (codePoint) {
-    let next = line.slice(pos - line.from + (forward ? 0 : -2),
-                          pos - line.from + (forward ? 2 : 0))
+    let next = line.text.slice(pos - line.from + (forward ? 0 : -2),
+                               pos - line.from + (forward ? 2 : 0))
     let size = next ? codePointSize(codePointAt(next, 0)) : 1
     target = forward ? Math.min(state.doc.length, pos + size) : Math.max(0, pos - size)
   } else {
@@ -356,7 +356,7 @@ const deleteByGroup = (view: EditorView, forward: boolean) => deleteBy(view, pos
       nextChar = "\n"
     } else {
       next = line.findClusterBreak(pos - line.from, forward) + line.from
-      nextChar = line.slice(Math.min(pos, next) - line.from, Math.max(pos, next) - line.from)
+      nextChar = line.text.slice(Math.min(pos, next) - line.from, Math.max(pos, next) - line.from)
     }
     let nextCat = categorize(nextChar)
     if (cat != null && nextCat != cat) break
@@ -446,10 +446,10 @@ function moveLine(state: EditorState, dispatch: (tr: Transaction) => void, forwa
     let nextLine = state.doc.lineAt(forward ? block.to + 1 : block.from - 1)
     if (forward)
       changes.push({from: block.to, to: nextLine.to},
-                   {from: block.from, insert: nextLine.slice() + state.lineBreak})
+                   {from: block.from, insert: nextLine.text + state.lineBreak})
     else
       changes.push({from: nextLine.from, to: block.from},
-                   {from: block.to, insert: state.lineBreak + nextLine.slice()})
+                   {from: block.to, insert: state.lineBreak + nextLine.text})
   }
   if (!changes.length) return false
   dispatch(state.update({changes, scrollIntoView: true}))
@@ -516,12 +516,12 @@ export const insertNewlineAndIndent: StateCommand = ({state, dispatch}): boolean
     let explode = from == to && isBetweenBrackets(state, from)
     let cx = new IndentContext(state, {simulateBreak: from, simulateDoubleBreak: !!explode})
     let indent = getIndentation(cx, from)
-    if (indent == null) indent = /^\s*/.exec(state.doc.lineAt(from).slice(0, 50))![0].length
+    if (indent == null) indent = /^\s*/.exec(state.doc.lineAt(from).text)![0].length
 
     let line = state.doc.lineAt(from)
-    while (to < line.to && /\s/.test(line.slice(to - line.from, to + 1 - line.from))) to++
+    while (to < line.to && /\s/.test(line.text.slice(to - line.from, to + 1 - line.from))) to++
     if (explode) ({from, to} = explode)
-    else if (from > line.from && from < line.from + 100 && !/\S/.test(line.slice(0, from))) from = line.from
+    else if (from > line.from && from < line.from + 100 && !/\S/.test(line.text.slice(0, from))) from = line.from
     let insert = ["", indentString(state, indent)]
     if (explode) insert.push(indentString(state, cx.lineIndent(line)))
     return {changes: {from, to, insert: Text.of(insert)},
@@ -561,7 +561,7 @@ export const indentSelection: StateCommand = ({state, dispatch}) => {
   let changes = changeBySelectedLine(state, (line, changes, range) => {
     let indent = getIndentation(context, line.from)
     if (indent == null) return
-    let cur = /^\s*/.exec(line.slice(0, Math.min(line.length, 200)))![0]
+    let cur = /^\s*/.exec(line.text)![0]
     let norm = indentString(state, indent)
     if (cur != norm || range.from < line.from + cur.length) {
       updated[line.from] = indent
@@ -585,8 +585,7 @@ export const indentMore: StateCommand = ({state, dispatch}) => {
 /// selected lines.
 export const indentLess: StateCommand = ({state, dispatch}) => {
   dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
-    let lineStart = line.slice(0, Math.min(line.length, 200))
-    let space = /^\s*/.exec(lineStart)![0]
+    let space = /^\s*/.exec(line.text)![0]
     if (!space) return
     let col = countColumn(space, 0, state.tabSize), keep = 0
     let insert = indentString(state, Math.max(0, col - getIndentUnit(state)))

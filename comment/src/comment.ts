@@ -195,7 +195,7 @@ class LineCommenter {
             if (lines.length > 1 && column.isLineSkipped[line.number]) continue
             const pos = line.from + column.minCol
             const posAfter = column.minCol + this.lineCommentToken.length
-            const marginLen = line.slice(posAfter, posAfter + 1) == " " ? 1 : 0
+            const marginLen = line.text.slice(posAfter, posAfter + 1) == " " ? 1 : 0
             changes.push({from: pos, to: pos + this.lineCommentToken.length + marginLen})
           }
         }
@@ -223,7 +223,7 @@ class LineCommenter {
     let isRangeLineDiscarded = true
     const isLineSkipped: { [id: number]: boolean } = []
     for (const line of lines) {
-      const str = line.slice(0, Math.min(line.length, SearchMargin))
+      const str = line.text
       const col = /^\s*/.exec(str)![0].length
       if ((lines.length == 1 || col < str.length) && col < minCol) {
         minCol = col

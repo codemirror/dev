@@ -223,18 +223,9 @@ class DocInput implements Input {
   lineAfter(pos: number) {
     if (pos >= this.length || pos < 0) return ""
     let stringStart = this.cursorPos - this.string.length
-    if (pos < stringStart || pos >= this.cursorPos) stringStart = this.syncTo(pos)
-    let off = pos - stringStart, result = ""
-    while (!this.cursor.lineBreak) {
-      result += off ? this.string.slice(off) : this.string
-      if (this.cursorPos >= this.length) {
-        if (this.cursorPos > this.length) result = result.slice(0, result.length - (this.cursorPos - this.length))
-        break
-      }
-      this.syncTo(this.cursorPos)
-      off = 0
-    }
-    return result
+    if (pos < stringStart || pos >= this.cursorPos)
+      stringStart = this.syncTo(pos)
+    return this.cursor.lineBreak ? "" : this.string.slice(pos - stringStart)
   }
 
   read(from: number, to: number) {

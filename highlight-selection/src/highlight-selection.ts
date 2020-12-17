@@ -80,15 +80,15 @@ function wordAt(doc: Text, pos: number, check: (ch: string) => CharCategory) {
   let from = pos - line.from, to = pos - line.from
   while (from > 0) {
     let prev = line.findClusterBreak(from, false)
-    if (check(line.slice(prev, from)) != CharCategory.Word) break
+    if (check(line.text.slice(prev, from)) != CharCategory.Word) break
     from = prev
   }
   while (to < line.length) {
     let next = line.findClusterBreak(to, true)
-    if (check(line.slice(to, next)) != CharCategory.Word) break
+    if (check(line.text.slice(to, next)) != CharCategory.Word) break
     to = next
   }
-  return from == to ? null : line.slice(from, to)
+  return from == to ? null : line.text.slice(from, to)
 }
 
 const matchDeco = Decoration.mark({class: themeClass("selectionMatch")})

@@ -22,15 +22,15 @@ export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   let from = linePos, to = linePos
   if (bias < 0) from = line.findClusterBreak(linePos, false)
   else to = line.findClusterBreak(linePos, true)
-  let cat = categorize(line.slice(from, to))
+  let cat = categorize(line.text.slice(from, to))
   while (from > 0) {
     let prev = line.findClusterBreak(from, false)
-    if (categorize(line.slice(prev, from)) != cat) break
+    if (categorize(line.text.slice(prev, from)) != cat) break
     from = prev
   }
   while (to < line.length) {
     let next = line.findClusterBreak(to, true)
-    if (categorize(line.slice(to, next)) != cat) break
+    if (categorize(line.text.slice(to, next)) != cat) break
     to = next
   }
   return EditorSelection.range(from + line.from, to + line.from)

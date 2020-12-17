@@ -26,7 +26,7 @@ class Snippet {
 
   instantiate(state: EditorState, pos: number) {
     let text = [], lineStart = [pos]
-    let lineObj = state.doc.lineAt(pos), baseIndent = /^\s*/.exec(lineObj.slice(0, Math.min(100, lineObj.length)))![0]
+    let lineObj = state.doc.lineAt(pos), baseIndent = /^\s*/.exec(lineObj.text)![0]
     for (let line of this.lines) {
       if (text.length) {
         let indent = baseIndent, tabs = /^\t*/.exec(line)![0].length

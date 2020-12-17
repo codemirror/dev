@@ -285,12 +285,12 @@ function doPaste(view: EditorView, input: string) {
     changes = {
       changes: state.selection.ranges.map(r => state.doc.lineAt(r.from))
         .filter((l, i, a) => i == 0 || a[i - 1] != l)
-        .map(line => ({from: line.from, insert: (byLine ? text.line(i++).slice() : input) + state.lineBreak}))
+        .map(line => ({from: line.from, insert: (byLine ? text.line(i++).text : input) + state.lineBreak}))
     }
   } else if (byLine) {
     changes = state.changeByRange(range => {
       let line = text.line(i++)
-      return {changes: {from: range.from, to: range.to, insert: line.slice()},
+      return {changes: {from: range.from, to: range.to, insert: line.text},
               range: EditorSelection.cursor(range.from + line.length)}
     })
   } else {
@@ -497,7 +497,7 @@ function copiedRange(state: EditorState) {
     for (let {from} of state.selection.ranges) {
       let line = state.doc.lineAt(from)
       if (line.number > upto) {
-        content.push(line.slice())
+        content.push(line.text)
         ranges.push({from: line.from, to: Math.min(state.doc.length, line.to + 1)})
       }
       upto = line.number

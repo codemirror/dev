@@ -128,7 +128,6 @@ describe("history", () => {
     state = type(state, "\n\n", 2)
     ist(state.doc.toString(), "..\n\n..hello!")
     state = receive(state, "\n\n", 1)
-    console.log("first undo ----------")
     state = command(state, undo)
     state = command(state, undo)
     ist(state.doc.toString(), ".\n\n...hello")

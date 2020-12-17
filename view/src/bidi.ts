@@ -226,7 +226,7 @@ export function moveVisually(line: Line, order: readonly BidiSpan[], dir: Direct
   }
   let indexForward = forward == (span.dir == dir)
   let nextIndex = line.findClusterBreak(startIndex, indexForward)
-  movedOver = line.slice(Math.min(startIndex, nextIndex), Math.max(startIndex, nextIndex))
+  movedOver = line.text.slice(Math.min(startIndex, nextIndex), Math.max(startIndex, nextIndex))
 
   if (nextIndex != span.side(forward, dir))
     return EditorSelection.cursor(nextIndex + line.from, indexForward ? -1 : 1, span.level)

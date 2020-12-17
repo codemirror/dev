@@ -2,7 +2,7 @@ import {Text} from "@codemirror/next/text"
 import ist from "ist"
 
 function depth(node: Text): number {
-  return !node.children ? 0 : 1 + Math.max(...node.children.map(depth))
+  return !node.children ? 1 : 1 + Math.max(...node.children.map(depth))
 }
 
 const line = "1234567890".repeat(10)
@@ -19,23 +19,26 @@ describe("Text", () => {
     ist(Text.of(["one", "two", "three"]).append(Text.of(["!", "ok"])).toString(), "one\ntwo\nthree!\nok")
   })
 
+  it("preserves length", () => {
+    ist(doc0.length, text0.length)
+  })
+
   it("creates a balanced tree when loading a document", () => {
     let doc = Text.of(new Array(2000).fill(line)), d = depth(doc)
-    ist(d, 3, "<=")
-    ist(d, 1, ">")
+    ist(d, 2, "<=")
   })
 
   it("rebalances on insert", () => {
     let doc = doc0
     let insert = "abc".repeat(200), at = Math.floor(doc.length / 2)
     for (let i = 0; i < 10; i++) doc = doc.replace(at, at, Text.of([insert]))
-    ist(depth(doc), 3, "<=")
+    ist(depth(doc), 2, "<=")
     ist(doc.toString(), text0.slice(0, at) + "abc".repeat(2000) + text0.slice(at))
   })
 
   it("collapses on delete", () => {
     let doc = doc0.replace(10, text0.length - 10, Text.empty)
-    ist(depth(doc), 0)
+    ist(depth(doc), 1)
     ist(doc.length, 20)
     ist(doc.toString(), line.slice(0, 20))
   })
@@ -86,6 +89,7 @@ describe("Text", () => {
     for (let i = 0; i < 400; i++) {
       let start = i == 0 ? 0 : Math.floor(Math.random() * doc.length)
       let end = i == 399 ? doc.length : start + Math.floor(Math.random() * (doc.length - start))
+      start = 4150; end = 4160
       ist(doc.slice(start, end).toString(), str.slice(start, end))
     }
   })
@@ -149,31 +153,10 @@ describe("Text", () => {
     ist(doc0.iterRange(doc0.length - 2, doc0.length - 1).next().value, "9")
   })
 
-  it("can iterate over document lines", () => {
-    let lines = []
+  it("can convert to JSON", () => {
     for (let i = 0; i < 200; i++) lines.push("line " + i)
-    for (let iter = Text.of(lines).iterLines(), i = 0; !iter.next().done; i++) {
-      ist(iter.value, "line " + i)
-      ist(i < 200)
-    }
-  })
-
-  it("iterates lines in empty documents", () => {
-    let result = []
-    for (let iter = Text.of([""]).iterLines(); !iter.next().done;) result.push(iter.value)
-    ist(JSON.stringify(result), JSON.stringify([""]))
-  })
-
-  it("iterates over empty lines", () => {
-    let lines = ["", "foo", "", "", "bar", "", ""], result = []
-    for (let iter = Text.of(lines).iterLines(); !iter.next().done;) result.push(iter.value)
-    ist(JSON.stringify(result), JSON.stringify(lines))
-  })
-
-  it("iterates over long lines", () => {
-    let long = line.repeat(100), result = []
-    for (let iter = Text.of([long]).iterLines(); !iter.next().done;) result.push(iter.value)
-    ist(JSON.stringify(result), JSON.stringify([long]))
+    let text = Text.of(lines)
+    ist(Text.of(text.toJSON()).eq(text))
   })
 
   it("can get line info by line number", () => {
@@ -184,7 +167,7 @@ describe("Text", () => {
       ist(l.from, (i - 1) * 101)
       ist(l.to, i * 101 - 1)
       ist(l.number, i)
-      ist(l.slice(), line)
+      ist(l.text, line)
     }
   })
 
@@ -196,16 +179,8 @@ describe("Text", () => {
       ist(l.from, i - (i % 101))
       ist(l.to, i - (i % 101) + 100)
       ist(l.number, Math.floor(i / 101) + 1)
-      ist(l.slice(), line)
+      ist(l.text, line)
     }
-  })
-
-  it("caches line objects", () => {
-    let line100 = doc0.line(100)
-    ist(doc0.line(100), line100)
-    ist(doc0.lineAt(line100.from), line100)
-    ist(doc0.lineAt(line100.to), line100)
-    ist(doc0.lineAt(line100.to - 1), line100)
   })
 
   it("can delete a range at the start of a child node", () => {
@@ -219,12 +194,5 @@ describe("Text", () => {
       ist(doc0.sliceString(from, to), text0.slice(from, to))
       ist(doc0.slice(from, to).toString(), text0.slice(from, to))
     }
-  })
-
-  it("can read part of a long line", () => {
-    let line = Text.of(["a".repeat(1000) + "XYZ" + "b".repeat(1000)]).line(1)
-    ist(line.slice(0, 50), "a".repeat(50))
-    ist(line.slice(2000, 2003), "bbb")
-    ist(line.slice(999, 1004), "aXYZb")
   })
 })

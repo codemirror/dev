@@ -21,7 +21,7 @@ function rectangleFor(state: EditorState, a: Pos, b: Pos) {
   } else {
     let startCol = Math.min(a.col, b.col), endCol = Math.max(a.col, b.col)
     for (let i = startLine; i <= endLine; i++) {
-      let line = state.doc.line(i), str = line.length > MaxOff ? line.slice(0, 2 * endCol) : line.slice()
+      let line = state.doc.line(i), str = line.length > MaxOff ? line.text.slice(0, 2 * endCol) : line.text
       let start = findColumn(str, 0, startCol, state.tabSize), end = findColumn(str, 0, endCol, state.tabSize)
       if (!start.leftOver)
         ranges.push(EditorSelection.range(line.from + start.offset, line.from + end.offset))
@@ -41,7 +41,7 @@ function getPos(view: EditorView, event: MouseEvent) {
   let line = view.state.doc.lineAt(offset), off = offset - line.from
   let col = off > MaxOff ? -1
     : off == line.length ? absoluteColumn(view, event.clientX)
-    : countColumn(line.slice(0, offset - line.from), 0, view.state.tabSize)
+    : countColumn(line.text.slice(0, offset - line.from), 0, view.state.tabSize)
   return {line: line.number, col, off}
 }
 
