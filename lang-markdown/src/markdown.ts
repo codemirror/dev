@@ -18,6 +18,8 @@ const parser = baseParser.configure({
       "Emphasis/...": t.emphasis,
       "StrongEmphasis/...": t.strong,
       "Link/... Image/...": t.link,
+      "OrderedList/... BulletList/...": t.list,
+      "BlockQuote/...": t.quote,
       InlineCode: t.monospace,
       URL: t.url,
       "HeaderMark HardBreak QuoteMark ListMark LinkMark EmphasisMark CodeMark": t.processingInstruction,
