@@ -154,7 +154,7 @@ export class EditorView {
     this.root = (config.root || document) as DocumentOrShadowRoot
 
     this.viewState = new ViewState(config.state || EditorState.create())
-    this.plugins = this.state.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
+    this.plugins = this.state.facet(viewPlugin).map(spec => new PluginInstance(spec).update(this))
     this.observer = new DOMObserver(this, (from, to, typeOver) => {
       applyDOMChange(this, from, to, typeOver)
     }, event => {
@@ -231,7 +231,7 @@ export class EditorView {
     try {
       for (let plugin of this.plugins) plugin.destroy(this)
       this.viewState = new ViewState(newState)
-      this.plugins = newState.facet(viewPlugin).map(spec => PluginInstance.create(spec, this))
+      this.plugins = newState.facet(viewPlugin).map(spec => new PluginInstance(spec).update(this))
       this.docView = new DocView(this)
       this.inputState.ensureHandlers(this)
       this.mountStyles()
@@ -244,25 +244,25 @@ export class EditorView {
   private updatePlugins(update: ViewUpdate) {
     let prevSpecs = update.prevState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
     if (prevSpecs != specs) {
-      let newPlugins = [], reused = []
+      let newPlugins = []
       for (let spec of specs) {
         let found = prevSpecs.indexOf(spec)
         if (found < 0) {
-          newPlugins.push(PluginInstance.create(spec, this))
+          newPlugins.push(new PluginInstance(spec))
         } else {
-          let plugin = this.plugins[found].update(update)
-          reused.push(plugin)
+          let plugin = this.plugins[found]
+          plugin.mustUpdate = update
           newPlugins.push(plugin)
         }
       }
-      for (let plugin of this.plugins)
-        if (reused.indexOf(plugin) < 0) plugin.destroy(this)
+      for (let plugin of this.plugins) if (plugin.mustUpdate != update) plugin.destroy(this)
       this.plugins = newPlugins
       this.inputState.ensureHandlers(this)
     } else {
-      for (let i = 0; i < this.plugins.length; i++)
-        this.plugins[i] = this.plugins[i].update(update)
+      for (let p of this.plugins) p.mustUpdate = update
     }
+    for (let i = 0; i < this.plugins.length; i++)
+      this.plugins[i] = this.plugins[i].update(this)
   }
 
   /// @internal
@@ -382,9 +382,8 @@ export class EditorView {
   /// Collect all values provided by the active plugins for a given
   /// field.
   pluginField<T>(field: PluginField<T>): readonly T[] {
-    // FIXME make this error when called during plugin updating
     let result: T[] = []
-    for (let plugin of this.plugins) plugin.takeField(field, result)
+    for (let plugin of this.plugins) plugin.update(this).takeField(field, result)
     return result
   }
 
@@ -393,7 +392,7 @@ export class EditorView {
   /// know you registered a given plugin, it is recommended to check
   /// the return value of this method.
   plugin<T>(plugin: ViewPlugin<T>): T | null {
-    for (let inst of this.plugins) if (inst.spec == plugin) return inst.value as T
+    for (let inst of this.plugins) if (inst.spec == plugin) return inst.update(this).value as T
     return null
   }
 

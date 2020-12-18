@@ -171,42 +171,51 @@ export const domEventHandlers = PluginField.define<{
 }>()
 
 export class PluginInstance {
-  constructor(readonly value: PluginValue, readonly spec: ViewPlugin<any>) {}
+  // When starting an update, all plugins have this field set to the
+  // update object, indicating they need to be updated. When finished
+  // updating, it is set to `false`. Retrieving a plugin that needs to
+  // be updated with `view.plugin` forces an eager update.
+  mustUpdate: ViewUpdate | null = null
+  // This is null when the plugin is initially created, but
+  // initialized on the first update.
+  value: PluginValue | null = null
 
-  static create(spec: ViewPlugin<any>, view: EditorView) {
-    let value
-    try { value = spec.create(view) }
-    catch (e) {
-      logException(view.state, e, "CodeMirror plugin crashed")
-      return PluginInstance.dummy
-    }
-    return new PluginInstance(value, spec)
-  }
+  constructor(readonly spec: ViewPlugin<any>) {}
 
   takeField<T>(type: PluginField<T>, target: T[]) {
     for (let {field, get} of this.spec.fields) if (field == type) target.push(get(this.value))
   }
 
-  update(update: ViewUpdate) {
-    if (!this.value.update) return this
-    try {
-      this.value.update(update)
-      return this
-    } catch (e) {
-      logException(update.state, e, "CodeMirror plugin crashed")
-      if (this.value.destroy) try { this.value.destroy() } catch (_) {}
-      return PluginInstance.dummy
+  update(view: EditorView) {
+    if (!this.value) {
+      try { this.value = this.spec.create(view) }
+      catch (e) {
+        logException(view.state, e, "CodeMirror plugin crashed")
+        return PluginInstance.dummy
+      }
+    } else if (this.mustUpdate) {
+      let update = this.mustUpdate
+      this.mustUpdate = null
+      if (!this.value.update) return this
+      try {
+        this.value.update(update)
+      } catch (e) {
+        logException(update.state, e, "CodeMirror plugin crashed")
+        if (this.value.destroy) try { this.value.destroy() } catch (_) {}
+        return PluginInstance.dummy
+      }
     }
+    return this
   }
 
   destroy(view: EditorView) {
-    if (this.value.destroy) {
+    if (this.value?.destroy) {
       try { this.value.destroy() }
       catch (e) { logException(view.state, e, "CodeMirror plugin crashed") }
     }
   }
 
-  static dummy = new PluginInstance({}, ViewPlugin.define(() => ({})))
+  static dummy = new PluginInstance(ViewPlugin.define(() => ({})))
 }
 
 export interface MeasureRequest<T> {

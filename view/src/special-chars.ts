@@ -51,7 +51,6 @@ const UnicodeRegexpSupport = /x/.unicode != null ? "gu" : "g"
 
 const specialCharConfig = Facet.define<SpecialCharConfig, Required<SpecialCharConfig> & {replaceTabs?: boolean}>({
   combine(configs) {
-    // FIXME make configurations compose properly
     let config: Required<SpecialCharConfig> & {replaceTabs?: boolean} = combineConfig(configs, {
       render: null,
       specialChars: Specials,
