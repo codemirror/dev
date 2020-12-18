@@ -548,8 +548,7 @@ export const tags = {
   heading6: t(heading),
   /// A prose separator (such as a horizontal rule).
   contentSeparator: t(content),
-  /// [Content](#highlight.tags.content) that represents a list or
-  /// list marker.
+  /// [Content](#highlight.tags.content) that represents a list.
   list: t(content),
   /// [Content](#highlight.tags.content) that represents a quote.
   quote: t(content),
@@ -617,9 +616,7 @@ export const tags = {
 
 /// A default highlight style (works well with light themes).
 export const defaultHighlightStyle = HighlightStyle.define(
-  {tag: tags.deleted,
-   textDecoration: "line-through"},
-  {tag: [tags.inserted, tags.link],
+  {tag: tags.link,
    textDecoration: "underline"},
   {tag: tags.heading,
    textDecoration: "underline",
@@ -630,21 +627,23 @@ export const defaultHighlightStyle = HighlightStyle.define(
    fontWeight: "bold"},
   {tag: tags.keyword,
    color: "#708"},
-  {tag: [tags.atom, tags.bool, tags.url, tags.contentSeparator],
+  {tag: [tags.atom, tags.bool, tags.url, tags.contentSeparator, tags.labelName],
    color: "#219"},
-  {tag: tags.number,
+  {tag: [tags.literal, tags.inserted],
    color: "#164"},
-  {tag: tags.string,
+  {tag: [tags.string, tags.deleted],
    color: "#a11"},
   {tag: [tags.regexp, tags.escape, tags.special(tags.string)],
    color: "#e40"},
   {tag: tags.definition(tags.variableName),
    color: "#00f"},
-  {tag: tags.typeName,
+  {tag: tags.local(tags.variableName),
+   color: "#30a"},
+  {tag: [tags.typeName, tags.namespace],
    color: "#085"},
   {tag: tags.className,
    color: "#167"},
-  {tag: tags.special(tags.variableName),
+  {tag: [tags.special(tags.variableName), tags.macroName, tags.local(tags.variableName)],
    color: "#256"},
   {tag: tags.definition(tags.propertyName),
    color: "#00c"},
