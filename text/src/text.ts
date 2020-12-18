@@ -1,13 +1,17 @@
 const enum Tree {
-  // The branch factor (both in leaf and branch nodes)
-  Branch = 32,
   // The branch factor as an exponent of 2
-  BranchShift = 5
+  BranchShift = 5,
+  // The approximate branch factor of the tree (both in leaf and
+  // branch nodes)
+  Branch = 1 << Tree.BranchShift
 }
 
-const enum O { From = 1, To = 2 }
+// Flags passed to decompose
+const enum Open { From = 1, To = 2 }
 
-/// A text iterator iterates over a sequence of strings.
+/// A text iterator iterates over a sequence of strings. When
+/// iterating over a [`Text`](#text.Text) document, result values will
+/// either be lines or line breaks.
 export interface TextIterator extends Iterator<string> {
   /// Retrieve the next string. Optionally skip a given number of
   /// positions after the current position. Always returns the object
@@ -23,7 +27,7 @@ export interface TextIterator extends Iterator<string> {
   lineBreak: boolean
 }
 
-/// The document tree type.
+/// The data structure for documents.
 export abstract class Text implements Iterable<string> {
   /// The length of the string.
   abstract readonly length: number
@@ -53,9 +57,9 @@ export abstract class Text implements Iterable<string> {
   /// Replace a range of the text with the given content.
   replace(from: number, to: number, text: Text): Text {
     let parts: Text[] = []
-    if (from) this.decompose(0, from, parts, O.To)
-    if (text.length) text.decompose(0, text.length, parts, (from ? O.From : 0) | (to < this.length ? O.To : 0))
-    if (to < this.length) this.decompose(to, this.length, parts, parts.length ? O.From : 0)
+    if (from) this.decompose(0, from, parts, Open.To)
+    if (text.length) text.decompose(0, text.length, parts, (from ? Open.From : 0) | (to < this.length ? Open.To : 0))
+    if (to < this.length) this.decompose(to, this.length, parts, parts.length ? Open.From : 0)
     return TextNode.from(parts, this.length - (to - from) + text.length)
   }
 
@@ -78,7 +82,17 @@ export abstract class Text implements Iterable<string> {
   abstract flatten(target: string[]): void
 
   /// Test whether this text is equal to another instance.
-  eq(other: Text): boolean { return this == other || eqContent(this, other) }
+  eq(other: Text): boolean {
+    if (other == this) return true
+    if (other.length != this.length || other.lines != this.lines) return false
+    let a = new RawTextCursor(this), b = new RawTextCursor(other)
+    for (;;) {
+      a.next()
+      b.next()
+      if (a.lineBreak != b.lineBreak || a.done != b.done || a.value != b.value) return false
+      if (a.done) return true
+    }
+  }
 
   /// Iterate over the text. When `dir` is `-1`, iteration happens
   /// from end to start. This will return lines and the breaks between
@@ -91,7 +105,7 @@ export abstract class Text implements Iterable<string> {
   iterRange(from: number, to: number = this.length): TextIterator { return new PartialTextCursor(this, from, to) }
 
   /// @internal
-  abstract decompose(from: number, to: number, target: Text[], open: O): void
+  abstract decompose(from: number, to: number, target: Text[], open: Open): void
 
   /// @internal
   toString() { return this.sliceString(0) }
@@ -110,7 +124,7 @@ export abstract class Text implements Iterable<string> {
   /// Create a `Text` instance for the given array of lines.
   static of(text: readonly string[]): Text {
     if (text.length == 0) throw new RangeError("A document must have at least one line")
-    if (text.length == 1 && !text[0] && Text.empty) return Text.empty
+    if (text.length == 1 && !text[0]) return Text.empty
     return text.length <= Tree.Branch ? new TextLeaf(text) : TextNode.from(TextLeaf.split(text, []))
   }
 
@@ -121,11 +135,9 @@ export abstract class Text implements Iterable<string> {
 if (typeof Symbol != "undefined")
   Text.prototype[Symbol.iterator] = function() { return this.iter() }
 
-// Leaves store an array of strings. There are always line breaks
-// between these strings (though not between adjacent Text nodes).
-// These are limited in length, so that bigger documents are
-// constructed as a tree structure. Long lines will be broken into a
-// number of single-line leaves.
+// Leaves store an array of line strings. There are always line breaks
+// between these strings. Leaves are limited in size and have to be
+// contained in TextNode instances for bigger documents.
 class TextLeaf extends Text {
   constructor(readonly text: readonly string[], readonly length: number = textLength(text)) {
     super()
@@ -145,10 +157,10 @@ class TextLeaf extends Text {
     }
   }
 
-  decompose(from: number, to: number, target: Text[], open: O) {
+  decompose(from: number, to: number, target: Text[], open: Open) {
     let text = from <= 0 && to >= this.length ? this
       : new TextLeaf(sliceText(this.text, from, to), Math.min(to, this.length) - Math.max(0, from))
-    if (open & O.From) {
+    if (open & Open.From) {
       let prev = target.pop() as TextLeaf
       let joined = appendText(text.text, prev.text.slice(), 0, text.length)
       if (joined.length <= Tree.Branch) {
@@ -205,7 +217,8 @@ class TextLeaf extends Text {
 
 // Nodes provide the tree structure of the `Text` type. They store a
 // number of other nodes or leaves, taking care to balance themselves
-// on changes.
+// on changes. There are implied line breaks _between_ the children of
+// a node (but not before the first or after the last child).
 class TextNode extends Text {
   readonly lines = 0
 
@@ -224,11 +237,11 @@ class TextNode extends Text {
     }
   }
 
-  decompose(from: number, to: number, target: Text[], open: O) {
+  decompose(from: number, to: number, target: Text[], open: Open) {
     for (let i = 0, pos = 0; pos <= to && i < this.children.length; i++) {
       let child = this.children[i], end = pos + child.length
       if (from <= end && to >= pos) {
-        let childOpen = open & ((pos <= from ? O.From : 0) | (end >= to ? O.To : 0))
+        let childOpen = open & ((pos <= from ? Open.From : 0) | (end >= to ? Open.To : 0))
         if (pos >= from && end <= to && !childOpen) target.push(child)
         else child.decompose(from - pos, to - pos, target, childOpen)
       }
@@ -243,9 +256,9 @@ class TextNode extends Text {
       // child's size remains in the acceptable range, only update
       // that child
       if (from >= pos && to <= end) {
-        let updated = child.replace(from - pos, to - pos, text), totalLines
-        if (updated.lines == child.lines ||
-            updated.lines < ((totalLines = this.lines - child.lines + updated.lines) >> Tree.BranchShift - 1) &&
+        let updated = child.replace(from - pos, to - pos, text)
+        let totalLines = this.lines - child.lines + updated.lines
+        if (updated.lines < (totalLines >> (Tree.BranchShift - 1)) &&
             updated.lines > (totalLines >> (Tree.BranchShift + 1))) {
           let copy = this.children.slice()
           copy[i] = updated
@@ -281,7 +294,7 @@ class TextNode extends Text {
       for (let ch of children) ch.flatten(flat)
       return new TextLeaf(flat, length)
     }
-    let chunk = Math.max(Tree.Branch, (lines >> Tree.BranchShift) + 1), maxChunk = chunk << 1, minChunk = chunk >> 1
+    let chunk = Math.max(Tree.Branch, lines >> Tree.BranchShift), maxChunk = chunk << 1, minChunk = chunk >> 1
     let chunked: Text[] = [], currentLines = 0, currentLen = -1, currentChunk: Text[] = []
     function add(child: Text) {
       let last
@@ -316,7 +329,7 @@ class TextNode extends Text {
   }
 }
 
-Text.empty = Text.of([""])
+Text.empty = new TextLeaf([""], 0)
 
 function textLength(text: readonly string[]) {
   let length = -1
@@ -340,36 +353,6 @@ function appendText(text: readonly string[], target: string[], from = 0, to = 1e
 
 function sliceText(text: readonly string[], from?: number, to?: number): string[] {
   return appendText(text, [""], from, to)
-}
-
-function eqContent(a: Text, b: Text): boolean {
-  if (a.length != b.length || a.lines != b.lines) return false
-  let iterA = new RawTextCursor(a), iterB = new RawTextCursor(b)
-  for (let offA = 0, offB = 0;;) {
-    if (iterA.lineBreak != iterB.lineBreak || iterA.done != iterB.done) {
-      return false
-    } else if (iterA.done) {
-      return true
-    } else if (iterA.lineBreak) {
-      iterA.next(); iterB.next()
-      offA = offB = 0
-    } else {
-      let strA = iterA.value.slice(offA), strB = iterB.value.slice(offB)
-      if (strA.length == strB.length) {
-        if (strA != strB) return false
-        iterA.next(); iterB.next()
-        offA = offB = 0
-      } else if (strA.length > strB.length) {
-        if (strA.slice(0, strB.length) != strB) return false
-        offA += strB.length
-        iterB.next(); offB = 0
-      } else {
-        if (strB.slice(0, strA.length) != strA) return false
-        offB += strA.length
-        iterA.next(); offA = 0
-      }
-    }
-  }
 }
 
 class RawTextCursor implements TextIterator {
@@ -449,11 +432,11 @@ class PartialTextCursor implements TextIterator {
     }
   }
 
-  next(): this {
+  next(skip = 0): this {
     if (this.limit <= 0) {
       this.limit = -1
     } else {
-      let {value, lineBreak, done} = this.cursor.next(this.skip)
+      let {value, lineBreak, done} = this.cursor.next(this.skip + skip)
       this.skip = 0
       this.value = value
       let len = lineBreak ? 1 : value.length
@@ -473,15 +456,12 @@ class PartialTextCursor implements TextIterator {
 /// This type describes a line in the document. It is created
 /// on-demand when lines are [queried](#text.Text.lineAt).
 export class Line {
-  /// The document that the line is part of.
-  doc!: Text
-
   /// @internal
   constructor(
     /// The position of the start of the line.
     readonly from: number,
     /// The position at the end of the line (_before_ the line break,
-    /// if this isn't the last line).
+    /// or at the end of document for the last line).
     readonly to: number,
     /// This line's line number (1-based).
     readonly number: number,
