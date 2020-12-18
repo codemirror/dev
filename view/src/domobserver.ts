@@ -136,7 +136,6 @@ export class DOMObserver {
   start() {
     if (this.active) return
     this.observer.observe(this.dom, observeOptions)
-    // FIXME is this shadow-root safe?
     this.dom.ownerDocument!.addEventListener("selectionchange", this.onSelectionChange)
     if (useCharData)
       this.dom.addEventListener("DOMCharacterDataModified", this.onCharData)

@@ -87,9 +87,6 @@ export class LineView extends ContentView implements BlockView {
     return inlineDOMAtPos(this.dom!, this.children, pos)
   }
 
-  // FIXME might need another hack to work around Firefox's behavior
-  // of not actually displaying the cursor even though it's there in
-  // the DOM
   sync(track?: {node: Node, written: boolean}) {
     if (!this.dom) {
       this.setDOM(document.createElement("div"))

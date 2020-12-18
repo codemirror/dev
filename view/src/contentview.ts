@@ -131,7 +131,6 @@ export abstract class ContentView {
             endDOM: toI < this.children.length - 1 && toI >= 0 ? this.children[toI + 1].dom : null}
   }
 
-  // FIXME track precise dirty ranges, to avoid full DOM sync on every touched node?
   markDirty(andParent: boolean = false) {
     if (this.dirty & Dirty.Node) return
     this.dirty |= Dirty.Node
