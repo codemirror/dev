@@ -1,5 +1,5 @@
 import {Text, Line} from "@codemirror/next/text"
-import {EditorState, Transaction, EditorSelection, StateCommand} from "@codemirror/next/state"
+import {EditorState, TransactionSpec, EditorSelection, StateCommand} from "@codemirror/next/state"
 import {KeyBinding} from "@codemirror/next/view"
 
 /// An object of this type can be provided as [language
@@ -13,42 +13,54 @@ export type CommentTokens = {
   line?: string
 }
 
+/// Comment or uncomment the current selection. Will use line comments
+/// if possible, otherwise falling back to block comments.
+export const toggleComment: StateCommand = target => {
+  let config = getConfig(target.state)
+  return config.line ? toggleLineComment(target) : config.block ? toggleBlockComment(target) : false
+}
+
+function command(f: (option: CommentOption, ranges: readonly {readonly from: number, readonly to: number}[],
+                     state: EditorState) => TransactionSpec | null,
+                 option: CommentOption): StateCommand {
+  return ({state, dispatch}) => {
+    let tr = f(option, state.selection.ranges, state)
+    if (!tr) return false
+    dispatch(state.update(tr))
+    return true
+  }
+}
+
 /// Comment or uncomment the current selection using line comments.
 /// The line comment syntax is taken from the
 /// [`commentTokens`](#comment.CommentTokens) [language
 /// data](#state.EditorState.languageData).
-export const toggleLineComment: StateCommand = ({state, dispatch}) =>
-  changeLineComment(CommentOption.Toggle, state.selection.ranges, state, dispatch)
+export const toggleLineComment = command(changeLineComment, CommentOption.Toggle)
 
 /// Comment the current selection using line comments.
-export const lineComment: StateCommand = ({state, dispatch}) =>
-  changeLineComment(CommentOption.Comment, state.selection.ranges, state, dispatch)
+export const lineComment = command(changeLineComment, CommentOption.Comment)
 
 /// Uncomment the current selection using line comments.
-export const lineUncomment: StateCommand = ({state, dispatch}) =>
-  changeLineComment(CommentOption.Uncomment, state.selection.ranges, state, dispatch)
+export const lineUncomment = command(changeLineComment, CommentOption.Uncomment)
 
 /// Comment or uncomment the current selection using block comments.
 /// The block comment syntax is taken from the
 /// [`commentTokens`](#comment.CommentTokens) [language
 /// data](#state.EditorState.languageData).
-export const toggleBlockComment: StateCommand = ({state, dispatch}) =>
-  changeBlockComment(CommentOption.Toggle, state.selection.ranges, state, dispatch)
+export const toggleBlockComment = command(changeBlockComment, CommentOption.Toggle)
 
 /// Comment the current selection using block comments.
-export const blockComment: StateCommand = ({state, dispatch}) =>
-  changeBlockComment(CommentOption.Comment, state.selection.ranges, state, dispatch)
+export const blockComment = command(changeBlockComment, CommentOption.Comment)
 
 /// Uncomment the current selection using block comments.
-export const blockUncomment: StateCommand = ({state, dispatch}) =>
-  changeBlockComment(CommentOption.Uncomment, state.selection.ranges, state, dispatch)
+export const blockUncomment = command(changeBlockComment, CommentOption.Uncomment)
 
 /// Default key bindings for this package.
 ///
-///  - Ctrl-/ (Cmd-/ on macOS): [\`toggleLineComment\`](#comment.toggleLineComment).
+///  - Ctrl-/ (Cmd-/ on macOS): [\`toggleComment\`](#comment.toggleComment).
 ///  - Shift-Alt-a: [\`toggleBlockComment\`](#comment.toggleBlockComment).
 export const commentKeymap: readonly KeyBinding[] = [
-  {key: "Mod-/", run: toggleLineComment},
+  {key: "Mod-/", run: toggleComment},
   {key: "Alt-A", run: toggleBlockComment}
 ]
 
@@ -105,15 +117,14 @@ function findBlockComment(state: EditorState, {open, close}: BlockToken, from: n
 function changeBlockComment(
   option: CommentOption,
   ranges: readonly {readonly from: number, readonly to: number}[],
-  state: EditorState,
-  dispatch: (tr: Transaction) => void
+  state: EditorState
 ) {
   let tokens = ranges.map(r => getConfig(state, r.from).block) as {open: string, close: string}[]
-  if (!tokens.every(c => c)) return false
+  if (!tokens.every(c => c)) return null
   let comments = ranges.map((r, i) => findBlockComment(state, tokens[i], r.from, r.to))
   if (option != CommentOption.Uncomment && !comments.every(c => c)) {
     let index = 0
-    dispatch(state.update(state.changeByRange(range => {
+    return state.changeByRange(range => {
       let {open, close} = tokens[index++]
       if (comments[index]) return {range}
       let shift = open.length + 1
@@ -121,8 +132,7 @@ function changeBlockComment(
         changes: [{from: range.from, insert: open + " "}, {from: range.to, insert: " " + close}],
         range: EditorSelection.range(range.anchor + shift, range.head + shift)
       }
-    })))
-    return true
+    })
   } else if (option != CommentOption.Comment && comments.some(c => c)) {
     let changes = []
     for (let i = 0, comment; i < comments.length; i++) if (comment = comments[i]) {
@@ -132,10 +142,9 @@ function changeBlockComment(
         {from: close.pos - close.margin, to: close.pos + token.close.length}
       )
     }
-    dispatch(state.update({changes}))
-    return true
+    return {changes}
   }
-  return false
+  return null
 }
 
 type LineRange = {
@@ -161,13 +170,12 @@ function findLineComment(token: string, lines: readonly Line[]): LineRange {
 function changeLineComment(
   option: CommentOption,
   ranges: readonly {readonly from: number, readonly to: number}[],
-  state: EditorState,
-  dispatch: (tr: Transaction) => void
+  state: EditorState
 ) {
   let lines: Line[][] = [], tokens: string[] = [], lineRanges: LineRange[] = []
   for (let {from, to} of ranges) {
     let token = getConfig(state, from).line
-    if (!token) return false
+    if (!token) return null
     tokens.push(token)
     let lns = getLinesInRange(state.doc, from, to)
     lines.push(lns)
@@ -181,8 +189,7 @@ function changeLineComment(
           changes.push({from: line.from + lineRange.minCol, insert: tokens[i] + " "})
       }
     }
-    dispatch(state.update({changes}))
-    return true
+    return {changes}
   } else if (option != CommentOption.Comment && lineRanges.some(c => c.commented)) {
     let changes = []
     for (let i = 0, lineRange; i < ranges.length; i++) if ((lineRange = lineRanges[i]).commented) {
@@ -195,10 +202,9 @@ function changeLineComment(
         changes.push({from: pos, to: pos + token.length + marginLen})
       }
     }
-    dispatch(state.update({changes}))
-    return true
+    return {changes}
   }
-  return false
+  return null
 }
 
 function getLinesInRange(doc: Text, from: number, to: number): Line[] {
