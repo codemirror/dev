@@ -5,7 +5,10 @@ import {EditorSelection, SelectionRange} from "@codemirror/next/state"
 export enum Direction {
   // (These are chosen to match the base levels, in bidi algorithm
   // terms, of spans in that direction.)
-  LTR = 0, RTL = 1
+  /// Left-to-right.
+  LTR = 0,
+  /// Right-to-left
+  RTL = 1
 }
 
 const LTR = Direction.LTR, RTL = Direction.RTL

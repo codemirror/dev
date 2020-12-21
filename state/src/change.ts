@@ -235,6 +235,10 @@ export class ChangeSet extends ChangeDesc {
 
   /// Iterate over the changed ranges in the document, calling `f` for
   /// each.
+  ///
+  /// When `individual` is true, adjacent changes (which are kept
+  /// separate for [position mapping](#state.ChangeDesc.mapPos)) are
+  /// reported separately.
   iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: Text) => void, individual = false) {
     iterChanges(this, f, individual)
   }
