@@ -7,7 +7,7 @@ import {EditorSelection, Transaction, Annotation, Text} from "@codemirror/next/s
 
 export function applyDOMChange(view: EditorView, start: number, end: number, typeOver: boolean) {
   let change: undefined | {from: number, to: number, insert: Text}, newSel
-  let sel = view.state.selection.primary, bounds
+  let sel = view.state.selection.main, bounds
   if (start > -1 && (bounds = view.docView.domBoundsAround(start, end, 0))) {
     let {from, to} = bounds
     let selPoints = view.docView.impreciseHead || view.docView.impreciseAnchor ? [] : selectionPoints(view.contentDOM, view.root)
@@ -28,10 +28,10 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   } else if (view.hasFocus) {
     let domSel = getSelection(view.root)
     let {impreciseHead: iHead, impreciseAnchor: iAnchor} = view.docView
-    let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ? view.state.selection.primary.head
+    let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ? view.state.selection.main.head
       : view.docView.posFromDOM(domSel.focusNode!, domSel.focusOffset)
     let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset
-      ? view.state.selection.primary.anchor
+      ? view.state.selection.main.anchor
       : selectionCollapsed(domSel) ? head : view.docView.posFromDOM(domSel.anchorNode!, domSel.anchorOffset)
     if (head != sel.head || anchor != sel.anchor)
       newSel = EditorSelection.single(anchor, head)
@@ -40,7 +40,7 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
   if (!change && !newSel) return
 
   // Heuristic to notice typing over a selected character
-  if (!change && typeOver && !sel.empty && newSel && newSel.primary.empty)
+  if (!change && typeOver && !sel.empty && newSel && newSel.main.empty)
     change = {from: sel.from, to: sel.to, insert: view.state.doc.slice(sel.from, sel.to)}
 
   if (change) {
@@ -73,12 +73,12 @@ export function applyDOMChange(view: EditorView, start: number, end: number, typ
       let changes = startState.changes(change)
       tr = {
         changes,
-        selection: newSel && !startState.selection.primary.eq(newSel.primary) && newSel.primary.to <= changes.newLength
-          ? startState.selection.replaceRange(newSel.primary) : undefined
+        selection: newSel && !startState.selection.main.eq(newSel.main) && newSel.main.to <= changes.newLength
+          ? startState.selection.replaceRange(newSel.main) : undefined
       }
     }
     view.dispatch(tr, {scrollIntoView: true, annotations: Transaction.userEvent.of("input")})
-  } else if (newSel && !newSel.primary.eq(sel)) {
+  } else if (newSel && !newSel.main.eq(sel)) {
     let scrollIntoView = false, annotations: Annotation<any> | undefined
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
       if (view.inputState.lastSelectionOrigin == "keyboardselection") scrollIntoView = true

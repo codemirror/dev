@@ -141,7 +141,7 @@ export interface CompletionResult {
   /// The start of the range that is being completed.
   from: number,
   /// The end of the range that is being completed. Defaults to the
-  /// primary cursor position.
+  /// main cursor position.
   to?: number,
   /// The completions
   options: readonly Completion[],
@@ -160,7 +160,7 @@ export class Option {
               readonly match: readonly number[]) {}
 }
 
-export function cur(state: EditorState) { return state.selection.primary.head }
+export function cur(state: EditorState) { return state.selection.main.head }
 
 // Make sure the given regexp has a $ at its end and, if `start` is
 // true, a ^ at its start.

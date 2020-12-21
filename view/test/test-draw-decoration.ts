@@ -348,7 +348,7 @@ describe("EditorView decoration", () => {
       sel.removeAllRanges()
       sel.addRange(range)
       cm.observer.flush()
-      let {anchor, head} = cm.state.selection.primary
+      let {anchor, head} = cm.state.selection.main
       ist(head, 7)
       ist(anchor, 2)
     })

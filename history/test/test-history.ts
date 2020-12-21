@@ -237,7 +237,7 @@ describe("history", () => {
     state = state.update({changes: {from: 1, insert: "b"}, selection: {anchor: 2}}).state
     state = command(state, undo)
     ist(state.doc.toString(), "")
-    ist(state.selection.primary.anchor, 0)
+    ist(state.selection.main.anchor, 0)
   })
 
   it("doesn't merge document changes if there's a selection change in between", () => {
@@ -294,10 +294,10 @@ describe("history", () => {
 
   it("doesn't undo selection-only transactions", () => {
     let state = mkState(undefined, "abc")
-    ist(state.selection.primary.head, 0)
+    ist(state.selection.main.head, 0)
     state = state.update({selection: {anchor: 2}}).state
     state = command(state, undo, false)
-    ist(state.selection.primary.head, 2)
+    ist(state.selection.main.head, 2)
   })
 
   it("isolates transactions when asked to", () => {
@@ -343,39 +343,39 @@ describe("history", () => {
 
     it("allows to undo selection-only transactions", () => {
       let state = mkState(undefined, "abc")
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
       state = state.update({selection: {anchor: 2}}).state
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
     })
 
     it("merges selection-only transactions from keyboard", () => {
       let state = mkState(undefined, "abc")
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
       state = state.update({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = state.update({selection: {anchor: 3}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = state.update({selection: {anchor: 1}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
     })
 
     it("doesn't merge selection-only transactions from other sources", () => {
       let state = mkState(undefined, "abc")
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
       state = state.update({selection: {anchor: 2}}).state
       state = state.update({selection: {anchor: 3}}).state
       state = state.update({selection: {anchor: 1}}).state
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 3)
+      ist(state.selection.main.head, 3)
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 2)
+      ist(state.selection.main.head, 2)
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
     })
 
     it("doesn't merge selection-only transactions if they change the number of selections", () => {
       let state = mkState(undefined, "abc")
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
       state = state.update({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = state.update({selection: EditorSelection.create([EditorSelection.cursor(1), EditorSelection.cursor(3)]),
                         annotations: Transaction.userEvent.of("keyboardselection")}).state
@@ -383,20 +383,20 @@ describe("history", () => {
       state = command(state, undoSelection)
       ist(state.selection.ranges.length, 2)
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
     })
 
     it("doesn't merge selection-only transactions if a selection changes empty state", () => {
       let state = mkState(undefined, "abc")
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
       state = state.update({selection: {anchor: 2}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = state.update({selection: {anchor: 2, head: 3}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = state.update({selection: {anchor: 1}, annotations: Transaction.userEvent.of("keyboardselection")}).state
       state = command(state, undoSelection)
-      ist(state.selection.primary.anchor, 2)
-      ist(state.selection.primary.head, 3)
+      ist(state.selection.main.anchor, 2)
+      ist(state.selection.main.head, 3)
       state = command(state, undoSelection)
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
     })
 
     it("allows to redo a change", () => {
@@ -409,11 +409,11 @@ describe("history", () => {
 
     it("allows to redo selection-only transactions", () => {
       let state = mkState(undefined, "abc")
-      ist(state.selection.primary.head, 0)
+      ist(state.selection.main.head, 0)
       state = state.update({selection: {anchor: 2}}).state
       state = command(state, undoSelection)
       state = command(state, redoSelection)
-      ist(state.selection.primary.head, 2)
+      ist(state.selection.main.head, 2)
     })
 
     it("only changes selection", () => {

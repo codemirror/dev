@@ -69,7 +69,7 @@ export class DOMObserver {
       // us a selection change event before the DOM changes are
       // reported.
       // (Selection.isCollapsed isn't reliable on IE)
-      if (browser.ie && browser.ie_version <= 11 && !this.view.state.selection.primary.empty &&
+      if (browser.ie && browser.ie_version <= 11 && !this.view.state.selection.main.empty &&
           sel.focusNode && isEquivalentPosition(sel.focusNode, sel.focusOffset, sel.anchorNode, sel.anchorOffset))
         this.flushSoon()
       else

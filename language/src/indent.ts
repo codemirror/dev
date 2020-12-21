@@ -294,9 +294,9 @@ const DontIndentBeyond = 200
 export function indentOnInput(): Extension {
   return EditorState.transactionFilter.of(tr => {
     if (!tr.docChanged || tr.annotation(Transaction.userEvent) != "input") return tr
-    let rules = tr.startState.languageDataAt<RegExp>("indentOnInput", tr.startState.selection.primary.head)
+    let rules = tr.startState.languageDataAt<RegExp>("indentOnInput", tr.startState.selection.main.head)
     if (!rules.length) return tr
-    let doc = tr.newDoc, {head} = tr.newSelection.primary, line = doc.lineAt(head)
+    let doc = tr.newDoc, {head} = tr.newSelection.main, line = doc.lineAt(head)
     if (head > line.from + DontIndentBeyond) return tr
     let lineStart = doc.sliceString(line.from, head)
     if (!rules.some(r => r.test(lineStart))) return tr

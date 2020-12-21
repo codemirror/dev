@@ -96,12 +96,12 @@ function findNextMatch(doc: Text, from: number, query: Query) {
 }
 
 /// Open the search panel if it isn't already open, and move the
-/// selection to the first match after the current primary selection.
+/// selection to the first match after the current main selection.
 /// Will wrap around to the start of the document when it reaches the
 /// end.
 export const findNext = searchCommand((view, state) => {
-  let {from, to} = view.state.selection.primary
-  let next = findNextMatch(view.state.doc, view.state.selection.primary.from + 1, state.query)
+  let {from, to} = view.state.selection.main
+  let next = findNextMatch(view.state.doc, view.state.selection.main.from + 1, state.query)
   if (!next || next.from == from && next.to == to) return false
   view.dispatch({selection: {anchor: next.from, head: next.to}, scrollIntoView: true})
   maybeAnnounceMatch(view)
@@ -124,12 +124,12 @@ function findPrevInRange(query: Query, doc: Text, from: number, to: number) {
 }
 
 /// Move the selection to the previous instance of the search query,
-/// before the current primary selection. Will wrap past the start
+/// before the current main selection. Will wrap past the start
 /// of the document to start searching at the end again.
 export const findPrevious = searchCommand((view, {query}) => {
   let {state} = view
-  let range = findPrevInRange(query, state.doc, 0, state.selection.primary.to - 1) ||
-    findPrevInRange(query, state.doc, state.selection.primary.from + 1, state.doc.length)
+  let range = findPrevInRange(query, state.doc, 0, state.selection.main.to - 1) ||
+    findPrevInRange(query, state.doc, state.selection.main.from + 1, state.doc.length)
   if (!range) return false
   view.dispatch({selection: {anchor: range.from, head: range.to}, scrollIntoView: true})
   maybeAnnounceMatch(view)
@@ -148,23 +148,23 @@ export const selectMatches = searchCommand((view, {query}) => {
 /// Select all instances of the currently selected text.
 export const selectSelectionMatches: StateCommand = ({state, dispatch}) => {
   let sel = state.selection
-  if (sel.ranges.length > 1 || sel.primary.empty) return false
-  let {from, to} = sel.primary
-  let ranges = [], primary = 0
+  if (sel.ranges.length > 1 || sel.main.empty) return false
+  let {from, to} = sel.main
+  let ranges = [], main = 0
   for (let cur = new SearchCursor(state.doc, state.sliceDoc(from, to)); !cur.next().done;) {
     if (ranges.length > 1000) return false
-    if (cur.value.from == from) primary = ranges.length
+    if (cur.value.from == from) main = ranges.length
     ranges.push(EditorSelection.range(cur.value.from, cur.value.to))
   }
-  dispatch(state.update({selection: new EditorSelection(ranges, primary)}))
+  dispatch(state.update({selection: new EditorSelection(ranges, main)}))
   return true
 }
 
 /// Replace the current match of the search query.
 export const replaceNext = searchCommand((view, {query}) => {
-  let {state} = view, next = findNextMatch(state.doc, state.selection.primary.from, query)
+  let {state} = view, next = findNextMatch(state.doc, state.selection.main.from, query)
   if (!next) return false
-  let {from, to} = state.selection.primary, changes = [], selection: {anchor: number, head: number} | undefined
+  let {from, to} = state.selection.main, changes = [], selection: {anchor: number, head: number} | undefined
   if (next.from == from && next.to == to) {
     changes.push({from: next.from, to: next.to, insert: query.replace})
     next = findNextMatch(state.doc, next.to, query)
@@ -318,7 +318,7 @@ const Break = /[\s\.,:;?!]/
 
 // FIXME this is a kludge
 function maybeAnnounceMatch(view: EditorView) {
-  let {from, to} = view.state.selection.primary
+  let {from, to} = view.state.selection.main
   let lineStart = view.state.doc.lineAt(from).from, lineEnd = view.state.doc.lineAt(to).to
   let start = Math.max(lineStart, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin)
   let text = view.state.sliceDoc(start, end)

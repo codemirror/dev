@@ -46,7 +46,7 @@ describe("DOM changes", () => {
     cm.inputState.lastKeyCode = 8
     cm.inputState.lastKeyTime = Date.now()
     flush(cm)
-    ist(cm.state.selection.primary.anchor, 1)
+    ist(cm.state.selection.main.anchor, 1)
   })
 
   it("notices text changes at the end of a long document", () => {

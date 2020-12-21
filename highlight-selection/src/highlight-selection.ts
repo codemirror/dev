@@ -110,7 +110,7 @@ const matchHighlighter = ViewPlugin.fromClass(class {
     let conf = view.state.facet(highlightConfig)
     let {state} = view, sel = state.selection
     if (sel.ranges.length > 1) return Decoration.none
-    let range = sel.primary, query, check = null
+    let range = sel.main, query, check = null
     if (range.empty) {
       if (!conf.highlightWordAroundCursor) return Decoration.none
       check = state.charCategorizer(range.head)

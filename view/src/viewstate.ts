@@ -151,7 +151,7 @@ export class ViewState {
     if (scrollTo) this.scrollTo = scrollTo
 
     if (!this.mustEnforceCursorAssoc && update.selectionSet && update.view.lineWrapping &&
-        update.state.selection.primary.empty && update.state.selection.primary.assoc)
+        update.state.selection.main.empty && update.state.selection.main.assoc)
       this.mustEnforceCursorAssoc = true
   }
 
@@ -300,7 +300,7 @@ export class ViewState {
         viewFrom = findPosition(structure, this.pixelViewport.left / totalWidth)
         viewTo = findPosition(structure, this.pixelViewport.right / totalWidth)
       }
-      let sel = this.state.selection.primary
+      let sel = this.state.selection.main
       // Make sure the gap doesn't cover a selection end
       if (sel.from <= viewFrom && sel.to >= line.from) viewFrom = sel.from
       if (sel.from <= line.to && sel.to >= viewTo) viewTo = sel.to

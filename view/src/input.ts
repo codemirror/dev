@@ -207,7 +207,7 @@ class MouseSelection {
 
   select(event: MouseEvent) {
     let selection = this.style.get(event, this.extend, this.multiple)
-    if (!selection.eq(this.view.state.selection) || selection.primary.assoc != this.view.state.selection.primary.assoc)
+    if (!selection.eq(this.view.state.selection) || selection.main.assoc != this.view.state.selection.main.assoc)
       this.view.dispatch({
         selection,
         annotations: Transaction.userEvent.of("pointerselection"),
@@ -232,8 +232,8 @@ function dragMovesSelection(view: EditorView, event: MouseEvent) {
 }
 
 function isInPrimarySelection(view: EditorView, event: MouseEvent) {
-  let {primary} = view.state.selection
-  if (primary.empty) return false
+  let {main} = view.state.selection
+  if (main.empty) return false
   // On boundary clicks, check whether the coordinates are inside the
   // selection's client rectangles
   let sel = getSelection(view.root)
@@ -413,7 +413,7 @@ function basicMouseSelection(view: EditorView, event: MouseEvent) {
         range = from < range.from ? EditorSelection.range(from, to) : EditorSelection.range(to, from)
       }
       if (extend)
-        return startSel.replaceRange(startSel.primary.extend(range.from, range.to))
+        return startSel.replaceRange(startSel.main.extend(range.from, range.to))
       else if (multiple)
         return startSel.addRange(range)
       else
@@ -423,12 +423,12 @@ function basicMouseSelection(view: EditorView, event: MouseEvent) {
 }
 
 handlers.dragstart = (view, event: DragEvent) => {
-  let {selection: {primary}} = view.state
+  let {selection: {main}} = view.state
   let {mouseSelection} = view.inputState
-  if (mouseSelection) mouseSelection.dragging = primary
+  if (mouseSelection) mouseSelection.dragging = main
 
   if (event.dataTransfer) {
-    event.dataTransfer.setData("Text", view.state.sliceDoc(primary.from, primary.to))
+    event.dataTransfer.setData("Text", view.state.sliceDoc(main.from, main.to))
     event.dataTransfer.effectAllowed = "copyMove"
   }
 }

@@ -176,7 +176,7 @@ export const closeLintPanel: Command = (view: EditorView) => {
 export const nextDiagnostic: Command = (view: EditorView) => {
   let field = view.state.field(lintState, false)
   if (!field) return false
-  let sel = view.state.selection.primary, next = field.diagnostics.iter(sel.to + 1)
+  let sel = view.state.selection.main, next = field.diagnostics.iter(sel.to + 1)
   if (!next.value) {
     next = field.diagnostics.iter(0)
     if (!next.value || next.from == sel.from && next.to == sel.to) return false

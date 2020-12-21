@@ -8,7 +8,7 @@ import {syntaxTree, IndentContext, getIndentUnit, indentUnit, indentString,
 import {SyntaxNode, NodeProp} from "lezer-tree"
 
 function updateSel(sel: EditorSelection, by: (range: SelectionRange) => SelectionRange) {
-  return EditorSelection.create(sel.ranges.map(by), sel.primaryIndex)
+  return EditorSelection.create(sel.ranges.map(by), sel.mainIndex)
 }
 
 function setSel(state: EditorState, selection: EditorSelection | {anchor: number, head?: number}) {
@@ -242,13 +242,13 @@ export const cursorDocEnd: StateCommand = ({state, dispatch}) => {
 
 /// Move the selection head to the start of the document.
 export const selectDocStart: StateCommand = ({state, dispatch}) => {
-  dispatch(setSel(state, {anchor: state.selection.primary.anchor, head: 0}))
+  dispatch(setSel(state, {anchor: state.selection.main.anchor, head: 0}))
   return true
 }
 
 /// Move the selection head to the end of the document.
 export const selectDocEnd: StateCommand = ({state, dispatch}) => {
-  dispatch(setSel(state, {anchor: state.selection.primary.anchor, head: state.doc.length}))
+  dispatch(setSel(state, {anchor: state.selection.main.anchor, head: state.doc.length}))
   return true
 }
 
@@ -283,12 +283,12 @@ export const selectParentSyntax: StateCommand = ({state, dispatch}) => {
 }
 
 /// Simplify the current selection. When multiple ranges are selected,
-/// reduce it to its primary range. Otherwise, if the selection is
+/// reduce it to its main range. Otherwise, if the selection is
 /// non-empty, convert it to a cursor selection.
 export const simplifySelection: StateCommand = ({state, dispatch}) => {
   let cur = state.selection, selection = null
-  if (cur.ranges.length > 1) selection = new EditorSelection([cur.primary])
-  else if (!cur.primary.empty) selection = new EditorSelection([EditorSelection.cursor(cur.primary.head)])
+  if (cur.ranges.length > 1) selection = new EditorSelection([cur.main])
+  else if (!cur.main.empty) selection = new EditorSelection([EditorSelection.cursor(cur.main.head)])
   if (!selection) return false
   dispatch(setSel(state, selection))
   return true

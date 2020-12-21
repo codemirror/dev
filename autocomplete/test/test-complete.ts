@@ -104,14 +104,14 @@ function once(c: CompletionSource): CompletionSource {
 function options(s: EditorState) { return currentCompletions(s).map(c => c.label).join(" ") }
 
 function type(view: EditorView, text: string) {
-  let cur = view.state.selection.primary.head
+  let cur = view.state.selection.main.head
   view.dispatch({changes: {from: cur, insert: text},
                  selection: {anchor: cur + text.length},
                  annotations: Transaction.userEvent.of("input")})
 }
 
 function del(view: EditorView) {
-  let cur = view.state.selection.primary.head
+  let cur = view.state.selection.main.head
   view.dispatch({changes: {from: cur - 1, to: cur},
                  annotations: Transaction.userEvent.of("delete")})
 }

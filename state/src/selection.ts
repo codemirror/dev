@@ -97,22 +97,22 @@ export class EditorSelection {
     /// The ranges in the selection, sorted by position. Ranges cannot
     /// overlap (but they may touch, if they aren't empty).
     readonly ranges: readonly SelectionRange[],
-    /// The index of the _primary_ range in the selection (which is
+    /// The index of the _main_ range in the selection (which is
     /// usually the range that was added last).
-    readonly primaryIndex: number = 0
+    readonly mainIndex: number = 0
   ) {}
 
   /// Map a selection through a mapping. Mostly used to adjust the
   /// selection position for changes.
   map(mapping: ChangeDesc): EditorSelection {
     if (mapping.empty) return this
-    return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.primaryIndex)
+    return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.mainIndex)
   }
 
   /// Compare this selection to another selection.
   eq(other: EditorSelection): boolean {
     if (this.ranges.length != other.ranges.length ||
-        this.primaryIndex != other.primaryIndex) return false
+        this.mainIndex != other.mainIndex) return false
     for (let i = 0; i < this.ranges.length; i++)
       if (!this.ranges[i].eq(other.ranges[i])) return false
     return true
@@ -121,38 +121,38 @@ export class EditorSelection {
   /// Get the primary selection range. Usually, you should make sure
   /// your code applies to _all_ ranges, by using methods like
   /// [`changeByRange`](#state.EditorState.changeByRange).
-  get primary(): SelectionRange { return this.ranges[this.primaryIndex] }
+  get main(): SelectionRange { return this.ranges[this.mainIndex] }
 
   /// Make sure the selection only has one range. Returns a selection
-  /// holding only the primary range from this selection.
+  /// holding only the main range from this selection.
   asSingle() {
-    return this.ranges.length == 1 ? this : new EditorSelection([this.primary])
+    return this.ranges.length == 1 ? this : new EditorSelection([this.main])
   }
 
   /// Extend this selection with an extra range.
-  addRange(range: SelectionRange, primary: boolean = true) {
-    return EditorSelection.create([range].concat(this.ranges), primary ? 0 : this.primaryIndex + 1)
+  addRange(range: SelectionRange, main: boolean = true) {
+    return EditorSelection.create([range].concat(this.ranges), main ? 0 : this.mainIndex + 1)
   }
 
   /// Replace a given range with another range, and then normalize the
   /// selection to merge and sort ranges if necessary.
-  replaceRange(range: SelectionRange, which: number = this.primaryIndex) {
+  replaceRange(range: SelectionRange, which: number = this.mainIndex) {
     let ranges = this.ranges.slice()
     ranges[which] = range
-    return EditorSelection.create(ranges, this.primaryIndex)
+    return EditorSelection.create(ranges, this.mainIndex)
   }
 
   /// Convert this selection to an object that can be serialized to
   /// JSON.
   toJSON(): any {
-    return {ranges: this.ranges.map(r => r.toJSON()), primaryIndex: this.primaryIndex}
+    return {ranges: this.ranges.map(r => r.toJSON()), main: this.mainIndex}
   }
 
   /// Create a selection from a JSON representation.
   static fromJSON(json: any): EditorSelection {
-    if (!json || !Array.isArray(json.ranges) || typeof json.primaryIndex != "number" || json.primaryIndex >= json.ranges.length)
+    if (!json || !Array.isArray(json.ranges) || typeof json.main != "number" || json.main >= json.ranges.length)
       throw new RangeError("Invalid JSON representation for EditorSelection")
-    return new EditorSelection(json.ranges.map((r: any) => SelectionRange.fromJSON(r)), json.primaryIndex)
+    return new EditorSelection(json.ranges.map((r: any) => SelectionRange.fromJSON(r)), json.main)
   }
 
   /// Create a selection holding a single range.
@@ -162,14 +162,14 @@ export class EditorSelection {
 
   /// Sort and merge the given set of ranges, creating a valid
   /// selection.
-  static create(ranges: readonly SelectionRange[], primaryIndex: number = 0) {
+  static create(ranges: readonly SelectionRange[], mainIndex: number = 0) {
     if (ranges.length == 0) throw new RangeError("A selection needs at least one range")
     for (let pos = 0, i = 0; i < ranges.length; i++) {
       let range = ranges[i]
-      if (range.empty ? range.from <= pos : range.from < pos) return normalized(ranges.slice(), primaryIndex)
+      if (range.empty ? range.from <= pos : range.from < pos) return normalized(ranges.slice(), mainIndex)
       pos = range.to
     }
-    return new EditorSelection(ranges, primaryIndex)
+    return new EditorSelection(ranges, mainIndex)
   }
 
   /// Create a cursor selection range at the given position. You can
@@ -189,19 +189,19 @@ export class EditorSelection {
   }
 }
 
-function normalized(ranges: SelectionRange[], primaryIndex: number = 0): EditorSelection {
-  let primary = ranges[primaryIndex]
+function normalized(ranges: SelectionRange[], mainIndex: number = 0): EditorSelection {
+  let main = ranges[mainIndex]
   ranges.sort((a, b) => a.from - b.from)
-  primaryIndex = ranges.indexOf(primary)
+  mainIndex = ranges.indexOf(main)
   for (let i = 1; i < ranges.length; i++) {
     let range = ranges[i], prev = ranges[i - 1]
     if (range.empty ? range.from <= prev.to : range.from < prev.to) {
       let from = prev.from, to = Math.max(range.to, prev.to)
-      if (i <= primaryIndex) primaryIndex--
+      if (i <= mainIndex) mainIndex--
       ranges.splice(--i, 2, range.anchor > range.head ? EditorSelection.range(to, from) : EditorSelection.range(from, to))
     }
   }
-  return new EditorSelection(ranges, primaryIndex)
+  return new EditorSelection(ranges, mainIndex)
 }
 
 export function checkSelection(selection: EditorSelection, docLength: number) {

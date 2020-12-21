@@ -18,7 +18,7 @@ describe("EditorView selection", () => {
       setDOMSel(node, offset)
       cm.contentDOM.focus()
       cm.observer.flush()
-      ist(cm.state.selection.primary.head, expected)
+      ist(cm.state.selection.main.head, expected)
     }
     let one = cm.contentDOM.firstChild!.firstChild!
     let three = cm.contentDOM.lastChild!.firstChild!

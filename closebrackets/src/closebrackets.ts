@@ -41,8 +41,8 @@ const bracketState = StateField.define<RangeSet<typeof closedBracket>>({
   create() { return RangeSet.empty },
   update(value, tr) {
     if (tr.selection) {
-      let lineStart = tr.state.doc.lineAt(tr.selection.primary.head).from
-      let prevLineStart = tr.startState.doc.lineAt(tr.startState.selection.primary.head).from
+      let lineStart = tr.state.doc.lineAt(tr.selection.main.head).from
+      let prevLineStart = tr.startState.doc.lineAt(tr.startState.selection.main.head).from
       if (lineStart != tr.changes.mapPos(prevLineStart, -1))
         value = RangeSet.empty
     }
@@ -77,7 +77,7 @@ function config(state: EditorState, pos: number) {
 
 function handleInput(view: EditorView, from: number, to: number, insert: string) {
   if (view.composing) return false
-  let sel = view.state.selection.primary
+  let sel = view.state.selection.main
   if (insert.length > 2 || insert.length == 2 && codePointSize(codePointAt(insert, 0)) == 1 ||
       from != sel.from || to != sel.to) return false
   let tr = handleInsertion(view.state, insert)
@@ -89,7 +89,7 @@ function handleInput(view: EditorView, from: number, to: number, insert: string)
 /// Command that implements deleting a pair of matching brackets when
 /// the cursor is between them.
 export const deleteBracketPair: StateCommand = ({state, dispatch}) => {
-  let conf = config(state, state.selection.primary.head)
+  let conf = config(state, state.selection.main.head)
   let tokens = conf.brackets || defaults.brackets
   let dont = null, changes = state.changeByRange(range => {
     if (range.empty) {
@@ -115,14 +115,14 @@ export const closeBracketsKeymap: readonly KeyBinding[] = [
 
 /// Implements the extension's behavior on text insertion. @internal
 export function handleInsertion(state: EditorState, ch: string): Transaction | null {
-  let conf = config(state, state.selection.primary.head)
+  let conf = config(state, state.selection.main.head)
   let tokens = conf.brackets || defaults.brackets
   for (let tok of tokens) {
     let closed = closing(codePointAt(tok, 0))
     if (ch == tok)
       return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1) 
         : handleOpen(state, tok, closed, conf.before || defaults.before)
-    if (ch == closed && closedBracketAt(state, state.selection.primary.from))
+    if (ch == closed && closedBracketAt(state, state.selection.main.from))
       return handleClose(state, tok, closed)
   }
   return null
@@ -171,7 +171,7 @@ function handleClose(state: EditorState, _open: string, close: string) {
     return dont = range
   })
   return dont ? null : state.update({
-    selection: EditorSelection.create(moved, state.selection.primaryIndex),
+    selection: EditorSelection.create(moved, state.selection.mainIndex),
     scrollIntoView: true,
     effects: state.selection.ranges.map(({from}) => skipBracketEffect.of(from))
   })

@@ -66,7 +66,7 @@ export const commentKeymap: readonly KeyBinding[] = [
 
 const enum CommentOption { Toggle, Comment, Uncomment }
 
-function getConfig(state: EditorState, pos = state.selection.primary.head) {
+function getConfig(state: EditorState, pos = state.selection.main.head) {
   let data = state.languageDataAt<CommentTokens>("commentTokens", pos)
   return data.length ? data[0] : {}
 }

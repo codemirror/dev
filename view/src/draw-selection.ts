@@ -112,7 +112,7 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
     let rangePieces = state.selection.ranges.map(r => r.empty ? [] : measureRange(this.view, r)).reduce((a, b) => a.concat(b))
     let cursors = []
     for (let r of state.selection.ranges) {
-      let prim = r == state.selection.primary
+      let prim = r == state.selection.main
       if (r.empty ? !prim || CanHidePrimary : conf.drawRangeCursor) {
         let piece = measureCursor(this.view, r, prim)
         if (piece) cursors.push(piece)

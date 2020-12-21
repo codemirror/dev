@@ -4,10 +4,10 @@ import {EditorSelection} from "@codemirror/next/state"
 describe("EditorSelection", () => {
   it("stores ranges with a primary range", () => {
     let sel = EditorSelection.create([EditorSelection.range(0, 1), EditorSelection.range(3, 2), EditorSelection.range(4, 5)], 1)
-    ist(sel.primary.from, 2)
-    ist(sel.primary.to, 3)
-    ist(sel.primary.anchor, 3)
-    ist(sel.primary.head, 2)
+    ist(sel.main.from, 2)
+    ist(sel.main.to, 3)
+    ist(sel.main.anchor, 3)
+    ist(sel.main.head, 2)
     ist(sel.ranges.map(r => r.anchor + "/" + r.head).join(","), "0/1,3/2,4/5")
   })
 

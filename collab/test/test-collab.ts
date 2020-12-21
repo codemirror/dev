@@ -47,7 +47,7 @@ class DummyServer {
     this.broadcast(n)
   }
 
-  type(n: number, text: string, pos: number = this.states[n].selection.primary.head) {
+  type(n: number, text: string, pos: number = this.states[n].selection.main.head) {
     this.update(n, s => s.update({changes: {from: pos, insert: text}, selection: {anchor: pos + text.length}}))
   }
 
@@ -184,7 +184,7 @@ describe("collab", () => {
     s.undo(0)
     s.undo(0)
     s.conv("o!")
-    ist(s.states[0].selection.primary.head, 0)
+    ist(s.states[0].selection.main.head, 0)
   })
 
   it("handles conflicting steps", () => {

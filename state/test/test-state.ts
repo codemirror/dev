@@ -5,7 +5,7 @@ describe("EditorState", () => {
   it("holds doc and selection properties", () => {
     let state = EditorState.create({doc: "hello"})
     ist(state.doc.toString(), "hello")
-    ist(state.selection.primary.from, 0)
+    ist(state.selection.main.from, 0)
   })
 
   it("can apply changes", () => {
@@ -133,7 +133,7 @@ describe("EditorState", () => {
       state = state.update(state.changeByRange(r => ({changes: {from: r.from, to: r.from + 1, insert: "q"},
                                                       range: EditorSelection.cursor(r.from + 1)}))).state
       ist(state.doc.toString(), "qi")
-      ist(state.selection.primary.from, 1)
+      ist(state.selection.main.from, 1)
     })
 
     it("does the right thing when there are multiple selections", () => {
@@ -160,7 +160,7 @@ describe("EditorState", () => {
       ], doc: "one two"})
       let tr1 = state.update({changes: {from: 3, insert: " three"}, selection: {anchor: 13}})
       ist(tr1.state.doc.toString(), "one two")
-      ist(tr1.state.selection.primary.head, 7)
+      ist(tr1.state.selection.main.head, 7)
       let tr2 = state.update({changes: {from: 4, to: 7, insert: "2"}})
       ist(tr2.state.doc.toString(), "one 2")
     })
@@ -193,13 +193,13 @@ describe("EditorState", () => {
     it("can constrain the selection", () => {
       let state = EditorState.create({
         extensions: EditorState.transactionFilter.of(tr => {
-          if (tr.selection && tr.selection.primary.to > 4) return [tr, {selection: {anchor: 4}}]
+          if (tr.selection && tr.selection.main.to > 4) return [tr, {selection: {anchor: 4}}]
           else return tr
         }),
         doc: "one two"
       })
-      ist(state.update({selection: {anchor: 3}}).selection!.primary.to, 3)
-      ist(state.update({selection: {anchor: 7}}).selection!.primary.to, 4)
+      ist(state.update({selection: {anchor: 3}}).selection!.main.to, 3)
+      ist(state.update({selection: {anchor: 7}}).selection!.main.to, 4)
     }),
 
     it("can append sequential changes", () => {

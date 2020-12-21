@@ -150,7 +150,7 @@ export class EditorState {
     }
     return {
       changes,
-      selection: EditorSelection.create(ranges, sel.primaryIndex),
+      selection: EditorSelection.create(ranges, sel.mainIndex),
       effects
     }
   }

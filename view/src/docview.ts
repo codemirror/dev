@@ -86,8 +86,8 @@ export class DocView extends ContentView {
     let pointerSel = update.transactions.some(tr => tr.annotation(Transaction.userEvent) == "pointerselection")
     if (this.dirty == Dirty.Not && changedRanges.length == 0 &&
         !(update.flags & (UpdateFlag.Viewport | UpdateFlag.LineGaps)) &&
-        update.state.selection.primary.from >= this.view.viewport.from &&
-        update.state.selection.primary.to <= this.view.viewport.to) {
+        update.state.selection.main.from >= this.view.viewport.from &&
+        update.state.selection.main.to <= this.view.viewport.to) {
       this.updateSelection(forceSelection, pointerSel)
       return false
     } else {
@@ -199,19 +199,19 @@ export class DocView extends ContentView {
   updateSelection(force = false, fromPointer = false) {
     if (!(fromPointer || this.mayControlSelection())) return
 
-    let primary = this.view.state.selection.primary
+    let main = this.view.state.selection.main
     // FIXME need to handle the case where the selection falls inside a block range
-    let anchor = this.domAtPos(primary.anchor)
-    let head = this.domAtPos(primary.head)
+    let anchor = this.domAtPos(main.anchor)
+    let head = this.domAtPos(main.head)
 
     let domSel = getSelection(this.root)
     // If the selection is already here, or in an equivalent position, don't touch it
     if (force || !domSel.focusNode ||
-        (browser.gecko && primary.empty && nextToUneditable(domSel.focusNode, domSel.focusOffset)) ||
+        (browser.gecko && main.empty && nextToUneditable(domSel.focusNode, domSel.focusOffset)) ||
         !isEquivalentPosition(anchor.node, anchor.offset, domSel.anchorNode, domSel.anchorOffset) ||
         !isEquivalentPosition(head.node, head.offset, domSel.focusNode, domSel.focusOffset)) {
       this.view.observer.ignore(() => {
-        if (primary.empty) {
+        if (main.empty) {
           // Work around https://bugzilla.mozilla.org/show_bug.cgi?id=1612076
           if (browser.gecko) {
             let nextTo = nextToUneditable(anchor.node, anchor.offset)
@@ -221,8 +221,8 @@ export class DocView extends ContentView {
             }
           }
           domSel.collapse(anchor.node, anchor.offset)
-          if (primary.bidiLevel != null && (domSel as any).cursorBidiLevel != null)
-            (domSel as any).cursorBidiLevel = primary.bidiLevel
+          if (main.bidiLevel != null && (domSel as any).cursorBidiLevel != null)
+            (domSel as any).cursorBidiLevel = main.bidiLevel
         } else if (domSel.extend) {
           // Selection.extend can be used to create an 'inverted' selection
           // (one where the focus is before the anchor), but not all
@@ -232,7 +232,7 @@ export class DocView extends ContentView {
         } else {
           // Primitive (IE) way
           let range = document.createRange()
-          if (primary.anchor > primary.head) [anchor, head] = [head, anchor]
+          if (main.anchor > main.head) [anchor, head] = [head, anchor]
           range.setEnd(head.node, head.offset)
           range.setStart(anchor.node, anchor.offset)
           domSel.removeAllRanges()
@@ -246,7 +246,7 @@ export class DocView extends ContentView {
   }
 
   enforceCursorAssoc() {
-    let cursor = this.view.state.selection.primary
+    let cursor = this.view.state.selection.main
     let sel = getSelection(this.root)
     if (!cursor.empty || !cursor.assoc || !sel.modify) return
     let line = LineView.find(this, cursor.head) // FIXME provide view-line-range finding helper
@@ -350,7 +350,7 @@ export class DocView extends ContentView {
 
   computeBlockGapDeco(): DecorationSet {
     let visible = this.view.viewState.viewport, viewports: Viewport[] = [visible]
-    let {head, anchor} = this.view.state.selection.primary
+    let {head, anchor} = this.view.state.selection.main
     if (head < visible.from || head > visible.to) {
       let {from, to} = this.view.viewState.lineAt(head, 0)
       viewports.push(new Viewport(from, to))

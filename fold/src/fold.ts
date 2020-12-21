@@ -41,7 +41,7 @@ const foldState = StateField.define<DecorationSet>({
     }
     // Clear folded ranges that cover the selection head
     if (tr.selection) {
-      let onSelection = false, {head} = tr.selection.primary
+      let onSelection = false, {head} = tr.selection.main
       folded.between(head, head, (a, b) => { if (a < head && b > head) onSelection = true })
       if (onSelection) folded = folded.update({
         filterFrom: head,
