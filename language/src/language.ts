@@ -6,7 +6,6 @@ import {Parser, ParserConfig} from "lezer"
 import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Extension, StateEffect, Facet, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
-import {treeHighlighter} from "@codemirror/next/highlight"
 
 /// Node prop stored on a grammar's top node to indicate the facet used
 /// to store language data related to that language.
@@ -493,7 +492,7 @@ const parseWorker = ViewPlugin.fromClass(class ParseWorker {
 /// The facet used to associate a language with an editor state.
 export const language = Facet.define<Language, Language | null>({
   combine(languages) { return languages.length ? languages[0] : null },
-  enables: [Language.state, parseWorker, treeHighlighter]
+  enables: [Language.state, parseWorker]
 })
 
 /// This class bundles a [language object](#language.Language) with an

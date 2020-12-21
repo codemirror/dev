@@ -228,6 +228,7 @@ export class HighlightStyle {
     this.module = new StyleModule(modSpec)
     this.match = this.match.bind(this)
     this.extension = [
+      treeHighlighter,
       highlightStyleProp.of(this),
       EditorView.styleModule.of(this.module)
     ]
@@ -282,11 +283,9 @@ export function highlightTree(
   highlightTreeRange(tree, 0, tree.length, getStyle, putStyle)
 }
 
-/// An extension that installs a highlighter that uses the syntax
-/// tree, along with the current [highlight
-/// style](#highlight.highlightStyle), to style the document. If no
-/// highlight style is active, this plugin won't do any highlighting.
-export const treeHighlighter = precedence(ViewPlugin.define(view => new TreeHighlighter(view), {
+// This extension installs a highlighter that highlights based on the
+// syntax tree and highlight style.
+const treeHighlighter = precedence(ViewPlugin.define(view => new TreeHighlighter(view), {
   decorations: v => v.decorations
 }), "fallback")
 
@@ -312,7 +311,7 @@ class TreeHighlighter {
 
   buildDeco(view: EditorView) {
     const style = view.state.facet(highlightStyleProp)
-    if (!style) return Decoration.none
+    if (!style || !this.tree.length) return Decoration.none
 
     let builder = new RangeSetBuilder<Decoration>()
     for (let {from, to} of view.visibleRanges) {
