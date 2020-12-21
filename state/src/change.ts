@@ -274,13 +274,13 @@ export class ChangeSet extends ChangeDesc {
   }
 
   /// Serialize this change set to a JSON-representable value.
-  toJSON() {
-    let parts: (number | [number, (readonly string[])?])[] = []
+  toJSON(): any {
+    let parts: (number | [number, ...string[]])[] = []
     for (let i = 0; i < this.sections.length; i += 2) {
       let len = this.sections[i], ins = this.sections[i + 1]
       if (ins < 0) parts.push(len)
       else if (ins == 0) parts.push([len])
-      else parts.push([len, this.inserted[i >> 1].toJSON()])
+      else parts.push(([len] as [number, ...string[]]).concat(this.inserted[i >> 1].toJSON()) as any)
     }
     return parts
   }
@@ -333,17 +333,20 @@ export class ChangeSet extends ChangeDesc {
 
   /// Create a changeset from its JSON representation (as produced by
   /// [`toJSON`](#state.ChangeSet.toJSON).
-  static fromJSON(json: readonly (number | [number, (readonly string[])?])[]) {
+  static fromJSON(json: any) {
+    if (!Array.isArray(json)) throw new RangeError("Invalid JSON representation of ChangeSet")
     let sections = [], inserted = []
     for (let i = 0; i < json.length; i++) {
       let part = json[i]
       if (typeof part == "number") {
         sections.push(part, -1)
+      } else if (!Array.isArray(part) || typeof part[0] != "number" || part.some((e, i) => i && typeof e != "string")) {
+        throw new RangeError("Invalid JSON representation of ChangeSet")
       } else if (part.length == 1) {
         sections.push(part[0], 0)
       } else {
         while (inserted.length < i) inserted.push(Text.empty)
-        inserted[i] = Text.of(part[1]!)
+        inserted[i] = Text.of(part.slice(1))
         sections.push(part[0], inserted[i].length)
       }
     }
