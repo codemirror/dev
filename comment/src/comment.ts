@@ -57,8 +57,8 @@ export const blockUncomment = command(changeBlockComment, CommentOption.Uncommen
 
 /// Default key bindings for this package.
 ///
-///  - Ctrl-/ (Cmd-/ on macOS): [\`toggleComment\`](#comment.toggleComment).
-///  - Shift-Alt-a: [\`toggleBlockComment\`](#comment.toggleBlockComment).
+///  - Ctrl-/ (Cmd-/ on macOS): [`toggleComment`](#comment.toggleComment).
+///  - Shift-Alt-a: [`toggleBlockComment`](#comment.toggleBlockComment).
 export const commentKeymap: readonly KeyBinding[] = [
   {key: "Mod-/", run: toggleComment},
   {key: "Alt-A", run: toggleBlockComment}

@@ -3,7 +3,7 @@ import {Facet, combineConfig, Text, Extension, CharCategory} from "@codemirror/n
 import {findClusterBreak} from "@codemirror/next/text"
 import {SearchCursor} from "@codemirror/next/search"
 
-/// Mark lines that have a cursor on them with the \`$activeLine\`
+/// Mark lines that have a cursor on them with the `$activeLine`
 /// theme class.
 export function highlightActiveLine(): Extension {
   return [defaultTheme, activeLineHighlighter]
