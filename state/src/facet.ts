@@ -111,13 +111,11 @@ function sameArray<T>(a: readonly T[], b: readonly T[]) {
 
 type Slot<T> = Facet<any, T> | StateField<T> | "doc" | "selection"
 
-// Marks a value as an [`Extension`](#state.Extension).
-declare const isExtension: unique symbol
-
 const enum Provider { Static, Single, Multi }
 
 class FacetProvider<Input> {
   readonly id = nextID++
+  extension!: Extension // Kludge to convince the type system these count as extensions
 
   constructor(readonly dependencies: readonly Slot<any>[],
               readonly facet: Facet<Input, any>,
@@ -150,8 +148,6 @@ class FacetProvider<Input> {
       }
     }
   }
-
-  [isExtension]!: true
 }
 
 function compareArray<T>(a: readonly T[], b: readonly T[], compare: (a: T, b: T) => boolean) {
@@ -292,9 +288,8 @@ export class StateField<Value> {
 
   /// State field instances can be used as
   /// [`Extension`](#state.Extension) values to enable the field in a
-  /// given state. (This symbol is a TypeScript-related trick to mark
-  /// it as an extension value.)
-  [isExtension]!: true
+  /// given state.
+  extension!: Extension
 }
 
 /// Extension values can be
@@ -304,7 +299,7 @@ export class StateField<Value> {
 /// field](#state.StateField) or facet provider, any object with an
 /// extension in its `extension` property, or an array of extension
 /// values.
-export type Extension = {[isExtension]: true} | {extension: Extension} | readonly Extension[]
+export type Extension = {extension: Extension} | readonly Extension[]
 
 /// Valid values of the second argument to
 /// [`precedence`](#state.precedence).
@@ -338,13 +333,13 @@ function maybePrec(prec: Precedence | undefined, ext: Extension) {
 }
 
 class PrecExtension {
-  constructor(readonly e: Extension, readonly prec: number) {}
-  [isExtension]!: true
+  constructor(readonly inner: Extension, readonly prec: number) {}
+  extension!: Extension
 }
 
 class TaggedExtension {
-  constructor(readonly tag: string | symbol, readonly extension: Extension) {}
-  [isExtension]!: true
+  constructor(readonly tag: string | symbol, readonly inner: Extension) {}
+  extension!: Extension
 }
 
 /// Tagged extensions can be used to make a configuration dynamic.
@@ -444,15 +439,17 @@ function flatten(extension: Extension, replacements: ExtensionMap) {
       if (ext.tag in tagsSeen)
         throw new RangeError(`Duplicate use of tag '${String(ext.tag)}' in extensions`)
       tagsSeen[ext.tag] = true
-      inner(replacements[ext.tag as any] || ext.extension, prec)
-    } else if ((ext as any).extension) {
-      inner((ext as any).extension, prec)
+      inner(replacements[ext.tag as any] || ext.inner, prec)
     } else if (ext instanceof PrecExtension) {
-      inner(ext.e, ext.prec)
+      inner(ext.inner, ext.prec)
+    } else if (ext instanceof StateField) {
+      result[prec].push(ext)
+      inner(ext.facets, prec)
+    } else if (ext instanceof FacetProvider) {
+      result[prec].push(ext)
+      if (ext.facet.extensions) inner(ext.facet.extensions, prec)
     } else {
-      result[prec].push(ext as any)
-      if (ext instanceof StateField) inner(ext.facets, prec)
-      else if (ext instanceof FacetProvider && ext.facet.extensions) inner(ext.facet.extensions, prec)
+      inner((ext as any).extension, prec)
     }
   }
   inner(extension, Prec.default)
