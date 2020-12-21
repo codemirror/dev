@@ -8,6 +8,12 @@
 
 @syntaxTree
 
+@ensureSyntaxTree
+
+@LanguageSupport
+
+@LanguageDescription
+
 ### Language metadata
 
 @foldService

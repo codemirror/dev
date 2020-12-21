@@ -23,13 +23,7 @@ and count each line break and UTF-16 code unit as one unit.
 
 @findColumn
 
-### Glyph Clusters
-
-@nextClusterBreak
-
-@prevClusterBreak
-
-### Code Points
+### Code Points and Characters
 
 If you support environments that don't yet have `String.fromCodePoint`
 and `codePointAt`, this package provides portable replacements for them.
@@ -39,3 +33,5 @@ and `codePointAt`, this package provides portable replacements for them.
 @fromCodePoint
 
 @codePointSize
+
+@findClusterBreak
