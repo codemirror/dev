@@ -86,9 +86,11 @@ export class EditorState {
 
   /// Create a [transaction](#state.Transaction) that updates this
   /// state. Any number of [transaction specs](#state.TransactionSpec)
-  /// can be passed. The [changes](#state.TransactionSpec.changes) (if
-  /// any) of each spec are assumed to start in the _current_ document
-  /// (not the document produced by previous specs), and its
+  /// can be passed. Unless
+  /// [`sequential`](#state.TransactionSpec.sequential) is set, the
+  /// [changes](#state.TransactionSpec.changes) (if any) of each spec
+  /// are assumed to start in the _current_ document (not the document
+  /// produced by previous specs), and its
   /// [selection](#state.TransactionSpec.selection) and
   /// [effects](#state.TransactionSpec.effects) are assumed to refer
   /// to the document created by its _own_ changes. The resulting
@@ -128,9 +130,11 @@ export class EditorState {
   /// changeset and selection, and return it as a [transaction
   /// spec](#state.TransactionSpec), which can be passed to
   /// [`update`](#state.EditorState.update).
-  changeByRange(f: (range: SelectionRange) => {range: SelectionRange,
-                                               changes?: ChangeSpec,
-                                               effects?: StateEffect<any> | readonly StateEffect<any>[]}): {
+  changeByRange(f: (range: SelectionRange) => {
+    range: SelectionRange,
+    changes?: ChangeSpec,
+    effects?: StateEffect<any> | readonly StateEffect<any>[]
+  }): {
     changes: ChangeSet,
     selection: EditorSelection,
     effects: readonly StateEffect<any>[]

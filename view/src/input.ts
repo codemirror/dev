@@ -20,7 +20,7 @@ export class InputState {
   registeredEvents: string[] = []
   customHandlers: readonly {
     plugin: PluginValue,
-    handlers: DOMEventHandlers
+    handlers: DOMEventHandlers<any>
   }[] = []
 
   composing = false

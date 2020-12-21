@@ -579,7 +579,7 @@ export class EditorView {
   /// handlers, which will be called any time the editor's [scroll
   /// element](#view.EditorView.scrollDOM) or one of its parent nodes
   /// is scrolled.
-  static domEventHandlers(handlers: DOMEventHandlers): Extension {
+  static domEventHandlers(handlers: DOMEventHandlers<any>): Extension {
     return ViewPlugin.define(() => ({}), {eventHandlers: handlers})
   }
 
@@ -674,16 +674,18 @@ export class EditorView {
   /// An extension that enables line wrapping in the editor.
   static lineWrapping = EditorView.theme({$content: {whiteSpace: "pre-wrap"}})
 
-  /// Facet that provides attributes for the editor's editable DOM
-  /// element.
+  /// Facet that provides additional DOM attributes for the editor's
+  /// editable DOM element.
   static contentAttributes = contentAttributes
 
-  /// Facet that provides editor DOM attributes for the editor's
-  /// outer element.
+  /// Facet that provides DOM attributes for the editor's outer
+  /// element.
   static editorAttributes = editorAttributes
 }
 
-interface EventMap extends HTMLElementEventMap {
+/// Helper type that maps event names to event object types, or the
+/// `any` type for unknown events.
+export interface DOMEventMap extends HTMLElementEventMap {
   [other: string]: any
 }
 
@@ -692,8 +694,8 @@ interface EventMap extends HTMLElementEventMap {
 /// to hold the appropriate event object type. For unknown events, it
 /// is inferred to any, and should be explicitly set if you want type
 /// checking.
-export type DOMEventHandlers<This = any> = {
-  [event in keyof EventMap]?: (this: This, event: EventMap[event], view: EditorView) => boolean | void
+export type DOMEventHandlers<This> = {
+  [event in keyof DOMEventMap]?: (this: This, event: DOMEventMap[event], view: EditorView) => boolean | void
 }
 
 // Maximum line length for which we compute accurate bidi info

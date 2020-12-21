@@ -167,7 +167,7 @@ export const pluginDecorations = PluginField.define<DecorationSet>()
 
 export const domEventHandlers = PluginField.define<{
   plugin: PluginValue,
-  handlers: DOMEventHandlers
+  handlers: DOMEventHandlers<any>
 }>()
 
 export class PluginInstance {
