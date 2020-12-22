@@ -14,9 +14,9 @@ additional [fields](#state.StateField) to the state object.
 
 @EditorSelection
 
-@Text
-
 @CharCategory
+
+@Text
 
 ### Changes and Transactions
 
@@ -33,17 +33,19 @@ let transaction = state.update({changes: {from: 6, to: 11, insert: "editor"}})
 console.log(transaction.state.doc.toString()) // "hello editor"
 ```
 
-@ChangeSpec
-
-@ChangeDesc
-
-@ChangeSet
-
 @TransactionSpec
 
 @ReconfigurationSpec
 
 @Transaction
+
+@ChangeSpec
+
+@ChangeDesc
+
+@MapMode
+
+@ChangeSet
 
 @Annotation
 
@@ -52,8 +54,6 @@ console.log(transaction.state.doc.toString()) // "hello editor"
 @StateEffect
 
 @StateEffectType
-
-@MapMode
 
 ### Extending Editor State
 

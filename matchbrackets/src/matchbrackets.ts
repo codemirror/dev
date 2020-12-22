@@ -61,7 +61,7 @@ const bracketMatchingState = StateField.define<DecorationSet>({
     }
     return Decoration.set(decorations, true)
   },
-  provide: [EditorView.decorations]
+  provide: f => EditorView.decorations.from(f)
 })
 
 const bracketMatchingUnique = [

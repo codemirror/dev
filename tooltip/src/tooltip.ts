@@ -280,7 +280,7 @@ export function hoverTooltip(
       return value
     },
 
-    provide: [showTooltip.nFrom(v => v ? [v] : [])]
+    provide: f => showTooltip.computeN([f], s => { let val = s.field(f); return val ? [val] : [] })
   })
 
   return [

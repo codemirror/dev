@@ -149,7 +149,7 @@ class Chunk<T extends RangeValue> {
 /// time you call `next` on it. Note that, unlike ES6 iterators, these
 /// start out pointing at the first element, so you should call `next`
 /// only after reading the first range (if any).
-export type RangeCursor<T> = {
+export interface RangeCursor<T> {
   /// Move the iterator forward.
   next: () => void
   /// The next range's value. Holds `null` when the cursor has reached

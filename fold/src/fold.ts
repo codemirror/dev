@@ -51,7 +51,7 @@ const foldState = StateField.define<DecorationSet>({
     }
     return folded
   },
-  provide: [EditorView.decorations]
+  provide: f => EditorView.decorations.compute([f], s => s.field(f))
 })
 
 function foldInside(state: EditorState, from: number, to: number) {

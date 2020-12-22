@@ -26,7 +26,7 @@ import {Facet} from "@codemirror/next/state"
 /// You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
 /// other platforms. So `Mod-b` is `Ctrl-b` on Linux but `Cmd-b` on
 /// macOS.
-export type KeyBinding = {
+export interface KeyBinding {
   /// The key name to use for this binding. If the platform-specific
   /// property (`mac`, `win`, or `linux`) for the current platform is
   /// used as well in the binding, that one takes precedence. If `key`

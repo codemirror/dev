@@ -12,7 +12,7 @@ export {StringStream}
 /// emitting tokens as it goes over it. It keeps a mutable (but
 /// copyable) object with state, in which it can store information
 /// about the current context.
-export type StreamParser<State> = {
+export interface StreamParser<State> {
   /// Read one token, advancing the stream past it, and returning a
   /// string indicating the token's style tag—either the name of one
   /// of the tags in [`tags`](#highlight.tags), or such a name

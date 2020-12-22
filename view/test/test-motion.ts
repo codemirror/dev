@@ -22,7 +22,7 @@ const widgetField = StateField.define<DecorationSet>({
     return Decoration.set(deco)
   },
   update(deco, tr) { return deco.map(tr.changes) },
-  provide: [EditorView.decorations]
+  provide: f => EditorView.decorations.from(f)
 })
 const oWidgets = [widgetField]
 
@@ -123,7 +123,7 @@ describe("EditorView.moveVertically", () => {
         ])
       },
       update(deco) { return deco },
-      provide: [EditorView.decorations]
+      provide: f => EditorView.decorations.from(f)
     })
     let cm = tempEditor("one\ntwo", [field])
     ist(cm.contentDOM.offsetHeight, 400, ">")

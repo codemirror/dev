@@ -99,7 +99,7 @@ export class SQLDialect {
 }
 
 /// Options used to configure an SQL extension.
-export type SQLConfig = {
+export interface SQLConfig {
   /// The [dialect](#lang-sql.SQLDialect) to use. Defaults to
   /// [`StandardSQL`](#lang-sql.StandardSQL).
   dialect?: SQLDialect,

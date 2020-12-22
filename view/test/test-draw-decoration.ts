@@ -17,7 +17,7 @@ function decos(startState: DecorationSet = Decoration.none) {
       }
       return value
     },
-    provide: [EditorView.decorations]
+    provide: f => EditorView.decorations.from(f)
   })
   return [field]
 }

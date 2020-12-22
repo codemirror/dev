@@ -28,14 +28,14 @@ type FacetConfig<Input, Output> = {
   enables?: Extension
 }
 
-/// A facet is a value that is assicated with a state and can be
-/// influenced by any number of extensions. Extensions can provide
-/// input values for the facet, and the facet combines those into an
-/// output value.
+/// A facet is a labeled value that is associated with an editor
+/// state. It takes inputs from any number of extensions, and combines
+/// those into a single output value.
 ///
-/// Examples of facets are the theme styles associated with an editor
-/// (which are all stored) or the tab size (which is reduced to a
-/// single value, using the input with the hightest precedence).
+/// Examples of facets are the [theme](#view.EditorView^theme) styles
+/// associated with an editor or the [tab
+/// size](#state.EditorState^tabSize) (which is reduced to a single
+/// value, using the input with the hightest precedence).
 export class Facet<Input, Output = readonly Input[]> {
   /// @internal
   readonly id = nextID++
@@ -90,18 +90,15 @@ export class Facet<Input, Output = readonly Input[]> {
     return new FacetProvider<Input>(deps, this, Provider.Multi, get)
   }
 
-  /// Helper method for registering a facet source with a state field
-  /// via its [`provide`](#state.StateField^define^config.provide) option.
-  /// Returns a value that can be passed to that option to make the
-  /// field automatically provide a value for this facet.
-  from<T>(get: (value: T) => Input, prec?: Precedence): (field: StateField<T>) => Extension {
-    return field => maybePrec(prec, this.compute([field], state => get(state.field(field))))
-  }
-
-  /// Helper for [providing](#state.StateField^define^config.provide)
-  /// a dynamic number of values for this facet from a state field.
-  nFrom<T>(get: (value: T) => readonly Input[], prec?: Precedence): (field: StateField<T>) => Extension {
-    return field => maybePrec(prec, this.computeN([field], state => get(state.field(field))))
+  /// Shorthand method for registering a facet source with a state
+  /// field as input. If the field's type corresponds to this facet's
+  /// input type, the getter function can be omitted. If given, it
+  /// will be used to retrieve the input from the field value.
+  from(field: StateField<Input>): Extension
+  from<T>(field: StateField<T>, get: (value: T) => Input): Extension
+  from<T>(field: StateField<T>, get?: (value: T) => Input): Extension {
+    if (!get) get = x => x as any
+    return this.compute([field], state => get!(state.field(field)))
   }
 }
 
@@ -197,15 +194,16 @@ type StateFieldSpec<Value> = {
   /// Compare two values of the field, returning `true` when they are
   /// the same. This is used to avoid recomputing facets that depend
   /// on the field when its value did not change. Defaults to using
-  /// `==`.
+  /// `===`.
   compare?: (a: Value, b: Value) => boolean,
 
-  /// Provide values for facets based on the value of this field. You
-  /// can pass facets that directly take the field value as input, or
-  /// use facet's [`from`](#state.Facet.from) and
-  /// [`nFrom`](#state.Facet.nFrom) methods to provide a getter
-  /// function.
-  provide?: readonly (Facet<Value, any> | ((field: StateField<Value>) => Extension))[]
+  /// Provide values for facets based on the value of this field. The
+  /// given function will be called once with the initializedfield. It
+  /// will usually want to call some facet's
+  /// [`from`](#state.Facet.from) method to create facet inputs from
+  /// this field, but can also return other extensions that should be
+  /// enabled by this field.
+  provide?: (field: StateField<Value>) => Extension
 
   /// A function used to serialize this field's content to JSON. Only
   /// necessary when this field is included in the argument to
@@ -227,6 +225,9 @@ const initField = Facet.define<{field: StateField<unknown>, create: (state: Edit
 /// Fields can store additional information in an editor state, and
 /// keep it in sync with the rest of the state.
 export class StateField<Value> {
+  /// @internal
+  public provides: Extension | undefined = undefined
+
   private constructor(
     /// @internal
     readonly id: number,
@@ -234,20 +235,13 @@ export class StateField<Value> {
     private updateF: (value: Value, tr: Transaction) => Value,
     private compareF: (a: Value, b: Value) => boolean,
     /// @internal
-    readonly facets: readonly Extension[],
-    /// @internal
     readonly spec: StateFieldSpec<Value>
   ) {}
 
   /// Define a state field.
   static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
-    let facets: Extension[] = []
-    let field = new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b),
-                                      facets, config)
-    if (config.provide) for (let p of config.provide) {
-      if (p instanceof Facet) facets.push(p.compute([field], state => state.field(field)))
-      else facets.push(p(field))
-    }
+    let field = new StateField<Value>(nextID++, config.create, config.update, config.compare || ((a, b) => a === b), config)
+    if (config.provide) field.provides = config.provide(field)
     return field
   }
 
@@ -282,7 +276,7 @@ export class StateField<Value> {
   /// Returns an extension that enables this field and overrides the
   /// way it is initialized. Can be useful when you need to provide a
   /// non-default starting value for the field.
-  init(create: (state: EditorState) => Value) {
+  init(create: (state: EditorState) => Value): Extension {
     return [this, initField.of({field: this as any, create})]
   }
 
@@ -295,10 +289,11 @@ export class StateField<Value> {
 /// Extension values can be
 /// [provided](#state.EditorStateConfig.extensions) when creating a
 /// state to attach various kinds of configuration and behavior
-/// information. It may an extension object, such as a [state
-/// field](#state.StateField) or facet provider, any object with an
-/// extension in its `extension` property, or an array of extension
-/// values.
+/// information. They can either be built-in extension-providing
+/// objects, such as [state fields](#state.StateField) or [facet
+/// providers](#state.Facet.of), or objects with an extension in its
+/// `extension` property. Extensions can be nested in arrays
+/// arbitrarily deep—they will be flattened when processed.
 export type Extension = {extension: Extension} | readonly Extension[]
 
 /// Valid values of the second argument to
@@ -326,10 +321,6 @@ const Prec = {fallback: 3, default: 2, extend: 1, override: 0}
 export function precedence(extension: Extension, value: Precedence): Extension {
   if (!Prec.hasOwnProperty(value as string)) throw new RangeError(`Invalid precedence: ${value}`)
   return new PrecExtension(extension, Prec[value])
-}
-
-function maybePrec(prec: Precedence | undefined, ext: Extension) {
-  return prec ? precedence(ext, prec) : ext
 }
 
 class PrecExtension {
@@ -444,7 +435,7 @@ function flatten(extension: Extension, replacements: ExtensionMap) {
       inner(ext.inner, ext.prec)
     } else if (ext instanceof StateField) {
       result[prec].push(ext)
-      inner(ext.facets, prec)
+      if (ext.provides) inner(ext.provides, prec)
     } else if (ext instanceof FacetProvider) {
       result[prec].push(ext)
       if (ext.facet.extensions) inner(ext.facet.extensions, prec)

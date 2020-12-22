@@ -206,8 +206,8 @@ export const completionState = StateField.define<CompletionState>({
 
   update(value, tr) { return value.update(tr) },
 
-  provide: [
-    showTooltip.nFrom(state => state.tooltip),
-    EditorView.contentAttributes.from(state => state.attrs)
+  provide: f => [
+    showTooltip.computeN([f], state => state.field(f).tooltip),
+    EditorView.contentAttributes.from(f, state => state.attrs)
   ]
 })

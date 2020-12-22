@@ -39,7 +39,7 @@ const searchState: StateField<SearchState> = StateField.define<SearchState>({
     }
     return value
   },
-  provide: [showPanel.nFrom(s => s.panel)]
+  provide: f => showPanel.computeN([f], s => s.field(f).panel)
 })
 
 class SearchState {

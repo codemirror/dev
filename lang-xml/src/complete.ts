@@ -4,7 +4,7 @@ import {syntaxTree} from "@codemirror/next/language"
 import {SyntaxNode} from "lezer-tree"
 
 /// Describes an element in your XML document schema.
-export type ElementSpec = {
+export interface ElementSpec {
   /// The element name.
   name: string,
   /// Allowed children in this element. When not given, all elements
@@ -29,7 +29,7 @@ export type ElementSpec = {
 }
 
 /// Describes an attribute in your XML schema.
-export type AttrSpec = {
+export interface AttrSpec {
   /// The attribute name.
   name: string,
   /// Pre-defined values to complete for this attribute.

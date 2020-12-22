@@ -123,8 +123,8 @@ const lintState = StateField.define<LintState>({
 
     return value
   },
-  provide: [showPanel.nFrom(s => s.panel ? [s.panel] : []),
-            EditorView.decorations.from(s => s.diagnostics)]
+  provide: f => [showPanel.computeN([f], s => { let {panel} = s.field(f); return panel ? [panel] : [] }),
+                 EditorView.decorations.from(f, s => s.diagnostics)]
 })
 
 const activeMark = Decoration.mark({class: themeClass("lintRange.active")})

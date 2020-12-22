@@ -23,11 +23,11 @@ const enum RangeFlag {
 /// is enabled, a [selection](#state.EditorSelection) may hold
 /// multiple ranges. By default, selections hold exactly one range.
 export class SelectionRange {
-  // @internal
+  /// @internal
   constructor(
-    /// The lower side of the range.
+    /// The lower boundary of the range.
     readonly from: number,
-    /// The upper side of the range.
+    /// The upper boundary of the range.
     readonly to: number,
     private flags: number
   ) {}
@@ -49,20 +49,25 @@ export class SelectionRange {
   /// means no association.
   get assoc(): -1 | 0 | 1 { return this.flags & RangeFlag.AssocBefore ? -1 : this.flags & RangeFlag.AssocAfter ? 1 : 0 }
 
-  /// The bidirectional text level associated with this cursor.
+  /// The bidirectional text level associated with this cursor, if
+  /// any.
   get bidiLevel(): number | null {
     let level = this.flags & RangeFlag.BidiLevelMask
     return level == 3 ? null : level
   }
 
+  /// The goal column (stored vertical offset) associated with a
+  /// cursor. This is used to preserve the vertical position when
+  /// moving across different-length lines.
   get goalColumn() {
     let value = this.flags >> RangeFlag.GoalColumnOffset
     return value == RangeFlag.NoGoalColumn ? undefined : value
   }
 
-  /// Map this range through a mapping.
-  map(mapping: ChangeDesc): SelectionRange {
-    let from = mapping.mapPos(this.from), to = mapping.mapPos(this.to)
+  /// Map this range through a change, producing a valid range in the
+  /// updated document.
+  map(change: ChangeDesc): SelectionRange {
+    let from = change.mapPos(this.from), to = change.mapPos(this.to)
     return from == this.from && to == this.to ? this : new SelectionRange(from, to, this.flags)
   }
 
@@ -102,11 +107,11 @@ export class EditorSelection {
     readonly mainIndex: number = 0
   ) {}
 
-  /// Map a selection through a mapping. Mostly used to adjust the
-  /// selection position for changes.
-  map(mapping: ChangeDesc): EditorSelection {
-    if (mapping.empty) return this
-    return EditorSelection.create(this.ranges.map(r => r.map(mapping)), this.mainIndex)
+  /// Map a selection through a change. Used to adjust the selection
+  /// position for changes.
+  map(change: ChangeDesc): EditorSelection {
+    if (change.empty) return this
+    return EditorSelection.create(this.ranges.map(r => r.map(change)), this.mainIndex)
   }
 
   /// Compare this selection to another selection.
@@ -173,9 +178,7 @@ export class EditorSelection {
   }
 
   /// Create a cursor selection range at the given position. You can
-  /// probably ignore [association](#state.SelectionRange.assoc) and
-  /// [bidi level](#state.SelectionRange.bidiLevel) in most
-  /// situations.
+  /// safely ignore the optional arguments in most situations.
   static cursor(pos: number, assoc = 0, bidiLevel?: number, goalColumn?: number) {
     return new SelectionRange(pos, pos, (assoc == 0 ? 0 : assoc < 0 ? RangeFlag.AssocBefore : RangeFlag.AssocAfter) |
                               (bidiLevel == null ? 3 : Math.min(2, bidiLevel)) |

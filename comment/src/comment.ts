@@ -5,7 +5,7 @@ import {KeyBinding} from "@codemirror/next/view"
 /// An object of this type can be provided as [language
 /// data](#state.EditorState.languageDataAt) under a `"commentTokens"`
 /// property to configure comment syntax for a language.
-export type CommentTokens = {
+export interface CommentTokens {
   /// The block comment syntax, if any. For example, for JavaScript
   /// you'd provide `{open: "/*", close: "*/"}`.
   block?: {open: string, close: string},

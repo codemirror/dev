@@ -93,10 +93,12 @@ export class ChangeDesc {
 
   /// Map this description, which should start with the same document
   /// as `other`, over another set of changes, so that it can be
-  /// applied after it.
+  /// applied after it. When `before` is true, map as if the changes
+  /// in `other` happened before the ones in `this`.
   mapDesc(other: ChangeDesc, before = false): ChangeDesc { return other.empty ? this : mapSet(this, other, before) }
 
-  /// Map a given position through these changes.
+  /// Map a given position through these changes, to produce a
+  /// position pointing into the new document.
   ///
   /// `assoc` indicates which side the position should be associated
   /// with. When it is negative or zero, the mapping will try to keep
@@ -107,8 +109,9 @@ export class ChangeDesc {
   /// at or replacements across the position. Defaults to -1.
   ///
   /// `mode` determines whether deletions should be
-  /// [reported](#state.MapMode). It defaults to `MapMode.Simple`
-  /// (don't report deletions).
+  /// [reported](#state.MapMode). It defaults to
+  /// [`MapMode.Simple`](#state.MapMode.Simple) (don't report
+  /// deletions).
   mapPos(pos: number, assoc?: number): number
   mapPos(pos: number, assoc: number, mode: MapMode): number | null
   mapPos(pos: number, assoc = -1, mode: MapMode = MapMode.Simple) {
@@ -189,10 +192,6 @@ export class ChangeSet extends ChangeDesc {
     return doc
   }
 
-  /// Map this set, which should start with the same document as
-  /// `other`, over another set of changes, so that it can be applied
-  /// after it. When `before` is true, map as if the changes in
-  /// `other` happened before the ones in `this`.
   mapDesc(other: ChangeDesc, before = false): ChangeDesc { return mapSet(this, other, before, true) }
 
   /// Given the document as it existed _before_ the changes, return a
@@ -236,9 +235,8 @@ export class ChangeSet extends ChangeDesc {
   /// Iterate over the changed ranges in the document, calling `f` for
   /// each.
   ///
-  /// When `individual` is true, adjacent changes (which are kept
-  /// separate for [position mapping](#state.ChangeDesc.mapPos)) are
-  /// reported separately.
+  /// When `individual` is true, adjacent changes are reported
+  /// separately.
   iterChanges(f: (fromA: number, toA: number, fromB: number, toB: number, inserted: Text) => void, individual = false) {
     iterChanges(this, f, individual)
   }

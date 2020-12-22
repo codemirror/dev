@@ -116,7 +116,7 @@ function keywords(keywords: string, types: string, builtin?: string) {
   return result
 }
 
-export type Dialect = {
+export interface Dialect {
   backslashEscapes: boolean,
   hashComments: boolean,
   spaceAfterDashes: boolean,

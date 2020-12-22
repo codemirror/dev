@@ -1,6 +1,6 @@
-/// This is used to [categorize](#state.EditorState.charCategorizer)
-/// characters into three categories. It is used do things like
-/// selecting by word.
+/// The categories produced by a [character
+/// categorizer](#state.EditorState.charCategorizer). These are used
+/// do things like selecting by word.
 export enum CharCategory {
   /// Word characters.
   Word,

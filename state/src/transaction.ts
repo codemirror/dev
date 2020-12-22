@@ -14,7 +14,12 @@ import {Text} from "@codemirror/next/text"
 /// effects](#state.StateEffect) are more appropriate.
 export class Annotation<T> {
   /// @internal
-  constructor(readonly type: AnnotationType<T>, readonly value: T) {}
+  constructor(
+    /// The annotation type.
+    readonly type: AnnotationType<T>,
+    /// The value of this annotation.
+    readonly value: T
+  ) {}
 
   /// Define a new type of annotation.
   static define<T>() { return new AnnotationType<T>() }
@@ -26,6 +31,7 @@ export class Annotation<T> {
 
 /// Marker that identifies a type of [annotation](#state.Annotation).
 export class AnnotationType<T> {
+  /// Create an instance of this annotation.
   of(value: T): Annotation<T> { return new Annotation(this, value) }
 }
 
@@ -99,7 +105,7 @@ export class StateEffectType<Value> {
 
 /// Describes a [transaction](#state.Transaction) when calling the
 /// [`EditorState.update`](#state.EditorState.update) method.
-export type TransactionSpec = {
+export interface TransactionSpec {
   /// The changes to the document made by this transaction.
   changes?: ChangeSpec
   /// When set, this transaction explicitly updates the selection.
@@ -134,7 +140,7 @@ export type TransactionSpec = {
 
 /// Type used in [transaction specs](#state.TransactionSpec) to
 /// indicate how the state should be reconfigured.
-export type ReconfigurationSpec = {
+export interface ReconfigurationSpec {
   /// If given, this will replace the state's entire
   /// [configuration](#state.EditorStateConfig.extensions) with a
   /// new configuration derived from the given extension. Previously
@@ -190,11 +196,12 @@ export class Transaction {
       this.annotations = annotations.concat(Transaction.time.of(Date.now()))
   }
 
-  /// The new document produced by the transaction. (Mostly exposed so
-  /// that [transaction filters](#state.EditorState^transactionFilter)
-  /// can look at the new document without forcing an entire new state
-  /// to be computed by accessing
-  /// [`.state`](#state.Transaction.state).
+  /// The new document produced by the transaction. Contrary to
+  /// [`.state`](#state.Transaction.state)`.doc`, accessing this won't
+  /// force the entire new state to be computed right away, so it is
+  /// recommended that [transaction
+  /// filters](#state.EditorState^transactionFilter) use this getter
+  /// when they need to look at the new document.
   get newDoc() {
     return this._doc || (this._doc = this.changes.apply(this.startState.doc))
   }
@@ -207,7 +214,10 @@ export class Transaction {
     return this.selection || this.startState.selection.map(this.changes)
   }
 
-  /// The new state created by the transaction.
+  /// The new state created by the transaction. Computed on demand
+  /// (but retained for subsequent access), so itis recommended not to
+  /// access it in [transaction
+  /// filters](#state.EditorState^transactionFilter) when possible.
   get state() {
     if (!this._state) this.startState.applyTransaction(this)
     return this._state!

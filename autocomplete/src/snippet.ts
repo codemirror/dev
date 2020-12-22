@@ -113,7 +113,7 @@ const snippetState = StateField.define<ActiveSnippet | null>({
     return value
   },
 
-  provide: [EditorView.decorations.from(val => val ? val.deco : Decoration.none)]
+  provide: f => EditorView.decorations.from(f, val => val ? val.deco : Decoration.none)
 })
 
 function fieldSelection(ranges: readonly FieldRange[], field: number) {
