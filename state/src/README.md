@@ -68,9 +68,7 @@ extensions for the editor state.
 
 @Facet
 
-@precedence
-
-@Precedence
+@Prec
 
 @tagExtension
 

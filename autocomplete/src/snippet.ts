@@ -1,6 +1,6 @@
 import {Decoration, DecorationSet, themeClass, WidgetType, EditorView, keymap, KeyBinding} from "@codemirror/next/view"
 import {StateField, StateEffect, ChangeDesc, EditorState, EditorSelection,
-        Transaction, TransactionSpec, Text, StateCommand, precedence, Facet} from "@codemirror/next/state"
+        Transaction, TransactionSpec, Text, StateCommand, Prec, Facet} from "@codemirror/next/state"
 import {indentUnit} from "@codemirror/next/language"
 import {baseTheme} from "./theme"
 import {Completion} from "./completion"
@@ -199,7 +199,7 @@ export const snippetKeymap = Facet.define<readonly KeyBinding[], readonly KeyBin
   combine(maps) { return maps.length ? maps[0] : defaultSnippetKeymap }
 })
 
-const addSnippetKeymap = precedence(keymap.compute([snippetKeymap], state => state.facet(snippetKeymap)), "override")
+const addSnippetKeymap = Prec.override(keymap.compute([snippetKeymap], state => state.facet(snippetKeymap)))
 
 /// Create a completion from a snippet. Returns an object with the
 /// properties from `completion`, plus an `apply` function that

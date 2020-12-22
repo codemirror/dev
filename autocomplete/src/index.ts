@@ -1,5 +1,5 @@
 import {tooltips} from "@codemirror/next/tooltip"
-import {precedence, Extension, EditorState} from "@codemirror/next/state"
+import {Prec, Extension, EditorState} from "@codemirror/next/state"
 import {keymap, KeyBinding} from "@codemirror/next/view"
 import {Completion} from "./completion"
 import {completionState, State} from "./state"
@@ -43,8 +43,8 @@ export const completionKeymap: readonly KeyBinding[] = [
   {key: "Enter", run: acceptCompletion}
 ]
 
-const completionKeymapExt = precedence(keymap.computeN([completionConfig], state => 
-  state.facet(completionConfig).defaultKeymap ? [completionKeymap] : []), "override")
+const completionKeymapExt = Prec.override(keymap.computeN([completionConfig], state => 
+  state.facet(completionConfig).defaultKeymap ? [completionKeymap] : []))
 
 /// Get the current completion status. When completions are available,
 /// this will return `"active"`. When completions are pending (in the

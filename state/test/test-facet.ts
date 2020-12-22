@@ -1,5 +1,5 @@
 import ist from "ist"
-import {EditorState, Facet, Extension, precedence, StateField} from "@codemirror/next/state"
+import {EditorState, Facet, Extension, Prec, StateField} from "@codemirror/next/state"
 
 function mk(...extensions: Extension[]) {
   return EditorState.create({extensions})
@@ -32,16 +32,16 @@ describe("EditorState facets", () => {
   })
 
   it("sorts extensions by priority", () => {
-    let st = mk(str.of("a"), str.of("b"), precedence(str.of("c"), "extend"),
-                precedence(str.of("d"), "override"),
-                precedence(str.of("e"), "fallback"),
-                precedence(str.of("f"), "extend"), str.of("g"))
+    let st = mk(str.of("a"), str.of("b"), Prec.extend(str.of("c")),
+                Prec.override(str.of("d")),
+                Prec.fallback(str.of("e")),
+                Prec.extend(str.of("f")), str.of("g"))
     ist(st.facet(str).join(), "d,c,f,a,b,g,e")
   })
 
   it("lets sub-extensions inherit their parent's priority", () => {
     let e = (n: number) => num.of(n)
-    let st = mk(num.of(1), precedence(e(2), "override"), e(4))
+    let st = mk(num.of(1), Prec.override(e(2)), e(4))
     ist(st.facet(num).join(), "2,1,4")
   })
 

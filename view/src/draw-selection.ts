@@ -1,4 +1,4 @@
-import {EditorSelection, SelectionRange, Extension, Facet, combineConfig, precedence} from "@codemirror/next/state"
+import {EditorSelection, SelectionRange, Extension, Facet, combineConfig, Prec} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate} from "./extension"
 import {EditorView} from "./editorview"
 import {themeClass} from "./theme"
@@ -147,7 +147,7 @@ const themeSpec = {
   }
 }
 if (CanHidePrimary) (themeSpec as any).$line.caretColor = "transparent !important"
-const hideNativeSelection = precedence(EditorView.theme(themeSpec), "override")
+const hideNativeSelection = Prec.override(EditorView.theme(themeSpec))
 
 const selectionClass = themeClass("selectionBackground")
 

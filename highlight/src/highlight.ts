@@ -1,7 +1,7 @@
 import {Tree, NodeProp} from "lezer-tree"
 import {StyleSpec, StyleModule} from "style-mod"
 import {EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet} from "@codemirror/next/view"
-import {Extension, precedence, Facet} from "@codemirror/next/state"
+import {Extension, Prec, Facet} from "@codemirror/next/state"
 import {syntaxTree} from "@codemirror/next/language"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 
@@ -285,9 +285,9 @@ export function highlightTree(
 
 // This extension installs a highlighter that highlights based on the
 // syntax tree and highlight style.
-const treeHighlighter = precedence(ViewPlugin.define(view => new TreeHighlighter(view), {
+const treeHighlighter = Prec.fallback(ViewPlugin.define(view => new TreeHighlighter(view), {
   decorations: v => v.decorations
-}), "fallback")
+}))
 
 class TreeHighlighter {
   decorations: DecorationSet

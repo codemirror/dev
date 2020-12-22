@@ -1,6 +1,6 @@
 export {EditorStateConfig, EditorState} from "./state"
 export {StateCommand} from "./extension"
-export {Facet, StateField, Extension, precedence, Precedence, tagExtension} from "./facet"
+export {Facet, StateField, Extension, Prec, tagExtension} from "./facet"
 export {EditorSelection, SelectionRange} from "./selection"
 export {Transaction, TransactionSpec, ReconfigurationSpec,
         Annotation, AnnotationType, StateEffect, StateEffectType} from "./transaction"

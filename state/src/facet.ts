@@ -296,31 +296,31 @@ export class StateField<Value> {
 /// arbitrarily deep—they will be flattened when processed.
 export type Extension = {extension: Extension} | readonly Extension[]
 
-/// Valid values of the second argument to
-/// [`precedence`](#state.precedence).
-///
-/// - `"fallback"`: A precedence below the default precedence, which
-///   will cause default-precedence extensions to override it even if
-///   they are specified later in the extension ordering.
-/// - `"default"`: The regular default precedence.
-/// - `"extend"`: A higher-than-default precedence.
-/// - `"override"`: Precedence above the `"default"` and `"extend"`
-///   precedences.
-export type Precedence = "fallback" | "default" | "extend" | "override"
+const Prec_ = {fallback: 3, default: 2, extend: 1, override: 0}
 
-const Prec = {fallback: 3, default: 2, extend: 1, override: 0}
+function prec(value: number) {
+  return (ext: Extension) => new PrecExtension(ext, value) as Extension
+}
 
 /// By default extensions are registered in the order they are found
-/// the flattened form of nested array that was provided. Individual
-/// extension values can be assigned a precedence to override this.
-/// Extensions that do not have a precedence set get the precedence of
-/// the nearest parent with a precedence, or
-/// [`"default"`](#state.Precedence) if there is no such parent. The
+/// in the flattened form of nested array that was provided.
+/// Individual extension values can be assigned a precedence to
+/// override this. Extensions that do not have a precedence set get
+/// the precedence of the nearest parent with a precedence, or
+/// [`default`](#state.Prec.default) if there is no such parent. The
 /// final ordering of extensions is determined by first sorting by
 /// precedence and then by order within each precedence.
-export function precedence(extension: Extension, value: Precedence): Extension {
-  if (!Prec.hasOwnProperty(value as string)) throw new RangeError(`Invalid precedence: ${value}`)
-  return new PrecExtension(extension, Prec[value])
+export const Prec = {
+  /// A precedence below the default precedence, which will cause
+  /// default-precedence extensions to override it even if they are
+  /// specified later in the extension ordering.
+  fallback: prec(Prec_.fallback),
+  /// The regular default precedence.
+  default: prec(Prec_.default),
+  /// A higher-than-default precedence.
+  extend: prec(Prec_.extend),
+  /// Precedence above the `default` and `extend` precedences.
+  override: prec(Prec_.override)
 }
 
 class PrecExtension {
@@ -443,10 +443,10 @@ function flatten(extension: Extension, replacements: ExtensionMap) {
       inner((ext as any).extension, prec)
     }
   }
-  inner(extension, Prec.default)
+  inner(extension, Prec_.default)
   for (let key of allKeys(replacements)) if (!(key in tagsSeen) && key != "full" && replacements[key as any]) {
     tagsSeen[key] = true
-    inner(replacements[key as any]!, Prec.default)
+    inner(replacements[key as any]!, Prec_.default)
   }
   return result.reduce((a, b) => a.concat(b))
 }

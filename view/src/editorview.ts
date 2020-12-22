@@ -1,4 +1,4 @@
-import {EditorState, Transaction, TransactionSpec, Extension, precedence, ChangeDesc,
+import {EditorState, Transaction, TransactionSpec, Extension, Prec, ChangeDesc,
         EditorSelection, SelectionRange} from "@codemirror/next/state"
 import {Line} from "@codemirror/next/text"
 import {StyleModule, StyleSpec} from "style-mod"
@@ -668,7 +668,7 @@ export class EditorView {
   /// there is a dark or light theme active. For example `"$$dark
   /// $myHighlight"`.
   static baseTheme(spec: {[selector: string]: StyleSpec}): Extension {
-    return precedence(styleModule.of(buildTheme("." + baseThemeID, spec)), "fallback")
+    return Prec.fallback(styleModule.of(buildTheme("." + baseThemeID, spec)))
   }
 
   /// An extension that enables line wrapping in the editor.

@@ -1,4 +1,4 @@
-import {precedence} from "@codemirror/next/state"
+import {Prec} from "@codemirror/next/state"
 import {KeyBinding, keymap} from "@codemirror/next/view"
 import {Language, LanguageSupport, LanguageDescription} from "@codemirror/next/language"
 import {markdownLanguage, markdownWithCodeLanguages} from "./markdown"
@@ -28,5 +28,5 @@ export function markdown(config: {
   let {codeLanguages, defaultCodeLanguage} = config
   let language = codeLanguages || defaultCodeLanguage ? markdownWithCodeLanguages(codeLanguages || [], defaultCodeLanguage)
     : markdownLanguage
-  return new LanguageSupport(language, precedence(keymap.of(markdownKeymap), "extend"))
+  return new LanguageSupport(language, Prec.extend(keymap.of(markdownKeymap)))
 }
