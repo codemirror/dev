@@ -10,16 +10,18 @@ export interface Completion {
   /// is matched agains to determine whether a completion matches (and
   /// how well it matches).
   label: string,
-  /// An optional bit of information to show (with a different style)
-  /// after the label.
+  /// An optional short piece of information to show (with a different
+  /// style) after the label.
   detail?: string,
   /// Additional info to show when the completion is selected. Can be
   /// a plain string or a function that'll render the DOM structure to
   /// show when invoked.
   info?: string | ((completion: Completion) => Node),
-  /// How to apply the completion. When this holds a string, the
-  /// completion range is replaced by that string. When it is a
-  /// function, that function is called to perform the completion.
+  /// How to apply the completion. The default is to replace it with
+  /// its [label](#autocomplete.Completion.label). When this holds a
+  /// string, the completion range is replaced by that string. When it
+  /// is a function, that function is called to perform the
+  /// completion.
   apply?: string | ((view: EditorView, completion: Completion, from: number, to: number) => void),
   /// The type of the completion. This is used to pick an icon to show
   /// for the completion. Icons are styled with a [theme
@@ -48,12 +50,12 @@ export class CompletionContext {
   constructor(
     /// The editor state that the completion happens in.
     readonly state: EditorState,
-    /// The position at which the completion happens.
+    /// The position at which the completion is happening.
     readonly pos: number,
     /// Indicates whether completion was activated explicitly, or
     /// implicitly by typing. The usual way to respond to this is to
     /// only return completions when either there is part of a
-    /// completable entity at the cursor, or explicit is true.
+    /// completable entity before the cursor, or `explicit` is true.
     readonly explicit: boolean
   ) {}
 
@@ -84,8 +86,8 @@ export class CompletionContext {
   /// Allows you to register abort handlers, which will be called when
   /// the query is
   /// [aborted](#autocomplete.CompletionContext.aborted).
-  addEventListener(_type: "abort", listener: () => void) {
-    if (this.abortListeners) this.abortListeners.push(listener)
+  addEventListener(type: "abort", listener: () => void) {
+    if (type == "abort" && this.abortListeners) this.abortListeners.push(listener)
   }
 }
 
@@ -107,9 +109,7 @@ function prefixMatch(options: readonly Completion[]) {
 }
 
 /// Given a a fixed array of options, return an autocompleter that
-/// compares those options to the current
-/// [token](#autocomplete.CompletionContext.tokenBefore) and returns
-/// the matching ones.
+/// completes them.
 export function completeFromList(list: readonly (string | Completion)[]): CompletionSource {
   let options = list.map(o => typeof o == "string" ? {label: o} : o) as Completion[]
   let [span, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options)
@@ -121,7 +121,7 @@ export function completeFromList(list: readonly (string | Completion)[]): Comple
 
 /// Wrap the given completion source so that it will not fire when the
 /// cursor is in a syntax node with one of the given names.
-export function ifNotIn(nodes: readonly string[], source: CompletionSource) {
+export function ifNotIn(nodes: readonly string[], source: CompletionSource): CompletionSource {
   return (context: CompletionContext) => {
     for (let pos: SyntaxNode | null = syntaxTree(context.state).resolve(context.pos, -1); pos; pos = pos.parent)
       if (nodes.indexOf(pos.name) > -1) return null
@@ -143,14 +143,17 @@ export interface CompletionResult {
   /// The end of the range that is being completed. Defaults to the
   /// main cursor position.
   to?: number,
-  /// The completions
+  /// The completions returned. These don't have to be compared with
+  /// the input by the source—the autocompletion system will do its
+  /// own matching (against the text between `from` and `to`) and
+  /// sorting.
   options: readonly Completion[],
   /// When given, further input that causes the part of the document
-  /// between (mapped) `from` and `to` to match this regular
-  /// expression will not query the completion source again, but
-  /// continue with this list of options. This can help a lot with
-  /// responsiveness, since it allows the completion list to be
-  /// updated synchronously.
+  /// between ([mapped](#state.ChangeDesc.mapPos)) `from` and `to` to
+  /// match this regular expression will not query the completion
+  /// source again, but continue with this list of options. This can
+  /// help a lot with responsiveness, since it allows the completion
+  /// list to be updated synchronously.
   span?: RegExp
 }
 

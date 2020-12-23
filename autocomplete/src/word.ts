@@ -3,6 +3,9 @@ import {Completion, CompletionSource} from "./completion"
 
 const enum C { Range = 50000 }
 
+/// A completion source that will scan the document for words (using a
+/// [character categorizer](#state.EditorState.charCategorizer)), and
+/// return those as completions.
 export const completeAnyWord: CompletionSource = context => {
   let options: Completion[] = [], seen: {[word: string]: boolean} = Object.create(null)
   let cat = context.state.charCategorizer(context.pos)

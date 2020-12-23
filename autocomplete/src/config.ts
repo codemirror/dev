@@ -5,7 +5,10 @@ export interface CompletionConfig {
   /// When enabled (defaults to true), autocompletion will start
   /// whenever the user types something that can be completed.
   activateOnTyping?: boolean
-  /// Override the completion sources used.
+  /// Override the completion sources used. By default, they will be
+  /// taken from the `"autocomplete"` [language
+  /// data](#state.EditorState.languageDataAt) (which should hold
+  /// [completion sources](#autocomplete.CompletionSource)).
   override?: readonly CompletionSource[] | null,
   /// The maximum number of options to render to the DOM.
   maxRenderedOptions?: number,
