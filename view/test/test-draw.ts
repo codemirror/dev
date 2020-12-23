@@ -198,6 +198,7 @@ describe("EditorView drawing", () => {
     let text = cm.contentDOM.textContent!
     ist(text.length, cm.state.doc.length, "<")
     ist(text.indexOf("<"), -1, ">")
+    ist(cm.visibleRanges.reduce((s, r) => s + r.to - r.from, 0), cm.viewport.to - cm.viewport.from, "<")
     cm.scrollDOM.scrollTop = cm.scrollDOM.scrollHeight / 2 + 100
     cm.dispatch({selection: {anchor: cm.state.doc.length >> 1}})
     cm.measure()
