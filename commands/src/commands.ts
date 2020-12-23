@@ -122,7 +122,9 @@ function moveByLineBoundary(view: EditorView, start: SelectionRange, forward: bo
 /// the line if there isn't one left on this line.
 export const cursorLineBoundaryForward: Command = view => moveSel(view, range => moveByLineBoundary(view, range, true))
 /// Move the selection to previous line wrap point, or failing that to
-/// the start of the line.
+/// the start of the line. If the line is indented, and the cursor
+/// isn't already at the end of the indentation, this will move to the
+/// end of the indentation instead of the start of the line.
 export const cursorLineBoundaryBackward: Command = view => moveSel(view, range => moveByLineBoundary(view, range, false))
 
 /// Move the selection to the start of the line.

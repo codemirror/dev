@@ -82,8 +82,8 @@ export class IndentContext {
       overrideIndentation?: (pos: number) => number,
       /// Make it look, to the indent logic, like a line break was
       /// added at the given position (which is mostly just useful for
-      /// implementing
-      /// [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent).
+      /// implementing something like
+      /// [`insertNewlineAndIndent`](#commands.insertNewlineAndIndent)).
       simulateBreak?: number,
       /// When `simulateBreak` is given, this can be used to make the
       /// simulate break behave like a double line break.
@@ -103,6 +103,15 @@ export class IndentContext {
                                              this.state.doc.lineAt(pos).to))
   }
 
+  /// Find the column for the given position.
+  column(pos: number) {
+    let line = this.state.doc.lineAt(pos), text = line.text.slice(0, pos - line.from)
+    let result = this.countColumn(text, pos - line.from)
+    let override = this.options?.overrideIndentation ? this.options.overrideIndentation(line.from) : -1
+    if (override > -1) result += override - this.countColumn(text, text.search(/\S/))
+    return result
+  }
+
   /// find the column position (taking tabs into account) of the given
   /// position in the given string.
   countColumn(line: string, pos: number) {
@@ -117,15 +126,6 @@ export class IndentContext {
       if (overriden > -1) return overriden
     }
     return this.countColumn(line.text, line.text.search(/\S/))
-  }
-
-  /// Find the column for the given position.
-  column(pos: number) {
-    let line = this.state.doc.lineAt(pos), text = line.text.slice(0, pos - line.from)
-    let result = this.countColumn(text, pos - line.from)
-    let override = this.options?.overrideIndentation ? this.options.overrideIndentation(line.from) : -1
-    if (override > -1) result += override - this.countColumn(text, text.search(/\S/))
-    return result
   }
 }
 
@@ -186,8 +186,8 @@ export class TreeIndentContext extends IndentContext {
     base: IndentContext,
     /// The position at which indentation is being computed.
     readonly pos: number,
-    /// The syntax tree node for which the indentation strategy is
-    /// registered.
+    /// The syntax tree node to which the indentation strategy
+    /// applies.
     readonly node: SyntaxNode) {
     super(base.state, base.options)
   }
@@ -261,7 +261,7 @@ function delimitedStrategy(context: TreeIndentContext, align: boolean, units: nu
   return context.baseIndent + (closed ? 0 : context.unit * units)
 }
 
-/// An indentation strategy that aligns a node content to its base
+/// An indentation strategy that aligns a node's content to its base
 /// indentation.
 export const flatIndent = (context: TreeIndentContext) => context.baseIndent
 
@@ -289,7 +289,7 @@ const DontIndentBeyond = 200
 ///
 /// To avoid unneccesary reindents, it is recommended to start the
 /// regexp with `^` (usually followed by `\s*`), and end it with `$`.
-/// For example, `/^\s*\}$` will reindent when a closing brace is
+/// For example, `/^\s*\}$/` will reindent when a closing brace is
 /// added at the start of a line.
 export function indentOnInput(): Extension {
   return EditorState.transactionFilter.of(tr => {

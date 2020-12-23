@@ -14,11 +14,11 @@ export abstract class RangeValue {
   endSide!: number
 
   /// The mode with which the location of the range should be mapped
-  /// when it's `from` and `to` are the same, to decide whether a
+  /// when its `from` and `to` are the same, to decide whether a
   /// change deletes the range. Defaults to `MapMode.TrackDel`.
   mapMode!: MapMode
-  /// Whether this value marks a point range, which shadows the ranges
-  /// contained in it.
+  /// Whether this value marks a point range, which is treated as
+  /// atomic and shadows the ranges contained in it.
   point!: boolean
 
   /// Create a [range](#rangeset.Range) with this value.
@@ -52,9 +52,6 @@ export interface RangeComparator<T extends RangeValue> {
   compareRange(from: number, to: number, activeA: T[], activeB: T[]): void
   /// Notification for a point range.
   comparePoint(from: number, to: number, byA: T | null, byB: T | null): void
-  /// Can be used to ignore all non-point ranges and points below a
-  /// given size. Specify 0 to get all points.
-  minPointSize?: number
 }
 
 /// Methods used when iterating over the spans created by a set of
@@ -73,9 +70,6 @@ export interface SpanIterator<T extends RangeValue> {
   /// the point started before the iterated range, `openStart` will be
   /// `active.length + 1` to signal this.
   point(from: number, to: number, value: T, active: readonly T[], openStart: number): void
-  /// When given and greater than -1, only points of at least this
-  /// size are taken into account.
-  minPointSize?: number
 }
 
 const enum C {
@@ -168,6 +162,7 @@ type RangeSetUpdate<T extends RangeValue> = {
   /// `true`.
   add?: readonly Range<T>[]
   /// Indicates whether the library should sort the ranges in `add`.
+  /// Defaults to `false`.
   sort?: boolean
   /// Filter the ranges already in the set. Only those for which this
   /// function returns `true` are kept.
@@ -176,7 +171,7 @@ type RangeSetUpdate<T extends RangeValue> = {
   /// applied. Filtering only a small range, as opposed to the entire
   /// set, can make updates cheaper.
   filterFrom?: number
-  /// The end position to applly the filter to.
+  /// The end position to apply the filter to.
   filterTo?: number
 }
 
@@ -281,8 +276,8 @@ export class RangeSet<T extends RangeValue> {
 
   /// Iterate over the ranges that touch the region `from` to `to`,
   /// calling `f` for each. There is no guarantee that the ranges will
-  /// be reported in any order. When the callback returns `false`,
-  /// iteration stops.
+  /// be reported in any specific order. When the callback returns
+  /// `false`, iteration stops.
   between(from: number, to: number, f: (from: number, to: number, value: T) => void | false): void {
     if (this == RangeSet.empty) return
     for (let i = 0; i < this.chunk.length; i++) {
@@ -299,30 +294,33 @@ export class RangeSet<T extends RangeValue> {
     return HeapCursor.from([this]).goto(from)
   }
 
-  /// Iterate over the given sets, starting from `from`.
+  /// Iterate over the ranges in a collection of sets, in order,
+  /// starting from `from`.
   static iter<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number = 0): RangeCursor<T> {
     return HeapCursor.from(sets).goto(from)
   }
 
   /// Iterate over two groups of sets, calling methods on `comparator`
-  /// to notify it of possible differences. `textDiff` indicates how
-  /// the underlying data changed between these ranges, and is needed
-  /// to synchronize the iteration. `from` and `to` are coordinates in
-  /// the _new_ space, after these changes.
+  /// to notify it of possible differences.
   static compare<T extends RangeValue>(
     oldSets: readonly RangeSet<T>[], newSets: readonly RangeSet<T>[],
+    /// This indicates how the underlying data changed between these
+    /// ranges, and is needed to synchronize the iteration. `from` and
+    /// `to` are coordinates in the _new_ space, after these changes.
     textDiff: ChangeDesc,
-    comparator: RangeComparator<T>
+    comparator: RangeComparator<T>,
+    /// Can be used to ignore all non-point ranges, and points below
+    /// the given size. When -1, all ranges are compared.
+    minPointSize: number = -1
   ) {
-    let minPoint = comparator.minPointSize ?? -1
     let a = oldSets.filter(set => set.maxPoint >= C.BigPointSize ||
-                           set != RangeSet.empty && newSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
+                           set != RangeSet.empty && newSets.indexOf(set) < 0 && set.maxPoint >= minPointSize!)
     let b = newSets.filter(set => set.maxPoint >= C.BigPointSize ||
-                           set != RangeSet.empty && oldSets.indexOf(set) < 0 && set.maxPoint >= minPoint)
+                           set != RangeSet.empty && oldSets.indexOf(set) < 0 && set.maxPoint >= minPointSize!)
     let sharedChunks = findSharedChunks(a, b)
 
-    let sideA = new SpanCursor(a, sharedChunks, minPoint)
-    let sideB = new SpanCursor(b, sharedChunks, minPoint)
+    let sideA = new SpanCursor(a, sharedChunks, minPointSize!)
+    let sideB = new SpanCursor(b, sharedChunks, minPointSize!)
 
     textDiff.iterGaps((fromA, fromB, length) => compare(sideA, fromA, sideB, fromB, length, comparator))
     if (textDiff.empty && textDiff.length == 0) compare(sideA, 0, sideB, 0, 0, comparator)
@@ -333,9 +331,14 @@ export class RangeSet<T extends RangeValue> {
   /// content. Returns the open count (see
   /// [`SpanIterator.span`](#rangeset.SpanIterator.span)) at the end
   /// of the iteration.
-  static spans<T extends RangeValue>(sets: readonly RangeSet<T>[], from: number, to: number,
-                                     iterator: SpanIterator<T>): number {
-    let cursor = new SpanCursor(sets, null, iterator.minPointSize ?? -1).goto(from), pos = from
+  static spans<T extends RangeValue>(
+    sets: readonly RangeSet<T>[], from: number, to: number,
+    iterator: SpanIterator<T>,
+    /// When given and greater than -1, only points of at least this
+    /// size are taken into account.
+    minPointSize: number = -1
+  ): number {
+    let cursor = new SpanCursor(sets, null, minPointSize).goto(from), pos = from
     let open = cursor.openStart
     for (;;) {
       let curTo = Math.min(cursor.to, to)

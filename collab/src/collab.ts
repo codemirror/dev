@@ -94,7 +94,15 @@ export function collab(config: CollabConfig = {}): Extension {
 /// Create a transaction that represents a set of new updates received
 /// from the authority. Applying this transaction moves the state
 /// forward to adjust to the authority's view of the document.
-export function receiveUpdates(state: EditorState, updates: readonly Update[], ownUpdateCount: number) {
+export function receiveUpdates(
+  state: EditorState,
+  updates: readonly Update[],
+  /// This should be equal to the number of updates (at the start of
+  /// the `updates` array) that came from this client itself. (This is
+  /// one of the things you'll want to use the [client
+  /// ID](#collab.getClientID) for.)
+  ownUpdateCount: number
+) {
   // Pushes a set of updates (received from the central authority)
   // into the editor state (which should have the collab plugin
   // enabled). Will recognize its own updates, and confirm unconfirmed

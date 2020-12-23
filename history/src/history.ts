@@ -6,8 +6,8 @@ const enum BranchName { Done, Undone }
 
 const fromHistory = Annotation.define<{side: BranchName, rest: Branch}>()
 
-/// Transaction annotation that will prevent that annotation from
-/// being combined with other annotations in the undo history. Given
+/// Transaction annotation that will prevent that transaction from
+/// being combined with other transactions in the undo history. Given
 /// `"before"`, it'll prevent merging with previous transactions. With
 /// `"after"`, subsequent transactions won't be combined with this
 /// one. With `"full"`, the transaction is isolated on both sides.

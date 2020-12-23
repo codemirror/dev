@@ -312,8 +312,7 @@ describe("RangeSet", () => {
       RangeSet.spans([mkSet([mk(0, 10, "a"), mk(20, 30, {name: "b", point: true})])], 0, 30, {
         span(from, to) { ranges.push(from, to) },
         point(from, to) { ranges.push(from, to) },
-        minPointSize: 0
-      })
+      }, 0)
       ist(ranges.join(), "0,20,20,30")
     })
   })

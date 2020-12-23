@@ -7,8 +7,8 @@ import {Text, TextIterator} from "@codemirror/next/text"
 import {EditorState, StateField, Transaction, Extension, StateEffect, Facet, ChangeDesc} from "@codemirror/next/state"
 import {ViewPlugin, ViewUpdate, EditorView} from "@codemirror/next/view"
 
-/// Node prop stored on a grammar's top node to indicate the facet used
-/// to store language data related to that language.
+/// Node prop stored in a grammar's top syntax node to provide the
+/// facet that stores language data for that language.
 export const languageDataProp = new NodeProp<Facet<{[name: string]: any}>>()
 
 /// Helper function to define a facet (to be added to the top syntax
@@ -34,15 +34,14 @@ export class Language {
   /// The extension value to install this provider.
   readonly extension: Extension
 
-  /// The parser (with [language data
-  /// facet](#language.defineLanguageFacet) attached). Can be useful
-  /// when using this as a [nested
+  /// The parser object. Can be useful when using this as a [nested
   /// parser](https://lezer.codemirror.net/docs/ref#lezer.NestedParserSpec).
   parser: {startParse: (input: Input, startPos: number, context: ParseContext) => PartialParse}
 
   /// Construct a language object. You usually don't need to invoke
   /// this directly. But when you do, make sure you use
-  /// `defineLanguageFacet` to create the first argument.
+  /// [`defineLanguageFacet`](#language.defineLanguageFacet) to create
+  /// the first argument.
   constructor(
     /// The [language data](#state.EditorState.languageDataAt) data
     /// facet used for this language.
@@ -70,7 +69,7 @@ export class Language {
 
   /// Find the document regions that were parsed using this language.
   /// The returned regions will _include_ any nested languages rooted
-  /// in this language, if applicable.
+  /// in this language, when those exist.
   findRegions(state: EditorState) {
     let lang = state.facet(language)
     if (lang?.data == this.data) return [{from: 0, to: state.doc.length}]
@@ -135,7 +134,7 @@ function languageDataFacetAt(state: EditorState, pos: number) {
   return topLang.data
 }
 
-/// A subclass of `Language` for use with
+/// A subclass of [`Language`](#language.Language) for use with
 /// [Lezer](https://lezer.codemirror.net/docs/ref#lezer.Parser)
 /// parsers.
 export class LezerLanguage extends Language {
@@ -170,9 +169,8 @@ export class LezerLanguage extends Language {
 }
 
 /// Get the syntax tree for a state, which is the current (possibly
-/// incomplete) parse tree of the [language](#language.Language) with
-/// the highest precedence, or the empty tree if there is no language
-/// available.
+/// incomplete) parse tree of active [language](#language.Language),
+/// or the empty tree if there is no language available.
 export function syntaxTree(state: EditorState): Tree {
   let field = state.field(Language.state, false)
   return field ? field.tree : Tree.empty
@@ -181,7 +179,7 @@ export function syntaxTree(state: EditorState): Tree {
 /// Try to get a parse tree that spans at least up to `upto`. The
 /// method will do at most `timeout` milliseconds of work to parse
 /// up to that point if the tree isn't already available.
-export function ensureSyntaxTree(state: EditorState, upto: number, timeout = 100): Tree | null {
+export function ensureSyntaxTree(state: EditorState, upto: number, timeout = 50): Tree | null {
   let parse = state.field(Language.state, false)?.context
   return !parse ? null : parse.tree.length >= upto || parse.work(timeout, upto) ? parse.tree : null
 }
@@ -272,13 +270,13 @@ export class EditorParseContext implements ParseContext {
     private parser: {startParse(input: Input, pos: number, context: ParseContext): PartialParse},
     /// The current editor state.
     readonly state: EditorState,
-    /// Tree fragments that can be reused by new parses.
+    /// Tree fragments that can be reused by incremental re-parses.
     public fragments: readonly TreeFragment[] = [],
     /// @internal
     public tree: Tree,
-    /// The current editor viewport, or some approximation thereof.
-    /// Intended to be used for opportunistically avoiding work (in
-    /// which case
+    /// The current editor viewport (or some overapproximation
+    /// thereof). Intended to be used for opportunistically avoiding
+    /// work (in which case
     /// [`skipUntilInView`](#language.EditorParseContext.skipUntilInView)
     /// should be called to make sure the parser is restarted when the
     /// skipped region becomes visible).
@@ -510,7 +508,10 @@ export class LanguageSupport {
   constructor(
     /// The language object.
     readonly language: Language,
-    /// An optional set of supporting extensions.
+    /// An optional set of supporting extensions. When nesting a
+    /// language in another language, the outer language is encouraged
+    /// to include the supporting extensions for its inner languages
+    /// in its own set of support extensions.
     readonly support: Extension = []
   ) {
     this.extension = [language, support]
@@ -528,7 +529,7 @@ export class LanguageDescription {
   private loading: Promise<LanguageSupport> | null = null
 
   private constructor(
-    /// The name of this mode.
+    /// The name of this language.
     readonly name: string,
     /// Alternative names for the mode (lowercased, includes `this.name`).
     readonly alias: readonly string[],
@@ -580,7 +581,7 @@ export class LanguageDescription {
   }
 
   /// Look for a language whose name or alias matches the the given
-  /// name (case-insensitively). If `fuzzy` istrue, and no direct
+  /// name (case-insensitively). If `fuzzy` is true, and no direct
   /// matchs is found, this'll also search for a language whose name
   /// or alias occurs in the string (for names shorter than three
   /// characters, only when surrounded by non-word characters).

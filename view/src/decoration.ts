@@ -24,7 +24,7 @@ interface MarkDecorationSpec {
   /// range—content is split on mark starts and ends, and each piece
   /// gets its own element.
   tagName?: string
-  /// Decoration specs allow other properties, which can be retrieved
+  /// Decoration specs allow extra properties, which can be retrieved
   /// through the decoration's [`spec`](#view.Decoration.spec)
   /// property.
   [other: string]: any
@@ -74,10 +74,10 @@ interface LineDecorationSpec {
 }
 
 /// Widgets added to the content are described by subclasses of this
-/// class. This makes it possible to delay creating of the DOM
-/// structure for a widget until it is needed, and to avoid redrawing
-/// widgets even when the decorations that define them are recreated.
-/// `T` can be a type of value passed to instances of the widget type.
+/// class. Using a description object like that makes it possible to
+/// delay creating of the DOM structure for a widget until it is
+/// needed, and to avoid redrawing widgets even when the decorations
+/// that define them are recreated.
 export abstract class WidgetType {
   /// Build the DOM structure for this widget instance.
   abstract toDOM(view: EditorView): HTMLElement
@@ -85,9 +85,10 @@ export abstract class WidgetType {
   /// Compare this instance to another instance of the same type.
   /// (TypeScript can't express this, but only instances of the same
   /// specific class will be passed to this method.) This is used to
-  /// avoid redrawing widgets when they are replace by a new
+  /// avoid redrawing widgets when they are replaced by a new
   /// decoration of the same type. The default implementation just
-  /// returns `false`, which may be wasteful.
+  /// returns `false`, which will cause new instances of the widget to
+  /// always be redrawn.
   eq(_widget: WidgetType): boolean { return false }
 
   /// Update a DOM element created by a widget of the same type (but
@@ -148,7 +149,9 @@ export abstract class Decoration extends RangeValue {
     readonly endSide: number,
     /// @internal
     readonly widget: WidgetType | null,
-    /// The config object used to create this decoration.
+    /// The config object used to create this decoration. You can
+    /// include additional properties in there to store metadata about
+    /// your decoration.
     readonly spec: any) { super() }
 
   /// @internal
@@ -164,7 +167,7 @@ export abstract class Decoration extends RangeValue {
   /// DOM elements to be created. Nesting order is determined by
   /// precedence of the [facet](#view.EditorView^decorations) or
   /// (below the facet-provided decorations) [view
-  /// plugin](#view.PluginSpec.decorations). Such elements are broken
+  /// plugin](#view.PluginSpec.decorations). Such elements are split
   /// on line boundaries and on the boundaries of higher-precedence
   /// decorations.
   static mark(spec: MarkDecorationSpec): Decoration {
@@ -196,7 +199,8 @@ export abstract class Decoration extends RangeValue {
   }
 
   /// Build a [`DecorationSet`](#view.DecorationSet) from the given
-  /// decorated range or ranges.
+  /// decorated range or ranges. If the ranges aren't already sorted,
+  /// pass `true` for `sort` to make the library sort them for you.
   static set(of: Range<Decoration> | readonly Range<Decoration>[], sort = false): DecorationSet {
     return RangeSet.of<Decoration>(of, sort)
   }

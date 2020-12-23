@@ -43,7 +43,8 @@ interface GutterConfig {
   markers?: (view: EditorView) => (RangeSet<GutterMarker> | readonly RangeSet<GutterMarker>[])
   /// Can be used to optionally add a single marker to every line.
   lineMarker?: (view: EditorView, line: BlockInfo, otherMarkers: readonly GutterMarker[]) => GutterMarker | null
-  /// Use a spacer element that gives the gutter its base width.
+  /// Add a hidden spacer element that gives the gutter its base
+  /// width.
   initialSpacer?: null | ((view: EditorView) => GutterMarker)
   /// Update the spacer element when the view is updated.
   updateSpacer?: null | ((spacer: GutterMarker, update: ViewUpdate) => GutterMarker)
@@ -64,7 +65,8 @@ const defaults = {
 
 const activeGutters = Facet.define<Required<GutterConfig>>()
 
-/// Define an editor gutter.
+/// Define an editor gutter. The order in which the gutters appear is
+/// determined by their extension priority.
 export function gutter(config: GutterConfig): Extension {
   return [gutters(), activeGutters.of({...defaults, ...config})]
 }
@@ -118,7 +120,9 @@ const unfixGutters = Facet.define<boolean, boolean>({
 ///
 /// Unless `fixed` is explicitly set to `false`, the gutters are
 /// fixed, meaning they don't scroll along with the content
-/// horizontally.
+/// horizontally (except on Internet Explorer, which doesn't support
+/// CSS [`position:
+/// sticky`](https://developer.mozilla.org/en-US/docs/Web/CSS/position#sticky)).
 export function gutters(config?: {fixed?: boolean}): Extension {
   let result = [
     gutterView,
@@ -376,8 +380,7 @@ const lineNumberGutter = gutter({
   }
 })
 
-/// Create a line number gutter extension. The order in which the
-/// gutters appear is determined by their extension priority.
+/// Create a line number gutter extension.
 export function lineNumbers(config: LineNumberConfig = {}): Extension {
   return [
     lineNumberConfig.of(config),

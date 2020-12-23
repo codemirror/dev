@@ -3,14 +3,15 @@ import {EditorState, Facet} from "@codemirror/next/state"
 import {syntaxTree} from "./language"
 
 /// A facet that registers a code folding service. When called with
-/// the extent of a line, such a function should return a range
-/// object when a foldable that starts on that line (but continues
-/// beyond it), if one can be found.
+/// the extent of a line, such a function should return a foldable
+/// range that starts on that line (but continues beyond it), if one
+/// can be found.
 export const foldService = Facet.define<(state: EditorState, lineStart: number, lineEnd: number) => ({from: number, to: number} | null)>()
 
-/// This node prop is used to associate folding information with node
-/// types. Given a syntax node, it should check whether that tree is
-/// foldable and return the range that can be collapsed when it is.
+/// This node prop is used to associate folding information with
+/// syntax node types. Given a syntax node, it should check whether
+/// that tree is foldable and return the range that can be collapsed
+/// when it is.
 export const foldNodeProp = new NodeProp<(node: SyntaxNode, state: EditorState) => ({from: number, to: number} | null)>()
 
 function syntaxFolding(state: EditorState, start: number, end: number) {

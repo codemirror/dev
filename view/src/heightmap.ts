@@ -603,16 +603,14 @@ class NodeBuilder implements SpanIterator<Decoration> {
   static build(oracle: HeightOracle, decorations: readonly DecorationSet[],
                from: number, to: number): (HeightMap | null)[] {
     let builder = new NodeBuilder(from, oracle)
-    RangeSet.spans(decorations, from, to, builder)
+    RangeSet.spans(decorations, from, to, builder, 0)
     return builder.finish(from)
   }
-
-  get minPointSize() { return 0 }
 }
 
 export function heightRelevantDecoChanges(a: readonly DecorationSet[], b: readonly DecorationSet[], diff: ChangeSet) {
-  let comp = new DecorationComparator()
-  RangeSet.compare(a, b, diff, comp)
+  let comp = new DecorationComparator
+  RangeSet.compare(a, b, diff, comp, 0)
   return comp.changes
 }
 
@@ -624,6 +622,4 @@ class DecorationComparator {
   comparePoint(from: number, to: number, a: Decoration | null, b: Decoration | null) {
     if (from < to || a && a.heightRelevant || b && b.heightRelevant) addRange(from, to, this.changes, 5)
   }
-
-  get minPointSize() { return 0 }
 }

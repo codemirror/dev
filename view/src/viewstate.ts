@@ -342,9 +342,8 @@ export class ViewState {
     let ranges: {from: number, to: number}[] = []
     RangeSet.spans(deco, this.viewport.from, this.viewport.to, {
       span(from, to) { ranges.push({from, to}) },
-      point() {},
-      minPointSize: 20
-    })
+      point() {}
+    }, 20)
     this.visibleRanges = ranges
   }
 
@@ -379,9 +378,8 @@ function lineStructure(from: number, to: number, state: EditorState) {
     point(from, to) {
       if (from > pos) { ranges.push({from: pos, to: from}); total += from - pos }
       pos = to
-    },
-    minPointSize: 20 // We're only interested in collapsed ranges of a significant size
-  })
+    }
+  }, 20) // We're only interested in collapsed ranges of a significant size
   if (pos < to) { ranges.push({from: pos, to}); total += to - pos }
   return {total, ranges}
 }

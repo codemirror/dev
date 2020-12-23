@@ -1,5 +1,9 @@
 @Language
 
+@defineLanguageFacet
+
+@languageDataProp
+
 @language
 
 @EditorParseContext
@@ -14,7 +18,7 @@
 
 @LanguageDescription
 
-### Language metadata
+### Folding
 
 @foldService
 
@@ -22,23 +26,19 @@
 
 @foldable
 
+### Indentation
+
 @indentService
 
-@getIndentation
-
 @indentNodeProp
+
+@getIndentation
 
 @indentUnit
 
 @getIndentUnit
 
 @indentString
-
-@defineLanguageFacet
-
-@languageDataProp
-
-### Indentation
 
 @IndentContext
 
