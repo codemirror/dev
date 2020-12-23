@@ -1,9 +1,9 @@
-import {Tree, TreeFragment, NodeType, NodeProp, NodeSet, SyntaxNode, PartialParse} from "lezer-tree"
+import {Tree, TreeFragment, NodeType, NodeSet, SyntaxNode, PartialParse} from "lezer-tree"
 import {Input} from "lezer"
 import {Tag, tags, styleTags} from "@codemirror/next/highlight"
 import {Language, defineLanguageFacet, languageDataProp, IndentContext, indentService,
         EditorParseContext, getIndentUnit, syntaxTree} from "@codemirror/next/language"
-import {EditorState} from "@codemirror/next/state"
+import {EditorState, Facet} from "@codemirror/next/state"
 import {StringStream} from "./stringstream"
 
 export {StringStream}
@@ -35,11 +35,6 @@ export interface StreamParser<State> {
   /// Compute automatic indentation for the line that starts with the
   /// given state and text.
   indent?(state: State, textAfter: string, context: IndentContext): number | null
-  /// Syntax [node
-  /// props](https://lezer.codemirror.net/docs/ref#tree.NodeProp) to
-  /// be added to the wrapper node created around syntax 'trees'
-  /// created by this syntax.
-  docProps?: readonly [NodeProp<any>, any][],
   /// Default [language data](#state.EditorState.languageDataAt) to
   /// attach to this language.
   languageData?: {[name: string]: any}
@@ -52,7 +47,6 @@ function fullParser<State>(spec: StreamParser<State>): Required<StreamParser<Sta
     startState: spec.startState || (() => (true as any)),
     copyState: spec.copyState || defaultCopyState,
     indent: spec.indent || (() => null),
-    docProps: spec.docProps || [],
     languageData: spec.languageData || {}
   }
 }
@@ -83,7 +77,7 @@ export class StreamLanguage<State> extends Language {
     let startParse = (input: Input, startPos: number, context: EditorParseContext) => new Parse(this, input, startPos, context)
     super(data, {startParse}, [indentService.of((cx, pos) => this.getIndent(cx, pos))])
     this.streamParser = p
-    this.docType = docID(p.docProps.concat([[languageDataProp, data]]))
+    this.docType = docID(data)
     this.stateAfter = new WeakMap
   }
 
@@ -300,11 +294,8 @@ function createTokenType(tagStr: string) {
   return type.id
 }
 
-function docID(props: readonly [NodeProp<any>, any][]) {
-  if (props.length == 0) return tokenID("")
-  let obj = Object.create(null)
-  for (let [prop, value] of props) prop.set(obj, value)
+function docID(data: Facet<{[name: string]: any}>) {
   let id = typeArray.length
-  typeArray.push(new (NodeType as any)("document", obj, id))
+  typeArray.push(new (NodeType as any)("document", languageDataProp.set(Object.create(null), data), id))
   return id
 }
