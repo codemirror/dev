@@ -8,7 +8,7 @@ import {Viewport} from "./viewstate"
 import browser from "./browser"
 import {Decoration, DecorationSet, WidgetType, BlockType, addRange} from "./decoration"
 import {clientRectsFor, isEquivalentPosition, maxOffset, Rect, scrollRectIntoView, getSelection, hasSelection} from "./dom"
-import {ViewUpdate, PluginField, pluginDecorations, decorations as decorationsFacet,
+import {ViewUpdate, PluginField, decorations as decorationsFacet,
         UpdateFlag, editable, ChangedRange} from "./extension"
 import {EditorView} from "./editorview"
 
@@ -381,7 +381,7 @@ export class DocView extends ContentView {
       this.view.viewState.lineGapDeco,
       this.compositionDeco,
       ...this.view.state.facet(decorationsFacet),
-      ...this.view.pluginField(pluginDecorations)
+      ...this.view.pluginField(PluginField.decorations)
     ]
   }
 

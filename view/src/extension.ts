@@ -50,11 +50,13 @@ export const editable = Facet.define<boolean, boolean>({combine: values => value
 /// This is the interface plugin objects conform to.
 export interface PluginValue {
   /// Notifies the plugin of an update that happened in the view. This
-  /// is called _before_ the view updates its DOM. It is responsible
-  /// for updating the plugin's internal state (including any state
-  /// that may be read by plugin fields). It should _not_ change the
-  /// DOM, or read the DOM in a way that triggers a layout
-  /// recomputation.
+  /// is called _before_ the view updates its own DOM. It is
+  /// responsible for updating the plugin's internal state (including
+  /// any state that may be read by plugin fields) and _writing_ to
+  /// the DOM for the changes in the update. To avoid unnecessary
+  /// layout recomputations, it should _not_ read the DOM layout—use
+  /// [`requestMeasure`](#view.EditorView.requestMeasure) to schedule
+  /// your code in a DOM reading phase if you need to.
   update?(_update: ViewUpdate): void
 
   /// Called when the plugin is no longer going to be used. Should
@@ -90,6 +92,11 @@ export class PluginField<T> {
 
   /// Define a new plugin field.
   static define<T>() { return new PluginField<T>() }
+
+  /// This field can be used by plugins to provide
+  /// [decorations](#view.Decoration).
+  // FIXME somehow ensure that no replacing decorations end up in here
+  static decorations = PluginField.define<DecorationSet>()
 
   /// Plugins can provide additional scroll margins (space around the
   /// sides of the scrolling element that should be considered
@@ -151,7 +158,7 @@ export class ViewPlugin<V extends PluginValue> {
       fields.push(provider)
     if (eventHandlers)
       fields.push(domEventHandlers.from((value: V) => ({plugin: value, handlers: eventHandlers} as any)))
-    if (decorations) fields.push(pluginDecorations.from(decorations))
+    if (decorations) fields.push(PluginField.decorations.from(decorations))
     return new ViewPlugin<V>(nextPluginID++, create, fields)
   }
 
@@ -161,9 +168,6 @@ export class ViewPlugin<V extends PluginValue> {
     return ViewPlugin.define(view => new cls(view), spec)
   }
 }
-
-// FIXME somehow ensure that no replacing decorations end up in here
-export const pluginDecorations = PluginField.define<DecorationSet>()
 
 export const domEventHandlers = PluginField.define<{
   plugin: PluginValue,
