@@ -8,7 +8,19 @@ import {StyleModule} from "style-mod"
 
 interface SpecialCharConfig {
   /// An optional function that renders the placeholder elements.
-  render?: ((code: number, description: string | null, placeHolder: string) => HTMLElement) | null
+  ///
+  /// The `description` argument will be text that clarifies what the
+  /// character is, which should be provided to screen readers (for
+  /// example with the
+  /// [`aria-label`](https://www.w3.org/TR/wai-aria/#aria-label)
+  /// attribute) and optionally shown to the user in other ways (such
+  /// as the
+  /// [`title`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/title)
+  /// attribute).
+  ///
+  /// The given placeholder string is a suggestion for how to display
+  /// the character visually.
+  render?: ((code: number, description: string | null, placeholder: string) => HTMLElement) | null
   /// Regular expression that matches the special characters to
   /// highlight.
   specialChars?: RegExp
@@ -126,15 +138,15 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
   decorations: v => v.decorations
 })
 
+const DefaultPlaceholder = "\u2022"
+
 // Assigns placeholder characters from the Control Pictures block to
 // ASCII control characters
-function placeHolder(code: number): string | null {
-  if (code >= 32) return null
+function placeholder(code: number): string {
+  if (code >= 32) return DefaultPlaceholder
   if (code == 10) return "\u2424"
   return String.fromCharCode(9216 + code)
 }
-
-const DefaultPlaceholder = "\u2022"
 
 class SpecialCharWidget extends WidgetType {
   constructor(readonly options: Required<SpecialCharConfig>,
@@ -143,8 +155,8 @@ class SpecialCharWidget extends WidgetType {
   eq(other: SpecialCharWidget) { return other.code == this.code }
 
   toDOM() {
-    let ph = placeHolder(this.code) || DefaultPlaceholder
-    let desc = "Control character " + (Names[this.code] || this.code)
+    let ph = placeholder(this.code)
+    let desc = "Control character " + (Names[this.code] || "0x" + this.code.toString(16))
     let custom = this.options.render && this.options.render(this.code, desc, ph)
     if (custom) return custom
     let span = document.createElement("span")

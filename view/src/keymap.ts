@@ -2,7 +2,7 @@ import {EditorView} from "./editorview"
 import {Command} from "./extension"
 import {modifierCodes} from "./input"
 import {base, keyName} from "w3c-keyname"
-import {Facet} from "@codemirror/next/state"
+import {Facet, EditorState} from "@codemirror/next/state"
 
 /// Key bindings associate key names with
 /// [command](#view.Command)-style functions.
@@ -45,8 +45,7 @@ export interface KeyBinding {
   run: Command,
   /// When given, this defines a second binding, using the (possibly
   /// platform-specific) key name prefixed with `Shift-` to activate
-  /// this command. This is mostly useful for cursor-motion commands
-  /// that also have a cursor-extending variant.
+  /// this command.
   shift?: Command
   /// By default, key bindings apply when focus is on the editor
   /// content (the `"editor"` scope). Some extensions, mostly those
@@ -108,7 +107,7 @@ type Keymap = {[scope: string]: {[key: string]: Binding}}
 
 const handleKeyEvents = EditorView.domEventHandlers({
   keydown(event, view) {
-    return runHandlers(view.state.facet(keymap), event, view, "editor")
+    return runHandlers(getKeymap(view.state), event, view, "editor")
   }
 })
 
@@ -118,17 +117,24 @@ const handleKeyEvents = EditorView.domEventHandlers({
 /// determine their precedence (the ones specified early or with high
 /// priority get checked first). When a handler has returned `true`
 /// for a given key, no further handlers are called.
-export const keymap = Facet.define<readonly KeyBinding[], Keymap>({
-  combine(bindings: readonly (readonly KeyBinding[])[]) {
-    return buildKeymap(bindings.length ? bindings.reduce((a, b) => a.concat(b)) : [])
-  },
-  enables: handleKeyEvents
-})
+export const keymap = Facet.define<readonly KeyBinding[]>({enables: handleKeyEvents})
 
-/// Run the key handlers registered for a given scope. Returns true if
-/// any of them handled the event.
+const Keymaps = new WeakMap<readonly (readonly KeyBinding[])[], Keymap>()
+
+// This is hidden behind an indirection, rather than directly computed
+// by the facet, to keep internal types out of the facet's type.
+function getKeymap(state: EditorState) {
+  let bindings = state.facet(keymap)
+  let map = Keymaps.get(bindings)
+  if (!map) Keymaps.set(bindings, map = buildKeymap(bindings.reduce((a, b) => a.concat(b), [])))
+  return map
+}
+
+/// Run the key handlers registered for a given scope. The event
+/// object should be `"keydown"` event. Returns true if any of the
+/// handlers handled it.
 export function runScopeHandlers(view: EditorView, event: KeyboardEvent, scope: string) {
-  return runHandlers(view.state.facet(keymap), event, view, scope)
+  return runHandlers(getKeymap(view.state), event, view, scope)
 }
 
 let storedPrefix: {view: EditorView, prefix: string, scope: string} | null = null
