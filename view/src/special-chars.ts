@@ -87,7 +87,7 @@ const specialCharPlugin = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
-    let confChange = update.prevState.facet(specialCharConfig) != update.state.facet(specialCharConfig)
+    let confChange = update.startState.facet(specialCharConfig) != update.state.facet(specialCharConfig)
     if (confChange) this.decorationCache = Object.create(null)
     if (confChange || update.changes.length || update.viewportChanged) this.recompute()
   }

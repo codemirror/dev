@@ -77,7 +77,7 @@ export class DocView extends ContentView {
     // This forces a selection update when lines are joined to work
     // around that. Issue #54
     let forceSelection = (browser.ie || browser.chrome) && !this.compositionDeco.size && update &&
-      update.state.doc.lines != update.prevState.doc.lines
+      update.state.doc.lines != update.startState.doc.lines
 
     let prevDeco = this.decorations, deco = this.updateDeco()
     let decoDiff = findChangedDeco(prevDeco, deco, update.changes)
@@ -91,7 +91,7 @@ export class DocView extends ContentView {
       this.updateSelection(forceSelection, pointerSel)
       return false
     } else {
-      this.updateInner(changedRanges, deco, update.prevState.doc.length, forceSelection, pointerSel)
+      this.updateInner(changedRanges, deco, update.startState.doc.length, forceSelection, pointerSel)
       return true
     }
   }

@@ -247,7 +247,7 @@ export class EditorView {
   }
 
   private updatePlugins(update: ViewUpdate) {
-    let prevSpecs = update.prevState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
+    let prevSpecs = update.startState.facet(viewPlugin), specs = update.state.facet(viewPlugin)
     if (prevSpecs != specs) {
       let newPlugins = []
       for (let spec of specs) {

@@ -86,6 +86,9 @@ export class PluginFieldProvider<V> {
 /// values that can be retrieved through the
 /// [`pluginField`](#view.EditorView.pluginField) view method.
 export class PluginField<T> {
+  /// Create a [provider](#view.PluginFieldProvider) for this field,
+  /// to use with a plugin's [provide](#view.PluginSpec.provide)
+  /// option.
   from<V extends PluginValue>(get: (value: V) => T): PluginFieldProvider<V> {
     return new PluginFieldProvider(this, get)
   }
@@ -296,7 +299,7 @@ export class ViewUpdate {
   /// The changes made to the document by this update.
   readonly changes: ChangeSet
   /// The previous editor state.
-  readonly prevState: EditorState
+  readonly startState: EditorState
   /// @internal
   flags = 0
   /// @internal
@@ -311,8 +314,8 @@ export class ViewUpdate {
     /// The transactions involved in the update. May be empty.
     readonly transactions: readonly Transaction[] = none
   ) {
-    this.prevState = view.state
-    this.changes = ChangeSet.empty(this.prevState.doc.length)
+    this.startState = view.state
+    this.changes = ChangeSet.empty(this.startState.doc.length)
     for (let tr of transactions) this.changes = this.changes.compose(tr.changes)
     let changedRanges: ChangedRange[] = []
     this.changes.iterChangedRanges((fromA, toA, fromB, toB) => changedRanges.push(new ChangedRange(fromA, toA, fromB, toB)))

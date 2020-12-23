@@ -99,7 +99,7 @@ const drawSelectionPlugin = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
-    let confChanged = update.prevState.facet(selectionConfig) != update.state.facet(selectionConfig)
+    let confChanged = update.startState.facet(selectionConfig) != update.state.facet(selectionConfig)
     if (confChanged || update.selectionSet || update.geometryChanged || update.viewportChanged)
       this.view.requestMeasure(this.measureReq)
     if (update.transactions.some(tr => tr.scrollIntoView))

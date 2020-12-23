@@ -98,7 +98,7 @@ class CompletionTooltip {
   mount() { this.updateSel() }
 
   update(update: ViewUpdate) {
-    if (update.state.field(this.stateField) != update.prevState.field(this.stateField))
+    if (update.state.field(this.stateField) != update.startState.field(this.stateField))
       this.updateSel()
   }
 

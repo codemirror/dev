@@ -58,7 +58,7 @@ const searchHighlighter = ViewPlugin.fromClass(class {
 
   update(update: ViewUpdate) {
     let state = update.state.field(searchState)
-    if (state != update.prevState.field(searchState) || update.docChanged || update.selectionSet)
+    if (state != update.startState.field(searchState) || update.docChanged || update.selectionSet)
       this.decorations = this.highlight(state)
   }
 

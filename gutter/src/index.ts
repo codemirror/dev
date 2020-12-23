@@ -172,7 +172,7 @@ const gutterView = ViewPlugin.fromClass(class {
   }
 
   updateGutters(update: ViewUpdate) {
-    let prev = update.prevState.facet(activeGutters), cur = update.state.facet(activeGutters)
+    let prev = update.startState.facet(activeGutters), cur = update.state.facet(activeGutters)
     let change = update.docChanged || update.heightChanged || update.viewportChanged
     if (prev == cur) {
       for (let gutter of this.gutters) if (gutter.update(update)) change = true

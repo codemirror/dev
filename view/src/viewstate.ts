@@ -132,7 +132,7 @@ export class ViewState {
     let contentChanges = update.changedRanges
     
     let heightChanges = ChangedRange.extendWithRanges(contentChanges, heightRelevantDecoChanges(
-      update.prevState.facet(decorations), newDeco, update ? update.changes : ChangeSet.empty(this.state.doc.length)))
+      update.startState.facet(decorations), newDeco, update ? update.changes : ChangeSet.empty(this.state.doc.length)))
     let prevHeight = this.heightMap.height
     this.heightMap = this.heightMap.applyChanges(newDeco, prev.doc, this.heightOracle.setDoc(this.state.doc), heightChanges)
     if (this.heightMap.height != prevHeight) update.flags |= UpdateFlag.Height

@@ -35,7 +35,7 @@ describe("EditorView extension", () => {
       prevDoc = view.state.doc
       return {
         update(update: ViewUpdate) {
-          ist(update.prevState.doc, prevDoc)
+          ist(update.startState.doc, prevDoc)
           ist(update.state.doc, cm.state.doc)
           prevDoc = cm.state.doc
           updates++

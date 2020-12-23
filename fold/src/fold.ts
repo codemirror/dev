@@ -225,7 +225,7 @@ export function foldGutter(config: FoldGutterConfig = {}): Extension {
     update(update: ViewUpdate) {
       let firstChange = -1
       update.changes.iterChangedRanges(from => { if (firstChange < 0) firstChange = from })
-      let foldChange = update.prevState.field(foldState, false) != update.state.field(foldState, false)
+      let foldChange = update.startState.field(foldState, false) != update.state.field(foldState, false)
       if (!foldChange && update.docChanged && update.view.viewport.from == this.from && firstChange > this.from) {
         let start = update.view.visualLineAt(firstChange).from
         this.markers = this.markers.update({

@@ -51,7 +51,7 @@ function rectangleSelectionStyle(view: EditorView, event: MouseEvent) {
   return {
     update(update) {
       if (update.docChanged) {
-        let newStart = update.changes.mapPos(update.prevState.doc.line(start.line).from)
+        let newStart = update.changes.mapPos(update.startState.doc.line(start.line).from)
         let newLine = update.state.doc.lineAt(newStart)
         start = {line: newLine.number, col: start.col, off: Math.min(start.off, newLine.length)}
         startSel = startSel.map(update.changes)

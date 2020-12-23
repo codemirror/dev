@@ -76,7 +76,7 @@ export const completionPlugin = ViewPlugin.fromClass(class implements PluginValu
 
   update(update: ViewUpdate) {
     let cState = update.state.field(completionState)
-    if (!update.selectionSet && !update.docChanged && update.prevState.field(completionState) == cState) return
+    if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState) return
 
     let doesReset = update.transactions.some(tr => {
       let event = tr.annotation(Transaction.userEvent)
