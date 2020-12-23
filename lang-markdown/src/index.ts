@@ -23,10 +23,13 @@ export function markdown(config: {
   /// matching language (with
   /// [`LanguageDescription.matchLanguageName`](#language.LanguageDescripton^.matchLanguageName))
   /// when a fenced code block has an info string.
-  codeLanguages?: readonly LanguageDescription[]
+  codeLanguages?: readonly LanguageDescription[],
+  /// Set this to false to disable installation of the Markdown
+  /// [keymap](#lang-markdown.markdownKeymap).
+  addKeymap?: boolean
 } = {}) {
-  let {codeLanguages, defaultCodeLanguage} = config
+  let {codeLanguages, defaultCodeLanguage, addKeymap = true} = config
   let language = codeLanguages || defaultCodeLanguage ? markdownWithCodeLanguages(codeLanguages || [], defaultCodeLanguage)
     : markdownLanguage
-  return new LanguageSupport(language, Prec.extend(keymap.of(markdownKeymap)))
+  return new LanguageSupport(language, addKeymap ? Prec.extend(keymap.of(markdownKeymap)) : [])
 }

@@ -14,7 +14,7 @@ export interface CommentTokens {
 }
 
 /// Comment or uncomment the current selection. Will use line comments
-/// if possible, otherwise falling back to block comments.
+/// if available, otherwise falling back to block comments.
 export const toggleComment: StateCommand = target => {
   let config = getConfig(target.state)
   return config.line ? toggleLineComment(target) : config.block ? toggleBlockComment(target) : false

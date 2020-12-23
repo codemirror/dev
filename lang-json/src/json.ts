@@ -3,8 +3,6 @@ import {continuedIndent, indentNodeProp, foldNodeProp, LezerLanguage, LanguageSu
 import {SyntaxNode} from "lezer-tree"
 import {styleTags, tags as t} from "@codemirror/next/highlight"
 
-export {jsonParseLinter} from "./lint"
-
 /// A language provider that provides JSON parsing.
 export const jsonLanguage = LezerLanguage.define({
   parser: parser.configure({
@@ -39,3 +37,5 @@ export const jsonLanguage = LezerLanguage.define({
 export function json() {
   return new LanguageSupport(jsonLanguage)
 }
+
+export {jsonParseLinter} from "./lint"
