@@ -9,7 +9,8 @@ import {MakeSelectionStyle} from "./input"
 /// Command functions are used in key bindings and other types of user
 /// actions. Given an editor view, they check whether their effect can
 /// apply to the editor, and if it can, perform it as a side effect
-/// (which usually means dispatching a transaction) and return `true`.
+/// (which usually means [dispatching](#view.EditorView.dispatch) a
+/// transaction) and return `true`.
 export type Command = (target: EditorView) => boolean
 
 const none: readonly any[] = []
@@ -112,9 +113,9 @@ export interface PluginSpec<V extends PluginValue> {
   eventHandlers?: DOMEventHandlers<V>,
 
   /// Allow the plugin to provide decorations. When given, this should
-  /// contain one or more functions that take the plugin value and
-  /// return a [decoration set](#view.DecorationSet).
-  decorations?: (value: V) => DecorationSet | readonly ((value: V) => DecorationSet)[]
+  /// a function that take the plugin value and return a [decoration
+  /// set](#view.DecorationSet).
+  decorations?: (value: V) => DecorationSet
 
   /// Specify that the plugin provides [plugin
   /// field](#view.PluginField) values. Use a field's
@@ -150,8 +151,7 @@ export class ViewPlugin<V extends PluginValue> {
       fields.push(provider)
     if (eventHandlers)
       fields.push(domEventHandlers.from((value: V) => ({plugin: value, handlers: eventHandlers} as any)))
-    if (decorations) for (let get of Array.isArray(decorations) ? decorations : [decorations])
-      fields.push(pluginDecorations.from(get))
+    if (decorations) fields.push(pluginDecorations.from(decorations))
     return new ViewPlugin<V>(nextPluginID++, create, fields)
   }
 
