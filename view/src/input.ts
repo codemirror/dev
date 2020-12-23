@@ -153,7 +153,7 @@ export interface MouseSelectionStyle {
   /// new selection should be added to the original selection.
   get: (curEvent: MouseEvent, extend: boolean, multiple: boolean) => EditorSelection
   /// Called when the view is updated while the gesture is in
-  /// progress. When the document changed, it may be necessary to map
+  /// progress. When the document changes, it may be necessary to map
   /// some data (like the original selection or start position)
   /// through the changes.
   update: (update: ViewUpdate) => void

@@ -1,6 +1,6 @@
 /// Utility function for combining behaviors to fill in a config
 /// object from an array of provided configs. Will, by default, error
-/// when a field gets two values that aren't ===-equal, but you can
+/// when a field gets two values that aren't `===`-equal, but you can
 /// provide combine functions per field to do something else.
 export function combineConfig<Config>(
   configs: readonly Partial<Config>[],

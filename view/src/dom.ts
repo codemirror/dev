@@ -76,7 +76,12 @@ export function maxOffset(node: Node): number {
 }
 
 /// Basic rectangle type.
-export interface Rect {left: number, right: number, top: number, bottom: number}
+export interface Rect {
+  readonly left: number
+  readonly right: number
+  readonly top: number
+  readonly bottom: number
+}
 
 export function flattenRect(rect: Rect, left: boolean) {
   let x = left ? rect.left : rect.right

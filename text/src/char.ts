@@ -64,7 +64,7 @@ function prevClusterBreak(str: string, pos: number) {
 function surrogateLow(ch: number) { return ch >= 0xDC00 && ch < 0xE000 }
 function surrogateHigh(ch: number) { return ch >= 0xD800 && ch < 0xDC00 }
 
-/// Find the code point at the given position in a string (as in the
+/// Find the code point at the given position in a string (like the
 /// [`codePointAt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/codePointAt)
 /// string method).
 export function codePointAt(str: string, pos: number) {
@@ -76,8 +76,8 @@ export function codePointAt(str: string, pos: number) {
 }
 
 /// Given a Unicode codepoint, return the JavaScript string that
-/// respresents it (as in
-/// [`String.fromCodePoint`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/fromCodePoint).
+/// respresents it (like
+/// [`String.fromCodePoint`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/fromCodePoint)).
 export function fromCodePoint(code: number) {
   if (code <= 0xffff) return String.fromCharCode(code)
   code -= 0x10000

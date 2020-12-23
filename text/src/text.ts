@@ -17,8 +17,8 @@ export interface TextIterator extends Iterator<string> {
   /// positions after the current position. Always returns the object
   /// itself.
   next(skip?: number): this
-  /// The current string. Will be `""` when the cursor is at its end
-  /// or `next` hasn't been called on it yet.
+  /// The current string. Will be the empty string when the cursor is
+  /// at its end or `next` hasn't been called on it yet.
   value: string
   /// Whether the end of the iteration has been reached. You should
   /// probably check this right after calling `next`.
@@ -111,7 +111,7 @@ export abstract class Text implements Iterable<string> {
   toString() { return this.sliceString(0) }
 
   /// Convert the document to an array of lines (which can be
-  /// deserialized again via [`Text.of`](#text.Text^of).
+  /// deserialized again via [`Text.of`](#text.Text^of)).
   toJSON() {
     let lines: string[] = []
     this.flatten(lines)
@@ -128,7 +128,7 @@ export abstract class Text implements Iterable<string> {
     return text.length <= Tree.Branch ? new TextLeaf(text) : TextNode.from(TextLeaf.split(text, []))
   }
 
-  /// The empty text.
+  /// The empty document.
   static empty: Text
 }
 

@@ -7,7 +7,7 @@ export enum Direction {
   // terms, of spans in that direction.)
   /// Left-to-right.
   LTR = 0,
-  /// Right-to-left
+  /// Right-to-left.
   RTL = 1
 }
 

@@ -58,7 +58,8 @@ export class SelectionRange {
 
   /// The goal column (stored vertical offset) associated with a
   /// cursor. This is used to preserve the vertical position when
-  /// moving across different-length lines.
+  /// [moving](#view.EditorView.moveVertically) across
+  /// lines of different length.
   get goalColumn() {
     let value = this.flags >> RangeFlag.GoalColumnOffset
     return value == RangeFlag.NoGoalColumn ? undefined : value
