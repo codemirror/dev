@@ -9,6 +9,7 @@ const ie = !!(ie_upto10 || ie_11up || ie_edge)
 const gecko = !ie && /gecko\/(\d+)/i.test(nav.userAgent)
 const chrome = !ie && /Chrome\/(\d+)/.exec(nav.userAgent)
 const webkit = "webkitFontSmoothing" in doc.documentElement.style
+const safari = !ie && /Apple Computer/.test(nav.vendor)
 
 export default {
   mac: /Mac/.test(nav.platform),
@@ -18,10 +19,10 @@ export default {
   gecko_version: gecko ? +(/Firefox\/(\d+)/.exec(nav.userAgent) || [0, 0])[1] : 0,
   chrome: !!chrome,
   chrome_version: chrome ? +chrome[1] : 0,
-  ios: !ie && /AppleWebKit/.test(nav.userAgent) && (/Mobile\/\w+/.test(nav.userAgent) || nav.maxTouchPoints > 2),
+  ios: safari && (/Mobile\/\w+/.test(nav.userAgent) || nav.maxTouchPoints > 2),
   android: /Android\b/.test(nav.userAgent),
   webkit,
-  safari: /Apple Computer/.test(nav.vendor),
+  safari,
   webkit_version: webkit ? +(/\bAppleWebKit\/(\d+)/.exec(navigator.userAgent) || [0, 0])[1] : 0,
   tabSize: doc.documentElement.style.tabSize != null ? "tab-size" : "-moz-tab-size"
 }
