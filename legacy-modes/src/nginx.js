@@ -155,6 +155,6 @@ export const nginx = {
   },
 
   languageData: {
-    indentOnInput: /^\s*\}/
+    indentOnInput: /^\s*\}$/
   }
 };

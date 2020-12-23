@@ -165,7 +165,7 @@ export const vhdl = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {line: "--"}
   }
 }

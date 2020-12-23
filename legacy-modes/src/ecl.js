@@ -182,6 +182,6 @@ export const ecl = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/
+    indentOnInput: /^\s*[{}]$/
   }
 };

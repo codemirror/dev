@@ -247,7 +247,7 @@ export const ttcn = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
     autocomplete: wordList
   }

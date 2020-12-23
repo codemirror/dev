@@ -113,7 +113,7 @@ export const dtd = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[\]>]/
+    indentOnInput: /^\s*[\]>]$/
   }
 };
 

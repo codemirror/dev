@@ -170,6 +170,6 @@ export const sieve = {
   },
 
   languageData: {
-    indentOnInput: /^\s*\}/
+    indentOnInput: /^\s*\}$/
   }
 };

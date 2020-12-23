@@ -182,7 +182,7 @@ export function asn1(parserConfig) {
     },
 
     languageData: {
-      indentOnInput: /^\s*[{}]/,
+      indentOnInput: /^\s*[{}]$/,
       commentTokens: {line: "--"}
     }
   };

@@ -394,7 +394,7 @@ export const julia = {
   },
 
   languageData: {
-    indentOnInput: /^\s*(end|else|catch|finally)\b/,
+    indentOnInput: /^\s*(end|else|catch|finally)\b$/,
     commentTokens: {line: "#", block: {open: "#=", close: "=#"}},
     closeBrackets: {brackets: ["(", "[", "{", '"']},
     autocomplete: keywordsList.concat(builtinsList)

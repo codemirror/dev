@@ -416,7 +416,7 @@ export const haxe = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {line: "//", block: {open: "/*", close: "*/"}}
   }
 };

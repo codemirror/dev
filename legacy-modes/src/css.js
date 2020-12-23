@@ -394,7 +394,7 @@ export function mkCSS(parserConfig) {
     },
 
     languageData: {
-      indentOnInput: /^\s*\}/,
+      indentOnInput: /^\s*\}$/,
       commentTokens: {line: lineComment, block: {open: "/*", close: "*/"}},
       autocomplete: allWords
     }

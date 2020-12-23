@@ -114,7 +114,7 @@ export const pascal = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {block: {open: "(*", close: "*)"}}
   }
 };

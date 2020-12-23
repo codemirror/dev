@@ -740,7 +740,7 @@ export const stylus = {
     return indent;
   },
   languageData: {
-    indentOnInput: /^\s*\}/,
+    indentOnInput: /^\s*\}$/,
     commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
     autocomplete: hintWords
   }

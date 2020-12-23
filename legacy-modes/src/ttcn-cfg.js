@@ -192,7 +192,7 @@ export const ttcnCfg = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {line: "#"}
   }
 };

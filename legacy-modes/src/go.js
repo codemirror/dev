@@ -158,7 +158,7 @@ export const go = {
   },
 
   languageData: {
-    indentOnInput: /^\s([{}]|case |default\s*:)/,
+    indentOnInput: /^\s([{}]|case |default\s*:)$/,
     commentTokens: {line: "//", block: {open: "/*", close: "*/"}}
   }
 };

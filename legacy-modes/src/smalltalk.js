@@ -144,6 +144,6 @@ export const smalltalk = {
   },
 
   languageData: {
-    indentOnInput: /^\s*\]/
+    indentOnInput: /^\s*\]$/
   }
 }

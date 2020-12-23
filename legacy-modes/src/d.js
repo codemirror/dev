@@ -196,7 +196,7 @@ export const d = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {line: "//", block: {open: "/*", close: "*/"}}
   }
 };

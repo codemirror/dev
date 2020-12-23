@@ -206,7 +206,7 @@ export const groovy = {
   },
 
   languageData: {
-    indentOnInput: /^\s*[{}]/,
+    indentOnInput: /^\s*[{}]$/,
     commentTokens: {line: "//", block: {open: "/*", close: "*/"}},
     closeBrackets: {brackets: ["(", "[", "{", "'", '"', "'''", '"""']}
   }
