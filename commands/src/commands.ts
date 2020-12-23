@@ -113,7 +113,7 @@ function moveByLineBoundary(view: EditorView, start: SelectionRange, forward: bo
     moved = view.moveToLineBoundary(start, forward, false)
   if (!forward && moved.head == line.from && line.length) {
     let space = /^\s*/.exec(view.state.sliceDoc(line.from, Math.min(line.from + 100, line.to)))![0].length
-    if (space && start.head > line.from + space) moved = EditorSelection.cursor(line.from + space)
+    if (space && start.head != line.from + space) moved = EditorSelection.cursor(line.from + space)
   }
   return moved
 }
