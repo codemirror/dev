@@ -12,18 +12,18 @@ let nextTagID = 0
 /// tree by a language mode, and then mapped to an actual CSS style by
 /// a [highlight style](#highlight.highlightStyle).
 ///
-/// CodeMirror uses a mostly-closed set of tags for generic
-/// highlighters, so that the list of things that a theme must style
-/// is clear and bounded (as opposed to traditional open string-based
-/// systems, which make it hard for highlighting themes to cover all
-/// the tokens produced by the various languages).
+/// Because syntax tree node types and highlight styles have to be
+/// able to talk the same language, CodeMirror uses a mostly _closed_
+/// [vocabulary](#highlight.tags) of syntax tags (as opposed to
+/// traditional open string-based systems, which make it hard for
+/// highlighting themes to cover all the tokens produced by the
+/// various languages).
 ///
 /// It _is_ possible to [define](#highlight.Tag^define) your own
 /// highlighting tags for system-internal use (where you control both
 /// the language package and the highlighter), but such tags will not
-/// be picked up by other highlighters (though you can derive them
-/// from standard tags to allow the highlighters to fall back to
-/// those).
+/// be picked up by regular highlighters (though you can derive them
+/// from standard tags to allow highlighters to fall back to those).
 export class Tag {
   /// @internal
   id = nextTagID++
@@ -122,7 +122,7 @@ function permute<T>(array: readonly T[]): (readonly T[])[] {
 /// trees make it rather hard to reason about what they would match.)
 ///
 /// A path can be ended with `/...` to indicate that the tag assigned
-/// to the node should also apply to all parent nodes, even if they
+/// to the node should also apply to all child nodes, even if they
 /// match their own style (by default, only the innermost style is
 /// used).
 ///
@@ -147,7 +147,7 @@ function permute<T>(array: readonly T[]): (readonly T[])[] {
 ///     // Add a style to all content inside Italic nodes
 ///     "Italic/...": tags.emphasis,
 ///     // Style InvalidString nodes as both `string` and `invalid`
-///     "InvalidString": tags.string + tags.invalid,
+///     "InvalidString": [tags.string, tags.invalid],
 ///     // Style the node named "/" as punctuation
 ///     '"/"': tags.punctuation
 ///   })
@@ -211,7 +211,10 @@ export class HighlightStyle {
   /// Extension that registers this style with an editor.
   readonly extension: Extension
 
-  /// A style module holding the CSS rules for this highlight style. If you use 
+  /// A style module holding the CSS rules for this highlight style.
+  /// When using
+  /// [`highlightTree`](#highlight.HighlightStyle.highlightTree), you
+  /// may want to manually mount this module to show the highlighting.
   readonly module: StyleModule
 
   private map: {[tagID: number]: string | null} = Object.create(null)
@@ -246,12 +249,12 @@ export class HighlightStyle {
     return this.map[tag.id] = null
   }
 
-  /// Create a highlighter style that associates the given styles to the
-  /// given tags. The spec's property names must be
-  /// [tags](#highlight.Tag) or lists of tags (which can be concatenated
-  /// with `+`). The values should be
-  /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)
-  /// style objects that define the CSS for that tag.
+  /// Create a highlighter style that associates the given styles to
+  /// the given tags. The spec must be objects that hold a style tag
+  /// or array of tags in their `tag` property, and
+  /// [`style-mod`](https://github.com/marijnh/style-mod#documentation)-style
+  /// CSS properties in further properties (which define the styling
+  /// for those tags).
   ///
   /// The CSS rules created for a highlighter will be emitted in the
   /// order of the spec's properties. That means that for elements that
@@ -399,19 +402,19 @@ const comment = t(), name = t(),
 /// The default set of highlighting [tags](#highlight.Tag^define) used
 /// by regular language packages and themes.
 ///
-/// This collection is heavily biasted towards programming language,
+/// This collection is heavily biased towards programming languages,
 /// and necessarily incomplete. A full ontology of syntactic
 /// constructs would fill a stack of books, and be impractical to
-/// write themes for. So try to make do with this set, possibly
-/// encoding more information with flags. If all else fails, [open an
+/// write themes for. So try to make do with this set. If all else
+/// fails, [open an
 /// issue](https://github.com/codemirror/codemirror.next) to propose a
-/// new type, or [define](#highlight.Tag^define) a custom tag for your
-/// use case.
+/// new tag, or [define](#highlight.Tag^define) a local custom tag for
+/// your use case.
 ///
 /// Note that it is not obligatory to always attach the most specific
 /// tag possible to an element—if your grammar can't easily
-/// distinguish a certain type of element, it is okay to style it as
-/// its more general variant.
+/// distinguish a certain type of element (such as a local variable),
+/// it is okay to style it as its more general variant (a variable).
 /// 
 /// For tags that extend some parent tag, the documentation links to
 /// the parent.
@@ -523,10 +526,10 @@ export const tags = {
   /// tokens).
   squareBracket: t(bracket),
   /// Parentheses (usually `(` and `)` tokens). Subtag of
-  /// [bracket](#highlight.tags.bracket)).
+  /// [bracket](#highlight.tags.bracket).
   paren: t(bracket),
   /// Braces (usually `{` and `}` tokens). Subtag of
-  /// [bracket](#highlight.tags.bracket)).
+  /// [bracket](#highlight.tags.bracket).
   brace: t(bracket),
 
   /// Content, for example plain text in XML or markup documents.
@@ -561,11 +564,11 @@ export const tags = {
   /// monospace.
   monospace: t(content),
 
-  /// Inserted content in a change-tracking format.
+  /// Inserted text in a change-tracking format.
   inserted: t(),
-  /// Deleted content.
+  /// Deleted text.
   deleted: t(),
-  /// Changed content.
+  /// Changed text.
   changed: t(),
 
   /// An invalid or unsyntactic element.
@@ -580,7 +583,7 @@ export const tags = {
   /// attributes to a given syntactic element.
   annotation: t(meta),
   /// Processing instruction or preprocessor directive. Subtag of
-  /// [meta](#highlight.tags.meta)).
+  /// [meta](#highlight.tags.meta).
   processingInstruction: t(meta),
 
   /// [Modifier](#highlight.Tag^defineModifier) that indicates that a
@@ -598,7 +601,7 @@ export const tags = {
   function: Tag.defineModifier(),
   /// [Modifier](#highlight.Tag^defineModifier) that can be applied to
   /// [names](#highlight.tags.name) to indicate that they belong to
-  /// the standard environment.
+  /// the language's standard environment.
   standard: Tag.defineModifier(),
   /// [Modifier](#highlight.Tag^defineModifier) that indicates a given
   /// [names](#highlight.tags.name) is local to some scope.

@@ -1,5 +1,7 @@
 @bracketMatching
 
+@Config
+
 @matchBrackets
 
 @MatchResult

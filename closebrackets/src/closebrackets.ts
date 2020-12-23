@@ -57,8 +57,9 @@ const bracketState = StateField.define<RangeSet<typeof closedBracket>>({
 
 /// Extension to enable bracket-closing behavior. When a closeable
 /// bracket is typed, its closing bracket is immediately inserted
-/// after the cursor. When closing a bracket directly in front of that
-/// closing bracket, the cursor moves over the existing bracket.
+/// after the cursor. When closing a bracket directly in front of a
+/// closing bracket inserted by the extension, the cursor moves over
+/// that bracket.
 export function closeBrackets(): Extension {
   return [EditorView.inputHandler.of(handleInput), bracketState]
 }

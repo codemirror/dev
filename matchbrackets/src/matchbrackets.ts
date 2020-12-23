@@ -4,7 +4,7 @@ import {EditorView, themeClass} from "@codemirror/next/view"
 import {Decoration, DecorationSet} from "@codemirror/next/view"
 import {Tree, SyntaxNode, NodeType, NodeProp} from "lezer-tree"
 
-interface Config {
+export interface Config {
   /// Whether the bracket matching should look at the character after
   /// the cursor when matching (if the one before isn't a bracket).
   /// Defaults to true.

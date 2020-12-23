@@ -209,8 +209,8 @@ class FoldMarker extends GutterMarker {
 }
 
 /// Create an extension that registers a fold gutter, which shows a
-/// fold status indicator before lines, which can be clicked to fold
-/// or unfold the line.
+/// fold status indicator before foldable lines (which can be clicked
+/// to fold or unfold the line).
 export function foldGutter(config: FoldGutterConfig = {}): Extension {
   let fullConfig = {...foldGutterDefaults, ...config}
   let canFold = new FoldMarker(fullConfig, true), canUnfold = new FoldMarker(fullConfig, false)

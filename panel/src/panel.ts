@@ -49,8 +49,9 @@ export interface Panel {
   pos?: number
 }
 
-/// Opening a panel is done by providing an object describing the
-/// panel through this facet.
+/// Opening a panel is done by providing a constructor function for
+/// the panel through this facet. (The panel is closed again when its
+/// constructor is no longer provided.)
 export const showPanel = Facet.define<(view: EditorView) => Panel>()
 
 /// Get the active panel created by the given constructor, if any.

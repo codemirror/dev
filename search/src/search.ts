@@ -238,9 +238,9 @@ export const closeSearchPanel: Command = view => {
 
 /// Default search-related key bindings.
 ///
-///  * Mod-f: [`openSearchPanel`](#search.openSearchPanel)
-///  * F3, Mod-g: [`findNext`](#search.findNext)
-///  * Shift-F3, Shift-Mod-g: [`findPrevious`](#search.findPrevious)
+///  - Mod-f: [`openSearchPanel`](#search.openSearchPanel)
+///  - F3, Mod-g: [`findNext`](#search.findNext)
+///  - Shift-F3, Shift-Mod-g: [`findPrevious`](#search.findPrevious)
 export const searchKeymap: readonly KeyBinding[] = [
   {key: "Mod-f", run: openSearchPanel, scope: "editor search-panel"},
   {key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel"},

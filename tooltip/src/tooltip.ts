@@ -117,7 +117,7 @@ const baseTheme = EditorView.baseTheme({
 })
 
 /// Supporting extension for displaying tooltips. Allows
-/// [`showTooltip`](#tooltip.showTooltip) to be used to define
+/// [`showTooltip`](#tooltip.showTooltip) to be used to create
 /// tooltips.
 export function tooltips(): Extension {
   return [tooltipPlugin, baseTheme]
