@@ -154,9 +154,9 @@ class SpecialCharWidget extends WidgetType {
 
   eq(other: SpecialCharWidget) { return other.code == this.code }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     let ph = placeholder(this.code)
-    let desc = "Control character " + (Names[this.code] || "0x" + this.code.toString(16))
+    let desc = view.state.phrase("Control character ") + (Names[this.code] || "0x" + this.code.toString(16))
     let custom = this.options.render && this.options.render(this.code, desc, ph)
     if (custom) return custom
     let span = document.createElement("span")
