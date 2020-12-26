@@ -2,7 +2,7 @@ import {Completion, CompletionContext, CompletionSource, completeFromList, ifNot
 import {EditorState} from "@codemirror/next/state"
 import {syntaxTree} from "@codemirror/next/language"
 import {SyntaxNode} from "lezer"
-import {Type} from "./sql.grammar.terms"
+import {Type, Keyword} from "./sql.grammar.terms"
 
 function tokenBefore(tree: SyntaxNode) {
   let cursor = tree.cursor.moveTo(tree.from, -1)
@@ -79,10 +79,10 @@ export function completeFromSchema(schema: {[table: string]: readonly (string | 
   }
 }
 
-export function completeKeywords(keywords: {[name: string]: number}) {
+export function completeKeywords(keywords: {[name: string]: number}, upperCase: boolean) {
   let completions =  Object.keys(keywords).map(keyword => ({
-    label: keyword,
-    type: keywords[keyword] == Type ? "type" : "keyword",
+    label: upperCase ? keyword.toUpperCase() : keyword,
+    type: keywords[keyword] == Type ? "type" : keywords[keyword] == Keyword ? "keyword" : "variable",
     boost: -1
   }))
   return ifNotIn(["QuotedIdentifier", "SpecialVar", "String", "LineComment", "BlockComment", "."],

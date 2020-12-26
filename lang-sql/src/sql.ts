@@ -113,14 +113,16 @@ export interface SQLConfig {
   tables?: readonly Completion[],
   /// When given, columns from the named table can be completed
   /// directly at the top level.
-  defaultTable?: string
+  defaultTable?: string,
+  /// When set to true, keyword completions will be upper-case.
+  upperCaseKeywords?: boolean
 }
 
 /// Returns an extension that enables keyword completion for the given
 /// SQL dialect.
-export function keywordCompletion(dialect: SQLDialect): Extension {
+export function keywordCompletion(dialect: SQLDialect, upperCase = false): Extension {
   return dialect.language.data.of({
-    autocomplete: completeKeywords(dialect.dialect.words)
+    autocomplete: completeKeywords(dialect.dialect.words, upperCase)
   })
 }
 
@@ -137,7 +139,7 @@ export function schemaCompletion(config: SQLConfig): Extension {
 /// extensions.
 export function sql(config: SQLConfig = {}) {
   let lang = config.dialect || StandardSQL
-  return new LanguageSupport(lang.language, [schemaCompletion(config), keywordCompletion(lang)])
+  return new LanguageSupport(lang.language, [schemaCompletion(config), keywordCompletion(lang, !!config.upperCaseKeywords)])
 }
 
 /// The standard SQL dialect.
