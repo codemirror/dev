@@ -63,6 +63,7 @@
     "./lang-rust": "./lang-rust/dist/index.js",
     "./lang-xml": "./lang-xml/dist/index.js",
     "./lang-markdown": "./lang-markdown/dist/index.js",
+    "./legacy-modes/mode/*": "./legacy-modes/mode/*.js",
     "./theme-one-dark": "./theme-one-dark/dist/index.js",
     "./package.json": "./package.json"
   },

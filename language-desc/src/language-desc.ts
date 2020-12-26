@@ -161,7 +161,7 @@ export const languages = [
     name: "APL",
     extensions: ["dyalog","apl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/apl").then(m => legacy(m.apl))
+      return import("@codemirror/next/legacy-modes/mode/apl").then(m => legacy(m.apl))
     }
   }),
   LanguageDescription.of({
@@ -169,35 +169,35 @@ export const languages = [
     alias: ["asciiarmor"],
     extensions: ["asc","pgp","sig"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/asciiarmor").then(m => legacy(m.asciiArmor))
+      return import("@codemirror/next/legacy-modes/mode/asciiarmor").then(m => legacy(m.asciiArmor))
     }
   }),
   LanguageDescription.of({
     name: "ASN.1",
     extensions: ["asn","asn1"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/asn1").then(m => legacy(m.asn1({})))
+      return import("@codemirror/next/legacy-modes/mode/asn1").then(m => legacy(m.asn1({})))
     }
   }),
   LanguageDescription.of({
     name: "Asterisk",
     filename: /^extensions\.conf$/i,
     load() {
-      return import("@codemirror/next/legacy-modes/src/asterisk").then(m => legacy(m.asterisk))
+      return import("@codemirror/next/legacy-modes/mode/asterisk").then(m => legacy(m.asterisk))
     }
   }),
   LanguageDescription.of({
     name: "Brainfuck",
     extensions: ["b","bf"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/brainfuck").then(m => legacy(m.brainfuck))
+      return import("@codemirror/next/legacy-modes/mode/brainfuck").then(m => legacy(m.brainfuck))
     }
   }),
   LanguageDescription.of({
     name: "Cobol",
     extensions: ["cob","cpy"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/cobol").then(m => legacy(m.cobol))
+      return import("@codemirror/next/legacy-modes/mode/cobol").then(m => legacy(m.cobol))
     }
   }),
   LanguageDescription.of({
@@ -205,28 +205,28 @@ export const languages = [
     alias: ["csharp","cs"],
     extensions: ["cs"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.csharp))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.csharp))
     }
   }),
   LanguageDescription.of({
     name: "Clojure",
     extensions: ["clj","cljc","cljx"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clojure").then(m => legacy(m.clojure))
+      return import("@codemirror/next/legacy-modes/mode/clojure").then(m => legacy(m.clojure))
     }
   }),
   LanguageDescription.of({
     name: "ClojureScript",
     extensions: ["cljs"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clojure").then(m => legacy(m.clojure))
+      return import("@codemirror/next/legacy-modes/mode/clojure").then(m => legacy(m.clojure))
     }
   }),
   LanguageDescription.of({
     name: "Closure Stylesheets (GSS)",
     extensions: ["gss"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/css").then(m => legacy(m.gss))
+      return import("@codemirror/next/legacy-modes/mode/css").then(m => legacy(m.gss))
     }
   }),
   LanguageDescription.of({
@@ -234,7 +234,7 @@ export const languages = [
     extensions: ["cmake","cmake.in"],
     filename: /^CMakeLists\.txt$/,
     load() {
-      return import("@codemirror/next/legacy-modes/src/cmake").then(m => legacy(m.cmake))
+      return import("@codemirror/next/legacy-modes/mode/cmake").then(m => legacy(m.cmake))
     }
   }),
   LanguageDescription.of({
@@ -242,7 +242,7 @@ export const languages = [
     alias: ["coffee","coffee-script"],
     extensions: ["coffee"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/coffeescript").then(m => legacy(m.coffeeScript))
+      return import("@codemirror/next/legacy-modes/mode/coffeescript").then(m => legacy(m.coffeeScript))
     }
   }),
   LanguageDescription.of({
@@ -250,144 +250,144 @@ export const languages = [
     alias: ["lisp"],
     extensions: ["cl","lisp","el"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/commonlisp").then(m => legacy(m.commonLisp))
+      return import("@codemirror/next/legacy-modes/mode/commonlisp").then(m => legacy(m.commonLisp))
     }
   }),
   LanguageDescription.of({
     name: "Cypher",
     extensions: ["cyp","cypher"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/cypher").then(m => legacy(m.cypher))
+      return import("@codemirror/next/legacy-modes/mode/cypher").then(m => legacy(m.cypher))
     }
   }),
   LanguageDescription.of({
     name: "Cython",
     extensions: ["pyx","pxd","pxi"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/python").then(m => legacy(m.cython))
+      return import("@codemirror/next/legacy-modes/mode/python").then(m => legacy(m.cython))
     }
   }),
   LanguageDescription.of({
     name: "Crystal",
     extensions: ["cr"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/crystal").then(m => legacy(m.crystal))
+      return import("@codemirror/next/legacy-modes/mode/crystal").then(m => legacy(m.crystal))
     }
   }),
   LanguageDescription.of({
     name: "D",
     extensions: ["d"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/d").then(m => legacy(m.d))
+      return import("@codemirror/next/legacy-modes/mode/d").then(m => legacy(m.d))
     }
   }),
   LanguageDescription.of({
     name: "Dart",
     extensions: ["dart"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.dart))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.dart))
     }
   }),
   LanguageDescription.of({
     name: "diff",
     extensions: ["diff","patch"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/diff").then(m => legacy(m.diff))
+      return import("@codemirror/next/legacy-modes/mode/diff").then(m => legacy(m.diff))
     }
   }),
   LanguageDescription.of({
     name: "Dockerfile",
     filename: /^Dockerfile$/,
     load() {
-      return import("@codemirror/next/legacy-modes/src/dockerfile").then(m => legacy(m.dockerFile))
+      return import("@codemirror/next/legacy-modes/mode/dockerfile").then(m => legacy(m.dockerFile))
     }
   }),
   LanguageDescription.of({
     name: "DTD",
     extensions: ["dtd"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/dtd").then(m => legacy(m.dtd))
+      return import("@codemirror/next/legacy-modes/mode/dtd").then(m => legacy(m.dtd))
     }
   }),
   LanguageDescription.of({
     name: "Dylan",
     extensions: ["dylan","dyl","intr"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/dylan").then(m => legacy(m.dylan))
+      return import("@codemirror/next/legacy-modes/mode/dylan").then(m => legacy(m.dylan))
     }
   }),
   LanguageDescription.of({
     name: "EBNF",
     load() {
-      return import("@codemirror/next/legacy-modes/src/ebnf").then(m => legacy(m.ebnf))
+      return import("@codemirror/next/legacy-modes/mode/ebnf").then(m => legacy(m.ebnf))
     }
   }),
   LanguageDescription.of({
     name: "ECL",
     extensions: ["ecl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/ecl").then(m => legacy(m.ecl))
+      return import("@codemirror/next/legacy-modes/mode/ecl").then(m => legacy(m.ecl))
     }
   }),
   LanguageDescription.of({
     name: "edn",
     extensions: ["edn"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clojure").then(m => legacy(m.clojure))
+      return import("@codemirror/next/legacy-modes/mode/clojure").then(m => legacy(m.clojure))
     }
   }),
   LanguageDescription.of({
     name: "Eiffel",
     extensions: ["e"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/eiffel").then(m => legacy(m.eiffel))
+      return import("@codemirror/next/legacy-modes/mode/eiffel").then(m => legacy(m.eiffel))
     }
   }),
   LanguageDescription.of({
     name: "Elm",
     extensions: ["elm"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/elm").then(m => legacy(m.elm))
+      return import("@codemirror/next/legacy-modes/mode/elm").then(m => legacy(m.elm))
     }
   }),
   LanguageDescription.of({
     name: "Erlang",
     extensions: ["erl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/erlang").then(m => legacy(m.erlang))
+      return import("@codemirror/next/legacy-modes/mode/erlang").then(m => legacy(m.erlang))
     }
   }),
   LanguageDescription.of({
     name: "Esper",
     load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.esper))
+      return import("@codemirror/next/legacy-modes/mode/sql").then(m => legacy(m.esper))
     }
   }),
   LanguageDescription.of({
     name: "Factor",
     extensions: ["factor"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/factor").then(m => legacy(m.factor))
+      return import("@codemirror/next/legacy-modes/mode/factor").then(m => legacy(m.factor))
     }
   }),
   LanguageDescription.of({
     name: "FCL",
     load() {
-      return import("@codemirror/next/legacy-modes/src/fcl").then(m => legacy(m.fcl))
+      return import("@codemirror/next/legacy-modes/mode/fcl").then(m => legacy(m.fcl))
     }
   }),
   LanguageDescription.of({
     name: "Forth",
     extensions: ["forth","fth","4th"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/forth").then(m => legacy(m.forth))
+      return import("@codemirror/next/legacy-modes/mode/forth").then(m => legacy(m.forth))
     }
   }),
   LanguageDescription.of({
     name: "Fortran",
     extensions: ["f","for","f77","f90","f95"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/fortran").then(m => legacy(m.fortran))
+      return import("@codemirror/next/legacy-modes/mode/fortran").then(m => legacy(m.fortran))
     }
   }),
   LanguageDescription.of({
@@ -395,28 +395,28 @@ export const languages = [
     alias: ["fsharp"],
     extensions: ["fs"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mllike").then(m => legacy(m.fSharp))
+      return import("@codemirror/next/legacy-modes/mode/mllike").then(m => legacy(m.fSharp))
     }
   }),
   LanguageDescription.of({
     name: "Gas",
     extensions: ["s"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/gas").then(m => legacy(m.gas))
+      return import("@codemirror/next/legacy-modes/mode/gas").then(m => legacy(m.gas))
     }
   }),
   LanguageDescription.of({
     name: "Gherkin",
     extensions: ["feature"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/gherkin").then(m => legacy(m.gherkin))
+      return import("@codemirror/next/legacy-modes/mode/gherkin").then(m => legacy(m.gherkin))
     }
   }),
   LanguageDescription.of({
     name: "Go",
     extensions: ["go"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/go").then(m => legacy(m.go))
+      return import("@codemirror/next/legacy-modes/mode/go").then(m => legacy(m.go))
     }
   }),
   LanguageDescription.of({
@@ -424,41 +424,41 @@ export const languages = [
     extensions: ["groovy","gradle"],
     filename: /^Jenkinsfile$/,
     load() {
-      return import("@codemirror/next/legacy-modes/src/groovy").then(m => legacy(m.groovy))
+      return import("@codemirror/next/legacy-modes/mode/groovy").then(m => legacy(m.groovy))
     }
   }),
   LanguageDescription.of({
     name: "Haskell",
     extensions: ["hs"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/haskell").then(m => legacy(m.haskell))
+      return import("@codemirror/next/legacy-modes/mode/haskell").then(m => legacy(m.haskell))
     }
   }),
   LanguageDescription.of({
     name: "Haxe",
     extensions: ["hx"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/haxe").then(m => legacy(m.haxe))
+      return import("@codemirror/next/legacy-modes/mode/haxe").then(m => legacy(m.haxe))
     }
   }),
   LanguageDescription.of({
     name: "HXML",
     extensions: ["hxml"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/haxe").then(m => legacy(m.hxml))
+      return import("@codemirror/next/legacy-modes/mode/haxe").then(m => legacy(m.hxml))
     }
   }),
   LanguageDescription.of({
     name: "HTTP",
     load() {
-      return import("@codemirror/next/legacy-modes/src/http").then(m => legacy(m.http))
+      return import("@codemirror/next/legacy-modes/mode/http").then(m => legacy(m.http))
     }
   }),
   LanguageDescription.of({
     name: "IDL",
     extensions: ["pro"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/idl").then(m => legacy(m.idl))
+      return import("@codemirror/next/legacy-modes/mode/idl").then(m => legacy(m.idl))
     }
   }),
   LanguageDescription.of({
@@ -466,35 +466,35 @@ export const languages = [
     alias: ["jsonld"],
     extensions: ["jsonld"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/javascript").then(m => legacy(m.jsonld))
+      return import("@codemirror/next/legacy-modes/mode/javascript").then(m => legacy(m.jsonld))
     }
   }),
   LanguageDescription.of({
     name: "Jinja2",
     extensions: ["j2","jinja","jinja2"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/jinja2").then(m => legacy(m.jinja2))
+      return import("@codemirror/next/legacy-modes/mode/jinja2").then(m => legacy(m.jinja2))
     }
   }),
   LanguageDescription.of({
     name: "Julia",
     extensions: ["jl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/julia").then(m => legacy(m.julia))
+      return import("@codemirror/next/legacy-modes/mode/julia").then(m => legacy(m.julia))
     }
   }),
   LanguageDescription.of({
     name: "Kotlin",
     extensions: ["kt"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.kotlin))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.kotlin))
     }
   }),
   LanguageDescription.of({
     name: "LESS",
     extensions: ["less"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/css").then(m => legacy(m.less))
+      return import("@codemirror/next/legacy-modes/mode/css").then(m => legacy(m.less))
     }
   }),
   LanguageDescription.of({
@@ -502,69 +502,69 @@ export const languages = [
     alias: ["ls"],
     extensions: ["ls"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/livescript").then(m => legacy(m.liveScript))
+      return import("@codemirror/next/legacy-modes/mode/livescript").then(m => legacy(m.liveScript))
     }
   }),
   LanguageDescription.of({
     name: "Lua",
     extensions: ["lua"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/lua").then(m => legacy(m.lua))
+      return import("@codemirror/next/legacy-modes/mode/lua").then(m => legacy(m.lua))
     }
   }),
   LanguageDescription.of({
     name: "mIRC",
     load() {
-      return import("@codemirror/next/legacy-modes/src/mirc").then(m => legacy(m.mirc))
+      return import("@codemirror/next/legacy-modes/mode/mirc").then(m => legacy(m.mirc))
     }
   }),
   LanguageDescription.of({
     name: "Mathematica",
     extensions: ["m","nb","wl","wls"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mathematica").then(m => legacy(m.mathematica))
+      return import("@codemirror/next/legacy-modes/mode/mathematica").then(m => legacy(m.mathematica))
     }
   }),
   LanguageDescription.of({
     name: "Modelica",
     extensions: ["mo"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/modelica").then(m => legacy(m.modelica))
+      return import("@codemirror/next/legacy-modes/mode/modelica").then(m => legacy(m.modelica))
     }
   }),
   LanguageDescription.of({
     name: "MUMPS",
     extensions: ["mps"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mumps").then(m => legacy(m.mumps))
+      return import("@codemirror/next/legacy-modes/mode/mumps").then(m => legacy(m.mumps))
     }
   }),
   LanguageDescription.of({
     name: "mbox",
     extensions: ["mbox"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mbox").then(m => legacy(m.mbox))
+      return import("@codemirror/next/legacy-modes/mode/mbox").then(m => legacy(m.mbox))
     }
   }),
   LanguageDescription.of({
     name: "Nginx",
     filename: /nginx.*\.conf$/i,
     load() {
-      return import("@codemirror/next/legacy-modes/src/nginx").then(m => legacy(m.nginx))
+      return import("@codemirror/next/legacy-modes/mode/nginx").then(m => legacy(m.nginx))
     }
   }),
   LanguageDescription.of({
     name: "NSIS",
     extensions: ["nsh","nsi"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/nsis").then(m => legacy(m.nsis))
+      return import("@codemirror/next/legacy-modes/mode/nsis").then(m => legacy(m.nsis))
     }
   }),
   LanguageDescription.of({
     name: "NTriples",
     extensions: ["nt","nq"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/ntriples").then(m => legacy(m.ntriples))
+      return import("@codemirror/next/legacy-modes/mode/ntriples").then(m => legacy(m.ntriples))
     }
   }),
   LanguageDescription.of({
@@ -572,7 +572,7 @@ export const languages = [
     alias: ["objective-c","objc"],
     extensions: ["m"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.objectiveC))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.objectiveC))
     }
   }),
   LanguageDescription.of({
@@ -580,56 +580,56 @@ export const languages = [
     alias: ["objective-c++","objc++"],
     extensions: ["mm"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.objectiveCpp))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.objectiveCpp))
     }
   }),
   LanguageDescription.of({
     name: "OCaml",
     extensions: ["ml","mli","mll","mly"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mllike").then(m => legacy(m.oCaml))
+      return import("@codemirror/next/legacy-modes/mode/mllike").then(m => legacy(m.oCaml))
     }
   }),
   LanguageDescription.of({
     name: "Octave",
     extensions: ["m"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/octave").then(m => legacy(m.octave))
+      return import("@codemirror/next/legacy-modes/mode/octave").then(m => legacy(m.octave))
     }
   }),
   LanguageDescription.of({
     name: "Oz",
     extensions: ["oz"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/oz").then(m => legacy(m.oz))
+      return import("@codemirror/next/legacy-modes/mode/oz").then(m => legacy(m.oz))
     }
   }),
   LanguageDescription.of({
     name: "Pascal",
     extensions: ["p","pas"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/pascal").then(m => legacy(m.pascal))
+      return import("@codemirror/next/legacy-modes/mode/pascal").then(m => legacy(m.pascal))
     }
   }),
   LanguageDescription.of({
     name: "Perl",
     extensions: ["pl","pm"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/perl").then(m => legacy(m.perl))
+      return import("@codemirror/next/legacy-modes/mode/perl").then(m => legacy(m.perl))
     }
   }),
   LanguageDescription.of({
     name: "Pig",
     extensions: ["pig"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/pig").then(m => legacy(m.pig))
+      return import("@codemirror/next/legacy-modes/mode/pig").then(m => legacy(m.pig))
     }
   }),
   LanguageDescription.of({
     name: "PowerShell",
     extensions: ["ps1","psd1","psm1"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/powershell").then(m => legacy(m.powerShell))
+      return import("@codemirror/next/legacy-modes/mode/powershell").then(m => legacy(m.powerShell))
     }
   }),
   LanguageDescription.of({
@@ -637,28 +637,28 @@ export const languages = [
     alias: ["ini","properties"],
     extensions: ["properties","ini","in"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/properties").then(m => legacy(m.properties))
+      return import("@codemirror/next/legacy-modes/mode/properties").then(m => legacy(m.properties))
     }
   }),
   LanguageDescription.of({
     name: "ProtoBuf",
     extensions: ["proto"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/protobuf").then(m => legacy(m.protobuf))
+      return import("@codemirror/next/legacy-modes/mode/protobuf").then(m => legacy(m.protobuf))
     }
   }),
   LanguageDescription.of({
     name: "Puppet",
     extensions: ["pp"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/puppet").then(m => legacy(m.puppet))
+      return import("@codemirror/next/legacy-modes/mode/puppet").then(m => legacy(m.puppet))
     }
   }),
   LanguageDescription.of({
     name: "Q",
     extensions: ["q"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/q").then(m => legacy(m.q))
+      return import("@codemirror/next/legacy-modes/mode/q").then(m => legacy(m.q))
     }
   }),
   LanguageDescription.of({
@@ -666,20 +666,20 @@ export const languages = [
     alias: ["rscript"],
     extensions: ["r","R"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/r").then(m => legacy(m.r))
+      return import("@codemirror/next/legacy-modes/mode/r").then(m => legacy(m.r))
     }
   }),
   LanguageDescription.of({
     name: "RPM Changes",
     load() {
-      return import("@codemirror/next/legacy-modes/src/rpm").then(m => legacy(m.rpmChanges))
+      return import("@codemirror/next/legacy-modes/mode/rpm").then(m => legacy(m.rpmChanges))
     }
   }),
   LanguageDescription.of({
     name: "RPM Spec",
     extensions: ["spec"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/rpm").then(m => legacy(m.rpmSpec))
+      return import("@codemirror/next/legacy-modes/mode/rpm").then(m => legacy(m.rpmSpec))
     }
   }),
   LanguageDescription.of({
@@ -687,35 +687,35 @@ export const languages = [
     alias: ["jruby","macruby","rake","rb","rbx"],
     extensions: ["rb"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/ruby").then(m => legacy(m.ruby))
+      return import("@codemirror/next/legacy-modes/mode/ruby").then(m => legacy(m.ruby))
     }
   }),
   LanguageDescription.of({
     name: "SAS",
     extensions: ["sas"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/sas").then(m => legacy(m.sas))
+      return import("@codemirror/next/legacy-modes/mode/sas").then(m => legacy(m.sas))
     }
   }),
   LanguageDescription.of({
     name: "Scala",
     extensions: ["scala"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.scala))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.scala))
     }
   }),
   LanguageDescription.of({
     name: "Scheme",
     extensions: ["scm","ss"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/scheme").then(m => legacy(m.scheme))
+      return import("@codemirror/next/legacy-modes/mode/scheme").then(m => legacy(m.scheme))
     }
   }),
   LanguageDescription.of({
     name: "SCSS",
     extensions: ["scss"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/css").then(m => legacy(m.sCSS))
+      return import("@codemirror/next/legacy-modes/mode/css").then(m => legacy(m.sCSS))
     }
   }),
   LanguageDescription.of({
@@ -724,34 +724,34 @@ export const languages = [
     extensions: ["sh","ksh","bash"],
     filename: /^PKGBUILD$/,
     load() {
-      return import("@codemirror/next/legacy-modes/src/shell").then(m => legacy(m.shell))
+      return import("@codemirror/next/legacy-modes/mode/shell").then(m => legacy(m.shell))
     }
   }),
   LanguageDescription.of({
     name: "Sieve",
     extensions: ["siv","sieve"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/sieve").then(m => legacy(m.sieve))
+      return import("@codemirror/next/legacy-modes/mode/sieve").then(m => legacy(m.sieve))
     }
   }),
   LanguageDescription.of({
     name: "Smalltalk",
     extensions: ["st"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/smalltalk").then(m => legacy(m.smalltalk))
+      return import("@codemirror/next/legacy-modes/mode/smalltalk").then(m => legacy(m.smalltalk))
     }
   }),
   LanguageDescription.of({
     name: "Solr",
     load() {
-      return import("@codemirror/next/legacy-modes/src/solr").then(m => legacy(m.solr))
+      return import("@codemirror/next/legacy-modes/mode/solr").then(m => legacy(m.solr))
     }
   }),
   LanguageDescription.of({
     name: "SML",
     extensions: ["sml","sig","fun","smackspec"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mllike").then(m => legacy(m.sml))
+      return import("@codemirror/next/legacy-modes/mode/mllike").then(m => legacy(m.sml))
     }
   }),
   LanguageDescription.of({
@@ -759,54 +759,54 @@ export const languages = [
     alias: ["sparul"],
     extensions: ["rq","sparql"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/sparql").then(m => legacy(m.sparql))
+      return import("@codemirror/next/legacy-modes/mode/sparql").then(m => legacy(m.sparql))
     }
   }),
   LanguageDescription.of({
     name: "Spreadsheet",
     alias: ["excel","formula"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/spreadsheet").then(m => legacy(m.spreadsheet))
+      return import("@codemirror/next/legacy-modes/mode/spreadsheet").then(m => legacy(m.spreadsheet))
     }
   }),
   LanguageDescription.of({
     name: "SQL",
     extensions: ["sql"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.standardSQL))
+      return import("@codemirror/next/legacy-modes/mode/sql").then(m => legacy(m.standardSQL))
     }
   }),
   LanguageDescription.of({
     name: "SQLite",
     load() {
-      return import("@codemirror/next/legacy-modes/src/sql").then(m => legacy(m.sqlite))
+      return import("@codemirror/next/legacy-modes/mode/sql").then(m => legacy(m.sqlite))
     }
   }),
   LanguageDescription.of({
     name: "Squirrel",
     extensions: ["nut"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/clike").then(m => legacy(m.squirrel))
+      return import("@codemirror/next/legacy-modes/mode/clike").then(m => legacy(m.squirrel))
     }
   }),
   LanguageDescription.of({
     name: "Stylus",
     extensions: ["styl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/stylus").then(m => legacy(m.stylus))
+      return import("@codemirror/next/legacy-modes/mode/stylus").then(m => legacy(m.stylus))
     }
   }),
   LanguageDescription.of({
     name: "Swift",
     extensions: ["swift"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/swift").then(m => legacy(m.swift))
+      return import("@codemirror/next/legacy-modes/mode/swift").then(m => legacy(m.swift))
     }
   }),
   LanguageDescription.of({
     name: "sTeX",
     load() {
-      return import("@codemirror/next/legacy-modes/src/stex").then(m => legacy(m.stex))
+      return import("@codemirror/next/legacy-modes/mode/stex").then(m => legacy(m.stex))
     }
   }),
   LanguageDescription.of({
@@ -814,131 +814,131 @@ export const languages = [
     alias: ["tex"],
     extensions: ["text","ltx","tex"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/stex").then(m => legacy(m.stex))
+      return import("@codemirror/next/legacy-modes/mode/stex").then(m => legacy(m.stex))
     }
   }),
   LanguageDescription.of({
     name: "SystemVerilog",
     extensions: ["v","sv","svh"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/verilog").then(m => legacy(m.verilog))
+      return import("@codemirror/next/legacy-modes/mode/verilog").then(m => legacy(m.verilog))
     }
   }),
   LanguageDescription.of({
     name: "Tcl",
     extensions: ["tcl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/tcl").then(m => legacy(m.tcl))
+      return import("@codemirror/next/legacy-modes/mode/tcl").then(m => legacy(m.tcl))
     }
   }),
   LanguageDescription.of({
     name: "Textile",
     extensions: ["textile"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/textile").then(m => legacy(m.textile))
+      return import("@codemirror/next/legacy-modes/mode/textile").then(m => legacy(m.textile))
     }
   }),
   LanguageDescription.of({
     name: "TiddlyWiki",
     load() {
-      return import("@codemirror/next/legacy-modes/src/tiddlywiki").then(m => legacy(m.tiddlyWiki))
+      return import("@codemirror/next/legacy-modes/mode/tiddlywiki").then(m => legacy(m.tiddlyWiki))
     }
   }),
   LanguageDescription.of({
     name: "Tiki wiki",
     load() {
-      return import("@codemirror/next/legacy-modes/src/tiki").then(m => legacy(m.tiki))
+      return import("@codemirror/next/legacy-modes/mode/tiki").then(m => legacy(m.tiki))
     }
   }),
   LanguageDescription.of({
     name: "TOML",
     extensions: ["toml"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/toml").then(m => legacy(m.toml))
+      return import("@codemirror/next/legacy-modes/mode/toml").then(m => legacy(m.toml))
     }
   }),
   LanguageDescription.of({
     name: "troff",
     extensions: ["1","2","3","4","5","6","7","8","9"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/troff").then(m => legacy(m.troff))
+      return import("@codemirror/next/legacy-modes/mode/troff").then(m => legacy(m.troff))
     }
   }),
   LanguageDescription.of({
     name: "TTCN",
     extensions: ["ttcn","ttcn3","ttcnpp"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/ttcn").then(m => legacy(m.ttcn))
+      return import("@codemirror/next/legacy-modes/mode/ttcn").then(m => legacy(m.ttcn))
     }
   }),
   LanguageDescription.of({
     name: "TTCN_CFG",
     extensions: ["cfg"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/ttcn-cfg").then(m => legacy(m.ttcnCfg))
+      return import("@codemirror/next/legacy-modes/mode/ttcn-cfg").then(m => legacy(m.ttcnCfg))
     }
   }),
   LanguageDescription.of({
     name: "Turtle",
     extensions: ["ttl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/turtle").then(m => legacy(m.turtle))
+      return import("@codemirror/next/legacy-modes/mode/turtle").then(m => legacy(m.turtle))
     }
   }),
   LanguageDescription.of({
     name: "Web IDL",
     extensions: ["webidl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/webidl").then(m => legacy(m.webIDL))
+      return import("@codemirror/next/legacy-modes/mode/webidl").then(m => legacy(m.webIDL))
     }
   }),
   LanguageDescription.of({
     name: "VB.NET",
     extensions: ["vb"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/vb").then(m => legacy(m.vb))
+      return import("@codemirror/next/legacy-modes/mode/vb").then(m => legacy(m.vb))
     }
   }),
   LanguageDescription.of({
     name: "VBScript",
     extensions: ["vbs"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/vbscript").then(m => legacy(m.vbScript))
+      return import("@codemirror/next/legacy-modes/mode/vbscript").then(m => legacy(m.vbScript))
     }
   }),
   LanguageDescription.of({
     name: "Velocity",
     extensions: ["vtl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/velocity").then(m => legacy(m.velocity))
+      return import("@codemirror/next/legacy-modes/mode/velocity").then(m => legacy(m.velocity))
     }
   }),
   LanguageDescription.of({
     name: "Verilog",
     extensions: ["v"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/verilog").then(m => legacy(m.verilog))
+      return import("@codemirror/next/legacy-modes/mode/verilog").then(m => legacy(m.verilog))
     }
   }),
   LanguageDescription.of({
     name: "VHDL",
     extensions: ["vhd","vhdl"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/vhdl").then(m => legacy(m.vhdl))
+      return import("@codemirror/next/legacy-modes/mode/vhdl").then(m => legacy(m.vhdl))
     }
   }),
   LanguageDescription.of({
     name: "XQuery",
     extensions: ["xy","xquery"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/xquery").then(m => legacy(m.xQuery))
+      return import("@codemirror/next/legacy-modes/mode/xquery").then(m => legacy(m.xQuery))
     }
   }),
   LanguageDescription.of({
     name: "Yacas",
     extensions: ["ys"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/yacas").then(m => legacy(m.yacas))
+      return import("@codemirror/next/legacy-modes/mode/yacas").then(m => legacy(m.yacas))
     }
   }),
   LanguageDescription.of({
@@ -946,42 +946,42 @@ export const languages = [
     alias: ["yml"],
     extensions: ["yaml","yml"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/yaml").then(m => legacy(m.yaml))
+      return import("@codemirror/next/legacy-modes/mode/yaml").then(m => legacy(m.yaml))
     }
   }),
   LanguageDescription.of({
     name: "Z80",
     extensions: ["z80"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/z80").then(m => legacy(m.z80))
+      return import("@codemirror/next/legacy-modes/mode/z80").then(m => legacy(m.z80))
     }
   }),
   LanguageDescription.of({
     name: "mscgen",
     extensions: ["mscgen","mscin","msc"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mscgen").then(m => legacy(m.mscgen))
+      return import("@codemirror/next/legacy-modes/mode/mscgen").then(m => legacy(m.mscgen))
     }
   }),
   LanguageDescription.of({
     name: "xu",
     extensions: ["xu"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mscgen").then(m => legacy(m.xu))
+      return import("@codemirror/next/legacy-modes/mode/mscgen").then(m => legacy(m.xu))
     }
   }),
   LanguageDescription.of({
     name: "msgenny",
     extensions: ["msgenny"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/mscgen").then(m => legacy(m.msgenny))
+      return import("@codemirror/next/legacy-modes/mode/mscgen").then(m => legacy(m.msgenny))
     }
   }),
   LanguageDescription.of({
     name: "WebAssembly",
     extensions: ["wat","wast"],
     load() {
-      return import("@codemirror/next/legacy-modes/src/wast").then(m => legacy(m.wast))
+      return import("@codemirror/next/legacy-modes/mode/wast").then(m => legacy(m.wast))
     }
   })
 ]

@@ -7,7 +7,7 @@ import {html} from "@codemirror/next/lang-html"
 //import {linter} from "@codemirror/next/lint"
 
 //import {StreamLanguage} from "@codemirror/next/stream-parser"
-//import legacyJS from "@codemirror/next/legacy-modes/src/javascript"
+//import {javascript} from "@codemirror/next/legacy-modes/mode/javascript"
 
 let state = EditorState.create({doc: `<script>
   const {readFile} = require("fs");
@@ -17,9 +17,9 @@ let state = EditorState.create({doc: `<script>
 </script>
 `, extensions: [
   basicSetup,
-  html()
+  html(),
 //  linter(esLint(new Linter)),
-//  StreamLanguage.define(legacyJS()),
+//  StreamLanguage.define(javascript),
 ]})
 
 ;(window as any).view = new EditorView({state, parent: document.querySelector("#editor")!})
