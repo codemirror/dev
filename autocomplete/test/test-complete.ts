@@ -140,6 +140,8 @@ describe("autocomplete", () => {
 
     run.options("sorts alphabetically when score is equal", "a", [from("ac ab acc")], "ab ac acc")
 
+    run.options("removes duplicate options", "t", [from("two"), from("two three")], "three two")
+
     run.test("will eagerly populate the result list when a source is slow", {
       doc: "on",
       sources: [from("one two"), slow(from("ono"), 100)]
