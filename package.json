@@ -39,7 +39,6 @@
     "./panel": "./panel/dist/index.js",
     "./tooltip": "./tooltip/dist/index.js",
     "./search": "./search/dist/index.js",
-    "./goto-line": "./goto-line/dist/index.js",
     "./lint": "./lint/dist/index.js",
     "./highlight": "./highlight/dist/index.js",
     "./stream-parser": "./stream-parser/dist/index.js",

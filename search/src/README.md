@@ -10,6 +10,7 @@
 @replaceAll
 @openSearchPanel
 @closeSearchPanel
+@gotoLine
 
 ### Cursor
 

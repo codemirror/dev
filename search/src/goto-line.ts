@@ -1,6 +1,6 @@
 import {panels, Panel, getPanel, showPanel} from "@codemirror/next/panel"
 import {EditorSelection, StateField, StateEffect} from "@codemirror/next/state"
-import {EditorView, Command, themeClass, KeyBinding} from "@codemirror/next/view"
+import {EditorView, Command, themeClass} from "@codemirror/next/view"
 
 function createLineDialog(view: EditorView): Panel {
   let dom = document.createElement("form")
@@ -85,8 +85,3 @@ const baseTheme = EditorView.baseTheme({
     "& label": { fontSize: "80%" }
   }
 })
-
-/// Keymap that binds Alt-g to [`gotoLine`](#goto-line.gotoLine).
-export const gotoLineKeymap: readonly KeyBinding[] = [
-  {key: "Alt-g", run: gotoLine}
-]

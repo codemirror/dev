@@ -11,7 +11,6 @@ import {searchKeymap} from "@codemirror/next/search"
 import {autocompletion, completionKeymap} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
-import {gotoLineKeymap} from "@codemirror/next/goto-line"
 import {highlightActiveLine, highlightSelectionMatches} from "@codemirror/next/highlight-selection"
 import {defaultHighlightStyle} from "@codemirror/next/highlight"
 import {lintKeymap} from "@codemirror/next/lint"
@@ -39,7 +38,6 @@ import {lintKeymap} from "@codemirror/next/lint"
 ///  - [active line highlighting](#highlight-selection.highlightActiveLine)
 ///  - [selection match highlighting](#highlight-selection.highlightSelectionMatches)
 ///  - [search](#search.searchKeymap)
-///  - [go to line](#goto-line.gotoLineKeymap)
 ///  - [commenting](#comment.commentKeymap)
 ///  - [linting](#lint.lintKeymap)
 ///
@@ -73,7 +71,6 @@ export const basicSetup: Extension = [
     ...historyKeymap,
     ...foldKeymap,
     ...commentKeymap,
-    ...gotoLineKeymap,
     ...completionKeymap,
     ...lintKeymap
   ])

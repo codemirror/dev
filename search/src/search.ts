@@ -6,7 +6,8 @@ import {Text} from "@codemirror/next/text"
 import {RangeSetBuilder} from "@codemirror/next/rangeset"
 import elt from "crelt"
 import {SearchCursor} from "./cursor"
-export {SearchCursor}
+import {gotoLine} from "./goto-line"
+export {SearchCursor, gotoLine}
 
 class Query {
   constructor(readonly search: string,
@@ -241,12 +242,14 @@ export const closeSearchPanel: Command = view => {
 ///  - Mod-f: [`openSearchPanel`](#search.openSearchPanel)
 ///  - F3, Mod-g: [`findNext`](#search.findNext)
 ///  - Shift-F3, Shift-Mod-g: [`findPrevious`](#search.findPrevious)
+///  - Alt-g: [`gotoLine`](#search.gotoLine)
 export const searchKeymap: readonly KeyBinding[] = [
   {key: "Mod-f", run: openSearchPanel, scope: "editor search-panel"},
   {key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel"},
   {key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel"},
   {key: "Escape", run: closeSearchPanel, scope: "editor search-panel"},
-  {key: "Mod-Shift-l", run: selectSelectionMatches}
+  {key: "Mod-Shift-l", run: selectSelectionMatches},
+  {key: "Alt-g", run: gotoLine}
 ]
 
 function buildPanel(conf: {
