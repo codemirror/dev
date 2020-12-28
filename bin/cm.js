@@ -197,13 +197,23 @@ function setModuleVersion(version) {
   fs.writeFileSync(packageFile, fs.readFileSync(packageFile, "utf8").replace(/"version":\s*".*?"/, `"version": "${version}"`))
 }
 
-function release() {
+function release(...args) {
   let currentVersion = packageJSON.version
   let changes = changelog(currentVersion)
   let newVersion = bumpVersion(currentVersion, changes)
   console.log(`Creating @codemirror/next ${newVersion}`)
 
   let notes = releaseNotes(changes, newVersion)
+  if (args.indexOf("--edit") > -1) {
+    let noteFile = path.join(root, "notes.txt")
+    fs.writeFileSync(noteFile, notes.head + notes.body)
+    run(process.env.EDITOR || emacs, [noteFile])
+    let edited = fs.readFileSync(noteFile)
+    fs.unlinkSync(noteFile)
+    if (!/\S/.test(edited)) process.exit(0)
+    let split = /^(.*)\n+([^]*)/.exec(edited)
+    notes = {head: split[1] + "\n\n", body: split[2]}
+  }
 
   setModuleVersion(newVersion)
   let log = path.join(root, "CHANGELOG.md")
