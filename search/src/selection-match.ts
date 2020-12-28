@@ -1,7 +1,7 @@
 import {EditorView, ViewPlugin, Decoration, DecorationSet, ViewUpdate, themeClass} from "@codemirror/next/view"
 import {Facet, combineConfig, Text, Extension, CharCategory} from "@codemirror/next/state"
 import {findClusterBreak} from "@codemirror/next/text"
-import {SearchCursor} from "@codemirror/next/search"
+import {SearchCursor} from "./cursor"
 
 type HighlightOptions = {
   /// Determines whether, when nothing is selected, the word around

@@ -1,5 +1,0 @@
-{
-  "main": "dist/index.js",
-  "types": "src/highlight-selection",
-  "type": "module"
-}

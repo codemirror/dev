@@ -7,11 +7,10 @@ import {lineNumbers} from "@codemirror/next/gutter"
 import {defaultKeymap} from "@codemirror/next/commands"
 import {bracketMatching} from "@codemirror/next/matchbrackets"
 import {closeBrackets, closeBracketsKeymap} from "@codemirror/next/closebrackets"
-import {searchKeymap} from "@codemirror/next/search"
+import {searchKeymap, highlightSelectionMatches} from "@codemirror/next/search"
 import {autocompletion, completionKeymap} from "@codemirror/next/autocomplete"
 import {commentKeymap} from "@codemirror/next/comment"
 import {rectangularSelection} from "@codemirror/next/rectangular-selection"
-import {highlightSelectionMatches} from "@codemirror/next/highlight-selection"
 import {defaultHighlightStyle} from "@codemirror/next/highlight"
 import {lintKeymap} from "@codemirror/next/lint"
 
@@ -36,7 +35,7 @@ import {lintKeymap} from "@codemirror/next/lint"
 ///  - [autocompletion](#autocomplete.autocompletion)
 ///  - [rectangular selection](#rectangular-selection.rectangularSelection)
 ///  - [active line highlighting](#view.highlightActiveLine)
-///  - [selection match highlighting](#highlight-selection.highlightSelectionMatches)
+///  - [selection match highlighting](#search.highlightSelectionMatches)
 ///  - [search](#search.searchKeymap)
 ///  - [commenting](#comment.commentKeymap)
 ///  - [linting](#lint.lintKeymap)

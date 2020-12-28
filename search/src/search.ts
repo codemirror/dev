@@ -7,6 +7,8 @@ import {RangeSetBuilder} from "@codemirror/next/rangeset"
 import elt from "crelt"
 import {SearchCursor} from "./cursor"
 import {gotoLine} from "./goto-line"
+
+export {highlightSelectionMatches} from "./selection-match"
 export {SearchCursor, gotoLine}
 
 class Query {
