@@ -209,6 +209,8 @@ const gutterView = ViewPlugin.fromClass(class {
   })
 })
 
+function asArray<T>(val: T | readonly T[]) { return (Array.isArray(val) ? val : [val]) as readonly T[] }
+
 class UpdateContext {
   cursor: RangeCursor<GutterMarker>
   localMarkers: GutterMarker[] = []
@@ -216,7 +218,7 @@ class UpdateContext {
   height = 0
 
   constructor(readonly gutter: SingleGutterView, viewport: {from: number, to: number}) {
-    this.cursor = RangeSet.iter(Array.isArray(gutter.markers) ? gutter.markers : [gutter.markers], viewport.from)
+    this.cursor = RangeSet.iter(gutter.markers, viewport.from)
   }
 
   line(view: EditorView, line: BlockInfo) {
@@ -257,7 +259,7 @@ class UpdateContext {
 class SingleGutterView {
   dom: HTMLElement
   elements: GutterElement[] = []
-  markers: RangeSet<GutterMarker> | readonly RangeSet<GutterMarker>[]
+  markers: readonly RangeSet<GutterMarker>[]
   spacer: GutterElement | null = null
   elementClass!: string
 
@@ -271,7 +273,7 @@ class SingleGutterView {
         if (config.domEventHandlers[prop](view, line, event)) event.preventDefault()
       })
     }
-    this.markers = config.markers(view)
+    this.markers = asArray(config.markers(view))
     if (config.initialSpacer) {
       this.spacer = new GutterElement(view, 0, 0, [config.initialSpacer(view)], this.elementClass)
       this.dom.appendChild(this.spacer.dom)
@@ -281,7 +283,7 @@ class SingleGutterView {
 
   update(update: ViewUpdate) {
     let prevMarkers = this.markers
-    this.markers = this.config.markers(update.view)
+    this.markers = asArray(this.config.markers(update.view))
     if (this.spacer && this.config.updateSpacer) {
       let updated = this.config.updateSpacer(this.spacer.markers[0], update)
       if (updated != this.spacer.markers[0]) this.spacer.update(update.view, 0, 0, [updated], this.elementClass)

@@ -85,7 +85,7 @@ function tagged(span: boolean): CompletionSource {
 }
 
 function sleep(delay: number) {
-  return new Promise(resolve => setTimeout(() => resolve(), delay))
+  return new Promise(resolve => setTimeout(() => resolve(undefined), delay))
 }
 
 function slow(c: CompletionSource, delay: number): CompletionSource {
