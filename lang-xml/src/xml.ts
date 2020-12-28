@@ -52,7 +52,7 @@ type XMLConfig = {
   /// Provide a schema to create completions from.
   elements?: readonly ElementSpec[],
   /// Supporting attribute descriptions for the schema specified in
-  /// [`elements`](#lang-xml.XMLConfig.elements).
+  /// [`elements`](#lang-xml.xml^conf.elements).
   attributes?: readonly AttrSpec[]
 }
 

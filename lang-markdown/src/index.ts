@@ -8,7 +8,7 @@ export {markdownLanguage, insertNewlineContinueMarkup, deleteMarkupBackward}
 /// A small keymap with Markdown-specific bindings. Binds Enter to
 /// [`insertNewlineContinueMarkup`](#lang-markdown.insertNewlineContinueMarkup)
 /// and Backspace to
-/// [`deleteMarkupBackward`](#commands.deleteMarkupBackward).
+/// [`deleteMarkupBackward`](#lang-markdown.deleteMarkupBackward).
 export const markdownKeymap: readonly KeyBinding[] = [
   {key: "Enter", run: insertNewlineContinueMarkup},
   {key: "Backspace", run: deleteMarkupBackward}
@@ -21,7 +21,7 @@ export function markdown(config: {
   defaultCodeLanguage?: Language,
   /// A collection of language descriptions to search through for a
   /// matching language (with
-  /// [`LanguageDescription.matchLanguageName`](#language.LanguageDescripton^.matchLanguageName))
+  /// [`LanguageDescription.matchLanguageName`](#language.LanguageDescription^matchLanguageName))
   /// when a fenced code block has an info string.
   codeLanguages?: readonly LanguageDescription[],
   /// Set this to false to disable installation of the Markdown

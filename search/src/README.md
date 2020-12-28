@@ -15,3 +15,7 @@
 ### Cursor
 
 @SearchCursor
+
+### Selection matching
+
+@highlightSelectionMatches

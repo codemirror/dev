@@ -10,7 +10,7 @@ let nextTagID = 0
 /// Highlighting tags are markers that denote a highlighting category.
 /// They are [associated](#highlight.styleTags) with parts of a syntax
 /// tree by a language mode, and then mapped to an actual CSS style by
-/// a [highlight style](#highlight.highlightStyle).
+/// a [highlight style](#highlight.HighlightStyle).
 ///
 /// Because syntax tree node types and highlight styles have to be
 /// able to talk the same language, CodeMirror uses a mostly _closed_
@@ -42,7 +42,7 @@ export class Tag {
 
   /// Define a new tag. If `parent` is given, the tag is treated as a
   /// sub-tag of that parent, and [highlight
-  /// styles](#highlight.highlightStyle) that don't mention this tag
+  /// styles](#highlight.HighlightStyle) that don't mention this tag
   /// will try to fall back to the parent tag (or grandparent tag,
   /// etc).
   static define(parent?: Tag): Tag {
@@ -212,9 +212,8 @@ export class HighlightStyle {
   readonly extension: Extension
 
   /// A style module holding the CSS rules for this highlight style.
-  /// When using
-  /// [`highlightTree`](#highlight.HighlightStyle.highlightTree), you
-  /// may want to manually mount this module to show the highlighting.
+  /// When using [`highlightTree`](#highlight.highlightTree), you may
+  /// want to manually mount this module to show the highlighting.
   readonly module: StyleModule
 
   private map: {[tagID: number]: string | null} = Object.create(null)

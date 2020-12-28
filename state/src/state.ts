@@ -301,7 +301,7 @@ export class EditorState {
   }
 
   /// Return a function that can categorize strings (expected to
-  /// represent a single [grapheme cluster](#text.nextClusterBreak))
+  /// represent a single [grapheme cluster](#text.findClusterBreak))
   /// into one of:
   ///
   ///  - Word (contains an alphanumeric character or a character
