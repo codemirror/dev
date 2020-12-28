@@ -144,6 +144,9 @@ export const baseTheme = buildTheme("." + baseThemeID, {
     display: "block"
   },
 
+  "$$light $activeLine": { backgroundColor: "#f3f9ff" },
+  "$$dark $activeLine": { backgroundColor: "#223039" },
+
   $placeholder: {
     color: "#888",
     display: "inline-block"

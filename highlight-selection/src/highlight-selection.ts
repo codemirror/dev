@@ -3,41 +3,6 @@ import {Facet, combineConfig, Text, Extension, CharCategory} from "@codemirror/n
 import {findClusterBreak} from "@codemirror/next/text"
 import {SearchCursor} from "@codemirror/next/search"
 
-/// Mark lines that have a cursor on them with the `$activeLine`
-/// theme class.
-export function highlightActiveLine(): Extension {
-  return [defaultTheme, activeLineHighlighter]
-}
-
-const lineDeco = Decoration.line({attributes: {class: themeClass("activeLine")}})
-
-const activeLineHighlighter = ViewPlugin.fromClass(class {
-  decorations: DecorationSet
-
-  constructor(view: EditorView) {
-    this.decorations = this.getDeco(view)
-  }
-
-  update(update: ViewUpdate) {
-    if (update.docChanged || update.selectionSet) this.decorations = this.getDeco(update.view)
-  }
-
-  getDeco(view: EditorView) {
-    let lastLineStart = -1, deco = []
-    for (let r of view.state.selection.ranges) {
-      if (!r.empty) continue
-      let line = view.visualLineAt(r.head)
-      if (line.from > lastLineStart) {
-        deco.push(lineDeco.range(line.from))
-        lastLineStart = line.from
-      }
-    }
-    return Decoration.set(deco)
-  }
-}, {
-  decorations: v => v.decorations
-})
-
 type HighlightOptions = {
   /// Determines whether, when nothing is selected, the word around
   /// the cursor is matched instead. Defaults to false.
@@ -144,8 +109,6 @@ const matchHighlighter = ViewPlugin.fromClass(class {
 })
 
 const defaultTheme = EditorView.baseTheme({
-  "$$light $activeLine": { backgroundColor: "#f3f9ff" },
-  "$$dark $activeLine": { backgroundColor: "#223039" },
   "$selectionMatch": { backgroundColor: "#99ff7780" },
   "$searchMatch $selectionMatch": {backgroundColor: "transparent"}
 })
