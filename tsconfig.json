@@ -1,9 +1,18 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["es6", "dom"],
+    "lib": ["es6", "dom", "scripthost"],
     "types": ["mocha"],
-    "stripInternal": true
+    "stripInternal": true,
+    "typeRoots": ["./node_modules/@types"],
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "strict": true,
+    "target": "es6",
+    "module": "es2020",
+    "newLine": "lf",
+    "declaration": true,
+    "declarationMap": true,
+    "moduleResolution": "node"
   },
   "include": ["*/src/*.ts", "*/test/*.ts", "demo/demo.ts"]
 }
