@@ -32,7 +32,7 @@
     "./gutter": "./gutter/dist/index.js",
     "./rangeset": "./rangeset/dist/index.js",
     "./language": "./language/dist/index.js",
-    "./language-desc": "./language-desc/dist/index.js",
+    "./language-data": "./language-data/dist/index.js",
     "./fold": "./fold/dist/index.js",
     "./matchbrackets": "./matchbrackets/dist/index.js",
     "./closebrackets": "./closebrackets/dist/index.js",

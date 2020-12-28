@@ -1,5 +1,5 @@
 {
   "main": "dist/index.js",
-  "types": "src/language-desc",
+  "types": "src/language-data",
   "type": "module"
 }
