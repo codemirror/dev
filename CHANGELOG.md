@@ -1,3 +1,95 @@
+## 0.16.0 (2020-12-28)
+
+### Breaking changes
+
+`hoverTooltip`'s callback function now takes a position and a side, rather than a predicate function, to determine whether a tooltip should be shown.
+
+The `highlightStyle` function, which defines a highlight style, is now called `HighlightStyle.define`.
+
+`completeSnippets` no longer exists. Use `completeFromList` in combination with `snippetCompletion`.
+
+The `...Support` functions that some language packages exported are gone, since it is now possible to get the support extensions directly from the package's main function.
+
+The `language` facet now returns an optional single language, not an array anymore.
+
+Languages no longer have `getTree` and `ensureTree` methods.
+
+`keymap` is now a facet, rather than a function, which means you have to use it with `keymap.of(...)`.
+
+The `markers` option to gutters now takes a view, rather than a state, as argument.
+
+The `completionKeymap` array now contains more default bindings.
+
+Removes support for `Text.iterLines`.
+
+`Line` objects no longer have `slice` and `findClusterBreak` methods (use `text` and the top-level `findClusterBreak` function instead).
+
+`EditorSelection.primary` is now called `EditorSelection.main`.
+
+`rectangularSelection` now takes its configuration as an object.
+
+A state field's `provide` option works differently. It now takes a function from the field to an extension. `Facet.from` has been changed to make it easy to use with this option.
+
+To set an extension's precedence, use the properties of the `Prec` object instead of the old `precedence` function.
+
+`ViewUpdate.prevState` has been renamed to `startState`.
+
+The `gotoLine` command is now part of the search package.
+
+`highlightActiveLine` is now exported from the view package instead of the highlight-selection package.
+
+The `highlightSelectionMatches` extension is now part of the search package.
+
+### Bug fixes
+
+Fix issue where `hoverTooltip` would falsely believe the mouse was outside of the editor when initialized with the pointer already on the editor.
+
+Drop duplicate completions.
+
+### New features
+
+Highlight styles are now instances of an exported `HighlightStyle` class, which allows you to get at its style module and match it against tags.
+
+The highlight package exports a new function, `highlightTree`, which runs the tree highlighter over a Lezer tree and tells you which styling should be applied where.
+
+`Language` objects now have a `parseString` method that can be used to synchronously parse a string of code in that language.
+
+When configuring an XML schema, it is now possible to provide text to complete into a given element.
+
+`Language` objects now have a `findRegions` method that tells you where in the document the language occurs.
+
+`Language` objects have a new `isActiveAt` method that tells you whether the language is active at a given point.
+
+The Markdown package now exports two new commands, `insertNewlineContinueMarkup` and `deleteMarkupBackward`, to help with editing Markdown.
+
+The new language-data package lists a large number of modes, with some metadata to help locate the one you're interested in.
+
+The language package now exports a `LanguageDescription` type that can be used to provide metadata about language packages.
+
+The CSS language package now exports a basic CSS completion source.
+
+Language packages' main interface function now returns an instance of `LanguageSupport` which provides access both to support extensions and the main language.
+
+The new top-level `ensureSyntaxTree` function in the language package replaces `Language.ensureTree`.
+
+Facets can now come with extensions that should be enabled when they are present in a state.
+
+The keys used for snippet field navigation are now configurable through the `snippetKeymap` facet.
+
+The autocomplete package now exports a `completeAnyWord` function that will gather completions from any words found in the document.
+
+You can now pass `defaultKeymap: false` to `autocompletion` to prevent it from adding its default completion keymap.
+
+`StateField.init` can now be used to provide a custom initial value for a field.
+
+`EditorState.toJSON` and `fromJSON` now allow you to opt in to serializing state fields.
+
+`Line` objects now have a `text` property holding their entire content.
+
+The new `toggleComment` command will automatically create a line or block comment depending on what syntax the language supports.
+
+The `gotoLine` command now allows relative offsets (with `+` and `-`), percentages (with a `%` at the end) and column positions (using `:` before the column number)
+
 ## 0.15.0 (2020-12-04)
 
 ### Breaking changes
