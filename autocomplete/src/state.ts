@@ -12,7 +12,7 @@ const MaxOptions = 300
 // label occur in the result.
 function score(option: Completion) {
   return (option.boost || 0) * 100 + (option.apply ? 10 : 0) + (option.info ? 5 : 0) +
-    (option.detail ? 4 : 0) + (option.type ? 1 : 0)
+    (option.type ? 1 : 0)
 }
 
 function sortOptions(active: readonly ActiveSource[], state: EditorState) {
@@ -28,7 +28,7 @@ function sortOptions(active: readonly ActiveSource[], state: EditorState) {
   let result = [], prev = null
   for (let opt of options.sort(cmpOption)) {
     if (result.length == MaxOptions) break
-    if (!prev || prev.label != opt.completion.label) result.push(opt)
+    if (!prev || prev.label != opt.completion.label || prev.detail != opt.completion.detail) result.push(opt)
     else if (score(opt.completion) > score(prev)) result[result.length - 1] = opt
     prev = opt.completion
   }
