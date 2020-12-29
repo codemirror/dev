@@ -87,6 +87,20 @@ function rollupConfig(pkg) {
   }
 }
 
+function rollupDeclConfig(pkg) {
+  return {
+    input: path.join(pkg.dir, pkg.json.types + ".d.ts"),
+    output: {
+      format: "esm",
+      file: path.join(pkg.dir, "dist", "index.d.ts")
+    },
+    plugins: [require("rollup-plugin-dts").default()],
+    onwarn(warning, warn) {
+      if (warning.code != "CIRCULAR_DEPENDENCY") warn(warning)
+    }
+  }
+}
+
 async function build() {
   console.info("Running TypeScript compiler...")
   let t0 = Date.now()
@@ -94,7 +108,7 @@ async function build() {
   console.info(`Done in ${Date.now() - t0}ms`)
   console.info("Building bundles...")
   t0 = Date.now()
-  await runRollup(packages.map(rollupConfig))
+  await runRollup(packages.map(rollupConfig).concat(packages.map(rollupDeclConfig)))
   console.log(`Done in ${Date.now() - t0}ms`)
 }
 
@@ -110,8 +124,6 @@ function startServer() {
   }).listen(8090, process.env.OPEN ? undefined : "127.0.0.1")
   console.log("Dev server listening on 8090")
 }
-
-const watchConfig = {clearScreen: false}
 
 function tsWatch() {
   const ts = require("typescript")
@@ -151,11 +163,17 @@ function devserver() {
   tsWatch()
   console.log("Watching...")
   for (let pkg of packages) {
-    let watcher = require("rollup").watch(Object.assign(rollupConfig(pkg), watchConfig))
+    let watcher = require("rollup").watch(rollupConfig(pkg))
     watcher.on("event", event => {
       if (event.code == "START") console.info("Start bundling " + pkg.name + "...")
       else if (event.code == "END") console.info("Finished bundling " + pkg.name)
-      else if (event.code == "ERROR") console.error("Bundling error: " + event.error)
+      else if (event.code == "ERROR") console.error(`Bundling error (${pkg.name}): ${event.error}`)
+      else if (event.code == "BUNDLE_END") event.result.close()
+    })
+    let declWatcher = require("rollup").watch(rollupDeclConfig(pkg))
+    declWatcher.on("event", event => {
+      if (event.code == "ERROR") console.error(`Decl bundling error (${pkg.name}): ${event.error}`)
+      else if (event.code == "BUNDLE_END") event.result.close()
     })
   }
   startServer()
