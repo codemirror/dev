@@ -1,7 +1,0 @@
-@bracketMatching
-
-@Config
-
-@matchBrackets
-
-@MatchResult
