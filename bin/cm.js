@@ -6,21 +6,6 @@ const child = require("child_process"), fs = require("fs"), fsp = fs.promises, p
 
 let root = join(__dirname, "..")
 
-class Pkg {
-  constructor(name) {
-    this.name = name
-    this.dir = join(root, name)
-    this.main = null
-    if (name != "legacy-modes") {
-      let files = fs.readdirSync(join(this.dir, "src")).filter(f => /^[^.]+\.ts$/.test(f))
-      let main = files.length == 1 ? files[0] : files.includes("index.ts") ? "index.ts"
-          : files.includes(name.replace(/^(theme-|lang-)/, "") + ".ts") ? name.replace(/^(theme-|lang-)/, "") + ".ts" : null
-      if (!main) throw new Error("Couldn't find a main script for " + name)
-      this.main = join(this.dir, "src", main)
-    }
-  }
-}
-
 const core = [
   "state",
   "text",
@@ -45,7 +30,7 @@ const core = [
   "comment",
   "rectangular-selection",
   "basic-setup"
-].map(n => new Pkg(n))
+]
 let nonCore = [
   "lang-javascript",
   "lang-java",
@@ -60,12 +45,31 @@ let nonCore = [
   "lang-markdown",
   "legacy-modes",
   "theme-one-dark"
-].map(n => new Pkg(n))
+]
 
-let packages = core.concat(nonCore), buildPackages = packages.filter(p => p.main)
+class Pkg {
+  constructor(name) {
+    this.name = name
+    this.dir = join(root, name)
+    this.main = null
+    if (name != "legacy-modes" && fs.existsSync(this.dir)) {
+      let files = fs.readdirSync(join(this.dir, "src")).filter(f => /^[^.]+\.ts$/.test(f))
+      let main = files.length == 1 ? files[0] : files.includes("index.ts") ? "index.ts"
+          : files.includes(name.replace(/^(theme-|lang-)/, "") + ".ts") ? name.replace(/^(theme-|lang-)/, "") + ".ts" : null
+      if (!main) throw new Error("Couldn't find a main script for " + name)
+      this.main = join(this.dir, "src", main)
+    }
+  }
+}
 
-let packageNames = Object.create(null)
-for (let p of packages) packageNames[p.name] = p
+function loadPackages() {
+  let packages = core.concat(nonCore).map(n => new Pkg(n))
+  let packageNames = Object.create(null)
+  for (let p of packages) packageNames[p.name] = p
+  return {packages, packageNames, buildPackages: packages.filter(p => p.main)}
+}
+
+let {packages, packageNames, buildPackages} = loadPackages()
 
 function start() {
   let command = process.argv[2]
@@ -134,6 +138,7 @@ function install(arg = null) {
   console.log("Running yarn install")
   run("yarn", ["install"])
   console.log("Building modules")
+  ;({packages, packageNames, buildPackages} = loadPackages())
   build()
 }
 
@@ -218,7 +223,7 @@ function customResolve(ts, host) {
   // resolution to handle sibling packages specially.
   host.resolveModuleNames = function(names, parent, _c, _r, options) {
     return names.map(name => {
-      let cm = /^@codemirror\/(\w+)$/.exec(name)
+      let cm = /^@codemirror\/([\w-]+)$/.exec(name)
       let pkg = cm && packageNames[cm[1]]
       if (pkg) return {resolvedFileName: pkg.main, isExternalLibraryImport: false}
       return ts.resolveModuleName(name, parent, options, host).resolvedModule

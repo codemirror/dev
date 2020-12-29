@@ -1,22 +1,21 @@
-# CodeMirror 6 prototype
+# CodeMirror
 
 [![Build Status](https://github.com/codemirror/codemirror.next/workflows/main/badge.svg)](https://github.com/codemirror/codemirror.next/actions)
-[![NPM version](https://img.shields.io/npm/v/@codemirror/next.svg)](https://www.npmjs.org/package/@codemirror/next)
 
-This is the prototype of the next version of [CodeMirror](https://codemirror.net), a complete rewrite.
+This is the central repository for [CodeMirror 6](https://codemirror.net/6). It holds the bug tracker and development scripts.
 
-Eventually, the content of this repository will move into different packages. For now, to reduce friction during development, it is a monorepo. Its content is published as the `@codemirror/next` package on [npm](https://npmjs.com).
+To get started, make sure you are running [node.js](https://nodejs.org/) version 14. After cloning the repository, run
 
-To get started, make sure you are running [node.js](https://nodejs.org/) version 13. After cloning the repository, run
+    bin/cm.js install
 
-    npm install
+to clone the packages that make up the system, install dependencies, and build the packages. At any time you can rebuild packages, either by running `npm run prepare` in their subdirectory, or all at once with
 
-to install dependencies, and
+    bin/cm.js build
+
+Developing is best done by setting up
 
     npm run dev
 
-to start a server that automatically rebuilds the bundles when the code changes and exposes a dev server on port 8090 running the [demo](http://localhost:8090) and [tests](http://localhost:8090/test).
+which starts a server that automatically rebuilds the packages when their code changes and exposes a dev server on port 8090 running the [demo](http://localhost:8090) and [browser tests](http://localhost:8090/test).
 
 Please see [the website](https://codemirror.net/6/) for more information and [docs](https://codemirror.net/6/docs/ref).
-
-This code is dual-licensed under the MIT and GPL-v3 licenses. This means that you, as user, may choose one of these licenses to abide by. I.e. if complying with the GPL is problematic for you, you can choose the more liberal MIT license.
