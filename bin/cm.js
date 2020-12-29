@@ -81,6 +81,7 @@ function start() {
     devserver,
     release,
     install,
+    clean,
     commit,
     push,
     run: runCmd,
@@ -95,6 +96,7 @@ function help(status) {
   cm install [--ssh]      Clone and symlink the packages, install dependencies, build
   cm packages             Emit a list of all pkg names
   cm build                Build the bundle files
+  cm clean                Delete files created by the build
   cm devserver            Start a dev server on port 8090
   cm release              Create commits to tag a release
   cm commit <args>        Run git commit in all packages that have changes
@@ -347,8 +349,13 @@ function release(...args) {
   run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"])
 }
 
+function clean() {
+  for (let pkg of buildPackages)
+    run("rm", ["-rf", "dist", "src/*.d.ts", "src/*.js", "src/*.map"], pkg.dir)
+}
+
 function commit(...args) {
-  for (pkg of packages) {
+  for (let pkg of packages) {
     if (run("git", ["diff"], pkg.dir) || run("git", ["diff", "--cached"], pkg.dir))
       console.log(pkg.name + ":\n" + run("git", ["commit"].concat(args), pkg.dir))
   }
