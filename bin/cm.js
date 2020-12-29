@@ -98,7 +98,8 @@ function help(status) {
   cm build                Build the bundle files
   cm clean                Delete files created by the build
   cm devserver            Start a dev server on port 8090
-  cm release              Create commits to tag a release
+  cm release <package> [--edit] [--version <version>]
+                          Create commits to tag a release
   cm commit <args>        Run git commit in all packages that have changes
   cm push                 Run git push in packages that have new commits
   cm run <command>        Run the given command in each of the package dirs
@@ -286,8 +287,8 @@ function devserver() {
   startServer()
 }
 
-function changelog(since) {
-  let commits = run("git", ["log", "--format=%B", "--reverse", since + "..master"])
+function changelog(pkg, since) {
+  let commits = run("git", ["log", "--format=%B", "--reverse", since + "..master"], pkg.dir)
   let result = {fix: [], feature: [], breaking: []}
   let re = /\n\r?\n(BREAKING|FIX|FEATURE):\s*([^]*?)(?=\r?\n\r?\n|\r?\n?$)/g, match
   while (match = re.exec(commits)) result[match[1].toLowerCase()].push(match[2].replace(/\r?\n/g, " "))
@@ -296,8 +297,9 @@ function changelog(since) {
 
 function bumpVersion(version, changes) {
   let [major, minor, patch] = version.split(".")
-  if (changes.breaking.length && major != "0") return `${Number(major) + 1}.0.0`
-  if (changes.feature.length || changes.breaking.length) return `${major}.${Number(minor) + 1}.0`
+  if (major == "0") return changes.breaking.length ? `0.${Number(minor) + 1}.0` : `0.${minor}.${Number(patch) + 1}`
+  if (changes.breaking.length) return `${Number(major) + 1}.0.0`
+  if (changes.feature.length) return `${major}.${Number(minor) + 1}.0`
   if (changes.fix.length) return `${major}.${minor}.${Number(patch) + 1}`
   throw new Error("No new release notes!")
 }
@@ -318,35 +320,74 @@ function releaseNotes(changes, version) {
   return {head, body}
 }
 
-function setModuleVersion(version) {
-  fs.writeFileSync(packageFile, fs.readFileSync(packageFile, "utf8").replace(/"version":\s*".*?"/, `"version": "${version}"`))
+function setModuleVersion(pkg, version) {
+  let file = join(pkg.dir, "package.json")
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/"version":\s*".*?"/, `"version": "${version}"`))
+}
+
+function updateDependencyVersion(pkg, version) {
+  let changed = []
+  for (let other of packages) if (other != pkg) {
+    let pkgFile = join(other.dir, "package.json"), text = fs.readFileSync(pkgFile, "utf8")
+    let updated = text.replace(new RegExp(`("@codemirror/${pkg.name}": ")(.*?)"`, "g"), (_, m, v) => m + "^" + version + '"')
+    if (updated != text) {
+      changed.push(other)
+      fs.writeFileSync(pkgFile, changed)
+      run("git", ["add", "package.json"], other.dir)
+      let lastMsg = run("git", ["log", "-1", "--pretty=%B"], other.dir)
+      if (/^Bump dependency /.test(lastMsg))
+        run("git", ["commit", "--amend", "-m", lastMsg + ", @codemirror/" + pkg.name], other.dir)
+      else
+        run("git", ["commit", "-m", "Bump dependency for @codemirror/" + pkg.name], other.dir)
+    }
+  }
+  return changed
 }
 
 function release(...args) {
-  let currentVersion = packageJSON.version
-  let changes = changelog(currentVersion)
-  let newVersion = bumpVersion(currentVersion, changes)
-  console.log(`Creating @codemirror/next ${newVersion}`)
+  let newVersion, edit = false, pkgName, pkg
+  for (let i = 0; i < args.length; i++) {
+    let arg = args[i]
+    if (arg == "--edit") edit = true
+    else if (arg == "--version" && i < args.length) newVersion = args[++i]
+    else if (!pkgName && arg[0] != "-") pkgName = arg
+    else help(1)
+  }
+  if (!pkgName || !(pkg = packageNames[pkgName])) help(1)
+
+  let log = join(pkg.dir, "CHANGELOG.md")
+  let newPackage = !fs.existsSync(log)
+
+  let currentVersion = require(join(pkg.dir, "package.json")).version
+  let changes = newPackage ? {fix: [], feature: [], breaking: ["First numbered release."]} : changelog(pkg, currentVersion)
+  if (!newVersion) newVersion = newPackage ? currentVersion : bumpVersion(currentVersion, changes)
+  console.log(`Creating @codemirror/${pkg.name} ${newVersion}`)
 
   let notes = releaseNotes(changes, newVersion)
-  if (args.indexOf("--edit") > -1) {
-    let noteFile = join(root, "notes.txt")
-    fs.writeFileSync(noteFile, notes.head + notes.body)
-    run(process.env.EDITOR || emacs, [noteFile])
-    let edited = fs.readFileSync(noteFile)
-    fs.unlinkSync(noteFile)
-    if (!/\S/.test(edited)) process.exit(0)
-    let split = /^(.*)\n+([^]*)/.exec(edited)
-    notes = {head: split[1] + "\n\n", body: split[2]}
-  }
+  if (edit) notes = editReleaseNotes(notes)
 
-  setModuleVersion(newVersion)
-  let log = join(root, "CHANGELOG.md")
-  fs.writeFileSync(log, notes.head + notes.body + fs.readFileSync(log, "utf8"))
-  run("git", ["add", "package.json"])
-  run("git", ["add", "CHANGELOG.md"])
-  run("git", ["commit", "-m", `Mark version ${newVersion}`])
-  run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"])
+  setModuleVersion(pkg, newVersion)
+  fs.writeFileSync(log, notes.head + notes.body + (newPackage ? "" : fs.readFileSync(log, "utf8")))
+  run("git", ["add", "package.json"], pkg.dir)
+  run("git", ["add", "CHANGELOG.md"], pkg.dir)
+  run("git", ["commit", "-m", `Mark version ${newVersion}`], pkg.dir)
+  run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"], pkg.dir)
+
+  if (changes.breaking.length) {
+    let updated = updateDependencyVersion(pkg, newVersion)
+    if (updated.length) console.log(`Updated dependencies in ${updated.map(p => p.name).join(", ")}`)
+  }
+}
+
+function editReleaseNotes(notes) {
+  let noteFile = join(root, "notes.txt")
+  fs.writeFileSync(noteFile, notes.head + notes.body)
+  run(process.env.EDITOR || "emacs", [noteFile])
+  let edited = fs.readFileSync(noteFile)
+  fs.unlinkSync(noteFile)
+  if (!/\S/.test(edited)) process.exit(0)
+  let split = /^(.*)\n+([^]*)/.exec(edited)
+  return {head: split[1] + "\n\n", body: split[2]}
 }
 
 function clean() {
