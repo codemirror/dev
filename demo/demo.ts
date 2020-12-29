@@ -1,13 +1,13 @@
-import {EditorState, EditorView, basicSetup} from "@codemirror/next/basic-setup"
-import {html} from "@codemirror/next/lang-html"
+import {EditorState, EditorView, basicSetup} from "@codemirror/basic-setup"
+import {html} from "@codemirror/lang-html"
 
-//import {esLint} from "@codemirror/next/lang-javascript"
+//import {esLint} from "@codemirror/lang-javascript"
 // @ts-ignore
 //import Linter from "eslint4b-prebuilt"
-//import {linter} from "@codemirror/next/lint"
+//import {linter} from "@codemirror/lint"
 
-//import {StreamLanguage} from "@codemirror/next/stream-parser"
-//import {javascript} from "@codemirror/next/legacy-modes/mode/javascript"
+//import {StreamLanguage} from "@codemirror/stream-parser"
+//import {javascript} from "@codemirror/legacy-modes/mode/javascript"
 
 let state = EditorState.create({doc: `<script>
   const {readFile} = require("fs");
