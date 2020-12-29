@@ -4,7 +4,6 @@
     "types": ["mocha"],
     "stripInternal": true,
     "typeRoots": ["./node_modules/@types"],
-    "noImplicitReturns": true,
     "noUnusedLocals": true,
     "strict": true,
     "target": "es6",
@@ -14,5 +13,5 @@
     "declarationMap": true,
     "moduleResolution": "node"
   },
-  "include": ["*/src/*.ts", "*/test/*.ts", "demo/demo.ts"]
+  "include": ["*/src/*.ts", "*/test/*.ts", "demo/demo.ts"],
 }

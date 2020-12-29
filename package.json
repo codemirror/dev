@@ -1,90 +1,19 @@
 {
   "name": "@codemirror/next",
   "version": "0.16.0",
-  "description": "Text/code editor component",
+  "description": "Text and code editor component",
   "scripts": {
     "test": "npm run test-node && node bin/selenium.js --start-server",
     "test-node": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js view/test/test-heightmap.js commands/test/test-*.js language/test/test-*.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js lang-xml/test/test-*.js lang-sql/test/test-*.js lang-html/test/test-*.js lang-markdown/test/test-*.js stream-parser/test/test-*.js",
     "prepare": "node bin/cm.js build",
     "dev": "node bin/cm.js devserver"
   },
-  "keywords": [
-    "editor",
-    "code",
-    "syntax",
-    "highlighting"
-  ],
-  "contributors": [
-    {
-      "name": "Marijn Haverbeke",
-      "email": "marijnh@gmail.com"
-    }
-  ],
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
-  "type": "module",
-  "exports": {
-    "./state": "./state/dist/index.js",
-    "./text": "./text/dist/index.js",
-    "./view": "./view/dist/index.js",
-    "./commands": "./commands/dist/index.js",
-    "./history": "./history/dist/index.js",
-    "./collab": "./collab/dist/index.js",
-    "./gutter": "./gutter/dist/index.js",
-    "./rangeset": "./rangeset/dist/index.js",
-    "./language": "./language/dist/index.js",
-    "./language-data": "./language-data/dist/index.js",
-    "./fold": "./fold/dist/index.js",
-    "./matchbrackets": "./matchbrackets/dist/index.js",
-    "./closebrackets": "./closebrackets/dist/index.js",
-    "./panel": "./panel/dist/index.js",
-    "./tooltip": "./tooltip/dist/index.js",
-    "./search": "./search/dist/index.js",
-    "./lint": "./lint/dist/index.js",
-    "./highlight": "./highlight/dist/index.js",
-    "./stream-parser": "./stream-parser/dist/index.js",
-    "./autocomplete": "./autocomplete/dist/index.js",
-    "./comment": "./comment/dist/index.js",
-    "./rectangular-selection": "./rectangular-selection/dist/index.js",
-    "./basic-setup": "./basic-setup/dist/index.js",
-    "./lang-javascript": "./lang-javascript/dist/index.js",
-    "./lang-java": "./lang-java/dist/index.js",
-    "./lang-json": "./lang-json/dist/index.js",
-    "./lang-cpp": "./lang-cpp/dist/index.js",
-    "./lang-python": "./lang-python/dist/index.js",
-    "./lang-css": "./lang-css/dist/index.js",
-    "./lang-html": "./lang-html/dist/index.js",
-    "./lang-sql": "./lang-sql/dist/index.js",
-    "./lang-rust": "./lang-rust/dist/index.js",
-    "./lang-xml": "./lang-xml/dist/index.js",
-    "./lang-markdown": "./lang-markdown/dist/index.js",
-    "./legacy-modes/mode/*": "./legacy-modes/mode/*.js",
-    "./theme-one-dark": "./theme-one-dark/dist/index.js",
-    "./package.json": "./package.json"
-  },
   "license": "(MIT OR GPL-3.0)",
-  "dependencies": {
-    "crelt": "^1.0.5",
-    "lezer": "^0.13.0",
-    "lezer-cpp": "^0.13.0",
-    "lezer-css": "^0.13.0",
-    "lezer-html": "^0.13.0",
-    "lezer-java": "^0.13.0",
-    "lezer-javascript": "^0.13.0",
-    "lezer-json": "^0.13.0",
-    "lezer-markdown": "^0.13.0",
-    "lezer-python": "^0.13.0",
-    "lezer-rust": "^0.13.0",
-    "lezer-tree": "^0.13.0",
-    "lezer-xml": "^0.13.0",
-    "style-mod": "^3.2.0",
-    "w3c-keyname": "^2.2.4"
-  },
   "devDependencies": {
     "@types/mocha": "^5.2.0",
     "eslint4b-prebuilt": "^6.7.1",
     "esmoduleserve": "^0.2.0",
-    "ist": "^1.1.6",
-    "lezer-generator": "^0.13.0",
     "mocha": "^7.1.1",
     "rollup": "^2.35.1",
     "rollup-plugin-dts": "^2.0.1",
@@ -95,5 +24,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/codemirror/codemirror.next.git"
-  }
+  },
+  "workspaces": [
+    "*"
+  ],
+  "private": true
 }

@@ -1,35 +1,85 @@
 #!/usr/bin/env node
 
-const child = require("child_process"), fs = require("fs"), fsp = fs.promises, path = require("path")
+// NOTE: Don't require anything from node_modules here, since the
+// install script has to be able to run _before_ that exists.
+const child = require("child_process"), fs = require("fs"), fsp = fs.promises, path = require("path"), {join} = path
 
-let root = path.join(__dirname, "..")
+let root = join(__dirname, "..")
 
 class Pkg {
   constructor(name) {
     this.name = name
-    this.dir = path.join(root, name)
-    this.json = require(path.join(this.dir, "package.json"))
+    this.dir = join(root, name)
+    this.main = null
+    if (name != "legacy-modes") {
+      let files = fs.readdirSync(join(this.dir, "src")).filter(f => /^[^.]+\.ts$/.test(f))
+      let main = files.length == 1 ? files[0] : files.includes("index.ts") ? "index.ts"
+          : files.includes(name.replace(/^(theme-|lang-)/, "") + ".ts") ? name.replace(/^(theme-|lang-)/, "") + ".ts" : null
+      if (!main) throw new Error("Couldn't find a main script for " + name)
+      this.main = join(this.dir, "src", main)
+    }
   }
 }
 
-const packageFile = path.join(root, "package.json"), packageJSON = JSON.parse(fs.readFileSync(packageFile, "utf8"))
-const packages = [], packageNames = Object.create(null)
-for (let exp of Object.keys(packageJSON.exports)) if (exp != "./package.json" && !/legacy-modes/.test(exp)) {
-  let pkg = new Pkg(/\.\/(.*)/.exec(exp)[1])
-  packages.push(pkg)
-  packageNames[pkg.name] = pkg
-}
-  
-function external(id) { return id != "tslib" && !/^(\.?\/|\w:)/.test(id) }
+const core = [
+  "state",
+  "text",
+  "view",
+  "commands",
+  "history",
+  "collab",
+  "gutter",
+  "rangeset",
+  "language",
+  "language-data",
+  "fold",
+  "matchbrackets",
+  "closebrackets",
+  "panel",
+  "tooltip",
+  "search",
+  "lint",
+  "highlight",
+  "stream-parser",
+  "autocomplete",
+  "comment",
+  "rectangular-selection",
+  "basic-setup"
+].map(n => new Pkg(n))
+let nonCore = [
+  "lang-javascript",
+  "lang-java",
+  "lang-json",
+  "lang-cpp",
+  "lang-python",
+  "lang-css",
+  "lang-html",
+  "lang-sql",
+  "lang-rust",
+  "lang-xml",
+  "lang-markdown",
+  "legacy-modes",
+  "theme-one-dark"
+].map(n => new Pkg(n))
+
+let packages = core.concat(nonCore), buildPackages = packages.filter(p => p.main)
+
+let packageNames = Object.create(null)
+for (let p of packages) packageNames[p.name] = p
 
 function start() {
   let command = process.argv[2]
+  if (command && !["install", "--help"].includes(command)) assertInstalled()
   let args = process.argv.slice(3)
   let cmdFn = {
     packages: listPackages,
     build,
     devserver,
     release,
+    install,
+    commit,
+    push,
+    run: runCmd,
     "--help": () => help(0)
   }[command]
   if (!cmdFn || cmdFn.length > args.length) help(1)
@@ -38,10 +88,14 @@ function start() {
 
 function help(status) {
   console.log(`Usage:
+  cm install [--ssh]      Clone and symlink the packages, install dependencies, build
   cm packages             Emit a list of all pkg names
   cm build                Build the bundle files
   cm devserver            Start a dev server on port 8090
   cm release              Create commits to tag a release
+  cm commit <args>        Run git commit in all packages that have changes
+  cm push                 Run git push in packages that have new commits
+  cm run <command>        Run the given command in each of the package dirs
   cm --help`)
   process.exit(status)
 }
@@ -55,6 +109,35 @@ function run(cmd, args, wd = root) {
   return child.execFileSync(cmd, args, {cwd: wd, encoding: "utf8", stdio: ["ignore", "pipe", process.stderr]})
 }
 
+function assertInstalled() {
+  for (let p of packages) {
+    if (!fs.existsSync(p.dir)) {
+      console.error(`module ${p.name} is missing. Did you forget to run 'cm install'?`)
+      process.exit(1)
+    }
+  }
+}
+
+function install(arg = null) {
+  let base = arg == "--ssh" ? "git@github.com:codemirror/" : "https://github.com/codemirror/"
+  if (arg && arg != "--ssh") help(1)
+
+  for (let pkg of packages) {
+    if (fs.existsSync(pkg.dir)) {
+      console.warn(`Skipping cloning of ${pkg.name} (directory exists)`)
+    } else {
+      let origin = base + pkg.name + ".git"
+      run("git", ["clone", origin, pkg.dir])
+    }
+  }
+
+  console.log("Running yarn install")
+  run("yarn", ["install"])
+  console.log("Building modules")
+  build()
+}
+
+
 function listPackages() {
   console.log(packages.map(p => p.name).join("\n"))
 }
@@ -66,20 +149,22 @@ async function runRollup(configs) {
     let dir = path.dirname(config.output.file)
     await fsp.mkdir(dir, {recursive: true}).catch(() => null)
     for (let file of result.output) {
-      await fsp.writeFile(path.join(dir, file.fileName), file.code || file.source)
+      await fsp.writeFile(join(dir, file.fileName), file.code || file.source)
       if (file.map)
-        await fsp.writeFile(path.join(dir, file.fileName + ".map"), file.map.toString())
+        await fsp.writeFile(join(dir, file.fileName + ".map"), file.map.toString())
     }
   }
 }
 
+function external(id) { return id != "tslib" && !/^(\.?\/|\w:)/.test(id) }
+
 function rollupConfig(pkg) {
   return {
-    input: path.join(pkg.dir, pkg.json.types + ".js"),
+    input: pkg.main.replace(/\.ts$/, ".js"),
     external,
     output: {
       format: "esm",
-      file: path.join(pkg.dir, "dist", "index.js"),
+      file: join(pkg.dir, "dist", "index.js"),
       sourcemap: true,
       externalLiveBindings: false
     },
@@ -89,14 +174,15 @@ function rollupConfig(pkg) {
 
 function rollupDeclConfig(pkg) {
   return {
-    input: path.join(pkg.dir, pkg.json.types + ".d.ts"),
+    input: pkg.main.replace(/\.ts$/, ".d.ts"),
+    external,
     output: {
       format: "esm",
-      file: path.join(pkg.dir, "dist", "index.d.ts")
+      file: join(pkg.dir, "dist", "index.d.ts")
     },
     plugins: [require("rollup-plugin-dts").default()],
     onwarn(warning, warn) {
-      if (warning.code != "CIRCULAR_DEPENDENCY") warn(warning)
+      if (warning.code != "CIRCULAR_DEPENDENCY" && warning.code != "UNUSED_EXTERNAL_IMPORT") warn(warning)
     }
   }
 }
@@ -105,15 +191,15 @@ async function build() {
   console.info("Running TypeScript compiler...")
   let t0 = Date.now()
   tsBuild()
-  console.info(`Done in ${Date.now() - t0}ms`)
+  console.info(`Done in ${((Date.now() - t0) / 1000).toFixed(2)}s`)
   console.info("Building bundles...")
   t0 = Date.now()
-  await runRollup(packages.map(rollupConfig).concat(packages.map(rollupDeclConfig)))
-  console.log(`Done in ${Date.now() - t0}ms`)
+  await runRollup(buildPackages.map(rollupConfig).concat(buildPackages.map(rollupDeclConfig)))
+  console.log(`Done in ${((Date.now() - t0) / 1000).toFixed(2)}s`)
 }
 
 function startServer() {
-  let serve = path.join(root, "demo")
+  let serve = join(root, "demo")
   let moduleserver = new (require("esmoduleserve/moduleserver"))({root: serve, maxDepth: 2})
   let serveStatic = require("serve-static")(serve)
   require("http").createServer((req, resp) => {
@@ -125,36 +211,50 @@ function startServer() {
   console.log("Dev server listening on 8090")
 }
 
-function tsWatch() {
-  const ts = require("typescript")
-  const formatHost = {
+function customResolve(ts, host) {
+  // TypeScript's default behavior will look at the types field in the
+  // package.json files and treat sibling packages as external,
+  // duplicating a bunch of type information. This overrides
+  // resolution to handle sibling packages specially.
+  host.resolveModuleNames = function(names, parent, _c, _r, options) {
+    return names.map(name => {
+      let cm = /^@codemirror\/(\w+)$/.exec(name)
+      let pkg = cm && packageNames[cm[1]]
+      if (pkg) return {resolvedFileName: pkg.main, isExternalLibraryImport: false}
+      return ts.resolveModuleName(name, parent, options, host).resolvedModule
+    })
+  }
+  return host
+}
+
+function tsFormatHost(ts) {
+  return {
     getCanonicalFileName: path => path,
     getCurrentDirectory: ts.sys.getCurrentDirectory,
     getNewLine: () => "\n"
   }
-  ts.createWatchProgram(ts.createWatchCompilerHost(
-    path.join(root, "tsconfig.json"),
+}
+
+function tsWatch() {
+  const ts = require("typescript")
+  ts.createWatchProgram(customResolve(ts, ts.createWatchCompilerHost(
+    join(root, "tsconfig.json"),
     {},
     ts.sys,
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
-    diag => console.error(ts.formatDiagnostic(diag, formatHost)),
+    diag => console.error(ts.formatDiagnostic(diag, tsFormatHost(ts))),
     diag => console.info(ts.flattenDiagnosticMessageText(diag.messageText, "\n"))
-  ))
+  )))
 }
 
 function tsBuild() {
   const ts = require("typescript")
-  const formatHost = {
-    getCanonicalFileName: path => path,
-    getCurrentDirectory: ts.sys.getCurrentDirectory,
-    getNewLine: () => "\n"
-  }
-  let conf = ts.getParsedCommandLineOfConfigFile(path.join(root, "tsconfig.json"), {}, ts.sys)
-  let program = ts.createProgram(conf.fileNames, conf.options)
+  let conf = ts.getParsedCommandLineOfConfigFile(join(root, "tsconfig.json"), {}, ts.sys)
+  let program = ts.createProgram(conf.fileNames, conf.options, customResolve(ts, ts.createCompilerHost(conf.options)))
   let emitResult = program.emit()
 
   for (let diag of ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics))
-    console.error(ts.formatDiagnostic(diag, formatHost))
+    console.error(ts.formatDiagnostic(diag, tsFormatHost(ts)))
 
   if (emitResult.emitSkipped) error("TS build failed")
 }
@@ -162,7 +262,7 @@ function tsBuild() {
 function devserver() {
   tsWatch()
   console.log("Watching...")
-  for (let pkg of packages) {
+  for (let pkg of buildPackages) {
     let watcher = require("rollup").watch(rollupConfig(pkg))
     watcher.on("event", event => {
       if (event.code == "START") console.info("Start bundling " + pkg.name + "...")
@@ -223,7 +323,7 @@ function release(...args) {
 
   let notes = releaseNotes(changes, newVersion)
   if (args.indexOf("--edit") > -1) {
-    let noteFile = path.join(root, "notes.txt")
+    let noteFile = join(root, "notes.txt")
     fs.writeFileSync(noteFile, notes.head + notes.body)
     run(process.env.EDITOR || emacs, [noteFile])
     let edited = fs.readFileSync(noteFile)
@@ -234,7 +334,7 @@ function release(...args) {
   }
 
   setModuleVersion(newVersion)
-  let log = path.join(root, "CHANGELOG.md")
+  let log = join(root, "CHANGELOG.md")
   fs.writeFileSync(log, notes.head + notes.body + fs.readFileSync(log, "utf8"))
   run("git", ["add", "package.json"])
   run("git", ["add", "CHANGELOG.md"])
@@ -242,14 +342,30 @@ function release(...args) {
   run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"])
 }
 
-function ensureSelfLink() {
-  let parent = path.join(root, "node_modules", "@codemirror"), link = path.join(parent, "next")
-  if (!fs.existsSync(link)) {
-    fs.mkdirSync(parent, {recursive: true})
-    fs.symlinkSync("../..", link, "junction")
+function commit(...args) {
+  for (pkg of packages) {
+    if (run("git", ["diff"], pkg.dir) || run("git", ["diff", "--cached"], pkg.dir))
+      console.log(pkg.name + ":\n" + run("git", ["commit"].concat(args), pkg.dir))
   }
 }
 
-ensureSelfLink()
+function push() {
+  for (let pkg of packages) {
+    if (/\bahead\b/.test(run("git", ["status", "-sb"], pkg.dir)))
+      run("git", ["push"], pkg.dir)
+  }
+}
+
+function runCmd(cmd, ...args) {
+  for (let pkg of packages) {
+    console.log(pkg.name + ":")
+    try {
+      console.log(run(cmd, args, pkg.dir))
+    } catch (e) {
+      console.log(e.toString())
+      process.exit(1)
+    }
+  }
+}
 
 start()
