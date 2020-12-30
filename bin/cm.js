@@ -84,6 +84,7 @@ function start() {
     clean,
     commit,
     push,
+    grep,
     run: runCmd,
     "--help": () => help(0)
   }[command]
@@ -103,6 +104,7 @@ function help(status) {
   cm commit <args>        Run git commit in all packages that have changes
   cm push                 Run git push in packages that have new commits
   cm run <command>        Run the given command in each of the package dirs
+  cm grep <pattern>       Grep through the source code for all packages
   cm --help`)
   process.exit(status)
 }
@@ -406,6 +408,31 @@ function push() {
   for (let pkg of packages) {
     if (/\bahead\b/.test(run("git", ["status", "-sb"], pkg.dir)))
       run("git", ["push"], pkg.dir)
+  }
+}
+
+function grep(pattern) {
+  let files = [join(root, "demo", "demo.ts")]
+  function add(dir, ext) {
+    let list
+    try { list = fs.readdirSync(dir) }
+    catch { return }
+    for (let f of list) if (ext.includes(/^[^.]*(.*)/.exec(f)[1])) {
+      files.push(path.relative(process.cwd(), join(dir, f)))
+    }
+  }
+  for (let pkg of packages) {
+    if (pkg.name == "legacy-modes") {
+      add(join(pkg.dir, "mode"), [".js", ".d.ts"])
+    } else {
+      add(join(pkg.dir, "src"), [".ts"])
+      add(join(pkg.dir, "test"), [".ts"])
+    }
+  }
+  try {
+    console.log(run("grep", ["--color", "-nH", "-e", pattern].concat(files), process.cwd()))
+  } catch(e) {
+    process.exit(1)
   }
 }
 
