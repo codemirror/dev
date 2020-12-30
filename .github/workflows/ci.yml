@@ -1,5 +1,5 @@
 name: main
-on: [push]
+on: [push, repository_dispatch]
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -12,4 +12,6 @@ jobs:
           path: '/home/runner/work/codemirror.next/codemirror.next/node_modules'
           key: ${{ runner.os }}-node-modules
 
-      - run: node bin/cm.js install && npm test
+      - run: node bin/cm.js install
+
+      - run: npm test
