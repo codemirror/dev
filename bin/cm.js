@@ -6,7 +6,7 @@ const child = require("child_process"), fs = require("fs"), fsp = fs.promises, p
 
 let root = join(__dirname, "..")
 
-const {loadPackages} = require("./packages")
+const {loadPackages, nonCore} = require("./packages")
 
 let {packages, packageNames, buildPackages} = loadPackages()
 
@@ -24,6 +24,7 @@ function start() {
     commit,
     push,
     grep,
+    "build-readme": buildReadme,
     run: runCmd,
     "--help": () => help(0)
   }[command]
@@ -33,13 +34,14 @@ function start() {
 
 function help(status) {
   console.log(`Usage:
-  cm install [--ssh]      Clone and symlink the packages, install dependencies, build
+  cm install [--ssh]      Clone and symlink the packages, install deps, build
   cm packages             Emit a list of all pkg names
   cm build                Build the bundle files
   cm clean                Delete files created by the build
   cm devserver            Start a dev server on port 8090
   cm release <package> [--edit] [--version <version>]
                           Create commits to tag a release
+  cm build-readme <pkg>   Regenerate the readme file for a non-core package
   cm commit <args>        Run git commit in all packages that have changes
   cm push                 Run git push in packages that have new commits
   cm run <command>        Run the given command in each of the package dirs
@@ -385,6 +387,12 @@ function runCmd(cmd, ...args) {
       process.exit(1)
     }
   }
+}
+
+function buildReadme(name) {
+  if (!nonCore.includes(name)) help(1)
+  let pkg = packageNames[name]
+  fs.writeFileSync(join(pkg.dir, "README.md"), require("./build-readme").buildReadme(pkg))
 }
 
 start()

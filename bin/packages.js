@@ -57,6 +57,7 @@ class Pkg {
     }
   }
 }
+exports.Pkg = Pkg
 
 exports.loadPackages = function loadPackages() {
   let packages = exports.all.map(n => new Pkg(n))
