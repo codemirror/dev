@@ -6,7 +6,10 @@ jobs:
     name: Build and test
     steps:
       - uses: actions/checkout@v1
-      - uses: bahmutov/npm-install@v1
+
+      - uses: actions/cache@v2
         with:
-          useLockFile: false
+          path: '/home/runner/work/codemirror.next/codemirror.next/node_modules'
+          key: ${{ runner.os }}-node-modules
+
       - run: node bin/cm.js install && npm test
