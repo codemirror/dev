@@ -9,4 +9,4 @@ jobs:
       - uses: bahmutov/npm-install@v1
         with:
           useLockFile: false
-      - run: npm test
+      - run: node bin/cm.js install && npm test
