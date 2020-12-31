@@ -11,11 +11,6 @@ jobs:
 
       - uses: actions/checkout@v1
 
-      - uses: actions/cache@v2
-        with:
-          path: '/home/runner/work/codemirror.next/codemirror.next/node_modules'
-          key: ${{ runner.os }}-node-modules
-
       - run: node bin/cm.js install
 
       - run: npm test
