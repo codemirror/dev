@@ -162,22 +162,6 @@ function startServer() {
   console.log("Dev server listening on 8090")
 }
 
-function customResolve(ts, host) {
-  // TypeScript's default behavior will look at the types field in the
-  // package.json files and treat sibling packages as external,
-  // duplicating a bunch of type information. This overrides
-  // resolution to handle sibling packages specially.
-  host.resolveModuleNames = function(names, parent, _c, _r, options) {
-    return names.map(name => {
-      let cm = /^@codemirror\/([\w-]+)$/.exec(name)
-      let pkg = cm && packageNames[cm[1]]
-      if (pkg) return {resolvedFileName: pkg.main, isExternalLibraryImport: false}
-      return ts.resolveModuleName(name, parent, options, host).resolvedModule
-    })
-  }
-  return host
-}
-
 function tsFormatHost(ts) {
   return {
     getCanonicalFileName: path => path,
@@ -188,20 +172,20 @@ function tsFormatHost(ts) {
 
 function tsWatch() {
   const ts = require("typescript")
-  ts.createWatchProgram(customResolve(ts, ts.createWatchCompilerHost(
+  ts.createWatchProgram(ts.createWatchCompilerHost(
     join(root, "tsconfig.json"),
     {},
     ts.sys,
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
     diag => console.error(ts.formatDiagnostic(diag, tsFormatHost(ts))),
     diag => console.info(ts.flattenDiagnosticMessageText(diag.messageText, "\n"))
-  )))
+  ))
 }
 
 function tsBuild() {
   const ts = require("typescript")
   let conf = ts.getParsedCommandLineOfConfigFile(join(root, "tsconfig.json"), {}, ts.sys)
-  let program = ts.createProgram(conf.fileNames, conf.options, customResolve(ts, ts.createCompilerHost(conf.options)))
+  let program = ts.createProgram(conf.fileNames, conf.options, ts.createCompilerHost(conf.options))
   let emitResult = program.emit()
 
   for (let diag of ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics))
