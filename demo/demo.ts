@@ -1,5 +1,6 @@
 import {EditorState, EditorView, basicSetup} from "@codemirror/basic-setup"
 import {html} from "@codemirror/lang-html"
+import {oneDark} from "@codemirror/theme-one-dark"
 
 //import {esLint} from "@codemirror/lang-javascript"
 // @ts-ignore
@@ -18,6 +19,7 @@ let state = EditorState.create({doc: `<script>
 `, extensions: [
   basicSetup,
   html(),
+  oneDark
 //  linter(esLint(new Linter)),
 //  StreamLanguage.define(javascript),
 ]})

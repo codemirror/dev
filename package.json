@@ -12,9 +12,7 @@
   "license": "(MIT OR GPL-3.0)",
   "devDependencies": {
     "@types/mocha": "^5.2.0",
-    "builddocs": "git://github.com/marijnh/builddocs.git#v1",
     "eslint4b-prebuilt": "^6.7.1",
-    "gettypes": "git://github.com/adrianheine/gettypes.git",
     "esmoduleserve": "^0.2.0",
     "mocha": "^7.1.1",
     "rollup": "^2.35.1",
