@@ -131,7 +131,20 @@ function rollupDeclConfig(pkg) {
       format: "esm",
       file: join(pkg.dir, "dist", "index.d.ts")
     },
-    plugins: [require("rollup-plugin-dts").default()],
+    plugins: [
+      require("rollup-plugin-dts").default(),
+      {
+        name: "fixup-relative-paths",
+        generateBundle(options, bundle) {
+          for (let file in bundle) {
+            let asset = bundle[file]
+            if (asset.code) asset.code = asset.code.replace(/['"]\.\.\/\.\.\/(\w+)\/src['"]/, (m, mod) => {
+              return packageNames[mod] ? `"@codemirror/${mod}"` : m
+            })
+          }
+        }
+      }
+    ],
     onwarn(warning, warn) {
       if (warning.code != "CIRCULAR_DEPENDENCY" && warning.code != "UNUSED_EXTERNAL_IMPORT") warn(warning)
     }
