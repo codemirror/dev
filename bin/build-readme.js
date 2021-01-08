@@ -2,7 +2,7 @@
 // docs as HTML.
 
 const {core, nonCore} = require("./packages")
-const {gather, gatherMany} = require("gettypes")
+const {gather, gatherMany} = require("getdocs-ts")
 const {build, browserImports} = require("builddocs")
 const {join} = require("path"), fs = require("fs")
 
