@@ -37,6 +37,7 @@ exports.nonCore = [
   "lang-rust",
   "lang-xml",
   "lang-markdown",
+  "lang-lezer",
   "legacy-modes",
   "theme-one-dark"
 ]
