@@ -16,6 +16,7 @@ function start() {
   let args = process.argv.slice(3)
   let cmdFn = {
     packages: listPackages,
+    status,
     build,
     devserver,
     release,
@@ -36,6 +37,7 @@ function help(status) {
   console.log(`Usage:
   cm install [--ssh]      Clone and symlink the packages, install deps, build
   cm packages             Emit a list of all pkg names
+  cm status               Output git status, when interesting, for packages
   cm build                Build the bundle files
   cm clean                Delete files created by the build
   cm devserver            Start a dev server on port 8090
@@ -91,6 +93,14 @@ function install(arg = null) {
 
 function listPackages() {
   console.log(packages.map(p => p.name).join("\n"))
+}
+
+function status() {
+  for (let pkg of packages) {
+    let output = run("git", ["status", "-sb"], pkg.dir)
+    if (output != "## main...origin/main\n")
+      console.log(`${pkg.name}:\n${output}`)
+  }
 }
 
 async function runRollup(configs) {
