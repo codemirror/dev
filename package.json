@@ -2,7 +2,7 @@
   "description": "Development environment for the CodeMirror 6 packages",
   "scripts": {
     "test": "npm run test-node && node bin/selenium.js --start-server",
-    "test-node": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js view/test/test-heightmap.js commands/test/test-*.js language/test/test-*.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js lang-xml/test/test-*.js lang-sql/test/test-*.js lang-html/test/test-*.js lang-markdown/test/test-*.js stream-parser/test/test-*.js",
+    "test-node": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js view/test/test-heightmap.js commands/test/test-*.js language/test/test-*.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js lang-xml/test/test-*.js lang-sql/test/test-*.js lang-html/test/test-*.js lang-markdown/test/test-*.js stream-parser/test/test-*.js highlight/test/test-*.js",
     "prepare": "node bin/cm.js build",
     "dev": "node bin/cm.js devserver"
   },
