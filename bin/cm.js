@@ -20,6 +20,7 @@ function start() {
     build,
     devserver,
     release,
+    "release-major": releaseMajor,
     install,
     clean,
     commit,
@@ -145,7 +146,7 @@ function rollupDeclConfig(pkg) {
       require("rollup-plugin-dts").default(),
       {
         name: "fixup-relative-paths",
-        generateBundle(options, bundle) {
+        generateBundle(_options, bundle) {
           for (let file in bundle) {
             let asset = bundle[file]
             if (asset.code) asset.code = asset.code.replace(/['"]\.\.\/\.\.\/(\w+)\/src['"]/, (m, mod) => {
@@ -177,7 +178,7 @@ function startServer() {
   let moduleserver = new (require("esmoduleserve/moduleserver"))({root: serve, maxDepth: 2})
   let serveStatic = require("serve-static")(serve)
   require("http").createServer((req, resp) => {
-    moduleserver.handleRequest(req, resp) || serveStatic(req, resp, err => {
+    moduleserver.handleRequest(req, resp) || serveStatic(req, resp, _err => {
       resp.statusCode = 404
       resp.end('Not found')
     })
@@ -279,7 +280,7 @@ function updateDependencyVersion(pkg, version) {
   let changed = []
   for (let other of packages) if (other != pkg) {
     let pkgFile = join(other.dir, "package.json"), text = fs.readFileSync(pkgFile, "utf8")
-    let updated = text.replace(new RegExp(`("@codemirror/${pkg.name}": ")(.*?)"`, "g"), (_, m, v) => m + "^" + version + '"')
+    let updated = text.replace(new RegExp(`("@codemirror/${pkg.name}": ")(.*?)"`, "g"), (_, m) => m + "^" + version + '"')
     if (updated != text) {
       changed.push(other)
       fs.writeFileSync(pkgFile, changed)
@@ -294,22 +295,44 @@ function updateDependencyVersion(pkg, version) {
   return changed
 }
 
+function updateAllDependencyVersions(version) {
+  for (let pkg of packages) {
+    let pkgFile = join(pkg.dir, "package.json"), text = fs.readFileSync(pkgFile, "utf8")
+    let updated = text.replace(/("@codemirror\/[^"]+": ")([^"]+)"/g, (_, m) => m + "^" + version + '"')
+    fs.writeFileSync(pkgFile, updated)
+  }
+}
+
+function version(pkg) {
+  return require(join(pkg.dir, "package.json")).version
+}
+
 function release(...args) {
-  let newVersion, edit = false, pkgName, pkg
+  let setVersion, edit = false, pkgName, pkg
   for (let i = 0; i < args.length; i++) {
     let arg = args[i]
     if (arg == "--edit") edit = true
-    else if (arg == "--version" && i < args.length) newVersion = args[++i]
+    else if (arg == "--version" && i < args.length) setVersion = args[++i]
     else if (!pkgName && arg[0] != "-") pkgName = arg
     else help(1)
   }
   if (!pkgName || !(pkg = packageNames[pkgName])) help(1)
 
+  let {changes, newVersion} = doRelease(pkg, setVersion, {edit})
+
+  if (changes.breaking.length) {
+    let updated = updateDependencyVersion(pkg, newVersion)
+    if (updated.length) console.log(`Updated dependencies in ${updated.map(p => p.name).join(", ")}`)
+  }
+}
+
+function doRelease(pkg, newVersion, {edit = false, defaultChanges = null}) {
   let log = join(pkg.dir, "CHANGELOG.md")
   let newPackage = !fs.existsSync(log)
 
-  let currentVersion = require(join(pkg.dir, "package.json")).version
+  let currentVersion = version(pkg)
   let changes = newPackage ? {fix: [], feature: [], breaking: ["First numbered release."]} : changelog(pkg, currentVersion)
+  if (defaultChanges && !changes.fix.length && !changes.feature.length && !changes.breaking.length) changes = defaultChanges
   if (!newVersion) newVersion = newPackage ? currentVersion : bumpVersion(currentVersion, changes)
   console.log(`Creating @codemirror/${pkg.name} ${newVersion}`)
 
@@ -323,10 +346,16 @@ function release(...args) {
   run("git", ["commit", "-m", `Mark version ${newVersion}`], pkg.dir)
   run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"], pkg.dir)
 
-  if (changes.breaking.length) {
-    let updated = updateDependencyVersion(pkg, newVersion)
-    if (updated.length) console.log(`Updated dependencies in ${updated.map(p => p.name).join(", ")}`)
-  }
+  return {changes, newVersion}
+}
+
+function releaseMajor() {
+  let versions = packages.map(version), prev = Math.max(...versions.map(v => +v.split(".")[1]))
+  let newVersion = `0.${prev + 1}.0`
+  updateAllDependencyVersions(newVersion)
+  for (let pkg of packages) doRelease(pkg, newVersion, {
+    defaultChanges: {fix: [], feature: [], breaking: ["Update dependencies to " + newVersion]}
+  })
 }
 
 function editReleaseNotes(notes) {
@@ -364,7 +393,7 @@ function grep(pattern) {
   function add(dir, ext) {
     let list
     try { list = fs.readdirSync(dir) }
-    catch { return }
+    catch (_) { return }
     for (let f of list) if (ext.includes(/^[^.]*(.*)/.exec(f)[1])) {
       files.push(path.relative(process.cwd(), join(dir, f)))
     }
