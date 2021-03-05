@@ -62,6 +62,10 @@ function run(cmd, args, wd = root) {
   return child.execFileSync(cmd, args, {cwd: wd, encoding: "utf8", stdio: ["ignore", "pipe", process.stderr]})
 }
 
+function replace(file, f) {
+  fs.writeFileSync(file, f(fs.readFileSync(file, "utf8")))
+}
+
 function assertInstalled() {
   for (let p of packages) {
     if (!fs.existsSync(p.dir)) {
@@ -127,7 +131,6 @@ function rollupConfig(pkg) {
     output: {
       format: "esm",
       file: join(pkg.dir, "dist", "index.js"),
-      sourcemap: true,
       externalLiveBindings: false
     },
     plugins: [require("lezer-generator/rollup").lezer()]
