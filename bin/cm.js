@@ -2,7 +2,7 @@
 
 // NOTE: Don't require anything from node_modules here, since the
 // install script has to be able to run _before_ that exists.
-const child = require("child_process"), fs = require("fs"), fsp = fs.promises, path = require("path"), {join} = path
+const child = require("child_process"), fs = require("fs"), path = require("path"), {join} = path
 
 let root = join(__dirname, "..")
 
@@ -108,72 +108,11 @@ function status() {
   }
 }
 
-async function runRollup(configs) {
-  for (let config of Array.isArray(configs) ? configs : [configs]) {
-    let bundle = await require("rollup").rollup(config)
-    let result = await bundle.generate(config.output)
-    let dir = path.dirname(config.output.file)
-    await fsp.mkdir(dir, {recursive: true}).catch(() => null)
-    for (let file of result.output) {
-      await fsp.writeFile(join(dir, file.fileName), file.code || file.source)
-      if (file.map)
-        await fsp.writeFile(join(dir, file.fileName + ".map"), file.map.toString())
-    }
-  }
-}
-
-function external(id) { return id != "tslib" && !/^(\.?\/|\w:)/.test(id) }
-
-function rollupConfig(pkg) {
-  return {
-    input: pkg.main.replace(/\.ts$/, ".js"),
-    external,
-    output: {
-      format: "esm",
-      file: join(pkg.dir, "dist", "index.js"),
-      externalLiveBindings: false
-    },
-    plugins: [require("lezer-generator/rollup").lezer()]
-  }
-}
-
-function rollupDeclConfig(pkg) {
-  return {
-    input: pkg.main.replace(/\.ts$/, ".d.ts"),
-    external,
-    output: {
-      format: "esm",
-      file: join(pkg.dir, "dist", "index.d.ts")
-    },
-    plugins: [
-      require("rollup-plugin-dts").default(),
-      {
-        name: "fixup-relative-paths",
-        generateBundle(_options, bundle) {
-          for (let file in bundle) {
-            let asset = bundle[file]
-            if (asset.code) asset.code = asset.code.replace(/['"]\.\.\/\.\.\/(\w+)\/src['"]/, (m, mod) => {
-              return packageNames[mod] ? `"@codemirror/${mod}"` : m
-            })
-          }
-        }
-      }
-    ],
-    onwarn(warning, warn) {
-      if (warning.code != "CIRCULAR_DEPENDENCY" && warning.code != "UNUSED_EXTERNAL_IMPORT") warn(warning)
-    }
-  }
-}
-
 async function build() {
-  console.info("Running TypeScript compiler...")
+  console.info("Building...")
   let t0 = Date.now()
-  tsBuild()
+  await require("../buildhelper/src/build").build(buildPackages.map(p => p.main))
   console.info(`Done in ${((Date.now() - t0) / 1000).toFixed(2)}s`)
-  console.info("Building bundles...")
-  t0 = Date.now()
-  await runRollup(buildPackages.map(rollupConfig).concat(buildPackages.map(rollupDeclConfig)))
-  console.log(`Done in ${((Date.now() - t0) / 1000).toFixed(2)}s`)
 }
 
 function startServer() {
@@ -189,55 +128,9 @@ function startServer() {
   console.log("Dev server listening on 8090")
 }
 
-function tsFormatHost(ts) {
-  return {
-    getCanonicalFileName: path => path,
-    getCurrentDirectory: ts.sys.getCurrentDirectory,
-    getNewLine: () => "\n"
-  }
-}
-
-function tsWatch() {
-  const ts = require("typescript")
-  ts.createWatchProgram(ts.createWatchCompilerHost(
-    join(root, "tsconfig.json"),
-    {},
-    ts.sys,
-    ts.createEmitAndSemanticDiagnosticsBuilderProgram,
-    diag => console.error(ts.formatDiagnostic(diag, tsFormatHost(ts))),
-    diag => console.info(ts.flattenDiagnosticMessageText(diag.messageText, "\n"))
-  ))
-}
-
-function tsBuild() {
-  const ts = require("typescript")
-  let conf = ts.getParsedCommandLineOfConfigFile(join(root, "tsconfig.json"), {}, ts.sys)
-  let program = ts.createProgram(conf.fileNames, conf.options, ts.createCompilerHost(conf.options))
-  let emitResult = program.emit()
-
-  for (let diag of ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics))
-    console.error(ts.formatDiagnostic(diag, tsFormatHost(ts)))
-
-  if (emitResult.emitSkipped) error("TS build failed")
-}
-
 function devserver() {
-  tsWatch()
+  require("../buildhelper/src/build").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")])
   console.log("Watching...")
-  for (let pkg of buildPackages) {
-    let watcher = require("rollup").watch(rollupConfig(pkg))
-    watcher.on("event", event => {
-      if (event.code == "START") console.info("Start bundling " + pkg.name + "...")
-      else if (event.code == "END") console.info("Finished bundling " + pkg.name)
-      else if (event.code == "ERROR") console.error(`Bundling error (${pkg.name}): ${event.error}`)
-      else if (event.code == "BUNDLE_END") event.result.close()
-    })
-    let declWatcher = require("rollup").watch(rollupDeclConfig(pkg))
-    declWatcher.on("event", event => {
-      if (event.code == "ERROR") console.error(`Decl bundling error (${pkg.name}): ${event.error}`)
-      else if (event.code == "BUNDLE_END") event.result.close()
-    })
-  }
   startServer()
 }
 
@@ -374,7 +267,7 @@ function editReleaseNotes(notes) {
 
 function clean() {
   for (let pkg of buildPackages)
-    run("rm", ["-rf", "dist", "src/*.d.ts", "src/*.js", "src/*.map"], pkg.dir)
+    run("rm", ["-rf", "dist"], pkg.dir)
 }
 
 function commit(...args) {

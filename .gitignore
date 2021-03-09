@@ -4,6 +4,7 @@ package-lock.json
 /demo/demo.d.ts*
 /demo/test/test.js*
 /website
+/buildhelper
 /state
 /text
 /view
