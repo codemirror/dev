@@ -9,6 +9,7 @@
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "devDependencies": {
+    "@codemirror/buildhelper": "^0.1.0",
     "@types/mocha": "^5.2.0",
     "eslint4b-prebuilt": "^6.7.1",
     "esmoduleserve": "^0.2.0",

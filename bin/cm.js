@@ -111,7 +111,7 @@ function status() {
 async function build() {
   console.info("Building...")
   let t0 = Date.now()
-  await require("../buildhelper/src/build").build(buildPackages.map(p => p.main))
+  await require("@codemirror/buildhelper").build(buildPackages.map(p => p.main))
   console.info(`Done in ${((Date.now() - t0) / 1000).toFixed(2)}s`)
 }
 
@@ -129,7 +129,7 @@ function startServer() {
 }
 
 function devserver() {
-  require("../buildhelper/src/build").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")])
+  require("@codemirror/buildhelper").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")])
   console.log("Watching...")
   startServer()
 }
