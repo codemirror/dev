@@ -130,7 +130,6 @@ function startServer() {
 
 function devserver() {
   require("@codemirror/buildhelper").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")])
-  console.log("Watching...")
   startServer()
 }
 
