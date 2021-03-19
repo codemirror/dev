@@ -178,11 +178,11 @@ function updateDependencyVersion(pkg, version) {
     let updated = text.replace(new RegExp(`("@codemirror/${pkg.name}": ")(.*?)"`, "g"), (_, m) => m + "^" + version + '"')
     if (updated != text) {
       changed.push(other)
-      fs.writeFileSync(pkgFile, changed)
+      fs.writeFileSync(pkgFile, updated)
       run("git", ["add", "package.json"], other.dir)
       let lastMsg = run("git", ["log", "-1", "--pretty=%B"], other.dir)
       if (/^Bump dependency /.test(lastMsg))
-        run("git", ["commit", "--amend", "-m", lastMsg + ", @codemirror/" + pkg.name], other.dir)
+        run("git", ["commit", "--amend", "-m", lastMsg.trimEnd() + ", @codemirror/" + pkg.name], other.dir)
       else
         run("git", ["commit", "-m", "Bump dependency for @codemirror/" + pkg.name], other.dir)
     }
