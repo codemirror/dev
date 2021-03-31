@@ -202,6 +202,8 @@ function version(pkg) {
   return require(join(pkg.dir, "package.json")).version
 }
 
+const mainVersion = /^0.\d+|\d+/
+
 function release(...args) {
   let setVersion, edit = false, pkgName, pkg
   for (let i = 0; i < args.length; i++) {
@@ -215,7 +217,7 @@ function release(...args) {
 
   let {changes, newVersion} = doRelease(pkg, setVersion, {edit})
 
-  if (changes.breaking.length) {
+  if (mainVersion.exec(newVersion)[0] != mainVersion.exec(version(pkg))[0]) {
     let updated = updateDependencyVersion(pkg, newVersion)
     if (updated.length) console.log(`Updated dependencies in ${updated.map(p => p.name).join(", ")}`)
   }
