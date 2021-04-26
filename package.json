@@ -1,20 +1,17 @@
 {
   "description": "Development environment for the CodeMirror 6 packages",
   "scripts": {
-    "test": "npm run test-node && node bin/selenium.js --start-server",
-    "test-node": "mocha text/test/test-*.js state/test/test-*.js history/test/test-*.js rangeset/test/test-rangeset.js view/test/test-heightmap.js commands/test/test-*.js language/test/test-*.js lang-javascript/test/test-*.js closebrackets/test/test-*.js search/test/test-*.js collab/test/test-*.js comment/test/test-*.js lang-xml/test/test-*.js lang-sql/test/test-*.js lang-html/test/test-*.js lang-markdown/test/test-*.js stream-parser/test/test-*.js highlight/test/test-*.js",
+    "test": "node bin/cm.js test",
+    "test-node": "node bin/cm.js test --no-browser",
     "prepare": "node bin/cm.js build",
     "dev": "node bin/cm.js devserver"
   },
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
   "license": "(MIT OR GPL-3.0)",
   "devDependencies": {
-    "@codemirror/buildhelper": "^0.1.0",
-    "@types/mocha": "^5.2.0",
+    "@codemirror/buildhelper": "^0.2.0",
     "eslint4b-prebuilt": "^6.7.1",
     "esmoduleserve": "^0.2.0",
-    "mocha": "^7.1.1",
-    "selenium-webdriver": "^4.0.0-alpha.7",
     "serve-static": "^1.14.1",
     "getdocs-ts": "^0.1.0",
     "builddocs": "^1.0.0"
