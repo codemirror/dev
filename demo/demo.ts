@@ -1,10 +1,9 @@
 import {EditorState, EditorView, basicSetup} from "@codemirror/basic-setup"
-import {markdown} from "@codemirror/lang-markdown"
-import {oneDark} from "@codemirror/theme-one-dark"
+import {javascript} from "@codemirror/lang-javascript"
 
-let state = EditorState.create({doc: '"one" "two"', extensions: [
+let state = EditorState.create({doc: 'console.log("Hello world")', extensions: [
   basicSetup,
-  markdown(),
+  javascript(),
 ]})
 
-let view = (window as any).view = new EditorView({state, parent: document.querySelector("#editor")!})
+;(window as any).view = new EditorView({state, parent: document.querySelector("#editor")!})
