@@ -60,8 +60,8 @@ function error(err) {
   process.exit(1)
 }
 
-function run(cmd, args, wd = root) {
-  return child.execFileSync(cmd, args, {cwd: wd, encoding: "utf8", stdio: ["ignore", "pipe", process.stderr]})
+function run(cmd, args, wd = root, { shell = false } = {}) {
+  return child.execFileSync(cmd, args, {shell, cwd: wd, encoding: "utf8", stdio: ["ignore", "pipe", process.stderr]})
 }
 
 function replace(file, f) {
@@ -91,7 +91,8 @@ function install(arg = null) {
   }
 
   console.log("Running yarn install")
-  run("yarn", ["install"])
+  // Needs shell: true on Windows for yarn.cmd
+  run("yarn", ["install"], root, {shell: true})
   console.log("Building modules")
   ;({packages, packageNames, buildPackages} = loadPackages())
   build()
