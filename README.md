@@ -4,7 +4,7 @@
 
 This is the central repository for [CodeMirror 6](https://codemirror.net/6). It holds the bug tracker and development scripts.
 
-To get started, make sure you are running [node.js](https://nodejs.org/) version 14. After cloning the repository, make sure you have [yarn](https://yarnpkg.com/) (version 1.x) installed and run
+To get started, make sure you are running [node.js](https://nodejs.org/) version 14. After cloning the repository, run
 
     node bin/cm.js install
 

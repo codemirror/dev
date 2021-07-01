@@ -90,9 +90,8 @@ function install(arg = null) {
     }
   }
 
-  console.log("Running yarn install")
-  // Needs shell: true on Windows for yarn.cmd
-  run("yarn", ["install"], root, {shell: true})
+  console.log("Running npm install")
+  run("npm", ["install"], root, {shell: process.platform == "win32"})
   console.log("Building modules")
   ;({packages, packageNames, buildPackages} = loadPackages())
   build()
