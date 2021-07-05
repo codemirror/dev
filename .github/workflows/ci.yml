@@ -15,11 +15,6 @@ jobs:
         with:
           node-version: '16'
 
-      - uses: actions/cache@v2
-        with:
-          path: '/home/runner/work/codemirror.next/codemirror.next/node_modules'
-          key: ${{ runner.os }}-npm-modules
-
       - run: node bin/cm.js install
 
       - run: npm test
