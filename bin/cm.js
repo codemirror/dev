@@ -202,7 +202,9 @@ function updateDependencyVersion(pkg, version) {
 function updateAllDependencyVersions(version) {
   for (let pkg of packages) {
     let pkgFile = join(pkg.dir, "package.json"), text = fs.readFileSync(pkgFile, "utf8")
-    let updated = text.replace(/("@codemirror\/[^"]+": ")([^"]+)"/g, (_, m) => m + "^" + version + '"')
+    let updated = text.replace(/("@codemirror\/[^"]+": ")([^"]+)"/g, (_, m, old) => {
+      return m + (/buildhelper/.test(m) ? old : "^" + version) + '"'
+    })
     fs.writeFileSync(pkgFile, updated)
   }
 }
