@@ -46,6 +46,7 @@
       "@codemirror/lang-xml": ["./lang-xml/src/xml.ts"],
       "@codemirror/lang-markdown": ["./lang-markdown/src/index.ts"],
       "@codemirror/lang-lezer": ["./lang-lezer/src/index.ts"],
+      "@codemirror/lang-php": ["./lang-php/src/php.ts"],
       "@codemirror/theme-one-dark": ["./theme-one-dark/src/one-dark.ts"]
     }
   },

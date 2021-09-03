@@ -30,6 +30,7 @@ exports.nonCore = [
   "lang-java",
   "lang-json",
   "lang-cpp",
+  "lang-php",
   "lang-python",
   "lang-css",
   "lang-html",
