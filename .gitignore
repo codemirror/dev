@@ -41,6 +41,7 @@ package-lock.json
 /lang-xml
 /lang-markdown
 /lang-lezer
+/lang-wast
 /legacy-modes
 /theme-one-dark
 .tern-*
