@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and test
     steps:
-      - uses: styfle/cancel-workflow-action@0.6.0
+      - uses: styfle/cancel-workflow-action@0.9.1
         with:
           access_token: ${{ github.token }}
 
