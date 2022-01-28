@@ -7,7 +7,7 @@
     "dev": "node bin/cm.js devserver"
   },
   "author": "Marijn Haverbeke <marijnh@gmail.com>",
-  "license": "(MIT OR GPL-3.0)",
+  "license": "MIT",
   "devDependencies": {
     "@codemirror/buildhelper": "^0.1.5",
     "eslint4b-prebuilt": "^6.7.1",
