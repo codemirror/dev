@@ -6,8 +6,6 @@ This is the central repository for [CodeMirror 6](https://codemirror.net/6). It 
 
 If you want to **use** CodeMirror, install the separate packages from npm, and ignore the contents of this repository. If you want to **develop on** CodeMirror, this repository provides scripts to install and work with the various packages.
 
-**NOTE**: The npm workspaces setup used by this repository is broken with recent versions of npm, causing it to [fail](https://github.com/codemirror/codemirror.next/issues/710) when installing from scratch.
-
 To get started, make sure you are running [node.js](https://nodejs.org/) version 16. After cloning the repository, run
 
     node bin/cm.js install
