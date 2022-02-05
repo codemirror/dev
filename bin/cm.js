@@ -42,7 +42,8 @@ function help(status) {
   cm status               Output git status, when interesting, for packages
   cm build                Build the bundle files
   cm clean                Delete files created by the build
-  cm devserver            Start a dev server on port 8090
+  cm devserver [--source-map]
+                          Start a dev server on port 8090
   cm release <package> [--edit] [--version <version>]
                           Create commits to tag a release
   cm build-readme <pkg>   Regenerate the readme file for a non-core package
@@ -137,8 +138,11 @@ function startServer() {
   console.log("Dev server listening on 8090")
 }
 
-function devserver() {
-  require("@codemirror/buildhelper").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")])
+function devserver(...args) {
+  let options = {
+    sourceMap : args.includes('--source-map')
+  }
+  require("@codemirror/buildhelper").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")], options)
   startServer()
 }
 
