@@ -18,6 +18,6 @@ Developing is best done by setting up
 
     npm run dev
 
-which starts a server that automatically rebuilds the packages when their code changes and exposes a dev server on port 8090 running the [demo](http://localhost:8090) and [browser tests](http://localhost:8090/test).
+which starts a server that automatically rebuilds the packages when their code changes and exposes a dev server on port 8090 running the [demo](http://localhost:8090) and [browser tests](http://localhost:8090/test/).
 
 Please see [the website](https://codemirror.net/6/) for more information and [docs](https://codemirror.net/6/docs/ref).
