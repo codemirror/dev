@@ -28,7 +28,6 @@
       "@codemirror/tooltip": ["./tooltip/src/tooltip.ts"],
       "@codemirror/search": ["./search/src/search.ts"],
       "@codemirror/lint": ["./lint/src/lint.ts"],
-      "@codemirror/highlight": ["./highlight/src/highlight.ts"],
       "@codemirror/stream-parser": ["./stream-parser/src/stream-parser.ts"],
       "@codemirror/autocomplete": ["./autocomplete/src/index.ts"],
       "@codemirror/comment": ["./comment/src/comment.ts"],

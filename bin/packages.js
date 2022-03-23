@@ -18,7 +18,6 @@ exports.core = [
   "closebrackets",
   "search",
   "lint",
-  "highlight",
   "stream-parser",
   "autocomplete",
   "comment",
