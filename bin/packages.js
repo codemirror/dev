@@ -1,27 +1,15 @@
 const fs = require("fs"), {join} = require("path")
 
 exports.core = [
-  "text",
   "state",
-  "rangeset",
   "view",
   "language",
   "commands",
-  "panel",
-  "tooltip",
-  "history",
-  "gutter",
   "collab",
   "language-data",
-  "fold",
-  "matchbrackets",
-  "closebrackets",
   "search",
   "lint",
-  "stream-parser",
   "autocomplete",
-  "comment",
-  "rectangular-selection",
   "basic-setup"
 ]
 exports.nonCore = [
