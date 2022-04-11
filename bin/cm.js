@@ -232,7 +232,9 @@ function release(...args) {
 
   let {changes, newVersion} = doRelease(pkg, setVersion, {edit})
 
-  if (mainVersion.exec(newVersion)[0] != mainVersion.exec(version(pkg))[0]) {
+  // Turned off for now, since this creates a huge mess on accidental
+  // major version bumps. Maybe add a manual utility for it?
+  if (false && mainVersion.exec(newVersion)[0] != mainVersion.exec(version(pkg))[0]) {
     let updated = updateDependencyVersion(pkg, newVersion)
     if (updated.length) console.log(`Updated dependencies in ${updated.map(p => p.name).join(", ")}`)
   }
