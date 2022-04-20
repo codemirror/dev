@@ -295,10 +295,10 @@ function commit(...args) {
   }
 }
 
-function push() {
+function push(...args) {
   for (let pkg of packages) {
     if (/\bahead\b/.test(run("git", ["status", "-sb"], pkg.dir)))
-      run("git", ["push"], pkg.dir)
+      run("git", ["push", ...args], pkg.dir)
   }
 }
 
