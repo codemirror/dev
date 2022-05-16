@@ -5,12 +5,12 @@ exports.core = [
   "view",
   "language",
   "commands",
-  "collab",
-  "language-data",
   "search",
-  "lint",
   "autocomplete",
-  "basic-setup"
+  "lint",
+  "collab",
+  "basic-setup",
+  "language-data",
 ]
 exports.nonCore = [
   "lang-javascript",
