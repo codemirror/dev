@@ -85,7 +85,7 @@ function install(arg = null) {
     if (fs.existsSync(pkg.dir)) {
       console.warn(`Skipping cloning of ${pkg.name} (directory exists)`)
     } else {
-      let origin = base + pkg.name + ".git"
+      let origin = base + (pkg.name == "codemirror" ? "basic-setup" : pkg.name) + ".git"
       run("git", ["clone", origin, pkg.dir])
     }
   }
