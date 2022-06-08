@@ -20,7 +20,6 @@ function start() {
     build,
     devserver,
     release,
-    "release-major": releaseMajor,
     install,
     clean,
     commit,
@@ -203,16 +202,6 @@ function updateDependencyVersion(pkg, version) {
   return changed
 }
 
-function updateAllDependencyVersions(version) {
-  for (let pkg of packages) {
-    let pkgFile = join(pkg.dir, "package.json"), text = fs.readFileSync(pkgFile, "utf8")
-    let updated = text.replace(/("@codemirror\/[^"]+": ")([^"]+)"/g, (_, m, old) => {
-      return m + (/buildhelper/.test(m) ? old : "^" + version) + '"'
-    })
-    fs.writeFileSync(pkgFile, updated)
-  }
-}
-
 function version(pkg) {
   return require(join(pkg.dir, "package.json")).version
 }
@@ -261,15 +250,6 @@ function doRelease(pkg, newVersion, {edit = false, defaultChanges = null}) {
   run("git", ["tag", newVersion, "-m", `Version ${newVersion}\n\n${notes.body}`, "--cleanup=verbatim"], pkg.dir)
 
   return {changes, newVersion}
-}
-
-function releaseMajor() {
-  let versions = packages.map(version), prev = Math.max(...versions.map(v => +v.split(".")[1]))
-  let newVersion = `0.${prev + 1}.0`
-  updateAllDependencyVersions(newVersion)
-  for (let pkg of packages) doRelease(pkg, newVersion, {
-    defaultChanges: {fix: [], feature: [], breaking: ["Update dependencies to " + newVersion]}
-  })
 }
 
 function editReleaseNotes(notes) {
