@@ -14,7 +14,7 @@ package-lock.json
 /search
 /lint
 /autocomplete
-/basic-setup
+/codemirror
 /lang-javascript
 /lang-java
 /lang-json

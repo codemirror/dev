@@ -9,8 +9,8 @@ exports.core = [
   "autocomplete",
   "lint",
   "collab",
-  "basic-setup",
   "language-data",
+  "codemirror",
 ]
 exports.nonCore = [
   "lang-javascript",
