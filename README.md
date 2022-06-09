@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/codemirror/codemirror.next/workflows/main/badge.svg)](https://github.com/codemirror/codemirror.next/actions)
 
-This is the central repository for [CodeMirror 6](https://codemirror.net/6). It holds the bug tracker and development scripts.
+This is the central repository for [CodeMirror 6](https://codemirror.net/6/). It holds the bug tracker and development scripts.
 
 If you want to **use** CodeMirror, install the separate packages from npm, and ignore the contents of this repository. If you want to **develop on** CodeMirror, this repository provides scripts to install and work with the various packages.
 
