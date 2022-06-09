@@ -9,7 +9,7 @@ const {join} = require("path"), fs = require("fs")
 exports.buildReadme = function(pkg) {
   let imports = [type => {
     let sibling = type.typeSource && core.find(name => type.typeSource.startsWith("../" + name + "/"))
-    if (sibling) return "https://codemirror.net/6/docs/ref#" + sibling + "." + type.type
+    if (sibling) return "https://codemirror.net/docs/ref#" + sibling + "." + type.type
   }, type => {
     if (/\blezer[\/-]tree\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#tree.${type.type}`
     if (/\blezer\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#lezer.${type.type}`
@@ -50,7 +50,7 @@ exports.buildReadme = function(pkg) {
     .replace(/id="(.*?)"/g, (_, id) => `id="user-content-${id.toLowerCase()}"`)
     .replace(/href="#(.*?)"/g, (_, id) => {
       let first = /^[^^.]*/.exec(id)[0]
-      if (core.includes(first)) return `href="https://codemirror.net/6/docs/ref/#${id}"`
+      if (core.includes(first)) return `href="https://codemirror.net/docs/ref/#${id}"`
       if (first == pkg.name && id.length > first.length) id = id.slice(first.length + 1)
       return `href="#user-content-${id.toLowerCase()}"`
     })

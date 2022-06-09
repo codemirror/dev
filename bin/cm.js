@@ -168,7 +168,7 @@ function releaseNotes(changes, version) {
 
   let types = {breaking: "Breaking changes", fix: "Bug fixes", feature: "New features"}
 
-  let refTarget = "https://codemirror.net/6/docs/ref/"
+  let refTarget = "https://codemirror.net/docs/ref/"
   let head = `## ${version} (${date})\n\n`, body = ""
   for (let type in types) {
     let messages = changes[type]
