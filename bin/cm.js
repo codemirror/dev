@@ -120,7 +120,11 @@ async function build() {
 function startServer() {
   let serve = join(root, "demo")
   let moduleserver = new (require("esmoduleserve/moduleserver"))({root: serve, maxDepth: 2})
-  let serveStatic = require("serve-static")(serve)
+  let serveStatic = require("serve-static")(serve, {
+    setHeaders(res, path) {
+      if (/try\/mods\//.test(path)) res.setHeader("Access-Control-Allow-Origin", "*")
+    }
+  })
   require("http").createServer((req, resp) => {
     if (/^\/test\/?($|\?)/.test(req.url)) {
       let runTests = require("@codemirror/buildhelper/src/runtests")
