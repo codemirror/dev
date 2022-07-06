@@ -1,5 +1,5 @@
 name: Issue Report
-about: Report a problem
+description: Report a problem
 body:
   - type: markdown
     attributes:
