@@ -150,7 +150,7 @@ function devserver(...args) {
 }
 
 function changelog(pkg, since) {
-  let commits = run("git", ["log", "--format=%B", "--reverse", since + "..main"], pkg.dir)
+  let commits = run("git", ["log", "--format=%B%n", "--reverse", since + "..main"], pkg.dir)
   let result = {fix: [], feature: [], breaking: []}
   let re = /\n\r?\n(BREAKING|FIX|FEATURE):\s*([^]*?)(?=\r?\n\r?\n|\r?\n?$)/g, match
   while (match = re.exec(commits)) result[match[1].toLowerCase()].push(match[2].replace(/\r?\n/g, " "))
