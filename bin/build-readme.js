@@ -11,8 +11,10 @@ exports.buildReadme = function(pkg) {
     let sibling = type.typeSource && core.find(name => type.typeSource.startsWith("../" + name + "/"))
     if (sibling) return "https://codemirror.net/docs/ref#" + sibling + "." + type.type
   }, type => {
-    if (/\blezer[\/-]tree\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#tree.${type.type}`
-    if (/\blezer\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#lezer.${type.type}`
+    if (/\blezer\/tree\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#tree.${type.type}`
+    if (/\blezer\/common\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#common.${type.type}`
+    if (/\blezer\/lr\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#lr.${type.type}`
+    if (/\blezer\/markdown\b/.test(type.typeSource)) return `https://github.com/lezer-parser/markdown#user-content-${type.type.toLowerCase()}`
     if (/\bstyle-mod\b/.test(type.typeSource)) return "https://github.com/marijnh/style-mod#documentation"
   }, browserImports]
 
