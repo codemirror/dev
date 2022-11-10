@@ -28,7 +28,8 @@ exports.nonCore = [
   "lang-lezer",
   "lang-wast",
   "legacy-modes",
-  "theme-one-dark"
+  "theme-one-dark",
+  "merge"
 ]
 
 exports.all = exports.core.concat(exports.nonCore)

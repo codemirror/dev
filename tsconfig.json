@@ -20,6 +20,7 @@
       "@codemirror/search": ["./search/src/search.ts"],
       "@codemirror/lint": ["./lint/src/lint.ts"],
       "@codemirror/autocomplete": ["./autocomplete/src/index.ts"],
+      "@codemirror/merge": ["./merge/src/index.ts"],
       "codemirror": ["./codemirror/src/codemirror.ts"],
       "@codemirror/lang-javascript": ["./lang-javascript/src/index.ts"],
       "@codemirror/lang-java": ["./lang-java/src/java.ts"],
