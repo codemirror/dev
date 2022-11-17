@@ -20,6 +20,7 @@ function start() {
     build,
     devserver,
     release,
+    unreleased,
     install,
     clean,
     commit,
@@ -265,6 +266,14 @@ function editReleaseNotes(notes) {
   if (!/\S/.test(edited)) process.exit(0)
   let split = /^(.*)\n+([^]*)/.exec(edited)
   return {head: split[1] + "\n\n", body: split[2]}
+}
+
+function unreleased() {
+  for (let pkg of packages) {
+    let ver = version(pkg), changes = changelog(pkg, ver)
+    if (changes.fix.length || changes.feature.length || changes.breaking.length)
+      console.log(pkg.name + ":\n\n", releaseNotes(changes, ver).body)
+  }
 }
 
 function clean() {
