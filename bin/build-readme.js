@@ -37,7 +37,7 @@ exports.buildReadme = function(pkg) {
     }
     template += "\n$$$"
   } else {
-    let placeholders = /\n@[^]*@\w+|\n@\w+/.exec(template)
+    let placeholders = /(^|\n)@[^]*@\w+|\n@\w+/.exec(template)
     html = build({
       mainText: placeholders[0],
       name: pkg.name,
