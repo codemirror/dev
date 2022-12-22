@@ -30,6 +30,7 @@ package-lock.json
 /lang-markdown
 /lang-lezer
 /lang-wast
+/lang-angular
 /legacy-modes
 /theme-one-dark
 .tern-*

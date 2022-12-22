@@ -36,6 +36,7 @@
       "@codemirror/lang-lezer": ["./lang-lezer/src/index.ts"],
       "@codemirror/lang-php": ["./lang-php/src/php.ts"],
       "@codemirror/lang-wast": ["./lang-wast/src/wast.ts"],
+      "@codemirror/lang-angular": ["./lang-wast/src/angular.ts"],
       "@codemirror/theme-one-dark": ["./theme-one-dark/src/one-dark.ts"]
     }
   },

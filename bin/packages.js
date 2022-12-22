@@ -27,6 +27,7 @@ exports.nonCore = [
   "lang-markdown",
   "lang-lezer",
   "lang-wast",
+  "lang-angular",
   "legacy-modes",
   "theme-one-dark",
   "merge"
