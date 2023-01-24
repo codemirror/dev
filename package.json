@@ -6,7 +6,7 @@
     "prepare": "node bin/cm.js build",
     "dev": "node bin/cm.js devserver"
   },
-  "author": "Marijn Haverbeke <marijnh@gmail.com>",
+  "author": "Marijn Haverbeke <marijn@haverbeke.berlin>",
   "license": "MIT",
   "devDependencies": {
     "@codemirror/buildhelper": "^0.1.5",

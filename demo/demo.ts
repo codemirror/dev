@@ -1,11 +1,9 @@
-import {EditorView, basicSetup} from "codemirror"
-import {javascript} from "@codemirror/lang-javascript"
+import {basicSetup, EditorView} from "codemirror"
+import {markdown} from "@codemirror/lang-markdown"
+import {placeholder} from "@codemirror/view"
 
 ;(window as any).view = new EditorView({
-  doc: 'console.log("Hello world")',
-  extensions: [
-    basicSetup,
-    javascript(),
-  ],
-  parent: document.querySelector("#editor")!
+  doc: "",
+  extensions: [basicSetup, markdown(), placeholder("Hello")],
+  parent: document.body
 })
