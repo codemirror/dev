@@ -32,6 +32,8 @@ package-lock.json
 /lang-wast
 /lang-angular
 /lang-vue
+/lang-sass
+/lang-jinja2
 /legacy-modes
 /theme-one-dark
 .tern-*
