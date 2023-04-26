@@ -38,6 +38,8 @@
       "@codemirror/lang-wast": ["./lang-wast/src/wast.ts"],
       "@codemirror/lang-angular": ["./lang-angular/src/angular.ts"],
       "@codemirror/lang-vue": ["./lang-vue/src/vue.ts"],
+      "@codemirror/lang-sass": ["./lang-sass/src/sass.ts"],
+      "@codemirror/lang-less": ["./lang-less/src/less.ts"],
       "@codemirror/theme-one-dark": ["./theme-one-dark/src/one-dark.ts"]
     }
   },
