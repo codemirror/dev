@@ -1,7 +1,7 @@
 // Function to build github-proof readmes that contain the package's API
 // docs as HTML.
 
-const {core, nonCore} = require("./packages")
+const {core} = require("./packages")
 const {gather, gatherMany} = require("getdocs-ts")
 const {build, browserImports} = require("builddocs")
 const {join} = require("path"), fs = require("fs")
