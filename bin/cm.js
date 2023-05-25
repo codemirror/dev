@@ -114,7 +114,7 @@ function status() {
 async function build() {
   console.info("Building...")
   let t0 = Date.now()
-  await require("@codemirror/buildhelper").build(buildPackages.map(p => p.main))
+  await require("@marijn/buildtool").build(buildPackages.map(p => p.main), require("@codemirror/buildhelper/src/options").options)
   console.info(`Done in ${((Date.now() - t0) / 1000).toFixed(2)}s`)
 }
 
@@ -128,7 +128,7 @@ function startServer() {
   })
   require("http").createServer((req, resp) => {
     if (/^\/test\/?($|\?)/.test(req.url)) {
-      let runTests = require("@codemirror/buildhelper/src/runtests")
+      let runTests = require("@marijn/testtool")
       let {browserTests} = runTests.gatherTests(buildPackages.map(p => p.dir))
       resp.writeHead(200, {"content-type": "text/html"})
       resp.end(runTests.testHTML(browserTests.map(f => path.relative(serve, f)), false))
@@ -144,9 +144,10 @@ function startServer() {
 
 function devserver(...args) {
   let options = {
-    sourceMap : args.includes('--source-map')
+    sourceMap : args.includes('--source-map'),
+    ...require("@codemirror/buildhelper/src/options").options
   }
-  require("@codemirror/buildhelper").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")], options)
+  require("@marijn/buildtool").watch(buildPackages.map(p => p.main).filter(f => f), [join(root, "demo/demo.ts")], options)
   startServer()
 }
 
@@ -339,7 +340,7 @@ function buildReadme(name) {
 }
 
 function test(...args) {
-  let runTests = require("@codemirror/buildhelper/src/runtests")
+  let runTests = require("@marijn/testtool")
   let {tests, browserTests} = runTests.gatherTests(buildPackages.map(p => p.dir))
   let browsers = [], grep, noBrowser = false
   for (let i = 0; i < args.length; i++) {
