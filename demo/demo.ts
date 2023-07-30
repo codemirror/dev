@@ -7,5 +7,5 @@ import {javascript} from "@codemirror/lang-javascript"
     basicSetup,
     javascript(),
   ],
-  parent: document.querySelector("#editor")!
+  parent: document.body
 })
