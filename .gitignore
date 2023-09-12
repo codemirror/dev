@@ -32,6 +32,7 @@ package-lock.json
 /lang-wast
 /lang-angular
 /lang-vue
+/lang-liquid
 /lang-sass
 /lang-jinja2
 /lang-less

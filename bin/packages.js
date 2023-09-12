@@ -30,6 +30,7 @@ exports.nonCore = [
   "lang-wast",
   "lang-angular",
   "lang-vue",
+  "lang-liquid",
   "lang-less",
   "legacy-modes",
   "theme-one-dark",
