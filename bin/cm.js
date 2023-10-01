@@ -225,6 +225,8 @@ function release(...args) {
   }
   if (!pkgName || !(pkg = packageNames[pkgName])) help(1)
 
+  run("git", ["pull"], pkg.dir)
+
   let {changes, newVersion} = doRelease(pkg, setVersion, {edit})
 
   // Turned off for now, since this creates a huge mess on accidental
