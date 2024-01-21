@@ -32,6 +32,7 @@ exports.nonCore = [
   "lang-vue",
   "lang-liquid",
   "lang-less",
+  "lang-yaml",
   "legacy-modes",
   "theme-one-dark",
   "merge"

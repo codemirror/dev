@@ -41,6 +41,7 @@
       "@codemirror/lang-liquid": ["./lang-vue/src/liquid.ts"],
       "@codemirror/lang-sass": ["./lang-sass/src/sass.ts"],
       "@codemirror/lang-less": ["./lang-less/src/less.ts"],
+      "@codemirror/lang-yaml": ["./lang-less/src/yaml.ts"],
       "@codemirror/theme-one-dark": ["./theme-one-dark/src/one-dark.ts"]
     }
   },

@@ -36,6 +36,7 @@ package-lock.json
 /lang-sass
 /lang-jinja2
 /lang-less
+/lang-yaml
 /legacy-modes
 /theme-one-dark
 .tern-*
