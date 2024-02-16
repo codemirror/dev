@@ -19,6 +19,7 @@ exports.nonCore = [
   "lang-cpp",
   "lang-php",
   "lang-python",
+  "lang-go",
   "lang-css",
   "lang-sass",
   "lang-html",

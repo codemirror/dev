@@ -21,6 +21,7 @@ package-lock.json
 /lang-json
 /lang-cpp
 /lang-python
+/lang-go
 /lang-css
 /lang-html
 /lang-php

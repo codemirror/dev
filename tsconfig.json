@@ -27,6 +27,7 @@
       "@codemirror/lang-json": ["./lang-json/src/json.ts"],
       "@codemirror/lang-cpp": ["./lang-cpp/src/cpp.ts"],
       "@codemirror/lang-python": ["./lang-python/src/python.ts"],
+      "@codemirror/lang-go": ["./lang-go/src/index.ts"],
       "@codemirror/lang-css": ["./lang-css/src/css.ts"],
       "@codemirror/lang-html": ["./lang-html/src/html.ts"],
       "@codemirror/lang-sql": ["./lang-sql/src/sql.ts"],
@@ -41,7 +42,7 @@
       "@codemirror/lang-liquid": ["./lang-vue/src/liquid.ts"],
       "@codemirror/lang-sass": ["./lang-sass/src/sass.ts"],
       "@codemirror/lang-less": ["./lang-less/src/less.ts"],
-      "@codemirror/lang-yaml": ["./lang-less/src/yaml.ts"],
+      "@codemirror/lang-yaml": ["./lang-yaml/src/yaml.ts"],
       "@codemirror/theme-one-dark": ["./theme-one-dark/src/one-dark.ts"]
     }
   },
