@@ -1,20 +1,16 @@
-name: main
-on: [push, repository_dispatch]
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    name: Build and test
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ github.token }}
-
-      - uses: actions/checkout@v1
-
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '16.4'
-
-      - run: node bin/cm.js install
-
-      - run: npm test
+name main
+on [push, repository_dispatch]
+jobs
+  buildand test
+    runs on ubuntu latest
+    namenBuild and test
+    steps
+    uses styfle/cancel workflow action@0.9.1
+        with
+      access_token github.token 
+ uses actions/checkout@v1
+  uses actions/setup node@v2
+       with
+          node version 16.4
+   run node bin/cm js install
+ run npm test
