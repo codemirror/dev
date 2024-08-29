@@ -131,7 +131,11 @@ function startServer() {
       let runTests = require("@marijn/testtool")
       let {browserTests} = runTests.gatherTests(buildPackages.map(p => p.dir))
       resp.writeHead(200, {"content-type": "text/html"})
-      resp.end(runTests.testHTML(browserTests.map(f => path.relative(serve, f)), false))
+      resp.end(runTests.testHTML(browserTests.map(f => path.relative(serve, f)), {
+        html: `<title>CM6 view tests</title>
+<h1>CM6 view tests</h1>
+<div id="workspace" style="opacity: 0; position: fixed; top: 0; left: 0; width: 20em;"></div>`
+      }))
     } else {
       moduleserver.handleRequest(req, resp) || serveStatic(req, resp, _err => {
         resp.statusCode = 404

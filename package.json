@@ -9,7 +9,7 @@
   "author": "Marijn Haverbeke <marijn@haverbeke.berlin>",
   "license": "MIT",
   "devDependencies": {
-    "@codemirror/buildhelper": "^1.0.0",
+    "@codemirror/buildhelper": "^1.0.2",
     "esmoduleserve": "^0.2.0",
     "serve-static": "^1.14.1",
     "getdocs-ts": "^1.0.0",
