@@ -1,13 +1,11 @@
 import {EditorView, basicSetup} from "codemirror"
+import {javascript} from "@codemirror/lang-javascript"
 
-let doc = ""
-for (let i = 0; i <= 1245526; i++) doc += String.fromCharCode("a".charCodeAt(0) + Math.floor(Math.random() * 26))
-
-let view = (window as any).view = new EditorView({
-  doc,
-  extensions: basicSetup,
+;(window as any).view = new EditorView({
+  doc: 'console.log("Hello world")',
+  extensions: [
+    basicSetup,
+    javascript(),
+  ],
   parent: document.body
 })
-
-console.log("---")
-view.dispatch({selection: {anchor: view.state.doc.length}, scrollIntoView: true})
