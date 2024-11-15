@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v2
         with:
-          node-version: '16.4'
+          node-version: '22.11.0'
 
       - run: node bin/cm.js install
 
