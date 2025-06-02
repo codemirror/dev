@@ -44,6 +44,7 @@
       "@codemirror/lang-sass": ["./lang-sass/src/sass.ts"],
       "@codemirror/lang-less": ["./lang-less/src/less.ts"],
       "@codemirror/lang-yaml": ["./lang-yaml/src/yaml.ts"],
+      "@codemirror/lang-jinja": ["./lang-jinja/src/jinja.ts"],
       "@codemirror/theme-one-dark": ["./theme-one-dark/src/one-dark.ts"]
     }
   },

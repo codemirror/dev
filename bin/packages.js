@@ -34,6 +34,7 @@ exports.nonCore = [
   "lang-liquid",
   "lang-less",
   "lang-yaml",
+  "lang-jinja",
   "legacy-modes",
   "theme-one-dark",
   "merge",
