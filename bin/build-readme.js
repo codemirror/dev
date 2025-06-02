@@ -16,6 +16,10 @@ exports.buildReadme = function(pkg) {
     if (/\blezer\/lr\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#lr.${type.type}`
     if (/\blezer\/markdown\b/.test(type.typeSource)) return `https://github.com/lezer-parser/markdown#user-content-${type.type.toLowerCase()}`
     if (/\bstyle-mod\b/.test(type.typeSource)) return "https://github.com/marijnh/style-mod#documentation"
+    if (/\bvscode-languageserver-/.test(type.typeSource))
+      return `https://microsoft.github.io/language-server-protocol/specifications/specification-current#` +
+        type.type[0].toLowerCase() + type.type.slice(1)
+    if (type.type == "TextEdit") console.log(type.typeSource, type.type)
   }, browserImports]
 
   let template = fs.readFileSync(join(pkg.dir, pkg.name == "legacy-modes" ? "mode" : "src", "README.md"), "utf8")
