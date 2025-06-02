@@ -36,7 +36,8 @@ exports.nonCore = [
   "lang-yaml",
   "legacy-modes",
   "theme-one-dark",
-  "merge"
+  "merge",
+  "lsp-client"
 ]
 
 exports.all = exports.core.concat(exports.nonCore)

@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "lib": ["es6", "dom", "scripthost"],
+    "lib": ["es2018", "dom", "scripthost"],
     "types": ["mocha"],
     "stripInternal": true,
     "typeRoots": ["./node_modules/@types"],
     "noUnusedLocals": true,
     "strict": true,
-    "target": "es6",
+    "target": "es2018",
     "module": "es2020",
     "newLine": "lf",
     "moduleResolution": "node",
@@ -21,6 +21,7 @@
       "@codemirror/lint": ["./lint/src/lint.ts"],
       "@codemirror/autocomplete": ["./autocomplete/src/index.ts"],
       "@codemirror/merge": ["./merge/src/index.ts"],
+      "@codemirror/lsp-client": ["./lsp-client/src/index.ts"],
       "codemirror": ["./codemirror/src/codemirror.ts"],
       "@codemirror/lang-javascript": ["./lang-javascript/src/index.ts"],
       "@codemirror/lang-java": ["./lang-java/src/java.ts"],

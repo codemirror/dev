@@ -16,6 +16,7 @@ package-lock.json
 /autocomplete
 /codemirror
 /merge
+/lsp-client
 /lang-javascript
 /lang-java
 /lang-json
