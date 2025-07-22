@@ -10,6 +10,8 @@ exports.core = [
   "lint",
   "collab",
   "language-data",
+  "merge",
+  "lsp-client",
   "codemirror",
 ]
 exports.nonCore = [
@@ -36,9 +38,7 @@ exports.nonCore = [
   "lang-yaml",
   "lang-jinja",
   "legacy-modes",
-  "theme-one-dark",
-  "merge",
-  "lsp-client"
+  "theme-one-dark"
 ]
 
 exports.all = exports.core.concat(exports.nonCore)
