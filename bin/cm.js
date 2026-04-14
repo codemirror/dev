@@ -79,7 +79,7 @@ function assertInstalled() {
 }
 
 function install(arg = null) {
-  let base = arg == "--ssh" ? "git@github.com:codemirror/" : "https://github.com/codemirror/"
+  let base = arg == "--ssh" ? "git@code.haverbeke.berlin:codemirror/" : "https://code.haverbeke.berlin/codemirror/"
   if (arg && arg != "--ssh") help(1)
 
   for (let pkg of packages) {

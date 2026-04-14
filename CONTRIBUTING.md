@@ -12,7 +12,7 @@ the [discuss.CodeMirror forum](http://discuss.codemirror.net).
 ## Submitting bug reports
 
 Report bugs on the
-[GitHub issue tracker](http://github.com/codemirror/dev/issues).
+[issue tracker](https://code.haverbeke.berlin/codemirror/dev/issues).
 Before reporting a bug, please read these pointers.
 
 - The issue tracker is for *bugs*, not requests for help. Questions
@@ -40,13 +40,16 @@ Code written by "AI" language models (either partially or fully) is
 copyrighted content, and because it tends to be of low quality and a
 waste of time to review.
 
-- Make sure you have a [GitHub Account](https://github.com/signup/free)
+- Make sure you have a [Codeberg](https://codeberg.org/user/sign_up)
+  or [GitHub](https://github.com/signup/free) account.
+  
+- Use that to create a [code.haverbeke.berlin
+  account](https://code.haverbeke.berlin/user/login).
 
-- Fork the relevant repository
-  ([how to fork a repo](https://help.github.com/articles/fork-a-repo))
+- Fork the relevant repository.
 
 - Create a local checkout of the code. You can use the
-  [dev repository](https://github.com/codemirror/dev) to
+  [dev repository](https://code.haverbeke.berlin/codemirror/dev) to
   easily check out all core modules.
 
 - Make your changes, and commit them
@@ -59,13 +62,13 @@ waste of time to review.
 
 - Make sure all tests pass. Run `npm run test` to verify tests pass.
 
-- Submit a pull request ([how to create a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)).
-  Don't put more than one feature/fix in a single pull request.
+- Submit a pull request. Don't put more than one feature/fix in a
+  single pull request.
 
 By contributing code to CodeMirror you
 
  - Agree to license the contributed code under the project's [MIT
-   license](https://github.com/CodeMirror/dev/blob/main/LICENSE).
+   license](https://code.haverbeke.berlin/codemirror/dev/src/branch/main/LICENSE).
 
  - Confirm that you have the right to contribute and license the code
    in question. (Either you hold all rights on the code, or the rights
@@ -88,8 +91,8 @@ By contributing code to CodeMirror you
 - Brace-less single-statement bodies are encouraged (whenever they
   don't impact readability).
 
-- [getdocs](https://github.com/marijnh/getdocs-ts)-style doc comments
-  above items that are part of the public API.
+- [getdocs](https://code.haverbeke.berlin/marijn/getdocs-ts)-style doc
+  comments above items that are part of the public API.
 
 - CodeMirror does *not* follow JSHint or JSLint prescribed style.
   Patches that try to 'fix' code to pass one of these linters will not

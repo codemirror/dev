@@ -14,8 +14,8 @@ exports.buildReadme = function(pkg) {
     if (/\blezer\/tree\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#tree.${type.type}`
     if (/\blezer\/common\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#common.${type.type}`
     if (/\blezer\/lr\b/.test(type.typeSource)) return `https://lezer.codemirror.net/docs/ref/#lr.${type.type}`
-    if (/\blezer\/markdown\b/.test(type.typeSource)) return `https://github.com/lezer-parser/markdown#user-content-${type.type.toLowerCase()}`
-    if (/\bstyle-mod\b/.test(type.typeSource)) return "https://github.com/marijnh/style-mod#documentation"
+    if (/\blezer\/markdown\b/.test(type.typeSource)) return `https://code.haverbeke.berlin/lezer/markdown#user-content-${type.type.toLowerCase()}`
+    if (/\bstyle-mod\b/.test(type.typeSource)) return "https://code.haverbeke.berlin/marijn/style-mod#documentation"
     if (/\bvscode-languageserver-/.test(type.typeSource))
       return `https://microsoft.github.io/language-server-protocol/specifications/specification-current#` +
         type.type[0].toLowerCase() + type.type.slice(1)

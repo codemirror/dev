@@ -1,6 +1,8 @@
 # CodeMirror
 
-[![Build Status](https://github.com/codemirror/dev/workflows/main/badge.svg)](https://github.com/codemirror/codemirror.next/actions)
+[ [**WEBSITE**](https://codemirror.net/) | [**DOCS**](https://codemirror.net/docs/ref/#view) | [**ISSUES**](https://code.haverbeke.berlin/codemirror/dev/issues) | [**FORUM**](https://discuss.codemirror.net/) ]
+
+<!-- [![Build Status](https://github.com/codemirror/dev/workflows/main/badge.svg)](https://github.com/codemirror/codemirror.next/actions) -->
 
 This is the central repository for [CodeMirror](https://codemirror.net/). It holds the bug tracker and development scripts.
 
